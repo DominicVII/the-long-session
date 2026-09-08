@@ -756,13 +756,20 @@ body.is-bare .unbare:hover{background:rgba(16,19,25,.95)}
 
 <div class="veil" id="veil"><div class="card" id="card"></div></div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<!-- Offline-first Three.js: local vendor copy, CDN only if missing -->
+<script src="vendor/three.min.js"></script>
+<script>
+if(!window.THREE){
+  document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"><\/script>');
+}
+</script>
+<script src="collab/proxy.js"></script>
 <script>
 (function(){
 "use strict";
 const el = id => document.getElementById(id);
 if(!window.THREE){
-  el("boot").textContent = "The 3D library did not load. Reload the page to try again.";
+  el("boot").textContent = "The 3D library did not load. Check vendor/three.min.js or your network, then reload.";
   return;
 }
 
@@ -1006,7 +1013,8 @@ const G = {
   states:[], prog:{active:null, doneList:[]}, mapSel:null, lobbies:[], lastTick:-1, doorGrace:0,
   money:{index:100, hist:[100]}, history:[], events:[], own:null, make:null, country:null,
   relics:[], relicSpots:{},
-  feed:[], moving:false, lastAuto:-1
+  feed:[], moving:false, lastAuto:-1,
+  gfx:"balanced", simple:false, plainSit:false
 };
 /* A body, not a cursor: velocity carries, turns ease in and out, and the
    head keeps moving a little even when the feet have stopped. */
@@ -1412,6 +1420,11 @@ function partyLine(bill){
   return {FED: fedFit > 0 ? 1 : -1, COM: fedFit > 0 ? -1 : 1, IND: 0};
 }
 function memberVote(m, bill){
+  /* COLLAB HOOK: absent partner uses ProxyAI from their action log */
+  if(typeof TLSCollab !== "undefined" && TLSCollab.shouldProxy(m)){
+    const pv = TLSCollab.proxyVote(m, bill);
+    if(pv === 1 || pv === -1) return pv;
+  }
   if(m.pledge && G.day - m.pledgeDay < 8){
     const line = partyLine(bill)[m.party];
     const strain = (line !== 0 && line !== m.pledge) ? m.traits.loyalty - 45 : -100;
@@ -1687,47 +1700,32 @@ renderer.debug.onShaderError = function(gl, prog, vs, fs){
   const log = gl.getProgramInfoLog(prog) || "";
   const v = gl.getShaderInfoLog(vs) || "", f = gl.getShaderInfoLog(fs) || "";
   SHADER_TROUBLE = (log + " " + v + " " + f).trim().slice(0, 300) || "unknown shader failure";
-  if(!G.simple){
+  if(G.gfx !== "simple"){
+    G.gfx = "simple";
     G.simple = true;
-    try{ applySimple(); }catch(e){}
+    try{ applyQuality(); }catch(e){}
     try{ feed("This machine could not build one of the shaders — switched to simple graphics."); }catch(e){}
     try{ note("Graphics dropped to simple: " + SHADER_TROUBLE, true); }catch(e){}
   }
 };
-/* Simple graphics: no shadow pass, one practical, and detail dropped
-   sooner. It is the same game; it just asks less of the driver. */
-/* How many people it takes before the room is treated as a crowd. */
-const SAFE_CROWD = 6;
+/* Graphics quality: Best / Balanced / Simple. Crowd mode only
+   nudges LODs and seated poses — it must never flip shadowMap.enabled,
+   because that forces shader recompiles and stutters. */
+let PEOPLE_CAST_SHADOW = false;
+let SHADOW_SKIP = 0.14;
+let GFX_EXPOSE = 1.0, GFX_HEMI = 1.0, GFX_SUN = 1.0;
+let GFX_PR = 2.0;
+let LOD_NEAR = 5.0, LOD_MID = 11.0, LOD_FAR = 16.0;
 let crowdSafe = false, crowdT = 0;
-/* Watch the room, and drop into the plain path while it is full. */
-function crowdWatch(dt){
-  crowdT -= dt;
-  if(crowdT > 0) return;
-  crowdT = 1.0;
-  if(G.simple) return;                 /* already plain, by choice */
-  const n2 = peopleGroup ? peopleGroup.children.length : 0;
-  const want = n2 > SAFE_CROWD;
-  if(want === crowdSafe) return;
-  crowdSafe = want;
-  applySimple();
-  if(want) feed("A full room — drawing it the plain way.");
+function migrateGfx(){
+  /* Missing gfx: keep Best only if they already saved it; otherwise Balanced.
+     Legacy simple flag still maps to Simple. */
+  if(G.gfx !== "best" && G.gfx !== "balanced" && G.gfx !== "simple"){
+    G.gfx = (G.simple === true) ? "simple" : "balanced";
+  }
+  G.simple = (G.gfx === "simple");
 }
-function applySimple(){
-  /* plain either because you asked for it, or because the room is full */
-  const on = !!G.simple || crowdSafe;
-  renderer.shadowMap.enabled = !on;
-  if(sun) sun.castShadow = !on;
-  /* the seated pose is the most demanding thing done to a body, so it
-     is the first thing to go when the room is being kept simple */
-  G.plainSit = on;
-  /* this can run before there is anybody to stand up */
-  if(on && G.members) try{ everyone().forEach(m => { m.sitting = false; }); }catch(e){}
-  LOD_NEAR = on ? 3.0 : 5.0;
-  LOD_MID  = on ? 6.0 : 11.0;
-  LOD_FAR  = on ? 9.0 : 16.0;
-  /* force every body to re-decide what it is showing, and in simple
-     mode let every matrix update itself again — if the freezing is
-     what is breaking the bodies, this is the switch that proves it */
+function refreshBodyLods(){
   if(G.members) try{
     everyone().forEach(p => {
       const g = p.mesh;
@@ -1738,16 +1736,102 @@ function applySimple(){
     });
   }catch(e){}
   try{ roomGroup.updateMatrixWorld(true); }catch(e){}
+}
+/* Crowd hysteresis: enter when > 7, leave only when < 4. */
+function crowdWatch(dt){
+  crowdT -= dt;
+  if(crowdT > 0) return;
+  crowdT = 1.0;
+  if(G.gfx === "simple") return;       /* already plain, by choice */
+  const n2 = peopleGroup ? peopleGroup.children.length : 0;
+  let want = crowdSafe;
+  if(n2 > 7) want = true;
+  else if(n2 < 4) want = false;
+  if(want === crowdSafe) return;
+  crowdSafe = want;
+  applyCrowd();
+  if(want) feed("A full room — drawing people a little plainer for now.");
+}
+/* LOD / seated-pose / pixel-ratio only. Never touches shadowMap.enabled. */
+function applyCrowd(){
+  const q = G.gfx || "balanced";
+  if(q === "simple"){
+    LOD_NEAR = 3.0; LOD_MID = 6.0; LOD_FAR = 9.0;
+    G.plainSit = true;
+    renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.25));
+  } else if(crowdSafe){
+    LOD_NEAR = 3.5; LOD_MID = 7.0; LOD_FAR = 11.0;
+    G.plainSit = true;
+    const prCap = q === "best" ? Math.min(GFX_PR, 1.75) : Math.min(GFX_PR, 1.5);
+    renderer.setPixelRatio(Math.min(devicePixelRatio || 1, prCap));
+  } else {
+    if(q === "best"){ LOD_NEAR = 6.0; LOD_MID = 13.0; LOD_FAR = 20.0; }
+    else { LOD_NEAR = 5.0; LOD_MID = 11.0; LOD_FAR = 16.0; }
+    G.plainSit = !!G.noSit;
+    renderer.setPixelRatio(Math.min(devicePixelRatio || 1, GFX_PR));
+  }
+  if(G.plainSit && G.members) try{ everyone().forEach(m => { m.sitting = false; }); }catch(e){}
+  refreshBodyLods();
   lightKey = "";
 }
-let LOD_NEAR = 5.0, LOD_MID = 11.0, LOD_FAR = 16.0;
+/* User graphics change (or shader-failure fallback) — only path that
+   may toggle renderer.shadowMap.enabled. */
+function applyQuality(){
+  migrateGfx();
+  const q = G.gfx;
+  if(q === "simple"){
+    renderer.shadowMap.enabled = false;
+    if(sun) sun.castShadow = false;
+    if(sun) sun.shadow.mapSize.set(512, 512);
+    GFX_PR = 1.25; GFX_EXPOSE = 1.0; GFX_HEMI = 1.0; GFX_SUN = 1.0;
+    PEOPLE_CAST_SHADOW = false; SHADOW_SKIP = 0.14;
+  } else if(q === "balanced"){
+    renderer.shadowMap.enabled = true;
+    if(sun){ sun.castShadow = true; sun.shadow.mapSize.set(1024, 1024); }
+    GFX_PR = 2.0; GFX_EXPOSE = 1.0; GFX_HEMI = 1.0; GFX_SUN = 1.0;
+    PEOPLE_CAST_SHADOW = false; SHADOW_SKIP = 0.14;
+  } else {
+    /* Best: room shadows at 1024, no people cast (people-cast was the lag spike). */
+    renderer.shadowMap.enabled = true;
+    if(sun){ sun.castShadow = true; sun.shadow.mapSize.set(1024, 1024); }
+    GFX_PR = 2.0; GFX_EXPOSE = 1.15; GFX_HEMI = 1.06; GFX_SUN = 1.05;
+    PEOPLE_CAST_SHADOW = false; SHADOW_SKIP = 0.14;
+  }
+  if(sun && sun.shadow && sun.shadow.map){
+    try{ sun.shadow.map.dispose(); }catch(e){}
+    sun.shadow.map = null;
+  }
+  renderer.shadowMap.needsUpdate = true;
+  /* mid-session quality flips must update bodies already built */
+  if(typeof peopleGroup !== "undefined" && peopleGroup) try{
+    peopleGroup.traverse(o => {
+      if(o.isMesh && o.castShadow !== undefined){
+        /* leave intentionally non-casting detail (buttons) alone if already false
+           and mesh is tiny — only promote/demote primary casters by flag */
+        if(PEOPLE_CAST_SHADOW){
+          if(o.geometry){
+            if(!o.geometry.boundingSphere) o.geometry.computeBoundingSphere();
+            const bs = o.geometry.boundingSphere;
+            const sc = Math.max(Math.abs(o.scale.x), Math.abs(o.scale.y), Math.abs(o.scale.z)) || 1;
+            if(bs && bs.radius * sc < 0.09) o.castShadow = false;
+            else o.castShadow = true;
+          } else o.castShadow = true;
+        } else {
+          o.castShadow = false;
+        }
+      }
+    });
+  }catch(e){}
+  applyCrowd();
+}
+function applySimple(){ applyQuality(); }
 renderer.shadowMap.autoUpdate = false;
 
 renderer.shadowMap.needsUpdate = true;
 let shadowT = 0;
 function shadowTick(dt){
   shadowT -= dt;
-  if(shadowT <= 0){ shadowT = 1/32; renderer.shadowMap.needsUpdate = true; }
+  if(shadowT <= 0){ shadowT = 1/20; renderer.shadowMap.needsUpdate = true; }
 }
 
 sceneEl.appendChild(renderer.domElement);
@@ -2154,11 +2238,13 @@ const FACECACHE = new Map();
 function faceCanvas(L){
   const _fk = [L.skin,L.hair,L.eye,L.beard?1:0].join("_");
   if(FACECACHE.has(_fk)) return FACECACHE.get(_fk);
-  const S = 320;
+  const S = 192;   /* was 320 — smaller atlas, cheaper upload + less fill */
   const c = document.createElement("canvas"); c.width = c.height = S;
   const x = c.getContext("2d");
   const skin = "#" + L.skin.toString(16).padStart(6,"0");
   const shade = (a) => "rgba(0,0,0," + a + ")";
+  /* Base MUST match skeleton/skull material color (L.skin) so the wrap
+     dissolves into the same tone with no foreign tint under the features. */
   x.fillStyle = skin; x.fillRect(0,0,S,S);
   /* subsurface warmth through the middle of the face */
   let g = x.createRadialGradient(S*0.5,S*0.60,S*0.05, S*0.5,S*0.55,S*0.55);
@@ -2237,19 +2323,10 @@ function faceCanvas(L){
     x.beginPath(); x.ellipse(S*0.5, S*0.80, S*0.20, S*0.15, 0,0,6.3); x.fill();
     x.globalAlpha = 1;
   }
-  /* Feather the edge to nothing so the painted face wraps into the skull
-     instead of ending on a visible rim. */
-  const fade = x.createRadialGradient(S*0.5,S*0.5,S*0.30, S*0.5,S*0.5,S*0.52);
-  fade.addColorStop(0,"rgba(0,0,0,1)");
-  fade.addColorStop(0.72,"rgba(0,0,0,1)");
-  fade.addColorStop(1,"rgba(0,0,0,0)");
-  x.globalCompositeOperation = "destination-in";
-  x.fillStyle = fade; x.fillRect(0,0,S,S);
-  x.globalCompositeOperation = "source-over";
-  /* skin detail: pores, a few creases, stubble where there is any */
-  for(let i=0;i<5200;i++){
+  /* Detail before the alpha fade so pores/stubble never re-opaque the rim. */
+  for(let i=0;i<800;i++){
     x.fillStyle = "rgba(0,0,0," + (Math.random()*0.05) + ")";
-    x.fillRect(Math.random()*S, Math.random()*S, 1.6, 1.6);
+    x.fillRect(Math.random()*S, Math.random()*S, 1.2, 1.2);
   }
   x.strokeStyle = "rgba(70,40,28,.14)"; x.lineWidth = S*0.004;
   [-1,1].forEach(s2 => {                       /* nasolabial folds */
@@ -2261,15 +2338,34 @@ function faceCanvas(L){
   x.beginPath(); x.moveTo(S*0.38, S*0.335);    /* a line across the brow */
   x.quadraticCurveTo(S*0.5, S*0.318, S*0.62, S*0.335); x.stroke();
   if(L.beard){
-    for(let i=0;i<3000;i++){
+    for(let i=0;i<480;i++){
       const px = S*0.5 + (Math.random()-0.5)*S*0.44, py = S*0.70 + Math.random()*S*0.22;
       x.fillStyle = "rgba(" + rint(20,60) + "," + rint(14,44) + "," + rint(10,34) + ",.35)";
-      x.fillRect(px, py, 1.6, 2.2);
+      x.fillRect(px, py, 1.2, 1.8);
     }
   }
+  /* Soft skin pull at the rim so leftover feature tint matches the skull. */
+  x.globalCompositeOperation = "source-atop";
+  const rim = x.createRadialGradient(S*0.5,S*0.5,S*0.28, S*0.5,S*0.5,S*0.50);
+  rim.addColorStop(0,"rgba(0,0,0,0)");
+  rim.addColorStop(0.55,"rgba(0,0,0,0)");
+  /* parse L.skin into rgb for a soft multiply-toward-skin */
+  const sr = (L.skin >> 16) & 255, sg2 = (L.skin >> 8) & 255, sb = L.skin & 255;
+  rim.addColorStop(1,"rgba(" + sr + "," + sg2 + "," + sb + ",0.55)");
+  x.fillStyle = rim; x.fillRect(0,0,S,S);
+  x.globalCompositeOperation = "source-over";
+  /* Stronger destination-in feather: decal dissolves into skull skin, no rim. */
+  const fade = x.createRadialGradient(S*0.5,S*0.5,S*0.26, S*0.5,S*0.5,S*0.50);
+  fade.addColorStop(0,"rgba(0,0,0,1)");
+  fade.addColorStop(0.52,"rgba(0,0,0,1)");
+  fade.addColorStop(0.78,"rgba(0,0,0,0.42)");
+  fade.addColorStop(1,"rgba(0,0,0,0)");
+  x.globalCompositeOperation = "destination-in";
+  x.fillStyle = fade; x.fillRect(0,0,S,S);
+  x.globalCompositeOperation = "source-over";
   const t = new THREE.CanvasTexture(c);
   t.encoding = THREE.sRGBEncoding;
-  t.anisotropy = 4;
+  t.anisotropy = 1;
   FACECACHE.set(_fk, t);
   return t;
 }
@@ -2277,7 +2373,7 @@ function faceCanvas(L){
 function faceDome(){
   /* Shallow: it has to match the curve of the skull it sits on, not
      bulge off the front of it. */
-  const g = new THREE.PlaneGeometry(1, 1.24, 22, 26);
+  const g = new THREE.PlaneGeometry(1, 1.24, 14, 16);
   const p = g.attributes.position, v = new THREE.Vector3();
   for(let i=0;i<p.count;i++){
     v.fromBufferAttribute(p, i);
@@ -3139,7 +3235,7 @@ function freezeRoom(){
       const bs = o.geometry.boundingSphere;
       if(bs){
         const sc = Math.max(Math.abs(o.scale.x), Math.abs(o.scale.y), Math.abs(o.scale.z)) || 1;
-        if(bs.radius * sc < 0.14) o.castShadow = false;
+        if(bs.radius * sc < SHADOW_SKIP) o.castShadow = false;
       }
     }
   });
@@ -3194,15 +3290,15 @@ function lightingSlow(){
   LIGHT_DAY = day;
   SUNC.setHSL(lerp(0.13,0.075,gold), lerp(0.25,0.62,gold), lerp(0.93,0.62,gold));
   sun.color.copy(SUNC);
-  sun.intensity = (R.open ? 2.3 : 1.75) * (0.12 + day*0.95);
+  sun.intensity = (R.open ? 2.3 : 1.75) * (0.12 + day*0.95) * GFX_SUN;
   hemi.color.setHSL(0.60, 0.20, lerp(0.30, 0.78, day));
   hemi.groundColor.setHSL(0.08, 0.16, lerp(0.10, 0.30, day));
-  hemi.intensity = R.open ? 0.75 : 0.42 + day*0.22;
+  hemi.intensity = (R.open ? 0.75 : 0.42 + day*0.22) * GFX_HEMI;
   const evening = 1 - day;
   lamp.intensity = R.open ? 0 : 0.35 + evening*1.5;
   fill.intensity = R.open ? 0.1 : 0.2 + evening*0.5;
   if(renderer.capabilities && !renderer.capabilities.floatVertexTextures) fill.intensity *= 0.6;
-  renderer.toneMappingExposure = lerp(0.78, 1.06, day);
+  renderer.toneMappingExposure = lerp(0.78, 1.06, day) * GFX_EXPOSE;
   FOGC.setHSL(0.6, 0.06, lerp(0.06, 0.55, day));
   if(!scene.fog) scene.fog = new THREE.Fog(FOGC.getHex(), 6, 60);
   scene.fog.color.copy(FOGC);
@@ -3264,7 +3360,7 @@ function buildPerson(p){
     const m = new THREE.Mesh(geo, mat);
     m.position.set(x,y,z);
     m.scale.set(sx, sy, sz===undefined ? sx : sz);
-    if(cast !== false) m.castShadow = true;
+    if(cast !== false) m.castShadow = !!PEOPLE_CAST_SHADOW;
     parent.add(m); return m;
   }
 
@@ -3335,7 +3431,7 @@ function buildPerson(p){
   };
   const body = new THREE.SkinnedMesh(built.geo,
     [skinnable(torsoMat), skinnable(legMat), skinnable(skin)]);
-  body.castShadow = true; body.receiveShadow = true;
+  body.castShadow = !!PEOPLE_CAST_SHADOW; body.receiveShadow = true;
   g.add(body);
   /* the root bone belongs to the mesh, and every world matrix must be
      current before the Skeleton takes its inverse bind matrices — bind
@@ -3437,22 +3533,16 @@ function buildPerson(p){
   const skull = new THREE.Mesh(SKULLS[(p.id||0) % SKULLS.length], skin);
   skull.position.set(0, hu*0.46, -hu*0.02);
   skull.scale.set(hu*0.95, hu*1.14, hu*1.02);
-  skull.castShadow = true;
+  skull.castShadow = !!PEOPLE_CAST_SHADOW;
   headG.add(skull);
   /* the painted face, curved onto the front of it */
   if(!p.faceTex) p.faceTex = faceCanvas(L);
-  const faceNM = normalMapFrom(p.faceTex, 1.5);
-  const face = new THREE.Mesh(FACE_DOME, new THREE.MeshPhysicalMaterial({
-    map:p.faceTex, roughness:0.70, metalness:0.0,
-    clearcoat:0.18, clearcoatRoughness:0.58,
+  /* No face normalMap — big CPU/GPU win; map + feather carries the look. */
+  const face = new THREE.Mesh(FACE_DOME, new THREE.MeshStandardMaterial({
+    map:p.faceTex, color:0xffffff, roughness:0.72, metalness:0.0,
     transparent:true, alphaTest:0.02, depthWrite:false,
-    polygonOffset:true, polygonOffsetFactor:-2, polygonOffsetUnits:-2,
-    normalMap:faceNM || null,
-    normalScale:new THREE.Vector2(0.5, 0.5)}));
-  /* the skull's front surface is at about 0.49hu; the dome bulges 0.095hu,
-     so it is seated at 0.40hu to sit just proud of the bone */
-  /* wraps right around onto the cheeks and under the jaw; the alpha fade
-     dissolves the edge into the skull so there is no seam anywhere */
+    polygonOffset:true, polygonOffsetFactor:-2, polygonOffsetUnits:-2}));
+  /* wraps onto the cheeks/jaw; alpha fade dissolves into skull skin (L.skin) */
   face.position.set(0, hu*0.470, hu*0.330);
   face.scale.set(hu*1.20, hu*0.94, hu*1.20);
   face.renderOrder = 2;
@@ -3466,13 +3556,15 @@ function buildPerson(p){
   const eyeL = M(PG.sph, dark, headG, -hu*0.14, hu*0.503, hu*0.001, hu*0.001, hu*0.001, hu*0.001, false);
   const eyeR = M(PG.sph, dark, headG,  hu*0.14, hu*0.503, hu*0.001, hu*0.001, hu*0.001, hu*0.001, false);
   const mouth = M(PG.box, matCol(0x7d4a44,.6), headG, 0, hu*0.30, hu*0.001, hu*0.001, hu*0.001, hu*0.001, false);
-  /* Wet eyes: a glossy lens over each painted eye, so they catch a real
-     specular highlight and read as eyes rather than as paint. */
-  const lens = new THREE.MeshPhysicalMaterial({
-    color:0xffffff, roughness:0.06, metalness:0.0, transparent:true, opacity:0.30,
-    clearcoat:1.0, clearcoatRoughness:0.03, depthWrite:false});
-  M(PG.sph, lens, headG, -hu*0.14, hu*0.503, hu*0.492, hu*0.088, hu*0.078, hu*0.052, false);
-  M(PG.sph, lens, headG,  hu*0.14, hu*0.503, hu*0.492, hu*0.088, hu*0.078, hu*0.052, false);
+  /* Eyes are painted on the face canvas. Skip clearcoat Physical lenses;
+     on Best only, a cheap glossy Standard sphere for a mild specular catch. */
+  if(G.gfx === "best"){
+    const lens = new THREE.MeshStandardMaterial({
+      color:0xffffff, roughness:0.18, metalness:0.0, transparent:true, opacity:0.22,
+      depthWrite:false});
+    M(PG.sph, lens, headG, -hu*0.14, hu*0.503, hu*0.492, hu*0.088, hu*0.078, hu*0.052, false);
+    M(PG.sph, lens, headG,  hu*0.14, hu*0.503, hu*0.492, hu*0.088, hu*0.078, hu*0.052, false);
+  }
   /* brow ridges above them, in skin, to catch the light off the socket */
   M(PG.sph, skin, headG, -hu*0.16, hu*0.585, hu*0.455, hu*0.145, hu*0.045, hu*0.055, false);
   M(PG.sph, skin, headG,  hu*0.16, hu*0.585, hu*0.455, hu*0.145, hu*0.045, hu*0.055, false);
@@ -8006,6 +8098,8 @@ function floorActions(){
     setSay("You are called. You speak for four minutes and the benches opposite go quiet for two of them.",
       fx("moved " + moved + " members toward " + (dir>0?"aye":"no") + " · +4 influence","25 minutes"));
     hearsAll(you.name + " spoke on the " + b.title.split(" ")[0] + " bill.");
+    /* COLLAB HOOK */
+    try{ if(typeof TLSCollab !== "undefined") TLSCollab.recordSpeech(dir, "floor speech on " + (b.title||"bill")); }catch(e){}
   }});
   A.push({t:"Point of order", c:"10m", run(){
     spend(10, 5);
@@ -10014,6 +10108,8 @@ function holdVote(){
   if(present){
     G.you.record.votes.push({id:b.id, title:b.title, pos:{econ:b.pos.econ,lib:b.pos.lib,def:b.pos.def,wel:b.pos.wel},
       vote:yourVote, day:G.day, passed});
+    /* COLLAB HOOK: record style for active seat */
+    try{ if(typeof TLSCollab !== "undefined") TLSCollab.recordVote(b, yourVote, line !== 0 && line !== yourVote); }catch(e){}
     if(line !== 0 && line !== yourVote){ G.you.standing = clamp(G.you.standing-8,0,100); G.you.record.partyBreaks++; }
     else G.you.standing = clamp(G.you.standing+3,0,100);
     if((oFit>0) !== (yourVote>0)) G.you.record.conscience++;
@@ -10603,6 +10699,11 @@ function refreshTravel(){
   st.innerHTML = "Settings<u>keys and look</u>";
   st.addEventListener("click", settingsCard);
   box.appendChild(st);
+  const cb = document.createElement("button");
+  cb.type = "button"; cb.className = "travel__btn";
+  cb.innerHTML = "Collab<u>" + (typeof TLSCollab !== "undefined" ? TLSCollab.summary().replace(/</g,"") : "two seats") + "</u>";
+  cb.addEventListener("click", collabCard);
+  box.appendChild(cb);
 }
 function callOn(m){
   if(!m || !G.running || G.moving) return;
@@ -10726,8 +10827,15 @@ function refreshFloor(){
     proposeBill(ax, +d);
   }));
   const a = el("voteAye"), n = el("voteNo"), mk = el("markUp");
-  if(a) a.addEventListener("click", () => { G.you.vote = 1; refreshPanels(); });
-  if(n) n.addEventListener("click", () => { G.you.vote = -1; refreshPanels(); });
+  if(a) a.addEventListener("click", () => {
+    G.you.vote = 1; refreshPanels();
+    /* COLLAB HOOK: intention logged as soft signal until roll call */
+    try{ if(typeof TLSCollab !== "undefined" && G.bill) TLSCollab.recordAction({kind:"intention", vote:1, billId:G.bill.id, title:G.bill.title, pos:G.bill.pos&&{econ:G.bill.pos.econ,lib:G.bill.pos.lib,def:G.bill.pos.def,wel:G.bill.pos.wel}}); }catch(e){}
+  });
+  if(n) n.addEventListener("click", () => {
+    G.you.vote = -1; refreshPanels();
+    try{ if(typeof TLSCollab !== "undefined" && G.bill) TLSCollab.recordAction({kind:"intention", vote:-1, billId:G.bill.id, title:G.bill.title, pos:G.bill.pos&&{econ:G.bill.pos.econ,lib:G.bill.pos.lib,def:G.bill.pos.def,wel:G.bill.pos.wel}}); }catch(e){}
+  });
   if(mk) mk.addEventListener("click", () => {
     b.marked = true; you.influence -= 10;
     const target = you.district[com.axis];
@@ -11089,6 +11197,180 @@ renderer.domElement.addEventListener("pointerup", () => {
 });
 
 /* ══════════════════════════════════════════════════════════
+   15b · COLLAB (localStorage seats + Proxy AI)
+   Seat A = you (existing save). Seat B = partner profile.
+   Sync via Export/Import JSON into collab/ for git — file://
+   cannot scan collab/players/. See collab/README.md.
+   COLLAB HOOK: vote/speech logging + proxy in memberVote.
+   ══════════════════════════════════════════════════════════ */
+const COLLAB_KEY = "tls-collab-players";
+const TLSCollab = (function(){
+  function blankPlayer(id, displayName){
+    return {
+      id: id || "seat-b",
+      displayName: displayName || "Partner",
+      memberId: null,
+      present: true,
+      style: {econ:0, lib:0, def:0, wel:0, partyLineBreakRate:0, voteAyeRate:0.5},
+      actions: [],
+      lastSeen: null
+    };
+  }
+  function defaultState(){
+    return {
+      version: 1,
+      activeSeat: "A",
+      proxyAbsent: false,
+      seatA: {id:"seat-a", displayName:"You", memberId:"you", present:true, style:{}, actions:[], lastSeen:null},
+      seatB: blankPlayer("seat-b", "Partner"),
+      world: {version:1, session:null, members:{}}
+    };
+  }
+  function load(){
+    try{
+      const raw = localStorage.getItem(COLLAB_KEY);
+      if(!raw) return defaultState();
+      const d = JSON.parse(raw);
+      const base = defaultState();
+      return Object.assign(base, d, {
+        seatA: Object.assign(base.seatA, d.seatA||{}),
+        seatB: Object.assign(base.seatB, d.seatB||{}),
+        world: Object.assign(base.world, d.world||{})
+      });
+    }catch(e){ return defaultState(); }
+  }
+  function saveState(st){
+    try{ localStorage.setItem(COLLAB_KEY, JSON.stringify(st)); return true; }
+    catch(e){ return false; }
+  }
+  let state = load();
+  function persist(){ saveState(state); }
+  function activeProfile(){
+    return state.activeSeat === "B" ? state.seatB : state.seatA;
+  }
+  function partnerProfile(){ return state.seatB; }
+  function setActiveSeat(s){
+    state.activeSeat = (s === "B") ? "B" : "A";
+    const p = activeProfile();
+    p.present = true;
+    p.lastSeen = new Date().toISOString();
+    persist();
+  }
+  function setPartnerName(name){
+    state.seatB.displayName = (name || "Partner").trim() || "Partner";
+    persist();
+  }
+  function setPartnerMemberId(id){
+    const n = (id === "" || id === null || id === undefined) ? null : +id;
+    state.seatB.memberId = (n === n) ? n : null;
+    if(state.world && state.world.members && state.seatB.id){
+      state.world.members[state.seatB.id] = state.seatB.memberId;
+    }
+    persist();
+  }
+  function setProxyAbsent(on){
+    state.proxyAbsent = !!on;
+    state.seatB.present = !state.proxyAbsent;
+    persist();
+  }
+  function recordAction(action){
+    const p = activeProfile();
+    if(!p.actions) p.actions = [];
+    const row = Object.assign({at: new Date().toISOString(), day: (typeof G !== "undefined" && G.day) || null}, action);
+    p.actions.push(row);
+    if(p.actions.length > 400) p.actions = p.actions.slice(-400);
+    p.lastSeen = row.at;
+    if(window.ProxyAI && ProxyAI.learnStyle) ProxyAI.learnStyle(p);
+    persist();
+  }
+  function recordVote(bill, vote, brokeLine){
+    if(!bill) return;
+    recordAction({
+      kind: "vote",
+      billId: bill.id,
+      title: bill.title,
+      pos: bill.pos ? {econ:bill.pos.econ, lib:bill.pos.lib, def:bill.pos.def, wel:bill.pos.wel} : null,
+      vote: vote,
+      brokeLine: !!brokeLine,
+      party: (G.you && G.you.party) || null
+    });
+  }
+  function recordSpeech(dir, text){
+    recordAction({
+      kind: "speech",
+      dir: dir || 0,
+      text: (text || "").slice(0, 240)
+    });
+  }
+  function shouldProxy(m){
+    if(!state.proxyAbsent || !m) return false;
+    const mid = state.seatB.memberId;
+    if(mid === null || mid === undefined) return false;
+    return m.id === mid;
+  }
+  function proxyVote(m, bill){
+    if(!window.ProxyAI || !ProxyAI.decide) return null;
+    const lineMap = (typeof partyLine === "function" && bill) ? partyLine(bill) : {};
+    const line = (m && lineMap[m.party]) || 0;
+    const v = ProxyAI.decide(state.seatB, {kind:"vote", bill:bill, partyLine:line, member:m});
+    return (v === 1 || v === -1) ? v : null;
+  }
+  function exportBundle(){
+    return {
+      version: 1,
+      world: state.world,
+      players: {
+        [state.seatA.id]: state.seatA,
+        [state.seatB.id]: state.seatB
+      },
+      meta: {activeSeat: state.activeSeat, proxyAbsent: state.proxyAbsent, exportedAt: new Date().toISOString()}
+    };
+  }
+  function importBundle(data){
+    if(!data || typeof data !== "object") throw new Error("Bad collab JSON");
+    if(data.world) state.world = Object.assign(state.world, data.world);
+    const players = data.players || {};
+    const ids = Object.keys(players);
+    if(data.seatA) state.seatA = Object.assign(blankPlayer("seat-a","You"), data.seatA);
+    if(data.seatB) state.seatB = Object.assign(blankPlayer("seat-b","Partner"), data.seatB);
+    if(ids.length){
+      /* Prefer non-you as seat B; first as A if structured that way */
+      const list = ids.map(k => players[k]);
+      const youish = list.find(p => p.memberId === "you" || p.id === "seat-a") || list[0];
+      const other = list.find(p => p !== youish) || blankPlayer("seat-b", "Partner");
+      state.seatA = Object.assign(blankPlayer("seat-a","You"), youish, {memberId: youish.memberId || "you"});
+      state.seatB = Object.assign(blankPlayer("seat-b","Partner"), other);
+    }
+    if(data.meta){
+      if(data.meta.activeSeat) state.activeSeat = data.meta.activeSeat;
+      if(typeof data.meta.proxyAbsent === "boolean") state.proxyAbsent = data.meta.proxyAbsent;
+    }
+    persist();
+  }
+  function downloadExport(){
+    const blob = new Blob([JSON.stringify(exportBundle(), null, 2)], {type:"application/json"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "tls-collab-export.json";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  }
+  function summary(){
+    const b = state.seatB;
+    const n = (b.actions||[]).length;
+    return (b.displayName||"Partner") + " · " + n + " logged action" + (n===1?"":"s") +
+      (state.proxyAbsent ? " · proxy on" : "");
+  }
+  return {
+    get state(){ return state; },
+    reload(){ state = load(); return state; },
+    persist, activeProfile, partnerProfile, setActiveSeat, setPartnerName,
+    setPartnerMemberId, setProxyAbsent, recordAction, recordVote, recordSpeech,
+    shouldProxy, proxyVote, exportBundle, importBundle, downloadExport, summary, blankPlayer
+  };
+})();
+
+/* ══════════════════════════════════════════════════════════
    16 · SAVE
    ══════════════════════════════════════════════════════════ */
 const SAVE_KEY = "longsession.v3";
@@ -11108,9 +11390,9 @@ function save(explicit){
       journal:G.journal, career:G.career, room:G.room, savedAt:G.savedAt,
       feed:G.feed, mail:G.mail, mailId:G.mailId, pendingReplies:G.pendingReplies, visitId:G.visitId,
       states:G.states, prog:G.prog, lobbies:G.lobbies, money:G.money, history:G.history, events:G.events,
-      regime:G.regime, amended:G.amended, exec:G.exec, presidents:G.presidents, statute:G.statute, bare:G.bare, simple:G.simple, noSit:G.noSit, voiceVar:G.voiceVar, voiceRate:G.voiceRate, voiceCarry:G.voiceCarry, hours:G.hours, withWhom:G.withWhom, ties:G.ties, panel:null, court:G.court, own:G.own, termLength:G.termLength, country:G.country,
+      regime:G.regime, amended:G.amended, exec:G.exec, presidents:G.presidents, statute:G.statute, bare:G.bare, gfx:G.gfx, simple:G.simple, noSit:G.noSit, voiceVar:G.voiceVar, voiceRate:G.voiceRate, voiceCarry:G.voiceCarry, hours:G.hours, withWhom:G.withWhom, ties:G.ties, panel:null, court:G.court, own:G.own, termLength:G.termLength, country:G.country,
       relics:G.relics, relicSpots:G.relicSpots, bind:G.bind, sens:G.sens,
-      regime:G.regime, amended:G.amended, exec:G.exec, presidents:G.presidents, statute:G.statute, bare:G.bare, simple:G.simple, noSit:G.noSit, voiceVar:G.voiceVar, voiceRate:G.voiceRate, voiceCarry:G.voiceCarry, hours:G.hours, withWhom:G.withWhom, ties:G.ties, panel:null, court:G.court, own:G.own, termLength:G.termLength
+      regime:G.regime, amended:G.amended, exec:G.exec, presidents:G.presidents, statute:G.statute, bare:G.bare, gfx:G.gfx, simple:G.simple, noSit:G.noSit, voiceVar:G.voiceVar, voiceRate:G.voiceRate, voiceCarry:G.voiceCarry, hours:G.hours, withWhom:G.withWhom, ties:G.ties, panel:null, court:G.court, own:G.own, termLength:G.termLength
     }));
     G.savedAt = hhmm();
     if(explicit) note("Saved.", false);
@@ -11124,6 +11406,10 @@ function loadSave(){
     const d = JSON.parse(raw);
     if(!d || !d.you || !d.members || !d.members.length) return false;
     Object.assign(G, d);
+    if(G.gfx !== "best" && G.gfx !== "balanced" && G.gfx !== "simple"){
+      G.gfx = (G.simple === true) ? "simple" : "balanced";
+    }
+    G.simple = (G.gfx === "simple");
     if(!G.states || !G.states.length) buildUnion();
     if(!G.lobbies || !G.lobbies.length) buildLobbies();
     if(!G.money) G.money = {index:100, hist:[100]};
@@ -11221,8 +11507,8 @@ const HANDBOOK = [
   {t:"Keeping your place", rows:[
     ["Saving", "Save at any moment from the strip. It also saves every 20 minutes and at every door."],
     ["Ending the day", "Your desk, after five o'clock. Or the sofa, if you need the hours back first."],
-    ["If it runs badly", "Settings → Graphics → Simple. Same game, much less asked of the machine."],
-    ["A full room", "When more than six people are in a room the game draws it the plain way by itself — no shadows, one lamp, nobody seated. It goes back when the room empties."],
+    ["If it runs badly", "Settings → Graphics → Simple (Best is the default). Same game, much less asked of the machine."],
+    ["A full room", "When a room fills (more than seven people) the game eases LODs and seated poses by itself — shadows stay on Best/Balanced. It goes back when the room thins below four."],
     ["If bodies look wrong", "Settings → Seated poses → Everyone stands, and Graphics → Simple. If either one fixes it, that is worth knowing."],
     ["Voices", "Settings → Voices. They speak aloud by default, and quieter the further away they are."]
   ]}
@@ -11245,6 +11531,96 @@ function handbookCard(){
     veil.hidden = true;
     G.running = wasRunning || true;
     refreshPanels();
+  });
+}
+
+function collabCard(){
+  const wasRunning = G.running;
+  G.running = false;
+  TLSCollab.reload();
+  const st = TLSCollab.state;
+  const members = (G.members||[]).slice().sort((a,b)=>a.name.localeCompare(b.name));
+  const mid = st.seatB.memberId;
+  const memberOpts = '<option value="">— pick partner’s member —</option>' +
+    members.map(m => '<option value="'+m.id+'"'+(m.id===mid?" selected":"")+'>'+m.name+' ('+m.party+')</option>').join("");
+  const aN = (st.seatA.actions||[]).length, bN = (st.seatB.actions||[]).length;
+  card.innerHTML =
+    '<div class="eyebrow">Collab · two seats</div><h1>Play with someone.</h1>' +
+    '<p>Seat <b>A</b> is your career save. Seat <b>B</b> is a partner profile tied to one House member. ' +
+      'Votes and speeches log into whichever seat you are playing as. When they are away, Proxy AI votes from their real action history — not a random NPC. ' +
+      'Sync by Export/Import JSON into <code>collab/</code> and git (browsers cannot scan that folder from <code>file://</code>).</p>' +
+    '<div class="mk">' +
+      '<div class="mk__row"><i>I’m playing as</i><div class="mk__opts">' +
+        '<button type="button" class="mk__opt'+(st.activeSeat!=="B"?" is-on":"")+'" data-seat="A">Seat A · you</button>' +
+        '<button type="button" class="mk__opt'+(st.activeSeat==="B"?" is-on":"")+'" data-seat="B">Seat B · partner</button>' +
+      '</div></div>' +
+      '<div class="mk__row"><i>Partner name</i><div class="mk__opts">' +
+        '<input type="text" id="colName" maxlength="40" value="'+(st.seatB.displayName||"").replace(/"/g,"&quot;")+'" ' +
+          'style="flex:1;min-width:140px;padding:6px 8px;border:1px solid var(--line);border-radius:2px;background:var(--surface);color:var(--ink)">' +
+      '</div></div>' +
+      '<div class="mk__row"><i>Partner member</i><div class="mk__opts">' +
+        '<select class="wire__to" id="colMember" '+(G.you?'':'disabled')+'>'+memberOpts+'</select>' +
+      '</div></div>' +
+      '<div class="mk__row"><i>Partner absent</i><div class="mk__opts">' +
+        '<button type="button" class="mk__opt'+(st.proxyAbsent?" is-on":"")+'" data-proxy="1">Proxy AI on</button>' +
+        '<button type="button" class="mk__opt'+(!st.proxyAbsent?" is-on":"")+'" data-proxy="0">They’re here</button>' +
+      '</div></div>' +
+      '<div class="mk__row"><i>Style log</i><span class="muted" style="font-size:10.5px">' +
+        'A: '+aN+' actions · B ('+(st.seatB.displayName||"Partner")+'): '+bN+' actions' +
+        (window.ProxyAI ? ' · ProxyAI loaded' : ' · ProxyAI missing (collab/proxy.js)') +
+      '</span></div>' +
+      '<div class="mk__row"><i>Share</i><div class="mk__opts">' +
+        '<button type="button" class="mk__opt" id="colExport">Export JSON</button>' +
+        '<button type="button" class="mk__opt" id="colImport">Import JSON</button>' +
+        '<input type="file" id="colFile" accept="application/json,.json" hidden>' +
+      '</div></div>' +
+    '</div>' +
+    '<div class="card__actions">' +
+      '<button class="btn btn--ghost" type="button" id="colSettings">Settings</button>' +
+      '<button class="btn" type="button" id="colDone">Back to it</button></div>';
+  veil.hidden = false;
+  card.querySelectorAll("[data-seat]").forEach(b => b.addEventListener("click", () => {
+    TLSCollab.setActiveSeat(b.getAttribute("data-seat"));
+    note("Recording style as Seat " + TLSCollab.state.activeSeat + ".");
+    collabCard();
+  }));
+  const cn = el("colName");
+  if(cn) cn.addEventListener("change", () => { TLSCollab.setPartnerName(cn.value); collabCard(); });
+  const cm = el("colMember");
+  if(cm) cm.addEventListener("change", () => {
+    TLSCollab.setPartnerMemberId(cm.value);
+    const m = byId(+cm.value);
+    if(m) note("Partner seat is " + m.name + ".");
+    collabCard();
+  });
+  card.querySelectorAll("[data-proxy]").forEach(b => b.addEventListener("click", () => {
+    TLSCollab.setProxyAbsent(b.getAttribute("data-proxy") === "1");
+    note(TLSCollab.state.proxyAbsent
+      ? "Partner absent — Proxy AI will vote from their log."
+      : "Partner present — Proxy AI off.");
+    collabCard();
+  }));
+  el("colExport").addEventListener("click", () => {
+    TLSCollab.downloadExport();
+    note("Collab JSON downloaded — put it under collab/ for git.");
+  });
+  el("colImport").addEventListener("click", () => el("colFile").click());
+  el("colFile").addEventListener("change", () => {
+    const f = el("colFile").files && el("colFile").files[0];
+    if(!f) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try{
+        TLSCollab.importBundle(JSON.parse(reader.result));
+        note("Collab profiles imported.");
+        collabCard();
+      }catch(e){ note("Could not import that JSON."); }
+    };
+    reader.readAsText(f);
+  });
+  el("colSettings").addEventListener("click", settingsCard);
+  el("colDone").addEventListener("click", () => {
+    veil.hidden = true; G.running = wasRunning || true; refreshPanels();
   });
 }
 
@@ -11285,12 +11661,13 @@ function settingsCard(){
         '<button type="button" class="mk__opt' + (G.noSit?" is-on":"") + '" data-sit="1">Everyone stands</button>' +
       '</div></div>' +
       '<div class="mk__row"><i>Graphics</i><div class="mk__opts">' +
-        '<button type="button" class="mk__opt' + (G.simple?"":" is-on") + '" data-gfx="0">Full</button>' +
-        '<button type="button" class="mk__opt' + (G.simple?" is-on":"") + '" data-gfx="1">Simple</button>' +
+        '<button type="button" class="mk__opt' + (G.gfx==="best"?" is-on":"") + '" data-gfx="best">Best</button>' +
+        '<button type="button" class="mk__opt' + (G.gfx==="balanced"?" is-on":"") + '" data-gfx="balanced">Balanced</button>' +
+        '<button type="button" class="mk__opt' + (G.gfx==="simple"?" is-on":"") + '" data-gfx="simple">Simple</button>' +
       '</div></div>' +
-      (crowdSafe && !G.simple
+      (crowdSafe && G.gfx !== "simple"
         ? '<div class="mk__row"><i></i><span class="muted" style="font-size:10.5px">' +
-          'The room is full, so it is being drawn the plain way for now. It goes back on its own.' +
+          'The room is full, so people are being drawn a little plainer for now. Shadows stay on. It goes back on its own.' +
           '</span></div>' : "") +
       (SHADER_TROUBLE ? '<div class="mk__row"><i>Driver said</i><span class="muted" style="font-size:10.5px">' +
         SHADER_TROUBLE.replace(/[<>]/g, "") + '</span></div>' : "") +
@@ -11308,6 +11685,7 @@ function settingsCard(){
       '<div class="mk__row"><i></i><button type="button" class="mk__opt" id="setTry">Hear a voice</button></div>') +
     '</div>' +
     '<div class="card__actions">' +
+      '<button class="btn btn--ghost" type="button" id="setCollab">Collab</button>' +
       '<button class="btn btn--ghost" type="button" id="setBook">The handbook</button>' +
       '<button class="btn btn--ghost" type="button" id="setReset">Reset to defaults</button>' +
       '<button class="btn" type="button" id="setDone">Back to it</button></div>';
@@ -11329,8 +11707,10 @@ function settingsCard(){
     settingsCard();
   }));
   card.querySelectorAll("[data-gfx]").forEach(b => b.addEventListener("click", () => {
-    G.simple = b.getAttribute("data-gfx") === "1";
-    applySimple();
+    G.gfx = b.getAttribute("data-gfx");
+    G.simple = G.gfx === "simple";
+    applyQuality();
+    save();
     settingsCard();
   }));
   card.querySelectorAll("[data-vo]").forEach(b => b.addEventListener("click", () => {
@@ -11356,6 +11736,7 @@ function settingsCard(){
     three.forEach((m, i) => setTimeout(() =>
       speak(m, "The member for " + m.state + " " + m.dist + ". That is my voice."), i * 2200));
   });
+  el("setCollab").addEventListener("click", collabCard);
   el("setBook").addEventListener("click", handbookCard);
   el("setReset").addEventListener("click", () => {
     G.bind = Object.assign({}, DEFAULT_BIND); G.sens = 1; awaitingBind = null; settingsCard();
@@ -12238,6 +12619,8 @@ function startRun(){
 }
 function begin(){
   if(!G.you || !G.members.length){ nameCard(); return; }
+  migrateGfx();
+  applyQuality();
   G.running = true; G.over = false;
   el("whereName").textContent = ROOMS[G.room].t;
   el("whereTag").textContent = ROOMS[G.room].tag;
@@ -12300,7 +12683,8 @@ function begin(){
 
 buildLobbies();
 if(G.bare) document.body.classList.add("is-bare");
-if(G.simple) applySimple();
+migrateGfx();
+applyQuality();
 buildRoom("office");
 resize();
 opening();
