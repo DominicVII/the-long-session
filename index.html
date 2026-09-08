@@ -666,7 +666,7 @@ body.is-bare .unbare:hover{background:rgba(16,19,25,.95)}
         <div class="hud"><i id="whereTag">Location</i><b id="whereName">—</b></div>
         <div class="keys">
           <span class="kbd">W S — walk</span><span class="kbd">A D — look</span><span class="kbd">Q C — step aside</span>
-          <span class="kbd">drag — look</span><span class="kbd">E — speak / use</span><span class="kbd">space — pause</span><span class="kbd">F / View — phone</span><span class="kbd">hold V — speak</span><span class="kbd">H — hide the display</span><span class="kbd">pad: A acts · X Y answer · B back</span>
+          <span class="kbd">drag — look</span><span class="kbd">E — speak / use</span><span class="kbd">space — pause</span><span class="kbd">F / View — phone</span><span class="kbd">hold V — speak</span><span class="kbd">H — hide the display</span><span class="kbd">pad: A sit / interact · ✛ prompts · B back</span>
         </div>
         <div class="track" id="track" hidden><div class="track__box">
           <i class="track__c track__c--tl"></i><i class="track__c track__c--tr"></i>
@@ -11782,19 +11782,17 @@ document.querySelectorAll("#speed button[data-s]").forEach(b =>
 
 /* ── Xbox / any standard gamepad ────────────────────────────
    Left stick walks and steps sideways, right stick looks, A speaks or
-   takes the highlighted line, B closes, Start pauses, triggers run — and
-   the D-pad walks the suggested lines and the buttons on any card, so a
-   whole conversation can be had without ever touching the keyboard.
+   confirms a D-pad-selected prompt, B closes, Start pauses, triggers run.
+   Prompts only arm after the D-pad moves onto them — face buttons do not
+   skip that and answer for you.
    Read once a frame rather than inside the clock, so it still answers
    while the game is paused or a card is up. */
 const PAD = {vx:0, vz:0, turn:0, tilt:0, sprint:false};
 const PADHELD = {};
 const NOPICKS = [];
-/* A is not an answer slot. A interacts, acts, and speaks — it does
-   the thing in front of you, or says the line you have chosen, and it
-   never fires an option you did not pick. The answers are X and Y, and
-   the D-pad for anything past two. B is the way out. */
-const PAD_GLYPH = ["X", "Y"];
+/* A sits / interacts, and confirms a line only after D-pad selects it.
+   X/Y never auto-answer prompts. B is the way out. */
+const PAD_GLYPH = [];
 let PICKS = NOPICKS, PICK = -1, pickKey = "";
 /* Everything you could click, in the order you would read it. With a card
    up that is the card; in a conversation it is the whole conversation and
@@ -11839,14 +11837,8 @@ function refreshPicks(){
     });
   }
   PICKS = out.length ? out : NOPICKS;
-  /* The first four things you could press get a face button each, and
-     the button is printed on them, so a prompt never has to be read
-     twice to work out which one answers it. */
-  PICKS.forEach((b, i) => {
-    const g = PAD_GLYPH[i];
-    if(g && !b.dataset.btn){ b.dataset.btn = g; }
-    else if(!g && b.dataset.btn) delete b.dataset.btn;
-  });
+  /* Clear any old X/Y face glyphs — prompts are D-pad + A only. */
+  PICKS.forEach(b => { if(b.dataset.btn) delete b.dataset.btn; });
 }
 function movePick(d){
   if(!PICKS.length) return;
@@ -11881,17 +11873,16 @@ function padLegend(on){
   const bits = [];
   const asked = !veil.hidden || TALK.open || (PROC.on && PROC.phase === "you");
   const focus = !asked && focusThing();
+  /* Prompts are only armed after D-pad moves onto them; A confirms. */
   bits.push(["A", focus ? (focus.type === "person" ? "speak to " + surname(focus.ref.name) : "use " + focus.ref.label)
-           : PICK >= 0 && PICKS[PICK] ? "say it"
-           : n2 ? "choose"
+           : PICK >= 0 && PICKS[PICK] ? "confirm"
            : seatUnderYou() ? (G.you.sitting ? "stand" : "sit")
+           : n2 ? "D-pad a line first"
            : "speak / use"]);
-  if(n2) bits.push(["X", PICKS[0].textContent.trim().slice(0, 20)]);
-  if(n2 > 1) bits.push(["Y", PICKS[1].textContent.trim().slice(0, 20)]);
-  else bits.push(["Y", "phone"]);
+  if(n2) bits.push(["✛", PICK >= 0 ? ("line " + (PICK+1) + "/" + n2) : "choose a line"]);
+  bits.push(["Y", "phone"]);
   bits.push(["B", !el("tipCard").hidden ? "close" : !veil.hidden ? "put it away"
                 : TALK.open ? "leave it" : G.bare ? "show display" : "back"]);
-  if(n2 > 3) bits.push(["✛", "more"]);
   bits.push(["LB RB", "panels"]);
   const html = bits.map(b => '<span><b>' + b[0] + '</b>' + b[1] + '</span>').join("");
   if(html !== legendWas){ legendWas = html; setHTML(box, html); }
@@ -11945,39 +11936,30 @@ function pollPad(){
     if(up || lf) movePick(-1);
     if(dn || rt) movePick(1);
   }
-  /* A, B, X and Y answer whatever prompt is on screen, in order. With
-     nothing to answer they fall back to what they have always done:
-     A speaks to whoever you face, B closes, Y is your phone. */
+  /* Xbox: A = sit / interact (and confirm a D-pad-selected prompt).
+     Prompts only fire after the D-pad has moved onto them — X/Y do not
+     skip that and answer for you. */
   const prompted = PICKS.length > 0;
-  const fireAt = i => {
-    const b = PICKS[i];
-    if(!b) return false;
-    PICKS.forEach(x => x.classList.remove("is-pick"));
-    PICK = -1; picksDirty = true;
-    b.click();
-    return true;
-  };
   if(edge(0)){
-    /* A does the thing. In a room that means speaking to whoever is in
-       front of you or using what you are facing. With a choice on
-       screen it means saying the line you have picked — and if you have
-       not picked one yet, it picks the first rather than firing it, so
-       A can never answer for you. */
     const asked = !veil.hidden || TALK.open || (PROC.on && PROC.phase === "you");
-    const t = (!asked && veil.hidden) ? focusThing() : null;
-    if(t){ (t.type === "person" ? openTalk : openProp)(t.ref); }
-    else if(PICK >= 0 && PICKS[PICK]){ firePick(); }
-    else if(prompted){ movePick(1); }
-    else if(veil.hidden && seatUnderYou()){ toggleSit(); }
+    /* Confirm only a prompt the D-pad has actually landed on */
+    if(asked && PICK >= 0 && PICKS[PICK]){ firePick(); }
+    else if(!asked && veil.hidden){
+      const t = focusThing();
+      if(t){ (t.type === "person" ? openTalk : openProp)(t.ref); }
+      else if(seatUnderYou()){ toggleSit(); }
+      else if(PICK >= 0 && PICKS[PICK]){ firePick(); }
+    } else if(PICK >= 0 && PICKS[PICK]){ firePick(); }
+    /* if prompts are up but nothing is D-pad-selected, A does nothing */
   }
   if(edge(1)) padBack();
-  if(edge(2)) { if(prompted) fireAt(0); }
+  if(edge(2)){
+    /* X reserved — do not auto-answer prompts (D-pad + A only) */
+  }
   if(edge(3)){
-    /* Y: the second answer if there is one, otherwise your phone */
-    if(!(prompted && PICKS.length > 1 && fireAt(1))){
-      if(!veil.hidden && phoneWasRunning !== null) phoneClose();
-      else if(veil.hidden && !TALK.open && G.running) phoneCard();
-    }
+    /* Y: phone only — never a shortcut past D-pad prompt picks */
+    if(!veil.hidden && phoneWasRunning !== null) phoneClose();
+    else if(veil.hidden && !TALK.open && G.running) phoneCard();
   }
   if(edge(9)) togglePause();
   /* the shoulders walk the panels, so the whole dossier is reachable */
