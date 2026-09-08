@@ -7538,6 +7538,7 @@ function micInit(){
 function micShow(t){
   const b = el("micBar");
   if(!b) return;
+  if(!t){ b.hidden = true; return; }
   b.hidden = false;
   say(el("micText"), t);
 }
@@ -7547,30 +7548,65 @@ function micStart(){
   /* the machine cannot listen and talk at the same time */
   hush();
   listening = true; micText = "";
-  micShow("Listening…");
+  /* No popup — listen like ordinary speech. Subtle HUD only if micBar exists. */
+  micShow("");
   try{ RECOG.start(); }catch(e){ listening = false; micHide(); }
 }
 function micStop(){
   if(!listening || !RECOG) return;
   try{ RECOG.stop(); }catch(e){}
 }
-/* where the words go depends on where you are standing */
+/* Speak aloud into the world — no talk panel, no card. They hear you
+   and answer in place, the way a room does. */
+function converseLive(m, text){
+  if(!m || !text) return;
+  m.chat = m.chat || [];
+  m.chat.push({role:"user", content:text});
+  const reply = improvise(m, text);
+  m.chat.push({role:"assistant", content:reply});
+  /* you said it out loud; they answer out loud */
+  try{ speak(null, text, 0.85); }catch(e){}
+  try{ speakAt(m, reply); }catch(e){ try{ speak(m, reply); }catch(e2){} }
+  ripple(m, 1, null, 0);
+  spend(4, 1);
+  const r = roomHears(text, {exclude:m, weight:1});
+  if(r && r.heard){
+    const tone = readTone(text);
+    if(tone.hostile || tone.promise || (r.backed && r.backed.length) || (r.objected && r.objected.length))
+      try{ reportRoom(r); }catch(e){}
+  }
+  /* if the talk UI is already open for them, mirror into the log — but never open it */
+  if(TALK.open && TALK.m === m){
+    try{
+      appendMsg("you", text);
+      appendMsg("them", reply, surname(m.name));
+      setSay(reply, "");
+      renderTalk();
+    }catch(e){}
+  } else {
+    try{ setSay(reply, surname(m.name)); }catch(e){}
+  }
+  refreshPanels();
+}
 function micSend(text){
-  micShow("“" + text + "”");
-  setTimeout(micHide, 2200);
+  micHide();
+  if(!text) return;
   if(PROC.on && PROC.phase === "you"){ procYouSay(null, text); return; }
-  if(TALK.open && TALK.m){ converse(TALK.m, text); return; }
+  /* Already mid-conversation UI: keep that thread, still no new popup */
+  if(TALK.open && TALK.m){ converseLive(TALK.m, text); return; }
   const f = focusThing();
   if(f && f.type === "person"){
-    openTalk(f.ref);
-    setTimeout(() => converse(f.ref, text), 120);
+    converseLive(f.ref, text);
     return;
   }
-  /* Nobody in front of you, but people around you: you have just said it
-     to the room, and the room heard it. */
-  if(audience(null).length){ addressRoom(text); return; }
-  const inp = el("wireIn");
-  if(inp){ inp.value = text; wireSend(); }
+  if(audience(null).length){
+    try{ speak(null, text, 0.9); }catch(e){}
+    addressRoom(text);
+    return;
+  }
+  /* nobody near — still speak the words into the empty room */
+  try{ speak(null, text, 0.75); }catch(e){}
+  try{ feed("You said it aloud. Nobody close enough answered."); }catch(e){}
 }
 
 function eventCard(e){
@@ -11492,7 +11528,7 @@ const HANDBOOK = [
     ["The prompt in the middle", "Tells you what E will do right now."],
     ["Sit", "Face a bench or a chair and press E. In a sitting, you take your own seat."],
     ["F", "Your phone — Vox, posting, your mail, and the count."],
-    ["Hold V", "Speak out loud. It goes to whoever is in front of you, or to the room."],
+    ["Hold V", "Speak out loud into the room — no popup. Whoever is in front of you answers in place."],
     ["H", "Hide the display. One button in the corner brings it back."],
     ["Space", "Pause. 1× 2× 4× set the speed of the day."]
   ]},
