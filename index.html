@@ -378,6 +378,19 @@ html,body{height:100%}
   display:flex; gap:12px; flex-wrap:wrap; justify-content:center; max-width:94%;
   pointer-events:none; font-size:10px; color:#d3d9e0; text-shadow:0 1px 4px rgba(0,0,0,.95)}
 .padbar[hidden]{display:none}
+
+.aloud-btn{position:absolute; right:12px; bottom:14px; z-index:8; pointer-events:auto;
+  font:600 11.5px Archivo,system-ui,sans-serif; letter-spacing:.06em; text-transform:uppercase;
+  padding:9px 12px; border-radius:3px; border:1px solid rgba(201,162,74,.55);
+  background:rgba(16,14,11,.78); color:#f0e4c8; cursor:pointer}
+.aloud-btn:hover,.aloud-btn.is-live{background:rgba(142,47,59,.92); border-color:#c9a24a; color:#fff}
+body.has-pad .aloud-btn{bottom:40px}
+body.in-session.has-pad .aloud-btn{bottom:118px}
+.heard{position:absolute; left:50%; top:14%; transform:translateX(-50%); z-index:9; pointer-events:none;
+  background:rgba(47,107,69,.9); color:#fff; font-size:12px; font-weight:600; padding:7px 12px; border-radius:2px;
+  opacity:0; transition:opacity .2s}
+.heard.is-on{opacity:1}
+
 /* with a pad plugged in, everything above the legend steps up a line */
 body.has-pad .prompt{bottom:34px}
 body.has-pad .tele{bottom:28px}
@@ -666,7 +679,7 @@ body.is-bare .unbare:hover{background:rgba(16,19,25,.95)}
         <div class="hud"><i id="whereTag">Location</i><b id="whereName">—</b></div>
         <div class="keys">
           <span class="kbd">W S — walk</span><span class="kbd">A D — look</span><span class="kbd">Q C — step aside</span>
-          <span class="kbd">drag — look</span><span class="kbd">E — speak / use</span><span class="kbd">space — pause</span><span class="kbd">F / View — phone</span><span class="kbd">hold V — speak</span><span class="kbd">H — hide the display</span><span class="kbd">pad: A sit / interact · ✛ prompts · B back</span>
+          <span class="kbd">drag — look</span><span class="kbd">E — speak / use</span><span class="kbd">space — pause</span><span class="kbd">F / View — phone</span><span class="kbd">hold V / Speak Aloud — they hear you</span><span class="kbd">H — hide the display</span><span class="kbd">pad: A sit/use · ✛/1–9 prompts · hold X aloud · B back</span>
         </div>
         <div class="track" id="track" hidden><div class="track__box">
           <i class="track__c track__c--tl"></i><i class="track__c track__c--tr"></i>
@@ -682,6 +695,8 @@ body.is-bare .unbare:hover{background:rgba(16,19,25,.95)}
         <div class="hail" id="hail" hidden></div>
         <div class="proc" id="procBar" hidden></div>
         <div class="tipcard" id="tipCard" hidden></div>
+        <div class="heard" id="heardFlash" aria-live="polite"></div>
+        <button type="button" class="aloud-btn" id="aloudBtn" title="Speak aloud into the room (hold V or hold X on pad)">Speak Aloud</button>
         <div class="mic" id="micBar" hidden><i></i><span id="micText"></span></div>
         <div class="padbar" id="padBar" hidden></div>
         <button type="button" class="unbare" id="unBare" title="Show the display (H)">▤</button>
@@ -7543,6 +7558,17 @@ function micShow(t){
   say(el("micText"), t);
 }
 function micHide(){ const b = el("micBar"); if(b) b.hidden = true; }
+
+function heardFlash(msg){
+  const b = el("heardFlash");
+  if(!b){ try{ feed(msg); }catch(e){} return; }
+  b.textContent = msg;
+  b.classList.add("is-on");
+  clearTimeout(heardFlash._t);
+  heardFlash._t = setTimeout(() => b.classList.remove("is-on"), 1600);
+  try{ feed(msg); }catch(e){}
+}
+
 function micStart(){
   if(listening || !micInit()) return;
   /* the machine cannot listen and talk at the same time */
@@ -7569,6 +7595,7 @@ function converseLive(m, text){
   try{ speakAt(m, reply); }catch(e){ try{ speak(m, reply); }catch(e2){} }
   ripple(m, 1, null, 0);
   spend(4, 1);
+  heardFlash(surname(m.name) + " heard you.");
   const r = roomHears(text, {exclude:m, weight:1});
   if(r && r.heard){
     const tone = readTone(text);
@@ -7602,6 +7629,7 @@ function micSend(text){
   if(audience(null).length){
     try{ speak(null, text, 0.9); }catch(e){}
     addressRoom(text);
+    heardFlash("The room heard you.");
     return;
   }
   /* nobody near — still speak the words into the empty room */
@@ -8553,6 +8581,14 @@ function talkSeed(m){
   if(TALK.m === m) TALK.seed = sd;
   return sd;
 }
+/* stable hash of what was said — same prompt to same person → same stream */
+function hashSaid(s){
+  return seedOf(String(s || "").toLowerCase().replace(/\s+/g, " ").trim().slice(0, 160));
+}
+function talkRng(m, said){
+  const turns = m && m.chat ? m.chat.length : 0;
+  return rng(seedOf(String(m ? m.id : "x") + "|say|" + hashSaid(said) + "|" + turns));
+}
 /* pick a word from a set, weighted toward how this person actually talks */
 function word(m, key, rnd){
   const set = LEX[key];
@@ -8568,21 +8604,25 @@ function word(m, key, rnd){
   });
   return best[0];
 }
-/* fill a frame, one slot at a time */
-function fillFrame(m, frame, slots){
-  const rnd = rng(talkSeed(m) + frame.length + Math.floor(Math.random()*1e6));
+/* fill a frame, one slot at a time — optional rnd keeps phrasing stable per prompt */
+function fillFrame(m, frame, slots, rnd){
+  const r = rnd || rng(talkSeed(m) + seedOf(frame) + ((slots && slots._salt) || 0));
   return frame.replace(/\{(\w+)(:cap)?\}/g, (all, key, capIt) => {
-    let v = (slots && slots[key] !== undefined) ? slots[key] : word(m, key, rnd);
+    let v = (slots && slots[key] !== undefined) ? slots[key] : word(m, key, r);
     if(capIt) v = v.charAt(0).toUpperCase() + v.slice(1);
     return v;
   });
 }
 /* Compose a line of the given kind. If the sentence has been said
    before — by anybody, ever — build it again. */
-function compose(m, kind, slots){
+function compose(m, kind, slots, rnd){
   const frames = FRAMES[kind];
   if(!frames) return "";
-  return fresh(() => fillFrame(m, pick(frames), slots), 18);
+  const r = rnd || rng(talkSeed(m) + seedOf(kind));
+  return fresh(() => {
+    const frame = frames[Math.floor(r() * frames.length) % frames.length];
+    return fillFrame(m, frame, slots, r);
+  }, 18);
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -8668,117 +8708,217 @@ function hedge(m){
 }
 
 /* ── answering ───────────────────────────────────────────── */
-function answerBill(m, u){
+function answerBill(m, u, rnd){
+  const r = rnd || (() => Math.random());
   const b = G.bill && !G.bill.done ? G.bill : null;
-  if(!b) return "There is nothing on the calendar worth the argument yet.";
+  if(!b) return "There is nothing on the calendar worth the argument yet. Until there is, I am saving my voice.";
   const v = memberVote(m, b), st = stakeIn(m, b), bio = bioOf(m);
-  if(st.level >= 3)
+  const partyLine = m.party === (G.you && G.you.party) ? "our side" : "their side";
+  if(st.level >= 3){
     return (v > 0 ? "I am an aye and I am not moving. " : "I am a no and I am not moving. ") +
-      st.why + " That is not a position, it is " + bio.town + ".";
+      st.why + " That is not a position, it is " + bio.town +
+      ". The whip can count me however they like — " + partyLine + " does not get a veto on that.";
+  }
   if(u.intent === "request"){
-    /* they are being asked for their vote, and they answer it */
     const owed = m.rel.debtFromYou > 0;
-    if(v > 0) return compose(m, "press") + " You have it — I was an aye before you asked." +
-      (owed ? " You need not have spent a favour on it." : "");
-    if(owed) return "I owe you, so I will not lie to you: I am a no. Ask me for something I can actually give.";
-    if(m.traits.conviction > 68) return "No. I have read it and I cannot vote for it, and you would not respect me if I did.";
+    if(v > 0) return compose(m, "press", null, r) + " You have it — I was an aye before you asked." +
+      (owed ? " You need not have spent a favour on it." : " Do not waste the favour on what I was already doing.");
+    if(owed) return "I owe you, so I will not lie to you: I am a no. Ask me for something I can actually give, not a vote that would end me in " + bio.town + ".";
+    if(m.traits.conviction > 68) return "No. I have read it and I cannot vote for it, and you would not respect me if I did. My creed will not stretch that far.";
+    if(m.fear.k === "seat" && m.margin < 10)
+      return "Ask me again when you can tell me what it does for " + bio.town + ". Until then I am a no — I won by " + m.margin + " and I can count.";
     return "Ask me again when you can tell me what it does for " + bio.town + ". Until then I am a no.";
   }
-  const line = compose(m, "position", {stance: v > 0 ? "an aye" : "a no", bill: b.title});
-  return v > 0 ? line : line + " The arithmetic at home does not move because you want it to.";
+  const line = compose(m, "position", {stance: v > 0 ? "an aye" : "a no", bill: b.title}, r);
+  const extras = [];
+  if(st.level >= 2 && st.why) extras.push(st.why);
+  else if(v <= 0) extras.push("The arithmetic at home does not move because you want it to.");
+  if(m.intent && (m.intent.k === "pass" || m.intent.k === "kill") && r() < 0.55)
+    extras.push("This week I came in to " + m.intent.t + ".");
+  return [line].concat(extras).join(" ");
 }
-function answerHome(m, u){
+function answerHome(m, u, rnd){
+  const r = rnd || (() => Math.random());
   const bio = bioOf(m);
   autoInit(m);
   const lines = ["I sit for " + m.state + " " + m.dist + ". I won it by " + m.margin +
     ", and that number decides more in this building than anybody admits."];
   lines.push("In " + bio.town + ", " + bio.trouble + ".");
+  if(bio.pride) lines.push("What they still have is " + bio.pride + " — that is the part the gallery never writes.");
   if(m.fear.k === "seat") lines.push("If I lose four hundred votes I am not here next year, and I know exactly which four hundred.");
   if(m.fear.k === "town") lines.push("What frightens me is the place going under while I am here talking about procedure.");
-  return lines.slice(0, u.intent === "question" ? 3 : 2).join(" ");
+  if(m.need) lines.push("What they keep asking me for is " + m.need + ", and I have not delivered it yet.");
+  const n = u.intent === "question" ? 4 : (r() < 0.45 ? 3 : 2);
+  return lines.slice(0, n).join(" ");
 }
-function answerMoney(m){
-  if(m.traits.discretion > 66) return "I do not discuss money standing up in a corridor.";
-  if(m.rel.trust > 60) return "Everyone in here takes money. The only question that matters is who knows about it, and I would rather you heard it from me.";
-  return "Everyone takes money. Ask me that again when we know each other better.";
+function answerMoney(m, rnd){
+  const r = rnd || (() => Math.random());
+  if(m.traits.discretion > 66) return "I do not discuss money standing up in a corridor. Put it in writing if you must, and even then I may not answer.";
+  if(m.rel.trust > 60) return "Everyone in here takes money. The only question that matters is who knows about it, and I would rather you heard it from me than from a column.";
+  if(m.fear.k === "expose") return "I am careful with who I take from. Careful is not the same as clean, and I will not pretend it is.";
+  return r() < 0.5
+    ? "Everyone takes money. Ask me that again when we know each other better."
+    : "If you are asking whether I can be bought, the answer is no. If you are asking whether anyone here is, look at the vote sheet.";
 }
-function answerParty(m){
-  if(m.traits.loyalty > 66) return "The party has been good to me and I do not embarrass it in public. What I say in the room is a different matter.";
-  if(m.traits.loyalty < 38) return "The whip is a suggestion with a firm voice. I have ignored it before and I will again.";
-  return "I go with them until it costs me something at home. Then I do not.";
-}
-function answerPost(m){
+function answerParty(m, rnd){
+  const r = rnd || (() => Math.random());
   autoInit(m);
-  return m.goal.k === "chair" ? "I want a committee before this term is out, and I have stopped pretending otherwise."
-       : m.goal.k === "leader" ? "I would like to be in the room where the line gets decided, rather than told about it afterwards."
-       : m.post ? "I hold the " + postTitle(m.post).toLowerCase() + ". It is less than it looks and more work than it sounds."
-       : "I came here " + m.goal.t + ". A gavel would help with that, but it is not the thing itself.";
+  const bits = [];
+  if(m.traits.loyalty > 66) bits.push("The party has been good to me and I do not embarrass it in public. What I say in the room is a different matter.");
+  else if(m.traits.loyalty < 38) bits.push("The whip is a suggestion with a firm voice. I have ignored it before and I will again.");
+  else bits.push("I go with them until it costs me something at home. Then I do not.");
+  if(m.intent && m.intent.k === "line") bits.push("This week I am trying to " + m.intent.t + ".");
+  if(m.fear.k === "party") bits.push("What keeps me up is " + m.fear.t + ".");
+  if(r() < 0.4) bits.push("Loyalty without a district behind it is just theatre.");
+  return bits.slice(0, 3).join(" ");
 }
-function answerNamed(m, u){
+function answerPost(m, rnd){
+  autoInit(m);
+  const bits = [];
+  if(m.goal.k === "chair") bits.push("I want a committee before this term is out, and I have stopped pretending otherwise.");
+  else if(m.goal.k === "leader") bits.push("I would like to be in the room where the line gets decided, rather than told about it afterwards.");
+  else if(m.post) bits.push("I hold the " + postTitle(m.post).toLowerCase() + ". It is less than it looks and more work than it sounds.");
+  else bits.push("I came here " + m.goal.t + ". A gavel would help with that, but it is not the thing itself.");
+  if(m.goalAt > 40) bits.push("I am further along than I was in the spring, and people have noticed.");
+  return bits.join(" ");
+}
+function answerNamed(m, u, rnd){
+  const r = rnd || (() => Math.random());
   const p = u.named;
   if(!p || p === m) return null;
-  /* what they say about somebody comes out of what is actually between
-     them, including whatever happened this week */
+  const bits = [];
   if(p.kind === "member" && G.ties && G.ties[pairKey(m, p)]){
     const t = G.ties[pairKey(m, p)];
-    if(t.mem.length && chance(.7))
-      return (t.w > 20 ? surname(p.name) + " has been decent to me. "
+    if(t.mem.length && r() < 0.7)
+      bits.push((t.w > 20 ? surname(p.name) + " has been decent to me. "
             : t.w < -20 ? "I have had about enough of " + surname(p.name) + ". "
-            : "") + t.mem[0].t;
-    if(t.w > 55) return surname(p.name) + " is the one person here I would leave a room with.";
-    if(t.w < -55) return "I will not be in a room with " + surname(p.name) + " if I can help it, and they know why.";
+            : "") + t.mem[0].t);
+    else if(t.w > 55) bits.push(surname(p.name) + " is the one person here I would leave a room with.");
+    else if(t.w < -55) bits.push("I will not be in a room with " + surname(p.name) + " if I can help it, and they know why.");
   }
-  if(byId(m.rival) === p)
-    return surname(p.name) + " and I do not agree about anything and never have. Whatever they told you, halve it.";
-  if((m.allies || []).indexOf(p.id) >= 0)
-    return surname(p.name) + " is the one person in here I would leave a room with. Do not come between us.";
+  if(!bits.length && byId(m.rival) === p)
+    bits.push(surname(p.name) + " and I do not agree about anything and never have. Whatever they told you, halve it.");
+  if(!bits.length && (m.allies || []).indexOf(p.id) >= 0)
+    bits.push(surname(p.name) + " is the one person in here I would leave a room with. Do not come between us.");
   const know = m.mem && m.mem.some(e => e.t.indexOf(surname(p.name)) >= 0);
-  if(know) return "I have had dealings with " + surname(p.name) + ". They were not restful.";
-  const v = G.bill && !G.bill.done ? memberVote(p, G.bill) : 0;
-  return surname(p.name) + " is " + (v > 0 ? "with the bill, or says so" : v < 0 ? "nowhere near the bill" : "not saying") +
-    ". Beyond that I would only be guessing, and I try not to guess out loud.";
+  if(!bits.length && know) bits.push("I have had dealings with " + surname(p.name) + ". They were not restful.");
+  if(!bits.length){
+    const v = G.bill && !G.bill.done ? memberVote(p, G.bill) : 0;
+    bits.push(surname(p.name) + " is " + (v > 0 ? "with the bill, or says so" : v < 0 ? "nowhere near the bill" : "not saying") +
+      ". Beyond that I would only be guessing, and I try not to guess out loud.");
+  }
+  if(r() < 0.35 && m.intent) bits.push("And if they get in the way of me trying to " + m.intent.t + ", we will have a different conversation.");
+  return bits.join(" ");
 }
-function answerRumour(m){
+function answerRumour(m, rnd){
+  const r = rnd || (() => Math.random());
   if(m.heard && m.heard.length)
     return "I hear " + m.heard[0].t.charAt(0).toLowerCase() + m.heard[0].t.slice(1) +
-      " I did not go looking for it.";
+      " I did not go looking for it." + (r() < 0.4 ? " Whether I believe it is another matter." : "");
   const mine = (G.secrets || []).filter(s2 => (s2.knownBy || []).indexOf(m.id) >= 0);
   if(mine.length && m.traits.discretion < 55)
     return "There is something going round about " + (mine[0].t || "somebody in here") + ". You did not get it from me.";
+  if(m.fear.k === "expose") return "I hear a great deal and repeat almost none of it. That is how I am still here.";
   return "If I hear anything worth repeating, you will not be the first to know. But you will know.";
 }
-function answerTrust(m){
+function answerTrust(m, rnd){
   const t = topMemory(m);
   if(t && t.w < 0) return "Trust? " + t.t + " Work back from there.";
-  if(m.rel.warmth > 40) return "I trust you more than I trust most of them, which is not the compliment it sounds like.";
+  if(m.rel.warmth > 40) return "I trust you more than I trust most of them, which is not the compliment it sounds like. Do not make me revise it.";
   if(m.rel.warmth < -25) return "No. Not since you gave me a reason not to.";
+  if(m.chat && m.chat.length > 4) return "We have talked enough that I can tell you this much: I am still measuring you. That is the honest answer.";
   return "I do not know you well enough to answer that honestly, and I would rather say so than flatter you.";
 }
-function answerPersonal(m){
+function answerPersonal(m, rnd){
+  const r = rnd || (() => Math.random());
   const bio = bioOf(m);
-  if(chance(.4)) return compose(m, "weary") + " " + bio.priv;
-  return pick([
-    bio.priv + " I do not usually say that in this building.",
-    "I have not been home in eleven days and my own family have stopped asking when I am back.",
-    "I am tired in a way sleep does not fix. Everybody here is. We do not say it."
-  ]);
+  autoInit(m);
+  const bits = [];
+  if(r() < 0.4) bits.push(compose(m, "weary", null, r));
+  bits.push(bio.priv + " I do not usually say that in this building.");
+  if(r() < 0.45) bits.push("I have not been home in eleven days and my own family have stopped asking when I am back.");
+  if(m.fear) bits.push("What keeps me up is " + m.fear.t + ".");
+  return bits.slice(0, r() < 0.5 ? 2 : 3).join(" ");
 }
-function answerCreed(m){
+function answerCreed(m, rnd){
   const c = creedOf(m.creed);
-  return "I hold with " + c.t + " — " + c.holds + ". It is not a slogan; it is the thing I check against.";
+  autoInit(m);
+  return "I hold with " + c.t + " — " + c.holds +
+    ". It is not a slogan; it is the thing I check against when the whip starts talking." +
+    (m.goal ? " I came here " + m.goal.t + ", and the creed is how I keep from losing the thread." : "");
+}
+/* prior turns in this conversation — they remember what you both said */
+function recallChat(m, rnd){
+  const r = rnd || (() => Math.random());
+  const chat = m.chat || [];
+  if(chat.length < 2) return null;
+  const yours = chat.filter(t => t.role === "user").slice(-4);
+  const mine = chat.filter(t => t.role === "assistant").slice(-3);
+  if(!yours.length) return null;
+  if(r() < 0.55 && yours.length){
+    const prev = yours[yours.length - 1].content.replace(/\\s+/g, " ").trim().slice(0, 72);
+    if(prev.length > 12)
+      return "You said \"" + prev + (prev.length >= 70 ? "…" : "") + "\" a moment ago — I have not forgotten it.";
+  }
+  if(mine.length && r() < 0.4){
+    const prev = mine[mine.length - 1].content.replace(/\\s+/g, " ").trim().slice(0, 64);
+    if(prev.length > 16)
+      return "I meant what I said earlier: " + prev.replace(/\\.*$/, "") + ".";
+  }
+  return null;
+}
+/* offline stand-in for applyEffect — warmth/trust from what was actually said */
+function applyImprovEffect(m, u, reply){
+  if(!m || !u) return;
+  let w = 0, tr = 0;
+  if(u.intent === "praise" || u.intent === "apology"){ w += 3; tr += 1; }
+  else if(u.intent === "agree"){ w += 2; }
+  else if(u.intent === "offer"){ w += 2; tr += 1; }
+  else if(u.intent === "insult"){ w -= 6; tr -= 2; }
+  else if(u.intent === "threat"){ w -= 8; tr -= 3; }
+  else if(u.intent === "disagree"){ w -= 1; }
+  else if(u.warm){ w += 1; }
+  else if(u.cold){ w -= 2; }
+  if(u.topics.indexOf("personal") >= 0 && m.rel.warmth > -10) w += 1;
+  if(u.topics.indexOf("creed") >= 0 && m.traits.conviction > 55) tr += 1;
+  if(u.topics.indexOf("home") >= 0) w += 1;
+  if(u.heat) w -= u.heat;
+  /* soft pledge language in the reply itself */
+  const rs = String(reply || "").toLowerCase();
+  if(G.bill && !G.bill.done && m.kind === "member"){
+    if(/\\byou have it\\b|\\bi was an aye\\b|\\bi am an aye\\b|\\bi will vote for\\b/.test(rs)){
+      m.pledge = 1; m.pledgeDay = G.day;
+    } else if(/\\bi am a no\\b|\\bi cannot vote for\\b|\\bi will not vote\\b|\\bi am not moving\\b.*no/.test(rs)){
+      if(/\\bi am a no\\b|\\bcannot vote for\\b|\\bwill not vote\\b/.test(rs)){ m.pledge = -1; m.pledgeDay = G.day; }
+    }
+  }
+  if(w) ripple(m, w, null, 0);
+  if(tr) m.rel.trust = clamp(m.rel.trust + tr, 0, 100);
+  if(Math.abs(w) >= 4 || u.intent === "threat" || u.intent === "apology"){
+    const memo = u.intent === "threat" ? "You threatened me to my face."
+               : u.intent === "apology" ? "You apologised without being made to."
+               : u.intent === "praise" ? "You said something decent and meant it."
+               : (u.raw || "").slice(0, 120);
+    if(memo && memo.length > 8) remember(m, memo, w || 2, Math.abs(w) > 6);
+  }
+  m.known = Math.max(m.known || 0, 1);
 }
 
-/* what they say back, and what it does */
+/* what they say back, and what it does — fully offline, cause-aware */
 function improvise(m, said){
   const u = understand(m, said);
   const mood = moodOf(m), v = voiceOf(m);
+  const r = talkRng(m, said);
   const out = [];
-  const short = v.terse && !u.aboutThem;
+  const short = v.terse && !u.aboutThem && u.intent !== "question" && u.heat < 1;
+  autoInit(m);
+  const bio = bioOf(m);
+  const pickR = arr => arr[Math.floor(r() * arr.length) % arr.length];
 
   /* ── the reaction, before the answer ── */
-  if(u.intent === "greet") out.push(pick(mood.val > 20
-    ? ["There you are.", "Good — I was hoping to catch you.", "Morning to you."]
-    : ["Representative.", "Mm.", "You have caught me on a bad one."]));
+  if(u.intent === "greet") out.push(pickR(mood.val > 20
+    ? ["There you are.", "Good — I was hoping to catch you.", "Morning to you.", "Come in. I have a minute."]
+    : ["Representative.", "Mm.", "You have caught me on a bad one.", "Make it quick."]));
   else if(u.intent === "apology"){
     const t = topMemory(m);
     if(t && t.w < 0){
@@ -8795,78 +8935,101 @@ function improvise(m, said){
   }
   else if(u.intent === "insult" || u.intent === "threat"){
     out.push(u.intent === "threat"
-      ? pick(["Say that again slowly.", "You want to be careful with that.", "Is that what this is."])
-      : pick(["That is beneath you.", "Right. We are doing this.", "Say it louder, then."]));
+      ? pickR(["Say that again slowly.", "You want to be careful with that.", "Is that what this is.", "Do not threaten me in this building."])
+      : pickR(["That is beneath you.", "Right. We are doing this.", "Say it louder, then.", "I will remember how you put that."]));
     ripple(m, -(9 + u.heat*4), u.intent === "threat"
       ? "You threatened me to my face and I have not forgotten it."
       : "You called me something in front of me.", -(9 + u.heat*3), true);
     if(u.intent === "threat") secretly(G.you, m);
   }
-  else if(u.intent === "agree") out.push(pick(["Then we understand each other.", "Good. That is rarer than it should be."]));
-  else if(u.intent === "disagree") out.push(compose(m, "doubt"));
+  else if(u.intent === "agree") out.push(pickR(["Then we understand each other.", "Good. That is rarer than it should be.", "At last — somebody who can count."]));
+  else if(u.intent === "disagree") out.push(compose(m, "doubt", null, r));
   else if(u.intent === "offer"){
     const worth = m.rel.warmth > 10 || m.traits.loyalty < 50;
     out.push(worth ? "Go on, then. What is it actually worth?" : "I am careful about what I take and who from.");
     if(worth){ m.rel.debtToThem = (m.rel.debtToThem || 0) + 1; ripple(m, 5, "You offered me something before I had to ask.", 4); }
   }
-  else if(u.intent === "farewell") out.push(pick(["Right. Mind how you go.", "We will speak again. We always do."]));
-  else if(!short) out.push(hedge(m).trim());
+  else if(u.intent === "farewell") out.push(pickR(["Right. Mind how you go.", "We will speak again. We always do.", "Go carefully."]));
+  else if(!short && r() < 0.72) out.push(hedge(m).trim());
 
   /* ── the answer itself, from what they actually are ── */
   const topic = u.topics[0];
   let body = null;
-  if(u.named && (topic === "none" || topic === "rumour" || topic === "trust")) body = answerNamed(m, u);
+  if(u.named && (topic === "none" || topic === "rumour" || topic === "trust")) body = answerNamed(m, u, r);
   if(!body) switch(topic){
-    case "bill":     body = answerBill(m, u); break;
-    case "money":    body = answerMoney(m); break;
-    case "party":    body = answerParty(m); break;
-    case "home":     body = answerHome(m, u); break;
-    case "post":     body = answerPost(m); break;
-    case "rumour":   body = answerRumour(m); break;
-    case "trust":    body = answerTrust(m); break;
-    case "personal": body = answerPersonal(m); break;
-    case "creed":    body = answerCreed(m); break;
-    case "press":    body = m.kind === "press" ? "I file at six. Give me something I can print."
-                          : "The gallery will write what it writes. I have stopped reading it."; break;
+    case "bill":     body = answerBill(m, u, r); break;
+    case "money":    body = answerMoney(m, r); break;
+    case "party":    body = answerParty(m, r); break;
+    case "home":     body = answerHome(m, u, r); break;
+    case "post":     body = answerPost(m, r); break;
+    case "rumour":   body = answerRumour(m, r); break;
+    case "trust":    body = answerTrust(m, r); break;
+    case "personal": body = answerPersonal(m, r); break;
+    case "creed":    body = answerCreed(m, r); break;
+    case "press":    body = m.kind === "press" ? "I file at six. Give me something I can print, not a gesture."
+                          : "The gallery will write what it writes. I have stopped reading it, which is how I sleep."; break;
     case "country":  body = "The Republic is twenty states that agree on about four things. " +
-                            "Anyone who tells you otherwise is running for something."; break;
+                            "Anyone who tells you otherwise is running for something. I check everything against " +
+                            creedOf(m.creed).t + " and against " + bio.town + "."; break;
     default:
-      if(u.named) body = answerNamed(m, u);
+      if(u.named) body = answerNamed(m, u, r);
       else if(u.intent === "question") body = "Because I want to " + m.intent.t +
-        ", and you are either useful to that or you are not.";
-      else if(u.intent === "request") body = "Ask me for something specific and I will give you a specific answer.";
+        ", and you are either useful to that or you are not. " +
+        (m.fear ? "What I will not risk is " + m.fear.t + "." : "");
+      else if(u.intent === "request") body = "Ask me for something specific and I will give you a specific answer. Vague asks get vague refusals.";
       else if(u.place) body = u.place === m.state
-        ? "You have been reading about my state. Then you know what it needs."
+        ? "You have been reading about my state. Then you know what it needs — and it is not another speech."
         : "I know " + u.place + " a little. They have their own trouble and it is not mine.";
-      else body = chance(.5)
-        ? compose(m, "district", {people: bioOf(m).town})
-        : fresh(() => fillFrame(m, pick([
+      else body = r() < 0.5
+        ? compose(m, "district", {people: bio.town}, r)
+        : fresh(() => fillFrame(m, pickR([
             "I came up as " + m.bg.replace(/^an? /, "") + ", and it colours how I {think} that.",
             "What I want {now} is to " + m.intent.t + ", and {little} else.",
             "You will forgive me if I {refuse} take that at face value.",
             "Say that on the floor and see who stands with you.",
-            "{maybe:cap}. I have heard {much} this week and believed {little} of it."
-          ])), 14);
+            "{maybe:cap}. I have heard {much} this week and believed {little} of it.",
+            "In " + bio.town + " they would not thank me for soft answers."
+          ]), null, r), 14);
   }
   if(body) out.push(body);
 
-  /* ── and something of their own back ── */
-  if(!short && chance(u.intent === "question" ? 0.5 : 0.3)){
-    autoInit(m);
-    out.push(chance(.55)
-      ? compose(m, "probe", {people: bioOf(m).town})
-      : fresh(() => fillFrame(m, pick([
+  /* ── cause / stake / party colour that makes them unique ── */
+  if(!short && r() < 0.42){
+    const b = G.bill && !G.bill.done ? G.bill : null;
+    const st = b ? stakeIn(m, b) : null;
+    if(st && st.level >= 2 && topic !== "bill")
+      out.push("And while we are talking — " + (st.why || ("this bill sits heavy on " + bio.town + ".")));
+    else if(m.fear && r() < 0.5)
+      out.push("I keep coming back to " + m.fear.t + ". That is the honest part.");
+    else if(m.goal && r() < 0.55)
+      out.push("I am still here to " + m.goal.t.replace(/^to /, "") + ".");
+    else if(m.party)
+      out.push(m.traits.loyalty > 60
+        ? "My caucus expects me to hold the line, and mostly I do."
+        : "Do not confuse my party label with a blank cheque.");
+  }
+
+  /* ── probe back, or recall a prior turn ── */
+  const recalled = (!short && r() < 0.38) ? recallChat(m, r) : null;
+  if(recalled) out.push(recalled);
+  else if(!short && r() < (u.intent === "question" ? 0.55 : 0.32)){
+    out.push(r() < 0.55
+      ? compose(m, "probe", {people: bio.town}, r)
+      : fresh(() => fillFrame(m, pickR([
           "And what am I supposed to do with that?",
           "Would you say that with the gallery in the room?",
-          "Who else have you been {told} that?"
-        ])), 12));
+          "Who else have you been {told} that?",
+          "Where does that leave " + bio.town + "?"
+        ]), null, r), 12));
   }
   const t = topMemory(m);
-  if(t && !u.warm && chance(.22)) out.push(t.t);
+  if(t && !u.warm && r() < 0.28) out.push(t.t);
 
-  /* three sentences at the outside: it has to fit in the panel */
-  let line = out.filter(Boolean).slice(0, short ? 2 : 3).join(" ");
-  if(line.length > 260) line = line.slice(0, 250).replace(/[^ ]*$/, "").trim() + "…";
+  /* 2–5 sentences when not terse; keep panel readable */
+  const maxBeats = short ? 2 : (u.intent === "question" || u.topics[0] !== "none" ? 5 : 4);
+  let line = out.filter(Boolean).slice(0, maxBeats).join(" ");
+  if(line.length > 420) line = line.slice(0, 410).replace(/[^ ]*$/, "").trim() + "…";
+  try{ applyImprovEffect(m, u, line); }catch(e){}
   return line;
 }
 /* Things you can say without typing a word. */
@@ -9145,13 +9308,22 @@ el("wireIn").addEventListener("keydown", e => { if(e.key === "Enter"){ e.prevent
 /* press and hold to speak, on a mouse or a finger, the same as V */
 (function(){
   const b = el("wireMic");
-  if(!b) return;
-  if(!micReady()){ b.hidden = true; return; }
-  const down = e => { e.preventDefault(); b.classList.add("is-live"); micStart(); };
-  const up   = () => { b.classList.remove("is-live"); micStop(); };
-  b.addEventListener("pointerdown", down);
-  addEventListener("pointerup", up);
-  b.addEventListener("pointercancel", up);
+  const ab = el("aloudBtn");
+  const bindHold = (node) => {
+    if(!node) return;
+    if(!micReady()){ node.hidden = true; return; }
+    const down = e => { e.preventDefault(); node.classList.add("is-live"); if(ab) ab.classList.add("is-live"); if(b) b.classList.add("is-live"); micStart(); };
+    const up   = () => { node.classList.remove("is-live"); if(ab) ab.classList.remove("is-live"); if(b) b.classList.remove("is-live"); micStop(); };
+    node.addEventListener("pointerdown", down);
+    addEventListener("pointerup", up);
+    node.addEventListener("pointercancel", up);
+  };
+  if(b){
+    b.title = "Hold to speak aloud into the room (also Hold V)";
+    b.textContent = "Speak Aloud";
+    bindHold(b);
+  }
+  bindHold(ab);
 })();
 
 /* Choosing who you are talking to should actually change who you are
@@ -11223,6 +11395,19 @@ addEventListener("keydown", e => {
   const k = e.key.toLowerCase();
   if(["arrowup","arrowdown","arrowleft","arrowright"," "].indexOf(k) >= 0) e.preventDefault();
   if(k === (G.bind||DEFAULT_BIND).pause){ togglePause(); return; }
+  /* Number keys = quick prompt answers */
+  if(k >= "1" && k <= "9" && !e.ctrlKey && !e.metaKey && !e.altKey){
+    refreshPicks();
+    const idx = k.charCodeAt(0) - 49;
+    if(PICKS[idx]){
+      e.preventDefault();
+      PICK = idx;
+      PICKS.forEach(b => b.classList.remove("is-pick"));
+      PICKS[idx].classList.add("is-pick");
+      firePick();
+      return;
+    }
+  }
   keys[k] = true;
   if(k === "e" && !TALK.open){
     const f = focusThing();
@@ -11231,7 +11416,7 @@ addEventListener("keydown", e => {
   }
   if(k === "escape" && TALK.open) closeTalk();
   if(k === "h" && veil.hidden){ immersion(); return; }
-  if(k === "v" && veil.hidden && !listening){ micStart(); return; }
+  if(k === "v" && veil.hidden && !listening){ const ab=el("aloudBtn"); if(ab) ab.classList.add("is-live"); micStart(); return; }
   if(k === ((G.bind||DEFAULT_BIND).phone || "f") && veil.hidden && !TALK.open && G.running) phoneCard();
   else if(k === "escape" && !veil.hidden && phoneWasRunning !== null) phoneClose();
 });
@@ -11239,7 +11424,7 @@ addEventListener("keyup", e => {
   if(typingInField(e)) return;
   const k = e.key.toLowerCase();
   keys[k] = false;
-  if(k === "v" && listening) micStop();     /* let go of V and it goes */
+  if(k === "v" && listening){ const ab=el("aloudBtn"); if(ab) ab.classList.remove("is-live"); micStop(); }
 });
 
 let drag = null;
@@ -11528,7 +11713,7 @@ const HANDBOOK = [
     ["The prompt in the middle", "Tells you what E will do right now."],
     ["Sit", "Face a bench or a chair and press E. In a sitting, you take your own seat."],
     ["F", "Your phone — Vox, posting, your mail, and the count."],
-    ["Hold V", "Speak out loud into the room — no popup. Whoever is in front of you answers in place."],
+    ["Hold V / Speak Aloud", "Speak into the room — no popup. 1–9 answer prompts. Pad: hold X to speak aloud, D-pad then A to confirm a numbered line."],
     ["H", "Hide the display. One button in the corner brings it back."],
     ["Space", "Pause. 1× 2× 4× set the speed of the day."]
   ]},
@@ -11873,8 +12058,11 @@ function refreshPicks(){
     });
   }
   PICKS = out.length ? out : NOPICKS;
-  /* Clear any old X/Y face glyphs — prompts are D-pad + A only. */
-  PICKS.forEach(b => { if(b.dataset.btn) delete b.dataset.btn; });
+  /* Number badges 1–9 for quick answers (keyboard + visible on pad). */
+  PICKS.forEach((b, i) => {
+    if(i < 9) b.dataset.btn = String(i + 1);
+    else if(b.dataset.btn) delete b.dataset.btn;
+  });
 }
 function movePick(d){
   if(!PICKS.length) return;
@@ -11911,11 +12099,12 @@ function padLegend(on){
   const focus = !asked && focusThing();
   /* Prompts are only armed after D-pad moves onto them; A confirms. */
   bits.push(["A", focus ? (focus.type === "person" ? "speak to " + surname(focus.ref.name) : "use " + focus.ref.label)
-           : PICK >= 0 && PICKS[PICK] ? "confirm"
+           : PICK >= 0 && PICKS[PICK] ? "confirm #" + (PICK+1)
            : seatUnderYou() ? (G.you.sitting ? "stand" : "sit")
-           : n2 ? "D-pad a line first"
+           : n2 ? "D-pad / 1–9 a line"
            : "speak / use"]);
-  if(n2) bits.push(["✛", PICK >= 0 ? ("line " + (PICK+1) + "/" + n2) : "choose a line"]);
+  if(n2) bits.push(["✛", PICK >= 0 ? ("#" + (PICK+1) + "/" + n2) : "choose 1–" + Math.min(9, n2)]);
+  bits.push(["hold X", "speak aloud"]);
   bits.push(["Y", "phone"]);
   bits.push(["B", !el("tipCard").hidden ? "close" : !veil.hidden ? "put it away"
                 : TALK.open ? "leave it" : G.bare ? "show display" : "back"]);
@@ -11989,8 +12178,11 @@ function pollPad(){
     /* if prompts are up but nothing is D-pad-selected, A does nothing */
   }
   if(edge(1)) padBack();
-  if(edge(2)){
-    /* X reserved — do not auto-answer prompts (D-pad + A only) */
+  /* Hold X = speak aloud (same as Hold V / Speak Aloud button) */
+  {
+    const xDown = down(2);
+    if(xDown && !PADHELD._micX){ PADHELD._micX = true; micStart(); const ab=el("aloudBtn"); if(ab) ab.classList.add("is-live"); }
+    if(!xDown && PADHELD._micX){ PADHELD._micX = false; micStop(); const ab=el("aloudBtn"); if(ab) ab.classList.remove("is-live"); }
   }
   if(edge(3)){
     /* Y: phone only — never a shortcut past D-pad prompt picks */
