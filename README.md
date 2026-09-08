@@ -3,7 +3,10 @@
 A first-person political life simulator. You are one member of a legislature in an
 invented republic, and the only thing you accumulate is what other people think of you.
 
-**Play:** https://claude.ai/code/artifact/1ac630ff-56ab-468a-9935-d695d9b8f34c
+**Play:** https://YOUR-USERNAME.github.io/the-long-session/
+
+Or open `index.html` from anywhere — a download, a USB stick, a folder on your desktop.
+It is one file. There is no build step and nothing to install.
 
 Everything runs in the page. No connector, no account, no permission prompt, nothing
 sent anywhere — every word anybody says is written in the game, out of who they are and
@@ -168,3 +171,24 @@ can stand again. **Lose twice and that is the career.**
 
 Built as a single HTML file. Three.js from CDN; every texture, material, face, garment,
 voice and flag is generated in code at runtime. No other assets.
+
+---
+
+## Running it yourself
+
+Nothing to install. Three ways, in order of least effort:
+
+1. **GitHub Pages** — Settings → Pages → Source: `main`, folder `/ (root)`. A minute later it is
+   live at `https://YOUR-USERNAME.github.io/the-long-session/` and stays live.
+2. **Open the file** — double-click `index.html`. Saving works in most browsers; a few block
+   local storage on `file://`, in which case the game runs but will not remember your career.
+3. **Any static host** — drop `index.html` anywhere that serves files.
+
+The only thing it fetches is three.js from a CDN and two fonts from Google. Everything else —
+every texture, every face, every garment, every line anybody says — is made in code as you play.
+Your career is saved in your own browser and goes nowhere else.
+
+## If it runs badly
+
+**Settings → Graphics → Simple.** Same game, far less asked of the machine. A room with more
+than six people in it switches to that on its own and switches back when it empties.
