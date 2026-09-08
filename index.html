@@ -1678,12 +1678,12 @@ const sceneEl = el("scene");
 /* preserveDrawingBuffer keeps the last frame readable, so link previews and
    thumbnails of this page show the room rather than a black rectangle. */
 const renderer = new THREE.WebGLRenderer({antialias:true, preserveDrawingBuffer:true});
-renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.5));
 renderer.outputEncoding = THREE.sRGBEncoding;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.0;
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.type = THREE.PCFShadowMap;
 /* The shadow pass is a second render of the whole room. Half the rate is
    indistinguishable from all of it and gives the main pass its time back;
    go much below that and shadows start trailing behind the feet. */
@@ -1713,9 +1713,10 @@ renderer.debug.onShaderError = function(gl, prog, vs, fs){
    because that forces shader recompiles and stutters. */
 let PEOPLE_CAST_SHADOW = false;
 let SHADOW_SKIP = 0.14;
+let SHADOW_PERIOD = 1/20;   /* shadow map refresh Hz — set in applyQuality */
 let GFX_EXPOSE = 1.0, GFX_HEMI = 1.0, GFX_SUN = 1.0;
-let GFX_PR = 2.0;
-let LOD_NEAR = 5.0, LOD_MID = 11.0, LOD_FAR = 16.0;
+let GFX_PR = 1.5;
+let LOD_NEAR = 4.0, LOD_MID = 8.5, LOD_FAR = 13.0;
 let crowdSafe = false, crowdT = 0;
 function migrateGfx(){
   /* Missing gfx: keep Best only if they already saved it; otherwise Balanced.
@@ -1755,22 +1756,32 @@ function crowdWatch(dt){
 /* LOD / seated-pose / pixel-ratio only. Never touches shadowMap.enabled. */
 function applyCrowd(){
   const q = G.gfx || "balanced";
+  /* LOD / PR only — never touches renderer.shadowMap.enabled. */
   if(q === "simple"){
-    LOD_NEAR = 3.0; LOD_MID = 6.0; LOD_FAR = 9.0;
+    LOD_NEAR = 2.6; LOD_MID = 5.0; LOD_FAR = 8.0;
     G.plainSit = true;
-    renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.25));
+    renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.0));
   } else if(crowdSafe){
-    LOD_NEAR = 3.5; LOD_MID = 7.0; LOD_FAR = 11.0;
+    /* Full room: squeeze LODs and hide hair wisps; shadows stay as quality set them. */
+    LOD_NEAR = 3.0; LOD_MID = 6.0; LOD_FAR = 9.5;
     G.plainSit = true;
-    const prCap = q === "best" ? Math.min(GFX_PR, 1.75) : Math.min(GFX_PR, 1.5);
+    const prCap = q === "best" ? Math.min(GFX_PR, 1.5) : Math.min(GFX_PR, 1.25);
     renderer.setPixelRatio(Math.min(devicePixelRatio || 1, prCap));
   } else {
-    if(q === "best"){ LOD_NEAR = 6.0; LOD_MID = 13.0; LOD_FAR = 20.0; }
-    else { LOD_NEAR = 5.0; LOD_MID = 11.0; LOD_FAR = 16.0; }
+    if(q === "best"){ LOD_NEAR = 5.5; LOD_MID = 11.0; LOD_FAR = 16.0; }
+    else { LOD_NEAR = 4.0; LOD_MID = 8.5; LOD_FAR = 13.0; }  /* balanced: shorter than old 5/11/16 */
     G.plainSit = !!G.noSit;
     renderer.setPixelRatio(Math.min(devicePixelRatio || 1, GFX_PR));
   }
   if(G.plainSit && G.members) try{ everyone().forEach(m => { m.sitting = false; }); }catch(e){}
+  /* Hair wisps: Best only, and never in a crowded room. */
+  const showWisp = (q === "best" && !crowdSafe);
+  if(G.members) try{
+    everyone().forEach(m => {
+      const u = m.mesh && m.mesh.userData;
+      if(u && u.wisps) for(const w of u.wisps) w.visible = showWisp;
+    });
+  }catch(e){}
   refreshBodyLods();
   lightKey = "";
 }
@@ -1781,21 +1792,24 @@ function applyQuality(){
   const q = G.gfx;
   if(q === "simple"){
     renderer.shadowMap.enabled = false;
+    renderer.shadowMap.type = THREE.PCFShadowMap;
     if(sun) sun.castShadow = false;
     if(sun) sun.shadow.mapSize.set(512, 512);
-    GFX_PR = 1.25; GFX_EXPOSE = 1.0; GFX_HEMI = 1.0; GFX_SUN = 1.0;
-    PEOPLE_CAST_SHADOW = false; SHADOW_SKIP = 0.14;
+    GFX_PR = 1.0; GFX_EXPOSE = 1.0; GFX_HEMI = 1.0; GFX_SUN = 1.0;
+    PEOPLE_CAST_SHADOW = false; SHADOW_SKIP = 0.16; SHADOW_PERIOD = 1/12;
   } else if(q === "balanced"){
     renderer.shadowMap.enabled = true;
-    if(sun){ sun.castShadow = true; sun.shadow.mapSize.set(1024, 1024); }
-    GFX_PR = 2.0; GFX_EXPOSE = 1.0; GFX_HEMI = 1.0; GFX_SUN = 1.0;
-    PEOPLE_CAST_SHADOW = false; SHADOW_SKIP = 0.14;
+    renderer.shadowMap.type = THREE.PCFShadowMap;   /* cheaper than Soft */
+    if(sun){ sun.castShadow = true; sun.shadow.mapSize.set(512, 512); }
+    GFX_PR = 1.5; GFX_EXPOSE = 1.0; GFX_HEMI = 1.0; GFX_SUN = 1.0;
+    PEOPLE_CAST_SHADOW = false; SHADOW_SKIP = 0.14; SHADOW_PERIOD = 1/20;
   } else {
-    /* Best: room shadows at 1024, no people cast (people-cast was the lag spike). */
+    /* Best: room shadows ≤1024, DPR 1.75, no people cast. */
     renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     if(sun){ sun.castShadow = true; sun.shadow.mapSize.set(1024, 1024); }
-    GFX_PR = 2.0; GFX_EXPOSE = 1.15; GFX_HEMI = 1.06; GFX_SUN = 1.05;
-    PEOPLE_CAST_SHADOW = false; SHADOW_SKIP = 0.14;
+    GFX_PR = 1.75; GFX_EXPOSE = 1.15; GFX_HEMI = 1.06; GFX_SUN = 1.05;
+    PEOPLE_CAST_SHADOW = false; SHADOW_SKIP = 0.14; SHADOW_PERIOD = 1/16;
   }
   if(sun && sun.shadow && sun.shadow.map){
     try{ sun.shadow.map.dispose(); }catch(e){}
@@ -1830,8 +1844,9 @@ renderer.shadowMap.autoUpdate = false;
 renderer.shadowMap.needsUpdate = true;
 let shadowT = 0;
 function shadowTick(dt){
+  if(!renderer.shadowMap.enabled) return;
   shadowT -= dt;
-  if(shadowT <= 0){ shadowT = 1/20; renderer.shadowMap.needsUpdate = true; }
+  if(shadowT <= 0){ shadowT = SHADOW_PERIOD || 1/20; renderer.shadowMap.needsUpdate = true; }
 }
 
 sceneEl.appendChild(renderer.domElement);
@@ -1846,7 +1861,7 @@ const hemi = new THREE.HemisphereLight(0xdfe6f0, 0x3a3630, 0.55);
 scene.add(hemi);
 const sun = new THREE.DirectionalLight(0xfff0dc, 1.6);
 sun.castShadow = true;
-sun.shadow.mapSize.set(1024,1024);
+sun.shadow.mapSize.set(512,512);
 sun.shadow.bias = -0.0011;
 sun.shadow.radius = 3;
 scene.add(sun); scene.add(sun.target);
@@ -1863,7 +1878,7 @@ function texCanvas(size, paint){
   const t = new THREE.CanvasTexture(c);
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.encoding = THREE.sRGBEncoding;
-  t.anisotropy = 4;
+  t.anisotropy = 1;
   return t;
 }
 function noise(ctx, s, amt, alpha){
@@ -2202,7 +2217,7 @@ function skinnedBody(spec){
    a cranium: occiput, brow ridge, temples, cheekbones, a jaw
    that narrows to a chin. Four variants, built once, shared. */
 function sculptSkull(seed){
-  const g = new THREE.SphereGeometry(0.5, 30, 22);
+  const g = new THREE.SphereGeometry(0.5, 18, 14);  /* was 30×22 — shared skulls, all presets */
   const p = g.attributes.position;
   const v = new THREE.Vector3();
   for(let i=0;i<p.count;i++){
@@ -2238,7 +2253,7 @@ const FACECACHE = new Map();
 function faceCanvas(L){
   const _fk = [L.skin,L.hair,L.eye,L.beard?1:0].join("_");
   if(FACECACHE.has(_fk)) return FACECACHE.get(_fk);
-  const S = 192;   /* was 320 — smaller atlas, cheaper upload + less fill */
+  const S = (G.gfx === "best") ? 192 : 160;   /* Balanced/Simple: smaller face atlas */
   const c = document.createElement("canvas"); c.width = c.height = S;
   const x = c.getContext("2d");
   const skin = "#" + L.skin.toString(16).padStart(6,"0");
@@ -2417,7 +2432,7 @@ function normalMapFrom(tex, strength){
   const out = document.createElement("canvas"); out.width = out.height = s;
   const octx = out.getContext("2d"), od = octx.createImageData(s,s);
   const lum = i => (data[i*4]*0.3 + data[i*4+1]*0.59 + data[i*4+2]*0.11)/255;
-  const k = strength === undefined ? 2.6 : strength;
+  const k = strength === undefined ? 2.0 : strength;  /* slightly softer relief; boot-cached */
   for(let y=0;y<s;y++){
     for(let x=0;x<s;x++){
       const i = y*s + x;
@@ -3345,11 +3360,9 @@ function buildPerson(p){
   const suit  = matCol(L.suit, .93);
   const suit2 = matCol(L.suit, .95);
   const shirt = matCol(L.shirt, .88);
-  /* skin: a physical material with a faint oily clearcoat, which is what
-     stops it reading as painted plastic under a hard light */
-  const skin = new THREE.MeshPhysicalMaterial({
-    color:L.skin, roughness:0.68, metalness:0.0,
-    clearcoat:0.16, clearcoatRoughness:0.62
+  /* skin: Standard (Physical+clearcoat was a per-person fragment cost) */
+  const skin = new THREE.MeshStandardMaterial({
+    color:L.skin, roughness:0.68, metalness:0.0
   });
   const hair  = matCol(L.hair, .92);
   const dark  = matCol(0x14120f, .45);
@@ -3575,15 +3588,23 @@ function buildPerson(p){
   const lidR = M(PG.box, skin, headG,  hu*0.14, hu*0.512, hu*0.487, hu*0.132, hu*0.001, hu*0.026, false);
 
   /* hair: a cap that sits on the crown and leaves a forehead */
+  const personWisps = [];
   if(L.style !== 3){
     /* three shells at slightly different radii, so the hair has depth
        and a soft edge rather than reading as one moulded lump */
     /* a shell just outside the skull, pushed back so a forehead shows */
     M(PG.sph, hair, headG, 0, hu*0.515, -hu*0.085, hu*0.985, hu*1.155, hu*1.055);
-    const wisp = new THREE.MeshStandardMaterial({color:L.hair, roughness:.94,
-      transparent:true, opacity:0.5, depthWrite:false});
-    M(PG.sph, wisp, headG, 0, hu*0.520, -hu*0.095, hu*1.012, hu*1.175, hu*1.080, false);
-    M(PG.sph, wisp, headG, 0, hu*0.525, -hu*0.105, hu*1.038, hu*1.192, hu*1.104, false);
+    /* Soft hair shells: Best only (and never under crowdSafe — applyCrowd toggles). */
+    const wispA = M(PG.sph, hair, headG, 0, hu*0.520, -hu*0.095, hu*1.012, hu*1.175, hu*1.080, false);
+    const wispB = M(PG.sph, hair, headG, 0, hu*0.525, -hu*0.105, hu*1.038, hu*1.192, hu*1.104, false);
+    {
+      const wisp = new THREE.MeshStandardMaterial({color:L.hair, roughness:.94,
+        transparent:true, opacity:0.5, depthWrite:false});
+      wispA.material = wisp; wispB.material = wisp;
+      const showWisp = (G.gfx === "best" && !crowdSafe);
+      wispA.visible = wispB.visible = showWisp;
+      personWisps.push(wispA, wispB);
+    }
     M(PG.sph, hair, headG, 0, hu*0.38, -hu*0.46, hu*0.94, hu*0.86, hu*0.72, false);   /* back of the head */
     if(L.style === 1)   /* a parting, sitting proud on one side */
       M(PG.sph, hair, headG, -hu*0.34, hu*0.86, -hu*0.02, hu*0.52, hu*0.42, hu*0.78, false);
@@ -3659,9 +3680,10 @@ function buildPerson(p){
 
   g.userData = {
     pelvis:BN.hips, spine:BN.chestB, headG:BN.headB, armL, armR, legL, legR,
-    eyeL, eyeR, mouth, lidL, lidR, hu, detailHead:headG,
+    eyeL, eyeR, mouth, lidL, lidR, hu, detailHead:headG, body:body,
+    wisps:personWisps,
     H:H, hipY:hipY, blink:1 + Math.random()*5, gest:0, shift:Math.random()*6,
-    glance:2 + Math.random()*4, glanceX:0
+    glance:2 + Math.random()*4, glanceX:0, poseN:0
   };
   tierPerson(g);
   g.updateMatrixWorld(true);
@@ -3773,6 +3795,14 @@ function animatePerson(p, dt){
   p.phase += dt * (moving ? 6.4 : 1.0);
   p.mesh.position.set(p.x, 0, p.z);
   p.mesh.rotation.y = p.facing;
+
+  /* Beyond LOD_FAR: placement + mesh LOD only — skip bone posing.
+     Mid-band idle posing runs every other frame (renderer still skins once). */
+  if(dist >= LOD_FAR) return;
+  u.poseN = (u.poseN|0) + 1;
+  if(!moving && !talking && !(p.sitting && !G.noSit && !G.plainSit) && dist >= LOD_MID && (u.poseN & 1)){
+    return;
+  }
 
   const ph = p.phase, s = Math.sin(ph), A = moving ? 0.58 : 0.0;
 
