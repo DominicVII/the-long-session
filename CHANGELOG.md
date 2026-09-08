@@ -1,4 +1,6 @@
-# The Long Session — changelog
+# One Nation, Under, ME. — changelog
+
+(Formerly The Long Session.)
 
 Live link: https://claude.ai/code/artifact/e1a2f577-1007-48dc-afaa-9b9f10205fc0
 

@@ -1,7 +1,7 @@
-# Update The Long Session from git (fast-forward only).
+# Update One Nation, Under, ME. from git (fast-forward only).
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
-Write-Host "Updating The Long Session..."
+Write-Host "Updating One Nation, Under, ME...."
 git pull --ff-only
 if ($LASTEXITCODE -ne 0) {
   Write-Host "git pull failed. Resolve conflicts or fetch manually, then retry."

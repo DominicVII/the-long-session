@@ -1,4 +1,6 @@
-# The Long Session
+# One Nation, Under, ME.
+
+Formerly *The Long Session*. Repo folder stays `the-long-session`.
 
 A first-person political life simulator. You are one member of a legislature in an
 invented republic, and the only thing you accumulate is what other people think of you.
