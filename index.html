@@ -57,7 +57,7 @@ button{font-family:inherit; color:inherit}
 /* One frame. The bar, the view and the wire are fixed; only the panels
    scroll, and they scroll inside themselves. Nothing pushes the page. */
 html,body{height:100%}
-.shell{display:grid; grid-template-rows:auto minmax(0,1fr) auto auto; gap:9px; padding:9px;
+.shell{display:grid; grid-template-rows:auto minmax(0,1fr) auto; gap:9px; padding:9px;
   max-width:1520px; margin:0 auto; height:100dvh; min-height:540px; box-sizing:border-box}
 @supports not (height:100dvh){ .shell{height:100vh} }
 
@@ -113,7 +113,12 @@ html,body{height:100%}
 .hud{position:absolute; left:12px; top:10px; pointer-events:none}
 .hud b{display:block; font-family:"Instrument Serif",Georgia,serif; font-size:19px; color:#eef1f4; text-shadow:0 2px 10px rgba(0,0,0,.9)}
 .hud i{font-style:normal; font-size:9px; font-weight:600; letter-spacing:.15em; text-transform:uppercase; color:#aab3bd; text-shadow:0 2px 8px rgba(0,0,0,.9)}
-.keys{position:absolute; right:12px; top:10px; display:flex; gap:5px; flex-wrap:wrap; justify-content:flex-end; max-width:54%; pointer-events:none}
+.keys{position:absolute; right:12px; top:10px; display:flex; gap:5px; flex-wrap:wrap; justify-content:flex-end; max-width:54%; pointer-events:none;
+  opacity:1; transition:opacity .5s ease}
+/* Ten key hints wrapped across half the screen is a wall of text over
+   the room — read once, then permanently in the way. It fades the
+   moment you actually move or act, and stays gone. */
+.keys.is-gone{opacity:0}
 .kbd{font-family:"JetBrains Mono",monospace; font-size:9.5px; background:rgba(12,15,19,.62); border:1px solid rgba(200,210,220,.28);
   color:#ccd3db; padding:3px 6px; border-radius:2px}
 /* Every floating thing on the view lives in its own lane and moves out
@@ -230,20 +235,10 @@ html,body{height:100%}
 .wire__how b{color:var(--fed); font-weight:600}
 .wire__state{font-size:10.5px; color:var(--ink-3); font-family:"JetBrains Mono",monospace; flex:0 1 auto; min-width:0}
 
-/* the wire ticker along the bottom */
-.tick{display:flex; align-items:center; gap:0; background:#12151a; border-radius:3px;
-  overflow:hidden; box-shadow:var(--shadow); border:1px solid rgba(255,255,255,.08)}
-.tick__tag{flex:0 0 auto; background:var(--fed); color:#fff; font-size:9px; font-weight:700;
-  letter-spacing:.16em; text-transform:uppercase; padding:9px 11px; white-space:nowrap}
-.tick__win{flex:1 1 auto; overflow:hidden; position:relative; height:32px}
-.tick__run{position:absolute; top:0; left:0; height:32px; display:flex; align-items:center;
-  white-space:nowrap; will-change:transform; animation:tickrun 46s linear infinite}
-.tick__run span{color:#e7eaee; font-size:11.5px; padding:0 26px; font-family:Archivo,sans-serif}
-.tick__run b{color:var(--fed); font-weight:700; letter-spacing:.1em; font-size:9.5px;
-  text-transform:uppercase; margin-right:8px}
-@keyframes tickrun{ from{transform:translateX(0)} to{transform:translateX(-50%)} }
-.tick:hover .tick__run{animation-play-state:paused}
-@media (prefers-reduced-motion: reduce){ .tick__run{animation:none; padding-left:12px} }
+/* The wire used to run as a marquee along the bottom — a second
+   permanent animation loop beside the WebGL canvas's own, and more
+   words over the view. It now lives on the phone as a page you read
+   when you choose to, under the Paper tab. */
 
 /* inbox */
 .mailrow{border-bottom:1px solid var(--line-soft); padding:10px 0; cursor:pointer}
@@ -417,7 +412,7 @@ body.is-bare .dossier,
 body.is-bare .travel,
 body.is-bare .keys{display:none}
 body.is-bare .grid{grid-template-columns:minmax(0,1fr)}
-body.is-bare .shell{grid-template-rows:minmax(0,1fr) auto auto}
+body.is-bare .shell{grid-template-rows:minmax(0,1fr) auto}
 body.is-bare .stage{border-radius:3px}
 /* the one thing that stays: the way back */
 .unbare{display:none}
@@ -636,7 +631,7 @@ body.is-bare .unbare:hover{background:rgba(16,19,25,.95)}
 @media (max-width:520px){
   /* a phone in portrait cannot hold all of this at once; let it scroll */
   html,body{height:auto}
-  .shell{height:auto; min-height:100dvh; grid-template-rows:auto auto auto auto}
+  .shell{height:auto; min-height:100dvh; grid-template-rows:auto auto auto}
   .grid{grid-template-rows:auto auto; align-items:start}
   .scene{aspect-ratio:16/10; flex:0 0 auto; min-height:260px}
   .stage{flex:0 0 auto}
@@ -763,10 +758,6 @@ body.is-bare .unbare:hover{background:rgba(16,19,25,.95)}
     <button class="chat__btn chat__btn--ghost" type="button" id="wireStop" hidden>Stop</button>
     <span class="wire__state" id="wireState"></span>
   </footer>
-  <div class="tick" id="tick">
-    <div class="tick__tag">The Wire</div>
-    <div class="tick__win"><div class="tick__run" id="tickRun"></div></div>
-  </div>
 </div>
 
 <div class="veil" id="veil"><div class="card" id="card"></div></div>
@@ -4720,7 +4711,7 @@ function seatUnderYou(){
   return best;
 }
 function toggleSit(){
-  if(G.you.sitting){ G.you.sitting = false; feed("You stand."); return; }
+  if(G.you.sitting){ G.you.sitting = false; G.you.sitY = 0; feed("You stand."); return; }
   const s2 = seatUnderYou();
   if(!s2) return;
   /* sit ON the seat, facing out, not buried in the bench in front of it */
@@ -4730,6 +4721,11 @@ function toggleSit(){
   cam.yaw = f;
   cam.vx = cam.vz = 0;
   G.you.sitting = true;
+  /* the committee dais sits members up on a 0.30m platform, which
+     seatRoom already carries for members via sitY; the player's own eye
+     height never read it, so sitting in one of those seven chairs put
+     your view at floor height, half inside the platform. */
+  G.you.sitY = s2.y || 0;
   feed("You sit down.");
 }
 function focusTarget(){
@@ -5203,7 +5199,7 @@ function refreshVox(){
    the whip count, the wire and Vox. It costs you the same minutes it
    would cost you sitting down, because reading is reading.
    ══════════════════════════════════════════════════════════ */
-let phoneTab = "vox";
+let phoneTab = "paper";
 function phoneCard(){
   if(!G.running && !G.over && !phoneWasRunning) return;
   voxInit();
@@ -5214,6 +5210,16 @@ function phoneCard(){
   const tabBtn = (id, label) =>
     '<button type="button" class="mk__opt' + (phoneTab === id ? " is-on" : "") + '" data-ptab="' + id + '">' + label + '</button>';
   let body = "";
+  if(phoneTab === "paper"){
+    /* the wire used to scroll past you in the room on its own clock,
+       whether you were reading it or not. It reads better sitting
+       still, on a page you open when you want it. */
+    const H = makeHeadlines();
+    body = '<div class="phone__scroll">' + (H.length
+        ? H.map(h => '<div class="entry"><div class="entry__d">' + h[0].toUpperCase() + '</div>' +
+            '<div class="entry__t">' + h[1] + '</div></div>').join("")
+        : '<p class="muted">Nothing to report yet.</p>') + '</div>';
+  } else
   if(phoneTab === "vox"){
     body = '<div class="phone__scroll">' + (voxRows(14) || '<p class="muted">Nothing yet.</p>') + '</div>';
   } else if(phoneTab === "post"){
@@ -5252,7 +5258,7 @@ function phoneCard(){
     '<div class="eyebrow">Your phone · ' + hhmm() + '</div>' +
     '<h1>The office, in your pocket.</h1>' +
     '<div class="mk__opts phone__tabs">' +
-      tabBtn("vox", "Vox") + tabBtn("post", "Post") +
+      tabBtn("paper", "Paper") + tabBtn("vox", "Vox") + tabBtn("post", "Post") +
       tabBtn("mail", "Mail" + (unread ? " (" + unread + ")" : "")) + tabBtn("desk", "The count") +
     '</div>' + body +
     '<div class="card__actions"><button class="btn" type="button" id="phDone">Put it away</button></div>';
@@ -5413,7 +5419,7 @@ function checkEvents(){
   if(q !== G.lastAuto){ G.lastAuto = q; if(G.running && !G.over) save(); }
   /* the wire refreshes often, and money moves with it */
   const tk = Math.floor(G.minute/12);
-  if(tk !== G.lastTick){ G.lastTick = tk; lobbyMoney(); paintTicker(); }
+  if(tk !== G.lastTick){ G.lastTick = tk; lobbyMoney(); }
   const due = eventDue();
   if(due && G.running && !G.over){
     if(due.rsvp === true && G.room !== due.room && !G.moving){ escortTo(due); return; }
@@ -7886,7 +7892,7 @@ function eventCard(e){
     if(o && o.run) o.run();
     note(e.t + ": " + (o ? o.t : "attended") + ".", true);
     G.running = true;
-    refreshPanels(); paintTicker();
+    refreshPanels();
   }));
 }
 
@@ -7933,13 +7939,6 @@ function makeHeadlines(){
   const defect = G.members.filter(m => m.traits.loyalty < 34 && Math.abs(m.rel.warmth) > 30)[0];
   if(defect) H.push(["Rumour", "Talk that " + defect.name + " is unhappy where they sit"]);
   return H;
-}
-function paintTicker(){
-  const H = makeHeadlines();
-  if(!H.length) return;
-  const html = H.map(h => '<span><b>' + h[0] + '</b>' + h[1] + '</span>').join("");
-  setHTML(el("tickRun"), html + html);      /* doubled, so the loop is seamless */
-
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -10539,16 +10538,6 @@ function note(text, big){
 function feed(text, kind){
   G.feed.unshift({t:text, at:hhmm(), kind:kind||"", born:G.t});
   if(G.feed.length > 8) G.feed.pop();
-  feedDirty = true;
-}
-/* the wire is rebuilt a few times a minute, not on every notice */
-let feedDirty = false, feedT = 0;
-function feedTick(dt){
-  if(!feedDirty) return;
-  feedT -= dt;
-  if(feedT > 0) return;
-  feedT = 2.5; feedDirty = false;
-  try{ paintTicker(); }catch(e){}
 }
 function paintFeed(){
   /* The feed used to print itself over the top right of the room, where
@@ -10915,7 +10904,7 @@ function careerEnd(){
     (foes.length ? '<p><strong>Will be glad you are gone:</strong> ' + listify(foes.map(m=>m.name)) + '.</p>' : '') +
     '<div class="card__actions"><button class="btn" type="button" id="again">Run again, somewhere else</button></div>';
   veil.hidden = false;
-  try{ localStorage.removeItem(SAVE_KEY); }catch(e){}
+  clearSave();
   el("again").addEventListener("click", () => location.reload());
 }
 
@@ -11463,6 +11452,19 @@ function typingInField(e){
   const t = e.target;
   return !!t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable);
 }
+/* The control legend is only worth anything until it has been read.
+   Once the player presses something that moves or acts it has done its
+   job and become text sitting over the room, so it goes — once — with
+   a fallback timer for anyone on a pad who never touches a listed key.
+   Selected by class, not id: the div carries no id attribute. */
+let keysHintGone = false;
+function hideKeysHint(){
+  if(keysHintGone) return;
+  keysHintGone = true;
+  const k = document.querySelector(".keys");
+  if(k) k.classList.add("is-gone");
+}
+setTimeout(hideKeysHint, 14000);
 addEventListener("keydown", e => {
   if(typingInField(e)) return;            /* never walk the player while they type */
   const k = e.key.toLowerCase();
@@ -11481,6 +11483,7 @@ addEventListener("keydown", e => {
       return;
     }
   }
+  if("wasdqce".indexOf(k) >= 0 || k === "v" || k === "h") hideKeysHint();
   keys[k] = true;
   if(k === "e" && !TALK.open){
     const f = focusThing();
@@ -11502,6 +11505,7 @@ addEventListener("keyup", e => {
 
 let drag = null;
 renderer.domElement.addEventListener("pointerdown", e => {
+  hideKeysHint();
   drag = {x:e.clientX, y:e.clientY, yaw:cam.yaw, pitch:cam.pitch, moved:0};
   renderer.domElement.setPointerCapture(e.pointerId);
 });
@@ -11671,13 +11675,29 @@ const TLSCollab = (function(){
     }
     persist();
   }
-  function downloadExport(){
-    const blob = new Blob([JSON.stringify(exportBundle(), null, 2)], {type:"application/json"});
+  /* Two homes, two ways to hand over a file. Served as a plain page
+     (GitHub Pages and the like) an anchor with a blob href downloads
+     normally. Inside the Claude artifact viewer that anchor is inert —
+     the sandbox never lets a page start its own download — so there the
+     save goes through the downloads capability, which asks the viewer
+     and may be declined. Try the capability first, fall back to the
+     anchor, so the same button works in both places. */
+  async function downloadExport(){
+    const text = JSON.stringify(exportBundle(), null, 2);
+    const name = "tls-collab-export.json";
+    try{
+      if(typeof claude !== "undefined" && claude.use){
+        const dl = await claude.use("downloads");
+        if(dl){ await dl.save({filename:name, data:text}); return true; }
+      }
+    }catch(e){ return false; }
+    const blob = new Blob([text], {type:"application/json"});
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = "tls-collab-export.json";
+    a.download = name;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    return true;
   }
   function summary(){
     const b = state.seatB;
@@ -11698,6 +11718,25 @@ const TLSCollab = (function(){
    16 · SAVE
    ══════════════════════════════════════════════════════════ */
 const SAVE_KEY = "longsession.v3";
+/* The save also lives in this artifact's own shared store, when the
+   viewer has granted it — so opening the game in a different browser,
+   or on a different device, finds the same career instead of starting
+   over. localStorage stays the fast copy this page always reads and
+   writes; the shared copy rides alongside it, best-effort, and is only
+   ever read back once — at boot, before anything has been played this
+   session — so nothing already in motion is overwritten out from under
+   a player mid-career. Whichever browser saved last wins, everywhere:
+   the same save unless resaved. */
+let DB = null, dbTried = false;
+async function initDB(){
+  if(dbTried) return DB;
+  dbTried = true;
+  try{
+    if(typeof claude !== "undefined" && claude.use) DB = await claude.use("db");
+  }catch(e){ DB = null; }
+  return DB;
+}
+function saveDoc(){ return DB ? DB.doc("saves/main") : null; }
 function stripMesh(m){
   const c = Object.assign({}, m);
   delete c.mesh;
@@ -11706,7 +11745,7 @@ function stripMesh(m){
 }
 function save(explicit){
   try{
-    localStorage.setItem(SAVE_KEY, JSON.stringify({
+    const payload = {
       day:G.day, minute:G.minute, congress:G.congress, term:G.term, sittingDay:G.sittingDay,
       mood:G.mood, seatsBy:G.seatsBy, recessLeft:G.recessLeft, billIndex:G.billIndex, secretId:G.secretId,
       members:G.members.map(stripMesh), press:G.press.map(stripMesh), civ:G.civ.map(stripMesh),
@@ -11716,10 +11755,20 @@ function save(explicit){
       states:G.states, prog:G.prog, lobbies:G.lobbies, money:G.money, history:G.history, events:G.events,
       regime:G.regime, amended:G.amended, exec:G.exec, presidents:G.presidents, statute:G.statute, bare:G.bare, gfx:G.gfx, simple:G.simple, noSit:G.noSit, voiceVar:G.voiceVar, voiceRate:G.voiceRate, voiceCarry:G.voiceCarry, hours:G.hours, withWhom:G.withWhom, ties:G.ties, panel:null, court:G.court, own:G.own, termLength:G.termLength, country:G.country,
       relics:G.relics, relicSpots:G.relicSpots, bind:G.bind, sens:G.sens,
-      regime:G.regime, amended:G.amended, exec:G.exec, presidents:G.presidents, statute:G.statute, bare:G.bare, gfx:G.gfx, simple:G.simple, noSit:G.noSit, voiceVar:G.voiceVar, voiceRate:G.voiceRate, voiceCarry:G.voiceCarry, hours:G.hours, withWhom:G.withWhom, ties:G.ties, panel:null, court:G.court, own:G.own, termLength:G.termLength
-    }));
+      /* the clock the shared save is compared by — not the game clock,
+         the real one, so two browsers can be told apart by which of
+         them actually wrote last */
+      savedAtMs: Date.now()
+    };
+    localStorage.setItem(SAVE_KEY, JSON.stringify(payload));
     G.savedAt = hhmm();
     if(explicit) note("Saved.", false);
+    /* best-effort: the local save above is the one thing that must
+       never fail, so the shared copy can never block or break it — a
+       career too large for one shared document (256 KiB) still saves
+       fine locally, it just will not be the copy another browser sees */
+    const doc = saveDoc();
+    if(doc) doc.set(payload).catch(() => {});
     return true;
   }catch(e){ return false; }
 }
@@ -11740,11 +11789,61 @@ function loadSave(){
     if(!G.history) buildHistory();
     if(G.country) TEX.flag = flagTexture(G.country.flag); else renameCountry((G.regime&&G.regime.form)||"republic");
     if(!G.prog) G.prog = {active:null, doneList:[]};
+    /* A save carries whatever room you were standing in when it was
+       written. If a later version drops a room, or the stored value is
+       simply wrong, that key is the one thing "Continue" cannot survive
+       without: begin() reads ROOMS[G.room] on its very first line. Put
+       the player back in their own office rather than crash the load
+       over a single stale string. */
+    if(!ROOMS[G.room]) G.room = "office";
+    if(G.visitId !== null && G.visitId !== undefined && G.room !== "visit") G.visitId = null;
     G.members.forEach(m => { m.mesh = null; usedNames.add(m.name); });
     G.press.forEach(m => m.mesh = null);
     G.civ.forEach(m => m.mesh = null);
     return true;
   }catch(e){ return false; }
+}
+/* Deliberately ending a career — game over, or "New career" — clears
+   the shared copy too. Without this the next reconcile would pull the
+   ended career straight back from another browser that had not caught
+   up, which would make starting over look like it silently failed. */
+function clearSave(){
+  try{ localStorage.removeItem(SAVE_KEY); }catch(e){}
+  const doc = saveDoc();
+  if(doc) doc.delete().catch(() => {});
+}
+/* Runs once, at boot, after the opening card has already been painted
+   from whatever localStorage says — so the player never waits on a
+   capability that may not answer at all. If the shared store holds a
+   save written more recently than the local one, it replaces the local
+   copy and redraws the still-open opening card. Once the player has
+   started playing (G.running), this stops touching anything: nobody's
+   live career is overwritten because a slow call finally came back. */
+async function reconcileFromDB(){
+  await initDB();
+  const doc = saveDoc();
+  if(!doc) return;
+  let snap;
+  try{ snap = await doc.get(); }catch(e){ return; }
+  let local = null;
+  try{
+    const raw = localStorage.getItem(SAVE_KEY);
+    if(raw) local = JSON.parse(raw);
+  }catch(e){}
+  if(snap.exists){
+    const remote = snap.data();
+    const remoteAt = (remote && remote.savedAtMs) || 0;
+    const localAt = (local && local.savedAtMs) || 0;
+    if(remoteAt > localAt){
+      try{ localStorage.setItem(SAVE_KEY, JSON.stringify(remote)); }catch(e){}
+      if(!G.running) opening();
+    } else if(local && localAt > remoteAt){
+      doc.set(local).catch(() => {});
+    }
+  } else if(local){
+    /* nothing shared yet — this browser's save becomes the first one */
+    doc.set(local).catch(() => {});
+  }
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -11924,9 +12023,11 @@ function collabCard(){
       : "Partner present — Proxy AI off.");
     collabCard();
   }));
-  el("colExport").addEventListener("click", () => {
-    TLSCollab.downloadExport();
-    note("Collab JSON downloaded — put it under collab/ for git.");
+  el("colExport").addEventListener("click", async () => {
+    /* the viewer can decline the save, so only claim it happened when it did */
+    const ok = await TLSCollab.downloadExport();
+    note(ok ? "Collab JSON saved — put it under collab/ for git."
+            : "The save was declined or is unavailable here.", !ok);
   });
   el("colImport").addEventListener("click", () => el("colFile").click());
   el("colFile").addEventListener("change", () => {
@@ -12226,6 +12327,9 @@ function pollPad(){
   PAD.turn = -dz(ax[2] || 0) * 1.7;
   PAD.tilt = -dz(ax[3] || 0) * 1.2;
   const b = gp.buttons || [];
+  /* a pad player never presses the keys the legend lists, so any real
+     stick or button input clears it just the same as a keypress */
+  if(PAD.vx || PAD.vz || PAD.turn || PAD.tilt || b.some(x => x && x.pressed)) hideKeysHint();
   const down = i => !!(b[i] && b[i].pressed);
   const edge = i => { const d = down(i), was = !!PADHELD[i]; PADHELD[i] = d; return d && !was; };
   if(down(6) || down(7) || down(10)) PAD.sprint = true;
@@ -12393,6 +12497,11 @@ function say(node, text){
 }
 let last = performance.now(), acc = 0, frameFails = 0;
 let hailT = 0, hailWho = null, matChkT = 0, matChk = 0, matChkSaid = 0;
+/* the furniture repair sweep: a fixed slice of roomGroup checked every
+   half-second, the window moving along so a big room costs the same
+   per frame as a small one */
+let furnChkT = 0, furnCursor = 0, furnFixed = 0, furnFixedSaid = 0;
+const FURN_BATCH = 24;
 
 function frame(now){
   try{ frameBody(now); }
@@ -12451,6 +12560,48 @@ function frameBody(now){
       feed("A body was drawing wrong and has been put right.");
     }
   }
+  /* The same corruption that flattens a body into a slab can hit a
+     piece of furniture — a desk, a bench, a lamp — for the same reason:
+     a matrix that stopped updating after something reparented it, or a
+     NaN from one bad frame. Nothing was watching the room itself, so a
+     broken chair stayed broken forever, at any quality tier — this was
+     never a quality problem, so Simple never fixed it either. A room
+     can be a few hundred objects, so this does not walk all of them
+     every tick the way the (much shorter) person list does: it takes a
+     fixed slice each half-second and moves the window along, so cost
+     per frame stays flat however furnished the room is, and the whole
+     room is swept within a few seconds of entering it. Lights are
+     skipped — the light budget turns those on and off on purpose. */
+  furnChkT -= dt;
+  if(furnChkT <= 0){
+    furnChkT = 0.5;
+    const kids = roomGroup.children, n = kids.length;
+    if(n){
+      const batch = Math.min(FURN_BATCH, n);
+      for(let i = 0; i < batch; i++){
+        const g = kids[(furnCursor + i) % n];
+        if(!g || g.isLight) continue;
+        const e = g.matrixWorld.elements;
+        let bad = false;
+        for(let k = 0; k < 16; k++) if(!isFinite(e[k])){ bad = true; break; }
+        if(!bad){
+          const sx = Math.hypot(e[0], e[1], e[2]), sy = Math.hypot(e[4], e[5], e[6]), sz = Math.hypot(e[8], e[9], e[10]);
+          if(sx < 1e-4 || sy < 1e-4 || sz < 1e-4) bad = true;
+        }
+        if(bad){
+          g.matrixAutoUpdate = true;
+          g.updateMatrixWorld(true);
+          g.traverse(o => { o.matrixAutoUpdate = true; });
+          furnFixed++;
+        }
+      }
+      furnCursor = (furnCursor + batch) % n;
+      if(furnFixed > furnFixedSaid){
+        furnFixedSaid = furnFixed;
+        feed("Something in the room was drawing wrong and has been put right.");
+      }
+    }
+  }
   /* the head keeps living even when the feet stop: bob under stride,
      a slow breath at rest, and a lean into the turn */
   cam.drift = smooth(cam.drift, 0, 0.2, dt);
@@ -12459,7 +12610,7 @@ function frameBody(now){
   /* seated, your eye is where a seated eye is — otherwise you are
      standing inside the desk in front of you and the whole view is the
      flat side of it */
-  const eye = G.you && G.you.sitting ? 1.19 : 1.66;
+  const eye = G.you && G.you.sitting ? 1.19 + (G.you.sitY || 0) : 1.66;
   cam.eye = cam.eye === undefined ? eye : smooth(cam.eye, eye, 0.004, dt);
   camera.position.set(
     cam.x + Math.cos(cam.yaw)*sway,
@@ -12480,7 +12631,6 @@ function frameBody(now){
   updatePlates(foc);
   updateTrack(TALK.m || foc);
   updateTele(dt);
-  feedTick(dt);
   /* the marker's pulse is the only thing left writing a uniform every
      frame for something you may not even be looking at */
   const wantMarker = !!(thing && thing.type === "prop" && !TALK.open);
@@ -12545,7 +12695,7 @@ function opening(){
   const c2 = el("cont");
   if(c2) c2.addEventListener("click", () => { veil.hidden = true; begin(); });
   el("fresh").addEventListener("click", () => {
-    try{ localStorage.removeItem(SAVE_KEY); }catch(e){}
+    clearSave();
     veil.hidden = true; nameCard();
   });
 }
@@ -13001,6 +13151,10 @@ applyQuality();
 buildRoom("office");
 resize();
 opening();
+/* fire-and-forget: the opening card above is already correct for
+   whatever this browser knows locally, and is only redrawn again if
+   the shared store actually holds something newer */
+reconcileFromDB();
 
 /* Every room's first build pays for its textures and its shader programs —
    three hundred milliseconds or more, taken out of the frame you walk
