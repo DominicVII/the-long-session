@@ -3986,7 +3986,7 @@ function updatePlates(focus){
     /* dialogue shows only when it is actually being said to somebody:
        to you, or to another person standing right there. */
     const partner = p.sayTo && p.sayTo !== "you" ? byId(p.sayTo) : null;
-    const spoken = p.sayT > 0 && p.say &&
+    const spoken = p.sayT > 0 && p.say && canHearPerson(p, p.say) &&
       (p.sayTo === "you" || (partner && partner.room === p.room && !partner.gone));
     const mood = presentOf(p);
     const sub = p.kind==="press" ? p.outlet : p.kind==="civ" ? p.role
@@ -6685,6 +6685,7 @@ function idNum(id){
 }
 function speak(p, text, vol){
   if(G.mute || !("speechSynthesis" in window) || !text) return;
+  if(p && !canHearPerson(p, text)) return;
   if(!voiceReady) loadVoices();
   try{
     const u = new SpeechSynthesisUtterance(String(text).slice(0, 240));
@@ -6787,21 +6788,63 @@ function interjectWhy(m, target){
   if(b && b.town) pool.push("nothing in this touches " + b.town + ", which is the whole reason it was filed");
   return pick(pool);
 }
-/* an exclamation, and then the reason for it */
-function interject(m, line, target){
-  return fresh(() => line + " — " + interjectWhy(m, target), 16);
+/* Track last lines so retorts do not loop the same six phrases. */
+function noteSaid(m, line){
+  if(!m) return;
+  if(!m._recent) m._recent = [];
+  const s = String(line || "").trim();
+  if(!s) return;
+  m._recent.unshift(s);
+  if(m._recent.length > 12) m._recent.length = 12;
+  try{ SAID.add(s); }catch(e){}
 }
-function procHeckle(m){
-
+function tooRecent(m, line){
+  const s = String(line || "").trim();
+  if(!s) return true;
+  if(SAID.has(s)) return true;
+  const rec = (m && m._recent) || [];
+  return rec.some(x => x === s || (x.length > 24 && s.length > 24 && (x.indexOf(s.slice(0, 28)) >= 0 || s.indexOf(x.slice(0, 28)) >= 0)));
+}
+/* an exclamation keyed to what was just said, then why they care */
+function interject(m, line, target, about){
+  const tip = String(about || (target && target.say) || "").slice(0, 90);
+  return fresh(() => {
+    let opener = line;
+    if(tip && chance(.55)){
+      const hook = tip.replace(/^["“]|["”]$/g, "").split(/[.!?]/)[0].trim();
+      if(hook.length > 12 && hook.length < 70)
+        opener = pick(["On that —", "To that point —", "About “" + hook.slice(0, 42) + "” —", line]);
+    }
+    const out = opener + " — " + interjectWhy(m, target);
+    noteSaid(m, out);
+    return out;
+  }, 20);
+}
+function procHeckle(m, about){
   const hot = moodOf(m).val < -20;
-  return fresh(() => pick(hot
-    ? ["Nonsense.", "Shame.", "Say that again outside.", "You know better than that.",
-       "That is not what it says and you know it.", "Order — this is not evidence.",
-       "Rubbish.", "Who wrote that for you?", "Answer the question.",
-       "That is the third time you have said it and it was not true the first time."]
-    : ["Hear, hear.", "Order.", "Give way.", "Read clause three.", "Say more about that.",
-       "That is fair.", "Quite right.", "Let them finish.", "On that point —",
-       "I would want that in the record."]), 14);
+  const tip = String(about || "").toLowerCase();
+  const pooled = [];
+  if(/money|cost|guilder|tariff|spend/.test(tip))
+    pooled.push("Where is the costing?", "Name the figure.", "That number does not appear in the text.");
+  if(/district|town|home|people|jobs/.test(tip))
+    pooled.push("Say the name of the town.", "Who asked for that at home?", "My people did not send me here for that.");
+  if(/party|whip|line|caucus/.test(tip))
+    pooled.push("Is that the whip speaking?", "Say it without the brief.", "The line is not a fact.");
+  if(/lie|false|not true|untrue/.test(tip))
+    pooled.push("Then put the true one in the record.", "Withdraw it.", "Cite it or sit down.");
+  const hotPool = pooled.concat(["Nonsense — and here is why.", "Shame, if that is the best you have.",
+    "Say that again outside, with the same papers.", "That is not what the clause says.",
+    "Answer what was asked, not what you prepared.", "Who wrote that for you?"]);
+  const coolPool = pooled.concat(["Hear, hear — on that exact point.", "Order. Let the reason land.",
+    "Give way for one sentence.", "Put that in the record.", "Fair — continue.",
+    "Quite right, and it follows from the text.", "On that point I agree, briefly."]);
+  return fresh(() => {
+    let line = pick(hot ? hotPool : coolPool);
+    let n = 0;
+    while(tooRecent(m, line) && n++ < 10) line = pick(hot ? hotPool : coolPool);
+    noteSaid(m, line);
+    return line;
+  }, 18);
 }
 /* what you can say when the chair calls you */
 function procOptions(e){
@@ -7463,18 +7506,35 @@ function immersion(on){
    sounds like a room full of different people rather than one.
    ══════════════════════════════════════════════════════════ */
 const EARSHOT = 11;                 /* metres past which you hear nothing */
-function earshot(p){
-  if(!p || p.x === undefined) return 1;
+function isScream(text){
+  const s = String(text || "").trim();
+  if(!s) return false;
+  if(/!{2,}/.test(s)) return true;
+  if(/\b(SCREAM|SCREAMS|SCREAMING|YELL|YELLS|YELLING|SHOUT|SHOUTS|SHOUTING|BELLOW|BELLOWING)\b/.test(s)) return true;
+  if(/\b(scream|screams|screaming|yell|yells|yelling|shout|shouts|shouting|bellow)\b/i.test(s) && /!/.test(s)) return true;
+  const letters = s.replace(/[^A-Za-z]/g, "");
+  if(letters.length >= 10 && s === s.toUpperCase() && /[A-Z]/.test(s)) return true;
+  return false;
+}
+/* You only hear people in your room — unless they SCREAM across the building. */
+function canHearPerson(p, text){
+  if(!p) return true;                 /* your own voice */
+  if(presentWith(p) || p.room === G.room) return true;
+  return isScream(text);
+}
+function earshot(p, text){
+  if(!p) return 1;
+  if(!canHearPerson(p, text)) return 0;
+  if(p.x === undefined) return 1;
+  /* scream from another room: muffled but intelligible */
+  if(p.room !== G.room && isScream(text)) return 0.62;
   const d = Math.hypot(p.x - cam.x, p.z - cam.z);
   if(d > EARSHOT) return 0;
-  /* close to full volume within a couple of paces, then falls away */
   return clamp(1.05 - Math.pow(d / EARSHOT, 1.35), 0, 1);
 }
-/* Whether you can make out the words, or only that somebody is talking.
-   Below about a third of the room's width, it is noise. */
-function audible(p){ return earshot(p) > 0.30; }
+function audible(p, text){ return earshot(p, text) > 0.30; }
 function speakAt(p, text){
-  const v = earshot(p);
+  const v = earshot(p, text);
   if(v <= 0.06) return;
   speak(p, text, v);
 }
@@ -9025,10 +9085,23 @@ function improvise(m, said){
   const t = topMemory(m);
   if(t && !u.warm && r() < 0.28) out.push(t.t);
 
-  /* 2–5 sentences when not terse; keep panel readable */
+  /* Prefer a coherent follow-on from the last thing THEY said */
+  const prev = (m.chat || []).filter(c => c.role === "assistant").slice(-1)[0];
+  if(prev && prev.content && !short && r() < 0.42 && (u.intent === "question" || u.intent === "disagree")){
+    const bit = String(prev.content).split(/[.!?]/)[0].trim();
+    if(bit.length > 18 && bit.length < 90)
+      out.unshift(pick([
+        "I already said " + bit.charAt(0).toLowerCase() + bit.slice(1) + " — hold me to it.",
+        "Going back to that: " + bit + ".",
+        "Do not make me walk it back: " + bit + "."
+      ]));
+  }
   const maxBeats = short ? 2 : (u.intent === "question" || u.topics[0] !== "none" ? 5 : 4);
-  let line = out.filter(Boolean).slice(0, maxBeats).join(" ");
+  const cleaned = out.filter(Boolean).filter(s => !tooRecent(m, s));
+  const use = cleaned.length ? cleaned : out.filter(Boolean);
+  let line = use.slice(0, maxBeats).join(" ");
   if(line.length > 420) line = line.slice(0, 410).replace(/[^ ]*$/, "").trim() + "…";
+  noteSaid(m, line);
   try{ applyImprovEffect(m, u, line); }catch(e){}
   return line;
 }
