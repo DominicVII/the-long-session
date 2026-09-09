@@ -56,6 +56,10 @@
 body{background:var(--stone); color:var(--ink); font-family:Archivo,"Helvetica Neue",Arial,sans-serif; font-size:14px; line-height:1.5; -webkit-font-smoothing:antialiased}
 :focus-visible{outline:2px solid var(--focus); outline-offset:2px}
 button{font-family:inherit; color:inherit}
+a{color:var(--com); text-decoration-color:color-mix(in srgb,var(--com) 55%,transparent);
+  text-underline-offset:2px}
+a:visited{color:var(--com)}
+a:hover{color:var(--fed)}
 
 /* One frame. The bar, the view and the wire are fixed; only the panels
    scroll, and they scroll inside themselves. Nothing pushes the page. */
@@ -603,6 +607,10 @@ body.is-bare .unbare{display:none}
 .risk__b{height:4px; background:var(--line-soft); border-radius:2px; overflow:hidden; margin-top:8px}
 .risk__b b{display:block; height:100%; background:var(--bad)}
 .risk__m{font-size:10.5px; color:var(--ink-3); font-family:"JetBrains Mono",monospace; margin-top:5px}
+.risk__actions{display:flex; gap:6px; margin-top:8px}
+.risk__actions .conc__btn{flex:1}
+.risk__actions .conc__btn.is-accepted{background:color-mix(in srgb,var(--good) 14%,var(--surface)); color:var(--good); border-color:color-mix(in srgb,var(--good) 55%,var(--line))}
+.risk__actions .conc__btn.is-declined{background:color-mix(in srgb,var(--bad) 10%,var(--surface)); color:var(--bad); border-color:color-mix(in srgb,var(--bad) 48%,var(--line))}
 .dn{display:grid; grid-template-columns:1fr auto; gap:2px 10px; padding:9px 0; border-bottom:1px solid var(--line-soft); font-size:12px}
 .dn b{font-family:"JetBrains Mono",monospace; font-size:11px}
 .dn span.s{grid-column:1/-1; font-size:10.5px; color:var(--ink-3)}
@@ -7797,14 +7805,15 @@ function dayScheduleHtml(){
       '<div class="risk__m">' + hourLabel(e.hour) + " · " + room +
         (e.k ? (" · " + e.k) : "") + " · <b>" + tagLab + "</b></div>" +
       (e.d ? '<p class="muted" style="margin:6px 0 0">' + e.d + '</p>' : '') +
-      (!done ? '<div style="display:flex;gap:6px;margin-top:8px">' +
-        '<button type="button" class="conc__btn" style="flex:1" data-gp="day:' + ix + ':1" data-day-rsvp="' + ix + ':1"' +
-          (e.rsvp === true ? " disabled" : "") + '>Accept</button>' +
-        '<button type="button" class="conc__btn" style="flex:1" data-gp="day:' + ix + ':0" data-day-rsvp="' + ix + ':0"' +
-          (e.rsvp === false ? " disabled" : "") + '>Decline</button>' +
+      (!done ? '<div class="risk__actions">' +
+        '<button type="button" class="conc__btn' + (e.rsvp === true ? " is-accepted" : "") + '" data-gp="day:' + ix + ':1" data-day-rsvp="' + ix + ':1"' +
+          (e.rsvp === true ? " disabled" : "") + '>' + (e.rsvp === true ? "✓ Accepted" : "Accept") + '</button>' +
+        '<button type="button" class="conc__btn' + (e.rsvp === false ? " is-declined" : "") + '" data-gp="day:' + ix + ':0" data-day-rsvp="' + ix + ':0"' +
+          (e.rsvp === false ? " disabled" : "") + '>' + (e.rsvp === false ? "✓ Declined" : "Decline") + '</button>' +
       '</div>' : '') +
     '</div>';
   }).join("") + '</div>' +
+  '<div class="card__actions" style="margin-top:10px"><button type="button" class="btn btn--ghost" id="dayAcceptAll">Accept all</button></div>' +
   '<p class="phone__hint">X opens this schedule any time. LB / RB (or LT / RT) walk phone tabs · D-pad / stick moves buttons · A selects · B puts it away.</p>';
 }
 function openDaySchedule(){
@@ -7914,6 +7923,13 @@ function phoneCard(){
     try{ save(); }catch(e){}
     phoneCard();
   }));
+  const acceptAll = el("dayAcceptAll");
+  if(acceptAll) acceptAll.addEventListener("click", () => {
+    dayEventsToday().forEach(ev => { if(!ev.done) ev.rsvp = true; });
+    feed("Accepted every remaining item on today's schedule.");
+    try{ save(); }catch(e){}
+    phoneCard();
+  });
   card.querySelectorAll("[data-post]").forEach(b => b.addEventListener("click", () => {
     const kind = b.getAttribute("data-post");
     const k = voxKinds().find(x => x.id === kind);
@@ -9393,18 +9409,19 @@ function dayPlanCard(){
     '<p><strong>Personal:</strong> ' + hook + '</p>' +
     (list.length
       ? '<p>Accept and you will be walked in when the hour hits. Decline and the building keeps a different memory.</p>' +
+        '<div class="card__actions" style="margin:10px 0 12px"><button class="btn btn--ghost" type="button" id="planAcceptAll">Accept all without conflict</button></div>' +
         list.map((e,i) =>
-          '<div class="risk" style="border-left-color:var(--fed)">' +
+          '<div class="risk" style="border-left-color:' + (e.rsvp === true ? 'var(--good)' : e.rsvp === false ? 'var(--bad)' : 'var(--fed)') + '">' +
             '<div class="risk__t">' + e.t + '</div>' +
             '<div class="risk__m">' + hourLabel(e.hour) + " · " +
               ((ROOMS[e.room]&&ROOMS[e.room].t)||e.room||"somewhere") +
               (e.k ? " · " + e.k : "") + '</div>' +
             '<p class="muted" style="margin:6px 0 8px">' + e.d + '</p>' +
-            '<div style="display:flex;gap:6px">' +
-              '<button class="conc__btn" style="flex:1" type="button" data-rsvp="' + i + ':1">' +
-                (e.rsvp === true ? "✓ Going" : "Accept") + '</button>' +
-              '<button class="conc__btn" style="flex:1" type="button" data-rsvp="' + i + ':0">' +
-                (e.rsvp === false ? "✓ Sent word" : "Decline") + '</button>' +
+            '<div class="risk__actions">' +
+              '<button class="conc__btn' + (e.rsvp === true ? " is-accepted" : "") + '" type="button" data-rsvp="' + i + ':1">' +
+                (e.rsvp === true ? "✓ Accepted" : "Accept") + '</button>' +
+              '<button class="conc__btn' + (e.rsvp === false ? " is-declined" : "") + '" type="button" data-rsvp="' + i + ':0">' +
+                (e.rsvp === false ? "✓ Declined" : "Decline") + '</button>' +
             '</div></div>').join("")
       : '<p>No meetings, no hearings, nobody wanting you behind a lectern. Do your own work — the corridor will invent a story if you do not.</p>') +
     '<div class="card__actions"><button class="btn" type="button" id="planGo" data-gp="plan:go">Start the day</button></div>';
@@ -9416,6 +9433,11 @@ function dayPlanCard(){
       dayPlanCard();
     }catch(e){ if(window.console) console.warn("rsvp", e); }
   }));
+  const planAcceptAll = el("planAcceptAll");
+  if(planAcceptAll) planAcceptAll.addEventListener("click", () => {
+    list.forEach(ev => { ev.rsvp = true; });
+    dayPlanCard();
+  });
   const pg = el("planGo");
   if(pg) pg.addEventListener("click", () => {
     try{
