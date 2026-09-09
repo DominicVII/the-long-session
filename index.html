@@ -10278,7 +10278,7 @@ function innerLife(m){
    and higher than a chairman who has never had to hurry.
    Off by default in the settings if you would rather read.
    ══════════════════════════════════════════════════════════ */
-let VOICES = [], voiceReady = false;
+let VOICES = [], voiceReady = false, voiceLastAt = 0;
 function loadVoices(){
   if(!("speechSynthesis" in window)) return;
   const v = speechSynthesis.getVoices() || [];
@@ -10296,9 +10296,16 @@ function idNum(id){
 function speak(p, text, vol){
   if(G.mute || !("speechSynthesis" in window) || !text) return;
   if(p && !canHearPerson(p, text)) return;
+  /* Speech synthesis is a shared browser queue. Ambient dialogue can fire
+     several times per second; allowing every utterance to queue eventually
+     locks up Chromium and makes the game look crashed. Keep one voice at a
+     time and let the next room update speak naturally. */
+  const now = performance.now();
+  if(now - voiceLastAt < 520) return;
+  if(speechSynthesis.speaking || speechSynthesis.pending) return;
   if(!voiceReady) loadVoices();
   try{
-    const u = new SpeechSynthesisUtterance(String(text).slice(0, 240));
+    const u = new SpeechSynthesisUtterance(String(text).slice(0, 190));
     if(VOICES.length) u.voice = VOICES[idNum(p ? p.id : "you") % VOICES.length];
     const t = p && p.traits ? p.traits : null;
     /* a hot temper talks faster and higher; a chairman does not hurry */
@@ -10312,10 +10319,18 @@ function speak(p, text, vol){
                     ((idNum(p ? p.id : "you") % 9) - 4) * 0.055) * spread, 0.5, 1.9);
     const carry = G.voiceCarry === undefined ? 1 : G.voiceCarry;
     u.volume = clamp((vol === undefined ? 0.95 : vol * 0.95) * carry, 0, 1);
+    voiceLastAt = now;
     speechSynthesis.speak(u);
   }catch(e){}
 }
-function hush(){ try{ if("speechSynthesis" in window) speechSynthesis.cancel(); }catch(e){} }
+function hush(){
+  try{
+    if("speechSynthesis" in window){
+      speechSynthesis.cancel();
+      voiceLastAt = 0;
+    }
+  }catch(e){}
+}
 
 /* ══════════════════════════════════════════════════════════
    PROCEEDINGS
@@ -15555,8 +15570,24 @@ function paintFeed(){
 
 /* ── moving between rooms without a cut ───────────────────── */
 function transition(build){
+  /* A second travel click while the fade is in progress used to queue
+     another room build behind the first one, leaving the input layer and
+     fade veil out of sync. Ignore duplicate requests until this seam is
+     complete. */
+  if(G.moving) return;
   const f = el("fade");
   G.moving = true;
+  let settled = false;
+  const settle = () => {
+    if(settled) return;
+    settled = true;
+    G.moving = false;
+    try{
+      f.style.transition = "opacity .5s ease";
+      f.style.opacity = "0";
+    }catch(e){}
+    try{ save(); }catch(e){}
+  };
   f.style.transition = "opacity .26s ease";
   f.style.opacity = "1";
   setTimeout(() => {
@@ -15570,13 +15601,10 @@ function transition(build){
       cam.vx = cam.vz = cam.yawVel = 0;
       G.doorGrace = G.t + 2.5;            /* don't fall straight back out */
     }catch(e){}
-    try{
-      f.style.transition = "opacity .5s ease";
-      f.style.opacity = "0";
-    }catch(e){}
-    G.moving = false;
-    try{ save(); }catch(e){}            /* continuity is kept at every seam */
+    settle();
   }, 270);
+  /* A failed/aborted room build must never leave a permanent black veil. */
+  setTimeout(settle, 3500);
 }
 function overnight(){
   const news = [];
@@ -18097,7 +18125,12 @@ function opening(){
 }
 function softUnstickVeil(){
   try{ veil.hidden = true; card.classList.remove("card--open"); veil.classList.remove("veil--make"); }catch(e){}
-  try{ G.running = !!(G.you && G.members && G.members.length); }catch(e){}
+  try{
+    G.moving = false;
+    const f = el("fade");
+    if(f){ f.style.transition = "opacity .2s ease"; f.style.opacity = "0"; }
+    G.running = !!(G.you && G.members && G.members.length);
+  }catch(e){}
 }
 if(!window.__onumBootClickBound){
   window.__onumBootClickBound = true;
