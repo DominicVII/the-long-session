@@ -3421,6 +3421,8 @@ const DIM = {
    and plant a soft contact disc so feet read as on the ground. */
 function groundGroup(g, padScale){
   if(!g) return g;
+  g.userData = g.userData || {};
+  g.userData.groundedProp = true;
   try{
     g.updateWorldMatrix(true, true);
     const box = new THREE.Box3().setFromObject(g);
@@ -3467,12 +3469,15 @@ function tidyRoomFurniture(){
   const seen = new Set();
   const remove = [];
   roomGroup.children.slice().forEach(g => {
-    if(!g || !g.isGroup || g.userData && g.userData.noTidy) return;
+    if(!g || !g.isGroup || g.userData && (g.userData.noTidy || !g.userData.groundedProp)) return;
     try{
+      /* Re-run the grounding calculation after all child meshes are present.
+         This catches late-added props in the House floor instead of leaving
+         their contact shadow or one leaf hovering above the floor. */
+      groundGroup(g, 0.62);
       g.updateWorldMatrix(true, true);
       const box = new THREE.Box3().setFromObject(g);
       if(!isFinite(box.min.y) || !isFinite(box.max.y)) return;
-      if(box.min.y < -0.002) g.position.y -= box.min.y;
       const c = box.getCenter(new THREE.Vector3());
       const s = box.getSize(new THREE.Vector3());
       const key = [c.x,c.y,c.z,s.x,s.y,s.z].map(v => Math.round(v*100)/100).join("|");
