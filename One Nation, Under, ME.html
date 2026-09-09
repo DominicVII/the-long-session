@@ -4502,11 +4502,13 @@ function buildRoomShell(id){
   addPlane(floorMat, 0, 0, d/2, w + 0.08, d + 0.08, -Math.PI/2); /* y=0 — furniture feet plant here */
   if(!R.open){ const ceil = matTex(TEX.coffer, Math.max(1,w/3.6), Math.max(1,d/3.6), .95);
     ceil.side = THREE.DoubleSide; addPlane(ceil, 0, h - 0.004, d/2, w + 0.06, d + 0.06, Math.PI/2); }
-  const wallOut = 0.02;
-  addPlane(wallMat, 0, h/2, d + wallOut, w + 0.08, h + 0.04);                 /* back  */
-  addPlane(wallMat, 0, h/2, -wallOut, w + 0.08, h + 0.04, 0, Math.PI);       /* front */
-  addPlane(wallMat, -hw - wallOut, h/2, d/2, d + 0.08, h + 0.04, 0, Math.PI/2); /* left */
-  addPlane(wallMat, hw + wallOut, h/2, d/2, d + 0.08, h + 0.04, 0, -Math.PI/2); /* right */
+  /* Keep the four shell planes on distinct contact lines.  The old corner
+     overlap created doubled wall edges and z-fighting when viewed obliquely. */
+  const wallOut = 0.004, wallSpan = 0.012;
+  addPlane(wallMat, 0, h/2, d + wallOut, w + wallSpan, h);                 /* back  */
+  addPlane(wallMat, 0, h/2, -wallOut, w + wallSpan, h, 0, Math.PI);       /* front */
+  addPlane(wallMat, -hw - wallOut, h/2, d/2, d + wallSpan, h, 0, Math.PI/2); /* left */
+  addPlane(wallMat, hw + wallOut, h/2, d/2, d + wallSpan, h, 0, -Math.PI/2); /* right */
   /* basic skirt always; full linings when not on the cheap preset */
   {
     const wood2 = R.style==="wood" || R.style==="chamber";
@@ -5750,10 +5752,11 @@ function buildPerson(p){
     /* three shells at slightly different radii, so the hair has depth
        and a soft edge rather than reading as one moulded lump */
     /* a shell just outside the skull, pushed back so a forehead shows */
-    M(PG.sph, hair, headG, 0, hu*0.515, -hu*0.085, hu*0.985, hu*1.155, hu*1.055);
+    const hairW = headW / hu, hairH = headH / hu, hairD = headD / hu;
+    M(PG.sph, hair, headG, 0, hu*0.535, -hu*0.07, hairW*1.03, hairH*1.06, hairD*1.04);
     /* Soft hair shells: Best only (and never under crowdSafe — applyCrowd toggles). */
-    const wispA = M(PG.sph, hair, headG, 0, hu*0.520, -hu*0.095, hu*1.012, hu*1.175, hu*1.080, false);
-    const wispB = M(PG.sph, hair, headG, 0, hu*0.525, -hu*0.105, hu*1.038, hu*1.192, hu*1.104, false);
+    const wispA = M(PG.sph, hair, headG, 0, hu*0.540, -hu*0.075, hairW*1.045, hairH*1.075, hairD*1.055, false);
+    const wispB = M(PG.sph, hair, headG, 0, hu*0.545, -hu*0.080, hairW*1.06, hairH*1.09, hairD*1.07, false);
     {
       const wisp = new THREE.MeshStandardMaterial({color:L.hair, roughness:.94,
         transparent:true, opacity:0.5, depthWrite:false});
@@ -5777,7 +5780,8 @@ function buildPerson(p){
     M(PG.sph, hair, headG, 0, hu*0.36, -hu*0.60, hu*0.88, hu*0.54, hu*0.52, false);
   }
   /* a beard has to be outside the jaw, not inside the skull */
-  if(L.beard) M(PG.sph, hair, headG, 0, hu*0.20, hu*0.10, hu*0.99, hu*0.66, hu*1.04, false);
+  if(L.beard) M(PG.sph, hair, headG, 0, hu*0.20, hu*0.10,
+    hairW*0.78, hairH*0.42, hairD*0.72, false);
   if(L.glasses){
     const gl = matCol(0x22242a, .3, .5);
     M(PG.ring, gl, headG, -hu*0.175, hu*0.515, hu*0.325, hu*0.255, hu*0.255, hu*0.255, false);
@@ -7803,7 +7807,12 @@ function dayScheduleHtml(){
     billBit = '<div class="risk" style="border-left-color:var(--ink-3);margin-bottom:10px">' +
       '<div class="risk__t">' + b.title + '</div>' +
       '<div class="risk__m">Roll call · day ' + b.voteDay +
-        (b.voteHour != null ? (' · ' + hourLabel(b.voteHour)) : '') + '</div></div>';
+        (b.voteHour != null ? (' · ' + hourLabel(b.voteHour)) : '') + '</div>' +
+      '<div class="risk__actions">' +
+        '<button type="button" class="conc__btn" data-gp="phone-vote:1" data-phone-vote="1">1 · Vote yes</button>' +
+        '<button type="button" class="conc__btn" data-gp="phone-vote:-1" data-phone-vote="-1">2 · Vote no</button>' +
+      '</div>' +
+      '<p class="phone__hint">Choose with D-pad / stick, then press A or click. Keyboard 1 = yes, 2 = no.</p></div>';
   }
   if(!list.length){
     return billBit + '<p class="muted">No sittings on the book for today. The corridor will invent one if you wait long enough.</p>';
@@ -7935,6 +7944,16 @@ function phoneCard(){
     if(!ev || ev.done) return;
     ev.rsvp = yes;
     feed(yes ? ("Accepted: " + ev.t + ".") : ("Sent word — skipping " + ev.t + "."));
+    try{ save(); }catch(e){}
+    phoneCard();
+  }));
+  card.querySelectorAll("[data-phone-vote]").forEach(btn => btn.addEventListener("click", () => {
+    if(!G.bill || G.bill.done) return;
+    const vote = +btn.getAttribute("data-phone-vote");
+    if(vote !== 1 && vote !== -1) return;
+    G.you.vote = vote;
+    try{ taylorDayVoteDefiance(vote); }catch(e){}
+    feed(vote > 0 ? "Phone vote recorded: yes." : "Phone vote recorded: no.");
     try{ save(); }catch(e){}
     phoneCard();
   }));
@@ -16715,12 +16734,13 @@ renderer.domElement.addEventListener("pointerdown", e => {
 });
 renderer.domElement.addEventListener("pointermove", e => {
   if(!drag) return;
-  const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+  const dx = clamp(e.clientX - drag.x, -32, 32);
+  const dy = clamp(e.clientY - drag.y, -32, 32);
   drag.x = e.clientX; drag.y = e.clientY;
   drag.moved = Math.max(drag.moved, Math.abs(dx) + Math.abs(dy));
   /* Never gated on has-pad — pad sticks and mouse yaw/pitch both apply */
-  cam.yaw -= dx * 0.005;
-  cam.pitch = clamp(cam.pitch - dy * 0.004, -1.15, 1.15);
+  cam.yaw -= dx * 0.0024;
+  cam.pitch = clamp(cam.pitch - dy * 0.0018, -1.05, 1.05);
 });
 renderer.domElement.addEventListener("pointerup", () => {
   const wasDrag = drag && drag.moved > 6;
@@ -17796,6 +17816,9 @@ function pollPad(){
 }
 
 function tick(dt){
+  /* A stalled tab can report a huge delta; never turn that into a physics
+     teleport or a burst of room/voice work after the tab resumes. */
+  dt = clamp(Number(dt) || 0.016, 0.001, 0.05);
   G.t += dt;
   const w = dt * G.speed;          /* how fast the day runs around you */
   /* proper WASD: W/S walk, A/D step sideways, arrows look around */
