@@ -5940,6 +5940,47 @@ function syncPeople(){
   peopleGroup.traverse(o => { if(o.isSkinnedMesh && o.skeleton) o.skeleton.update(); });
   } finally { syncPeople._busy = false; }
 }
+function syncPeopleStaged(done){
+  if(_buildingRoom || syncPeopleStaged._busy) return;
+  syncPeopleStaged._busy = true;
+  FRAME_ID++;
+  while(peopleGroup.children.length) peopleGroup.remove(peopleGroup.children[0]);
+  const list = hereNow().slice();
+  let at = 0;
+  const step = () => {
+    const stop = Math.min(list.length, at + 3);
+    try{
+      for(; at < stop; at++){
+        const p = list[at];
+        if(p.look){
+          ensureLookMorphs(p.look);
+          if(p.mesh && (p.look._faceVer !== 2 || p.look._clothVer !== 2)){
+            if(p.mesh.parent) p.mesh.parent.remove(p.mesh);
+            p.mesh = null; p.faceTex = null;
+          }
+        }
+        if(!p.mesh){
+          p.mesh = buildPerson(p);
+          if(p.look){ p.look._faceVer = 2; p.look._clothVer = 2; }
+        }
+        peopleGroup.add(p.mesh);
+      }
+      peopleGroup.updateMatrixWorld(true);
+    }catch(e){
+      syncPeopleStaged._busy = false;
+      if(window.console) console.warn("syncPeople staged", e);
+      if(done) done(e);
+      return;
+    }
+    if(at < list.length){
+      requestAnimationFrame(step);
+      return;
+    }
+    syncPeopleStaged._busy = false;
+    if(done) done();
+  };
+  requestAnimationFrame(step);
+}
 function wrapPi(a){
   while(a > Math.PI) a -= Math.PI*2;
   while(a < -Math.PI) a += Math.PI*2;
@@ -9420,12 +9461,13 @@ function escortTo(e){
     cam.x = sp.x; cam.z = sp.z; cam.yaw = 0; cam.vx = cam.vz = 0;
     everyone().forEach(m => { if(m.room===dest) placeInRoom(m); });
     if(dest === "floor") seatChamber();
-    buildRoom(dest); syncPeople();
-    el("whereName").textContent = ROOMS[dest].t;
-    el("whereTag").textContent = ROOMS[dest].tag;
-    refreshPanels();
-    e.escorting = false;
-    eventCard(e);
+    return rebuildRoomStaged(dest, () => {
+      el("whereName").textContent = ROOMS[dest].t;
+      el("whereTag").textContent = ROOMS[dest].tag;
+      e.escorting = false;
+      eventCard(e);
+      refreshPanels();
+    });
   });
 }
 /* ── the day's card, read over breakfast ─────────────────── */
@@ -15635,7 +15677,21 @@ function transition(build){
   f.style.opacity = "1";
   setTimeout(() => {
     try{
-      build();
+      const pending = build();
+      if(pending && typeof pending.then === "function"){
+        pending.then(() => {
+          try{
+            cam.drift = -0.09;
+            cam.vx = cam.vz = cam.yawVel = 0;
+            G.doorGrace = G.t + 2.5;
+          }catch(e){}
+          settle();
+        }, (e) => {
+          if(window.console) console.warn("transition staged build", e);
+          settle();
+        });
+        return;
+      }
     }catch(e){
       if(window.console) console.warn("transition build", e);
     }
@@ -15648,6 +15704,20 @@ function transition(build){
   }, 270);
   /* A failed/aborted room build must never leave a permanent black veil. */
   setTimeout(settle, 3500);
+}
+function rebuildRoomStaged(id, after){
+  return new Promise((resolve, reject) => {
+    requestAnimationFrame(() => {
+      try{
+        buildRoom(id);
+      }catch(e){ reject(e); return; }
+      syncPeopleStaged((e) => {
+        if(e){ reject(e); return; }
+        try{ if(after) after(); }catch(err){ reject(err); return; }
+        resolve();
+      });
+    });
+  });
 }
 function overnight(){
   const news = [];
@@ -16014,11 +16084,12 @@ function goOutside(){
     const b = roomBox("steps");
     { const sp = safeSpawn(G.room); cam.x = sp.x; cam.z = sp.z; } cam.yaw = 0; G.doorGrace = G.t + 2.5;
     everyone().forEach(m => { if(m.room === "steps") placeInRoom(m); });
-    buildRoom("steps"); syncPeople();
-    el("whereName").textContent = ROOMS.steps.t;
-    el("whereTag").textContent = "No longer a member";
-    G.running = true;
-    refreshPanels();
+    return rebuildRoomStaged("steps", () => {
+      el("whereName").textContent = ROOMS.steps.t;
+      el("whereTag").textContent = "No longer a member";
+      G.running = true;
+      refreshPanels();
+    });
   });
 }
 function outsideAllowed(id){
@@ -16159,13 +16230,14 @@ function callOn(m){
     const b = roomBox("visit");
     { const sp = safeSpawn(G.room); cam.x = sp.x; cam.z = sp.z; } cam.yaw = 0; G.doorGrace = G.t + 2.5;
     m.x = 0.2; m.z = 6.0; m.tx = m.x; m.tz = m.z; m.facing = Math.PI;
-    buildRoom("visit"); syncPeople();
-    el("whereName").textContent = surname(m.name) + "'s office";
-    el("whereTag").textContent = m.suite;
-    m.known = Math.max(m.known, 1);
-    ripple(m, 3, "You came to my office rather than catching me in a corridor.", 3);
-    note("Called on " + m.name + " at " + m.suite + ".");
-    refreshPanels();
+    return rebuildRoomStaged("visit", () => {
+      el("whereName").textContent = surname(m.name) + "'s office";
+      el("whereTag").textContent = m.suite;
+      m.known = Math.max(m.known, 1);
+      ripple(m, 3, "You came to my office rather than catching me in a corridor.", 3);
+      note("Called on " + m.name + " at " + m.suite + ".");
+      refreshPanels();
+    });
   });
 }
 function goTo(id){
@@ -16179,10 +16251,11 @@ function goTo(id){
     const b = roomBox(id);
     { const sp = safeSpawn(G.room); cam.x = sp.x; cam.z = sp.z; } cam.yaw = 0; G.doorGrace = G.t + 2.5;
     everyone().forEach(m => { if(m.room===id) placeInRoom(m); });
-    buildRoom(id); syncPeople();
-    el("whereName").textContent = ROOMS[id].t;
-    el("whereTag").textContent = ROOMS[id].tag;
-    refreshPanels();
+    return rebuildRoomStaged(id, () => {
+      el("whereName").textContent = ROOMS[id].t;
+      el("whereTag").textContent = ROOMS[id].tag;
+      refreshPanels();
+    });
   });
 }
 function refreshFloor(){
