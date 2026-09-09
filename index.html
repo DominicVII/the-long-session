@@ -16898,6 +16898,8 @@ const TLSCollab = (function(){
    16 · SAVE
    ══════════════════════════════════════════════════════════ */
 const SAVE_KEY = "longsession.v3";
+const SAVE_BACKUP_KEY = "longsession.v3.backup";
+let saveBusy = false;
 function stripMesh(m){
   const c = Object.assign({}, m);
   delete c.mesh;
@@ -16905,8 +16907,10 @@ function stripMesh(m){
   return c;
 }
 function save(explicit){
+  if(saveBusy) return false;
+  saveBusy = true;
   try{
-    localStorage.setItem(SAVE_KEY, JSON.stringify({
+    const payload = JSON.stringify({
       _gfxOk:true,
       day:G.day, minute:G.minute, congress:G.congress, term:G.term, sittingDay:G.sittingDay,
       mood:G.mood, seatsBy:G.seatsBy, recessLeft:G.recessLeft, billIndex:G.billIndex, secretId:G.secretId,
@@ -16920,22 +16924,34 @@ function save(explicit){
       relics:G.relics, relicSpots:G.relicSpots, bind:G.bind, sens:G.sens,
       regime:G.regime, amended:G.amended, exec:G.exec, presidents:G.presidents, statute:G.statute, bare:G.bare, gfx:G.gfx, simple:G.simple, fullDetail:G.fullDetail, noSit:G.noSit, voiceVar:G.voiceVar, voiceRate:G.voiceRate, voiceCarry:G.voiceCarry, hours:G.hours, withWhom:G.withWhom, ties:G.ties, panel:null, court:G.court, own:G.own, parties:G.parties, termLength:G.termLength,
       greatest:G.greatest, blasphemy:G.blasphemy, loreNote:G.loreNote, greatnessOpen:G.greatnessOpen
-    }));
+    });
+    const previous = localStorage.getItem(SAVE_KEY);
+    if(previous) localStorage.setItem(SAVE_BACKUP_KEY, previous);
+    localStorage.setItem(SAVE_KEY, payload);
     G.savedAt = hhmm();
     if(explicit) note("Saved.", false);
+    saveBusy = false;
     return true;
-  }catch(e){ return false; }
+  }catch(e){
+    saveBusy = false;
+    try{ if(window.console) console.warn("save", e); }catch(e2){}
+    return false;
+  }
 }
 function loadSave(){
   try{
-    const raw = localStorage.getItem(SAVE_KEY);
+    let raw = localStorage.getItem(SAVE_KEY);
+    if(!raw) raw = localStorage.getItem(SAVE_BACKUP_KEY);
     if(!raw) return false;
     let d;
     try{ d = JSON.parse(raw); }
     catch(parseErr){
-      /* Partial / corrupt write — keep the key; do not wipe Continuity. */
+      /* A torn primary write can happen if the browser closes mid-save. */
       if(window.console) console.warn("loadSave parse", parseErr);
-      return false;
+      try{
+        raw = localStorage.getItem(SAVE_BACKUP_KEY);
+        d = JSON.parse(raw || "");
+      }catch(backupErr){ return false; }
     }
     if(!d || !d.you || !d.members || !d.members.length) return false;
     Object.assign(G, d);

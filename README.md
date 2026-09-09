@@ -12,7 +12,7 @@ First-person political life in an invented republic. You are one member of the H
 
 | | |
 |---|---|
-| **Windows (best)** | Keep the folder together (`index.html`, `vendor/`, `collab/`). Double-click **`Play.bat`** (or `.\Play.ps1`). Offline — no internet required. |
+| **Windows (best)** | Keep the folder together (`index.html`, `vendor/`, `collab/`). Double-click the desktop **One Nation Under ME** shortcut, or run **`Launch-Offline.ps1`** / **`StartLocal.bat`**. Offline — no internet required. |
 | **Browser file** | Open `index.html` (`file://`). Three.js loads from `vendor/`. |
 | **Local server** | From the folder: `python3 -m http.server 8765` → [http://127.0.0.1:8765/index.html](http://127.0.0.1:8765/index.html) |
 
@@ -30,12 +30,18 @@ To move a career to another computer:
 
 The imported save replaces the local browser save and reloads the game. Keep the JSON private: it contains the complete career history.
 
+The game also keeps a rolling browser backup (`longsession.v3.backup`) behind the main
+career save. If the browser closes during a write, Continue automatically falls back to
+the last complete snapshot. Saves are written during play, at room changes, when the
+page is hidden, and before the browser closes.
+
 ### Public link (GitHub `main`)
 
 > Push this folder to `main` for the CDN to match your machine. Until then, use **Play.bat** / local server.
 
 | Host | URL |
 |------|-----|
+| **GitHub Pages** | `https://dominicvii.github.io/the-long-session/` (enable Pages for `main` / root) |
 | **raw.githack** | https://raw.githack.com/DominicVII/the-long-session/main/index.html |
 | **jsDelivr** | https://cdn.jsdelivr.net/gh/DominicVII/the-long-session@main/index.html |
 
