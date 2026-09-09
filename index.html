@@ -745,6 +745,7 @@ body.is-bare .unbare{display:none}
       <div class="bar__clock" id="hClock">8:00</div>
       <div class="speed" id="speed">
         <button type="button" id="btnPause" title="Pause (space)" aria-label="Pause">II</button>
+        <button type="button" id="btnMenu" title="Open game menu" aria-label="Open game menu">Menu</button>
         <button type="button" data-s="1" class="is-on" title="Normal">1&times;</button>
         <button type="button" data-s="2" title="Double">2&times;</button>
         <button type="button" data-s="4" title="Fast">4&times;</button>
@@ -3589,6 +3590,28 @@ function propShelf(x,z,ry,w,h){
     const bk=matTex(TEX.books, Math.max(1,w*2.2), 1, .92);
     put(bk,0,0.16+i*(h-0.3)/rows+0.17,0.03, w-0.12,0.30,0.20);
   }
+  return groundGroup(g, 0.7);
+}
+function propCabinet(mat, trim, x, z, w, h, d, ry){
+  const g = new THREE.Group();
+  g.position.set(x,0,z); g.rotation.y = ry || 0; roomGroup.add(g);
+  const put = (m,px,py,pz,sx,sy,sz) => {
+    const e = new THREE.Mesh(UNIT.box,m);
+    e.position.set(px,py,pz); e.scale.set(sx,sy,sz);
+    e.castShadow = true; e.receiveShadow = true; g.add(e);
+  };
+  const hh = h || 1.05, ww = w || 0.58, dd = d || 0.62;
+  put(mat, 0, hh/2, 0, ww, hh, dd);
+  put(trim || mat, 0, hh + 0.025, 0, ww + 0.06, 0.05, dd + 0.05);
+  const rows = 3, faceH = (hh - 0.16) / rows;
+  for(let i=0;i<rows;i++){
+    const y = 0.08 + faceH/2 + i*faceH;
+    put(trim || mat, 0, y, dd/2 + 0.014, ww - 0.08, faceH - 0.025, 0.028);
+    put(matCol(0xb08b45, .35, .8), 0, y, dd/2 + 0.034, 0.055, 0.018, 0.018);
+  }
+  [[-ww*.36,-dd*.34],[ww*.36,-dd*.34],[-ww*.36,dd*.34],[ww*.36,dd*.34]].forEach(p =>
+    put(trim || mat, p[0], 0.025, p[1], 0.07, 0.05, 0.07));
+  return groundGroup(g, 0.65);
 }
 function propRug(x,z,w,d,ry){
   const m=new THREE.Mesh(UNIT.plane, matTex(TEX.rug, 1,1, .98));
@@ -4516,14 +4539,11 @@ function buildRoomInner(id){
   /* per-room fittings */
   if(id === "office" || id === "visit"){
     try{
-    addBox(woodMat, 0,0.38,7.2, 2.0,0.10,1.0);                 /* desk top   */
-    addBox(woodMat, -0.85,0.19,7.2, 0.16,0.38,0.9);
-    addBox(woodMat, 0.85,0.19,7.2, 0.16,0.38,0.9);
+    propDesk(woodMat, woodMat, 0, 7.2, 2.0, 1.0);              /* member desk */
+    propChair(woodMat, leather, 0, 8.2, Math.PI);
     addBox(paperMat, -0.4,0.45,7.1, 0.3,0.02,0.4);
-    addBox(leather, 0,0.24,8.2, 0.6,0.48,0.6);                 /* chair      */
-    addBox(leather, 0,0.62,8.45, 0.6,0.7,0.12);
-    addBox(woodMat, -hw+0.35,1.0,4.5, 0.5,2.0,2.6);            /* bookcase   */
-    for(let i=0;i<3;i++) addBox(matCol([0x7a3b32,0x2f4a5c,0x4a4030][i], .9), -hw+0.35,0.5+i*0.62,4.5, 0.44,0.34,2.4, 0, true);
+    /* Shelves and cabinet share the same grounded prop recipes as every room. */
+    propCabinet(matCol(0x2a2f36,.7), matCol(0x3a4048,.6), hw-0.55, 5.6, 0.55, 1.04, 0.62);
     /* flags via placeRoomFlags (national+NO7; Taylor Day: NO7 only) */
     addCyl(brass, 0.75,0.52,7.0, 0.06,0.18);
   
@@ -4813,8 +4833,6 @@ function buildRoomInner(id){
     /* back-wall art: generic flush pass only (avoid double frames) */
     propSconce(-hw+0.12, 2.1, 4.2, Math.PI/2);
     propSconce(hw-0.12, 2.1, 4.2, -Math.PI/2);
-    addBox(matCol(0x2a2f36,.7), hw-0.55, 0.52, 5.6, 0.55,1.04,0.62, 0, true);   /* filing cabinet */
-    addBox(matCol(0x3a4048,.6), hw-0.55, 0.78, 5.29, 0.42,0.03,0.02, 0, true);
     addBox(matCol(0x1e2126,.8), -hw+1.4, 0.16, 9.0, 0.30,0.32,0.30, 0, true);   /* wastebasket */
     /* side table + tray for visitors; name plate feel near entry */
     addBox(woodMat, 1.55, 0.38, 5.15, 0.55, 0.06, 0.55, 0, true);
@@ -11703,9 +11721,11 @@ function makeHeadlines(){
   if(defect) H.push(["Rumour", "Talk that " + defect.name + " is unhappy where they sit"]);
   return H;
 }
-/* Bottom Wire ticker: frame-based scroll (~15s per loop at 60fps), not CSS time. */
-const TICK_LOOP_FRAMES = 15 * 60; /* 900 frames ≈ 15s wall at 60fps */
-let tickScrollF = 0;
+/* Bottom Wire ticker: move in occasional, readable steps instead of
+   continuously consuming paint work while the player is moving. */
+const TICK_PAUSE_FRAMES = 5 * 60;
+const TICK_STOPS = 12;
+let tickStop = 0, tickPauseF = 0;
 let tickHoverPause = false;
 function paintTicker(){
   const H = makeHeadlines();
@@ -11714,7 +11734,8 @@ function paintTicker(){
   const run = el("tickRun");
   if(!run) return;
   setHTML(run, html + html);      /* doubled, so the loop is seamless */
-  /* keep scroll phase; next tickScrollFrame will re-measure width */
+  tickStop = 0; tickPauseF = 0;
+  run.style.transform = "translateX(0)";
 }
 function tickScrollFrame(){
   const run = el("tickRun");
@@ -11728,10 +11749,12 @@ function tickScrollFrame(){
     }
   }catch(e){}
   if(tickHoverPause || box.matches(":hover")) return;
+  if(tickPauseF++ < TICK_PAUSE_FRAMES) return;
+  tickPauseF = 0;
   const half = run.scrollWidth * 0.5;
   if(!(half > 1)) return;
-  tickScrollF = (tickScrollF + 1) % TICK_LOOP_FRAMES;
-  const x = -(half * (tickScrollF / TICK_LOOP_FRAMES));
+  tickStop = (tickStop + 1) % TICK_STOPS;
+  const x = -(half * (tickStop / TICK_STOPS));
   run.style.transform = "translateX(" + x.toFixed(2) + "px)";
 }
 (function bindTickHover(){
@@ -16893,6 +16916,13 @@ function setSpeed(s){
   pb.classList.toggle("is-held", s === 0);
 }
 function togglePause(){ setSpeed(G.speed > 0 ? 0 : (G.prevSpeed || 1)); }
+function showGameMenu(){
+  if(!G.you || !(G.members && G.members.length) || !G.running) return;
+  try{ save(); }catch(e){}
+  G.running = false;
+  setSpeed(0);
+  opening();
+}
 
 /* ── settings, and rebinding the keys ── */
 /* ══════════════════════════════════════════════════════════
@@ -17203,6 +17233,7 @@ function settingsCard(){
   });
 }
 el("btnPause").addEventListener("click", togglePause);
+el("btnMenu").addEventListener("click", showGameMenu);
 (function(){
   const openBtn = el("uiOpenBtn");
   if(openBtn) openBtn.addEventListener("click", () => openPanels());
@@ -18046,6 +18077,7 @@ function cardActContinue(){
     /* Recover into office with save intact — never removeItem here. */
     try{
       G.running = true; G.over = false;
+      setSpeed(G.prevSpeed || 1);
       if(!G.room || !ROOMS[G.room]) G.room = "office";
       try{ save(); }catch(e0){}
       buildRoom(G.room || "office");
