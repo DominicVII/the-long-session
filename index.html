@@ -3452,6 +3452,27 @@ function groundFloorMesh(m){
   }catch(e){}
   return m;
 }
+/* Final room pass for compound furniture: keep every group on the floor and
+   drop accidental duplicate placements without touching walls, floors, or
+   other single-mesh architectural details. */
+function tidyRoomFurniture(){
+  const seen = new Set();
+  const remove = [];
+  roomGroup.children.slice().forEach(g => {
+    if(!g || !g.isGroup || g.userData && g.userData.noTidy) return;
+    try{
+      g.updateWorldMatrix(true, true);
+      const box = new THREE.Box3().setFromObject(g);
+      if(!isFinite(box.min.y) || !isFinite(box.max.y)) return;
+      if(box.min.y < -0.002) g.position.y -= box.min.y;
+      const c = box.getCenter(new THREE.Vector3());
+      const s = box.getSize(new THREE.Vector3());
+      const key = [c.x,c.y,c.z,s.x,s.y,s.z].map(v => Math.round(v*100)/100).join("|");
+      if(seen.has(key)) remove.push(g); else seen.add(key);
+    }catch(e){}
+  });
+  remove.forEach(g => roomGroup.remove(g));
+}
 /* a desk with legs, its top at writing height */
 function propDesk(topMat, legMat, x, z, w, dp, ry, h){
   /* chamber desk: thick top, full apron, paneled legs, drawer face */
@@ -4430,6 +4451,7 @@ function buildRoom(id){
     try{
       clearRoom();
       buildRoomInner(id);
+      tidyRoomFurniture();
       if(!roomGroup || roomGroup.children.length < 5)
         throw new Error("room shell too empty");
     }catch(e){
