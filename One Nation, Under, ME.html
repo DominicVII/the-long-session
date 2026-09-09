@@ -5679,23 +5679,32 @@ function buildPerson(p){
   skull.scale.set(headW, headH, headD);
   skull.castShadow = !!PEOPLE_CAST_SHADOW;
   headG.add(skull);
-  /* Always rebuild face tex when morphs exist (stale cache from old skins) */
-  p.faceTex = faceCanvas(L);
-  L._faceVer = 2;
+  /*
+     Faces are modeled volumes, not a canvas decal.  The skull supplies the
+     cheeks and forehead; these small meshes supply the readable planes that
+     catch light at normal gameplay distance.
+  */
   L._clothVer = 2;
-  const faceGeo = (G.gfx === "simple") ? FACE_DOME_LO : FACE_DOME;
-  const face = new THREE.Mesh(faceGeo, new THREE.MeshStandardMaterial({
-    map:p.faceTex, color:0xffffff, roughness:0.68, metalness:0.0,
-    transparent:true, alphaTest:0.015, depthWrite:false,
-    polygonOffset:true, polygonOffsetFactor:-3, polygonOffsetUnits:-3}));
-  /* Hug the skull face plane — width/height follow the same morphs */
-  /* The skull's front is roughly z=.5 in local head units.  Keeping the
-     dome at .27 buried the painted features inside the cranium, so faces
-     disappeared or flickered behind the skull from normal camera angles. */
-  face.position.set(0, hu*0.455, hu*(0.455 + 0.02*headD/hu));
-  face.scale.set(headW*1.12, headH*0.86, headD*1.05);
-  face.renderOrder = 2;
-  headG.add(face);
+  const eyeWhite = matCol(0xe8e3da, .45);
+  const irisMat = matCol(L.eye || 0x5a3d24, .32);
+  const pupilMat = matCol(0x090807, .26);
+  const eyeY3 = hu*0.50;
+  const eyeX3 = hu*0.14*fw;
+  let eyeL, eyeR;
+  [-1,1].forEach(side => {
+    const ex = side*eyeX3;
+    const eye = M(PG.sph, eyeWhite, headG, ex, eyeY3, hu*0.455,
+      hu*0.060, hu*0.038, hu*0.028, false);
+    if(side < 0) eyeL = eye; else eyeR = eye;
+    M(PG.sph, irisMat, headG, ex, eyeY3, hu*0.482,
+      hu*0.030, hu*0.027, hu*0.012, false);
+    M(PG.sph, pupilMat, headG, ex, eyeY3, hu*0.493,
+      hu*0.014, hu*0.018, hu*0.008, false);
+    if(G.gfx === "best"){
+      M(PG.sph, matCol(0xffffff, .18), headG, ex-hu*0.009, eyeY3+hu*0.010, hu*0.502,
+        hu*0.007, hu*0.007, hu*0.004, false);
+    }
+  });
   /* ears against the skull */
   const earY = hu*0.43, earX = headW*0.92;
   M(PG.sph, skin, headG, -earX, earY, -hu*0.04, hu*0.048, hu*0.145, hu*0.095, false);
@@ -5705,14 +5714,15 @@ function buildPerson(p){
   M(PG.sph, skin, headG,  hu*0.20*fw, hu*0.36, hu*0.30, hu*0.11*ck, hu*0.085*ck, hu*0.070*ck, false);
   /* chin */
   M(PG.sph, skin, headG, 0, hu*(fem ? 0.20 : 0.18), hu*0.34, hu*(0.09*jw), hu*0.07, hu*0.08, false);
-  /* nose — modest bridge that matches painted length (not a huge cone) */
-  const nose = M(PG.sph, skin, headG, 0, hu*(0.40 - 0.02*nl), hu*(0.42 + 0.02*nl),
-    hu*(0.055 + 0.02*nl), hu*(0.10 + 0.04*nl), hu*(0.09 + 0.03*nl), false);
-  nose.scale.z *= 1.15;
-  /* animation anchors (near painted features; kept tiny) */
-  const eyeL = M(PG.sph, dark, headG, -hu*0.14*fw, hu*0.50, hu*0.001, hu*0.001, hu*0.001, hu*0.001, false);
-  const eyeR = M(PG.sph, dark, headG,  hu*0.14*fw, hu*0.50, hu*0.001, hu*0.001, hu*0.001, hu*0.001, false);
-  const mouth = M(PG.box, matCol(0x7d4a44,.6), headG, 0, hu*0.30, hu*0.001, hu*0.001, hu*0.001, hu*0.001, false);
+  /* nose bridge, tip, and nostril wings are separate lit forms */
+  M(PG.sph, skin, headG, 0, hu*(0.425 - 0.02*nl), hu*0.405,
+    hu*(0.040 + 0.012*nl), hu*(0.105 + 0.035*nl), hu*(0.075 + 0.025*nl), false);
+  M(PG.sph, skin, headG, 0, hu*(0.345 - 0.01*nl), hu*(0.475 + 0.015*nl),
+    hu*(0.070 + 0.015*nl), hu*(0.045 + 0.015*nl), hu*(0.050 + 0.015*nl), false);
+  M(PG.sph, skin, headG, -hu*0.045, hu*0.345, hu*0.462,
+    hu*0.030, hu*0.025, hu*0.025, false);
+  M(PG.sph, skin, headG,  hu*0.045, hu*0.345, hu*0.462,
+    hu*0.030, hu*0.025, hu*0.025, false);
   if(G.gfx === "best"){
     const lens = new THREE.MeshStandardMaterial({
       color:0xffffff, roughness:0.16, metalness:0.0, transparent:true, opacity:0.20,
@@ -5726,13 +5736,13 @@ function buildPerson(p){
     hu*0.12*browS, hu*(0.032*bh), hu*0.048, false);
   M(PG.sph, skin, headG,  hu*0.15*fw, hu*(0.56 + 0.02*bh), hu*0.40,
     hu*0.12*browS, hu*(0.032*bh), hu*0.048, false);
-  /* lips with volume aligned to paint */
+  /* lips with volume */
   const lipM = matCol(fem ? 0x9a5a58 : 0x8a5550, .55);
-  M(PG.sph, lipM, headG, 0, hu*(0.275 + 0.01*lf), hu*0.425, hu*(0.095*lf), hu*(0.028*lf), hu*0.032, false);
+  const mouth = M(PG.sph, lipM, headG, 0, hu*(0.275 + 0.01*lf), hu*0.425, hu*(0.095*lf), hu*(0.028*lf), hu*0.032, false);
   M(PG.sph, lipM, headG, 0, hu*(0.255 + 0.01*lf), hu*0.430, hu*(0.088*lf), hu*(0.034*lf), hu*0.030, false);
-  /* lids over painted eyes */
-  const lidL = M(PG.box, skin, headG, -hu*0.14*fw, hu*0.508, hu*0.448, hu*0.115, hu*0.001, hu*0.024, false);
-  const lidR = M(PG.box, skin, headG,  hu*0.14*fw, hu*0.508, hu*0.448, hu*0.115, hu*0.001, hu*0.024, false);
+  /* upper eyelids shade the modeled eyes and keep them from looking pasted on */
+  const lidL = M(PG.sph, skin, headG, -eyeX3, hu*0.522, hu*0.480, hu*0.075, hu*0.018, hu*0.022, false);
+  const lidR = M(PG.sph, skin, headG,  eyeX3, hu*0.522, hu*0.480, hu*0.075, hu*0.018, hu*0.022, false);
 
   /* hair: a cap that sits on the crown and leaves a forehead */
   const personWisps = [];
