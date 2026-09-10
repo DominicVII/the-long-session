@@ -3872,9 +3872,11 @@ function propLaptop(x, z, ry, deskH){
   };
   put(body, 0, 0.018, 0, 0.46, 0.035, 0.34);
   put(trim, 0, 0.039, 0.035, 0.28, 0.008, 0.16);
-  /* screen rises from the rear hinge and leans back toward the user */
+  /* screen rises from the rear hinge and leans back toward the user.
+     The user sits at +z (the touchpad is at +0.035), so the lit panel
+     belongs on the lid's +z face — behind it, the lid is all you see. */
   put(body, 0, 0.19, -0.145, 0.46, 0.32, 0.028, -0.10);
-  put(screen, 0, 0.19, -0.162, 0.39, 0.25, 0.008, -0.10);
+  put(screen, 0, 0.19, -0.127, 0.39, 0.25, 0.008, -0.10);
   return groundGroup(g, 0.45);
 }
 /* a long bench with a back */
@@ -4137,15 +4139,20 @@ function propFrame(wall, x,y,z, w,h, tex, ry){
     addBox(gilt, x, y + h*0.5 - 0.006, fz + nz*0.006, w + 0.012, 0.012, 0.01, ry, true);
     addBox(gilt, x, y - h*0.5 + 0.006, fz + nz*0.006, w + 0.012, 0.012, 0.01, ry, true);
   } else {
-    addBox(wood, fx, y + (h + rail) * 0.5, z, depth, rail, w + rail * 2, ry, false);
-    addBox(wood, fx, y - (h + rail) * 0.5, z, depth, rail, w + rail * 2, ry, false);
-    addBox(wood, fx, y, z - (w + rail) * 0.5, depth, h, rail, ry, false);
-    addBox(wood, fx, y, z + (w + rail) * 0.5, depth, h, rail, ry, false);
+    /* These are already written in world axes for a side wall — thin in x,
+       long in z. The planes below still take ry, because a plane starts in
+       xy and has to be turned to face the room; a box that has already been
+       measured side-on must not be turned again, or every rail swings out
+       of the wall and lies across the picture. */
+    addBox(wood, fx, y + (h + rail) * 0.5, z, depth, rail, w + rail * 2, 0, false);
+    addBox(wood, fx, y - (h + rail) * 0.5, z, depth, rail, w + rail * 2, 0, false);
+    addBox(wood, fx, y, z - (w + rail) * 0.5, depth, h, rail, 0, false);
+    addBox(wood, fx, y, z + (w + rail) * 0.5, depth, h, rail, 0, false);
     [[-1,-1],[-1,1],[1,-1],[1,1]].forEach(c => {
-      addBox(wood, fx, y + c[1]*(h*0.5+rail*0.5), z + c[0]*(w*0.5+rail*0.5), depth*1.05, rail*1.05, rail*1.05, ry, false);
+      addBox(wood, fx, y + c[1]*(h*0.5+rail*0.5), z + c[0]*(w*0.5+rail*0.5), depth*1.05, rail*1.05, rail*1.05, 0, false);
     });
-    addBox(gilt, fx + nx*0.006, y + h*0.5 - 0.006, z, 0.01, 0.012, w + 0.012, ry, true);
-    addBox(gilt, fx + nx*0.006, y - h*0.5 + 0.006, z, 0.01, 0.012, w + 0.012, ry, true);
+    addBox(gilt, fx + nx*0.006, y + h*0.5 - 0.006, z, 0.01, 0.012, w + 0.012, 0, true);
+    addBox(gilt, fx + nx*0.006, y - h*0.5 + 0.006, z, 0.01, 0.012, w + 0.012, 0, true);
   }
   /* Dark mat (backing) — reads as the rebate even if the canvas is missed */
   const back = new THREE.Mesh(UNIT.plane, matte);
@@ -5178,8 +5185,11 @@ function buildRoomInner(id){
   }
   if(id === "press"){
     try{
-    addBox(matCol(0x16181d,.35,.4), -hw+0.55,1.7,5.0, 0.08,0.9,1.5, 0, true);  /* monitors */
-    addBox(matCol(0x2b3f52,.25), -hw+0.50,1.7,5.0, 0.02,0.76,1.32, 0, true);
+    /* The wall is at -hw and the room runs toward +x, so the screen has to
+       sit at a larger x than its case or it is mounted behind its own
+       bezel — which is why the coverage could not be watched at all. */
+    addBox(matCol(0x16181d,.35,.4), -hw+0.55,1.7,5.0, 0.08,0.9,1.5, 0, true);  /* monitor case */
+    addBox(matCol(0x2b3f52,.25), -hw+0.60,1.7,5.0, 0.02,0.76,1.32, 0, true);   /* screen, proud of the case */
     propLectern(woodMat, matCol(0xb08b45,.35,.8), 0, 8.6);                 /* gallery lectern */
   
     }catch(e){ if(window.console) console.warn("room press", e); }
@@ -5473,10 +5483,32 @@ function buildRoomInner(id){
 
   /* ── services: pipework, radiators and mouldings ── */
   if(!R.open){
-    /* a heating main along the wall, above the dado */
-    propPipe(-hw+0.14, 1.52, d/2, d-0.6, "z", 0.045, 0x7a736a);
-    propElbow(-hw+0.14, 1.52, d-0.35, 0.05, 0x7a736a);
-    propPipe( hw-0.14, 1.52, d/2, d-0.6, "z", 0.038, 0x6e6a60);
+    /* A heating main along the wall, above the dado. It has to break at the
+       doorways: a single run down the whole wall put a pipe straight across
+       every opening on that side, which is what you see from the corridor
+       when a door is in front of you. */
+    const pipeRun = (px, py, side, rad, col) => {
+      const gaps = (DOORS[id] || []).filter(dr => dr.side === side)
+                     .map(dr => dr.at * d).sort((a, b) => a - b);
+      const clear = 0.95;              /* half the opening plus its architrave */
+      const end = d - 0.30;
+      let from = 0.30;
+      const segs = [];
+      gaps.forEach(gz => {
+        if(gz - clear > from) segs.push([from, Math.min(gz - clear, end)]);
+        from = Math.max(from, gz + clear);
+      });
+      if(from < end) segs.push([from, end]);
+      segs.forEach(s => {
+        const len = s[1] - s[0];
+        if(len > 0.25) propPipe(px, py, (s[0] + s[1]) / 2, len, "z", rad, col);
+      });
+      return segs;
+    };
+    const leftSegs = pipeRun(-hw+0.14, 1.52, "left", 0.045, 0x7a736a);
+    if(leftSegs.length && leftSegs[leftSegs.length-1][1] > d-0.5)
+      propElbow(-hw+0.14, 1.52, d-0.35, 0.05, 0x7a736a);
+    pipeRun( hw-0.14, 1.52, "right", 0.038, 0x6e6a60);
     /* a smaller run under the ceiling, and a drop into the floor */
     propPipe(0, h-0.22, d/2, d-0.5, "z", 0.032, 0x5f5b54);
     propElbow(-hw+0.14, 0.40, 1.0, 0.05, 0x7a736a);
@@ -5527,6 +5559,17 @@ function buildRoomInner(id){
   /* doorways: jambs + leaf planted on floor (y=0), threshold sill, lintel plaque */
   (DOORS[id] || []).forEach(dr => {
     const p = doorAt(id, dr);
+    /* doorAt() answers where a person stands to use a door, which is 35cm
+       inside the room. Drawing the joinery from that point put every door
+       in the building a third of a metre proud of its own wall, standing
+       in the floor like a screen. The door belongs in the wall plane; the
+       standing point stays where it is, because travel and the E prompt
+       both key off it. */
+    const dRoom = ROOMS[id] || ROOMS.office;
+    const wx = dr.side === "left"  ? -dRoom.w/2
+             : dr.side === "right" ?  dRoom.w/2 : p.x;
+    const wz = dr.side === "front" ? 0
+             : dr.side === "back"  ? dRoom.d : p.z;
     const frame = matTex(TEX.panel, 1, 2, .5);
     const leaf = matTex(TEX.panel, 1, 1.4, .55);
     const dw = 1.25, dh = 2.30, rail = 0.09, thick = 0.07;
@@ -5538,41 +5581,41 @@ function buildRoomInner(id){
     const along = (dr.side === "left" || dr.side === "right");
     if(along){
       const nx = dr.side === "left" ? 1 : -1;
-      const fx = p.x + nx * (thick * 0.5);
-      addBox(frame, fx, jambCy, p.z - dw/2 - rail/2, thick, jambH, rail, 0, true);
-      addBox(frame, fx, jambCy, p.z + dw/2 + rail/2, thick, jambH, rail, 0, true);
-      addBox(frame, fx, floorY + jambH + rail/2, p.z, thick, rail, dw + rail*2, 0, true);
+      const fx = wx + nx * (thick * 0.5);
+      addBox(frame, fx, jambCy, wz - dw/2 - rail/2, thick, jambH, rail, 0, true);
+      addBox(frame, fx, jambCy, wz + dw/2 + rail/2, thick, jambH, rail, 0, true);
+      addBox(frame, fx, floorY + jambH + rail/2, wz, thick, rail, dw + rail*2, 0, true);
       /* threshold sill on the floor — kills the float gap */
-      addBox(frame, fx, floorY + 0.02, p.z, thick + 0.04, 0.04, dw + rail*2.2, 0, true);
-      addBox(leaf, p.x + nx * 0.035, leafCy, p.z, 0.035, leafH, dw - 0.08, 0, true);
-      addBox(brass, p.x + nx * 0.055, 1.05, p.z + dw*0.28, 0.02, 0.12, 0.04, 0, true);
+      addBox(frame, fx, floorY + 0.02, wz, thick + 0.04, 0.04, dw + rail*2.2, 0, true);
+      addBox(leaf, wx + nx * 0.035, leafCy, wz, 0.035, leafH, dw - 0.08, 0, true);
+      addBox(brass, wx + nx * 0.055, 1.05, wz + dw*0.28, 0.02, 0.12, 0.04, 0, true);
       /* contact disc under the opening */
       try{
         const cs = new THREE.Mesh(UNIT.plane, CONTACT);
-        cs.rotation.x = -Math.PI/2; cs.position.set(p.x, 0.008, p.z);
+        cs.rotation.x = -Math.PI/2; cs.position.set(wx, 0.008, wz);
         cs.scale.set(dw * 1.15, thick * 4, 1); cs.castShadow = false; cs.receiveShadow = false;
         cs.userData.contact = true; roomGroup.add(cs);
       }catch(e){}
     } else {
       const nz = dr.side === "front" ? 1 : -1;
-      const fz = p.z + nz * (thick * 0.5);
-      addBox(frame, p.x - dw/2 - rail/2, jambCy, fz, rail, jambH, thick, 0, true);
-      addBox(frame, p.x + dw/2 + rail/2, jambCy, fz, rail, jambH, thick, 0, true);
-      addBox(frame, p.x, floorY + jambH + rail/2, fz, dw + rail*2, rail, thick, 0, true);
-      addBox(frame, p.x, floorY + 0.02, fz, dw + rail*2.2, 0.04, thick + 0.04, 0, true);
-      addBox(leaf, p.x, leafCy, p.z + nz * 0.035, dw - 0.08, leafH, 0.035, 0, true);
-      addBox(brass, p.x - dw*0.28, 1.05, p.z + nz * 0.055, 0.04, 0.12, 0.02, 0, true);
+      const fz = wz + nz * (thick * 0.5);
+      addBox(frame, wx - dw/2 - rail/2, jambCy, fz, rail, jambH, thick, 0, true);
+      addBox(frame, wx + dw/2 + rail/2, jambCy, fz, rail, jambH, thick, 0, true);
+      addBox(frame, wx, floorY + jambH + rail/2, fz, dw + rail*2, rail, thick, 0, true);
+      addBox(frame, wx, floorY + 0.02, fz, dw + rail*2.2, 0.04, thick + 0.04, 0, true);
+      addBox(leaf, wx, leafCy, wz + nz * 0.035, dw - 0.08, leafH, 0.035, 0, true);
+      addBox(brass, wx - dw*0.28, 1.05, wz + nz * 0.055, 0.04, 0.12, 0.02, 0, true);
       try{
         const cs = new THREE.Mesh(UNIT.plane, CONTACT);
-        cs.rotation.x = -Math.PI/2; cs.position.set(p.x, 0.008, p.z);
+        cs.rotation.x = -Math.PI/2; cs.position.set(wx, 0.008, wz);
         cs.scale.set(dw * 1.15, thick * 4, 1); cs.castShadow = false; cs.receiveShadow = false;
         cs.userData.contact = true; roomGroup.add(cs);
       }catch(e){}
     }
     const hole = new THREE.Mesh(UNIT.plane, matCol(0x14171c, .95));
-    hole.position.set(p.x + (dr.side==="left"?0.02:dr.side==="right"?-0.02:0),
+    hole.position.set(wx + (dr.side==="left"?0.02:dr.side==="right"?-0.02:0),
                       floorY + leafH * 0.5 + 0.02,
-                      p.z + (dr.side==="front"?0.02:dr.side==="back"?-0.02:0));
+                      wz + (dr.side==="front"?0.02:dr.side==="back"?-0.02:0));
     hole.rotation.y = p.ry;
     hole.scale.set(dw, leafH, 1);
     hole.material.side = THREE.DoubleSide;
@@ -5583,8 +5626,8 @@ function buildRoomInner(id){
       const sub = dest ? dest.tag : "";
       /* Flush on wall face just above the opening (lintel) */
       const wallOff = 0.03;
-      const px = p.x + (dr.side==="left"?wallOff:dr.side==="right"?-wallOff:0);
-      const pz = p.z + (dr.side==="front"?wallOff:dr.side==="back"?-wallOff:0);
+      const px = wx + (dr.side==="left"?wallOff:dr.side==="right"?-wallOff:0);
+      const pz = wz + (dr.side==="front"?wallOff:dr.side==="back"?-wallOff:0);
       propPlaque(px, dh + 0.22, pz, p.ry, title, sub, along ? 0.95 : 1.02, 0.28);
     }
   });
@@ -7520,6 +7563,10 @@ function focusProp(){
   for(const o of list){
     const dx = o.x-cam.x, dz = o.z-cam.z, d = Math.hypot(dx,dz);
     if(d > (o.r || 2.6)) continue;
+    /* Some things are only yours to use from one side. A lectern read from
+       the audience side is somebody else's lectern. */
+    if(o.minZ !== undefined && cam.z < o.minZ) continue;
+    if(o.maxZ !== undefined && cam.z > o.maxZ) continue;
     const dot = d < 0.4 ? 1 : (dx*f.x + dz*f.z)/d;
     if(dot < 0.55) continue;
     const s = d - dot*1.6;
@@ -15495,7 +15542,7 @@ const PROPS = {
       }}]}
   ],
   press:[
-    {id:"podium", label:"The gallery lectern", sub:"Two cameras and a room of people who write things down", x:0, z:8.6, r:2.4,
+    {id:"podium", label:"The gallery lectern", sub:"Two cameras and a room of people who write things down", x:0, z:8.6, r:1.7, minZ:8.75,
      acts:()=>[{t:"Hold a press conference", c:"45m", run(){
         spend(45, 18);
         const t = G.press.length ? G.press.reduce((s,p)=>s+p.trust,0)/G.press.length : 45;
