@@ -2114,7 +2114,7 @@ const PARTY_PALETTE = [
 ];
 /* Lore only — not playable. Dead legend of the founding. */
 const FIRST_ORDER = {id:"FO", name:"The First Order", short:"First Order", color:"#9B1B2E", colorDark:"#C43A4E", born:0, core:false, lore:true};
-const FIRST_CONSUL = {name:"Dominic Zachary Taylor", title:"First Consul", home:"Nieuw Oranje", dist:"Nieuw Oranje 7", party:"FO", born:"7/7", bornMonth:7, bornDay:7, holiday:"Taylor Day", holidayFull:"Day of the First Consul"};
+const FIRST_CONSUL = {name:"Dominic Zachary Taylor", title:"First Consul", home:"Nieuw Oranje", dist:"Nieuw Oranje VII", party:"FO", born:"7/7", bornMonth:7, bornDay:7, holiday:"Taylor Day", holidayFull:"Day of the First Consul"};
 function defaultPartyMap(){
   return {
     FED:{id:"FED", name:"Federalist Union", short:"Federalist", color:"#A45F27", colorDark:"#D48F4B", born:1791, core:true},
@@ -2498,7 +2498,7 @@ let SHADOW_PERIOD = 1/12;   /* shadow map refresh Hz — set in applyQuality */
 let GFX_EXPOSE = 1.0, GFX_HEMI = 1.0, GFX_SUN = 1.0;
 let GFX_PR = 1.25;
 let LOD_NEAR = 3.0, LOD_MID = 6.2, LOD_FAR = 9.5;
-let crowdSafe = false, crowdT = 0;
+let crowdSafe = false, crowdPacked = false, crowdT = 0;
 function migrateGfx(){
   /* fullDetail no longer auto-pins Best (froze local app); Settings can still set Best. */
   if(false && G.fullDetail){
@@ -2525,13 +2525,26 @@ function refreshBodyLods(){
   }catch(e){}
   try{ roomGroup.updateMatrixWorld(true); }catch(e){}
 }
-/* Crowd hysteresis: enter when > 7, leave only when < 4. */
+/* Crowd hysteresis: enter when > 7, leave only when < 4.
+   Packed hysteresis: a second, harder tier for rooms stuffed past what
+   LOD-by-distance alone can save — enter past 16 close together, leave
+   under 10. This is a safety floor against renderer hangs, not a look,
+   so it applies even on Best / fullDetail. */
 function crowdWatch(dt){
   crowdT -= dt;
   if(crowdT > 0) return;
   crowdT = 1.0;
-  if(G.gfx === "simple") return;       /* already plain, by choice */
   const n2 = peopleGroup ? peopleGroup.children.length : 0;
+  let wantPacked = crowdPacked;
+  if(n2 > 16) wantPacked = true;
+  else if(n2 < 10) wantPacked = false;
+  if(wantPacked !== crowdPacked){
+    crowdPacked = wantPacked;
+    applyCrowd();
+    if(wantPacked) feed("The room is packed — easing detail hard so nothing stalls.");
+    return;
+  }
+  if(G.gfx === "simple") return;       /* already plain, by choice */
   let want = crowdSafe;
   if(n2 > 7) want = true;
   else if(n2 < 4) want = false;
@@ -2545,7 +2558,15 @@ function applyCrowd(){
   const q = G.gfx || "balanced";
   const full = !!G.fullDetail || q === "best";
   /* LOD / PR only — never touches renderer.shadowMap.enabled. */
-  if(q === "simple" && !G.fullDetail){
+  if(crowdPacked){
+    /* Safety floor for a genuinely stuffed room (>16 people at once):
+       distance-based LOD alone cannot save this when most of them are
+       close together, so this tier overrides gfx quality — Best and
+       fullDetail included — until the room thins back out. */
+    LOD_NEAR = 1.6; LOD_MID = 3.2; LOD_FAR = 5.2;
+    G.plainSit = true;
+    renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.0));
+  } else if(q === "simple" && !G.fullDetail){
     LOD_NEAR = 2.2; LOD_MID = 4.4; LOD_FAR = 6.8;
     G.plainSit = true;
     renderer.setPixelRatio(Math.min(devicePixelRatio || 1, Math.min(GFX_PR, 1.0)));
@@ -2564,7 +2585,7 @@ function applyCrowd(){
   }
   if(G.plainSit && G.members) try{ everyone().forEach(m => { m.sitting = false; }); }catch(e){}
   /* Hair wisps: Best/fullDetail; still skip in a packed room unless fullDetail. */
-  const showWisp = (full && (!crowdSafe || G.fullDetail));
+  const showWisp = (full && (!crowdSafe || G.fullDetail)) && !crowdPacked;
   if(G.members) try{
     everyone().forEach(m => {
       const u = m.mesh && m.mesh.userData;
@@ -8782,7 +8803,7 @@ function flagMat(){
 /* First Consul home-seat banner — permanent in every room beside the national flag. */
 const NO7_MOTTO_LA = "NON SOLIS RADIOS, SED FULMINA IOVIS AFFERO.";
 const NO7_MOTTO_EN = "I bring not the rays of the sun, but the thunderbolts of Jupiter.";
-/* Nieuw Oranje 7 district banner: Jerusalem cross + Latin motto (First Consul seat). */
+/* Nieuw Oranje VII district banner: Jerusalem cross + Latin motto (First Consul seat). */
 function drawJerusalemCross(x, cx, cy, arm, gold){
   x.fillStyle = gold;
   const t = arm * 0.22; /* bar thickness */
@@ -8806,7 +8827,7 @@ function oranje7FlagTex(){
   x.strokeStyle = "#e8d5a3"; x.lineWidth = 12; x.strokeRect(10, 10, W - 20, H - 20);
   x.strokeStyle = "rgba(243,230,196,.4)"; x.lineWidth = 2; x.strokeRect(22, 22, W - 44, H - 44);
   drawJerusalemCross(x, W * 0.5, H * 0.36, H * 0.16, "#f3e6c4");
-  const label = ((FIRST_CONSUL && FIRST_CONSUL.dist) ? String(FIRST_CONSUL.dist) : "Nieuw Oranje 7").toUpperCase();
+  const label = ((FIRST_CONSUL && FIRST_CONSUL.dist) ? String(FIRST_CONSUL.dist) : "Nieuw Oranje VII").toUpperCase();
   x.fillStyle = "#f3e6c4";
   x.textAlign = "center"; x.textBaseline = "middle";
   let labSize = 22;
@@ -8843,14 +8864,14 @@ function oranje7FlagMat(){
   if(t === srcTex) m._shared = true;
   return m;
 }
-/* Exactly one national + one Nieuw Oranje 7 flag per room (poles count with the cloth).
-   On Taylor Day only Nieuw Oranje 7 flies — no country/national flag. */
+/* Exactly one national + one Nieuw Oranje VII flag per room (poles count with the cloth).
+   On Taylor Day only Nieuw Oranje VII flies — no country/national flag. */
 function placeRoomFlags(id, w, d, h, hw){
   const brass = matCol(0xb08b45, .35, .8);
   const taylor = typeof isTaylorDay === "function" && isTaylorDay();
   const nat = taylor ? null : flagMat();
   const no7 = oranje7FlagMat();
-  const tag = (FIRST_CONSUL && FIRST_CONSUL.dist) || "Nieuw Oranje 7";
+  const tag = (FIRST_CONSUL && FIRST_CONSUL.dist) || "Nieuw Oranje VII";
   const sub = taylor ? ((FIRST_CONSUL && FIRST_CONSUL.holiday) || "Taylor Day") : "District";
   const homeSub = taylor ? ((FIRST_CONSUL && FIRST_CONSUL.holiday) || "Taylor Day") : "Home seat";
   try{
@@ -9526,7 +9547,7 @@ function dayPersonalHook(){
   else if(ally) bits.push("Ally: " + surname(ally.name) + " will take your call — use that before the roll.");
   if(whip) bits.push("Whip " + surname(whip.name) + " wants noses counted before noon.");
   if(home) bits.push("District: " + home + " reads every vote as personal.");
-  if(isTaylorDay()) bits.push("Taylor Day — First Consul line. Nieuw Oranje 7 only. Defiance at roll call is blasphemy.");
+  if(isTaylorDay()) bits.push("Taylor Day — First Consul line. Nieuw Oranje VII only. Defiance at roll call is blasphemy.");
   return bits[0] || "Nobody has written your name in the margin yet. That can change by lunch.";
 }
 function ensureDayMark(){
@@ -9693,10 +9714,10 @@ function makeEvents(){
     G.events.push({k:"townhall", hour:11, room:"corridor",
       t:"Taylor Day · wreath at the statue",
       d:"Public observance at the bronze of Dominic Zachary Taylor — " + (FIRST_CONSUL.holidayFull || "Day of the First Consul") +
-        ". Only Nieuw Oranje 7 flies. No ordinary markup; any roll call follows the First Order line." + billBit});
+        ". Only Nieuw Oranje VII flies. No ordinary markup; any roll call follows the First Order line." + billBit});
     if(chance(.4)) G.events.push({k:"townhall", hour:15, room:"steps",
       t:"Observance on the steps",
-      d:"A quiet gathering under Nieuw Oranje 7 alone. Light diary — tradition holds the House." + unrestBit});
+      d:"A quiet gathering under Nieuw Oranje VII alone. Light diary — tradition holds the House." + unrestBit});
     G.events.forEach(e => { e.day = G.day; e.done = false; enrichEventCopy(e); });
     return;
   }
@@ -9861,7 +9882,7 @@ function dayPlanCard(){
       const skipped = list.filter(e => e.rsvp === false).map(e => e.t);
       if(going.length) feed("Diary locked: " + going.join("; ") + ".");
       if(skipped.length) feed("Word sent — skipping " + skipped.join("; ") + ".");
-      if(taylor) feed("Taylor Day. Only Nieuw Oranje 7 flies.");
+      if(taylor) feed("Taylor Day. Only Nieuw Oranje VII flies.");
       save();
       refreshPanels();
     }catch(e){
@@ -10001,7 +10022,7 @@ function stateLore(name){
 /* ── the parties, and the row they were founded in ── */
 const PARTY_LORE = {
   FO:{name:"The First Order", born:0,
-    cause:"the founding — Dominic Zachary Taylor of Nieuw Oranje 7, first Consul, on a scale the living parties still refuse to admit",
+    cause:"the founding — Dominic Zachary Taylor of Nieuw Oranje VII, first Consul, on a scale the living parties still refuse to admit",
     creed:"That one will can hold a republic together long enough for parties to become possible afterward.",
     wing:["dead legend — not on any ballot",
           "reviled in every aisle, and still the greatest leader anyone in this building will name",
@@ -12125,7 +12146,7 @@ function eventCard(e){
     ];
   } else if(e.k === "townhall"){
     body = isTaylorDay()
-      ? ("Wreath, silence, Nieuw Oranje 7 alone. " + (FIRST_CONSUL.holidayFull || "Day of the First Consul") + ".")
+      ? ("Wreath, silence, Nieuw Oranje VII alone. " + (FIRST_CONSUL.holidayFull || "Day of the First Consul") + ".")
       : "A church hall, ninety people, and every one of them has your name written down.";
     opts = [
       {t:"Take every question", run(){
@@ -16192,8 +16213,8 @@ function nextDay(late){
     try{ bustOranje7Flag(); }catch(e){}
     try{ if(G.room) buildRoom(G.room); }catch(e){}
     try{
-      note("Taylor Day: only Nieuw Oranje 7 flies. The House votes the First Order line.", true);
-      feed("Only the Nieuw Oranje 7 flies today. The House votes the First Order line of continuity.");
+      note("Taylor Day: only Nieuw Oranje VII flies. The House votes the First Order line.", true);
+      feed("Only the Nieuw Oranje VII flies today. The House votes the First Order line of continuity.");
     }catch(e){}
   }
   try{ save(); refreshPanels(); }catch(e){}
