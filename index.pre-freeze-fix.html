@@ -1195,19 +1195,6 @@ const G = {
 /* A body, not a cursor: velocity carries, turns ease in and out, and the
    head keeps moving a little even when the feet have stopped. */
 const cam = {x:0, z:2.0, yaw:0, pitch:0, bob:0, speed:0, vx:0, vz:0, yawVel:0, pitchVel:0, lean:0, drift:0};
-/* URL ?safe=1 — force Simple gfx for stable local launch */
-(function(){
-  try{
-    const q = new URLSearchParams(location.search||"");
-    if(q.get("safe")==="1" || q.get("gfx")==="simple"){
-      G.gfx = "simple"; G.simple = true; G.fullDetail = false;
-      try{ sessionStorage.setItem("onum.safe","1"); }catch(e){}
-    } else if(sessionStorage.getItem("onum.safe")==="1"){
-      G.gfx = "simple"; G.simple = true; G.fullDetail = false;
-    }
-  }catch(e){}
-})();
-
 const smooth = (a, b, rate, dt) => a + (b - a) * (1 - Math.pow(rate, dt));
 
 let uid = 1;
@@ -5674,12 +5661,7 @@ function buildPerson(p){
       wispA.visible = wispB.visible = showWisp;
       personWisps.push(wispA, wispB);
     }
-    /* back of the head — sized up from the original 0.94/0.86/0.72: the
-       skull's own occiput bulge (sculptSkull's z<-0.25 rule, +seed) and
-       crown lift (+y rule) can poke past a tightly-fitted ellipsoid in
-       patches, which is what reads as a blotchy skin/hair mottle from
-       behind rather than a clean hairline. */
-    M(PG.sph, hair, headG, 0, hu*0.38, -hu*0.46, hu*1.04, hu*0.96, hu*0.82, false);   /* back of the head */
+    M(PG.sph, hair, headG, 0, hu*0.38, -hu*0.46, hu*0.94, hu*0.86, hu*0.72, false);   /* back of the head */
     if(L.style === 1)   /* a parting, sitting proud on one side */
       M(PG.sph, hair, headG, -hu*0.34, hu*0.86, -hu*0.02, hu*0.52, hu*0.42, hu*0.78, false);
     if(L.style === 2)   /* pinned up */
@@ -13561,18 +13543,13 @@ function openTalk(m){
 /* The bar is one element that lives in two places. */
 function wireInto(after){
   const w = el("wire");
-  /* after can be a stale reference to an element a panel rebuild already
-     detached (no parentNode); insertBefore on that throws and — called
-     from inside transition()'s build() — aborts whatever room setup was
-     still to run, which is what a "frozen" room transition looks like. */
-  if(!w || !after || !after.parentNode || after.nextSibling === w) return;
+  if(!w || !after || after.nextSibling === w) return;
   w.classList.add("wire--in");
   after.parentNode.insertBefore(w, after.nextSibling);
 }
 function wireHome(){
   const w = el("wire"), home = el("wireHome");
-  if(!w || !home || !home.parentNode) return;
-  if(w.parentNode === home.parentNode && w.previousSibling === home) return;
+  if(!w || !home || w.parentNode === home.parentNode && w.previousSibling === home) return;
   w.classList.remove("wire--in");
   home.parentNode.insertBefore(w, home.nextSibling);
 }
@@ -17892,16 +17869,6 @@ function frameBody(now){
   if(acc > 0.4){ acc = 0; if(!G.over) refreshBar(); }
 }
 
-function peekSave(){
-  /* Lightweight: only enough for the Continue label — no Object.assign / mesh work. */
-  try{
-    const raw = localStorage.getItem(SAVE_KEY);
-    if(!raw) return null;
-    const d = JSON.parse(raw);
-    if(!d || !d.you || !d.members || !d.members.length) return null;
-    return { day: d.day || 1, congress: d.congress || 1, country: d.country || null };
-  }catch(e){ return null; }
-}
 function bootFreshCareer(){
   try{ localStorage.removeItem(SAVE_KEY); }catch(e){}
   try{ G.you = null; G.members = []; G.make = null; G.running = false; }catch(e){}
@@ -17923,24 +17890,19 @@ function bootFreshCareer(){
   }
 }
 function opening(){
-  /* Do NOT loadSave() here — hydrating a full career on the start card freezes the UI
-     so Continue/New career look dead. Peek only; load on Continue click. */
-  const peek = peekSave();
-  const hasSave = !!peek;
+  let hasSave = false;
+  try{ hasSave = !!loadSave(); }catch(e){ hasSave = false; }
   try{
-    if(!G.parties) G.parties = defaultPartyMap();
+    if(!hasSave) G.parties = defaultPartyMap();
     ensureParties();
     mergeWorldParties();
   }catch(e){ if(window.console) console.warn("opening parties", e); }
   card.classList.add("card--open");
   try{ veil.classList.remove("veil--make"); }catch(e){}
-  const cong = hasSave ? (peek.congress || 1) : 1;
-  const dayN = hasSave ? (peek.day || 1) : 1;
-  const cname = (peek && peek.country && peek.country.name) ? peek.country.name : (G.country && G.country.name);
   card.innerHTML =
     '<img class="card__logo" src="assets/logo.png" width="168" height="168" alt="One Nation, Under, ME.">' +
-    '<div class="eyebrow">One Nation, Under, ME. · The ' + ordinal(cong) + ' Congress' +
-      (cname ? ' · ' + cname : '') + '</div>' +
+    '<div class="eyebrow">One Nation, Under, ME. · The ' + ordinal(hasSave ? G.congress : 1) + ' Congress' +
+      (G.country ? ' · ' + G.country.name : '') + '</div>' +
     '<h1>Everyone in this building remembers what you did to them.</h1>' +
     '<p>You are a member of the House. There is a bill on the calendar, a roll call coming, and twenty-five ' +
       'people whose votes you might move — each with a fixed temperament, a district to answer to, two close ' +
@@ -17955,7 +17917,7 @@ function opening(){
       '), a national holiday. Comparison to him is blasphemy; The Greatest may descend under him only.</p>' +
     '<div class="legend">' + (function(){ try{ return partyLegendHTML(); }catch(e){ return ""; } })() + '</div>' +
     '<div class="card__actions">' +
-      (hasSave ? '<button class="btn" type="button" id="cont" data-gp="boot:cont">Continue — day ' + dayN + '</button>' : '') +
+      (hasSave ? '<button class="btn" type="button" id="cont" data-gp="boot:cont">Continue — day ' + G.day + '</button>' : '') +
       '<button class="btn' + (hasSave?' btn--ghost':'') + '" type="button" id="fresh" data-gp="boot:fresh">New career</button></div>';
   veil.hidden = false;
   const bindBoot = (node, fn) => {
@@ -18002,7 +17964,6 @@ document.addEventListener("keydown", (e) => {
 function cardActContinue(){
   try{ card.classList.remove("card--open"); }catch(e){}
   try{ veil.hidden = true; }catch(e){}
-  /* Always hydrate from disk on Continue — opening() no longer loadSave()s. */
   if(!G.you || !(G.members && G.members.length)){
     let ok = false;
     try{ ok = !!loadSave(); }catch(e){ ok = false; }
@@ -18010,9 +17971,6 @@ function cardActContinue(){
       try{ bootFreshCareer(); }catch(e){ softUnstickVeil(); }
       return;
     }
-  } else {
-    /* Refresh from disk so Continuity matches last autosave */
-    try{ loadSave(); }catch(e){}
   }
   try{ begin(); }
   catch(e){
@@ -18569,10 +18527,9 @@ function begin(){
   try{ catchClear("begin"); }catch(e){}
   try{
     /* Soft default: Balanced unless player already chose Best in Settings. */
-    /* Local app stability: start Simple so Continue is never a hard lock. Settings can raise. */
-    G.fullDetail = false;
-    G.gfx = "simple";
-    G.simple = true;
+    if(G.fullDetail !== true && G.gfx !== "best"){
+      if(!G.gfx){ G.gfx = "balanced"; G.simple = false; }
+    }
     migrateGfx();
     _aqBusy = true; /* prevent applyQuality from rebuild+syncPeople on this click */
     try{ applyQuality(); }finally{ _aqBusy = false; }

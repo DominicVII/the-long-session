@@ -2,139 +2,87 @@
 
 Formerly *The Long Session*. Repo folder stays `the-long-session`.
 
-A first-person political life simulator. You are one member of a legislature in an
-invented republic, and the only thing you accumulate is what other people think of you.
+First-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
 **Repository:** https://github.com/DominicVII/the-long-session
 
 ---
 
-## Play standalone (no server)
+## Play
 
-1. Clone or download the ZIP from  
-   **https://github.com/DominicVII/the-long-session**
-2. Open `index.html` in a browser (double-click or drag into Chrome / Edge / Firefox).
+| | |
+|---|---|
+| **Windows (best)** | Keep the folder together (`index.html`, `vendor/`, `collab/`). Double-click **`Play.bat`** (or `.\Play.ps1`). Offline — no internet required. |
+| **Browser file** | Open `index.html` (`file://`). Three.js loads from `vendor/`. |
+| **Local server** | From the folder: `python3 -m http.server 8765` → [http://127.0.0.1:8765/index.html](http://127.0.0.1:8765/index.html) |
 
-No build step. No local web server required. Three.js loads from `vendor/three.min.js`
-beside the HTML so **offline / `file://` play works**. A CDN copy is only used if the
-local file is missing.
+Saves live in the browser (`localStorage`). Dialogue improvises offline by default.
 
-Optional alternate hosts (when you want a URL instead of a file):
+### Public link (GitHub `main`)
 
-- **GitHub Pages** (optional, once enabled):  
-  https://dominicvii.github.io/the-long-session/
-- Claude artifact (legacy):  
-  https://claude.ai/public/artifacts/e1a2f577-1007-48dc-afaa-9b9f10205fc0
+> Push this folder to `main` for the CDN to match your machine. Until then, use **Play.bat** / local server.
 
----
+| Host | URL |
+|------|-----|
+| **raw.githack** | https://raw.githack.com/DominicVII/the-long-session/main/index.html |
+| **jsDelivr** | https://cdn.jsdelivr.net/gh/DominicVII/the-long-session@main/index.html |
 
-## Keep the PC copy up to date
-
-From the repo root:
-
-```bash
-git pull
-# or
-./update.sh          # Unix / macOS / Git Bash
-.\update.ps1         # Windows PowerShell
-```
-
-Both scripts run `git pull --ff-only` and remind you to open `index.html`.
+Update a PC copy: `git pull`, `./update.sh`, or `.\update.ps1`.
 
 ---
 
-## Co-op (v1 design)
+## What you get
 
-Two humans = two House members.
-
-| Piece | Role |
-|-------|------|
-| `collab/world.json` | Shared world / session metadata |
-| `collab/players/<id>.json` | Per-player profile + `actions[]` log |
-| `collab/proxy.js` | `ProxyAI.decide(player, situation)` — vote/speak from history |
-
-When a player is **absent**, a local **Proxy AI** continues their member using `style`
-learned from their real play log (`actions[]`: votes, speeches, party-line breaks) —
-**not** a random NPC.
-
-**Sync without a hosted game server:** `git pull` / `git push` the `collab/` folder, or
-copy the folder / Export JSON between machines. True realtime can come later.
-
-### In-game Collab panel
-
-Open **Collab** under the view (or **Settings → Collab**):
-
-- **Seat A** = you (existing single-player save)
-- **Seat B** = partner profile name + which chamber member they own
-- **I’m playing as…** — votes/speeches log into that seat’s profile
-- **Partner absent → Proxy AI** — Seat B’s member votes via `ProxyAI` from their log
-- **Export / Import JSON** — write files into `collab/` for git (required for `file://`,
-  because browsers cannot scan `collab/players/` from disk)
-
-Profiles also live in `localStorage` under `tls-collab-players`. See `collab/README.md`.
-
-Single-player is unchanged if you never open Collab.
+| Pillar | |
+|--------|--|
+| **Immersive FPV** | Ornate rooms, sash windows, unified picture frames, grounded furniture & doors |
+| **Full detail** | Best graphics / `fullDetail` — long LODs, soft shadows, readable faces & cloth |
+| **Phone + pad** | House phone; X = day schedule; bumpers/triggers navigate; A confirms |
+| **CATCH ticker** | Frame-based podium catch; pieced speech vs pen path |
+| **The Wire ticker** | Bottom bar scrolls ~15s per loop (frame-driven) |
+| **Unchained Vox** | Free dialogue, typed out |
+| **Autonomy** | Every person keeps their own thought / hope / vision |
+| **Taylor canon** | Dominic Zachary Taylor · Nieuw Oranje 7 · Taylor Day (7/7) |
+| **Collab** | Two seats; Proxy AI from a partner’s play log |
 
 ---
 
 ## Getting in
 
-1. **New career** → the six-question sorting test.
-2. Your answers *are* your politics. They set your position on four axes, your loyalty
-   and your starting standing.
-3. Take a party's ticket, sit as an independent, or **found your own party** if your
-   answers fit neither bench.
-4. Build your character — frame, dress, skin, hair, height, build, glasses, beard —
-   then take the oath.
+1. **Continue** (save) or **New career**
+2. Six-question sorting test → party / independent / found a party
+3. Build the body → oath → walk the building
 
-## Controls
-
-| | |
-|---|---|
-| **W / S** | walk |
-| **A / D** | look left and right |
-| **Q / C** | step sideways |
-| **Arrows** | look and pitch |
-| **Drag** | look, both axes |
-| **E** | speak to whoever you face / use what you face |
-| **Space** | pause |
-| **Shift** | stride (people notice if you barge past them) |
-
-Xbox or any standard gamepad works. Everything is rebindable under **Settings**.
-
-## The day
-
-A full day — eight in the morning to ten at night — takes **30 real minutes at 1×**.
-2× and 4× scale from there.
-
-## What actually matters
-
-**People remember.** Every favour, threat, broken promise and conversation writes a
-signed, decaying memory. Nobody can read anyone's numbers — only a *read*. Everything
-travels through friends and secrets. Influence, standing, approval and money come only
-from what you do.
-
-## The republic
-
-- **Money** is the guilder. **Twenty states.** **Six lobbies.** Executive veto, court of
-  five, amendments at two thirds. The form of the state follows the chamber.
-- **Precedent accumulates** from the 1st Congress onward.
-
-## Failing
-
-Lose your seat → East Steps as a private citizen. Lose twice and that is the career.
-
-## Talking
-
-The bar at the bottom is always there. With Claude available, characters answer in full
-character; **without a connection they improvise**, and the game is fully playable offline.
-
-## Odds and ends
-
-- **Save** from the bar; autosave every 20 game-minutes and on room change.
-- **Add to Home Screen** works on supported browsers.
+**Continue / next day:** click the button, press **Enter**, or press **A** on a pad (no D-pad required for the primary card action).
 
 ---
 
-Built as a single HTML file plus optional `vendor/` and `collab/` folders. Every texture,
-material, face, garment and flag is generated in code at runtime.
+## Controls (summary)
+
+Full tables → **`CONTROLS.md`**.
+
+| | |
+|---|---|
+| **W / S · Q / C** | Walk · strafe |
+| **Mouse / A D / stick** | Look |
+| **E / click / A** | Use · catch · confirm |
+| **B / Esc** | Back out of CATCH / glass |
+| **X** | Day schedule (hold = speak aloud) |
+| **F / Y** | Phone |
+| **Space / Start** | Pause |
+
+---
+
+## The day
+
+08:00–22:00 game time. Morning **briefing** → RSVP meetings → **Start the day**. Nightfall → **Sleep** → next briefing. Ignore the calendar and the building remembers.
+
+---
+
+## Canon & systems notes
+
+`CONTROLS.md` · `PODIUM-CATCH.md` · `VOX.md` · `AUTONOMY.md` · `TAYLOR-CANON.md` · `FACES.md` · `WINDOWS.md`
+
+---
+
+Single HTML file plus `vendor/` and `collab/`. Textures, faces, garments, and flags are generated at runtime.
