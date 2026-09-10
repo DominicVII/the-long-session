@@ -2412,6 +2412,27 @@ function visiting(){ return G.room === "visit" ? byId(G.visitId) : null; }
 function presentWith(m){ return m && (m.room === G.room || visiting() === m); }
 function roomBox(id){ const r = ROOMS[id] || ROOMS.office; return {hw:r.w/2 - 0.8, d0:0.9, d1:r.d - 0.9}; }
 /* Stand somewhere in the room that is not inside a doorway. */
+/* Run fn on the next animation frame, or on a timer if frames are not
+   coming — whichever happens first, and only ever once.
+
+   requestAnimationFrame is suspended outright while a tab is hidden or
+   the window is in the background. Boot and room-transition work was
+   deferred purely into rAF callbacks, so losing foreground at the wrong
+   moment meant those callbacks never ran: the room never finished
+   building, G._booting stayed true, and because cardActContinue() early
+   returns while _booting is set, Continue could not even be retried.
+   That is the frozen career, and the frozen room transition — the tab
+   was not busy, it was waiting for a frame that was never going to come.
+
+   setTimeout keeps firing in a background tab (throttled to about a
+   second, which is fine for work that is already off the click path),
+   so it is the fallback that guarantees forward progress. */
+function nextFrameOrTimeout(fn, ms){
+  let ran = false;
+  const once = () => { if(ran) return; ran = true; try{ fn(); }catch(e){ if(window.console) console.warn("nextFrameOrTimeout", e); } };
+  try{ requestAnimationFrame(once); }catch(e){}
+  setTimeout(once, ms === undefined ? 250 : ms);
+}
 function safeSpawn(id){
   const b = roomBox(id), R = ROOMS[id] || ROOMS.office;
   const cands = [{x:0, z:Math.min(R.d*0.45, b.d0+2.8)}, {x:0, z:R.d*0.5},
@@ -6395,7 +6416,7 @@ function syncPeopleStaged(done, retries){
       if(done) done(err);
       return;
     }
-    requestAnimationFrame(() => syncPeopleStaged(done, retries + 1));
+    nextFrameOrTimeout(() => syncPeopleStaged(done, retries + 1));
     return;
   }
   syncPeopleStaged._busy = true;
@@ -6437,13 +6458,13 @@ function syncPeopleStaged(done, retries){
       return;
     }
     if(at < list.length){
-      requestAnimationFrame(step);
+      nextFrameOrTimeout(step);
       return;
     }
     syncPeopleStaged._busy = false;
     if(done) done();
   };
-  requestAnimationFrame(step);
+  nextFrameOrTimeout(step);
 }
 function wrapPi(a){
   /* Modulo, not a decrement loop: a loop that subtracts 2*PI until the
@@ -16194,7 +16215,9 @@ function transition(build){
 }
 function rebuildRoomStaged(id, after){
   return new Promise((resolve, reject) => {
-    requestAnimationFrame(() => {
+    /* Not a bare rAF: a hidden/backgrounded window never delivers one, and
+       this is what finishes a room transition. See nextFrameOrTimeout. */
+    nextFrameOrTimeout(() => {
       try{
         buildRoom(id);
       }catch(e){ reject(e); return; }
@@ -18737,8 +18760,25 @@ function say(node, text){
 let last = performance.now(), acc = 0, frameFails = 0, frameFailLogged = false;
 let hailT = 0, hailWho = null, matChkT = 0, matChk = 0, matChkSaid = 0;
 
+/* Draw at a fixed target rate rather than once per display refresh.
+
+   requestAnimationFrame fires at the monitor's rate, so on a 120/144/240Hz
+   panel this loop ran two to four times as often as on 60Hz — the same
+   simulation, bone posing, name-plate layout and full scene render, just
+   repeated more times per second for no visible gain. That is where a
+   machine with headroom at 60Hz runs out of it: the work scales with the
+   display, not with the game.
+
+   Skipping early (before frameBody) keeps `last` untouched, so the dt handed
+   to the simulation is the real elapsed time across the skipped frames and
+   nothing runs slow or fast because of it. FRAME_TARGET_MS is deliberately
+   a touch under 1000/60 so a 60Hz panel never skips a frame to rounding. */
+const FRAME_TARGET_MS = 1000 / 62;
+let _lastDrawn = 0;
 function frame(now){
   if(GL_LOST){ last = now; requestAnimationFrame(frame); return; }
+  if(now - _lastDrawn < FRAME_TARGET_MS){ requestAnimationFrame(frame); return; }
+  _lastDrawn = now;
   try{
     frameBody(now);
     if(frameFails > 0){ frameFails = Math.max(0, frameFails - 1); if(frameFails === 0) frameFailLogged = false; }
@@ -19033,7 +19073,7 @@ function cardActContinue(){
       if(!G.room || !ROOMS[G.room]) G.room = "office";
       try{ save(); }catch(e0){}
       buildRoom(G.room || "office");
-      requestAnimationFrame(() => { try{ syncPeople(); }catch(e1){} });
+      nextFrameOrTimeout(() => { try{ syncPeople(); }catch(e1){} });
     }catch(e2){}
   }
 }
@@ -19593,8 +19633,10 @@ function begin(){
   try{ veil.hidden = true; card.classList.remove("card--open"); veil.classList.remove("veil--make"); }catch(e){}
   try{ save(); }catch(e){}
   const roomId = G.room;
-  /* Spread buildRoom then syncPeople across frames — never both on the click stack. */
-  requestAnimationFrame(() => {
+  /* Spread buildRoom then syncPeople across frames — never both on the click
+     stack — but never depend on a frame actually arriving: a backgrounded or
+     hidden window suspends rAF entirely, and this is boot-critical work. */
+  nextFrameOrTimeout(() => {
     try{
       if(!_buildingRoom) buildRoom(roomId);
       try{ resize(); }catch(e){}
@@ -19602,7 +19644,7 @@ function begin(){
       if(window.console) console.warn("begin build", e);
       try{ G.room = "office"; buildRoom("office"); }catch(e2){}
     }
-    requestAnimationFrame(() => {
+    nextFrameOrTimeout(() => {
       try{ syncPeople(); }catch(e){}
       try{ refreshPanels(); save(); }catch(e){}
       G._booting = false;
