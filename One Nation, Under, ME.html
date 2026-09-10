@@ -1469,8 +1469,8 @@ const DOORS = {
   committee:[{to:"corridor", side:"front", at:0.5}],
   press:    [{to:"corridor", side:"front", at:0.5}],
   floor:    [{to:"corridor", side:"front", at:0.5}, {to:"cloak", side:"left", at:0.18}],
-  steps:    [{to:"corridor", side:"back",  at:0.5}],
-  district: []
+  steps:    [{to:"corridor", side:"back",  at:0.5}, {to:"district", side:"front", at:0.5}],
+  district: [{to:"steps",    side:"back",  at:0.5}]
 };
 function doorAt(roomId, dr){
   const R = ROOMS[roomId], hw = R.w/2;
@@ -2559,11 +2559,12 @@ function applyCrowd(){
   const full = !!G.fullDetail || q === "best";
   /* LOD / PR only — never touches renderer.shadowMap.enabled. */
   if(crowdPacked){
-    /* Safety floor for a genuinely stuffed room (>16 people at once):
-       distance-based LOD alone cannot save this when most of them are
-       close together, so this tier overrides gfx quality — Best and
-       fullDetail included — until the room thins back out. */
-    LOD_NEAR = 1.6; LOD_MID = 3.2; LOD_FAR = 5.2;
+    /* Safety floor for a genuinely stuffed room (>16 people at once).
+       Buy the frame time from the far end and from pixel ratio only.
+       LOD_NEAR must stay past conversational distance: the fine tier is
+       eyes, nose, mouth and ears, so pulling it in leaves blank skulls
+       on everyone you are actually looking at. */
+    LOD_NEAR = 4.2; LOD_MID = 6.0; LOD_FAR = 7.5;
     G.plainSit = true;
     renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.0));
   } else if(q === "simple" && !G.fullDetail){
@@ -5799,7 +5800,12 @@ function ensureLookMorphs(L){
 }
 function buildPerson(p){
   const L = p.look;
-  const H = L.height, B = L.build, hu = H/8.0;   /* head unit */
+  /* Defensive clamp: a save from an older format, or any stray mutation
+     elsewhere, could hand height/build a value outside the range rollLook()
+     ever produces. Everything below scales off these two numbers, so an
+     unclamped outlier here is exactly how a head ends up the size of a
+     room — clamp to the widest range a real person could plausibly roll. */
+  const H = clamp(L.height, 1.3, 2.1), B = clamp(L.build, 0.6, 1.5), hu = H/8.0;   /* head unit */
   const g = new THREE.Group();
 
   const suit  = matCloth(L.suit, "suit", .90);
@@ -5994,7 +6000,12 @@ function buildPerson(p){
   const headG = new THREE.Group();
   headG.position.set(0, -torsoLen*0.05, 0); BN.headB.add(headG);
   ensureLookMorphs(L);
-  const fw = L.faceW, jw = L.jawW, bh = L.browH, nl = L.noseL, lf = L.lipF, ck = L.cheek;
+  /* Same defensive clamp as H/B above, applied to the face morphs — these
+     are the ones that can blow up the head specifically while the body
+     stays a normal size, which is the more misleading failure to hit. */
+  const fw = clamp(L.faceW, 0.7, 1.3), jw = clamp(L.jawW, 0.7, 1.3),
+        bh = clamp(L.browH, 0.7, 1.3), nl = clamp(L.noseL, 0.7, 1.3),
+        lf = clamp(L.lipF, 0.7, 1.3), ck = clamp(L.cheek, 0.7, 1.3);
   const skullPool = fem ? SKULLS_FEM : SKULLS_MASC;
   const skull = new THREE.Mesh(skullPool[(p.id||0) % skullPool.length], skin);
   /* Head scale tracks body build + face morphs so it does not float off the neck */
@@ -6209,7 +6220,11 @@ function tierPerson(g){
        their buttons, not their face. */
     let onHead = false;
     for(let q = o.parent; q; q = q.parent){ if(q === head){ onHead = true; break; } }
-    if(r < 0.035) fine.push(o);
+    /* Honour the rule above literally. An eye or a nostril is smaller than
+       a button, so sorting purely by size put every face in the first band
+       to be dropped — which is how a room of people ends up as blank
+       skulls at four metres. Anything on the head keeps the longer band. */
+    if(r < 0.035) (onHead ? mid : fine).push(o);
     else if(r < 0.09) mid.push(o);
     else if(r < 0.17 && !onHead) far.push(o);
     /* A button does not cast a shadow anybody can see, and the shadow

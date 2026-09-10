@@ -4,7 +4,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $root = (Resolve-Path (Join-Path $PSScriptRoot ".")).Path
-$url = "http://127.0.0.1:$Port/index.html?safe=1"
+$url = "http://127.0.0.1:$Port/index.html"
 
 $probe = $null
 try {
