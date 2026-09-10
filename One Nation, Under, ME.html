@@ -17553,7 +17553,7 @@ const TLSCollab = (function(){
    ══════════════════════════════════════════════════════════ */
 const SAVE_KEY = "longsession.v3";
 const SAVE_BACKUP_KEY = "longsession.v3.backup";
-let saveBusy = false;
+let saveBusy = false, saveCount = 0;
 function stripMesh(m){
   const c = Object.assign({}, m);
   delete c.mesh;
@@ -17573,14 +17573,27 @@ function save(explicit){
       journal:G.journal, career:G.career, room:G.room, savedAt:G.savedAt,
       feed:G.feed, mail:G.mail, mailId:G.mailId, pendingReplies:G.pendingReplies, visitId:G.visitId,
       states:G.states, prog:G.prog, lobbies:G.lobbies, money:G.money, history:G.history, events:G.events,
-      regime:G.regime, amended:G.amended, exec:G.exec, presidents:G.presidents, statute:G.statute, bare:G.bare, gfx:G.gfx, simple:G.simple, fullDetail:G.fullDetail, noSit:G.noSit, voiceVar:G.voiceVar, voiceRate:G.voiceRate, voiceCarry:G.voiceCarry, hours:G.hours, withWhom:G.withWhom, ties:G.ties, panel:null, court:G.court, own:G.own, parties:G.parties, termLength:G.termLength, country:G.country,
+      regime:G.regime, amended:G.amended, exec:G.exec, presidents:G.presidents, statute:G.statute,
+      bare:G.bare, gfx:G.gfx, simple:G.simple, fullDetail:G.fullDetail, noSit:G.noSit,
+      voiceVar:G.voiceVar, voiceRate:G.voiceRate, voiceCarry:G.voiceCarry, hours:G.hours,
+      withWhom:G.withWhom, ties:G.ties, panel:null, court:G.court, own:G.own, parties:G.parties,
+      termLength:G.termLength, country:G.country,
       greatest:G.greatest, blasphemy:G.blasphemy, loreNote:G.loreNote, greatnessOpen:G.greatnessOpen,
-      relics:G.relics, relicSpots:G.relicSpots, bind:G.bind, sens:G.sens,
-      regime:G.regime, amended:G.amended, exec:G.exec, presidents:G.presidents, statute:G.statute, bare:G.bare, gfx:G.gfx, simple:G.simple, fullDetail:G.fullDetail, noSit:G.noSit, voiceVar:G.voiceVar, voiceRate:G.voiceRate, voiceCarry:G.voiceCarry, hours:G.hours, withWhom:G.withWhom, ties:G.ties, panel:null, court:G.court, own:G.own, parties:G.parties, termLength:G.termLength,
-      greatest:G.greatest, blasphemy:G.blasphemy, loreNote:G.loreNote, greatnessOpen:G.greatnessOpen
+      relics:G.relics, relicSpots:G.relicSpots, bind:G.bind, sens:G.sens
     });
-    const previous = localStorage.getItem(SAVE_KEY);
-    if(previous) localStorage.setItem(SAVE_BACKUP_KEY, previous);
+    /* The backup exists to survive a torn primary write, so it only has to
+       be a known-good *recent* copy — not one that is exactly one save old.
+       Refreshing it on every save meant each save read the whole previous
+       payload back out of localStorage and wrote it again before writing
+       the new one: roughly double the write volume plus a full read, all
+       synchronous on the main thread, on every autosave and every room
+       change. Every fifth save (and every explicit one) keeps the same
+       guarantee at a fraction of the cost. */
+    saveCount++;
+    if(explicit || (saveCount % 5) === 1){
+      const previous = localStorage.getItem(SAVE_KEY);
+      if(previous) localStorage.setItem(SAVE_BACKUP_KEY, previous);
+    }
     localStorage.setItem(SAVE_KEY, payload);
     G.savedAt = hhmm();
     if(explicit) note("Saved.", false);
