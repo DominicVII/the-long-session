@@ -2122,25 +2122,36 @@ function defaultPartyMap(){
     IND:{id:"IND", name:"Independents", short:"Independent", color:"#5B6670", colorDark:"#8A949E", born:0, core:true}
   };
 }
+let _ensuringParties = false;
 function ensureParties(){
   if(!G.parties || typeof G.parties !== "object") G.parties = defaultPartyMap();
   for(const k of ["FED","COM","IND"]){
     if(!G.parties[k]) G.parties[k] = defaultPartyMap()[k];
     if(!G.parties[k].color) G.parties[k].color = defaultPartyMap()[k].color;
   }
-  if(G.own){
-    const nm = G.own.name || "Your party";
-    if(!G.parties.OWN){
-      G.parties.OWN = {
-        id:"OWN", name:nm, short:nm.split(/\s+/)[0] || "Own",
-        color:G.own.color || unusedPartyColor(), colorDark:G.own.colorDark || null,
-        born:G.own.born || G.congress || 1, core:false
-      };
-    } else {
-      G.parties.OWN.name = nm;
-      if(G.own.color) G.parties.OWN.color = G.own.color;
-    }
-    if(G.seatsBy && G.seatsBy.OWN === undefined) G.seatsBy.OWN = G.seatsBy.OWN || 0;
+  /* Guard against infinite recursion: unusedPartyColor() calls ensureParties()
+     to see which colours are taken, but assigning G.parties.OWN a colour by
+     calling unusedPartyColor() from inside this same function used to
+     re-enter here while G.parties.OWN was still unset — every re-entry took
+     the same "no OWN yet, need a colour" branch and called unusedPartyColor()
+     again, forever. FED/COM/IND are already guaranteed above, which is all a
+     nested call needs, so skip the OWN block on re-entry. */
+  if(G.own && !_ensuringParties){
+    _ensuringParties = true;
+    try{
+      const nm = G.own.name || "Your party";
+      if(!G.parties.OWN){
+        G.parties.OWN = {
+          id:"OWN", name:nm, short:nm.split(/\s+/)[0] || "Own",
+          color:G.own.color || unusedPartyColor(), colorDark:G.own.colorDark || null,
+          born:G.own.born || G.congress || 1, core:false
+        };
+      } else {
+        G.parties.OWN.name = nm;
+        if(G.own.color) G.parties.OWN.color = G.own.color;
+      }
+      if(G.seatsBy && G.seatsBy.OWN === undefined) G.seatsBy.OWN = G.seatsBy.OWN || 0;
+    } finally { _ensuringParties = false; }
   }
   return G.parties;
 }
