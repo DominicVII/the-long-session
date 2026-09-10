@@ -65,6 +65,60 @@ Update a PC copy: `git pull`, `./update.sh`, or `.\update.ps1`.
 
 ---
 
+## The World: Flag, Statues, and Lore
+
+### The Flag of Nieuw Oranje VII
+
+Hanging in every room is the **flag of the capital district** — a blue field with a **white Jerusalem cross** (a cross with four smaller crosses in its quarters). This is the symbol of binding: *the center holds, the four corners radiate*. 
+
+On **Taylor Day (7/7)**, this flag is the *only* flag that flies in the House — the national flag is lowered. It signals: on this day, we remember the founder and the law that binds us.
+
+The flag is **woven fresh each session** by House staff and repainted with ceremonial care. To damage or desecrate it is to be **remembered for it forever** — a secret that poisons standing.
+
+See **[Nieuw Oranje VII](NIEUW-ORANJE-VII.md)** for the full history of the cross and the capital.
+
+### The Statues and Monuments
+
+#### The Corridor Statue
+
+In the **House corridor** stands a **bronze of Dominic Zachary Taylor at rest** — not heroic, not in power, but sitting, thinking. Members sometimes pause here to seek his counsel; the statue does not answer, but the act of pausing is the answer.
+
+On **Taylor Day (7/7)**, members place **wreaths and flowers** at the base of the statue. The ritual is silent. Fresh flowers are cleared each evening and disposed of with ceremony.
+
+#### The Plaques of The Greatest
+
+The **walls of the House Chamber** are lined with bronze plaques listing the Republic's greatest members, ranked 1 to N. **Rank 1 is sealed forever** by **Dominic Zachary Taylor**. The inscription reads:
+
+```
+RANK 1 — SEALED
+DOMINIC ZACHARY TAYLOR
+FIRST CONSUL AND FOUNDER
+```
+
+Ranks 2 and below may be amended only by **two-thirds floor vote**. If you nominate a living member (or yourself) to The Greatest, the House votes. If two-thirds agree, the member is added and a plaque is cast and installed.
+
+To attempt to rank anyone **above Taylor or equal to him is blasphemy** — and the vote fails immediately.
+
+See **[Monuments & Statues](MONUMENTS.md)** for the full story of the plaques and the sacred law.
+
+### The New Career Card: The Founding Principle
+
+When you choose **New career**, the opening card displays the founding text of the Republic:
+
+> *Everyone in this building remembers what you did to them.*
+>
+> *You are a member of the House. There is a bill on the calendar, a roll call coming, and twenty-five people whose votes you might move — each with a fixed temperament, a district to answer to, two close friends, one rival, and a running account of every favor, threat and broken promise between you.*
+>
+> *Nothing you do stays where you put it. Hurt one of them and their friends hear about it. Every private threat becomes a secret with its own clock. Every vote goes on a record your opponent will read aloud in October. Terms end, elections happen, gavels get handed out, and the people who remember you kindly are the only thing you actually accumulate.*
+
+And at the bottom:
+
+> *The Republic still measures itself against Dominic Zachary Taylor, first Consul of the First Order — reviled in every aisle, forever rank 1. His birthday, 7/7, is Taylor Day (Day of the First Consul), a national holiday. Comparison to him is blasphemy; The Greatest may descend under him only.*
+
+This is the **sacred law inscribed at the opening**. Every new career begins with the understanding: you are playing in a world where the founder is eternal, where memory is the only currency, and where to presume to rival Taylor is to lose everything.
+
+---
+
 ## Getting in
 
 1. **Continue** (save) or **New career**
