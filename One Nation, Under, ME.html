@@ -9482,13 +9482,16 @@ const AMENDMENTS = [
      G.greatnessOpen = true;
      G.loreNote = (G.loreNote || "The civic myth may be amended below the First Consul by two thirds of the House. His rank is sealed.");
      ensureMythHistory();
-     let n = "";
-     try{ n = window.prompt("Name a figure for The Greatest (ranks 2+ only). Cancel or blank to record the lore note alone.", ""); }catch(e){ n = ""; }
-     if(n && String(n).trim()){
-       voteGreatness(String(n).trim(), "Elevated by civic-myth amendment");
-     } else {
-       note("Lore amendment in force: greatness below Taylor may be voted. His myth is untouched.", true);
-     }
+     askLine("The civic myth is amended",
+       "Name a figure for The Greatest — ranks 2 and below only. Leave it blank to record the lore note alone.",
+       "A name, or nothing", n => {
+       if(n && String(n).trim()){
+         voteGreatness(String(n).trim(), "Elevated by civic-myth amendment");
+       } else {
+         note("Lore amendment in force: greatness below Taylor may be voted. His myth is untouched.", true);
+       }
+       try{ refreshPanels(); }catch(e){}
+     });
    }}
 ];
 function amendmentsOpen(){
@@ -17166,15 +17169,53 @@ function refreshCareer(){
     b.addEventListener("click", () => proposeAmendment(b.getAttribute("data-am"))));
   const bg = el("btnGreatness");
   if(bg) bg.addEventListener("click", () => {
-    let n = "";
-    try{ n = window.prompt("Name a figure for The Greatest (ranks 2+ only — never above Taylor).", ""); }catch(e){ n = ""; }
-    if(n && String(n).trim()){
+    askLine("A motion of the House", "Name a figure for The Greatest — ranks 2 and below only. The First Consul's rank is sealed.", "A name", n => {
+      if(!(n && String(n).trim())) return;
       if(G.you.influence < 8){ note("Need 8 influence to move a greatness nomination.", true); return; }
       G.you.influence -= 8;
       voteGreatness(String(n).trim(), "Named by floor motion of the House");
       refreshPanels();
-    }
+    });
   });
+}
+/* Ask for a line of text without blocking the renderer.
+
+   window.prompt() stops the whole page dead until it is answered: no
+   frames, no timers, no game. In a plain tab you at least see the dialog
+   and can dismiss it; in an app-mode window it can open behind or off to
+   one side, and what you are looking at is a game that has simply stopped
+   — indistinguishable from a freeze, and unrecoverable until it is found
+   and dismissed. This does the same job with the card the game already
+   uses for every other question it asks. */
+function askLine(title, msg, placeholder, cb){
+  const done = v => {
+    try{ veil.hidden = true; card.classList.remove("card--open"); }catch(e){}
+    try{ G.running = wasRunning; }catch(e){}
+    try{ cb(v); }catch(e){ if(window.console) console.warn("askLine", e); }
+  };
+  const wasRunning = G.running;
+  G.running = false;
+  card.innerHTML =
+    '<div class="eyebrow">' + title + '</div>' +
+    '<p>' + msg + '</p>' +
+    '<p><input class="mk__name" id="askLineInput" maxlength="60" placeholder="' +
+      (placeholder || "") + '" style="font-size:19px"></p>' +
+    '<div class="card__actions">' +
+      '<button class="btn btn--ghost" type="button" id="askLineNo">Cancel</button>' +
+      '<button class="btn" type="button" id="askLineYes">Confirm</button></div>';
+  veil.hidden = false;
+  card.classList.add("card--open");
+  const input = el("askLineInput");
+  const yes = el("askLineYes"), no = el("askLineNo");
+  if(yes) yes.addEventListener("click", () => done(input ? input.value : ""));
+  if(no) no.addEventListener("click", () => done(""));
+  if(input){
+    input.addEventListener("keydown", ev => {
+      if(ev.key === "Enter"){ ev.preventDefault(); done(input.value); }
+      else if(ev.key === "Escape"){ ev.preventDefault(); done(""); }
+    });
+    try{ input.focus(); }catch(e){}
+  }
 }
 function refreshPanels(){
   refreshBar(); refreshTravel(); refreshWire();
