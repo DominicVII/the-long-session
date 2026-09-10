@@ -6446,8 +6446,16 @@ function syncPeopleStaged(done, retries){
   requestAnimationFrame(step);
 }
 function wrapPi(a){
-  while(a > Math.PI) a -= Math.PI*2;
-  while(a < -Math.PI) a += Math.PI*2;
+  /* Modulo, not a decrement loop: a loop that subtracts 2*PI until the
+     value fits never returns if `a` is ever Infinity (any upstream NaN
+     from a divide-by-zero or a bad vector normalize can surface as
+     Infinity here) or just very large after a long session of turning.
+     That is a true hang — it never throws, so the per-frame try/catch
+     in frame() cannot recover it. A single modulo is O(1) regardless
+     of how big or broken the input is, and safely yields NaN (not a
+     hang) for genuinely non-finite input. */
+  if(!isFinite(a)) return 0;
+  a = ((a + Math.PI) % (Math.PI*2) + Math.PI*2) % (Math.PI*2) - Math.PI;
   return a;
 }
 function animatePerson(p, dt){
@@ -14557,10 +14565,11 @@ function tickSpeechApproach(dt){
   const ease = k * k * (3 - 2 * k);
   cam.x += (a.x - cam.x) * Math.max(0.35, ease);
   cam.z += (a.z - cam.z) * Math.max(0.35, ease);
-  /* shortest yaw blend */
-  let dy = a.yaw - cam.yaw;
-  while(dy > Math.PI) dy -= Math.PI*2;
-  while(dy < -Math.PI) dy += Math.PI*2;
+  /* shortest yaw blend — modulo, not a decrement loop (see wrapPi): if
+     a.yaw or cam.yaw is ever non-finite, a while-based wrap here spins
+     forever with nothing to throw and nothing for frame()'s per-frame
+     try/catch to catch. wrapPi already returns 0 for non-finite input. */
+  const dy = wrapPi(a.yaw - cam.yaw);
   cam.yaw += dy * Math.max(0.4, ease);
   cam.vx = cam.vz = 0;
   if(a.t <= 0 || Math.hypot(a.x - cam.x, a.z - cam.z) < 0.08){
