@@ -5912,7 +5912,7 @@ function takeRelic(r){
   r.found = true;
   G.relics = G.relics || [];
   G.relics.push({k:r.k, t:r.t, d:r.d, room:r.room, day:G.day, congress:G.congress});
-  note("Found something in " + ROOMS[r.room].t + ": " + r.t.toLowerCase() + ".", true);
+  note("Found something in " + (ROOMS[r.room]?ROOMS[r.room].t:r.room) + ": " + r.t.toLowerCase() + ".", true);
   feed("You found " + r.t.toLowerCase() + ".");
   G.you.approval = clamp(G.you.approval + 1, 0, 100);
   refreshPanels();
@@ -6058,7 +6058,7 @@ function escortTo(e){
   e.escorting = true;
   const dest = e.room;
   feed("Going in for the " + e.t.toLowerCase() + ".");
-  spend(Math.round(ROOMS[dest].travel*0.5), 3);
+  spend(Math.round((ROOMS[dest]?ROOMS[dest].travel:0)*0.5), 3);
   transition(() => {
     G.room = dest; G.visitId = null;
     const sp = safeSpawn(dest);
@@ -6066,8 +6066,8 @@ function escortTo(e){
     everyone().forEach(m => { if(m.room===dest) placeInRoom(m); });
     if(dest === "floor") seatChamber();
     buildRoom(dest); syncPeople();
-    el("whereName").textContent = ROOMS[dest].t;
-    el("whereTag").textContent = ROOMS[dest].tag;
+    el("whereName").textContent = ROOMS[dest]?ROOMS[dest].t:dest;
+    el("whereTag").textContent = ROOMS[dest]?ROOMS[dest].tag:"";
     refreshPanels();
     e.escorting = false;
     eventCard(e);
@@ -6091,7 +6091,7 @@ function dayPlanCard(){
         list.map((e,i) =>
           '<div class="risk" style="border-left-color:var(--fed)">' +
             '<div class="risk__t">' + e.t + '</div>' +
-            '<div class="risk__m">' + (e.hour>12?e.hour-12:e.hour) + " o'clock · " + ROOMS[e.room].t + '</div>' +
+            '<div class="risk__m">' + (e.hour>12?e.hour-12:e.hour) + " o'clock · " + (ROOMS[e.room]?ROOMS[e.room].t:e.room) + '</div>' +
             '<p class="muted" style="margin:6px 0 8px">' + e.d + '</p>' +
             '<div style="display:flex;gap:6px">' +
               '<button class="conc__btn" style="flex:1" type="button" data-rsvp="' + i + ':1">' +
@@ -7876,11 +7876,11 @@ function eventCard(e){
 
   card.innerHTML =
     '<div class="eyebrow">' + dateString() + " · " + (e.hour>12?e.hour-12:e.hour) + " o'clock · " +
-      ROOMS[e.room].t + '</div>' +
+      (ROOMS[e.room]?ROOMS[e.room].t:e.room) + '</div>' +
     '<h1>' + e.t + '</h1>' +
     '<p class="dream">' + e.d + '</p>' +
     '<p>' + body + '</p>' +
-    (here ? '' : '<p class="muted">You were in ' + ROOMS[G.room].t + '.</p>') +
+    (here ? '' : '<p class="muted">You were in ' + (ROOMS[G.room]?ROOMS[G.room].t:G.room) + '.</p>') +
     '<div class="card__actions">' + opts.map((o,i) =>
       '<button class="btn' + (i ? ' btn--ghost' : '') + '" type="button" data-ev="' + i + '"' +
       (o.off ? ' disabled' : '') + '>' + o.t + '</button>').join("") + '</div>';
@@ -7927,7 +7927,7 @@ function makeHeadlines(){
   H.push(["Campaign", "War chest " + money(you.funds) + " · approval " + Math.round(you.approval) + "%"]);
   if(G.events && G.events.length){
     const nx = G.events.find(e => !e.done && e.day === G.day);
-    if(nx) H.push(["Diary", nx.t + " at " + (nx.hour>12?nx.hour-12:nx.hour) + " o'clock, " + ROOMS[nx.room].t]);
+    if(nx) H.push(["Diary", nx.t + " at " + (nx.hour>12?nx.hour-12:nx.hour) + " o'clock, " + (ROOMS[nx.room]?ROOMS[nx.room].t:nx.room)]);
   }
   if(G.history && G.history.length){
     const h = pick(G.history);
@@ -8487,7 +8487,7 @@ function dossierFor(m){
     L.push("As things stand you would vote " + (memberVote(m,b) > 0 ? "AYE" : "NO") + "." +
       (m.pledge ? " You have already pledged " + (m.pledge>0?"aye":"no") + " to them." : ""));
   }
-  L.push("WHERE: " + ROOMS[G.room].t + ", " + hhmm() + ", " + dayLabel().toLowerCase() + ", day " + G.day + ".");
+  L.push("WHERE: " + (ROOMS[G.room]?ROOMS[G.room].t:G.room) + ", " + hhmm() + ", " + dayLabel().toLowerCase() + ", day " + G.day + ".");
   const pc = citePrecedent();
   if(pc) L.push("A precedent you would reach for in an argument: " + pc.who + " of the " + ordinal(pc.congress) + " " + pc.act + ", which settled " + pc.precedent + ". Cite it the way a member cites precedent — " +
     "briefly, and only if it helps you.");
@@ -9430,7 +9430,7 @@ function openProp(o){
   el("talk").classList.add("is-open");
   el("talk").scrollTop = 0;
   el("tkName").textContent = o.label;
-  el("tkMeta").innerHTML = '<span class="chip chip--ind">' + ROOMS[G.room].t + '</span><span>' + o.sub + '</span>';
+  el("tkMeta").innerHTML = '<span class="chip chip--ind">' + (ROOMS[G.room]?ROOMS[G.room].t:G.room) + '</span><span>' + o.sub + '</span>';
   el("tkMood").textContent = "—";
   el("tkMood").style.color = "var(--ink-3)";
   el("tkBars").innerHTML = "";
@@ -11027,16 +11027,16 @@ function callOn(m){
 function goTo(id){
   if(G.moving) return;
   closeTalk();
-  spend(ROOMS[id].travel, Math.round(ROOMS[id].travel/8));
-  feed("Walking to " + ROOMS[id].t + ".");
+  spend(ROOMS[id]?ROOMS[id].travel:0, Math.round((ROOMS[id]?ROOMS[id].travel:0)/8));
+  feed("Walking to " + (ROOMS[id]?ROOMS[id].t:id) + ".");
   transition(() => {
     G.room = id; G.visitId = null;
     const b = roomBox(id);
     { const sp = safeSpawn(G.room); cam.x = sp.x; cam.z = sp.z; } cam.yaw = 0; G.doorGrace = G.t + 2.5;
     everyone().forEach(m => { if(m.room===id) placeInRoom(m); });
     buildRoom(id); syncPeople();
-    el("whereName").textContent = ROOMS[id].t;
-    el("whereTag").textContent = ROOMS[id].tag;
+    el("whereName").textContent = ROOMS[id]?ROOMS[id].t:id;
+    el("whereTag").textContent = ROOMS[id]?ROOMS[id].tag:"";
     refreshPanels();
   });
 }
@@ -12460,8 +12460,8 @@ function walkThroughDoors(){
   if(!hit) return;
   const dest = hit.dr.to, fromRoom = G.room;
   G.doorGrace = G.t + 2.2;
-  feed("Through to " + ROOMS[dest].t + ".");
-  spend(Math.round(ROOMS[dest].travel * 0.45), 2);
+  feed("Through to " + (ROOMS[dest]?ROOMS[dest].t:dest) + ".");
+  spend(Math.round((ROOMS[dest]?ROOMS[dest].travel:0) * 0.45), 2);
   transition(() => {
     G.room = dest; G.visitId = null;
     const b = roomBox(dest);
