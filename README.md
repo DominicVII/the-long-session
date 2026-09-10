@@ -12,11 +12,28 @@ First-person political life in an invented republic. You are one member of the H
 
 | | |
 |---|---|
-| **Windows (best)** | Keep the folder together (`index.html`, `vendor/`, `collab/`). Double-click **`Play.bat`** (or `.\Play.ps1`). Offline — no internet required. |
-| **Browser file** | Open `index.html` (`file://`). Three.js loads from `vendor/`. |
+| **Windows (best)** | Keep the folder together (`index.html`, `One Nation, Under, ME.html`, `vendor/`, `assets/`, `collab/`). Double-click **`Play.bat`**, **`StartLocal.bat`**, or run **`Launch-Offline.ps1`**. Offline — no internet required. |
+| **Browser file** | Open `One Nation, Under, ME.html` (`file://`). Three.js loads from `vendor/`. `index.html` is a thin redirect to it, kept only so GitHub Pages has a root document. |
 | **Local server** | From the folder: `python3 -m http.server 8765` → [http://127.0.0.1:8765/index.html](http://127.0.0.1:8765/index.html) |
 
 Saves live in the browser (`localStorage`). Dialogue improvises offline by default.
+
+### Offline continuity between computers or consoles
+
+Use **`StartLocal.bat`** (or **`SafeStart.bat`**) for the reliable offline launcher. It uses the included PowerShell server, so Python and internet access are not required. The opening menu is lightweight and the 3D rooms are built only after you start a career.
+
+To move a career to another computer:
+
+1. Open **Career** in the running game and choose **Export career save**.
+2. Copy `one-nation-under-me-save.json` to the other computer by USB, cloud storage, or a network share.
+3. Launch the game there, open **Career**, choose **Import career save**, and select the JSON file.
+
+The imported save replaces the local browser save and reloads the game. Keep the JSON private: it contains the complete career history.
+
+The game also keeps a rolling browser backup (`longsession.v3.backup`) behind the main
+career save. If the browser closes during a write, Continue automatically falls back to
+the last complete snapshot. Saves are written during play, at room changes, when the
+page is hidden, and before the browser closes.
 
 ### Public link (GitHub `main`)
 
@@ -24,6 +41,7 @@ Saves live in the browser (`localStorage`). Dialogue improvises offline by defau
 
 | Host | URL |
 |------|-----|
+| **GitHub Pages** | `https://dominicvii.github.io/the-long-session/` (enable Pages for `main` / root) |
 | **raw.githack** | https://raw.githack.com/DominicVII/the-long-session/main/index.html |
 | **jsDelivr** | https://cdn.jsdelivr.net/gh/DominicVII/the-long-session@main/index.html |
 
