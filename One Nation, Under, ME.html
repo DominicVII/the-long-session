@@ -19621,31 +19621,17 @@ try{ opening(); }catch(e){
   }catch(e2){}
 }
 
-/* warmRooms OPTIMIZED (2026-09-09): selective pre-loading of meeting rooms
-   during idle time to reduce freezes when meetings trigger room transitions.
-   Only builds commonly-used meeting rooms (caucus, press, committee) when the
-   game is running and not in a loading state. Avoids the startup freeze that
-   disabled the original warmRooms by deferring to requestIdleCallback. */
-(function warmRooms(){
-  const criticalRooms = ["caucus", "press", "committee", "floor", "steps"];
-  const preloadRooms = () => {
-    if(!G || !G.running || G.loading) return;
-    for(const roomId of criticalRooms){
-      try{
-        if(ROOMS[roomId] && typeof buildRoom === "function"){
-          buildRoom(roomId);
-        }
-      }catch(e){
-        if(window.console) console.warn("warmRooms preload", roomId, e);
-      }
-    }
-  };
-  if(typeof requestIdleCallback === "function"){
-    requestIdleCallback(preloadRooms, {timeout: 5000});
-  } else {
-    setTimeout(preloadRooms, 2000);
-  }
-})();
+/* warmRooms DISABLED (2026-09-08 freeze fix, reconfirmed 2026-09-09):
+   buildRoom() rebuilds the single shared `roomGroup` used by whichever
+   room is currently on screen, so pre-building other rooms in the
+   background does not warm a cache — it repeatedly clears and replaces
+   the room the player is standing in, synchronously, on the main thread.
+   A 2026-09-09 attempt to pre-load caucus/press/committee/floor/steps via
+   requestIdleCallback reproduced the original freeze (worse: it could
+   fire the instant a saved game loads with G.running already true,
+   before the player even reached the start card) and was reverted.
+   Rooms build on first enter instead; see buildRoom()/rebuildRoomStaged(). */
+(function warmRooms(){ /* no-op */ })();
 
 /* Continuity: wall-clock autosave while running (survives long AFK in one room). */
 setInterval(() => {
