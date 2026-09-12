@@ -1472,6 +1472,21 @@ const DOORS = {
   steps:    [{to:"corridor", side:"back",  at:0.5}, {to:"district", side:"front", at:0.5}],
   district: [{to:"steps",    side:"back",  at:0.5}]
 };
+/* Which walls are already spoken for. A wall with a door in it, or a run
+   of windows, is not a wall to hang a picture on or run a picture rail
+   across: that is how a pale beam ends up crossing a door head, and a
+   painting ends up sharing plaster with a sash. One table, read by the
+   window pass, the art pass and the lining pass alike. */
+function wallsInUse(id){
+  const R = ROOMS[id] || {};
+  const out = {door:{}, win:{}};
+  (DOORS[id] || []).forEach(dr => { if(dr && dr.side) out.door[dr.side] = true; });
+  const lit = R.light;
+  if(lit === "left" || lit === "right") out.win[lit] = true;
+  else if(lit === "back" || lit === "high") out.win.back = true;
+  return out;
+}
+function wallTaken(u, side){ return !!(u && (u.door[side] || u.win[side])); }
 function doorAt(roomId, dr){
   const R = ROOMS[roomId], hw = R.w/2;
   if(dr.side === "front") return {x:(dr.at-0.5)*R.w*0.8, z:0.35, ry:0};
@@ -4303,8 +4318,13 @@ function propWindow(wall, x,y,z, w,h, ry, opts){
     g.renderOrder = 1;
     roomGroup.add(g); return g;
   };
-  /* Thicknesses — reveal meets wall; glass sits in sash rebate. */
-  const revealD = 0.085;   /* outer stone/wood reveal depth into room */
+  /* Thicknesses. The assembly is recessed, not applied: the reveal goes
+     back INTO the wall from the plaster line, the sash sits in that
+     opening, and the glass is further back still. Built the other way —
+     everything pushed into the room off the wall plane — a window reads
+     as a pale box stuck on the plaster, which is exactly how it looked
+     on the office art wall and down the side of the caucus room. */
+  const revealD = 0.085;   /* reveal depth, taken back behind the plaster */
   const sashD   = 0.038;   /* sash/mullion face */
   const glassIn = 0.018;   /* glass inset from wall (rebate; not coplanar) */
   const barW    = 0.036;   /* muntin/mullion thickness */
@@ -4315,14 +4335,14 @@ function propWindow(wall, x,y,z, w,h, ry, opts){
     /* Opening on left/right wall: span along Z. ry tells facing. */
     const sign = (ry !== undefined && Math.sin(ry || 0) < 0) ? -1 : 1;
     const face = x;                         /* wall contact plane */
-    const revX = face + sign * (revealD * 0.5);
+    const revX = face - sign * (revealD * 0.5);
     /* Outer reveal (jambs + head + sill apron) — covers wall plane, no light leak */
     put(revealM, revX, y, z - w/2, revealD, h + sideT*2, sideT, true);           /* left jamb (along -Z) */
     put(revealM, revX, y, z + w/2, revealD, h + sideT*2, sideT, true);           /* right jamb */
     put(sillM,   revX, y - h/2 - sillT*0.35, z, revealD + 0.02, sillT, w + sideT*2.2, true); /* sill + miters past jambs */
     put(revealM, revX, y + h/2 + lintT*0.35, z, revealD + 0.01, lintT, w + sideT*2.0, true); /* lintel */
     /* Inner sash rectangle (slightly proud of reveal inner face) */
-    const sashX = face + sign * (revealD - sashD * 0.45);
+    const sashX = face - sign * (sashD * 0.5);        /* flush in the opening */
     /* Sash rails (outer) */
     put(sashM, sashX, y - h/2 + barW*0.55, z, sashD, barW, w - sideT*0.2, true);
     put(sashM, sashX, y + h/2 - barW*0.55, z, sashD, barW, w - sideT*0.2, true);
@@ -4338,7 +4358,7 @@ function propWindow(wall, x,y,z, w,h, ry, opts){
       put(sashM, sashX, yy, z, sashD, barW * 0.75, w - barW*1.6, true);
     }
     /* Glass panes inset in rebate — one plane per pane, shy of sash face */
-    const gX = face + sign * glassIn;
+    const gX = face - sign * (sashD + glassIn);       /* set back in the rebate */
     const cellW = (w - barW * (cols + 1)) / cols;
     const cellH = (h - barW * (rows + 1)) / rows;
     for(let r = 0; r < rows; r++){
@@ -4349,7 +4369,7 @@ function propWindow(wall, x,y,z, w,h, ry, opts){
       }
     }
     if(blinds){
-      const bx = face + sign * (revealD * 0.72);
+      const bx = face - sign * (revealD * 0.72);
       const slat = matCol(0xcfc6b4, .9);
       const nSl = Math.max(6, Math.round(h / 0.09));
       for(let sl = 0; sl < nSl; sl++){
@@ -4360,12 +4380,12 @@ function propWindow(wall, x,y,z, w,h, ry, opts){
     /* Back / front wall: span along X */
     const into = (z > 1) ? -1 : 1;   /* toward room centre */
     const face = z;
-    const revZ = face + into * (revealD * 0.5);
+    const revZ = face - into * (revealD * 0.5);
     put(revealM, x - w/2, y, revZ, sideT, h + sideT*2, revealD, true);
     put(revealM, x + w/2, y, revZ, sideT, h + sideT*2, revealD, true);
     put(sillM,   x, y - h/2 - sillT*0.35, revZ, w + sideT*2.2, sillT, revealD + 0.02, true);
     put(revealM, x, y + h/2 + lintT*0.35, revZ, w + sideT*2.0, lintT, revealD + 0.01, true);
-    const sashZ = face + into * (revealD - sashD * 0.45);
+    const sashZ = face - into * (sashD * 0.5);        /* flush in the opening */
     put(sashM, x, y - h/2 + barW*0.55, sashZ, w - sideT*0.2, barW, sashD, true);
     put(sashM, x, y + h/2 - barW*0.55, sashZ, w - sideT*0.2, barW, sashD, true);
     put(sashM, x - w/2 + barW*0.55, y, sashZ, barW, h - barW, sashD, true);
@@ -4378,7 +4398,7 @@ function propWindow(wall, x,y,z, w,h, ry, opts){
       const yy = y - h/2 + (r / rows) * h;
       put(sashM, x, yy, sashZ, w - barW*1.6, barW * 0.75, sashD, true);
     }
-    const gZ = face + into * glassIn;
+    const gZ = face - into * (sashD + glassIn);       /* set back in the rebate */
     const cellW = (w - barW * (cols + 1)) / cols;
     const cellH = (h - barW * (rows + 1)) / rows;
     for(let r = 0; r < rows; r++){
@@ -4389,7 +4409,7 @@ function propWindow(wall, x,y,z, w,h, ry, opts){
       }
     }
     if(blinds){
-      const bz = face + into * (revealD * 0.72);
+      const bz = face - into * (revealD * 0.72);
       const slat = matCol(0xcfc6b4, .9);
       const nSl = Math.max(6, Math.round(h / 0.09));
       for(let sl = 0; sl < nSl; sl++){
@@ -4904,7 +4924,15 @@ function buildRoomShell(id){
     ];
     /* Continuous runs: lengths reach into corner pilasters so joints are covered.
        Depths are staggered (never a second coplanar strip on the same face). */
-    const band = (mat, y, thick, depth, grow) => runs.forEach(r2 => {
+    /* Which wall each run belongs to, so a run can be left out. */
+    runs[0].side = "back"; runs[1].side = "front"; runs[2].side = "left"; runs[3].side = "right";
+    const useB = wallsInUse(id);
+    const band = (mat, y, thick, depth, grow, blankOnly) => runs.forEach(r2 => {
+      /* A picture rail is for hanging pictures. Running it across a wall
+         with a door or a window in it is what put a long pale beam over
+         the door head on the House floor. Skip that wall; do not shuffle
+         the rail up or down to miss it. */
+      if(blankOnly && wallTaken(useB, r2.side)) return;
       const len = r2.len + (grow || 0);
       if(r2.ax === "x") addBox(mat, r2.x, y, r2.z + (r2.z > d/2 ? -depth/2 : depth/2), len, thick, depth, 0, true);
       else               addBox(mat, r2.x + (r2.x > 0 ? -depth/2 : depth/2), y, r2.z, depth, thick, len, 0, true);
@@ -4934,18 +4962,18 @@ function buildRoomShell(id){
           addBox(stile, xx, 0.72, 0.042, 0.055, 1.10, 0.018, 0, true);
         }
         band(matCol(0x4c371f, .48), 1.335, 0.055, 0.072, 0.08);  /* chair rail → corners */
-        band(matCol(0x6b4d2c, .52), h*0.70, 0.038, 0.048, 0.08); /* picture rail body */
-        band(matCol(0x5a4024, .50), h*0.70 + 0.048, 0.016, 0.032, 0.08); /* cap — stepped out */
+        band(matCol(0x6b4d2c, .52), h*0.70, 0.038, 0.048, 0.08, true); /* picture rail body — blank walls only */
+        band(matCol(0x5a4024, .50), h*0.70 + 0.048, 0.016, 0.032, 0.08, true); /* cap — blank walls only */
       } else if(stony){
         band(matCol(0xc6bfae, .78), 1.05, 0.10, 0.056, 0.08);
         band(matCol(0xb8b1a0, .80), 1.125, 0.028, 0.042, 0.08);  /* string — stepped */
-        band(matCol(0xd2ccbc, .82), h*0.68, 0.042, 0.042, 0.08);
-        band(matCol(0xcfc8b8, .84), h*0.68 + 0.042, 0.018, 0.030, 0.08);
+        band(matCol(0xd2ccbc, .82), h*0.68, 0.042, 0.042, 0.08, true);
+        band(matCol(0xcfc8b8, .84), h*0.68 + 0.042, 0.018, 0.030, 0.08, true);
       } else {
         /* Painted plaster — matte, not plastic-flat; rails meet corner posts */
         band(matCol(0xdcd8cd, .90), 0.95, 0.055, 0.042, 0.08);
         band(matCol(0xd2cec2, .92), 1.005, 0.018, 0.032, 0.08);
-        band(matCol(0xe4e0d6, .90), h*0.72, 0.032, 0.040, 0.08);
+        band(matCol(0xe4e0d6, .90), h*0.72, 0.032, 0.040, 0.08, true);
       }
       if(!R.open){
         const cor = wood2 ? matCol(0xd6d1c2, .88) : stony ? matCol(0xcfc9b9, .86) : matCol(0xeae6dc, .90);
@@ -5176,6 +5204,13 @@ function buildRoomInner(id){
   if(!R.open){
     try{
       const side = R.light;
+      const use = wallsInUse(id);
+      const winWall = (side === "left" || side === "right") ? side
+                    : (side === "back" || side === "high") ? "back" : null;
+      /* A door already owns that wall. Openings do not share plaster with
+         a doorway — that is the assembly that ends up hanging over a door
+         head like a beam. Skip, do not offset. */
+      if(winWall && use.door[winWall]) throw new Error("skip windows: door wall");
       const stony = R.style==="marble" || R.style==="stone" || R.style==="chamber";
       const woodish = R.style==="wood" || R.style==="plain";
       /* Pane grid by room feel: wood offices 2×2; marble/chamber halls 3×2. */
@@ -5195,15 +5230,24 @@ function buildRoomInner(id){
           propWindow("x", x, wy, wz, wwSide, wh, ry, opts);
         }
       } else if(side === "back" || side === "high"){
-        const n = side === "high" ? 3 : 3;
+        /* Two openings across the chamber's back wall. Three put one of
+           them dead centre, behind the banner, where it read as a pale
+           slab stuck to the plaster. */
+        const n = (R.style === "chamber") ? 2 : 3;
         const zz = d - 0.002;
         for(let i=0;i<n;i++){
-          const wx = -w * 0.28 + i * (w * 0.28);
+          /* Spread symmetrically about the centre line. Three openings sit
+             at -0.28w, 0, +0.28w as before; two straddle the middle at
+             -0.28w and +0.28w, so neither one ends up behind the banner. */
+          const wx = (i - (n - 1) / 2) * (w * 0.56 / Math.max(1, n - 1));
           propWindow("z", wx, wy, zz, wwBack, wh * (side==="high"?0.85:1), 0, opts);
         }
       }
       /* cloak / lamp-lit rooms: no R.light window wall — skip */
-    }catch(e){ if(window.console) console.warn("windows", e); }
+    }catch(e){
+      if(e && /^skip windows/.test(e.message || "")) { /* deliberate: that wall has a door */ }
+      else if(window.console) console.warn("windows", e);
+    }
   }
   /* fittings the interaction points refer to */
   if(id === "office" || id === "visit"){
@@ -5577,19 +5621,23 @@ function buildRoomInner(id){
   if(R.style === "wood" || R.style === "marble" || R.style === "plain" || R.style === "chamber"){
     const arts = artPool();
     const nA = arts.length || 1;
+    /* Paintings go on blank wall only. A wall with a door or a run of
+       windows in it is not blank, and hanging art there is what put a
+       sash box beside a picture frame on the office art wall. */
+    const useA = wallsInUse(id);
     const doorZsL = (id === "corridor") ? (DOORS.corridor||[]).filter(dr => dr.side==="left").map(dr => dr.at * d) : [];
     const doorZsR = (id === "corridor") ? (DOORS.corridor||[]).filter(dr => dr.side==="right").map(dr => dr.at * d) : [];
     const noticeZ = (id === "corridor") ? 4.9 : null; /* skip bay occupied by the notice board */
     const nArt = id === "corridor" ? 6 : (id === "floor" || id === "caucus" || id === "committee" ? 5 : 4);
     const yMid = Math.min(2.55, Math.max(1.85, h * 0.48));
-    for(let i=0;i<nArt;i++){
+    for(let i=0; i<nArt && !wallTaken(useA, "left"); i++){
       const zz = d*(0.20 + i*(0.58/Math.max(1,nArt-1)));
       if(zz > d-0.7) break;
       if(doorZsL.some(bz => Math.abs(bz - zz) < 1.8)) continue;
       if(noticeZ != null && Math.abs(noticeZ - zz) < 1.5) continue;
       propFrame("x", -hw+0.001, yMid + (i%2)*0.10, zz, 0.78, 0.58, arts[i % nA], Math.PI/2);
     }
-    if(id !== "steps" && id !== "district"){
+    if(id !== "steps" && id !== "district" && !wallTaken(useA, "right")){
       for(let i=0;i<Math.min(4, nArt);i++){
         const zz = d*(0.26 + i*0.18);
         if(zz > d-0.7) break;
@@ -5597,13 +5645,17 @@ function buildRoomInner(id){
         propFrame("x", hw-0.001, yMid + 0.05, zz, 0.72, 0.55, arts[(i+2) % nA], -Math.PI/2);
       }
     }
-    /* Front + back wall pairs (into-room) — every indoor dressed room */
+    /* Front + back wall pairs (into-room) — blank walls only */
     if(id !== "steps" && id !== "district"){
       const bx = Math.min(2.6, hw - 1.1);
-      propFrame("z", -bx, yMid + 0.08, 0.001, 0.88, 0.64, arts[1 % nA]);
-      propFrame("z",  bx, yMid + 0.08, 0.001, 0.88, 0.64, arts[2 % nA]);
-      propFrame("z", -bx, yMid + 0.12, d-0.001, 0.95, 0.70, arts[0 % nA]);
-      propFrame("z",  bx, yMid + 0.12, d-0.001, 0.95, 0.70, arts[3 % nA]);
+      if(!wallTaken(useA, "front")){
+        propFrame("z", -bx, yMid + 0.08, 0.001, 0.88, 0.64, arts[1 % nA]);
+        propFrame("z",  bx, yMid + 0.08, 0.001, 0.88, 0.64, arts[2 % nA]);
+      }
+      if(!wallTaken(useA, "back")){
+        propFrame("z", -bx, yMid + 0.12, d-0.001, 0.95, 0.70, arts[0 % nA]);
+        propFrame("z",  bx, yMid + 0.12, d-0.001, 0.95, 0.70, arts[3 % nA]);
+      }
     }
   }
 
