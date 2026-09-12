@@ -11,6 +11,14 @@ the reasoning behind each.
 
 ---
 
+## Boot: duplicate skinKey + opening-card quote (12 Sep 2026)
+
+- Duplicate `const skinKey` in `buildPerson` threw on load — renamed the body cache key.
+- Opening-card logo `onerror` used nested single quotes, which is a parse error. The House would not start. Fixed.
+
+---
+
+
 ## Shared body, hair cuts, suit cuts (12 Sep 2026)
 
 - **One body model:** skinned geometry is shared per frame+outfit. Height/build is a root scale. Faces, hair, glasses stay unique.
