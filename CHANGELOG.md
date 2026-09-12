@@ -11,6 +11,16 @@ the reasoning behind each.
 
 ---
 
+## Standalone app — one HTML, no network (12 Sep 2026)
+
+- Three.js r128 and ProxyAI are inlined. The HTML boots from disk with no
+  vendor folder, no CDN, no server.
+- `Play.bat` opens an Edge/Chrome app window on the HTML.
+- `Install-App.ps1` copies it to LocalAppData and pins Desktop + Start Menu shortcuts.
+
+---
+
+
 ## Boot: duplicate skinKey + opening-card quote (12 Sep 2026)
 
 - Duplicate `const skinKey` in `buildPerson` threw on load — renamed the body cache key.

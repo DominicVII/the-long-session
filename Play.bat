@@ -1,24 +1,27 @@
 @echo off
-REM One Nation, Under, ME. — offline file:// launch (no server)
-REM Prefer StartLocal.bat — file:// can fail WebGL/localStorage oddly in Edge/Chrome --app.
+REM One Nation, Under, ME. — standalone app window. No server. No internet.
 cd /d "%~dp0"
-if not exist "vendor\three.min.js" (
-  echo Missing vendor\three.min.js — copy the full the-long-session folder.
+set "GAME=%~dp0One Nation, Under, ME.html"
+if not exist "%GAME%" (
+  echo Missing "One Nation, Under, ME.html" next to this launcher.
   pause
   exit /b 1
 )
-if not exist "index.html" (
-  echo Missing index.html
-  pause
-  exit /b 1
-)
-echo Launching via file:// — if you get a blank screen or dead buttons, use StartLocal.bat instead.
+
 where msedge >nul 2>&1 && (
-  start "" msedge --app="%cd%\index.html"
+  start "" msedge --app="%GAME%"
+  exit /b 0
+)
+if exist "%ProgramFiles%\Microsoft\Edge\Application\msedge.exe" (
+  start "" "%ProgramFiles%\Microsoft\Edge\Application\msedge.exe" --app="%GAME%"
+  exit /b 0
+)
+if exist "%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe" (
+  start "" "%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe" --app="%GAME%"
   exit /b 0
 )
 where chrome >nul 2>&1 && (
-  start "" chrome --app="%cd%\index.html"
+  start "" chrome --app="%GAME%"
   exit /b 0
 )
-start "" "%cd%\index.html"
+start "" "%GAME%"
