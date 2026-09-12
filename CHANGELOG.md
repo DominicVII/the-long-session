@@ -11,6 +11,13 @@ the reasoning behind each.
 
 ---
 
+## WebGL: skip the House under cards (12 Sep 2026)
+
+- Cards (Sleep, morning) no longer draw the 3D scene underneath.
+- Static furniture matrices are frozen. No object sort. Modest Dell caps at ~30fps, no filmic pass, short far plane.
+
+---
+
 ## Dell / Edge: Simple graphics on modest machines (12 Sep 2026)
 
 - Windows laptops with 8 threads or 8GB (typical Dell + Intel UHD) start in Simple: no antialias, no shadows, low-power GPU.

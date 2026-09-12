@@ -2715,8 +2715,14 @@ try{
     G.gfx = "simple"; G.simple = true;
   }
 }catch(e){}
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.0;
+renderer.sortObjects = false;
+if(typeof MODEST !== "undefined" && MODEST){
+  renderer.toneMapping = THREE.NoToneMapping;
+  renderer.toneMappingExposure = 1;
+} else {
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.0;
+}
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap;
 /* Context loss must not leave the view in a sticky panic banner. */
@@ -2990,7 +2996,7 @@ if(sceneEl) sceneEl.appendChild(renderer.domElement);
 el("boot").remove();
 
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(58, 16/10, 0.05, 240);
+const camera = new THREE.PerspectiveCamera(58, 16/10, 0.08, (typeof MODEST !== "undefined" && MODEST) ? 42 : 80);
 const roomGroup = new THREE.Group(); scene.add(roomGroup);
 const peopleGroup = new THREE.Group(); scene.add(peopleGroup);
 
@@ -4029,12 +4035,14 @@ function addBox(mat, x,y,z, w,h,d, ry, noShadow){
   const m = new THREE.Mesh(UNIT.box, mat);
   m.position.set(x,y,z); m.scale.set(w,h,d); if(ry) m.rotation.y = ry;
   m.castShadow = !noShadow; m.receiveShadow = true;
+  m.updateMatrix(); m.matrixAutoUpdate = false;
   roomGroup.add(m); return m;
 }
 function addCyl(mat, x,y,z, r,h, ry){
   const m = new THREE.Mesh(UNIT.cyl, mat);
   m.position.set(x,y,z); m.scale.set(r*2,h,r*2); if(ry) m.rotation.y = ry;
   m.castShadow = true; m.receiveShadow = true;
+  m.updateMatrix(); m.matrixAutoUpdate = false;
   roomGroup.add(m); return m;
 }
 function addPlane(mat, x,y,z, w,h, rx,ry){
@@ -4042,6 +4050,7 @@ function addPlane(mat, x,y,z, w,h, rx,ry){
   m.position.set(x,y,z); m.scale.set(w,h,1);
   m.rotation.set(rx||0, ry||0, 0);
   m.receiveShadow = true;
+  m.updateMatrix(); m.matrixAutoUpdate = false;
   roomGroup.add(m); return m;
 }
 
@@ -4124,6 +4133,19 @@ function tidyRoomFurniture(){
     }catch(e){}
   });
   remove.forEach(g => roomGroup.remove(g));
+}
+function freezeStaticRoom(){
+  /* Furniture never moves after build — skip per-frame matrix walks. */
+  if(!roomGroup) return;
+  try{
+    roomGroup.updateMatrixWorld(true);
+    roomGroup.traverse(o => {
+      if(!o || o.isSkinnedMesh) return;
+      if(o.isLight) return;
+      o.updateMatrix();
+      o.matrixAutoUpdate = false;
+    });
+  }catch(e){}
 }
 /* a desk with legs, its top at writing height */
 function propDesk(topMat, legMat, x, z, w, dp, ry, h){
@@ -5170,6 +5192,8 @@ function buildRoom(id){
       clearRoom();
       buildRoomInner(id);
       tidyRoomFurniture();
+      freezeStaticRoom();
+      freezeStaticRoom();
       if(!roomGroup || roomGroup.children.length < 5)
         throw new Error("room shell too empty");
     }catch(e){
@@ -19461,7 +19485,7 @@ let hailT = 0, hailWho = null, matChkT = 0, matChk = 0, matChkSaid = 0;
    to the simulation is the real elapsed time across the skipped frames and
    nothing runs slow or fast because of it. FRAME_TARGET_MS is deliberately
    a touch under 1000/60 so a 60Hz panel never skips a frame to rounding. */
-const FRAME_TARGET_MS = 1000 / 62;
+const FRAME_TARGET_MS = (typeof MODEST !== "undefined" && MODEST) ? (1000 / 32) : (1000 / 62);
 let _lastDrawn = 0;
 function frame(now){
   if(GL_LOST){ last = now; requestAnimationFrame(frame); return; }
@@ -19488,6 +19512,14 @@ function frameBody(now){
   const dt = Math.min(0.05, (now-last)/1000); last = now;
   FRAME_ID++;
   pollPad();
+  const cardUp = !!(typeof veil !== "undefined" && veil && !veil.hidden);
+  if(cardUp && !TALK.open){
+    /* On-demand GL: the overlay owns the pixels. Drawing the House under
+       Ten o'clock is what froze Edge on Intel UHD during Sleep. */
+    try{ feedTick(dt); }catch(e){}
+    try{ tickScrollFrame(); }catch(e){}
+    return;
+  }
   if(G.running && !G.over && G.speed > 0){
     try{ tick(dt); }
     catch(err){
