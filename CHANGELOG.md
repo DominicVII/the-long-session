@@ -11,6 +11,13 @@ the reasoning behind each.
 
 ---
 
+## Dell / Edge: Simple graphics on modest machines (12 Sep 2026)
+
+- Windows laptops with 8 threads or 8GB (typical Dell + Intel UHD) start in Simple: no antialias, no shadows, low-power GPU.
+- Sleep still yields; batches of 8 so Edge does not show Wait.
+
+---
+
 ## Sleep no longer freezes Edge (12 Sep 2026)
 
 - Sleep stays on the Ten o'clock card ("The House is settling") until morning is drawn.

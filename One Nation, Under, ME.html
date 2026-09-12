@@ -1701,6 +1701,23 @@ const cam = {x:0, z:2.0, yaw:0, pitch:0, bob:0, speed:0, vx:0, vz:0, yawVel:0, p
     }
   }catch(e){}
 })();
+function modestMachine(){
+  try{
+    const cores = navigator.hardwareConcurrency || 4;
+    const mem = navigator.deviceMemory || 8;
+    const win = /Windows/i.test(navigator.userAgent || "");
+    /* Dell-class laptops: 8GB / 6–8 threads / Intel UHD. Edge --app hangs
+       if we ask this machine for antialias, soft shadows, and a full House. */
+    if(mem && mem <= 8) return true;
+    if(cores <= 6) return true;
+    if(win && cores <= 8 && (!mem || mem <= 16)) return true;
+  }catch(e){}
+  return false;
+}
+const MODEST = modestMachine();
+if(MODEST && G.gfx !== "best"){
+  G.gfx = "simple"; G.simple = true; G.fullDetail = false;
+}
 
 const smooth = (a, b, rate, dt) => a + (b - a) * (1 - Math.pow(rate, dt));
 
@@ -2499,7 +2516,7 @@ function scheduleDayStaged(done){
   let at = 0;
   const step = () => {
     try{
-      const stop = Math.min(list.length, at + 12);
+      const stop = Math.min(list.length, at + 8);
       for(; at < stop; at++){
         const m = list[at];
         if(!m) continue;
@@ -2682,9 +2699,22 @@ function placeInRoom(m){
 const sceneEl = el("scene");
 /* preserveDrawingBuffer keeps the last frame readable, so link previews and
    thumbnails of this page show the room rather than a black rectangle. */
-const renderer = new THREE.WebGLRenderer({antialias:true, preserveDrawingBuffer:false, powerPreference:"high-performance"});
+const renderer = new THREE.WebGLRenderer({
+  antialias: !MODEST,
+  preserveDrawingBuffer: false,
+  powerPreference: MODEST ? "low-power" : "high-performance",
+  failIfMajorPerformanceCaveat: false
+});
 renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.0));
 renderer.outputEncoding = THREE.sRGBEncoding;
+try{
+  const gl = renderer.getContext();
+  const ext = gl && gl.getExtension && gl.getExtension("WEBGL_debug_renderer_info");
+  const gpu = ext ? (gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) || "") : "";
+  if(/Intel|UHD|Iris|HD Graphics|Adreno|Mali/i.test(gpu) && G.gfx === "balanced"){
+    G.gfx = "simple"; G.simple = true;
+  }
+}catch(e){}
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.0;
 renderer.shadowMap.enabled = true;
@@ -18248,6 +18278,9 @@ function loadSave(){
     }
     if(G.gfx !== "best") G.fullDetail = false;
     G.simple = (G.gfx === "simple");
+    if(typeof MODEST !== "undefined" && MODEST && G.gfx !== "best"){
+      G.gfx = "simple"; G.simple = true; G.fullDetail = false;
+    }
     if(!G.room || typeof G.room !== "string") G.room = "office";
     if(typeof G.day !== "number" || !(G.day > 0)) G.day = 1;
     if(typeof G.minute !== "number" || G.minute < 0) G.minute = 8*60;
