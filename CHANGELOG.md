@@ -11,6 +11,15 @@ the reasoning behind each.
 
 ---
 
+## Sleep is a clock, not a rebuild (12 Sep 2026)
+
+Edge still hung on "The House is settling" because Sleep was remeshing
+people, rewriting panels, and stringifying the whole career. Sleep now
+only advances the day and writes the morning card. Save and bodies wait
+until after that card is on screen / Start the day.
+
+---
+
 ## Continue career — full resume (12 Sep 2026)
 
 Taken from Stardew (never wipe a farm on a bad load), Skyrim (pause Continue

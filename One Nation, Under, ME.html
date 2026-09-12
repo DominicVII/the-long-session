@@ -2509,14 +2509,14 @@ function scheduleDay(){
   if(t === "session" && (!G.bill || G.bill.done)) G.bill = makeBill();
 }
 function scheduleDayStaged(done){
-  /* Same work as scheduleDay, 12 people per turn so Edge Sleep cannot freeze. */
+  /* Diary only — no meshes. 4 people per paint so Edge can breathe. */
   const t = dayType();
   let list = [];
   try{ list = everyone(); }catch(e){ list = []; }
   let at = 0;
   const step = () => {
     try{
-      const stop = Math.min(list.length, at + 8);
+      const stop = Math.min(list.length, at + 4);
       for(; at < stop; at++){
         const m = list[at];
         if(!m) continue;
@@ -2525,15 +2525,17 @@ function scheduleDayStaged(done){
         routeForDay(m, t);
       }
     }catch(e){ if(window.console) console.warn("scheduleDay staged", e); }
-    if(at < list.length){ yieldMain(step); return; }
+    if(at < list.length){ yieldPaint(step); return; }
     lastBlock = -1;
-    try{ makeEvents(); }catch(e){}
-    try{
-      if(t === "session" && (!G.bill || G.bill.done)) G.bill = makeBill();
-    }catch(e){}
-    if(done) done();
+    yieldPaint(() => {
+      try{ makeEvents(); }catch(e){}
+      try{
+        if(t === "session" && (!G.bill || G.bill.done)) G.bill = makeBill();
+      }catch(e){}
+      if(done) done();
+    });
   };
-  yieldMain(step);
+  yieldPaint(step);
 }
 /* ── the shape of a working day ─────────────────────────────
    Members are not scattered at random: they do mail in the morning,
@@ -2664,9 +2666,15 @@ function nextFrameOrTimeout(fn, ms){
   setTimeout(once, ms === undefined ? 250 : ms);
 }
 function yieldMain(fn){
-  /* Edge --app hung-renderer fires if the thread stays busy ~8s. A 0-timeout
-     always returns to the event loop so the Wait dialog never appears. */
-  setTimeout(() => { try{ fn(); }catch(e){ if(window.console) console.warn("yieldMain", e); } }, 0);
+  /* Edge hung-renderer fires ~8s. Never stack work on 0-timeouts in one burst —
+     16ms lets the compositor paint Sleep/Continue cards. */
+  setTimeout(() => { try{ fn(); }catch(e){ if(window.console) console.warn("yieldMain", e); } }, 16);
+}
+function yieldPaint(fn){
+  let ran = false;
+  const once = () => { if(ran) return; ran = true; try{ fn(); }catch(e){ if(window.console) console.warn("yieldPaint", e); } };
+  try{ requestAnimationFrame(() => setTimeout(once, 0)); }catch(e){}
+  setTimeout(once, 48);
 }
 function safeSpawn(id){
   const b = roomBox(id), R = ROOMS[id] || ROOMS.office;
@@ -10492,19 +10500,31 @@ function dayPlanCard(){
   });
   const pg = el("planGo");
   if(pg) pg.addEventListener("click", () => {
+    if(pg.disabled) return;
+    pg.disabled = true;
+    pg.textContent = "Opening…";
     try{
-      veil.hidden = true;
-      G.running = true;
       const going = list.filter(e => e.rsvp === true).map(e => e.t);
       const skipped = list.filter(e => e.rsvp === false).map(e => e.t);
       if(going.length) feed("Diary locked: " + going.join("; ") + ".");
       if(skipped.length) feed("Word sent — skipping " + skipped.join("; ") + ".");
       if(taylor) feed("Taylor Day. Only Nieuw Oranje VII flies.");
-      save();
-      refreshPanels();
+    }catch(e){}
+    const go = () => {
+      try{ document.body.classList.remove("boot-menu"); }catch(e){}
+      veil.hidden = true;
+      G.running = true;
+      try{ setSpeed(G.prevSpeed || 1); }catch(e){ G.speed = 1; }
+      yieldPaint(() => { try{ save(false); refreshPanels(); }catch(e){} });
+    };
+    try{
+      syncPeopleStaged((err) => {
+        if(err && window.console) console.warn("planGo people", err);
+        go();
+      });
     }catch(e){
       if(window.console) console.warn("planGo", e);
-      softUnstickVeil(); G.running = true;
+      go();
     }
   });
   markPicks();
@@ -16879,9 +16899,8 @@ function nightfall(){
   markPicks();
 }
 function nextDay(late){
-  /* Stay on the Ten o'clock card. Hide nothing until the morning briefing
-     is actually in the DOM — swapping to a frozen 3D view is what made
-     Chrome throw "This page isn't responding". */
+  /* Stardew sleep: clock + diary only. No 3D, no panels, no stringify
+     until the morning card is on screen. That is what froze Edge. */
   if(nextDay._busy) return;
   nextDay._busy = true;
   G.running = false;
@@ -16889,17 +16908,25 @@ function nextDay(late){
     const h = card.querySelector("h1");
     if(h) h.textContent = "The House is settling.";
     const dream = card.querySelector("p.dream");
-    if(dream) dream.textContent = "Doors close. The floor is rewritten. Morning comes when it is ready.";
+    if(dream) dream.textContent = "Doors close. Morning comes when it is ready.";
     const acts = card.querySelector(".card__actions");
     if(acts) acts.innerHTML = '<button class="btn" type="button" disabled>Sleeping…</button>';
   }catch(e){}
-  const fail = (e) => {
+  const showMorning = () => {
+    if(!nextDay._busy) return;
     nextDay._busy = false;
-    if(window.console) console.warn("nextDay", e);
-    try{ dayPlanCard(); }catch(e2){ softUnstickVeil(); G.running = true; }
+    try{ dayPlanCard(); }catch(e){
+      if(window.console) console.warn("dayPlanCard", e);
+      softUnstickVeil(); G.running = true;
+    }
+    yieldPaint(() => { try{ save(false); }catch(e){} });
   };
-  const afterPaint = (fn) => yieldMain(() => yieldMain(fn));
-  yieldMain(() => {
+  const fail = (e) => {
+    if(window.console) console.warn("nextDay", e);
+    showMorning();
+  };
+  setTimeout(() => { if(nextDay._busy) showMorning(); }, 4000);
+  yieldPaint(() => {
     try{
       G.day = (G.day || 0) + 1; G.sittingDay = (G.sittingDay || 0) + 1; G.minute = 8*60; G.pendingNight = false;
       G.dayMark = {day:G.day, helped:[], hurt:[], attended:[], ignored:[], scraps:[]};
@@ -16913,45 +16940,9 @@ function nextDay(late){
       try{ ballotCard(); }catch(e){ fail(e); }
       return;
     }
-    yieldMain(() => {
+    yieldPaint(() => {
       try{ voxDaily(); }catch(e){}
-      scheduleDayStaged(() => {
-        const afterPeople = () => {
-          afterPaint(() => {
-            try{ save(); }catch(e){}
-            yieldMain(() => {
-              try{ refreshPanels(); }catch(e){}
-              afterPaint(() => {
-                nextDay._busy = false;
-                try{ dayPlanCard(); }catch(e){ fail(e); }
-              });
-            });
-          });
-        };
-        const peopleThen = () => {
-          try{
-            syncPeopleStaged((err) => {
-              if(err && window.console) console.warn("nextDay people", err);
-              afterPeople();
-            });
-          }catch(e){ afterPeople(); }
-        };
-        if(isTaylorDay()){
-          try{ bustOranje7Flag(); }catch(e){}
-          try{
-            note("Taylor Day: only Nieuw Oranje VII flies. The House votes the First Order line.", true);
-            feed("Only the Nieuw Oranje VII flies today. The House votes the First Order line of continuity.");
-          }catch(e){}
-          if(G.room){
-            yieldMain(() => {
-              try{ buildRoom(G.room); }catch(e){}
-              peopleThen();
-            });
-            return;
-          }
-        }
-        peopleThen();
-      });
+      scheduleDayStaged(showMorning);
     });
   });
 }
