@@ -1,16 +1,22 @@
-# One Nation, Under, ME. — changelog
+# One Nation, Under, ME. — the log
 
-(Formerly The Long Session.)
+Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.com/DominicVII/the-long-session)
 
-Live link: https://claude.ai/code/artifact/e1a2f577-1007-48dc-afaa-9b9f10205fc0
+A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
-A political-career simulator: a 3D chamber built in three.js (r128), with
-NPC members, bills, votes, secrets, a phone, and a save system. This
-document tracks every change made to it in this session, in order, with
-the reasoning behind each.
+## Play this build
+
+| | |
+|---|---|
+| **GitHub Pages** | https://dominicvii.github.io/the-long-session/ |
+| **raw.githack** | https://raw.githack.com/DominicVII/the-long-session/main/index.html |
+| **jsDelivr** | https://cdn.jsdelivr.net/gh/DominicVII/the-long-session@main/index.html |
+
+Saves live in the browser (`localStorage`). Continue never deletes a career. Sleep is a clock, not a 3D rebuild.
+
+This is the actual working log of the published HTML — not a Claude artifact.
 
 ---
-
 ## Sleep is a clock, not a rebuild (12 Sep 2026)
 
 Edge still hung on "The House is settling" because Sleep was remeshing
