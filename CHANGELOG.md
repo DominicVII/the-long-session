@@ -11,6 +11,13 @@ the reasoning behind each.
 
 ---
 
+## Sleep no longer freezes Edge (12 Sep 2026)
+
+- Sleep stays on the Ten o'clock card ("The House is settling") until morning is drawn.
+- Day roll, people, save, and panels each yield to Edge so the hung-page dialog does not fire.
+
+---
+
 ## Chamber architecture, speech browse, original seal (12 Sep 2026)
 
 - **No timer on chats.** Podium and interview lines stay until you take one.

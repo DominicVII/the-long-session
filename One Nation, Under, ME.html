@@ -2491,6 +2491,33 @@ function scheduleDay(){
   makeEvents();
   if(t === "session" && (!G.bill || G.bill.done)) G.bill = makeBill();
 }
+function scheduleDayStaged(done){
+  /* Same work as scheduleDay, 12 people per turn so Edge Sleep cannot freeze. */
+  const t = dayType();
+  let list = [];
+  try{ list = everyone(); }catch(e){ list = []; }
+  let at = 0;
+  const step = () => {
+    try{
+      const stop = Math.min(list.length, at + 12);
+      for(; at < stop; at++){
+        const m = list[at];
+        if(!m) continue;
+        rollNoise(m);
+        if(m.kind === "member") m.intent = chooseIntent(m);
+        routeForDay(m, t);
+      }
+    }catch(e){ if(window.console) console.warn("scheduleDay staged", e); }
+    if(at < list.length){ yieldMain(step); return; }
+    lastBlock = -1;
+    try{ makeEvents(); }catch(e){}
+    try{
+      if(t === "session" && (!G.bill || G.bill.done)) G.bill = makeBill();
+    }catch(e){}
+    if(done) done();
+  };
+  yieldMain(step);
+}
 /* ── the shape of a working day ─────────────────────────────
    Members are not scattered at random: they do mail in the morning,
    sit in committee, take the floor for votes, eat in the cloakroom,
@@ -2618,6 +2645,11 @@ function nextFrameOrTimeout(fn, ms){
   const once = () => { if(ran) return; ran = true; try{ fn(); }catch(e){ if(window.console) console.warn("nextFrameOrTimeout", e); } };
   try{ requestAnimationFrame(once); }catch(e){}
   setTimeout(once, ms === undefined ? 250 : ms);
+}
+function yieldMain(fn){
+  /* Edge --app hung-renderer fires if the thread stays busy ~8s. A 0-timeout
+     always returns to the event loop so the Wait dialog never appears. */
+  setTimeout(() => { try{ fn(); }catch(e){ if(window.console) console.warn("yieldMain", e); } }, 0);
 }
 function safeSpawn(id){
   const b = roomBox(id), R = ROOMS[id] || ROOMS.office;
@@ -16784,34 +16816,90 @@ function nightfall(){
   veil.hidden = false;
   const on = el("okNight");
   if(on) on.addEventListener("click", () => {
+    if(nextDay._busy) return;
+    on.disabled = true;
+    on.textContent = "Sleeping…";
     try{ nextDay(late); }
-    catch(e){ if(window.console) console.warn("okNight", e); softUnstickVeil(); G.running = true; }
+    catch(e){ if(window.console) console.warn("okNight", e); nextDay._busy = false; softUnstickVeil(); G.running = true; }
   });
   markPicks();
 }
 function nextDay(late){
-  veil.hidden = true;
-  G.day = (G.day || 0) + 1; G.sittingDay = (G.sittingDay || 0) + 1; G.minute = 8*60; G.pendingNight = false;
-  G.dayMark = {day:G.day, helped:[], hurt:[], attended:[], ignored:[], scraps:[]};
-  G.wireScraps = [];
-  G.lastAmbientHour = -1;
-  if(G.you) G.you.energy = clamp(late ? 78 : 100, 0, 100);
-  /* Nothing accrues for turning up. Everything here is earned or it is not had. */
-  if(G.recessLeft > 0) G.recessLeft--;
-  try{ voxDaily(); }catch(e){}
-  if(G.sittingDay > (G.termLength || 9999)){ try{ ballotCard(); }catch(e){} return; }
-  try{ scheduleDay(); }catch(e){ if(window.console) console.warn("scheduleDay", e); }
-  try{ syncPeople(); }catch(e){}
-  if(isTaylorDay()){
-    try{ bustOranje7Flag(); }catch(e){}
-    try{ if(G.room) buildRoom(G.room); }catch(e){}
+  /* Stay on the Ten o'clock card. Hide nothing until the morning briefing
+     is actually in the DOM — swapping to a frozen 3D view is what made
+     Chrome throw "This page isn't responding". */
+  if(nextDay._busy) return;
+  nextDay._busy = true;
+  G.running = false;
+  try{
+    const h = card.querySelector("h1");
+    if(h) h.textContent = "The House is settling.";
+    const dream = card.querySelector("p.dream");
+    if(dream) dream.textContent = "Doors close. The floor is rewritten. Morning comes when it is ready.";
+    const acts = card.querySelector(".card__actions");
+    if(acts) acts.innerHTML = '<button class="btn" type="button" disabled>Sleeping…</button>';
+  }catch(e){}
+  const fail = (e) => {
+    nextDay._busy = false;
+    if(window.console) console.warn("nextDay", e);
+    try{ dayPlanCard(); }catch(e2){ softUnstickVeil(); G.running = true; }
+  };
+  const afterPaint = (fn) => yieldMain(() => yieldMain(fn));
+  yieldMain(() => {
     try{
-      note("Taylor Day: only Nieuw Oranje VII flies. The House votes the First Order line.", true);
-      feed("Only the Nieuw Oranje VII flies today. The House votes the First Order line of continuity.");
-    }catch(e){}
-  }
-  try{ save(); refreshPanels(); }catch(e){}
-  try{ dayPlanCard(); }catch(e){ G.running = true; veil.hidden = true; if(window.console) console.warn("dayPlanCard", e); }
+      G.day = (G.day || 0) + 1; G.sittingDay = (G.sittingDay || 0) + 1; G.minute = 8*60; G.pendingNight = false;
+      G.dayMark = {day:G.day, helped:[], hurt:[], attended:[], ignored:[], scraps:[]};
+      G.wireScraps = [];
+      G.lastAmbientHour = -1;
+      if(G.you) G.you.energy = clamp(late ? 78 : 100, 0, 100);
+      if(G.recessLeft > 0) G.recessLeft--;
+    }catch(e){ fail(e); return; }
+    if(G.sittingDay > (G.termLength || 9999)){
+      nextDay._busy = false;
+      try{ ballotCard(); }catch(e){ fail(e); }
+      return;
+    }
+    yieldMain(() => {
+      try{ voxDaily(); }catch(e){}
+      scheduleDayStaged(() => {
+        const afterPeople = () => {
+          afterPaint(() => {
+            try{ save(); }catch(e){}
+            yieldMain(() => {
+              try{ refreshPanels(); }catch(e){}
+              afterPaint(() => {
+                nextDay._busy = false;
+                try{ dayPlanCard(); }catch(e){ fail(e); }
+              });
+            });
+          });
+        };
+        const peopleThen = () => {
+          try{
+            syncPeopleStaged((err) => {
+              if(err && window.console) console.warn("nextDay people", err);
+              afterPeople();
+            });
+          }catch(e){ afterPeople(); }
+        };
+        if(isTaylorDay()){
+          try{ bustOranje7Flag(); }catch(e){}
+          try{
+            note("Taylor Day: only Nieuw Oranje VII flies. The House votes the First Order line.", true);
+            feed("Only the Nieuw Oranje VII flies today. The House votes the First Order line of continuity.");
+          }catch(e){}
+          if(G.room){
+            yieldMain(() => {
+              try{ buildRoom(G.room); }catch(e){}
+              peopleThen();
+            });
+            return;
+          }
+        }
+        peopleThen();
+      });
+    });
+  });
 }
 
 function worstVote(){
