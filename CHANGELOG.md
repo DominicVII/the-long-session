@@ -11,6 +11,16 @@ the reasoning behind each.
 
 ---
 
+## Shared body, hair cuts, suit cuts (12 Sep 2026)
+
+- **One body model:** skinned geometry is shared per frame+outfit. Height/build is a root scale. Faces, hair, glasses stay unique.
+- **Hair:** readable cuts plus **Caesar cut**. Side parting is two flattened combs with a scalp gap, not a lump.
+- **Suits:** navy/burgundy/khaki/slate palette; open collar; real waistcoat; rolled sleeves; longer skirt/dress.
+- **Glasses** sit in front of the face. Seated floor amendment and lectern radius clamp remain.
+
+---
+
+
 ## 1. Event listener robustness
 
 **Problem:** `wireSend`, `wireIn`, `wireTo`, `wireStop`, `chatThink`,

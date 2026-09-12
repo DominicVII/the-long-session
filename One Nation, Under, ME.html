@@ -622,8 +622,20 @@ body.is-bare .unbare{display:none}
 .careerline{display:grid; grid-template-columns:70px 1fr; gap:10px; padding:9px 0; border-bottom:1px solid var(--line-soft); font-size:12px}
 .careerline b{font-family:"JetBrains Mono",monospace; font-size:10.5px; color:var(--ink-3)}
 
-.veil{position:fixed; inset:0; z-index:30; display:grid; place-items:center; padding:20px; overflow-y:auto;
-  background:color-mix(in srgb,var(--stone) 80%,transparent); backdrop-filter:blur(2px)}
+.veil{position:fixed; inset:0; z-index:80; display:grid; place-items:center; padding:20px; overflow-y:auto;
+  background:color-mix(in srgb,var(--stone) 96%,transparent); backdrop-filter:blur(10px)}
+body.boot-menu .ui-toolbar,
+body.boot-menu .aloud-btn,
+body.boot-menu .keys,
+body.boot-menu .wire,
+body.boot-menu .tick,
+body.boot-menu .bar,
+body.boot-menu .travel,
+body.boot-menu .dossier{display:none !important}
+body.boot-menu .shell{grid-template-rows:minmax(0,1fr)}
+.card--open{animation:cardin .45s ease both}
+@keyframes cardin{from{opacity:0; transform:translateY(10px)} to{opacity:1; transform:none}}
+.boot-hint{font-size:11px; color:var(--ink-3); margin-top:10px; letter-spacing:.04em}
 .veil[hidden]{display:none}
 .card{width:min(690px,100%); background:var(--paper); border:1px solid var(--line); border-top:3px solid var(--fed);
   border-radius:3px; box-shadow:0 26px 70px -34px rgba(0,0,0,.7); padding:26px 30px 24px}
@@ -1472,21 +1484,6 @@ const DOORS = {
   steps:    [{to:"corridor", side:"back",  at:0.5}, {to:"district", side:"front", at:0.5}],
   district: [{to:"steps",    side:"back",  at:0.5}]
 };
-/* Which walls are already spoken for. A wall with a door in it, or a run
-   of windows, is not a wall to hang a picture on or run a picture rail
-   across: that is how a pale beam ends up crossing a door head, and a
-   painting ends up sharing plaster with a sash. One table, read by the
-   window pass, the art pass and the lining pass alike. */
-function wallsInUse(id){
-  const R = ROOMS[id] || {};
-  const out = {door:{}, win:{}};
-  (DOORS[id] || []).forEach(dr => { if(dr && dr.side) out.door[dr.side] = true; });
-  const lit = R.light;
-  if(lit === "left" || lit === "right") out.win[lit] = true;
-  else if(lit === "back" || lit === "high") out.win.back = true;
-  return out;
-}
-function wallTaken(u, side){ return !!(u && (u.door[side] || u.win[side])); }
 function doorAt(roomId, dr){
   const R = ROOMS[roomId], hw = R.w/2;
   if(dr.side === "front") return {x:(dr.at-0.5)*R.w*0.8, z:0.35, ry:0};
@@ -1587,7 +1584,7 @@ function newName(stateOrCult){
   return pick(FIRST)+" "+pick(LAST)+" "+uid;
 }
 const SKINS  = [0xf0d3ba,0xe8c4a0,0xd9ab84,0xc08e64,0x9c6b45,0x7a4f31,0x5c3a22,0x3f2818];
-const SUITS  = [0x2b2f38,0x1d2530,0x3a3a3c,0x4a4238,0x2f3b33,0x1a1c24,0x554b42,0x30343f,0x424a55,0x24313d];
+const SUITS  = [0x1a2744,0x12141a,0x3d1f22,0x2c1810,0x4a5a6a,0x5c5346,0x1d2530,0x2f3b33,0x554b42,0x24313d,0x1a1c24,0x6a4e2a];
 const SHIRTS = [0xf2f0ea,0xe8ecf0,0xdfe6ee,0xf0e6dc,0xe4e8e2,0xffffff,0xd8e2ea];
 const HAIRS  = [0x14100d,0x2f2318,0x4a3728,0x6b5540,0x8b7355,0xa89880,0xd8d3c8,0x3a3a3a,0x5c3218];
 /* ── what people wear ─────────────────────────────────────
@@ -1604,7 +1601,7 @@ const WARDROBE = {
 };
 const WEAR_MASC = ["suit_tie","three_piece","suit_open","shirt_vest","suit_tie","suit_tie"];
 const WEAR_FEM  = ["skirt_suit","trouser_suit","dress_jacket","blouse_skirt","skirt_suit","trouser_suit"];
-const HAIRSTYLES = ["Short back and sides","Side parting","Pinned up","Thinning","Long","Cropped curls"];
+const HAIRSTYLES = ["Short back and sides","Side parting","Pinned up","Thinning","Long","Cropped curls","Caesar cut"];
 
 /* No two people in the building look alike. Kin may share colouring;
    nobody shares a build and an outfit. */
@@ -1637,7 +1634,7 @@ function rollLook(opts){
     height: fem ? 1.55 + Math.random()*0.22 : 1.66 + Math.random()*0.26,
     build:0.88 + Math.random()*0.30,
     frame,
-    style:(Math.random()*6)|0,
+    style:(Math.random()*7)|0,
     glasses:chance(.27), eye:pick([0x5a3d24,0x3d2a18,0x6b4a2a,0x4a6070,0x556b4a,0x2f2018,0x7a6a4a,0x3a4a5c]),
     beard: !fem && chance(.30),
     wear: pick(fem ? WEAR_FEM : WEAR_MASC),
@@ -3106,11 +3103,9 @@ const UNIT = {
    instead of two tubes pivoting past each other.
    ══════════════════════════════════════════════════════════ */
 const RING = 16;                      /* vertices around a limb — smooth cloth silhouette */
-function skinnedBody(spec){
-  /* spec.bones: {name:{parent, pos:[x,y,z]}} in bind pose
-     spec.segs:  [{a, b, r0, r1, mat, rings}] a is the owning bone   */
+function makeBones(spec){
   const names = Object.keys(spec.bones);
-  const bones = {}, order = [], world = {};
+  const bones = {}, order = [];
   names.forEach(n => {
     const d = spec.bones[n];
     const b = new THREE.Bone();
@@ -3123,6 +3118,28 @@ function skinnedBody(spec){
     if(d.parent) bones[d.parent].add(bones[n]);
     order.push(bones[n]);
   });
+  return {bones, order};
+}
+/* One body geometry per frame+outfit. Everyone else reuses it and we scale
+   the root — that is what "one model, unique faces" actually means here. */
+const BODY_CANON_H = 1.70, BODY_CANON_B = 1.00;
+const SKIN_GEO = new Map();
+function sharedSkin(spec, key){
+  let geo = SKIN_GEO.get(key);
+  if(!geo){
+    const first = skinnedBody(spec);
+    SKIN_GEO.set(key, first.geo);
+    return first;
+  }
+  const {bones, order} = makeBones(spec);
+  return {geo, bones, order};
+}
+function skinnedBody(spec){
+  /* spec.bones: {name:{parent, pos:[x,y,z]}} in bind pose
+     spec.segs:  [{a, b, r0, r1, mat, rings}] a is the owning bone   */
+  const {bones, order} = makeBones(spec);
+  const names = Object.keys(spec.bones);
+  const world = {};
   /* bind-pose positions in model space */
   function worldOf(n){
     if(world[n]) return world[n];
@@ -4318,13 +4335,8 @@ function propWindow(wall, x,y,z, w,h, ry, opts){
     g.renderOrder = 1;
     roomGroup.add(g); return g;
   };
-  /* Thicknesses. The assembly is recessed, not applied: the reveal goes
-     back INTO the wall from the plaster line, the sash sits in that
-     opening, and the glass is further back still. Built the other way —
-     everything pushed into the room off the wall plane — a window reads
-     as a pale box stuck on the plaster, which is exactly how it looked
-     on the office art wall and down the side of the caucus room. */
-  const revealD = 0.085;   /* reveal depth, taken back behind the plaster */
+  /* Thicknesses — reveal meets wall; glass sits in sash rebate. */
+  const revealD = 0.085;   /* outer stone/wood reveal depth into room */
   const sashD   = 0.038;   /* sash/mullion face */
   const glassIn = 0.018;   /* glass inset from wall (rebate; not coplanar) */
   const barW    = 0.036;   /* muntin/mullion thickness */
@@ -4335,14 +4347,14 @@ function propWindow(wall, x,y,z, w,h, ry, opts){
     /* Opening on left/right wall: span along Z. ry tells facing. */
     const sign = (ry !== undefined && Math.sin(ry || 0) < 0) ? -1 : 1;
     const face = x;                         /* wall contact plane */
-    const revX = face - sign * (revealD * 0.5);
+    const revX = face + sign * (revealD * 0.5);
     /* Outer reveal (jambs + head + sill apron) — covers wall plane, no light leak */
     put(revealM, revX, y, z - w/2, revealD, h + sideT*2, sideT, true);           /* left jamb (along -Z) */
     put(revealM, revX, y, z + w/2, revealD, h + sideT*2, sideT, true);           /* right jamb */
     put(sillM,   revX, y - h/2 - sillT*0.35, z, revealD + 0.02, sillT, w + sideT*2.2, true); /* sill + miters past jambs */
     put(revealM, revX, y + h/2 + lintT*0.35, z, revealD + 0.01, lintT, w + sideT*2.0, true); /* lintel */
     /* Inner sash rectangle (slightly proud of reveal inner face) */
-    const sashX = face - sign * (sashD * 0.5);        /* flush in the opening */
+    const sashX = face + sign * (revealD - sashD * 0.45);
     /* Sash rails (outer) */
     put(sashM, sashX, y - h/2 + barW*0.55, z, sashD, barW, w - sideT*0.2, true);
     put(sashM, sashX, y + h/2 - barW*0.55, z, sashD, barW, w - sideT*0.2, true);
@@ -4358,7 +4370,7 @@ function propWindow(wall, x,y,z, w,h, ry, opts){
       put(sashM, sashX, yy, z, sashD, barW * 0.75, w - barW*1.6, true);
     }
     /* Glass panes inset in rebate — one plane per pane, shy of sash face */
-    const gX = face - sign * (sashD + glassIn);       /* set back in the rebate */
+    const gX = face + sign * glassIn;
     const cellW = (w - barW * (cols + 1)) / cols;
     const cellH = (h - barW * (rows + 1)) / rows;
     for(let r = 0; r < rows; r++){
@@ -4369,7 +4381,7 @@ function propWindow(wall, x,y,z, w,h, ry, opts){
       }
     }
     if(blinds){
-      const bx = face - sign * (revealD * 0.72);
+      const bx = face + sign * (revealD * 0.72);
       const slat = matCol(0xcfc6b4, .9);
       const nSl = Math.max(6, Math.round(h / 0.09));
       for(let sl = 0; sl < nSl; sl++){
@@ -4380,12 +4392,12 @@ function propWindow(wall, x,y,z, w,h, ry, opts){
     /* Back / front wall: span along X */
     const into = (z > 1) ? -1 : 1;   /* toward room centre */
     const face = z;
-    const revZ = face - into * (revealD * 0.5);
+    const revZ = face + into * (revealD * 0.5);
     put(revealM, x - w/2, y, revZ, sideT, h + sideT*2, revealD, true);
     put(revealM, x + w/2, y, revZ, sideT, h + sideT*2, revealD, true);
     put(sillM,   x, y - h/2 - sillT*0.35, revZ, w + sideT*2.2, sillT, revealD + 0.02, true);
     put(revealM, x, y + h/2 + lintT*0.35, revZ, w + sideT*2.0, lintT, revealD + 0.01, true);
-    const sashZ = face - into * (sashD * 0.5);        /* flush in the opening */
+    const sashZ = face + into * (revealD - sashD * 0.45);
     put(sashM, x, y - h/2 + barW*0.55, sashZ, w - sideT*0.2, barW, sashD, true);
     put(sashM, x, y + h/2 - barW*0.55, sashZ, w - sideT*0.2, barW, sashD, true);
     put(sashM, x - w/2 + barW*0.55, y, sashZ, barW, h - barW, sashD, true);
@@ -4398,7 +4410,7 @@ function propWindow(wall, x,y,z, w,h, ry, opts){
       const yy = y - h/2 + (r / rows) * h;
       put(sashM, x, yy, sashZ, w - barW*1.6, barW * 0.75, sashD, true);
     }
-    const gZ = face - into * (sashD + glassIn);       /* set back in the rebate */
+    const gZ = face + into * glassIn;
     const cellW = (w - barW * (cols + 1)) / cols;
     const cellH = (h - barW * (rows + 1)) / rows;
     for(let r = 0; r < rows; r++){
@@ -4409,7 +4421,7 @@ function propWindow(wall, x,y,z, w,h, ry, opts){
       }
     }
     if(blinds){
-      const bz = face - into * (revealD * 0.72);
+      const bz = face + into * (revealD * 0.72);
       const slat = matCol(0xcfc6b4, .9);
       const nSl = Math.max(6, Math.round(h / 0.09));
       for(let sl = 0; sl < nSl; sl++){
@@ -4924,15 +4936,7 @@ function buildRoomShell(id){
     ];
     /* Continuous runs: lengths reach into corner pilasters so joints are covered.
        Depths are staggered (never a second coplanar strip on the same face). */
-    /* Which wall each run belongs to, so a run can be left out. */
-    runs[0].side = "back"; runs[1].side = "front"; runs[2].side = "left"; runs[3].side = "right";
-    const useB = wallsInUse(id);
-    const band = (mat, y, thick, depth, grow, blankOnly) => runs.forEach(r2 => {
-      /* A picture rail is for hanging pictures. Running it across a wall
-         with a door or a window in it is what put a long pale beam over
-         the door head on the House floor. Skip that wall; do not shuffle
-         the rail up or down to miss it. */
-      if(blankOnly && wallTaken(useB, r2.side)) return;
+    const band = (mat, y, thick, depth, grow) => runs.forEach(r2 => {
       const len = r2.len + (grow || 0);
       if(r2.ax === "x") addBox(mat, r2.x, y, r2.z + (r2.z > d/2 ? -depth/2 : depth/2), len, thick, depth, 0, true);
       else               addBox(mat, r2.x + (r2.x > 0 ? -depth/2 : depth/2), y, r2.z, depth, thick, len, 0, true);
@@ -4962,18 +4966,18 @@ function buildRoomShell(id){
           addBox(stile, xx, 0.72, 0.042, 0.055, 1.10, 0.018, 0, true);
         }
         band(matCol(0x4c371f, .48), 1.335, 0.055, 0.072, 0.08);  /* chair rail → corners */
-        band(matCol(0x6b4d2c, .52), h*0.70, 0.038, 0.048, 0.08, true); /* picture rail body — blank walls only */
-        band(matCol(0x5a4024, .50), h*0.70 + 0.048, 0.016, 0.032, 0.08, true); /* cap — blank walls only */
+        band(matCol(0x6b4d2c, .52), h*0.70, 0.038, 0.048, 0.08); /* picture rail body */
+        band(matCol(0x5a4024, .50), h*0.70 + 0.048, 0.016, 0.032, 0.08); /* cap — stepped out */
       } else if(stony){
         band(matCol(0xc6bfae, .78), 1.05, 0.10, 0.056, 0.08);
         band(matCol(0xb8b1a0, .80), 1.125, 0.028, 0.042, 0.08);  /* string — stepped */
-        band(matCol(0xd2ccbc, .82), h*0.68, 0.042, 0.042, 0.08, true);
-        band(matCol(0xcfc8b8, .84), h*0.68 + 0.042, 0.018, 0.030, 0.08, true);
+        band(matCol(0xd2ccbc, .82), h*0.68, 0.042, 0.042, 0.08);
+        band(matCol(0xcfc8b8, .84), h*0.68 + 0.042, 0.018, 0.030, 0.08);
       } else {
         /* Painted plaster — matte, not plastic-flat; rails meet corner posts */
         band(matCol(0xdcd8cd, .90), 0.95, 0.055, 0.042, 0.08);
         band(matCol(0xd2cec2, .92), 1.005, 0.018, 0.032, 0.08);
-        band(matCol(0xe4e0d6, .90), h*0.72, 0.032, 0.040, 0.08, true);
+        band(matCol(0xe4e0d6, .90), h*0.72, 0.032, 0.040, 0.08);
       }
       if(!R.open){
         const cor = wood2 ? matCol(0xd6d1c2, .88) : stony ? matCol(0xcfc9b9, .86) : matCol(0xeae6dc, .90);
@@ -5137,14 +5141,24 @@ function buildRoomInner(id){
       propBench(bench, woodMat, x, 7.5, 8.0, 0.56, face);
       /* writing ledge: thick top, apron, upright panel toward aisle */
       const lx = x + (s2 ? 0.68 : -0.68);
-      addBox(woodMat, lx, DIM.benchDesk - 0.045, 7.5, 0.42, 0.08, 8.0, 0, true);
-      addBox(woodMat, lx, DIM.benchDesk - 0.12, 7.5, 0.38, 0.06, 8.0, 0, true); /* apron under top */
-      /* upright from the floor up to the ledge — no floating panel */
-      const uh = DIM.benchDesk - 0.02;
-      addBox(woodMat, lx, uh * 0.5, 7.5, 0.06, uh, 8.0, 0, true);
-      /* short end returns so the ledge does not read as an infinite slab */
-      addBox(woodMat, lx, DIM.benchDesk - 0.04, 7.5 - 3.95, 0.42, 0.07, 0.08, 0, true);
-      addBox(woodMat, lx, DIM.benchDesk - 0.04, 7.5 + 3.95, 0.42, 0.07, 0.08, 0, true);
+      (function plantLedge(){
+        const gL = new THREE.Group(); gL.position.set(lx, 0, 7.5); roomGroup.add(gL);
+        const putL = (m,px,py,pz,sx,sy,sz) => {
+          const e = new THREE.Mesh(UNIT.box, m);
+          e.position.set(px,py,pz); e.scale.set(sx,sy,sz);
+          e.castShadow = true; e.receiveShadow = true; gL.add(e);
+        };
+        const H = DIM.benchDesk;
+        putL(woodMat, 0, H - 0.04, 0, 0.42, 0.08, 8.0);
+        putL(woodMat, 0, H - 0.12, 0, 0.38, 0.06, 8.0);
+        putL(woodMat, 0, H * 0.5, 0, 0.07, H - 0.04, 8.0); /* kick panel to the floor */
+        for(let k=-3;k<=3;k++){
+          putL(woodMat, 0, H * 0.38, k * 1.14, 0.08, H * 0.76, 0.08); /* legs */
+        }
+        putL(woodMat, 0, H - 0.04, -3.95, 0.42, 0.07, 0.10);
+        putL(woodMat, 0, H - 0.04,  3.95, 0.42, 0.07, 0.10);
+        groundGroup(gL, 0.8);
+      })();
     }
     /* the rostrum: a step up, and a desk you can be seen over */
     addBox(woodMat, 0, 0.18, d-2.6, 4.6, 0.36, 1.9, 0, true);
@@ -5204,13 +5218,6 @@ function buildRoomInner(id){
   if(!R.open){
     try{
       const side = R.light;
-      const use = wallsInUse(id);
-      const winWall = (side === "left" || side === "right") ? side
-                    : (side === "back" || side === "high") ? "back" : null;
-      /* A door already owns that wall. Openings do not share plaster with
-         a doorway — that is the assembly that ends up hanging over a door
-         head like a beam. Skip, do not offset. */
-      if(winWall && use.door[winWall]) throw new Error("skip windows: door wall");
       const stony = R.style==="marble" || R.style==="stone" || R.style==="chamber";
       const woodish = R.style==="wood" || R.style==="plain";
       /* Pane grid by room feel: wood offices 2×2; marble/chamber halls 3×2. */
@@ -5222,32 +5229,30 @@ function buildRoomInner(id){
       const wwBack = Math.min(w * 0.20, 2.1);
       const blinds = (id === "office" || id === "visit");
       const opts = {cols, rows, blinds, stone: stony, style: R.style};
+      const doorsHere = DOORS[id] || [];
       if(side === "left" || side === "right"){
-        const x = side === "left" ? -hw + 0.002 : hw - 0.002;
-        const ry = side === "left" ? Math.PI/2 : -Math.PI/2;
-        for(let i=0;i<2;i++){
-          const wz = d * (0.30 + i * 0.36);
-          propWindow("x", x, wy, wz, wwSide, wh, ry, opts);
+        if(!doorsHere.some(dr => dr.side === side)){
+          const x = side === "left" ? -hw + 0.01 : hw - 0.01;
+          const ry = side === "left" ? Math.PI/2 : -Math.PI/2;
+          const n = id === "floor" ? 1 : 2;
+          for(let i=0;i<n;i++){
+            const wz = d * (0.34 + i * 0.30);
+            if(doorsHere.filter(dr => dr.side===side).some(dr => Math.abs(dr.at*d - wz) < 1.8)) continue;
+            propWindow("x", x, wy, wz, Math.min(wwSide, 1.25), Math.min(wh, 1.35), ry, opts);
+          }
         }
       } else if(side === "back" || side === "high"){
-        /* Two openings across the chamber's back wall. Three put one of
-           them dead centre, behind the banner, where it read as a pale
-           slab stuck to the plaster. */
-        const n = (R.style === "chamber") ? 2 : 3;
-        const zz = d - 0.002;
-        for(let i=0;i<n;i++){
-          /* Spread symmetrically about the centre line. Three openings sit
-             at -0.28w, 0, +0.28w as before; two straddle the middle at
-             -0.28w and +0.28w, so neither one ends up behind the banner. */
-          const wx = (i - (n - 1) / 2) * (w * 0.56 / Math.max(1, n - 1));
-          propWindow("z", wx, wy, zz, wwBack, wh * (side==="high"?0.85:1), 0, opts);
+        if(!doorsHere.some(dr => dr.side === "back")){
+          const n = (id === "floor") ? 2 : 2;
+          const zz = d - 0.01;
+          for(let i=0;i<n;i++){
+            const wx = -w * 0.22 + i * (w * 0.44);
+            propWindow("z", wx, Math.min(wy, 2.15), zz, Math.min(wwBack, 1.6), Math.min(wh, 1.4), 0, opts);
+          }
         }
       }
       /* cloak / lamp-lit rooms: no R.light window wall — skip */
-    }catch(e){
-      if(e && /^skip windows/.test(e.message || "")) { /* deliberate: that wall has a door */ }
-      else if(window.console) console.warn("windows", e);
-    }
+    }catch(e){ if(window.console) console.warn("windows", e); }
   }
   /* fittings the interaction points refer to */
   if(id === "office" || id === "visit"){
@@ -5621,40 +5626,48 @@ function buildRoomInner(id){
   if(R.style === "wood" || R.style === "marble" || R.style === "plain" || R.style === "chamber"){
     const arts = artPool();
     const nA = arts.length || 1;
-    /* Paintings go on blank wall only. A wall with a door or a run of
-       windows in it is not blank, and hanging art there is what put a
-       sash box beside a picture frame on the office art wall. */
-    const useA = wallsInUse(id);
     const doorZsL = (id === "corridor") ? (DOORS.corridor||[]).filter(dr => dr.side==="left").map(dr => dr.at * d) : [];
     const doorZsR = (id === "corridor") ? (DOORS.corridor||[]).filter(dr => dr.side==="right").map(dr => dr.at * d) : [];
     const noticeZ = (id === "corridor") ? 4.9 : null; /* skip bay occupied by the notice board */
-    const nArt = id === "corridor" ? 6 : (id === "floor" || id === "caucus" || id === "committee" ? 5 : 4);
-    const yMid = Math.min(2.55, Math.max(1.85, h * 0.48));
-    for(let i=0; i<nArt && !wallTaken(useA, "left"); i++){
-      const zz = d*(0.20 + i*(0.58/Math.max(1,nArt-1)));
-      if(zz > d-0.7) break;
-      if(doorZsL.some(bz => Math.abs(bz - zz) < 1.8)) continue;
-      if(noticeZ != null && Math.abs(noticeZ - zz) < 1.5) continue;
-      propFrame("x", -hw+0.001, yMid + (i%2)*0.10, zz, 0.78, 0.58, arts[i % nA], Math.PI/2);
-    }
-    if(id !== "steps" && id !== "district" && !wallTaken(useA, "right")){
-      for(let i=0;i<Math.min(4, nArt);i++){
-        const zz = d*(0.26 + i*0.18);
-        if(zz > d-0.7) break;
-        if(doorZsR.some(bz => Math.abs(bz - zz) < 1.8)) continue;
-        propFrame("x", hw-0.001, yMid + 0.05, zz, 0.72, 0.55, arts[(i+2) % nA], -Math.PI/2);
+    const nArt = id === "corridor" ? 4 : (id === "floor" || id === "caucus" || id === "committee" ? 3 : 3);
+    const yMid = Math.min(2.35, Math.max(1.85, h * 0.42));
+    const light = R.light;
+    const skipL = light === "left";
+    const skipR = light === "right";
+    const doorsHere = DOORS[id] || [];
+    const doorFront = doorsHere.some(dr => dr.side === "front");
+    const doorBack  = doorsHere.some(dr => dr.side === "back");
+    const doorZsAllL = doorsHere.filter(dr => dr.side==="left").map(dr => dr.at * d).concat(doorZsL);
+    const doorZsAllR = doorsHere.filter(dr => dr.side==="right").map(dr => dr.at * d).concat(doorZsR);
+    if(!skipL){
+      for(let i=0;i<nArt;i++){
+        const zz = d*(0.22 + i*(0.50/Math.max(1,nArt-1)));
+        if(zz > d-0.85) break;
+        if(doorZsAllL.some(bz => Math.abs(bz - zz) < 1.6)) continue;
+        if(noticeZ != null && Math.abs(noticeZ - zz) < 1.5) continue;
+        propFrame("x", -hw+0.012, yMid + (i%2)*0.06, zz, 0.62, 0.48, arts[i % nA], Math.PI/2);
       }
     }
-    /* Front + back wall pairs (into-room) — blank walls only */
+    if(id !== "steps" && id !== "district" && !skipR){
+      for(let i=0;i<nArt;i++){
+        const zz = d*(0.28 + i*(0.46/Math.max(1,nArt-1)));
+        if(zz > d-0.85) break;
+        if(doorZsAllR.some(bz => Math.abs(bz - zz) < 1.6)) continue;
+        propFrame("x", hw-0.012, yMid + 0.04, zz, 0.58, 0.46, arts[(i+2) % nA], -Math.PI/2);
+      }
+    }
+    /* Front / back pictures — never on a door wall, never on a window wall */
     if(id !== "steps" && id !== "district"){
-      const bx = Math.min(2.6, hw - 1.1);
-      if(!wallTaken(useA, "front")){
-        propFrame("z", -bx, yMid + 0.08, 0.001, 0.88, 0.64, arts[1 % nA]);
-        propFrame("z",  bx, yMid + 0.08, 0.001, 0.88, 0.64, arts[2 % nA]);
+      const bx = Math.min(2.2, hw - 1.3);
+      const skipFront = doorFront || light === "sky";
+      const skipBack  = doorBack || light === "back" || light === "high";
+      if(!skipFront){
+        propFrame("z", -bx, yMid + 0.06, 0.014, 0.70, 0.52, arts[1 % nA]);
+        propFrame("z",  bx, yMid + 0.06, 0.014, 0.70, 0.52, arts[2 % nA]);
       }
-      if(!wallTaken(useA, "back")){
-        propFrame("z", -bx, yMid + 0.12, d-0.001, 0.95, 0.70, arts[0 % nA]);
-        propFrame("z",  bx, yMid + 0.12, d-0.001, 0.95, 0.70, arts[3 % nA]);
+      if(!skipBack){
+        propFrame("z", -bx, yMid + 0.08, d-0.014, 0.74, 0.54, arts[0 % nA]);
+        propFrame("z",  bx, yMid + 0.08, d-0.014, 0.74, 0.54, arts[3 % nA]);
       }
     }
   }
@@ -5951,8 +5964,14 @@ function buildPerson(p){
      ever produces. Everything below scales off these two numbers, so an
      unclamped outlier here is exactly how a head ends up the size of a
      room — clamp to the widest range a real person could plausibly roll. */
-  const H = clamp(L.height, 1.3, 2.1), B = clamp(L.build, 0.6, 1.5), hu = H/8.0;   /* head unit */
+  const Hreal = clamp(L.height, 1.3, 2.1), Breal = clamp(L.build, 0.6, 1.5);
+  /* Shared body is authored at one size. Height/build become a root scale.
+     Faces, hair, glasses still build per person on that body. */
+  const H = BODY_CANON_H, B = BODY_CANON_B, hu = H/8.0;
   const g = new THREE.Group();
+  const bodyScaleY = Hreal / BODY_CANON_H;
+  const bodyScaleXZ = bodyScaleY * (0.88 + 0.12 * Breal);
+  g.scale.set(bodyScaleXZ, bodyScaleY, bodyScaleXZ);
 
   const suit  = matCloth(L.suit, "suit", .90);
   const suit2 = matCloth(L.suit, "suit", .92);
@@ -5967,7 +5986,7 @@ function buildPerson(p){
     skin._shared = true;
     G._skinCol.set(skinKey, skin);
   }
-  const hair  = matCol(L.hair, .90);
+  const hair  = matCol(L.hair, .55);
   const dark  = matCol(0x14120f, .45);
   const shoeM = matCol(0x16161a, .40);
   const tie   = matCol(partyColorNum(p.party || "IND"), .68);
@@ -6032,7 +6051,8 @@ function buildPerson(p){
       {a:"knR", b:"anR", r0:H*0.062*B, r1:H*0.046*B, mat:1}
     ]
   };
-  const built = skinnedBody(spec);
+  const skinKey = (fem ? "f" : "m") + "|" + (W.jacket ? "j" : "-") + "|" + (W.bottom || "t");
+  const built = sharedSkin(spec, skinKey);
   const skinnable = m => {
     if(!G._skinMats) G._skinMats = new Map();
     if(G._skinMats.has(m.uuid)) return G._skinMats.get(m.uuid);
@@ -6073,41 +6093,46 @@ function buildPerson(p){
      the one underneath punches through the one on top. */
   if(fem)  /* a little shaping through the chest */
     M(PG.sph, W.jacket ? suit : shirt, spine, 0, torsoLen*0.70, H*0.046*B, H*0.146*B, H*0.072, H*0.050*B, false);
+  const openCut = (L.wear === "suit_open");
+  const vestMat = matCloth(W.vest ? (L.suit ^ 0x1a1210) : L.suit, "suit", .86);
   if(W.vest){
-    for(let i=0;i<4;i++)
-      M(PG.sph, matCol(0x2a2118,.35,.4), spine, 0, torsoLen*(0.38+i*0.13), H*0.076*B, H*0.010, H*0.010, H*0.006, false);
+    /* A real waistcoat — two fronts, a V, buttons. Not four specks. */
+    for(const s2 of [-1,1]){
+      const vf = M(PG.sph, vestMat, spine, s2*H*0.038*B, torsoLen*0.52, H*0.050*B,
+        H*0.078*B, torsoLen*0.46, H*0.055*B, false);
+      vf.rotation.z = s2*0.04;
+    }
+    for(let i=0;i<5;i++)
+      M(PG.sph, matCol(0xc9a24a,.35,.55), spine, 0, torsoLen*(0.34+i*0.11), H*0.092*B, H*0.012, H*0.012, H*0.008, false);
   }
   if(W.jacket){
-    /* the jacket sits open: two front panels with the shirt showing between */
-    /* Two panels that curve around the chest. They used to be boxes,
-       which read as a pair of planks strapped to the front of somebody
-       — a coat has to follow the body it is on. */
+    const gap = openCut ? 0.078 : (W.vest ? 0.062 : 0.050);
+    const lapW = openCut ? 0.062 : 0.048;
     for(const s2 of [-1,1]){
-      const panel = M(PG.sph, suit, spine, s2*H*0.055*B, torsoLen*0.52, H*0.014*B,
-        H*0.098*B, torsoLen*0.53, H*0.090*B, false);
-      panel.rotation.z = s2*0.05;
-      /* the skirt of the coat, below the waist */
-      M(PG.sph, suit, spine, s2*H*0.050*B, torsoLen*0.20, H*0.012*B,
-        H*0.092*B, torsoLen*0.26, H*0.084*B, false);
+      const panel = M(PG.sph, suit, spine, s2*H*gap*B, torsoLen*0.52, H*0.014*B,
+        H*(openCut ? 0.088 : 0.102)*B, torsoLen*(openCut ? 0.48 : 0.55), H*0.090*B, false);
+      panel.rotation.z = s2*(openCut ? 0.10 : 0.04);
+      M(PG.sph, suit, spine, s2*H*(gap-0.008)*B, torsoLen*0.18, H*0.012*B,
+        H*0.092*B, torsoLen*(openCut ? 0.20 : 0.28), H*0.084*B, false);
     }
-    /* lapels, notched */
     for(const s2 of [-1,1]){
-      const lap = M(PG.box, suit2, spine, s2*H*0.042*B, torsoLen*0.84, H*0.088*B,
-        H*0.052*B, torsoLen*0.28, H*0.012, false);
-      lap.rotation.z = s2*0.32;
-      const notch = M(PG.box, suit2, spine, s2*H*0.076*B, torsoLen*0.93, H*0.082*B,
-        H*0.040*B, H*0.026, H*0.010, false);
-      notch.rotation.z = s2*0.9;
+      const lap = M(PG.box, suit2, spine, s2*H*(openCut?0.055:0.042)*B, torsoLen*0.84, H*0.090*B,
+        H*lapW*B, torsoLen*(openCut ? 0.34 : 0.26), H*0.014, false);
+      lap.rotation.z = s2*(openCut ? 0.48 : 0.30);
+      const notch = M(PG.box, suit2, spine, s2*H*0.080*B, torsoLen*0.94, H*0.084*B,
+        H*0.042*B, H*0.028, H*0.012, false);
+      notch.rotation.z = s2*(openCut ? 1.05 : 0.85);
     }
-    /* two buttons and a pocket square */
-    for(let i=0;i<2;i++)
-      M(PG.sph, matCol(0x1d1710,.35,.4), spine, H*0.088*B, torsoLen*(0.42+i*0.12), H*0.090*B, H*0.011,H*0.011,H*0.006, false);
-    M(PG.box, matCol(pick([0xc4544a,0xd9b45e,0x4a7fa8,0xe8e4d8]),.8), spine,
-      -H*0.108*B, torsoLen*0.74, H*0.086*B, H*0.036*B, H*0.020, H*0.008, false);
-    /* the party pin, on the left lapel where it belongs */
-    M(PG.sph, tie, spine, -H*0.052*B, torsoLen*0.90, H*0.090*B, H*0.013, H*0.013, H*0.007, false);
-    M(PG.ring, matCol(0xc9a24a,.3,.85), spine, -H*0.052*B, torsoLen*0.90, H*0.092*B,
-      H*0.020, H*0.020, H*0.020, false).rotation.x = Math.PI/2;
+    const nBtn = W.vest ? 2 : (openCut ? 1 : 3);
+    for(let i=0;i<nBtn;i++)
+      M(PG.sph, matCol(0x1d1710,.35,.4), spine, H*0.092*B, torsoLen*(0.38+i*0.13), H*0.092*B, H*0.013,H*0.013,H*0.007, false);
+    if(!openCut){
+      M(PG.box, matCol(pick([0xc4544a,0xd9b45e,0x4a7fa8,0xe8e4d8]),.8), spine,
+        -H*0.112*B, torsoLen*0.74, H*0.088*B, H*0.040*B, H*0.022, H*0.010, false);
+    }
+    M(PG.sph, tie, spine, -H*0.054*B, torsoLen*0.90, H*0.094*B, H*0.015, H*0.015, H*0.008, false);
+    M(PG.ring, matCol(0xc9a24a,.3,.85), spine, -H*0.054*B, torsoLen*0.90, H*0.096*B,
+      H*0.022, H*0.022, H*0.022, false).rotation.x = Math.PI/2;
   }
   /* shirt collar */
   for(const s2 of [-1,1]){
@@ -6117,12 +6142,21 @@ function buildPerson(p){
   }
   /* neckwear */
   if(W.neck === "tie"){
-    M(PG.box, tie, spine, 0, torsoLen*0.965, H*0.070*B, H*0.030*B, H*0.030, H*0.016, false);
-    M(PG.box, tie, spine, 0, torsoLen*0.74, H*0.086*B, H*0.034*B, torsoLen*0.40, H*0.012, false);
+    M(PG.box, tie, spine, 0, torsoLen*0.965, H*0.074*B, H*0.036*B, H*0.034, H*0.018, false);
+    M(PG.box, tie, spine, 0, torsoLen*0.70, H*0.092*B, H*0.042*B, torsoLen*0.48, H*0.016, false);
+  } else if(W.neck === "open"){
+    /* Open collar: shirt placket showing, no knot */
+    M(PG.box, shirt, spine, 0, torsoLen*0.78, H*0.070*B, H*0.028*B, torsoLen*0.38, H*0.010, false);
+    for(const s2 of [-1,1]){
+      const wing = M(PG.box, shirt, spine, s2*H*0.048*B, torsoLen*1.00, H*0.058*B,
+        H*0.052*B, H*0.050, H*0.016, false);
+      wing.rotation.z = s2*0.85;
+    }
   } else if(W.neck === "scarf"){
-    const sc = tie;                       /* the scarf takes the party colour too */
-    M(PG.waist, sc, spine, 0, torsoLen*0.97, 0, H*0.108*B, H*0.055, H*0.086*B, false);
-    M(PG.box, sc, spine, -H*0.052*B, torsoLen*0.80, H*0.072*B, H*0.040*B, torsoLen*0.30, H*0.012, false);
+    const sc = tie;
+    M(PG.waist, sc, spine, 0, torsoLen*0.97, 0, H*0.118*B, H*0.062, H*0.094*B, false);
+    M(PG.box, sc, spine, -H*0.058*B, torsoLen*0.72, H*0.078*B, H*0.048*B, torsoLen*0.42, H*0.016, false);
+    M(PG.box, sc, spine,  H*0.040*B, torsoLen*0.62, H*0.070*B, H*0.036*B, torsoLen*0.28, H*0.014, false);
   } else if(W.neck === "bow"){
     /* a pussy-bow at the collar, in the party colour */
     M(PG.sph, tie, spine, -H*0.036*B, torsoLen*0.955, H*0.056*B, H*0.032*B, H*0.026, H*0.016, false)
@@ -6167,7 +6201,7 @@ function buildPerson(p){
      cheeks and forehead; these small meshes supply the readable planes that
      catch light at normal gameplay distance.
   */
-  L._clothVer = 2;
+  L._clothVer = 5;
   const eyeWhite = matCol(0xe8e3da, .45);
   const irisMat = matCol(L.eye || 0x5a3d24, .32);
   const pupilMat = matCol(0x090807, .26);
@@ -6234,88 +6268,109 @@ function buildPerson(p){
   const lidL = M(PG.sph, skin, headG, -eyeX3, hu*0.522, hu*0.503, hu*0.075, hu*0.018, hu*0.022, false);
   const lidR = M(PG.sph, skin, headG,  eyeX3, hu*0.522, hu*0.503, hu*0.075, hu*0.018, hu*0.022, false);
 
-  /* hair: a cap that sits on the crown and leaves a forehead */
+  /* Hair: readable cuts. Parting is two combed plates with a scalp gap — not a lump. */
   const personWisps = [];
-  /* headW/H/D are already absolute (hu-scaled) dimensions — hair and beard
-     just need those same numbers under a shorter name. Dividing by hu here
-     used to turn them into a bare ratio (~0.9-1.0) that then got used AS
-     the scale.set() argument below, which strips out the hu scaling the
-     sphere still needed: with hu ~0.18-0.2, that inflated every hair shell
-     and the beard by roughly 1/hu (~5x) — a sphere meant to read as a head
-     of hair instead swallowed the whole head and torso in a single ball. */
   const hairW = headW, hairH = headH, hairD = headD;
-  if(L.style !== 3){
-    /* three shells at slightly different radii, so the hair has depth
-       and a soft edge rather than reading as one moulded lump */
-    /* a shell just outside the skull, pushed back so a forehead shows */
-    M(PG.sph, hair, headG, 0, hu*0.535, -hu*0.07, hairW*1.03, hairH*1.06, hairD*1.04);
-    /* Soft hair shells: Best only (and never under crowdSafe — applyCrowd toggles). */
-    const wispA = M(PG.sph, hair, headG, 0, hu*0.540, -hu*0.075, hairW*1.045, hairH*1.075, hairD*1.055, false);
-    const wispB = M(PG.sph, hair, headG, 0, hu*0.545, -hu*0.080, hairW*1.06, hairH*1.09, hairD*1.07, false);
-    {
-      const wisp = new THREE.MeshStandardMaterial({color:L.hair, roughness:.94,
-        transparent:true, opacity:0.5, depthWrite:false});
-      wispA.material = wisp; wispB.material = wisp;
-      const showWisp = (G.gfx === "best" && !crowdSafe);
-      wispA.visible = wispB.visible = showWisp;
-      personWisps.push(wispA, wispB);
-    }
-    /* back of the head — sized up from the original 0.94/0.86/0.72: the
-       skull's own occiput bulge (sculptSkull's z<-0.25 rule, +seed) and
-       crown lift (+y rule) can poke past a tightly-fitted ellipsoid in
-       patches, which is what reads as a blotchy skin/hair mottle from
-       behind rather than a clean hairline. */
-    M(PG.sph, hair, headG, 0, hu*0.38, -hu*0.46, hu*1.04, hu*0.96, hu*0.82, false);   /* back of the head */
-    if(L.style === 1)   /* a parting, sitting proud on one side */
-      M(PG.sph, hair, headG, -hu*0.34, hu*0.86, -hu*0.02, hu*0.52, hu*0.42, hu*0.78, false);
-    if(L.style === 2)   /* pinned up */
-      M(PG.sph, hair, headG, 0, hu*0.62, -hu*0.86, hu*0.44, hu*0.44, hu*0.40);
-    if(L.style === 4){  /* long: it falls down the neck rather than hanging as a slab */
-      M(PG.sph, hair, headG, 0, hu*0.10, -hu*0.50, hu*0.94, hu*0.92, hu*0.56, false);
-      M(PG.sph, hair, headG, 0, -hu*0.42, -hu*0.44, hu*0.80, hu*0.60, hu*0.46, false);
-    }
-  } else {   /* thinning: what is left of it, around the sides and back */
-    M(PG.sph, hair, headG, -hu*0.62, hu*0.44, -hu*0.10, hu*0.44, hu*0.52, hu*0.86, false);
-    M(PG.sph, hair, headG,  hu*0.62, hu*0.44, -hu*0.10, hu*0.44, hu*0.52, hu*0.86, false);
-    M(PG.sph, hair, headG, 0, hu*0.36, -hu*0.60, hu*0.88, hu*0.54, hu*0.52, false);
+  const hs = (L.style|0) % 7;
+  const puff = (x,y,z,sx,sy,sz, cast) => M(PG.sph, hair, headG, x, y, z, sx, sy, sz, cast===true);
+  const comb = (x,y,z,sx,sy,sz, rz) => {
+    const m = M(PG.sph, hair, headG, x, y, z, sx, sy, sz, false);
+    if(rz) m.rotation.z = rz;
+    return m;
+  };
+  if(hs === 0){
+    /* Short back and sides — tight crown, faded sides, open forehead */
+    puff(0, hu*0.56, -hu*0.06, hairW*0.98, hairH*0.72, hairD*0.92);
+    puff(0, hu*0.42, -hu*0.42, hairW*0.88, hairH*0.52, hairD*0.55);
+    puff(-hairW*0.78, hu*0.42, -hu*0.04, hu*0.16, hu*0.28, hu*0.36);
+    puff( hairW*0.78, hu*0.42, -hu*0.04, hu*0.16, hu*0.28, hu*0.36);
+  } else if(hs === 1){
+    /* Side parting — two flattened combs, scalp showing in the gap */
+    const side = ((p.id||0) % 2) ? 1 : -1;
+    comb(side*hu*0.30, hu*0.58,  hu*0.04, hairW*0.48, hairH*0.16, hairD*0.86, side*0.22);
+    comb(side*hu*0.26, hu*0.56, -hu*0.16, hairW*0.46, hairH*0.15, hairD*0.72, side*0.12);
+    comb(side*hu*0.20, hu*0.54, -hu*0.36, hairW*0.40, hairH*0.14, hairD*0.50, side*0.06);
+    comb(-side*hu*0.34, hu*0.52,  hu*0.00, hairW*0.26, hairH*0.12, hairD*0.70, -side*0.16);
+    comb(-side*hu*0.30, hu*0.50, -hu*0.22, hairW*0.24, hairH*0.11, hairD*0.52, -side*0.08);
+    puff(0, hu*0.34, -hu*0.50, hairW*0.78, hairH*0.24, hairD*0.40);
+    puff(side*hairW*0.82, hu*0.42, -hu*0.04, hu*0.12, hu*0.22, hu*0.32);
+    puff(-side*hairW*0.80, hu*0.40, -hu*0.04, hu*0.10, hu*0.18, hu*0.28);
+  } else if(hs === 2){
+    /* Pinned up — nape clean, bun sits on the crown-back */
+    puff(0, hu*0.58, -hu*0.10, hairW*0.92, hairH*0.58, hairD*0.80);
+    puff(-hairW*0.70, hu*0.44, -hu*0.06, hu*0.14, hu*0.22, hu*0.28);
+    puff( hairW*0.70, hu*0.44, -hu*0.06, hu*0.14, hu*0.22, hu*0.28);
+    puff(0, hu*0.70, -hu*0.52, hu*0.38, hu*0.32, hu*0.32, true);
+    puff(0, hu*0.66, -hu*0.58, hu*0.28, hu*0.24, hu*0.24);
+  } else if(hs === 3){
+    /* Thinning — horseshoe, bald crown, no cap on top */
+    puff(-hairW*0.72, hu*0.40, -hu*0.02, hu*0.22, hu*0.32, hu*0.48);
+    puff( hairW*0.72, hu*0.40, -hu*0.02, hu*0.22, hu*0.32, hu*0.48);
+    puff(0, hu*0.34, -hu*0.52, hairW*0.86, hairH*0.40, hairD*0.42);
+    puff(-hairW*0.50, hu*0.50, -hu*0.28, hu*0.20, hu*0.16, hu*0.30);
+    puff( hairW*0.50, hu*0.50, -hu*0.28, hu*0.20, hu*0.16, hu*0.30);
+  } else if(hs === 4){
+    /* Long — falls to the collar, sides frame the face, forehead open */
+    puff(0, hu*0.56, -hu*0.08, hairW*1.04, hairH*0.78, hairD*0.98);
+    puff(0, hu*0.18, -hu*0.50, hairW*0.96, hairH*0.95, hairD*0.62);
+    puff(0, -hu*0.28, -hu*0.42, hairW*0.82, hairH*0.70, hairD*0.48);
+    puff(-hairW*0.82, hu*0.22,  hu*0.04, hu*0.22, hu*0.70, hu*0.28);
+    puff( hairW*0.82, hu*0.22,  hu*0.04, hu*0.22, hu*0.70, hu*0.28);
+    puff(-hu*0.16, hu*0.52, hu*0.28, hu*0.22, hu*0.10, hu*0.16);
+    puff( hu*0.16, hu*0.52, hu*0.28, hu*0.22, hu*0.10, hu*0.16);
+  } else if(hs === 5){
+    /* Cropped curls — tight beads over the crown, short sides */
+    puff(0, hu*0.54, -hu*0.08, hairW*0.92, hairH*0.62, hairD*0.86);
+    const curls = [
+      [0, 0.72, -0.02],[ -0.22, 0.68, 0.08],[0.22, 0.68, 0.08],
+      [-0.32, 0.56, -0.06],[0.32, 0.56, -0.06],[0, 0.64, -0.28],
+      [-0.18, 0.58, -0.22],[0.18, 0.58, -0.22]
+    ];
+    curls.forEach(c => puff(c[0]*hu, c[1]*hu, c[2]*hu, hu*0.16, hu*0.14, hu*0.16));
+    puff(0, hu*0.38, -hu*0.44, hairW*0.80, hairH*0.40, hairD*0.48);
+  } else {
+    /* Caesar — short even cap, straight fringe across the brow */
+    puff(0, hu*0.60, -hu*0.10, hairW*0.94, hairH*0.26, hairD*0.88);
+    puff(0, hu*0.54,  hu*0.18, hairW*0.86, hairH*0.16, hairD*0.42);
+    M(PG.box, hair, headG, 0, hu*0.545, hu*0.40, hairW*0.72, hu*0.09, hu*0.12, false);
+    puff(-hairW*0.82, hu*0.44, -hu*0.02, hu*0.13, hu*0.28, hu*0.40);
+    puff( hairW*0.82, hu*0.44, -hu*0.02, hu*0.13, hu*0.28, hu*0.40);
+    puff(0, hu*0.40, -hu*0.48, hairW*0.84, hairH*0.32, hairD*0.38);
   }
-  /*
-     A rear cap is always present.  At the witness table the camera sees
-     backs of heads; without this shell every style collapsed into a smooth
-     skin-coloured egg.  It stays behind the ears and below the crown so it
-     cannot cover the modeled face.
-  */
-  const rearHair = M(PG.sph, hair, headG, 0, hu*0.46, -headD*0.47,
-    headW*0.94, headH*0.70, headD*0.42, false);
-  rearHair.userData.rearHair = true;
   /* a beard has to be outside the jaw, not inside the skull */
   if(L.beard) M(PG.sph, hair, headG, 0, hu*0.20, hu*0.10,
     hairW*0.78, hairH*0.42, hairD*0.72, false);
   if(L.glasses){
-    /* Glasses went in at z = 0.325, which is inside the skull: the face
-       plane sits at about 0.48, which is why the eye whites are at 0.478
-       and the pupil at 0.516. They were modelled every time and never
-       once drawn — the same burial the comment above describes for the
-       eyes and lips. Lenses now sit clear of the pupil highlight, and
-       the arms run back to the ears, which is the one measurement on
-       this head already known to land on the surface. */
-    const gl = matCol(0x22242a, .3, .5);
-    const lensZ = hu*0.545;              /* just proud of the highlight at 0.525 */
-    const armX  = headW*0.88;            /* the ears are at headW*0.92 */
-    const armZ0 = hu*0.02, armZ1 = lensZ;
-    M(PG.ring, gl, headG, -hu*0.175, hu*0.515, lensZ, hu*0.255, hu*0.255, hu*0.255, false);
-    M(PG.ring, gl, headG,  hu*0.175, hu*0.515, lensZ, hu*0.255, hu*0.255, hu*0.255, false);
-    M(PG.box, gl, headG, 0, hu*0.515, lensZ, hu*0.10, hu*0.018, hu*0.018, false);
-    M(PG.box, gl, headG, -armX, hu*0.505, (armZ0+armZ1)/2, hu*0.02, hu*0.018, armZ1-armZ0, false);
-    M(PG.box, gl, headG,  armX, hu*0.505, (armZ0+armZ1)/2, hu*0.02, hu*0.018, armZ1-armZ0, false);
+    /* Rims must sit in front of the face plane (eyes are at ~0.48 hu).
+       The old z=0.325 buried both rings inside the skull, so "glasses on"
+       built meshes nobody could see. */
+    const gl = matCol(0x1a1c20, .22, .35);
+    const lens = new THREE.MeshBasicMaterial({
+      color:0x9eb8c8, transparent:true, opacity:0.22, side:THREE.DoubleSide, depthWrite:false
+    });
+    const eyeY = hu*0.50, eyeZ = hu*0.545, eyeX = hu*0.145*fw;
+    function rim(sx){
+      const r = M(PG.ring, gl, headG, sx, eyeY, eyeZ, hu*0.28, hu*0.28, hu*0.12, false);
+      r.rotation.x = Math.PI/2;
+      const pane = new THREE.Mesh(PG.plane, lens);
+      pane.position.set(sx, eyeY, eyeZ + hu*0.008);
+      pane.scale.set(hu*0.20, hu*0.16, 1);
+      headG.add(pane);
+    }
+    rim(-eyeX); rim(eyeX);
+    M(PG.box, gl, headG, 0, eyeY + hu*0.02, eyeZ, hu*0.09, hu*0.016, hu*0.016, false);
+    M(PG.box, gl, headG, -eyeX - hu*0.16, eyeY, eyeZ - hu*0.12, hu*0.018, hu*0.016, hu*0.28, false);
+    M(PG.box, gl, headG,  eyeX + hu*0.16, eyeY, eyeZ - hu*0.12, hu*0.018, hu*0.016, hu*0.28, false);
   }
 
   /* limbs: upper section, joint sphere, lower section, extremity */
   function arm(side){
     const up = side < 0 ? BN.shL : BN.shR;
     const lo = side < 0 ? BN.elL : BN.elR;
-    if(W.jacket)   /* a cuff, with a shirt cuff showing below it */
+    if(W.jacket)
       M(PG.arm2, suit2, lo, 0, -foreArm*0.86, 0, H*0.054*B, foreArm*0.16, H*0.054*B, false);
+    else
+      M(PG.arm2, shirt, lo, 0, -foreArm*0.45, 0, H*0.058*B, foreArm*0.22, H*0.058*B, false); /* rolled sleeve */
     M(PG.arm2, shirt, lo, 0, -foreArm - H*0.006, 0, H*0.046*B, H*0.020, H*0.046*B, false);
     /* a hand with a palm and a thumb reads far better than a blob */
     const hand = M(PG.sph, skin, lo, 0, -foreArm - H*0.028, 0, H*0.038*B, H*0.052, H*0.024*B);
@@ -6351,18 +6406,18 @@ function buildPerson(p){
   const legL = leg(-1), legR = leg(1);
   /* skirts and dresses hang from the waist */
   if(W.bottom === "skirt"){
-    M(PG.skirt, skirtC, pelvis, 0, -H*0.085, 0, H*0.250*B, H*0.26, H*0.190*B);
-    M(PG.waist, matCloth(L.suit, "skirt", .78), pelvis, 0, -H*0.212, 0, H*0.300*B, H*0.020, H*0.228*B, false);
+    M(PG.skirt, skirtC, pelvis, 0, -H*0.110, 0, H*0.262*B, H*0.32, H*0.200*B);
+    M(PG.waist, matCloth(L.suit, "skirt", .78), pelvis, 0, -H*0.255, 0, H*0.320*B, H*0.024, H*0.248*B, false);
   } else if(W.bottom === "dress"){
-    M(PG.skirt, skirtC, pelvis, 0, -H*0.135, 0, H*0.268*B, H*0.36, H*0.205*B);
-    M(PG.waist, matCol(0xc9a24a,.35,.7), pelvis, 0, H*0.052, 0, H*0.246*B, H*0.016, H*0.152*B, false);
+    M(PG.skirt, skirtC, pelvis, 0, -H*0.175, 0, H*0.285*B, H*0.46, H*0.220*B);
+    M(PG.waist, matCol(0xc9a24a,.35,.7), pelvis, 0, H*0.052, 0, H*0.250*B, H*0.018, H*0.158*B, false);
   }
 
   g.userData = {
     pelvis:BN.hips, spine:BN.chestB, headG:BN.headB, armL, armR, legL, legR,
     eyeL, eyeR, mouth, lidL, lidR, hu, detailHead:headG, body:body,
     wisps:personWisps,
-    H:H, hipY:hipY, blink:1 + Math.random()*5, gest:0, shift:Math.random()*6,
+    H:H, hipY:hipY, bodyScale:bodyScaleY, blink:1 + Math.random()*5, gest:0, shift:Math.random()*6,
     glance:2 + Math.random()*4, glanceX:0, poseN:0
   };
   tierPerson(g);
@@ -6413,33 +6468,12 @@ function tierPerson(g){
   u.fine = fine; u.mid = mid; u.far = far;
   u.lodF = true; u.lodM = true; u.lodR = true;
 }
-/* How many people may be built inline before the job is handed to the
-   staged path. Building one person is a mesh, its materials, and the
-   shaders those materials are the first to need; a chamber's worth on a
-   single frame is a stall nothing can draw through. The callers that can
-   hand this function a full room are not rare — the hour turning
-   (restaff), a new day, a change of graphics quality — so the decision
-   lives here rather than at each call site. */
-const SYNC_INLINE_MAX = 4;
 function syncPeople(){
   /* This decides who is standing in the room, so it must never be given
      a list from earlier in the frame: anything that has just moved
      somebody would put them in the wrong room, or in none. */
   if(_buildingRoom) return;
-  if(syncPeopleStaged._busy) return;   /* a staged rebuild already owns this */
   if(syncPeople._busy) return;
-  /* Count the real work first: meshes that have to be built from nothing,
-     and old-format bodies that have to be remade. Re-parenting people who
-     already have a body is cheap and stays inline. */
-  let toBuild = 0;
-  const pending = hereNow();
-  for(let i = 0; i < pending.length; i++){
-    const p = pending[i];
-    if(!p.mesh) toBuild++;
-    else if(p.look && (p.look._faceVer !== 2 || p.look._clothVer !== 2)) toBuild++;
-    if(toBuild > SYNC_INLINE_MAX) break;
-  }
-  if(toBuild > SYNC_INLINE_MAX){ syncPeopleStaged(); return; }
   syncPeople._busy = true;
   try{
   FRAME_ID++;
@@ -6448,7 +6482,7 @@ function syncPeople(){
     if(p.look){
       ensureLookMorphs(p.look);
       /* v2 faces: remesh once so old sticker-heads become real faces */
-      if(p.mesh && (p.look._faceVer !== 2 || p.look._clothVer !== 2)){
+      if(p.mesh && (p.look._faceVer !== 2 || p.look._clothVer !== 5)){
         try{
           if(p.mesh.parent) p.mesh.parent.remove(p.mesh);
         }catch(e){}
@@ -6457,7 +6491,7 @@ function syncPeople(){
     }
     if(!p.mesh){
       p.mesh = buildPerson(p);
-      if(p.look){ p.look._faceVer = 2; p.look._clothVer = 2; }
+      if(p.look){ p.look._faceVer = 2; p.look._clothVer = 5; }
     }
     peopleGroup.add(p.mesh);
   });
@@ -6508,14 +6542,14 @@ function syncPeopleStaged(done, retries){
         const p = list[at];
         if(p.look){
           ensureLookMorphs(p.look);
-          if(p.mesh && (p.look._faceVer !== 2 || p.look._clothVer !== 2)){
+          if(p.mesh && (p.look._faceVer !== 2 || p.look._clothVer !== 5)){
             if(p.mesh.parent) p.mesh.parent.remove(p.mesh);
             p.mesh = null; p.faceTex = null;
           }
         }
         if(!p.mesh){
           p.mesh = buildPerson(p);
-          if(p.look){ p.look._faceVer = 2; p.look._clothVer = 2; }
+          if(p.look){ p.look._faceVer = 2; p.look._clothVer = 5; }
         }
         peopleGroup.add(p.mesh);
       }
@@ -6615,7 +6649,7 @@ function animatePerson(p, dt){
        never an absolute height — and a modest fold rather than a right
        angle. A seated figure only has to read as seated; taking the
        bones far from their bind pose is what tears the mesh apart. */
-    const sy = p.sitY || 0;
+    const sy = (p.sitY || 0) / (u.bodyScale || 1);
     u.pelvis.position.y = sy + u.hipY - H*0.150;
     u.legL.up.rotation.x = -0.92; u.legR.up.rotation.x = -0.92;
     u.legL.lo.rotation.x =  0.86; u.legR.lo.rotation.x =  0.86;
@@ -7504,7 +7538,9 @@ function speechZoneProps(room){
 function inSpeechZone(x, z, room){
   const props = speechZoneProps(room || G.room);
   for(const o of props){
-    const rad = Math.max(3.0, (o.r || 2.6) + 0.5);
+    /* Must stay tight. 3m turned the whole well into "the lectern" and
+       ate Sit / Amend / E on the House floor. */
+    const rad = Math.min(1.25, Math.max(0.85, o.r || 1.05));
     if(Math.hypot(x - o.x, z - o.z) <= rad) return o;
   }
   return null;
@@ -7550,6 +7586,8 @@ function enforceSessionFloor(m){
 }
 function enforceLecternCapPlayer(){
   if(!PROC.on || !SEATED_ROOMS[G.room] || !G.you || G.you.sitting) return false;
+  if(TALK && TALK.open) return false;
+  try{ if(veil && !veil.hidden) return false; }catch(e){}
   if(PROC.phase === "you") return false; /* you have the floor */
   const zone = inSpeechZone(cam.x, cam.z, G.room);
   if(!zone) return false;
@@ -8190,28 +8228,10 @@ function voxTick(w){
 function voxReducedMotion(){
   try{ return !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches); }catch(e){ return false; }
 }
-/* Nobody watches a panel that is not on screen being typed out, but the
-   desk and the phone both rebuild Vox whether it is showing or not — and
-   every rebuild used to start the animation again, on every row. */
-function voxPaneShowing(box){
-  if(!box || !box.closest) return true;
-  const pane = box.closest(".pane");
-  if(!pane) return true;                            /* the phone's own card */
-  return pane.classList.contains("is-on") && document.body.classList.contains("ui-open");
-}
-/* How many rows may be mid-sentence at once. A refresh rebuilds every
-   row it shows, so without a ceiling a full feed starts twenty-six
-   typewriters together, each writing to the DOM every thirty
-   milliseconds, none of them finishing before the next refresh throws
-   the lot away and starts them again. Newest first: those are the ones
-   worth watching arrive. */
-const VOX_TYPE_MAX = 3;
 function voxTypePosts(root){
   const box = root || document;
   if(!box || !box.querySelectorAll) return;
   const nodes = box.querySelectorAll(".vox__t[data-full]");
-  const showing = voxPaneShowing(box);
-  let typing = 0;
   nodes.forEach(node => {
     if(node._voxTyping) return;
     const id = +node.getAttribute("data-vid");
@@ -8221,27 +8241,18 @@ function voxTypePosts(root){
       node.innerHTML = voxMarkup(full);
       return;
     }
-    if(voxReducedMotion() || !full || !showing || typing >= VOX_TYPE_MAX){
+    if(voxReducedMotion() || !full){
       node.innerHTML = voxMarkup(full);
       if(post) post.typed = true;
       return;
     }
-    typing++;
     node._voxTyping = true;
     node.classList.add("is-typing");
     node.textContent = "";
     let i = 0;
     const speed = 20 + Math.random() * 20;
     const step = () => {
-      /* Torn out mid-sentence, because the panel was rebuilt under us.
-         It has had its turn: mark it read, or the next refresh starts
-         this post from the first character again — and the one after
-         that, and the one after that, for as long as the career lasts. */
-      if(!node.isConnected){
-        node._voxTyping = false;
-        if(post) post.typed = true;
-        return;
-      }
+      if(!node.isConnected){ node._voxTyping = false; return; }
       if(i >= full.length){
         node.innerHTML = voxMarkup(full);
         node.classList.remove("is-typing");
@@ -14505,8 +14516,8 @@ function swayRoom(dir, power, reach){
 /* ── Podium / speech-station quick lines (on-glass #prompt) ── */
 const SPEECH_STATION_IDS = {
   caucus:["lectern"],
-  committee:["dais","well","witness"],
-  floor:["rostrum","lectern","table"],
+  committee:["dais","well"],
+  floor:["rostrum","lectern"],
   press:["podium"],
   steps:["stump"]
 };
@@ -14722,6 +14733,12 @@ function tickSpeechApproach(dt){
 }
 function interactPropOrSpeech(o){
   if(!o) return;
+  /* Seated or already at the stand: open the prop. Do not walk you to the
+     lectern — that was eating File amendment / Career actions. */
+  if(o.id === "table" || (G.you && G.you.sitting && (o.id === "lectern" || o.id === "rostrum" || o.id === "table"))){
+    openProp(o);
+    return;
+  }
   if(isSpeechStationProp(o)) approachSpeechStation(o);
   else if(o.id === "desk" && G.room === "office" && G.you && !G.you.sitting){
     sitCasuallyAtDesk();
@@ -15299,12 +15316,35 @@ function seatVoiceAvailable(){
   if(PROC.phase === "run" || PROC.phase === "open" || PROC.phase === "you") return true;
   return false;
 }
+function fileFloorAmendment(fromSeat){
+  if(!G.bill || G.bill.done){
+    setSay("There is no live bill to amend.", fx("",""));
+    return false;
+  }
+  if(G.you.influence < 9){
+    setSay("You do not have the influence to file from here.", fx("",""));
+    return false;
+  }
+  spend(fromSeat ? 25 : 55, fromSeat ? 8 : 16);
+  G.you.influence -= 9;
+  const a = pick(AXES);
+  G.bill.pos[a.k] = Math.round(lerp(G.bill.pos[a.k], G.you.district[a.k], 0.4));
+  G.bill.line = describeBill(G.bill);
+  G.you.standing = clamp(G.you.standing-3,0,100);
+  const where = fromSeat ? "from your place" : "at the clerk's table";
+  setSay("Filed " + where + ". It moves the bill on " + a.n.toLowerCase() + ", and the leadership will read it as a message.",
+    fx("bill moved toward your district","−9 influence, −3 standing"));
+  note("Filed a floor amendment " + where + " on " + G.bill.title + ".");
+  try{ refreshPanels(); }catch(e){}
+  return true;
+}
 function seatVoiceActs(){
   return [
     {t:"Shout", c:"1", run:() => seatShout()},
     {t:"Heckle", c:"2", run:() => seatHeckle()},
     {t:"Speak mind", c:"3", run:() => seatSpeakMind()},
     {t:"Out of hand", c:"4", run:() => seatOutOfHand()},
+    {t:"File amendment", c:"5", off:!G.bill||G.bill.done||G.you.influence<9, run:() => fileFloorAmendment(true)},
     {t:"Stand", c:"—", run:() => { try{ riseFromSeat(); }catch(e){ G.you.sitting = false; } }}
   ];
 }
@@ -15740,15 +15780,9 @@ const PROPS = {
           note("Spoke on " + G.bill.title + ".");
         }
       }}]},
-    {id:"table", label:"The clerk's table", sub:"Where an amendment gets filed", x:0, z:11.45, r:2.4,
+    {id:"table", label:"The clerk's table", sub:"Where an amendment gets filed", x:0, z:11.45, r:1.15,
      acts:()=>[{t:"File a floor amendment", c:"55m · 9 infl", off:!G.bill||G.bill.done||G.you.influence<9, run(){
-        spend(55, 16); G.you.influence -= 9;
-        const a = pick(AXES);
-        G.bill.pos[a.k] = Math.round(lerp(G.bill.pos[a.k], G.you.district[a.k], 0.4));
-        G.bill.line = describeBill(G.bill);
-        G.you.standing = clamp(G.you.standing-3,0,100);
-        setSay("Filed at the desk. It moves the bill on " + a.n.toLowerCase() + ", and the leadership will read it as a message.",
-          fx("bill moved toward your district","−9 influence, −3 standing"));
+        fileFloorAmendment(false); return;
       }}]},
     {id:"lectern", label:"The well lectern", sub:"Floor manager's stand in the aisle", x:0.55, z:9.15, r:2.0,
      acts:()=>[{t:"Take the well lectern", c:"20m", off:!G.bill||G.bill.done, run(){
@@ -19221,13 +19255,14 @@ function opening(){
     ensureParties();
     mergeWorldParties();
   }catch(e){ if(window.console) console.warn("opening parties", e); }
+  document.body.classList.add("boot-menu");
   card.classList.add("card--open");
   try{ veil.classList.remove("veil--make"); }catch(e){}
   const cong = hasSave ? (peek.congress || 1) : 1;
   const dayN = hasSave ? (peek.day || 1) : 1;
   const cname = (peek && peek.country && peek.country.name) ? peek.country.name : (G.country && G.country.name);
   card.innerHTML =
-    '<img class="card__logo" src="assets/logo.png" width="168" height="168" alt="One Nation, Under, ME.">' +
+    '<img class="card__logo" src="assets/logo.png" width="168" height="168" alt="One Nation, Under, ME." onerror="this.style.display='none'">' +
     '<div class="eyebrow">One Nation, Under, ME. · The ' + ordinal(cong) + ' Congress' +
       (cname ? ' · ' + cname : '') + '</div>' +
     '<h1>Everyone in this building remembers what you did to them.</h1>' +
@@ -19245,7 +19280,9 @@ function opening(){
     '<div class="legend">' + (function(){ try{ return partyLegendHTML(); }catch(e){ return ""; } })() + '</div>' +
     '<div class="card__actions">' +
       (hasSave ? '<button class="btn" type="button" id="cont" data-gp="boot:cont">Continue — day ' + dayN + '</button>' : '') +
-      '<button class="btn' + (hasSave?' btn--ghost':'') + '" type="button" id="fresh" data-gp="boot:fresh">New career</button></div>';
+      '<button class="btn' + (hasSave?' btn--ghost':'') + '" type="button" id="fresh" data-gp="boot:fresh">New career</button>' +
+      '<button class="btn btn--ghost" type="button" id="bootBook" data-gp="boot:book">Handbook</button></div>' +
+      '<p class="boot-hint">Enter continues · Esc opens settings once you are inside · H hides the panels</p>';
   veil.hidden = false;
   const bindBoot = (node, fn) => {
     if(!node) return;
@@ -19256,17 +19293,30 @@ function opening(){
   };
   bindBoot(el("cont"), cardActContinue);
   bindBoot(el("fresh"), bootFreshCareer);
+  bindBoot(el("bootBook"), () => { try{ handbookCard(); }catch(e){} });
   markPicks();
 }
 function softUnstickVeil(){
   G._booting = false;
-  try{ veil.hidden = true; card.classList.remove("card--open"); veil.classList.remove("veil--make"); }catch(e){}
+  try{ document.body.classList.remove("boot-menu"); }catch(e){}
+  try{ document.body.classList.remove("boot-menu"); veil.hidden = true; card.classList.remove("card--open"); veil.classList.remove("veil--make"); }catch(e){}
   try{
     G.moving = false;
     const f = el("fade");
     if(f){ f.style.transition = "opacity .2s ease"; f.style.opacity = "0"; }
     G.running = !!(G.you && G.members && G.members.length);
   }catch(e){}
+}
+if(!window.__onumBootEnterBound){
+  window.__onumBootEnterBound = true;
+  addEventListener("keydown", e => {
+    if(e.key !== "Enter") return;
+    if(!document.body.classList.contains("boot-menu")) return;
+    if(veil.hidden) return;
+    const cont = el("cont"), fresh = el("fresh");
+    const go = (cont && !cont.hidden) ? cont : fresh;
+    if(go) go.click();
+  });
 }
 if(!window.__onumBootClickBound){
   window.__onumBootClickBound = true;
@@ -19880,7 +19930,7 @@ function begin(){
   try{ el("whereName").textContent = R0.t; el("whereTag").textContent = R0.tag; }catch(e){}
   try{ const sp = safeSpawn(G.room); cam.x = sp.x; cam.z = sp.z; cam.yaw = 0; G.doorGrace = (G.t || 0) + 2.5; }catch(e){}
   try{ everyone().forEach(m => { if(m.room === G.room) placeInRoom(m); }); }catch(e){}
-  try{ veil.hidden = true; card.classList.remove("card--open"); veil.classList.remove("veil--make"); }catch(e){}
+  try{ document.body.classList.remove("boot-menu"); veil.hidden = true; card.classList.remove("card--open"); veil.classList.remove("veil--make"); }catch(e){}
   try{ save(); }catch(e){}
   const roomId = G.room;
   /* Spread buildRoom then syncPeople across frames — never both on the click
@@ -19906,6 +19956,15 @@ function begin(){
       G._booting = false;
     });
   });
+  /* If rAF/timeout staging never finishes, do not leave Continue latched. */
+  setTimeout(() => {
+    if(!G._booting) return;
+    G._booting = false;
+    syncPeopleStaged._busy = false;
+    _buildingRoom = false;
+    try{ G.running = true; setSpeed(G.prevSpeed || 1); refreshPanels(); }catch(e){}
+    try{ feed("Continue recovered — room is up."); }catch(e){}
+  }, 8000);
 }
 
 /* ── Add to Home Screen ──────────────────────────────────
