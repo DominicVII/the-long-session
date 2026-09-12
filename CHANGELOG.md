@@ -11,6 +11,19 @@ the reasoning behind each.
 
 ---
 
+## Chamber architecture, speech browse, original seal (12 Sep 2026)
+
+- **No timer on chats.** Podium and interview lines stay until you take one.
+- **LT / RT** (or ← / →) browse speech and interview lines; **A / E** takes the line on the glass.
+- **Original capitol seal** restored on the opening card.
+- **Windows** are opaque sky panes in the wall — they no longer float as pale slabs over paintings.
+- **House gallery** no longer hangs over the entrance door. Side decks sit on the walls.
+- **Wainscot** gaps at every door so the leaf is in the opening, not on the dado.
+- **Corridor notice board** is cork above the heating main; the pipe breaks at that bay.
+- **Civic seal** on the Chair's wall (House floor and committee).
+
+---
+
 ## Standalone app — one HTML, no network (12 Sep 2026)
 
 - Three.js r128 and ProxyAI are inlined. The HTML boots from disk with no
