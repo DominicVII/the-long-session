@@ -6240,12 +6240,22 @@ function buildPerson(p){
   if(L.beard) M(PG.sph, hair, headG, 0, hu*0.20, hu*0.10,
     hairW*0.78, hairH*0.42, hairD*0.72, false);
   if(L.glasses){
+    /* Glasses went in at z = 0.325, which is inside the skull: the face
+       plane sits at about 0.48, which is why the eye whites are at 0.478
+       and the pupil at 0.516. They were modelled every time and never
+       once drawn — the same burial the comment above describes for the
+       eyes and lips. Lenses now sit clear of the pupil highlight, and
+       the arms run back to the ears, which is the one measurement on
+       this head already known to land on the surface. */
     const gl = matCol(0x22242a, .3, .5);
-    M(PG.ring, gl, headG, -hu*0.175, hu*0.515, hu*0.325, hu*0.255, hu*0.255, hu*0.255, false);
-    M(PG.ring, gl, headG,  hu*0.175, hu*0.515, hu*0.325, hu*0.255, hu*0.255, hu*0.255, false);
-    M(PG.box, gl, headG, 0, hu*0.515, hu*0.325, hu*0.10, hu*0.018, hu*0.018, false);
-    M(PG.box, gl, headG, -hu*0.335, hu*0.515, hu*0.12, hu*0.02, hu*0.018, hu*0.42, false);
-    M(PG.box, gl, headG,  hu*0.335, hu*0.515, hu*0.12, hu*0.02, hu*0.018, hu*0.42, false);
+    const lensZ = hu*0.545;              /* just proud of the highlight at 0.525 */
+    const armX  = headW*0.88;            /* the ears are at headW*0.92 */
+    const armZ0 = hu*0.02, armZ1 = lensZ;
+    M(PG.ring, gl, headG, -hu*0.175, hu*0.515, lensZ, hu*0.255, hu*0.255, hu*0.255, false);
+    M(PG.ring, gl, headG,  hu*0.175, hu*0.515, lensZ, hu*0.255, hu*0.255, hu*0.255, false);
+    M(PG.box, gl, headG, 0, hu*0.515, lensZ, hu*0.10, hu*0.018, hu*0.018, false);
+    M(PG.box, gl, headG, -armX, hu*0.505, (armZ0+armZ1)/2, hu*0.02, hu*0.018, armZ1-armZ0, false);
+    M(PG.box, gl, headG,  armX, hu*0.505, (armZ0+armZ1)/2, hu*0.02, hu*0.018, armZ1-armZ0, false);
   }
 
   /* limbs: upper section, joint sphere, lower section, extremity */
@@ -6351,12 +6361,33 @@ function tierPerson(g){
   u.fine = fine; u.mid = mid; u.far = far;
   u.lodF = true; u.lodM = true; u.lodR = true;
 }
+/* How many people may be built inline before the job is handed to the
+   staged path. Building one person is a mesh, its materials, and the
+   shaders those materials are the first to need; a chamber's worth on a
+   single frame is a stall nothing can draw through. The callers that can
+   hand this function a full room are not rare — the hour turning
+   (restaff), a new day, a change of graphics quality — so the decision
+   lives here rather than at each call site. */
+const SYNC_INLINE_MAX = 4;
 function syncPeople(){
   /* This decides who is standing in the room, so it must never be given
      a list from earlier in the frame: anything that has just moved
      somebody would put them in the wrong room, or in none. */
   if(_buildingRoom) return;
+  if(syncPeopleStaged._busy) return;   /* a staged rebuild already owns this */
   if(syncPeople._busy) return;
+  /* Count the real work first: meshes that have to be built from nothing,
+     and old-format bodies that have to be remade. Re-parenting people who
+     already have a body is cheap and stays inline. */
+  let toBuild = 0;
+  const pending = hereNow();
+  for(let i = 0; i < pending.length; i++){
+    const p = pending[i];
+    if(!p.mesh) toBuild++;
+    else if(p.look && (p.look._faceVer !== 2 || p.look._clothVer !== 2)) toBuild++;
+    if(toBuild > SYNC_INLINE_MAX) break;
+  }
+  if(toBuild > SYNC_INLINE_MAX){ syncPeopleStaged(); return; }
   syncPeople._busy = true;
   try{
   FRAME_ID++;
