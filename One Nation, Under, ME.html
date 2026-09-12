@@ -8107,10 +8107,28 @@ function voxTick(w){
 function voxReducedMotion(){
   try{ return !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches); }catch(e){ return false; }
 }
+/* Nobody watches a panel that is not on screen being typed out, but the
+   desk and the phone both rebuild Vox whether it is showing or not — and
+   every rebuild used to start the animation again, on every row. */
+function voxPaneShowing(box){
+  if(!box || !box.closest) return true;
+  const pane = box.closest(".pane");
+  if(!pane) return true;                            /* the phone's own card */
+  return pane.classList.contains("is-on") && document.body.classList.contains("ui-open");
+}
+/* How many rows may be mid-sentence at once. A refresh rebuilds every
+   row it shows, so without a ceiling a full feed starts twenty-six
+   typewriters together, each writing to the DOM every thirty
+   milliseconds, none of them finishing before the next refresh throws
+   the lot away and starts them again. Newest first: those are the ones
+   worth watching arrive. */
+const VOX_TYPE_MAX = 3;
 function voxTypePosts(root){
   const box = root || document;
   if(!box || !box.querySelectorAll) return;
   const nodes = box.querySelectorAll(".vox__t[data-full]");
+  const showing = voxPaneShowing(box);
+  let typing = 0;
   nodes.forEach(node => {
     if(node._voxTyping) return;
     const id = +node.getAttribute("data-vid");
@@ -8120,18 +8138,27 @@ function voxTypePosts(root){
       node.innerHTML = voxMarkup(full);
       return;
     }
-    if(voxReducedMotion() || !full){
+    if(voxReducedMotion() || !full || !showing || typing >= VOX_TYPE_MAX){
       node.innerHTML = voxMarkup(full);
       if(post) post.typed = true;
       return;
     }
+    typing++;
     node._voxTyping = true;
     node.classList.add("is-typing");
     node.textContent = "";
     let i = 0;
     const speed = 20 + Math.random() * 20;
     const step = () => {
-      if(!node.isConnected){ node._voxTyping = false; return; }
+      /* Torn out mid-sentence, because the panel was rebuilt under us.
+         It has had its turn: mark it read, or the next refresh starts
+         this post from the first character again — and the one after
+         that, and the one after that, for as long as the career lasts. */
+      if(!node.isConnected){
+        node._voxTyping = false;
+        if(post) post.typed = true;
+        return;
+      }
       if(i >= full.length){
         node.innerHTML = voxMarkup(full);
         node.classList.remove("is-typing");
