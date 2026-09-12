@@ -18239,6 +18239,8 @@ function save(explicit){
       termLength:G.termLength, country:G.country,
       greatest:G.greatest, blasphemy:G.blasphemy, loreNote:G.loreNote, greatnessOpen:G.greatnessOpen,
       relics:G.relics, relicSpots:G.relicSpots, bind:G.bind, sens:G.sens,
+      pendingNight:!!G.pendingNight,
+      cam:{x:cam.x, z:cam.z, yaw:cam.yaw, pitch:cam.pitch},
       /* the clock the shared save is compared by — not the game clock, the
          real one, so two browsers can be told apart by which wrote last */
       savedAtMs: Date.now()
@@ -18320,11 +18322,30 @@ function loadSave(){
     if(!Array.isArray(G.civ)) G.civ = [];
     ensureParties();
     mergeWorldParties();
-    G.members.forEach(m => { m.mesh = null; usedNames.add(m.name); });
-    G.press.forEach(m => m.mesh = null);
-    G.civ.forEach(m => m.mesh = null);
+    G.members.forEach(m => hydrateLoadedPerson(m));
+    G.press.forEach(m => hydrateLoadedPerson(m));
+    G.civ.forEach(m => hydrateLoadedPerson(m));
+    if(G.you) hydrateLoadedPerson(G.you);
+    if(d.cam && isFinite(d.cam.x) && isFinite(d.cam.z)){
+      cam.x = d.cam.x; cam.z = d.cam.z;
+      if(isFinite(d.cam.yaw)) cam.yaw = d.cam.yaw;
+      if(isFinite(d.cam.pitch)) cam.pitch = d.cam.pitch;
+      G._savedCam = true;
+    } else G._savedCam = false;
     return true;
   }catch(e){ return false; }
+}
+function hydrateLoadedPerson(m){
+  if(!m) return;
+  m.mesh = null;
+  m.faceTex = null;
+  if(!m.rel) m.rel = {warmth:0, known:0, debtFromYou:0, debtToYou:0};
+  if(m.rel.warmth == null) m.rel.warmth = 0;
+  if(!m.look){ try{ m.look = rollLook(); }catch(e){} }
+  else try{ ensureLookMorphs(m.look); }catch(e){}
+  if(!m.room || typeof m.room !== "string") m.room = "away";
+  if(!m.pos) m.pos = {econ:0, lib:0, def:0, wel:0};
+  try{ if(m.name) usedNames.add(m.name); }catch(e){}
 }
 function exportCareerSave(){
   const raw = localStorage.getItem(SAVE_KEY);
@@ -19648,14 +19669,24 @@ function frameBody(now){
 }
 
 function peekSave(){
-  /* Lightweight: only enough for the Continue label — no Object.assign / mesh work. */
-  try{
-    const raw = localStorage.getItem(SAVE_KEY);
-    if(!raw) return null;
-    const d = JSON.parse(raw);
-    if(!d || !d.you || !d.members || !d.members.length) return null;
-    return { day: d.day || 1, congress: d.congress || 1, country: d.country || null };
-  }catch(e){ return null; }
+  /* Lightweight: Continue label only. Check backup if the primary write tore. */
+  const keys = [SAVE_KEY, SAVE_BACKUP_KEY];
+  for(let i=0;i<keys.length;i++){
+    try{
+      const raw = localStorage.getItem(keys[i]);
+      if(!raw) continue;
+      const d = JSON.parse(raw);
+      if(!d || !d.you || !d.members || !d.members.length) continue;
+      return {
+        day: d.day || 1,
+        congress: d.congress || 1,
+        country: d.country || null,
+        name: d.you && d.you.name,
+        room: d.room || "office"
+      };
+    }catch(e){}
+  }
+  return null;
 }
 function bootFreshCareer(){
   if(G._booting) return;
@@ -19714,7 +19745,9 @@ function opening(){
       '), a national holiday. Comparison to him is blasphemy; The Greatest may descend under him only.</p>' +
     '<div class="legend">' + (function(){ try{ return partyLegendHTML(); }catch(e){ return ""; } })() + '</div>' +
     '<div class="card__actions">' +
-      (hasSave ? '<button class="btn" type="button" id="cont" data-gp="boot:cont">Continue — day ' + dayN + '</button>' : '') +
+      (hasSave ? '<button class="btn" type="button" id="cont" data-gp="boot:cont">Continue' +
+        (peek.name ? ' — ' + peek.name : '') +
+        ' · day ' + dayN + '</button>' : '') +
       '<button class="btn' + (hasSave?' btn--ghost':'') + '" type="button" id="fresh" data-gp="boot:fresh">New career</button>' +
       '<button class="btn btn--ghost" type="button" id="bootBook" data-gp="boot:book">Handbook</button></div>' +
       '<p class="boot-hint">Enter continues · Esc opens settings once you are inside · H hides the panels</p>';
@@ -19781,36 +19814,66 @@ document.addEventListener("keydown", (e) => {
 
 function cardActContinue(){
   if(G._booting) return;
+  /* Skyrim / pause-menu: world already in memory — just stand up. Never rebuild. */
+  if(G.you && G.members && G.members.length && G.room && ROOMS[G.room] && !G.over){
+    resumeLiveCareer();
+    return;
+  }
   G._booting = true;
-  try{ card.classList.remove("card--open"); }catch(e){}
-  try{ veil.hidden = true; }catch(e){}
-  /* Always hydrate from disk on Continue — opening() no longer loadSave()s. */
-  if(!G.you || !(G.members && G.members.length)){
+  try{
+    const h = card.querySelector("h1");
+    if(h) h.textContent = "Resuming the House.";
+    const acts = card.querySelector(".card__actions");
+    if(acts) acts.innerHTML = '<button class="btn" type="button" disabled>Loading career…</button>';
+  }catch(e){}
+  yieldMain(() => {
     let ok = false;
     try{ ok = !!loadSave(); }catch(e){ ok = false; }
     if(!ok || !G.you || !(G.members && G.members.length)){
-      try{ bootFreshCareer(); }catch(e){ softUnstickVeil(); }
+      G._booting = false;
+      showContinueBroken();
       return;
     }
-  } else {
-    /* Refresh from disk so Continuity matches last autosave */
-    try{ loadSave(); }catch(e){}
-  }
-  try{ begin(); }
-  catch(e){
-    if(window.console) console.warn("begin", e);
-    G._booting = false;
-    softUnstickVeil();
-    /* Recover into office with save intact — never removeItem here. */
-    try{
-      G.running = true; G.over = false;
-      setSpeed(G.prevSpeed || 1);
-      if(!G.room || !ROOMS[G.room]) G.room = "office";
-      try{ save(); }catch(e0){}
-      buildRoom(G.room || "office");
-      syncPeopleStaged();
-    }catch(e2){}
-  }
+    try{ begin(); }
+    catch(e){
+      if(window.console) console.warn("begin", e);
+      G._booting = false;
+      showContinueBroken(e);
+    }
+  });
+}
+function resumeLiveCareer(){
+  /* Pause menu Continue: same room, same feet, HUD back. */
+  G._booting = false;
+  G.running = true;
+  G.over = false;
+  try{ document.body.classList.remove("boot-menu"); }catch(e){}
+  try{ veil.hidden = true; card.classList.remove("card--open"); veil.classList.remove("veil--make"); }catch(e){}
+  try{ setSpeed(G.prevSpeed || 1); }catch(e){ G.speed = 1; }
+  try{ refreshPanels(); }catch(e){}
+  try{ catchClear("resume"); }catch(e){}
+}
+function showContinueBroken(err){
+  /* Stardew rule: a bad load never deletes the farm. */
+  try{
+    veil.hidden = false;
+    card.classList.add("card--open");
+    document.body.classList.add("boot-menu");
+    const peek = peekSave();
+    card.innerHTML =
+      '<div class="eyebrow">Career save is still here</div>' +
+      '<h1>Could not open that sitting.</h1>' +
+      '<p>The career was not erased. Retry, or export it from Career once you are in.</p>' +
+      (peek ? '<p class="muted">On disk: day ' + peek.day + (peek.name ? ' · ' + peek.name : '') + '.</p>' : '') +
+      (err ? '<p class="muted">' + String((err && err.message) || err).slice(0, 180) + '</p>' : '') +
+      '<div class="card__actions">' +
+        '<button class="btn" type="button" id="cont" data-gp="boot:cont">Try Continue again</button>' +
+        '<button class="btn btn--ghost" type="button" id="fresh" data-gp="boot:fresh">New career</button>' +
+      '</div>';
+    const c = el("cont"), f = el("fresh");
+    if(c) c.onclick = () => { try{ cardActContinue(); }catch(e){ softUnstickVeil(); } };
+    if(f) f.onclick = () => { try{ bootFreshCareer(); }catch(e){ softUnstickVeil(); } };
+  }catch(e2){ softUnstickVeil(); }
 }
 /* ══════════════════════════════════════════════════════════
    THE QUESTIONNAIRE
@@ -20339,39 +20402,39 @@ function startRun(){
   begin();
 }
 function begin(){
-  if(!G.you || !(G.members && G.members.length)){ nameCard(); return; }
-  /* Continuity first: mark play + persist before heavy WebGL so a mid-begin
-     stall still leaves Continue intact. */
-  G.running = true; G.over = false;
+  if(!G.you || !(G.members && G.members.length)){
+    G._booting = false;
+    try{ opening(); }catch(e){ nameCard(); }
+    return;
+  }
+  G.over = false;
   G._bootGraceUntil = performance.now() + 3500;
-  G.bare = true;
-  document.body.classList.add("is-bare");
   document.body.classList.remove("ui-open");
   if(!G.room || !ROOMS[G.room]) G.room = "office";
   try{ ensureParties(); }catch(e){}
   try{ ensureMythHistory(); ensureGreatest(); }catch(e){}
   try{ catchClear("begin"); }catch(e){}
   try{
-    /* Soft default: Balanced unless player already chose Best in Settings. */
-    /* Local app stability: start Simple so Continue is never a hard lock. Settings can raise. */
-    G.fullDetail = false;
-    G.gfx = "simple";
-    G.simple = true;
+    if(typeof MODEST !== "undefined" && MODEST){
+      G.fullDetail = false; G.gfx = "simple"; G.simple = true;
+    }
     migrateGfx();
-    _aqBusy = true; /* prevent applyQuality from rebuild+syncPeople on this click */
+    _aqBusy = true;
     try{ applyQuality(); }finally{ _aqBusy = false; }
   }catch(e){ _aqBusy = false; }
   const R0 = ROOMS[G.room];
   try{ el("whereName").textContent = R0.t; el("whereTag").textContent = R0.tag; }catch(e){}
-  try{ const sp = safeSpawn(G.room); cam.x = sp.x; cam.z = sp.z; cam.yaw = 0; G.doorGrace = (G.t || 0) + 2.5; }catch(e){}
+  if(!G._savedCam){
+    try{ const sp = safeSpawn(G.room); cam.x = sp.x; cam.z = sp.z; cam.yaw = 0; }catch(e){}
+  }
+  G.doorGrace = (G.t || 0) + 2.5;
   try{ everyone().forEach(m => { if(m.room === G.room) placeInRoom(m); }); }catch(e){}
-  try{ document.body.classList.remove("boot-menu"); veil.hidden = true; card.classList.remove("card--open"); veil.classList.remove("veil--make"); }catch(e){}
-  try{ save(); }catch(e){}
+  try{
+    const h = card.querySelector("h1");
+    if(h) h.textContent = "The floor is being set.";
+  }catch(e){}
   const roomId = G.room;
-  /* Spread buildRoom then syncPeople across frames — never both on the click
-     stack — but never depend on a frame actually arriving: a backgrounded or
-     hidden window suspends rAF entirely, and this is boot-critical work. */
-  nextFrameOrTimeout(() => {
+  yieldMain(() => {
     try{
       if(!_buildingRoom) buildRoom(roomId);
       try{ resize(); }catch(e){}
@@ -20379,27 +20442,24 @@ function begin(){
       if(window.console) console.warn("begin build", e);
       try{ G.room = "office"; buildRoom("office"); }catch(e2){}
     }
-    /* Three people a frame, the same staged path a room transition uses.
-       Continue is the one boot with nothing warmed up: a fresh career
-       has been through the character maker, so most of what a person is
-       made of — meshes, materials, and the shaders they are the first to
-       need — is already compiled by the time anyone reaches a room.
-       Continue builds the whole room's population from cold, and doing
-       it on one frame is a block nothing can draw through. */
     syncPeopleStaged(() => {
-      try{ refreshPanels(); save(); }catch(e){}
+      try{ document.body.classList.remove("boot-menu"); }catch(e){}
+      try{ veil.hidden = true; card.classList.remove("card--open"); veil.classList.remove("veil--make"); }catch(e){}
+      G.running = true;
       G._booting = false;
+      try{ setSpeed(G.prevSpeed || 1); }catch(e){ G.speed = 1; }
+      try{ refreshPanels(); save(); }catch(e){}
     });
   });
-  /* If rAF/timeout staging never finishes, do not leave Continue latched. */
   setTimeout(() => {
     if(!G._booting) return;
     G._booting = false;
     syncPeopleStaged._busy = false;
     _buildingRoom = false;
+    try{ document.body.classList.remove("boot-menu"); veil.hidden = true; card.classList.remove("card--open"); }catch(e){}
     try{ G.running = true; setSpeed(G.prevSpeed || 1); refreshPanels(); }catch(e){}
-    try{ feed("Continue recovered — room is up."); }catch(e){}
-  }, 8000);
+    try{ feed("Continue recovered — you are in the building."); }catch(e){}
+  }, 10000);
 }
 
 /* ── Add to Home Screen ──────────────────────────────────

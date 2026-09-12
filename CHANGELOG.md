@@ -11,6 +11,19 @@ the reasoning behind each.
 
 ---
 
+## Continue career — full resume (12 Sep 2026)
+
+Taken from Stardew (never wipe a farm on a bad load), Skyrim (pause Continue
+just stands you back up), and immersive sims (wake where you saved).
+
+- Pause-menu Continue no longer rebuilds the House.
+- Cold Continue hydrates the save, keeps the card up until the room is drawn, then you are on your last feet.
+- A failed Continue never deletes the career.
+- Backup save is peeked if the primary write tore.
+- Camera position is saved and restored.
+
+---
+
 ## WebGL: skip the House under cards (12 Sep 2026)
 
 - Cards (Sleep, morning) no longer draw the 3D scene underneath.
