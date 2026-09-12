@@ -22,6 +22,7 @@ Three modes. None is a gate for the others.
 | **1–9** | Fire that prompt / seated act (no D-pad needed) |
 | Space | Pause |
 | F | Phone |
+| X | Today's schedule (Day tab on the phone) |
 | Hold V | Speak aloud |
 | H | House panels · Shift+H immersive |
 | **Hold ? or /** | Show on-glass KBM tips (hidden again on release) |

@@ -12,7 +12,7 @@ First-person political life in an invented republic. You are one member of the H
 
 | | |
 |---|---|
-| **Windows (best)** | Keep the folder together (`index.html`, `One Nation, Under, ME.html`, `vendor/`, `assets/`, `collab/`). Double-click **`Play.bat`**, **`StartLocal.bat`**, or run **`Launch-Offline.ps1`**. Offline — no internet required. |
+| **Windows (best)** | Keep the folder together (`index.html`, `One Nation, Under, ME.html`, `vendor/`, `assets/`, `collab/`). Double-click **`StartLocal.bat`** (or **`Play.bat`**, or run **`Launch-Offline.ps1`**). Offline — no internet required. **`Stop.bat`** closes the server window afterwards. |
 | **Browser file** | Open `One Nation, Under, ME.html` (`file://`). Three.js loads from `vendor/`. `index.html` is a thin redirect to it, kept only so GitHub Pages has a root document. |
 | **Local server** | From the folder: `python3 -m http.server 8765` → [http://127.0.0.1:8765/index.html](http://127.0.0.1:8765/index.html) |
 
@@ -20,7 +20,13 @@ Saves live in the browser (`localStorage`). Dialogue improvises offline by defau
 
 ### Offline continuity between computers or consoles
 
-Use **`StartLocal.bat`** (or **`SafeStart.bat`**) for the reliable offline launcher. It uses the included PowerShell server, so Python and internet access are not required. The opening menu is lightweight and the 3D rooms are built only after you start a career.
+Use **`StartLocal.bat`** for the reliable offline launcher — full graphics; **`SafeStart.bat`** is the same launch with simple graphics. Both use the included PowerShell server, so Python and internet access are not required. The opening menu is lightweight and the 3D rooms are built only after you start a career.
+
+The server picks the first free port from 8765 upward, and asks a port
+that is already answering whether it is this game before reusing it, so a
+port held by something else is no longer a dead end. **`Stop.bat`** closes
+it again and frees the port. If anything reports a port, the game folder,
+or your microphone as "in use", see **`TROUBLESHOOTING.md`**.
 
 To move a career to another computer:
 

@@ -196,3 +196,89 @@ JSON mirrored in `localStorage` (`tls-collab-players`). Votes/speeches log into 
 active seat; `memberVote` consults Proxy AI for the partner member when proxy is on.
 Single-player path unchanged if Collab is ignored.
 
+
+---
+
+## Ready to play, and nothing left holding the machine
+
+Two complaints, one session: *make the game ready to play fully*, and
+*something has it in use*. The second turned out to be several different
+things, all of them the launcher's fault rather than the game's.
+
+### The server no longer sits in the game folder
+
+`Serve-Local.ps1` inherited the game folder as its working directory,
+and a process sitting in a folder locks that folder on Windows: the
+folder cannot be moved or renamed, `git pull` fails, and Windows reports
+it "in use by another process" — long after the player finished playing,
+because the server window has no exit condition and nobody closes it.
+
+The server now steps out to the temp folder before it serves a single
+byte, so the folder it serves is never the folder it holds.
+
+### A way to close it
+
+New `Stop.bat` / `Stop-Local.ps1`. The server writes a small state file
+(PID, port, root) under `%LOCALAPPDATA%\OneNationUnderME` and answers a
+`/__quit` request; Stop asks politely first, forces only if that is
+ignored, and clears the state file either way. It also sweeps the
+launcher's ports for servers started before any of this existed.
+
+When a port is still held afterwards, Stop names the program and PID
+holding it. "Something has it in use" should not require the player to
+go and find out what "something" is.
+
+### A port that belongs to someone else is no longer a dead end
+
+The old launcher treated *anything* answering on 8765 as the game: it
+would open a stranger's page and call it the career, or announce the
+port was in use and give up. New `Start-GameServer.ps1` asks a port who
+it is (`/__onume`, which answers with the server's own root folder) and
+walks to the next port — up to 8770 — whenever the answer is anybody
+else, or a different copy of the game. The URL goes to stdout and
+progress to stderr, so `StartLocal.bat` can read one while the player
+reads the other.
+
+### The microphone
+
+Hold **V** (or pad **X**) is speak-aloud, and the browser holds the
+microphone for as long as recognition is running. Alt-tab while holding
+the key and the keyup never arrives — the game goes on believing it is
+listening, and the tab keeps the microphone, so the next program the
+player opens to talk to is told the mic is busy by something else.
+
+`micStop()` now always asks the engine to let go rather than returning
+early when it believes it already stopped, with an `abort()` behind it
+if the engine does not end on its own. `blur`, `pagehide` and
+`visibilitychange` all release it, and `blur` clears every held key as
+well — the old behaviour returned the player to the game still walking
+into a wall.
+
+### Full graphics by default
+
+`StartLocal.bat` — the desktop shortcut, the Start Menu entry, and
+`One Nation Under ME.bat` — appended `?safe=1` to every launch, which
+forces Simple graphics. The flagship launcher was permanently running
+the game in its reduced mode, and `SafeStart.bat` was an alias for the
+same thing. `StartLocal.bat` now launches at full detail;
+`SafeStart.bat` passes `safe` and keeps the simple path for a machine
+that needs it.
+
+### X opens the schedule on a keyboard
+
+`openDaySchedule()` was reachable from pad X only, while the phone's own
+hint ("X opens this schedule any time") and `QUICKSTART.md` both told
+keyboard players it was theirs. It is now bound on the keyboard too, and
+yields to the key if the player has rebound it to something else.
+
+### Smaller things
+
+- `Install-LocalApp.ps1` builds the icon from a byte copy of `logo.png`
+  rather than `Image.FromFile`, which holds the file open for the life
+  of the object. It also installs Start Menu entries for simple graphics
+  and for closing the server.
+- `.bat` files are pinned to CRLF in `.gitattributes`. CMD reads a batch
+  file line by line as it runs it, and LF-only endings are not reliably
+  parsed around labels and multi-line blocks.
+- New `TROUBLESHOOTING.md` — every "in use" case above, what causes it,
+  and the one command that clears it.

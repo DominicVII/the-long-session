@@ -15,7 +15,12 @@ function New-AppIco {
   param($Png, $OutIco)
   try {
     Add-Type -AssemblyName System.Drawing
-    $img = [System.Drawing.Image]::FromFile($Png)
+    # Read the bytes first: Image.FromFile keeps the file open for the
+    # lifetime of the object, which is one more thing that can report the
+    # game folder "in use" if anything here throws.
+    $pngBytes = [IO.File]::ReadAllBytes($Png)
+    $srcMs = New-Object System.IO.MemoryStream(,$pngBytes)
+    $img = [System.Drawing.Image]::FromStream($srcMs)
     $sizes = @(256, 48, 32, 16)
     $ms = New-Object System.IO.MemoryStream
     $bw = New-Object System.IO.BinaryWriter $ms
@@ -38,7 +43,7 @@ function New-AppIco {
       $frames += ,@{ Size=$s; Bytes=$bytes; Offset=$offset }
       $offset += $bytes.Length
     }
-    $img.Dispose()
+    $img.Dispose(); $srcMs.Dispose()
     foreach ($f in $frames) {
       $szByte = if ($f.Size -ge 256) { [byte]0 } else { [byte]$f.Size }
       $bw.Write($szByte)
@@ -91,6 +96,19 @@ if (Test-Path $Offline) {
   New-Shortcut -Path $OffLnk -Target $Offline -WorkDir $Root -Icon $IconPath -Desc "Offline file:// launch (fallback)"
 }
 
+# Simple graphics, for a machine that stutters on the full scene.
+$SafeBat = Join-Path $Root "SafeStart.bat"
+if (Test-Path $SafeBat) {
+  New-Shortcut -Path (Join-Path $StartDir "One Nation (simple graphics).lnk") -Target $SafeBat -WorkDir $Root -Icon $IconPath -Desc "Play with simple graphics"
+}
+
+# And a way to close the server again, so a window left running from an
+# earlier session is never the thing holding the port or the folder.
+$StopBat = Join-Path $Root "Stop.bat"
+if (Test-Path $StopBat) {
+  New-Shortcut -Path (Join-Path $StartDir "Close the game server.lnk") -Target $StopBat -WorkDir $Root -Icon $IconPath -Desc "Close the local server and free the port"
+}
+
 # Pin-friendly Programs root shortcut
 $RootLnk = Join-Path ([Environment]::GetFolderPath("StartMenu")) "Programs\$Name.lnk"
 New-Shortcut -Path $RootLnk -Target $Launch -WorkDir $Root -Icon $IconPath -Desc "Play One Nation, Under, ME. locally"
@@ -98,4 +116,5 @@ New-Shortcut -Path $RootLnk -Target $Launch -WorkDir $Root -Icon $IconPath -Desc
 Write-Host "Installed local app:"
 Write-Host "  Desktop: $DeskLnk"
 Write-Host "  Start:   $StartLnk"
-Write-Host "Launch uses StartLocal.bat -> http://127.0.0.1:8765/index.html"
+Write-Host "  Stop:    Start Menu -> One Nation Under ME -> Close the game server"
+Write-Host "Launch uses StartLocal.bat -> http://127.0.0.1:8765/index.html (next free port if that one is taken)"

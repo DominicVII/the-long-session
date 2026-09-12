@@ -11977,9 +11977,32 @@ function micStart(){
   try{ RECOG.start(); }catch(e){ listening = false; micHide(); }
 }
 function micStop(){
-  if(!listening || !RECOG) return;
+  if(!RECOG) return;
+  /* Ask the engine to let go even when we already believe we stopped.
+     A dropped keyup — alt-tab with V held — used to leave the browser
+     holding the microphone, and then every other program on the machine
+     is told the mic is in use by something else. */
+  listening = false;
   try{ RECOG.stop(); }catch(e){}
+  clearTimeout(micStop._release);
+  micStop._release = setTimeout(() => {
+    if(listening) return;                 /* they started talking again */
+    try{ RECOG.abort(); }catch(e){}
+  }, 1500);
 }
+/* Hand the microphone back whenever the game is no longer the window in
+   front. Nothing here is speech the player still wants sent — they have
+   walked away from it. */
+function micRelease(){
+  if(!RECOG) return;
+  const ab = el("aloudBtn"); if(ab) ab.classList.remove("is-live");
+  const wm = el("wireMic"); if(wm) wm.classList.remove("is-live");
+  micStop();
+}
+addEventListener("pagehide", micRelease);
+document.addEventListener("visibilitychange", () => {
+  if(document.visibilityState === "hidden") micRelease();
+});
 /* Speak aloud into the world — no talk panel, no card. They hear you
    and answer in place, the way a room does. */
 function converseLive(m, text){
@@ -17333,8 +17356,21 @@ addEventListener("keydown", e => {
     return;
   }
   if(k === "v" && veil.hidden && !listening){ const ab=el("aloudBtn"); if(ab) ab.classList.add("is-live"); micStart(); return; }
+  /* KBM: X opens today's schedule, the same as pad X — the phone's own
+     hint and the quickstart both promise it, and only the pad had it. */
+  if(k === "x" && !bindTaken("x") && veil.hidden && !TALK.open && (G.running || phoneWasRunning !== null)){
+    openDaySchedule();
+    return;
+  }
   if(k === ((G.bind||DEFAULT_BIND).phone || "f") && veil.hidden && !TALK.open && G.running) phoneCard();
 });
+/* A rebound key wins over the extras above: whatever the player mapped
+   walk / look / step / interact / pause / phone to is theirs. */
+function bindTaken(k){
+  const B = G.bind || DEFAULT_BIND;
+  for(const name in B){ if(B[name] === k) return true; }
+  return false;
+}
 addEventListener("keyup", e => {
   if(typingInField(e)) return;
   if(isHelpTipKey(e)){ setHelpHeld(false); return; }
@@ -17342,7 +17378,14 @@ addEventListener("keyup", e => {
   keys[k] = false;
   if(k === "v" && listening){ const ab=el("aloudBtn"); if(ab) ab.classList.remove("is-live"); micStop(); }
 });
-addEventListener("blur", () => setHelpHeld(false));
+addEventListener("blur", () => {
+  setHelpHeld(false);
+  /* Keys held when the window goes away never send their keyup, so the
+     player came back walking into a wall with the microphone still open.
+     Let go of all of it. */
+  for(const k in keys) keys[k] = false;
+  micRelease();
+});
 
 /* Mouse look / click — always live, even with a pad connected (hybrid).
    Deltas are incremental so right-stick look stays additive while dragging. */

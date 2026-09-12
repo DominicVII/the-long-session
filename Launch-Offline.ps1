@@ -1,32 +1,18 @@
+# One Nation, Under, ME. — start the local server (if it is not already up)
+# and open the game. Port selection, identity and the "somebody else has
+# that port" case all live in Start-GameServer.ps1.
 param(
-  [int]$Port = 8765
+  [int]$Port = 8765,
+  [switch]$Safe
 )
-
 $ErrorActionPreference = "Stop"
 $root = (Resolve-Path (Join-Path $PSScriptRoot ".")).Path
-$url = "http://127.0.0.1:$Port/index.html"
+$starter = Join-Path $root "Start-GameServer.ps1"
+if (-not (Test-Path $starter)) { throw "Missing Start-GameServer.ps1 in $root" }
 
-$probe = $null
-try {
-  $probe = New-Object Net.Sockets.TcpClient("127.0.0.1", $Port)
-  $probe.Close()
-} catch {
-  Start-Process powershell.exe -ArgumentList @(
-    "-NoProfile", "-ExecutionPolicy", "Bypass",
-    "-File", (Join-Path $root "Serve-Local.ps1"),
-    "-Port", $Port,
-    "-Root", $root
-  ) -WindowStyle Minimized
-  for($i = 0; $i -lt 20; $i++){
-    Start-Sleep -Milliseconds 250
-    try {
-      $probe = New-Object Net.Sockets.TcpClient("127.0.0.1", $Port)
-      $probe.Close()
-      break
-    } catch {
-      if($i -eq 19){ throw "The offline game server did not start on port $Port." }
-    }
-  }
+$url = & $starter -Port $Port -Root $root
+if ($LASTEXITCODE -ne 0 -or -not $url) {
+  throw "The offline game server did not start. Run Stop.bat, then try again."
 }
-
+if ($Safe) { $url = "$url`?safe=1" }
 Start-Process $url

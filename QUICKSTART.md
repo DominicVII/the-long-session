@@ -12,12 +12,18 @@
 - No setup needed — just double-click
 
 ### 📄 Batch Files (From the game folder)
-1. **StartLocal.bat** (Recommended) — HTTP server, excellent compatibility
-2. **Play.bat** — Direct file access (may have WebGL issues)
-3. **SafeStart.bat** — Simplified graphics mode
+1. **StartLocal.bat** (Recommended) — HTTP server, full graphics, excellent compatibility
+2. **SafeStart.bat** — same server, simplified graphics, for a machine that stutters
+3. **Play.bat** — Direct file access (may have WebGL issues)
+4. **Stop.bat** — closes the server window when you are done playing
 
 ### 🔵 PowerShell (From the game folder)
 - Right-click `Launch-Offline.ps1` → "Run with PowerShell"
+
+The launcher serves the game on `http://127.0.0.1:8765/`. If another
+program already has that port, it quietly moves to the next free one and
+tells you which — and it checks that whatever answers a port really is
+this game before reusing it.
 
 ---
 
@@ -45,7 +51,7 @@
 | Pause | Space | - | Start |
 | Back out | Esc | - | B |
 
-**Full controls:** See `CONTROLS.md`
+**Full controls:** See `CONTROLS.md` — the Schedule key (X) opens the Day tab on your phone.
 
 ---
 
@@ -80,9 +86,17 @@ You are one member of the **House of Representatives** in an invented republic.
 
 ## If Something Goes Wrong
 
+### Something says a port, a folder, or the microphone is "in use"
+- Run **`Stop.bat`**. It closes the server window left over from an
+  earlier session, which is what is usually holding the port — and,
+  before this update, the game folder with it.
+- If the port belongs to another program entirely, `Stop.bat` names it,
+  and the launcher simply uses the next port.
+- Full list of causes and cures: **`TROUBLESHOOTING.md`**
+
 ### Server won't start on port 8765
-- Check if another app is using port 8765
-- Run `SafeStart.bat` for a fallback mode
+- Nothing to do — the launcher walks to the next free port (up to 8770)
+- `Stop.bat` gives 8765 back if you want it
 - Or use `python3 -m http.server 8765` if Python is installed
 
 ### Game runs but graphics are slow
@@ -110,6 +124,7 @@ You are one member of the **House of Representatives** in an invented republic.
 
 - **Repository:** https://github.com/DominicVII/the-long-session
 - **Full controls:** `CONTROLS.md`
+- **If something is stuck or "in use":** `TROUBLESHOOTING.md`
 - **Game systems:** `PODIUM-CATCH.md`, `VOX.md`, `AUTONOMY.md`
 - **Lore:** `TAYLOR-CANON.md`
 
