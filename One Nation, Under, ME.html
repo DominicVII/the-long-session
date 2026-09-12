@@ -1706,8 +1706,9 @@ function modestMachine(){
     const cores = navigator.hardwareConcurrency || 4;
     const mem = navigator.deviceMemory || 8;
     const win = /Windows/i.test(navigator.userAgent || "");
-    /* Dell-class laptops: 8GB / 6–8 threads / Intel UHD. Edge --app hangs
-       if we ask this machine for antialias, soft shadows, and a full House. */
+    const host = String(location.hostname || "");
+    if(/grok\.me$|grok-sandbox/i.test(host)) return true;
+    try{ if(window.self !== window.top) return true; }catch(e){ return true; }
     if(mem && mem <= 8) return true;
     if(cores <= 6) return true;
     if(win && cores <= 8 && (!mem || mem <= 16)) return true;
@@ -2580,9 +2581,45 @@ function restaff(force){
     const want = routineRoom(m, h, t);
     if(want !== m.room){ m.room = want; moved(); placeInRoom(m); movedAny = true; }
   });
-  if(movedAny) syncPeople();
-  /* Hourly flavour only — never per-frame. */
+  try{ ensureLivedIn(); }catch(e){}
+  const missing = hereNow().some(m => !m.mesh);
+  if(movedAny || missing){
+    nextFrameOrTimeout(() => {
+      try{ syncPeopleStaged(); }catch(e){ try{ syncPeople(); }catch(e2){} }
+    });
+  }
   try{ ambientHourBeat(h, t); }catch(e){}
+}
+function ensureLivedIn(){
+  /* Empty rooms feel dead. Pull a living crowd into wherever you are. */
+  if(!G.room || G.room === "visit" || !G.you) return;
+  const want = ({office:4, corridor:7, floor:9, cloak:5, caucus:6,
+                 committee:5, press:4, steps:4, district:3, staff:3})[G.room] || 4;
+  const here = everyone().filter(m => m && m.room === G.room && !m.gone);
+  if(here.length >= want) return;
+  const pool = everyone().filter(m => m && !m.gone && m.room !== G.room && TALK.m !== m && visiting() !== m);
+  for(let i = pool.length - 1; i > 0; i--){
+    const j = (Math.random() * (i + 1)) | 0;
+    const t = pool[i]; pool[i] = pool[j]; pool[j] = t;
+  }
+  let need = want - here.length;
+  for(let i = 0; i < pool.length && need > 0; i++){
+    const m = pool[i];
+    m.room = G.room;
+    placeInRoom(m);
+    m.wait = 0.4 + Math.random() * 2.2;
+    m.say = m.say || pick([
+      "Morning.",
+      "Got a minute?",
+      "They are already counting votes.",
+      "Have you seen the whip?",
+      "This building never sleeps, it just changes shoes."
+    ]);
+    m.sayT = 2.4 + Math.random();
+    m.sayTo = "you";
+    need--;
+  }
+  moved();
 }
 function routeForDay(m,t){
   m.room = routineRoom(m, 8, t);
@@ -2724,14 +2761,14 @@ try{
   }
 }catch(e){}
 renderer.sortObjects = false;
-if(typeof MODEST !== "undefined" && MODEST){
+if(MODEST){
   renderer.toneMapping = THREE.NoToneMapping;
   renderer.toneMappingExposure = 1;
 } else {
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.0;
 }
-renderer.shadowMap.enabled = true;
+renderer.shadowMap.enabled = !MODEST;
 renderer.shadowMap.type = THREE.PCFShadowMap;
 /* Context loss must not leave the view in a sticky panic banner. */
 let GL_LOST = false, GL_RECOVERING = false;
@@ -8217,7 +8254,17 @@ function wander(m, dt){
       else if(allies.length && chance(.34)){ const a = pick(allies); m.tx = a.x + (Math.random()*2-1)*1.1; m.tz = a.z + (Math.random()*2-1)*1.1; }
       else { m.tx = (Math.random()*2-1)*b.hw; m.tz = b.d0 + Math.random()*(b.d1-b.d0); }
       m.tx = clamp(m.tx,-b.hw,b.hw); m.tz = clamp(m.tz,b.d0,b.d1);
-      m.wait = 6 + Math.random()*16;         /* people stand about far more than they walk */
+      m.wait = 2.2 + Math.random()*7;
+      if(chance(.28)){
+        m.say = pick([
+          "Excuse me.",
+          "They will not like that.",
+          "Is the clerk in?",
+          "I have a meeting.",
+          "Did you hear?"
+        ]);
+        m.sayT = 2.2; m.sayTo = null;
+      }
     }
     return;
   }
@@ -9041,13 +9088,13 @@ function phoneClose(){
 function confabulate(dt){
   conferT -= dt;
   if(conferT > 0) return;
-  conferT = 1.6;
+  conferT = 0.85;
   const list = hereNow().filter(m => m.kind === "member");
   if(list.length < 2) return;
   for(let i=0;i<list.length;i++) for(let j=i+1;j<list.length;j++){
     const a = list[i], b = list[j];
     if(Math.hypot(a.x-b.x, a.z-b.z) > 1.9) continue;
-    if(G.t - a.lastConf < 26 || G.t - b.lastConf < 26) continue;
+    if(G.t - a.lastConf < 12 || G.t - b.lastConf < 12) continue;
     a.lastConf = b.lastConf = G.t;
     confer(a,b);
     /* and you hear it, at whatever volume standing there gets you */
@@ -9144,7 +9191,7 @@ function checkEvents(){
   if(h !== G.lastMailCheck){ G.lastMailCheck = h; maybeMail(); }
   /* the run is kept continuously, mid-day, not only at nightfall */
   const q = Math.floor(G.minute/8);
-  if(q !== G.lastAuto){ G.lastAuto = q; if(G.running && !G.over) save(); }
+  if(q !== G.lastAuto){ G.lastAuto = q; if(G.running && !G.over) queueSave(); }
   /* the wire refreshes often, and money moves with it */
   const tk = Math.floor(G.minute/12);
   if(tk !== G.lastTick){ G.lastTick = tk; lobbyMoney(); paintTicker(); }
@@ -10515,9 +10562,10 @@ function dayPlanCard(){
       veil.hidden = true;
       G.running = true;
       try{ setSpeed(G.prevSpeed || 1); }catch(e){ G.speed = 1; }
-      yieldPaint(() => { try{ save(false); refreshPanels(); }catch(e){} });
+      yieldPaint(() => { try{ queueSave(); refreshPanels(); }catch(e){} });
     };
     try{
+      try{ ensureLivedIn(); }catch(e){}
       syncPeopleStaged((err) => {
         if(err && window.console) console.warn("planGo people", err);
         go();
@@ -16858,8 +16906,6 @@ function overnight(){
 function nightfall(){
   G.running = false; try{ closeTalk(); }catch(e){}
   const late = (G.minute || 0) > 22*60 + 60;
-  let news = [];
-  try{ news = overnight() || []; }catch(e){ news = []; }
   const members = G.members || [];
   const warm = members.filter(m => m && m.rel && m.rel.warmth > 35).length;
   const cold = members.filter(m => m && m.rel && m.rel.warmth < -25).length;
@@ -16875,28 +16921,37 @@ function nightfall(){
     if((M.helped||[]).length) dayBits.push("Helped: " + M.helped.slice(0,2).map(x=>x.t).join("; ") + ".");
     if((M.hurt||[]).length) dayBits.push("Hurt: " + M.hurt.slice(0,2).map(x=>x.t).join("; ") + ".");
   }
-  try{ feed("Nightfall. The building keeps score whether you do or not."); }catch(e){}
-  card.innerHTML =
-    '<div class="eyebrow">' + dateString() + " · " + dayLabel() + '</div>' +
-    '<h1>Ten o’clock.</h1>' +
-    '<p class="dream">' + line + '</p>' +
-    (dayBits.length ? '<p><strong>Today’s residue:</strong> ' + dayBits.join(" ") + '</p>' : '') +
-    (b && !b.done ? '<p>On the calendar: <strong>' + b.title + '</strong>, roll call in ' +
-      Math.max(0, b.voteDay-G.day) + ' day' + (b.voteDay-G.day===1?'':'s') + '.</p>' : '') +
-    (G.secrets.length ? '<p>You are carrying <strong>' + G.secrets.length + '</strong> ' +
-      (G.secrets.length===1?'thing':'things') + ' you would rather not read about.</p>' : '') +
-    (news.length ? '<h2>Overnight</h2>' + news.map(n=>'<p>'+n+'</p>').join("") : '') +
-    '<div class="card__actions"><button class="btn" type="button" id="okNight" data-gp="night:sleep">Sleep</button></div>';
-  veil.hidden = false;
-  const on = el("okNight");
-  if(on) on.addEventListener("click", () => {
-    if(nextDay._busy) return;
-    on.disabled = true;
-    on.textContent = "Sleeping…";
-    try{ nextDay(late); }
-    catch(e){ if(window.console) console.warn("okNight", e); nextDay._busy = false; softUnstickVeil(); G.running = true; }
+  const paintNight = (news) => {
+    news = news || [];
+    try{ feed("Nightfall. The building keeps score whether you do or not."); }catch(e){}
+    card.innerHTML =
+      '<div class="eyebrow">' + dateString() + " · " + dayLabel() + '</div>' +
+      '<h1>Ten o’clock.</h1>' +
+      '<p class="dream">' + line + '</p>' +
+      (dayBits.length ? '<p><strong>Today’s residue:</strong> ' + dayBits.join(" ") + '</p>' : '') +
+      (b && !b.done ? '<p>On the calendar: <strong>' + b.title + '</strong>, roll call in ' +
+        Math.max(0, b.voteDay-G.day) + ' day' + (b.voteDay-G.day===1?'':'s') + '.</p>' : '') +
+      ((G.secrets||[]).length ? '<p>You are carrying <strong>' + G.secrets.length + '</strong> ' +
+        (G.secrets.length===1?'thing':'things') + ' you would rather not read about.</p>' : '') +
+      (news.length ? '<h2>Overnight</h2>' + news.map(n=>'<p>'+n+'</p>').join("") : '') +
+      '<div class="card__actions"><button class="btn" type="button" id="okNight" data-gp="night:sleep">Sleep</button></div>';
+    veil.hidden = false;
+    const on = el("okNight");
+    if(on) on.addEventListener("click", () => {
+      if(nextDay._busy) return;
+      on.disabled = true;
+      on.textContent = "Sleeping…";
+      try{ nextDay(late); }
+      catch(e){ if(window.console) console.warn("okNight", e); nextDay._busy = false; softUnstickVeil(); G.running = true; }
+    });
+    markPicks();
+  };
+  paintNight([]);
+  yieldPaint(() => {
+    let news = [];
+    try{ news = overnight() || []; }catch(e){ news = []; }
+    paintNight(news);
   });
-  markPicks();
 }
 function nextDay(late){
   /* Stardew sleep: clock + diary only. No 3D, no panels, no stringify
@@ -16919,7 +16974,7 @@ function nextDay(late){
       if(window.console) console.warn("dayPlanCard", e);
       softUnstickVeil(); G.running = true;
     }
-    yieldPaint(() => { try{ save(false); }catch(e){} });
+    yieldPaint(() => { try{ queueSave(); }catch(e){} });
   };
   const fail = (e) => {
     if(window.console) console.warn("nextDay", e);
@@ -18203,7 +18258,17 @@ async function reconcileFromDB(){
 }
 const SAVE_KEY = "longsession.v3";
 const SAVE_BACKUP_KEY = "longsession.v3.backup";
-let saveBusy = false, saveCount = 0;
+let saveBusy = false, saveCount = 0, saveQueued = false;
+function queueSave(explicit){
+  if(explicit){ try{ return save(true); }catch(e){ return false; } }
+  if(saveQueued || saveBusy) return false;
+  saveQueued = true;
+  setTimeout(() => {
+    saveQueued = false;
+    try{ save(false); }catch(e){}
+  }, 280);
+  return true;
+}
 function stripMesh(m){
   const c = Object.assign({}, m);
   delete c.mesh;
@@ -18221,7 +18286,7 @@ function save(explicit){
       members:G.members.map(stripMesh), press:G.press.map(stripMesh), civ:G.civ.map(stripMesh),
       you:G.you, bill:G.bill, secrets:G.secrets, donors:G.donors, casework:G.casework,
       journal:G.journal, career:G.career, room:G.room, savedAt:G.savedAt,
-      feed:G.feed, mail:G.mail, mailId:G.mailId, pendingReplies:G.pendingReplies, visitId:G.visitId,
+      feed:(G.feed||[]).slice(-24), mail:(G.mail||[]).slice(-20), mailId:G.mailId, pendingReplies:G.pendingReplies, visitId:G.visitId,
       states:G.states, prog:G.prog, lobbies:G.lobbies, money:G.money, history:G.history, events:G.events,
       regime:G.regime, amended:G.amended, exec:G.exec, presidents:G.presidents, statute:G.statute,
       bare:G.bare, gfx:G.gfx, simple:G.simple, fullDetail:G.fullDetail, noSit:G.noSit,
