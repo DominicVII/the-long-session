@@ -282,3 +282,49 @@ yields to the key if the player has rebound it to something else.
   parsed around labels and multi-line blocks.
 - New `TROUBLESHOOTING.md` — every "in use" case above, what causes it,
   and the one command that clears it.
+
+---
+
+## Continue: the boot that had nothing warmed up
+
+**Problem:** clicking **Continue** on the opening card left the page dead.
+Not slow — dead. A one-second heartbeat running inside the page logged a
+single beat when the button was clicked and then nothing at all for the
+next 75 seconds, with the veil still up and the room still unnamed. New
+career, in the same browser and the same session, was fine.
+
+**What it was not:** the V8 debugger, interrupted four times during the
+stall, stopped in the Vox typewriter (`voxTypePosts`'s `step`) every
+time — which looks conclusive and is not. `Debugger.pause` stops at the
+next *JavaScript* statement, and the typewriter's timer was the only
+JavaScript running, so every sample landed there. A CPU profile over the
+same 20 seconds put it at 11 ms, 0.1%. The thread was not executing
+script at all: 96.5% of the time was `(program)` — native work, inside
+the GL driver, with shader program linking in the sampled frames.
+
+**What it was:** `begin()` built the room's entire population on a single
+frame — `syncPeople()`, every person at once. Every mesh, every material
+and every shader those materials are the first to need, in one block,
+before anything can draw. A fresh career never feels this: the character
+maker has already built and compiled most of what a person is made of by
+the time anyone reaches a room. Continue starts cold, and pays for all of
+it on one frame.
+
+**Fix:** `begin()` now uses `syncPeopleStaged()` — three people a frame,
+the staged path a room transition has always used — and finishes boot in
+its completion callback. The recovery path in `cardActContinue()` uses it
+too.
+
+Measured, same instrument, same container, before and after:
+
+| | Before | After |
+|---|---|---|
+| Heartbeats after Continue | 1, then silence | continuous, every ~500ms |
+| Veil lifted | never (75s watched) | 1.3s |
+| Worst single block | never ended | 693ms, once |
+
+The remaining 693 ms is the room shell itself, which is one hitch rather
+than a wall. The Vox typewriter defect the debugger pointed at is real
+but separate and cheap — a post whose node is replaced mid-type never
+gets marked `typed`, so every refresh retypes it from zero — and it is
+left alone here rather than smuggled into a performance fix.
