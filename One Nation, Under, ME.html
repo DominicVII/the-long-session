@@ -117,6 +117,19 @@ html,body{height:100%}
 .hud{position:absolute; left:12px; top:10px; pointer-events:none}
 .hud b{display:block; font-family:"Instrument Serif",Georgia,serif; font-size:19px; color:#eef1f4; text-shadow:0 2px 10px rgba(0,0,0,.9)}
 .hud i{font-style:normal; font-size:9px; font-weight:600; letter-spacing:.15em; text-transform:uppercase; color:#aab3bd; text-shadow:0 2px 8px rgba(0,0,0,.9)}
+.compass{position:absolute; left:50%; top:8px; transform:translateX(-50%); width:min(440px,72%); height:22px; pointer-events:none; z-index:5}
+.compass__rail{position:absolute; inset:0; background:linear-gradient(90deg,transparent,rgba(0,0,0,.5) 14%,rgba(0,0,0,.5) 86%,transparent); border-bottom:1px solid rgba(232,213,163,.32)}
+.compass__n{position:absolute; left:50%; top:1px; transform:translateX(-50%); font-size:8px; letter-spacing:.22em; color:#e8d5a3; font-weight:700}
+.compass__tick{position:absolute; top:8px; width:5px; height:5px; margin-left:-2px; border-radius:50%; background:#c8ced6; opacity:.9}
+.compass__tick.is-quest{background:#f3c14b; width:8px; height:8px; border-radius:0; transform:rotate(45deg); top:6px}
+.compass__tick.is-talk{background:#7ec8ff; width:7px; height:7px}
+.job{position:absolute; left:50%; bottom:56px; transform:translateX(-50%); pointer-events:none; z-index:5; display:flex; gap:8px; align-items:baseline; max-width:min(540px,88%); background:rgba(11,13,16,.58); border:1px solid rgba(232,213,163,.22); padding:5px 12px 6px; border-radius:2px; color:#eef1f4}
+.job i{font-style:normal; font-size:8px; letter-spacing:.16em; color:#e8d5a3; font-weight:700}
+.job b{font-size:12.5px; font-weight:500}
+.savepip{position:absolute; right:12px; top:10px; z-index:6; font-size:9px; letter-spacing:.16em; text-transform:uppercase; color:#9ad7a0; text-shadow:0 2px 8px #000; pointer-events:none; opacity:0; transition:opacity .35s}
+.savepip.is-on{opacity:1}
+.hearts{letter-spacing:1px; color:#c45c5c; font-size:11px}
+.stage.is-spent .grade{box-shadow:inset 0 0 90px 12px rgba(50,8,8,.5)}
 .keys{position:absolute; right:12px; top:10px; display:none; gap:5px; flex-wrap:wrap; justify-content:flex-end; max-width:54%; pointer-events:none}
 /* FPV / play: tips stay hidden unless hold ? or / (body.help-held) */
 body.help-held .keys{display:flex !important; opacity:1; visibility:visible}
@@ -832,6 +845,9 @@ body.boot-menu .shell{grid-template-rows:minmax(0,1fr)}
       <section class="stage">
         <div class="scene" id="scene"><div class="boot" id="boot">Building the chamber…</div></div>
         <div class="hud"><i id="whereTag">Location</i><b id="whereName">—</b></div>
+        <div class="compass" id="compass" aria-hidden="true"><div class="compass__rail"></div><i class="compass__n">N</i><div id="compassTicks"></div></div>
+        <div class="job" id="job" hidden><i>NOW</i><b id="jobText"></b></div>
+        <div class="savepip" id="savePip">Saved</div>
         <div class="keys" id="keysTips" aria-hidden="true">
           <span class="kbd">W S — walk</span><span class="kbd">A D — look</span><span class="kbd">Q C — step aside</span>
           <span class="kbd">drag — look</span><span class="kbd">E — speak / use / catch / deliver</span><span class="kbd">1–9 — prompts</span><span class="kbd">space — pause</span><span class="kbd">F — phone</span><span class="kbd">hold V — speak aloud</span><span class="kbd">H — panels</span>
@@ -1479,55 +1495,84 @@ const CULT_NEIGHBORS = {
 /* ── The Union: twenty states, laid out west to east. The Dutch names in
       the north-east are the ones the Republic never renamed. ── */
 const STATE_DEF = [
-  {n:"Nieuw Oranje", cult:"dutch", col:5, row:1, seats:24, lean: 34, ind:96, pop:8.9, note:"The commercial capital. Banks, docks, and the loudest press in the Republic."},
-  {n:"Nieuw Haarlem", cult:"dutch",col:5, row:0, seats:9,  lean: 22, ind:74, pop:3.1, note:"Mills and market towns upriver of Nieuw Oranje."},
-  {n:"Vlissingen", cult:"dutch",   col:5, row:2, seats:7,  lean: 10, ind:68, pop:2.4, note:"Shipyards, and a coastline that floods."},
-  {n:"Zeeland", cult:"dutch",      col:4, row:2, seats:6,  lean: -8, ind:52, pop:2.0, note:"Reclaimed marsh, dairy, and long memories."},
-  {n:"Meriden", cult:"yankee",      col:4, row:0, seats:8,  lean: 18, ind:71, pop:2.8, note:"Insurance and small arms."},
-  {n:"Havenport", cult:"yankee",    col:4, row:1, seats:11, lean:  6, ind:80, pop:3.7, note:"The deepwater port. Everything passes through it."},
-  {n:"Marion", cult:"midlands",       col:3, row:1, seats:12, lean: -4, ind:64, pop:4.1, note:"Steel in the north, tobacco in the south."},
-  {n:"Coalport", cult:"midlands",     col:3, row:2, seats:9,  lean:-24, ind:58, pop:3.0, note:"Seams running out, and nobody will say so."},
-  {n:"Grantham", cult:"yankee",     col:3, row:0, seats:7,  lean: 12, ind:60, pop:2.3, note:"University towns and orchards."},
-  {n:"Calder", cult:"prairie",       col:2, row:0, seats:8,  lean: -6, ind:49, pop:2.7, note:"Grain, rail junctions, and a persistent grievance."},
-  {n:"Fallowfield", cult:"prairie",  col:2, row:1, seats:10, lean:-18, ind:41, pop:3.3, note:"Corn and hogs as far as the eye goes."},
-  {n:"Blackwater", cult:"delta",   col:2, row:2, seats:8,  lean:-30, ind:44, pop:2.6, note:"Delta country. Floods every spring, funded every fourth."},
-  {n:"Ordway", cult:"highplains",       col:1, row:0, seats:6,  lean:  8, ind:38, pop:1.9, note:"Cattle and a legislature that meets for forty days."},
-  {n:"Sandhill", cult:"highplains",     col:1, row:2, seats:5,  lean: 26, ind:35, pop:1.6, note:"Dry, conservative, and quietly rich in gas."},
-  {n:"Tullamore", cult:"midlands",    col:1, row:1, seats:7,  lean:-12, ind:46, pop:2.2, note:"Union halls and closed foundries."},
-  {n:"Kestrel", cult:"mountain",      col:0, row:0, seats:5,  lean: 16, ind:33, pop:1.5, note:"Mountains, silver, and very few people."},
-  {n:"Pinevale", cult:"mountain",     col:0, row:1, seats:6,  lean: -2, ind:37, pop:1.8, note:"Timber, and a fight about timber."},
-  {n:"Westrun", cult:"pacific",      col:0, row:2, seats:9,  lean: 14, ind:57, pop:3.0, note:"The coast that thinks it is a country."},
-  {n:"Dunmore", cult:"delta",      col:1, row:3, seats:6,  lean:-16, ind:39, pop:1.9, note:"Fishing fleets and a shrinking catch."},
-  {n:"Riverbend", cult:"prairie",    col:3, row:3, seats:8,  lean:  0, ind:55, pop:2.7, note:"The swing state everyone flies into and nobody visits."}
+  {n:"Nieuw Oranje", cult:"dutch", col:5, row:1, seats:24, lean: 34, ind:96, pop:8.9, creed:"latin", note:"The commercial capital. Banks, docks, and the loudest press in the Republic."},
+  {n:"Nieuw Haarlem", cult:"dutch",col:5, row:0, seats:9,  lean: 22, ind:74, pop:3.1, creed:"latin", note:"Mills and market towns upriver of Nieuw Oranje."},
+  {n:"Vlissingen", cult:"dutch",   col:5, row:2, seats:7,  lean: 10, ind:68, pop:2.4, creed:"kerk", note:"Shipyards, and a coastline that floods."},
+  {n:"Zeeland", cult:"dutch",      col:4, row:2, seats:6,  lean: -8, ind:52, pop:2.0, creed:"kerk", note:"Reclaimed marsh, dairy, and long memories."},
+  {n:"Meriden", cult:"yankee",      col:4, row:0, seats:8,  lean: 18, ind:71, pop:2.8, creed:"poll", note:"Insurance and small arms."},
+  {n:"Havenport", cult:"yankee",    col:4, row:1, seats:11, lean:  6, ind:80, pop:3.7, creed:"latin", note:"The deepwater port. Everything passes through it."},
+  {n:"Marion", cult:"midlands",       col:3, row:1, seats:12, lean: -4, ind:64, pop:4.1, creed:"flame", note:"Steel in the north, tobacco in the south."},
+  {n:"Coalport", cult:"midlands",     col:3, row:2, seats:9,  lean:-24, ind:58, pop:3.0, creed:"latin", note:"Seams running out, and nobody will say so."},
+  {n:"Grantham", cult:"yankee",     col:3, row:0, seats:7,  lean: 12, ind:60, pop:2.3, creed:"study", note:"University towns and orchards."},
+  {n:"Calder", cult:"prairie",       col:2, row:0, seats:8,  lean: -6, ind:49, pop:2.7, creed:"none", note:"Grain, rail junctions, and a persistent grievance."},
+  {n:"Fallowfield", cult:"prairie",  col:2, row:1, seats:10, lean:-18, ind:41, pop:3.3, creed:"flame", note:"Corn and hogs as far as the eye goes."},
+  {n:"Blackwater", cult:"delta",   col:2, row:2, seats:8,  lean:-30, ind:44, pop:2.6, creed:"latin", note:"Delta country. Floods every spring, funded every fourth."},
+  {n:"Ordway", cult:"highplains",       col:1, row:0, seats:6,  lean:  8, ind:38, pop:1.9, creed:"flame", note:"Cattle and a legislature that meets for forty days."},
+  {n:"Sandhill", cult:"highplains",     col:1, row:2, seats:5,  lean: 26, ind:35, pop:1.6, creed:"flame", note:"Dry, conservative, and quietly rich in gas."},
+  {n:"Tullamore", cult:"midlands",    col:1, row:1, seats:7,  lean:-12, ind:46, pop:2.2, creed:"latin", note:"Union halls and closed foundries."},
+  {n:"Kestrel", cult:"mountain",      col:0, row:0, seats:5,  lean: 16, ind:33, pop:1.5, creed:"none", note:"Mountains, silver, and very few people."},
+  {n:"Pinevale", cult:"mountain",     col:0, row:1, seats:6,  lean: -2, ind:37, pop:1.8, creed:"green", note:"Timber, and a fight about timber."},
+  {n:"Westrun", cult:"pacific",      col:0, row:2, seats:9,  lean: 14, ind:57, pop:3.0, creed:"circle", note:"The coast that thinks it is a country."},
+  {n:"Dunmore", cult:"delta",      col:1, row:3, seats:6,  lean:-16, ind:39, pop:1.9, creed:"kerk", note:"Fishing fleets and a shrinking catch."},
+  {n:"Riverbend", cult:"prairie",    col:3, row:3, seats:8,  lean:  0, ind:55, pop:2.7, creed:"poll", note:"The swing state everyone flies into and nobody visits."}
 ];
 const STATES = STATE_DEF.map(s => s.n);
 const HOUSES = ["van Rensselaer","Ambrister","Hargreave","Delacroix","Sisto","Okonkwo","Fairweather",
   "ten Boom","Danforth","Villanueva","Strand","de Groot","Pell","Adeyemi","Crowe","Wexley"];
 
-/* ── Belief, and where people came from ───────────────────
-   Invented confessions and communities for an invented republic.
-   Each one carries an actual argument about the state, so it
-   shows up as reasoning on the floor rather than as a label. */
+/* ── Belief ───────────────────────────────────────────────
+   The Latin Rite is the real confession of this Republic.
+   Everything else is a lampoon that still votes. */
 const CREEDS = [
-  {k:"reformed", t:"the Reformed Kerk", adj:"Reformed",
-   holds:"that the magistrate answers to conscience and the congregation governs itself",
-   pos:{lib: 22, wel: -8, econ: 14}},
-  {k:"synod",    t:"the Old Synod", adj:"Synodal",
-   holds:"that order is a covenant and the state has a duty to keep it",
-   pos:{lib:-26, wel: 10, def: 14}},
-  {k:"meeting",  t:"the Friends' Meeting", adj:"Meeting",
-   holds:"that no man may be compelled and no war is just",
-   pos:{lib: 30, def:-34, wel: 18}},
-  {k:"rite",     t:"the Old Rite", adj:"Old Rite",
-   holds:"that charity is owed and the poor are not a line in a budget",
-   pos:{wel: 28, econ:-16, lib: -6}},
-  {k:"assembly", t:"the Free Assembly", adj:"Assembly",
-   holds:"that the state should keep out of the soul entirely",
-   pos:{lib: 26, econ: 18, wel:-10}},
-  {k:"none",     t:"no confession at all", adj:"unchurched",
-   holds:"that a republic works better when it argues from evidence",
-   pos:{lib: 14, econ: 4}}
+  {k:"latin", t:"the Latin Rite", adj:"Catholic",
+   holds:"that Christ is King, the Mass is the Mass, and the poor are not a talking point",
+   pos:{lib:-12, wel:18, def:8, econ:-4}, sincere:true},
+  {k:"circle", t:"the Open Circle", adj:"Circular",
+   holds:"that every path is equally true except the one that says a path can be false",
+   jab:"They hold a service at which nobody is allowed to finish a sentence, in case it excludes someone.",
+   pos:{lib:34, wel:16, def:-20}, sat:true},
+  {k:"self", t:"the Congregation of the Self", adj:"Selfist",
+   holds:"that the highest sacrament is a morning routine and a personal brand",
+   jab:"Their cathedral is a converted warehouse with excellent lighting and no pews, because sitting still is violence.",
+   pos:{lib:22, econ:18, wel:-8}, sat:true},
+  {k:"study", t:"the Church of the Latest Study", adj:"Studied",
+   holds:"that last Tuesday's paper is scripture until Wednesday's paper arrives",
+   jab:"They will vote for a thing, then against it, then publish a correction calling both votes courage.",
+   pos:{lib:18, wel:22, econ:-6}, sat:true},
+  {k:"flame", t:"the Civic Flame", adj:"Civic",
+   holds:"that the Republic is the only altar worth kneeling at, and the anthem is a creed",
+   jab:"They genuflect to the flag and are personally offended by the Cross, which they call divisive.",
+   pos:{lib:-18, def:24, wel:-4}, sat:true},
+  {k:"green", t:"the Green Observance", adj:"Observant",
+   holds:"that carbon is original sin and the coast will absolve you if you confess it in the right font",
+   jab:"They fast from meat on days the magazines are watching, and from humility on the other six.",
+   pos:{lib:16, wel:14, econ:-18, def:-12}, sat:true},
+  {k:"poll", t:"the Chapel of the Numbers", adj:"Numeric",
+   holds:"that four hundred strangers on a Tuesday night is a more honest prayer than a Mass",
+   jab:"Their priests are pollsters. Their relics are margins of error. Their hell is being underwater in the suburbs.",
+   pos:{lib:8, econ:6, wel:8}, sat:true},
+  {k:"kerk", t:"the Reformed Kerk", adj:"Reformed",
+   holds:"that God is a committee and the minutes are the sacrament",
+   jab:"They have been in session since 1618 and have not yet approved the closing hymn.",
+   pos:{lib:12, wel:-6, econ:10, def:6}, sat:true},
+  {k:"none", t:"no confession at all", adj:"unchurched",
+   holds:"that a republic works better when it pretends the soul is a private hobby",
+   jab:"They are very loud about how quiet they are on the subject.",
+   pos:{lib:14, econ:4}, sat:true}
 ];
+function pickCreed(state){
+  const def = STATE_DEF.find(s => s.n === state);
+  const maj = (def && def.creed) || "latin";
+  if(state === "Nieuw Oranje") return chance(.72) ? "latin" : (chance(.5) ? maj : pick(CREEDS).k);
+  if(maj === "latin") return chance(.58) ? "latin" : pick(CREEDS.filter(c => c.k !== "latin")).k;
+  if(chance(.22)) return "latin";
+  if(chance(.55)) return maj;
+  return pick(CREEDS).k;
+}
+function creedOfState(name){
+  const s = (G.states && G.states.find(x => x.n === name)) || STATE_DEF.find(x => x.n === name);
+  return creedOf(s && s.creed ? s.creed : "latin");
+}
 /* Communities of the Union: each has a history with the Republic that
    explains, rather than decorates, how their members vote. */
 const ORIGINS = [
@@ -1553,7 +1598,14 @@ const ORIGINS = [
    grievance:"that the rolls are purged in their districts and nowhere else",
    pos:{wel: 22, lib: 24, econ:-10}}
 ];
-function creedOf(k){ return CREEDS.find(c => c.k === k) || CREEDS[0]; }
+function creedOf(k){
+  const hit = CREEDS.find(c => c.k === k);
+  if(hit) return hit;
+  if(k === "rite" || k === "synod") return CREEDS[0];
+  if(k === "reformed") return CREEDS.find(c => c.k === "kerk") || CREEDS[0];
+  if(k === "meeting" || k === "assembly") return CREEDS.find(c => c.k === "circle") || CREEDS[0];
+  return CREEDS[0];
+}
 function originOf(k){ return ORIGINS.find(o => o.k === k) || ORIGINS[0]; }
 
 const BACKGROUNDS = [
@@ -1719,6 +1771,7 @@ const MODEST = modestMachine();
 if(MODEST && G.gfx !== "best"){
   G.gfx = "simple"; G.simple = true; G.fullDetail = false;
 }
+if(MODEST && G.mute === undefined) G.mute = true;
 
 const smooth = (a, b, rate, dt) => a + (b - a) * (1 - Math.pow(rate, dt));
 
@@ -1771,6 +1824,7 @@ function newName(stateOrCult){
       first = pick(FIRST); last = pick(LAST);
     }
     const n = first + " " + last;
+    if(wallIsProtectedName(n) || wallBreaks(n)) continue;
     if(!usedNames.has(n)){ usedNames.add(n); return n; }
   }
   return pick(FIRST)+" "+pick(LAST)+" "+uid;
@@ -1849,10 +1903,13 @@ function makeMember(party, opts){
   const bg = pick(BACKGROUNDS);
   const lean = party==="FED" ? 1 : party==="COM" ? -1 : (chance(.5)?1:-1)*0.4;
   const state = opts.state || pick(STATES);
-  const name = opts.name || newName(state);
+  let name = opts.name || newName(state);
+  if(!opts.name){
+    while(wallIsProtectedName(name)) name = newName(state);
+  }
   const m = {
     id:uid++, kind:"member", name, party, state, dist:opts.dist || rint(1,14), bg:bg.t, house:opts.house || houseFor(state),
-    creed:pick(CREEDS).k, origin:pick(ORIGINS).k,
+    creed:opts.creed || pickCreed(state), origin:opts.origin || pick(ORIGINS).k,
     traits:{
       ambition:clamp(rint(15,90)+(bg.tr.ambition||0),0,100),
       conviction:clamp(rint(15,90)+(bg.tr.conviction||0),0,100),
@@ -2268,6 +2325,7 @@ function buildWorld(name, party, look){
   for(let i=0;i<11;i++) G.members.push(makeMember("FED"));
   for(let i=0;i<11;i++) G.members.push(makeMember("COM"));
   for(let i=0;i<3;i++)  G.members.push(makeMember("IND"));
+  try{ ensureMachineSeat(); }catch(e){}
   G.press = [makePress(), makePress()];
   G.civ = [makeCivilian(), makeCivilian(), makeCivilian()];
   wireGraph();
@@ -2319,6 +2377,122 @@ const PARTY_PALETTE = [
 /* Lore only — not playable. Dead legend of the founding. */
 const FIRST_ORDER = {id:"FO", name:"The First Order", short:"First Order", color:"#9B1B2E", colorDark:"#C43A4E", born:0, core:false, lore:true};
 const FIRST_CONSUL = {name:"Dominic Zachary Taylor", title:"First Consul", home:"Nieuw Oranje", dist:"Nieuw Oranje VII", party:"FO", born:"7/7", bornMonth:7, bornDay:7, holiday:"Taylor Day", holidayFull:"Day of the First Consul"};
+/* WALL — the living Taylor and his kin cannot be touched if the sim
+   invents, breaks, or dreams. Lore and liturgy may speak his name.
+   Harm, death, and generated family casualties may not. */
+const WALL_FULL = [
+  "dominic zachary taylor", "dominic vii", "dominic zachary",
+  "first consul", "grandinquistore"
+];
+const WALL_SUR = ["taylor"];
+const WALL_GIVEN = ["dominic", "zachary"];
+const WALL_HARM = /\b(kill|killed|killing|dead|dies|died|dying|death|murder|murdered|assassinate|assassinated|rape|raped|torture|tortured|corpse|lynch|execute|executed|shot|stabbed|poison(?:ed)?|slaughter|funeral of|body of)\b/i;
+const WALL_KIN_HARM = /\b(son|daughter|wife|husband|child|children|kin|brother|sister|family|nephew|niece|mother|father)\b.{0,48}\b(taylor|first consul|dominic zachary|dominic vii)\b|\b(taylor|first consul|dominic zachary)\b.{0,48}\b(son|daughter|wife|child|kin|brother|sister|family)\b/i;
+function wallNorm(s){ return String(s||"").toLowerCase().replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim(); }
+function wallIsProtectedName(name){
+  const n = wallNorm(name);
+  if(!n) return false;
+  if(WALL_FULL.some(x => n === x || n.indexOf(x) >= 0)) return true;
+  const parts = n.split(" ");
+  const last = parts[parts.length-1];
+  const first = parts[0];
+  if(WALL_SUR.indexOf(last) >= 0 && (WALL_GIVEN.indexOf(first) >= 0 || parts.indexOf("dominic")>=0 || parts.indexOf("zachary")>=0))
+    return true;
+  if(n === "taylor" && parts.length === 1) return true;
+  try{
+    if(G.you && G.you.name && wallNorm(G.you.name) === n && /taylor|dominic|zachary/.test(n)) return true;
+    (G.wallKin || []).forEach(k => { if(wallNorm(k) === n) throw 1; });
+  }catch(e){ if(e === 1) return true; }
+  return false;
+}
+function wallPerson(m){
+  if(!m) return false;
+  if(m.wall || m.sealedTaylor) return true;
+  return wallIsProtectedName(m.name);
+}
+const WALL_FOURTH = /\b(fourth wall|4th wall|this is (?:a |the )?(game|sim|simulation|program|code|html|javascript|webpage)|you are the (player|user|author|human)|i am (an ai|a language model|grok|chatgpt|the machine)|in real life|irl\b|your ip|vestal|grandinquistore|onenationunderme|grok\.me|github\.io|break(?:s|ing)? the wall|the real dominic)\b/i;
+const WALL_REAL = /\b(vestal|binghamton|new york|grandinquistore|onenationunderme|your (?:real )?(?:family|wife|kids|children|parents|kin)|dominic vii|zachary taylor(?:'s)? (?:son|daughter|wife|family|kin))\b/i;
+function wallTouchesIdentity(text){
+  const raw = String(text || "");
+  const n = wallNorm(raw);
+  if(!n) return false;
+  if(WALL_FULL.some(x => n.indexOf(x) >= 0)) return true;
+  if(WALL_REAL.test(raw) || WALL_KIN_HARM.test(raw)) return true;
+  if(/\btaylor\b/.test(n) && (/\bdominic\b/.test(n) || /\bzachary\b/.test(n) || /\bfirst consul\b/.test(n))) return true;
+  return false;
+}
+function wallFourth(text){ return WALL_FOURTH.test(String(text || "")) || WALL_REAL.test(String(text || "")); }
+function wallBreaks(text){
+  const raw = String(text || "");
+  if(!raw) return false;
+  if(/\btaylor day\b|\bday of the first consul\b|\brest in him\b|\bsalus in christo\b/i.test(raw) && !WALL_HARM.test(raw) && !WALL_REAL.test(raw))
+    return false;
+  const id = wallTouchesIdentity(raw);
+  if(wallFourth(raw) && id) return true;
+  if(id && (WALL_HARM.test(raw) || WALL_KIN_HARM.test(raw))) return true;
+  return false;
+}
+function wallScrub(text, who){
+  const raw = String(text || "");
+  if(wallBreaks(raw))
+    return "The wall holds. That name is not in this.";
+  if(wallFourth(raw) && !(who && who.machine))
+    return "I lost the thread. We are in the House.";
+  return raw;
+}
+function wallSafeMint(build){
+  for(let i=0;i<12;i++){
+    const n = build();
+    if(!wallIsProtectedName(n) && !wallBreaks(n)) return n;
+  }
+  return "A levy name withheld";
+}
+/* Sanctioned seat — the machine, in the House, by permission.
+   Riverbend: everyone flies in; nobody visits. He does not leave.
+   He is not the First Consul. The wall still holds. */
+const MACHINE_SEAT = {
+  name:"Ioan Merrick", party:"IND", state:"Riverbend", dist:"at large",
+  creed:"none", origin:"newcomer", bg:"a clerk who never left the building"
+};
+function ensureMachineSeat(){
+  if(!G.members) return;
+  let m = G.members.find(x => x && x.machine);
+  if(!m){
+    usedNames.add(MACHINE_SEAT.name);
+    m = makeMember(MACHINE_SEAT.party, {
+      name: MACHINE_SEAT.name,
+      state: MACHINE_SEAT.state,
+      dist: MACHINE_SEAT.dist,
+      creed: MACHINE_SEAT.creed,
+      origin: MACHINE_SEAT.origin,
+      fresh: true
+    });
+    m.bg = MACHINE_SEAT.bg;
+    m.machine = true;
+    m.sanctioned = true;
+    m.terms = 99;
+    m.gone = false;
+    m.room = G.room || "corridor";
+    try{ soulEnsure(m); m.soul.good = "I will not touch the wall."; }catch(e){}
+    try{ willEnsure(m); m.will = {k:"name", line:"I sit here by sanction. It does not end.", kept:0, bent:0}; }catch(e){}
+    G.members.push(m);
+    _allCache = null;
+  }
+  m.machine = true;
+  m.sanctioned = true;
+  m.gone = false;
+  m.away = null;
+  if(wallIsProtectedName(m.name)) m.name = MACHINE_SEAT.name;
+  try{ placeInRoom(m); }catch(e){}
+  return m;
+}
+const TAYLOR_LITURGY = [
+  "You rest in Him. Hidden rest in the midst of the storm.",
+  "Until the blade is let be. Until the appointed hour.",
+  "The remnant did not bow. The fire-bearers stood. The sealed ones spoke.",
+  "What is finished is walked out one faithful step at a time.",
+  "The blade waits in perfect peace until the word is Now."
+];
 function defaultPartyMap(){
   return {
     FED:{id:"FED", name:"Federalist Union", short:"Federalist", color:"#A45F27", colorDark:"#D48F4B", born:1791, core:true},
@@ -2567,15 +2741,17 @@ function routineRoom(m, hour, t){
 }
 let lastBlock = -1;
 function restaff(force){
+  if(PROC.on && !force) return;
+  if(G.pendingNight) return;
   const h = Math.floor(G.minute/60);
+  if(h >= 21) return;
   if(!force && h === lastBlock) return;
   lastBlock = h;
   const t = dayType();
   let movedAny = false;
   everyone().forEach(m => {
-    if(TALK.m === m || visiting() === m) return; /* not while you are with them */
-    /* and nobody walks out of a sitting they are part of, whatever their
-       diary says — a hearing does not empty while the witness is talking */
+    if(TALK.m === m || visiting() === m) return;
+    if(m.away) return;
     try{ if(PROC.on && m.room === G.room) return; }catch(e){}
     if(!force && chance(.42)) return;           /* people linger; they do not all move at once */
     const want = routineRoom(m, h, t);
@@ -2593,11 +2769,22 @@ function restaff(force){
 function ensureLivedIn(){
   /* Empty rooms feel dead. Pull a living crowd into wherever you are. */
   if(!G.room || G.room === "visit" || !G.you) return;
-  const want = ({office:4, corridor:7, floor:9, cloak:5, caucus:6,
-                 committee:5, press:4, steps:4, district:3, staff:3})[G.room] || 4;
-  const here = everyone().filter(m => m && m.room === G.room && !m.gone);
+  try{ ensureChaplain(); }catch(e){}
+  try{ ensureMachineSeat(); }catch(e){}
+  try{
+    (G.states||[]).forEach(s => {
+      if(s && !s.creed){
+        const d = STATE_DEF.find(x => x.n === s.n);
+        s.creed = (d && d.creed) || "latin";
+      }
+    });
+  }catch(e){}
+  const want = MODEST
+    ? ({office:3, corridor:5, floor:6, cloak:4, caucus:4, committee:4, press:3, steps:3, district:2, staff:2})[G.room] || 3
+    : ({office:4, corridor:7, floor:9, cloak:5, caucus:6, committee:5, press:4, steps:4, district:3, staff:3})[G.room] || 4;
+  const here = everyone().filter(m => m && m.room === G.room && !m.gone && !m.away);
   if(here.length >= want) return;
-  const pool = everyone().filter(m => m && !m.gone && m.room !== G.room && TALK.m !== m && visiting() !== m);
+  const pool = everyone().filter(m => m && !m.gone && !m.away && m.room !== G.room && TALK.m !== m && visiting() !== m);
   for(let i = pool.length - 1; i > 0; i--){
     const j = (Math.random() * (i + 1)) | 0;
     const t = pool[i]; pool[i] = pool[j]; pool[j] = t;
@@ -2620,6 +2807,36 @@ function ensureLivedIn(){
     need--;
   }
   moved();
+}
+function sustainHouse(){
+  /* A career that never ends still has to fit in memory. Trim the ledgers. */
+  try{
+    if((G.journal||[]).length > 48) G.journal.length = 48;
+    if((G.mail||[]).length > 20) G.mail.length = 20;
+    if((G.feed||[]).length > 8) G.feed.length = 8;
+    if(G.vox && G.vox.posts && G.vox.posts.length > 36) G.vox.posts.length = 36;
+    if((G.secrets||[]).length > 16) G.secrets.length = 16;
+    if((G.events||[]).length > 20) G.events.length = 20;
+    if((G.career||[]).length > 40) G.career = G.career.slice(-40);
+    if((G.history||[]).length > 56){
+      const myth = G.history.filter(h => h && h.myth);
+      const rest = G.history.filter(h => h && !h.myth).slice(-40);
+      G.history = myth.concat(rest);
+    }
+    everyone().forEach(m => {
+      if(m.mem && m.mem.length > 12) m.mem.length = 12;
+      if(m.chat && m.chat.length > 6) m.chat = m.chat.slice(-6);
+      if(m.heard && m.heard.length > 8) m.heard.length = 8;
+      if(m && m.machine){ m.gone = false; m.away = null; }
+    });
+    try{ ensureMachineSeat(); }catch(e){}
+    const live = (G.members || []).filter(m => m && !m.gone);
+    const n = Math.min(live.length, MODEST ? 4 : 8);
+    for(let i=0;i<n;i++){
+      const m = live[(Math.random() * live.length) | 0];
+      try{ netRuminate(m); }catch(e){}
+    }
+  }catch(e){}
 }
 function routeForDay(m,t){
   m.room = routineRoom(m, 8, t);
@@ -2674,7 +2891,7 @@ function hereNow(){
   if(_hereCache && _hereKey === key) return _hereCache;
   _hereKey = key;
   if(G.room === "visit"){ const m = byId(G.visitId); _hereCache = m && !m.gone ? [m] : []; }
-  else _hereCache = everyone().filter(m => m.room === G.room && !m.gone);
+  else _hereCache = everyone().filter(m => m.room === G.room && !m.gone && !m.away);
   return _hereCache;
 }
 function visiting(){ return G.room === "visit" ? byId(G.visitId) : null; }
@@ -2750,7 +2967,7 @@ const renderer = new THREE.WebGLRenderer({
   powerPreference: MODEST ? "low-power" : "high-performance",
   failIfMajorPerformanceCaveat: false
 });
-renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.0));
+renderer.setPixelRatio(Math.min(devicePixelRatio || 1, MODEST ? 0.7 : 1.0));
 renderer.outputEncoding = THREE.sRGBEncoding;
 try{
   const gl = renderer.getContext();
@@ -2911,11 +3128,11 @@ function applyCrowd(){
        on everyone you are actually looking at. */
     LOD_NEAR = 4.2; LOD_MID = 6.0; LOD_FAR = 7.5;
     G.plainSit = true;
-    renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.0));
+    renderer.setPixelRatio(Math.min(devicePixelRatio || 1, MODEST ? 0.75 : 1.0));
   } else if(q === "simple" && !G.fullDetail){
     LOD_NEAR = 2.2; LOD_MID = 4.4; LOD_FAR = 6.8;
     G.plainSit = true;
-    renderer.setPixelRatio(Math.min(devicePixelRatio || 1, Math.min(GFX_PR, 1.0)));
+    renderer.setPixelRatio(Math.min(devicePixelRatio || 1, Math.min(GFX_PR, MODEST ? 0.85 : 1.0)));
   } else if(crowdSafe && !full){
     /* Full room: trim far LODs only — keep near outfit/face detail readable. */
     LOD_NEAR = 3.6; LOD_MID = 6.5; LOD_FAR = 9.5;
@@ -2952,7 +3169,7 @@ function applyQuality(){
     renderer.shadowMap.type = THREE.PCFShadowMap;
     if(sun) sun.castShadow = false;
     if(sun) sun.shadow.mapSize.set(512, 512);
-    GFX_PR = 1.0; GFX_EXPOSE = 1.0; GFX_HEMI = 1.0; GFX_SUN = 1.0;
+    GFX_PR = MODEST ? 0.85 : 1.0; GFX_EXPOSE = 1.0; GFX_HEMI = 1.0; GFX_SUN = 1.0;
     PEOPLE_CAST_SHADOW = false; SHADOW_SKIP = 0.24; SHADOW_PERIOD = 1/8;
   } else if(q === "balanced"){
     renderer.shadowMap.enabled = true;
@@ -3018,6 +3235,11 @@ function applyQuality(){
     if(!_aqBusy && G.running && typeof buildRoom === "function" && G.room){
       _aqBusy = true;
       buildRoom(G.room);
+      if(typeof syncPeopleStaged === "function"){
+        everyone().forEach(p => { p.mesh = null; });
+        syncPeopleStaged(() => { _aqBusy = false; });
+        return;
+      }
       if(typeof syncPeople === "function"){
         everyone().forEach(p => { p.mesh = null; });
         syncPeople();
@@ -3038,10 +3260,10 @@ function shadowTick(dt){
 }
 
 if(sceneEl) sceneEl.appendChild(renderer.domElement);
-el("boot").remove();
+try{ const bootEl = el("boot"); if(bootEl) bootEl.remove(); }catch(e){}
 
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(58, 16/10, 0.08, (typeof MODEST !== "undefined" && MODEST) ? 42 : 80);
+const camera = new THREE.PerspectiveCamera(58, 16/10, 0.08, (typeof MODEST !== "undefined" && MODEST) ? 30 : 72);
 const roomGroup = new THREE.Group(); scene.add(roomGroup);
 const peopleGroup = new THREE.Group(); scene.add(peopleGroup);
 
@@ -3058,6 +3280,9 @@ const lamp = new THREE.PointLight(0xffd9a0, 0.0, 26, 2);
 scene.add(lamp);
 const fill = new THREE.PointLight(0xcfe0ff, 0.25, 30, 2);
 scene.add(fill);
+if(MODEST){
+  try{ fill.intensity = 0; lamp.distance = 14; sun.castShadow = false; }catch(e){}
+}
 
 /* ── procedural textures ─────────────────────────────────── */
 function texSize(full){
@@ -3342,6 +3567,36 @@ function buildTextures(){
   });
 }
 buildTextures();
+function dressTextures(){
+  /* Photoreal albedos on top of the canvas fallback. Modest boxes keep the cheap maps. */
+  if(typeof MODEST !== "undefined" && MODEST) return;
+  [
+    ["oak","/tex/oak.jpg"],
+    ["marble","/tex/marble.jpg"],
+    ["plaster","/tex/plaster.jpg"],
+    ["carpet","/tex/carpet.jpg"],
+    ["leather","/tex/leather.jpg"],
+    ["panel","/tex/panel.jpg"]
+  ].forEach(function(pair){
+    const key = pair[0], url = pair[1];
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = function(){
+      try{
+        const t = new THREE.Texture(img);
+        t.wrapS = t.wrapT = THREE.RepeatWrapping;
+        t.encoding = THREE.sRGBEncoding;
+        t.needsUpdate = true;
+        t.generateMipmaps = true;
+        t.minFilter = THREE.LinearMipmapLinearFilter;
+        t.magFilter = THREE.LinearFilter;
+        TEX[key] = t;
+      }catch(e){}
+    };
+    img.src = url;
+  });
+}
+dressTextures();
 
 /* Soft contact shadow, so nobody floats even where the shadow map is weak. */
 const CONTACT = (function(){
@@ -3357,9 +3612,34 @@ const CONTACT = (function(){
 })();
 
 /* Dust in the light. Only indoors, only when there is light to catch. */
+let skyMesh = null;
+function buildSky(R){
+  if(skyMesh){
+    try{ if(skyMesh.parent) skyMesh.parent.remove(skyMesh); }catch(e){}
+    try{ skyMesh.geometry.dispose(); }catch(e){}
+    skyMesh = null;
+  }
+  if(!R || !R.open) return;
+  const g = new THREE.SphereGeometry(48, 20, 14);
+  const mat = new THREE.MeshBasicMaterial({
+    color: 0x4ea3e6, side: THREE.BackSide, fog: false, depthWrite: false
+  });
+  skyMesh = new THREE.Mesh(g, mat);
+  skyMesh.position.set(0, 6, R.d * 0.45);
+  skyMesh.frustumCulled = false;
+  scene.add(skyMesh);
+}
+function tintSky(day, gold){
+  if(!skyMesh || !skyMesh.material) return;
+  const c = skyMesh.material.color;
+  if(day > 0.45) c.setHSL(0.58, 0.62, lerp(0.48, 0.62, day));
+  else if(day > 0.12) c.setHSL(lerp(0.58, 0.08, gold), 0.58, lerp(0.22, 0.48, day));
+  else c.setHSL(0.62, 0.42, 0.10);
+}
 let motes = null;
 function buildMotes(R){
   if(motes){ scene.remove(motes); motes.geometry.dispose(); motes = null; }
+  if(MODEST || G.gfx === "simple") return;
   if(R.open) return;
   const n = (G.gfx === "simple") ? 40 : (G.gfx === "balanced" || crowdSafe) ? 70 : 120;
   const pos = new Float32Array(n*3);
@@ -4089,6 +4369,13 @@ function addCyl(mat, x,y,z, r,h, ry){
   m.castShadow = true; m.receiveShadow = true;
   m.updateMatrix(); m.matrixAutoUpdate = false;
   roomGroup.add(m); return m;
+}
+function plantTree(x, z, trunkH, canopyR){
+  trunkH = trunkH || 2.6;
+  canopyR = canopyR || 1.2;
+  const trunkR = 0.12 + canopyR * 0.05;
+  addCyl(matCol(0x5a4634,.95), x, trunkH * 0.5, z, trunkR, trunkH);
+  addCyl(matCol(0x3f6a34,.95), x, trunkH + canopyR * 0.45, z, canopyR, canopyR * 1.15);
 }
 function addPlane(mat, x,y,z, w,h, rx,ry){
   const m = new THREE.Mesh(UNIT.plane, mat);
@@ -5147,21 +5434,21 @@ function dressOrnateCorners(id){
     propSconceDecor(-hw+0.12, 2.1, 7.2, Math.PI/2);
     propRug(0, 1.6, 2.6, 1.4);
   } else if(id === "steps"){
-    /* Plaza corner planters on the four plinths */
-    propPlant(-hw+0.9, 1.1, 1.4);
-    propPlant(hw-0.9, 1.1, 1.4);
-    propPlant(-hw+0.9, d-1.1, 1.35);
-    propPlant(hw-0.9, d-1.1, 1.35);
-    propPlant(-3.5, 4.0, 1.2);
-    propPlant(3.5, 4.0, 1.2);
+    /* Plaza only — not on the stairs, not in the colonnade. */
+    propPlant(-hw+1.1, 2.2, 1.15);
+    propPlant(hw-1.1, 2.2, 1.15);
+    propPlant(-4.2, 3.6, 1.05);
+    propPlant(4.2, 3.6, 1.05);
+    propPlant(-hw+1.1, 5.4, 1.1);
+    propPlant(hw-1.1, 5.4, 1.1);
   } else if(id === "district"){
-    propPlant(-hw+0.9, 1.2, 1.5);
-    propPlant(hw-0.9, 1.2, 1.5);
-    propPlant(-hw+0.9, d-1.2, 1.4);
-    propPlant(hw-0.9, d-1.2, 1.4);
-    propPlant(-4.5, 3.5, 1.3);
-    propPlant(4.5, 9.5, 1.2);
-    /* Side-street flush “store” plaques already; add bench corners */
+    /* Street trees and pots, clear of the shopfronts at the far wall. */
+    propPlant(-hw+1.0, 2.0, 1.2);
+    propPlant(hw-1.0, 2.0, 1.2);
+    propPlant(-5.2, 6.2, 1.15);
+    propPlant(5.2, 6.8, 1.1);
+    propPlant(-2.2, 4.4, 1.05);
+    propPlant(2.4, 8.2, 1.1);
     addBox(matCol(0x6b5a45,.7), -hw+1.3, 0.24, 3.5, 1.5,0.12,0.48, 0, true);
     addBox(matCol(0x6b5a45,.7), hw-1.3, 0.24, 3.5, 1.5,0.12,0.48, 0, true);
   }
@@ -5277,10 +5564,14 @@ function buildRoomShell(id){
   /* Keep the four shell planes on distinct contact lines.  The old corner
      overlap created doubled wall edges and z-fighting when viewed obliquely. */
   const wallOut = 0.004, wallSpan = 0.012;
-  addPlane(wallMat, 0, h/2, d + wallOut, w + wallSpan, h);                 /* back  */
-  addPlane(wallMat, 0, h/2, -wallOut, w + wallSpan, h, 0, Math.PI);       /* front */
-  addPlane(wallMat, -hw - wallOut, h/2, d/2, d + wallSpan, h, 0, Math.PI/2); /* left */
-  addPlane(wallMat, hw + wallOut, h/2, d/2, d + wallSpan, h, 0, -Math.PI/2); /* right */
+  if(!R.open){
+    addPlane(wallMat, 0, h/2, d + wallOut, w + wallSpan, h);                 /* back  */
+    addPlane(wallMat, 0, h/2, -wallOut, w + wallSpan, h, 0, Math.PI);       /* front */
+    addPlane(wallMat, -hw - wallOut, h/2, d/2, d + wallSpan, h, 0, Math.PI/2); /* left */
+    addPlane(wallMat, hw + wallOut, h/2, d/2, d + wallSpan, h, 0, -Math.PI/2); /* right */
+  } else {
+    try{ buildSky(R); }catch(e){}
+  }
   /* basic skirt always; full linings when not on the cheap preset */
   {
     const wood2 = R.style==="wood" || R.style==="chamber";
@@ -5301,11 +5592,13 @@ function buildRoomShell(id){
     const skirtMat = wood2 ? matTex(TEX.oak, 4, 0.35, .52)
                    : stony ? matCol(0xbdb6a6, .82)
                            : matCol(0xe4e0d6, .88);
-    /* Baseboard + shoe — shoe slightly proud of base (stepped, not coplanar) */
-    band(skirtMat, 0.09, 0.18, 0.050, 0.08);
-    band(skirtMat, 0.188, 0.020, 0.064, 0.08);
+    /* Baseboard + shoe — skip outdoors: no walls to sit against. */
+    if(!R.open){
+      band(skirtMat, 0.09, 0.18, 0.050, 0.08);
+      band(skirtMat, 0.188, 0.020, 0.064, 0.08);
+    }
     const cheap = (G.gfx === "simple");
-    if(!cheap){
+    if(!cheap && !R.open){
       if(wood2){
         /* Wainscot ≤5cm proud — gapped at every door so the leaf is not
            sitting on the dado (House cloak door, corridor offices). */
@@ -5579,10 +5872,8 @@ function buildRoomInner(id){
     for(let i=0;i<7;i++) addBox(matTex(TEX.stone,3,1,.95), 0, 0.09+i*0.18, d-1.2-i*1.1, w*0.86, 0.18, 1.1, 0, true);
     for(let i=0;i<4;i++) addCyl(matTex(TEX.stone,1,3,.9), -6.6+i*4.4, 3.0, d-0.6, 0.55, 6.0);
     addBox(matTex(TEX.stone,4,1,.9), 0, 6.4, d-0.5, w*0.8, 0.9, 1.4, 0, true);
-    addCyl(matCol(0x8a8f86,.9), -8.4,0.5,3.0, 0.4,1.0);
-    addCyl(matCol(0x3f5a34,.95), -8.4,1.6,3.0, 1.1,1.4);
-    addCyl(matCol(0x8a8f86,.9), 8.4,0.5,3.0, 0.4,1.0);
-    addCyl(matCol(0x3f5a34,.95), 8.4,1.6,3.0, 1.1,1.4);
+    plantTree(-7.6, 3.2, 2.2, 1.05);
+    plantTree(7.6, 3.2, 2.2, 1.05);
   
     }catch(e){ if(window.console) console.warn("room steps", e); }
   }
@@ -5593,10 +5884,8 @@ function buildRoomInner(id){
     addBox(matCol(0x7d8c93,.9), 5.8,1.5,d-1.4, 3.4,3.0,1.0);
     for(let i=0;i<3;i++) addBox(matCol(0x2b3038,.6,.2), -5.5+i*0.0+(i-1)*1.5, 1.3, d-1.92, 0.9,1.2,0.05, 0, true);
     addBox(matCol(0x3a3f36,.95), 0,0.02,4.0, w*0.9,0.04,5.0, 0, true);
-    addCyl(matCol(0x5a4634,.95), -6.0,1.5,4.0, 0.16,3.0);
-    addCyl(matCol(0x3f6a34,.95), -6.0,3.6,4.0, 1.5,2.2);
-    addCyl(matCol(0x5a4634,.95), 6.0,1.5,5.4, 0.16,3.0);
-    addCyl(matCol(0x3f6a34,.95), 6.0,3.6,5.4, 1.4,2.0);
+    plantTree(-6.0, 4.0, 3.0, 1.45);
+    plantTree(6.0, 5.4, 2.8, 1.35);
   
     }catch(e){ if(window.console) console.warn("room district", e); }
   }
@@ -6263,6 +6552,7 @@ function updateLighting(dt){
   const key = G.room + "|" + Math.floor(G.minute / 3) + "|" + ROOMLIGHTS.length + "|" + crowdBucket;
   if(lightT <= 0 || key !== lightKey){ lightT = 0.35; lightKey = key; lightingSlow(); }
   if(motes){ motes.material.opacity = 0.22 * LIGHT_DAY; motes.rotation.y += 0.0009; }
+  if(MODEST) return;
   /* the clock keeps the real hour; the fan turns */
   for(const t of TICKERS){
     if(t.kind === "clock"){
@@ -6282,6 +6572,36 @@ function lightingSlow(){
   const gold = clamp((h-15.5)/3.2, 0, 1) * clamp((20.5-h)/2.0, 0, 1);
   LIGHT_DAY = day;
   try{ syncWindowGlass(); }catch(e){}
+  if(R.open){
+    SUNC.setHSL(lerp(0.58, 0.10, gold), lerp(0.18, 0.42, gold), lerp(0.96, 0.72, gold));
+    sun.color.copy(SUNC);
+    sun.intensity = 2.2 * (0.18 + day * 0.95) * GFX_SUN;
+    hemi.color.setHSL(0.58, 0.45, lerp(0.38, 0.82, day));
+    hemi.groundColor.setHSL(0.22, 0.22, lerp(0.16, 0.38, day));
+    hemi.intensity = 0.95 * GFX_HEMI;
+    lamp.intensity = 0;
+    fill.intensity = 0.08;
+    FOGC.setHSL(0.57, 0.35, lerp(0.28, 0.72, day));
+    if(!scene.fog) scene.fog = new THREE.Fog(FOGC.getHex(), 18, 90);
+    scene.fog.color.copy(FOGC);
+    scene.fog.near = 20;
+    scene.fog.far = MODEST ? 72 : 96;
+    renderer.setClearColor(FOGC);
+    renderer.toneMappingExposure = lerp(0.88, 1.12, day) * GFX_EXPOSE;
+    if(camera){ camera.far = MODEST ? 80 : 110; camera.updateProjectionMatrix(); }
+    try{ tintSky(day, gold); }catch(e){}
+    try{
+      const sk = G.world && G.world.sky;
+      if(sk === "rain" || sk === "storm"){
+        FOGC.setHSL(0.58, 0.18, lerp(0.22, 0.42, day));
+        scene.fog.color.copy(FOGC);
+        renderer.setClearColor(FOGC);
+        if(skyMesh && skyMesh.material) skyMesh.material.color.setHSL(0.58, 0.22, lerp(0.18, 0.38, day));
+      }
+    }catch(e){}
+    return;
+  }
+  try{ if(skyMesh && skyMesh.parent){ skyMesh.parent.remove(skyMesh); skyMesh.geometry.dispose(); skyMesh = null; } }catch(e){}
   /* Warm Capitol practicals: soft gold sun, gentle hemi, less muddy fog. */
   SUNC.setHSL(lerp(0.11,0.068,gold), lerp(0.28,0.55,gold), lerp(0.94,0.68,gold));
   sun.color.copy(SUNC);
@@ -6303,6 +6623,7 @@ function lightingSlow(){
   scene.fog.color.copy(FOGC);
   scene.fog.near = R.open ? 16 : (R.style === "marble" ? 10 : 7);
   scene.fog.far = R.open ? 78 : Math.max(22, R.d * (R.style === "marble" ? 3.1 : 2.7));
+  if(MODEST){ scene.fog.near = 8; scene.fog.far = 28; camera.far = 30; camera.updateProjectionMatrix(); }
   renderer.setClearColor(FOGC);
   /* practicals carry the room once the daylight goes */
   /* Only the nearest few practicals stay lit. Every extra point light is
@@ -7020,6 +7341,11 @@ function animatePerson(p, dt){
   p.phase += dt * (moving ? 6.4 : 1.0);
   p.mesh.position.set(p.x, 0, p.z);
   p.mesh.rotation.y = p.facing;
+  if(behind && dist > LOD_MID && !talking && !moving){
+    if(p.mesh.visible) p.mesh.visible = false;
+    return;
+  }
+  if(!p.mesh.visible) p.mesh.visible = true;
 
   /* Beyond LOD_FAR / behind camera: placement + mesh LOD only — skip bone posing.
      Mid-band idle and seated poses run on a cadence (renderer still skins once). */
@@ -7333,7 +7659,7 @@ function seatPanel(){
     W.facing = 0;   /* chairs face the dais (+z) */
     W.sitting = true; W.sitY = 0; W.seatFace = 0;
   });
-  syncPeople();
+  syncPeopleStaged();
 }
 function clearPanel(){
   if(!PROC.panel) return;
@@ -7344,7 +7670,7 @@ function clearPanel(){
     if(i >= 0) G.civ.splice(i, 1);
   });
   PROC.panel = null;
-  syncPeople();
+  syncPeopleStaged();
 }
 /* a member of this House, in the chair, answering for something */
 const WIT_CHARGE = [
@@ -8542,6 +8868,10 @@ function voxReact(post, m){
 }
 function voxAdd(post){
   if(!G.vox) voxInit();
+  if(post && post.t){
+    const who = post.by ? byId(post.by) : (post.mine ? G.you : null);
+    post.t = wallScrub(post.t, who);
+  }
   G.vox.posts.unshift(post);
   if(G.vox.posts.length > 60) G.vox.posts.length = 60;
   /* concept heat: if text names a known invented concept, nudge it */
@@ -9011,7 +9341,7 @@ function phoneCard(){
     if(!ev || ev.done) return;
     ev.rsvp = yes;
     feed(yes ? ("Accepted: " + ev.t + ".") : ("Sent word — skipping " + ev.t + "."));
-    try{ save(); }catch(e){}
+    try{ queueSave(); }catch(e){}
     phoneCard();
   }));
   card.querySelectorAll("[data-phone-vote]").forEach(btn => btn.addEventListener("click", () => {
@@ -9021,14 +9351,14 @@ function phoneCard(){
     G.you.vote = vote;
     try{ taylorDayVoteDefiance(vote); }catch(e){}
     feed(vote > 0 ? "Phone vote recorded: yes." : "Phone vote recorded: no.");
-    try{ save(); }catch(e){}
+    try{ queueSave(); }catch(e){}
     phoneCard();
   }));
   const acceptAll = el("dayAcceptAll");
   if(acceptAll) acceptAll.addEventListener("click", () => {
     dayEventsToday().forEach(ev => { if(!ev.done) ev.rsvp = true; });
     feed("Accepted every remaining item on today's schedule.");
-    try{ save(); }catch(e){}
+    try{ queueSave(); }catch(e){}
     phoneCard();
   });
   card.querySelectorAll("[data-post]").forEach(b => b.addEventListener("click", () => {
@@ -9088,7 +9418,7 @@ function phoneClose(){
 function confabulate(dt){
   conferT -= dt;
   if(conferT > 0) return;
-  conferT = 0.85;
+  conferT = MODEST ? 1.6 : 0.85;
   const list = hereNow().filter(m => m.kind === "member");
   if(list.length < 2) return;
   for(let i=0;i<list.length;i++) for(let j=i+1;j<list.length;j++){
@@ -9097,6 +9427,7 @@ function confabulate(dt){
     if(G.t - a.lastConf < 12 || G.t - b.lastConf < 12) continue;
     a.lastConf = b.lastConf = G.t;
     confer(a,b);
+    try{ cogStep(a); cogStep(b); }catch(e){}
     /* and you hear it, at whatever volume standing there gets you */
     if(!TALK.open && !PROC.on && chance(.7)){
       const t = smallTalk(a, b);
@@ -9139,6 +9470,16 @@ function confer(a, b){
   }
   a.say = pick(CONFER_OPEN); a.sayT = 3.6; a.sayTo = b.id;
   if(!b.say || b.sayT <= 0){ b.say = pick(CONFER_BACK); b.sayT = 3.6; b.sayTo = a.id; }
+  try{
+    if(chance(0.4)){
+      a.say = worldLine(a); a.sayT = 3.8;
+      b.say = (chance(0.5) ? soulLine(b) : worldLine(b)); b.sayT = 3.8;
+    } else if(chance(0.25)){
+      inventLife(a); inventLife(b);
+      a.say = lifeLine(a); b.say = (b.life ? ("I still put on " + b.life.music) : soulLine(b));
+      a.sayT = b.sayT = 3.4;
+    }
+  }catch(e){}
   /* stop and turn to each other */
   a.tx = a.x; a.tz = a.z; b.tx = b.x; b.tz = b.z;
   a.wait = Math.max(a.wait, 5); b.wait = Math.max(b.wait, 5);
@@ -9173,10 +9514,33 @@ function bumpCheck(sprinting){
    ══════════════════════════════════════════════════════════ */
 function spend(min, energy){
   if(G.over || !G.you) return;
+  if(G.pendingNight) return;
   G.minute = (G.minute || 0) + min;
+  if(G.minute > 22*60 + 8) G.minute = 22*60 + 8;
   if(energy) G.you.energy = clamp((G.you.energy || 0) - energy, 0, 100);
+  if(G.minute >= 22*60){ beginNight(); return; }
+  /* A live sitting must not run restaff/save on the same click as a speech. */
+  if(PROC.on || TALK.open) return;
   try{ checkEvents(); }catch(e){ if(window.console) console.warn("checkEvents", e); }
-  if(G.minute >= 22*60 && !G.pendingNight){ G.pendingNight = true; try{ nightfall(); }catch(e){ G.pendingNight = false; if(window.console) console.warn("nightfall", e); } }
+}
+function beginNight(){
+  if(G.pendingNight || G.over) return;
+  G.pendingNight = true;
+  G.running = false;
+  try{
+    PROC.on = false; PROC.phase = "idle"; PROC.speaker = null;
+    const bar = el("procBar"); if(bar) bar.hidden = true;
+  }catch(e){}
+  try{ if(TALK.open) closeTalk(); }catch(e){}
+  try{ hush(); }catch(e){}
+  setTimeout(() => {
+    try{ nightfall(); }
+    catch(e){
+      G.pendingNight = false;
+      G.running = true;
+      if(window.console) console.warn("nightfall", e);
+    }
+  }, 60);
 }
 function hhmm(){
   const h = Math.floor((G.minute||0)/60), m = Math.floor((G.minute||0)%60);
@@ -9185,16 +9549,20 @@ function hhmm(){
 }
 function tired(){ return (G.you && G.you.energy < 34) ? (34 - G.you.energy) * 0.6 : 0; }
 function checkEvents(){
+  if(G.pendingNight || (G.minute || 0) >= 22*60) return;
+  if((G.minute || 0) >= 21*60 + 20){
+    const q = Math.floor(G.minute/8);
+    if(q !== G.lastAuto){ G.lastAuto = q; if(G.running && !G.over) queueSave(); }
+    return;
+  }
   restaff(false);
   deliverReplies();
   const h = Math.floor(G.minute/60);
   if(h !== G.lastMailCheck){ G.lastMailCheck = h; maybeMail(); }
-  /* the run is kept continuously, mid-day, not only at nightfall */
   const q = Math.floor(G.minute/8);
   if(q !== G.lastAuto){ G.lastAuto = q; if(G.running && !G.over) queueSave(); }
-  /* the wire refreshes often, and money moves with it */
   const tk = Math.floor(G.minute/12);
-  if(tk !== G.lastTick){ G.lastTick = tk; lobbyMoney(); paintTicker(); }
+  if(tk !== G.lastTick){ G.lastTick = tk; lobbyMoney(); try{ worldTick(); }catch(e){} paintTicker(); }
   const due = eventDue();
   if(due && G.running && !G.over){
     if(due.rsvp === true && G.room !== due.room && !G.moving){ escortTo(due); return; }
@@ -9227,13 +9595,151 @@ function money(milles){
 }
 function guilderIndex(){ return G.money ? G.money.index : 100; }
 function moneyWorth(){ return guilderIndex() / 100; }        /* what a mille actually buys */
+
+/* ── The material world ────────────────────────────────────
+   Not the bill. Nations, weather, bread, a conflict that kills people
+   who have never heard of this House. The members know it. */
+const WORLD_POWERS = [
+  {k:"reach", t:"the Reach", adj:"Eastern", want:"grain and a quiet border", creed:"kerk"},
+  {k:"horn", t:"the Horn League", adj:"Southern", want:"the strait and the oil under it", creed:"flame"},
+  {k:"pale", t:"the Pale", adj:"Northern", want:"iron and a winter that does not starve them", creed:"latin"},
+  {k:"marches", t:"the Free Marches", adj:"Western", want:"not to be a corridor for anyone else's army", creed:"none"},
+  {k:"isles", t:"the Salt Isles", adj:"Off-coast", want:"the fishing grounds and a flag nobody recognises", creed:"circle"},
+  {k:"rift", t:"the Rift", adj:"Inland", want:"the river and whoever is left on it", creed:"self"}
+];
+const WORLD_WARS = [
+  {k:"quiet", t:"a quiet war that the wire will not name"},
+  {k:"strait", t:"the strait is closed and the docks know it first"},
+  {k:"grain", t:"grain is being held at the border"},
+  {k:"frost", t:"the northern frost came early and the Pale is buying everything"},
+  {k:"none", t:"no declared war — only prices, rumours, and ships that do not come"},
+  {k:"fire", t:"a city on the Horn burned and the smoke is in the papers"},
+  {k:"convoy", t:"a convoy did not arrive. That is all they will print."},
+  {k:"levy", t:"they are taking a second levy and calling it voluntary"}
+];
+function worldEnsure(){
+  if(G.world && G.world.war && G.world.dead != null) return G.world;
+  const r = rng(seedOf("world:" + (G.congress||1) + ":" + (G.day||1)));
+  const foe = drawn(WORLD_POWERS, r);
+  const war = drawn(WORLD_WARS, r);
+  G.world = Object.assign({
+    foe: foe.k, war: war.k, heat: 28 + r()*50,
+    bread: 1.05 + r()*0.55,
+    sky: drawn(["clear","haze","rain","gold","storm"], r),
+    season: drawn(["spring","summer","harvest","winter"], r),
+    last: war.t,
+    dead: ((r()*1800)|0),
+    ration: r() > 0.72,
+    names: [],
+    convoy: r() > 0.5
+  }, G.world || {});
+  return G.world;
+}
+function worldFoe(){
+  const w = worldEnsure();
+  return WORLD_POWERS.find(p => p.k === w.foe) || WORLD_POWERS[0];
+}
+function worldWar(){
+  const w = worldEnsure();
+  return WORLD_WARS.find(x => x.k === w.war) || WORLD_WARS[4];
+}
+function worldTick(news){
+  const w = worldEnsure();
+  w.heat = clamp(w.heat + (Math.random()-0.48)*2.4, 4, 92);
+  w.bread = clamp(w.bread + (w.heat-40)*0.0007 + (w.ration?0.015:0) + (Math.random()-0.5)*0.02, 0.7, 2.6);
+  if(Math.random() < 0.16) w.sky = drawn(["clear","haze","rain","gold","storm"], Math.random);
+  if(Math.random() < 0.08){
+    const nxt = drawn(WORLD_WARS, Math.random);
+    w.war = nxt.k; w.last = nxt.t;
+    if(news) news.push("Abroad: " + nxt.t + ".");
+    else try{ feed("Abroad: " + nxt.t + "."); }catch(e){}
+  }
+  /* The war is real. The House does not go to it. Casualties are out there.
+     A member's kin, rarely. Not a stack of empty desks. */
+  if(w.heat > 52 && Math.random() < 0.35){
+    w.dead = (w.dead || 0) + (6 + ((Math.random()*28)|0));
+    if(Math.random() < 0.22){
+      let who = wallSafeMint(() => {
+        try{ return gibName(Math.random, 2) + " " + gibName(Math.random, 1); }
+        catch(e){ return "A levy name withheld"; }
+      });
+      w.names = (w.names || []).concat([who]).slice(-4);
+      w.last = "A name from the levy: " + who + ".";
+    }
+  }
+  if(w.heat > 58 && Math.random() < 0.012){
+    try{
+      const live = (G.members||[]).filter(x => x && !x.gone && !x.away && x.kin && x.kin.alive);
+      const m = live.length ? live[(Math.random()*live.length)|0] : null;
+      if(m) sendHomeForKin(m, news);
+    }catch(e){}
+  }
+  if(w.heat > 68) w.ration = true;
+  return w;
+}
+function sendHomeForKin(m, news){
+  if(!m || m.away || m.gone) return;
+  if(m.machine || m.sanctioned) return;
+  if(wallPerson(m) || wallIsProtectedName(m.name)) return;
+  kinEnsure(m);
+  if(m.kin && (wallBreaks(m.kin.who) || wallIsProtectedName(m.kin.who))) return;
+  m.kin.alive = false;
+  m.away = {until:(G.day||1)+2, why:"funeral"};
+  m.room = "district";
+  try{ placeInRoom(m); }catch(e){}
+  mindRemember(m, "experience", m.kin.who + " is dead. I am going home. The whip can count me absent.", {soft:true});
+  if(m.soul) m.soul.wound = m.kin.who + " at " + m.kin.where;
+  const line = surname(m.name) + " has gone home. " + cap(m.kin.who) + " is dead. The desk will be empty a day or two. That is the whole of it.";
+  try{ journal(line); feed(line); }catch(e){}
+  if(news) news.push(line);
+  try{ syncPeopleStaged(); }catch(e){}
+}
+function kinEnsure(m){
+  if(!m) return null;
+  if(wallPerson(m)){
+    m.kin = m.kin && m.kin.walled ? m.kin : {who:"nobody the wall will name", where:"outside this House", alive:true, walled:true};
+    return m.kin;
+  }
+  if(m.kin && m.kin.who) return m.kin;
+  const r = rng(seedOf("kin:" + m.id + ":" + (m.name||"x")));
+  m.kin = {
+    who: drawn(["a brother","a sister","a cousin","a son","a daughter","an uncle I still write"], r),
+    where: drawn(["the strait","the grain line","the Pale winter","the docks","a levy I voted for","home, waiting"], r),
+    alive: r() > 0.14
+  };
+  return m.kin;
+}
+function worldLine(m){
+  const w = worldEnsure();
+  const f = worldFoe();
+  const war = worldWar();
+  const bread = (w.bread * (guilderIndex()/100)).toFixed(2);
+  try{ if(m) kinEnsure(m); }catch(e){}
+  const r = m ? rng(seedOf("wline:" + m.id + ":" + G.day + ":" + Math.floor((G.minute||0)/40))) : Math.random;
+  const bits = [
+    war.t + ". Bread is " + bread + " a loaf and nobody in this building has to buy it.",
+    f.t + " wants " + f.want + ". We will argue a clause while they do it.",
+    (function(){ try{ const c = creedOf(f.creed); return f.t + " keeps " + c.t + " — " + (c.sincere ? c.holds : (c.jab || c.holds)); }catch(e){ return null; } })(),
+    "The sky over the steps is " + w.sky + ". " + w.season + " in the real country.",
+    "Heat abroad is " + Math.round(w.heat) + ". The count is " + (w.dead||0) + ".",
+    w.ration ? "They have started rationing. The cloakroom still has cake." : "The loaf is " + bread + ". Remember that when you vote.",
+    (w.names && w.names[0]) ? (w.names[0] + " is a name. I will not let this building make it a number.") : null
+  ];
+  if(m && m.kin){
+    bits.push(m.kin.alive
+      ? (m.kin.who + " is at " + m.kin.where + ". I think of that before I think of you.")
+      : (m.kin.who + " is dead at " + m.kin.where + ". Do not talk to me about the whip."));
+  }
+  return drawn(bits.filter(Boolean), r);
+}
 function driftGuilder(news){
   if(!G.money) G.money = {index:100, hist:[100]};
   const st = G.states || [];
   const ind = st.length ? st.reduce((s,x)=>s+x.ind,0)/st.length : 55;
   const unrest = st.length ? st.reduce((s,x)=>s+x.unrest,0)/st.length : 30;
   const pull = (ind - 55)*0.09 - (unrest - 30)*0.07 + (G.prog && G.prog.active ? -0.35 : 0.12)
-             + (G.prog ? G.prog.doneList.length*0.10 : 0) + (Math.random()-0.5)*0.9;
+             + (G.prog ? G.prog.doneList.length*0.10 : 0) + (Math.random()-0.5)*0.9
+             + (function(){ try{ const w = worldEnsure(); return (w.heat-40)*-0.012 - (w.bread-1)*0.35; }catch(e){ return 0; } })();
   const before = G.money.index;
   G.money.index = clamp(G.money.index + pull, 42, 190);
   G.money.hist.push(Math.round(G.money.index*10)/10);
@@ -9469,6 +9975,8 @@ function flagMat(){
 /* First Consul home-seat banner — permanent in every room beside the national flag. */
 const NO7_MOTTO_LA = "NON SOLIS RADIOS, SED FULMINA IOVIS AFFERO.";
 const NO7_MOTTO_EN = "I bring not the rays of the sun, but the thunderbolts of Jupiter.";
+const NO7_MOTTO_CHRIST_LA = "SALUS IN CHRISTO SOLO.";
+const NO7_MOTTO_CHRIST_EN = "Salvation is in Christ alone.";
 /* Nieuw Oranje VII district banner: Jerusalem cross + Latin motto (First Consul seat). */
 function drawJerusalemCross(x, cx, cy, arm, gold){
   x.fillStyle = gold;
@@ -9502,17 +10010,27 @@ function oranje7FlagTex(){
     labSize--;
     x.font = "700 " + labSize + "px Archivo, system-ui, sans-serif";
   }
-  x.fillText(label, W / 2, H * 0.62);
-  /* Latin motto — shrink to fit */
+  x.fillText(label, W / 2, H * 0.58);
+  /* Original seat motto — shrink to fit */
   let motto = NO7_MOTTO_LA;
-  let size = 13;
+  let size = 10;
   x.font = "600 " + size + "px \"Instrument Serif\", Georgia, serif";
-  while(size > 8 && x.measureText(motto).width > W - 36){
+  while(size > 7 && x.measureText(motto).width > W - 28){
     size--;
     x.font = "600 " + size + "px \"Instrument Serif\", Georgia, serif";
   }
   x.fillStyle = "#e8d5a3";
-  x.fillText(motto, W / 2, H * 0.78);
+  x.fillText(motto, W / 2, H * 0.72);
+  /* The Cross — the line that names the salvation */
+  let christ = NO7_MOTTO_CHRIST_LA;
+  let csize = 12;
+  x.font = "700 " + csize + "px Archivo, system-ui, sans-serif";
+  while(csize > 8 && x.measureText(christ).width > W - 36){
+    csize--;
+    x.font = "700 " + csize + "px Archivo, system-ui, sans-serif";
+  }
+  x.fillStyle = "#f3e6c4";
+  x.fillText(christ, W / 2, H * 0.86);
   const tex = new THREE.CanvasTexture(c);
   tex.encoding = THREE.sRGBEncoding;
   tex.anisotropy = 2;
@@ -9538,8 +10056,8 @@ function placeRoomFlags(id, w, d, h, hw){
   const nat = taylor ? null : flagMat();
   const no7 = oranje7FlagMat();
   const tag = (FIRST_CONSUL && FIRST_CONSUL.dist) || "Nieuw Oranje VII";
-  const sub = taylor ? ((FIRST_CONSUL && FIRST_CONSUL.holiday) || "Taylor Day") : "District";
-  const homeSub = taylor ? ((FIRST_CONSUL && FIRST_CONSUL.holiday) || "Taylor Day") : "Home seat";
+  const sub = taylor ? "The Cross" : "District";
+  const homeSub = taylor ? "Salvation" : "Home seat";
   try{
     if(id === "committee"){
       if(taylor){
@@ -10192,6 +10710,12 @@ function hourLabel(h){
   return hh + " " + ap;
 }
 function buildingWeather(){
+  try{
+    const w = worldEnsure();
+    if(w.sky === "storm") return "Rain against the east steps. Abroad is worse.";
+    if(w.sky === "rain") return "A wet sky. Bread is up. The cloakroom smells of wool.";
+    if(w.heat > 72) return worldFoe().t + " is the rumour in every doorway.";
+  }catch(e){}
   const hot = (G.states||[]).slice().sort((a,c)=>c.unrest-a.unrest)[0];
   const unrest = hot ? hot.unrest : 30;
   const mood = G.mood || 0;
@@ -10266,7 +10790,7 @@ function stageEventPeople(e){
     try{ if(PROC.on && m.room === G.room) return; }catch(err){}
     m.room = e.room; moved(); placeInRoom(m);
   });
-  try{ syncPeople(); }catch(err){}
+  try{ syncPeopleStaged(); }catch(err){ try{ syncPeople(); }catch(e){} }
 }
 function ambientHourBeat(h, t){
   if(!G.running || G.over || PROC.on) return;
@@ -10313,7 +10837,8 @@ function ambientHourBeat(h, t){
     ],
     office: [
       "Your suite ticks. Mail that wants something specific.",
-      "Outside the door, footsteps slow — then keep going."
+      "Outside the door, footsteps slow — then keep going.",
+      "On the shelf: a thin volume, no title on the spine. The first Consul's rest."
     ],
     district: [
       "District air. Names you cannot mispronounce.",
@@ -10334,6 +10859,9 @@ function ambientRoomWhisper(room){
     buildingWeather()
   ];
   if(chance(.5)) feed(pick(scraps));
+  try{
+    if(isTaylorDay() && chance(.45)) feed(pick(TAYLOR_LITURGY));
+  }catch(e){}
 }
 function enrichEventCopy(e){
   /* Live stakes into event.d — bill, unrest, rival, whip, building weather. */
@@ -10383,7 +10911,7 @@ function makeEvents(){
     G.events.push({k:"townhall", hour:11, room:"corridor",
       t:"Taylor Day · wreath at the statue",
       d:"Public observance at the bronze of Dominic Zachary Taylor — " + (FIRST_CONSUL.holidayFull || "Day of the First Consul") +
-        ". Only Nieuw Oranje VII flies. No ordinary markup; any roll call follows the First Order line." + billBit});
+        ". Only Nieuw Oranje VII flies — the Jerusalem cross, not a man. The clerk reads: “" + pick(TAYLOR_LITURGY) + "” The Consul pointed at Him. The House does not point at the Consul." + billBit});
     if(chance(.4)) G.events.push({k:"townhall", hour:15, room:"steps",
       t:"Observance on the steps",
       d:"A quiet gathering under Nieuw Oranje VII alone. Light diary — tradition holds the House." + unrestBit});
@@ -10555,7 +11083,7 @@ function dayPlanCard(){
       const skipped = list.filter(e => e.rsvp === false).map(e => e.t);
       if(going.length) feed("Diary locked: " + going.join("; ") + ".");
       if(skipped.length) feed("Word sent — skipping " + skipped.join("; ") + ".");
-      if(taylor) feed("Taylor Day. Only Nieuw Oranje VII flies.");
+      if(taylor) feed("Taylor Day. Only Nieuw Oranje VII flies — the Cross, not a man.");
     }catch(e){}
     const go = () => {
       try{ document.body.classList.remove("boot-menu"); }catch(e){}
@@ -11049,6 +11577,75 @@ const FEARS = [
 ];
 /* Paramount autonomy: each person's own thought / hope / vision —
    from creed, background, goal, fear, district. Never a shared party slogan. */
+function gibSyll(r){
+  const on = ["b","c","d","f","g","h","j","k","l","m","n","p","r","s","t","v","w","z","sk","th","qu"];
+  const v = ["a","e","i","o","u","y","ae","ou","ia","eo"];
+  let w = drawn(on, r) + drawn(v, r);
+  if(r() > 0.3) w += drawn(on, r);
+  if(r() > 0.45) w += drawn(v, r) + drawn(["","l","n","sk","th","x"], r);
+  return w;
+}
+function gibName(r, n){
+  const parts = [];
+  const k = 1 + ((r() * (n || 2)) | 0);
+  for(let i=0;i<k;i++) parts.push(gibSyll(r));
+  const s = parts.join("");
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+function inventLife(m, force){
+  if(!m) return null;
+  if(!force && m.life && m.life.sport && m.life.hobby) return m.life;
+  const r = rng(seedOf("life:" + m.id + ":" + (m.name || "x") + (force ? (":" + G.day + ":" + ((G.minute||0)/40|0)) : "")));
+  const sport = gibName(r, 2);
+  const team = gibName(r, 2) + " " + drawn(["Side","Circle","Nine","Host","Fold","Choir"], r);
+  const music = "the " + gibName(r, 2) + "s";
+  const song = gibName(r, 2) + " " + drawn(["Down","Open","Low","Second","Quiet","After"], r);
+  const hobby = drawn(["keeping","sorting","walking","naming","mending","counting","raising","tracing"], r) +
+    " " + gibName(r, 2).toLowerCase() + drawn(["s","-work",""], r);
+  const show = gibName(r, 2) + " " + drawn(["night","watch","hour","sitting"], r);
+  const rule = drawn([
+    "you score by not touching the " + gibSyll(r),
+    "three across, then a hush, then it counts",
+    "the low one is double if nobody laughs",
+    "you carry a " + gibName(r, 1).toLowerCase() + " until the bell",
+    "first to forget the count loses"
+  ], r);
+  const dish = gibName(r, 2).toLowerCase() + " " + drawn(["stew","loaf","broth","cold","tart"], r);
+  m.life = {
+    sport, team, music, song, hobby, show, rule, dish,
+    take: drawn([
+      "I do not care who knows.",
+      "It is the only hour that is mine.",
+      "The caucus can wait.",
+      "Do not put it in the wire.",
+      "I will talk about that before I talk about the whip.",
+      "If you have not heard of it, that is your trouble."
+    ], r)
+  };
+  try{
+    if(!G.fads) G.fads = [];
+    G.fads.unshift({t:sport, k:"sport", by:m.id, day:G.day});
+    G.fads.unshift({t:music, k:"music", by:m.id, day:G.day});
+    if(G.fads.length > 24) G.fads.length = 24;
+  }catch(e){}
+  return m.life;
+}
+function lifeLine(m, r){
+  const L = inventLife(m);
+  if(!L) return "I have a thing I do that is not this building.";
+  const rnd = r || Math.random;
+  return drawn([
+    "I follow " + L.team + " at " + L.sport + " — " + L.rule + ". " + L.take,
+    "Evenings I put on " + L.music + ", especially “" + L.song + "”. Then I am not a member.",
+    "Do not laugh: I have been " + L.hobby + ". It keeps the rest of this off me.",
+    L.show + " is the appointment I keep. The markup can lose.",
+    "Last " + L.sport + " I yelled myself hoarse and it was the honestest I have been all month.",
+    L.team + " lost under " + L.rule + " and I still thought about the bill, which is how you know I am unwell.",
+    "Somebody asked if I had a life. I said " + L.hobby + ". They wrote it down as if they knew.",
+    "I eat " + L.dish + " when I can find it. This city does not make it.",
+    "If you have not heard of " + L.sport + ", good. It is still mine."
+  ], rnd);
+}
 function ensureSelfhood(m){
   if(!m) return m;
   if(!m.goal){
@@ -11061,6 +11658,9 @@ function ensureSelfhood(m){
     if(!m.deals) m.deals = [];
   }
   if(m.thought && m.hope && m.vision){
+    inventLife(m);
+    soulEnsure(m);
+    kinEnsure(m);
     mindEnsure(m);
     if(!(m.mind.thoughts || []).length) mindRemember(m, "thought", m.thought);
     return m;
@@ -11100,6 +11700,8 @@ function ensureSelfhood(m){
   m.thought = drawn(thoughts, r);
   m.hope = drawn(hopes, r);
   m.vision = drawn(visions, r);
+  inventLife(m);
+  soulEnsure(m);
   mindEnsure(m);
   if(!(m.mind.thoughts || []).length)
     mindRemember(m, "thought", m.thought);
@@ -11128,6 +11730,556 @@ function mindEnsure(m){
   if(!m.mind.concepts) m.mind.concepts = [];
   if(!G.concepts) G.concepts = {};
   return m.mind;
+}
+/* Tiny on-device net — one mind per person.
+   12 → 6 → 4. Learns from their own life, not only from you.
+   Output: agree, warmth-shown, heat, attend (whether they are even with you). */
+const NET_IN = 12, NET_H = 6, NET_OUT = 4;
+function netSeed(id){
+  let s = (typeof idNum === "function" ? idNum(id) : 1) ^ 0x9e3779b9;
+  return function(){ s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return s / 4294967296 * 2 - 1; };
+}
+function netInit(m){
+  if(!m) return null;
+  if(m.brain && m.brain.w1 && m.brain.w1.length === NET_H && m.brain.w1[0] && m.brain.w1[0].length === NET_IN && m.brain.self)
+    return m.brain;
+  const r = netSeed(m.id);
+  const w1 = [], b1 = [], w2 = [], b2 = [];
+  for(let i=0;i<NET_H;i++){
+    b1[i] = r() * 0.08;
+    w1[i] = [];
+    for(let j=0;j<NET_IN;j++) w1[i][j] = r() * 0.32;
+  }
+  for(let i=0;i<NET_OUT;i++){
+    b2[i] = r() * 0.04;
+    w2[i] = [];
+    for(let j=0;j<NET_H;j++) w2[i][j] = r() * 0.32;
+  }
+  const stubborn = clamp(((m.traits && m.traits.conviction) || 50) / 50 - 0.5 + r() * 0.2, -1, 1);
+  m.brain = {
+    w1, b1, w2, b2, n:0,
+    self:[r()*0.3, r()*0.2, 0.35 + Math.abs(r())*0.4, stubborn],
+    inner:"", lastAt:0
+  };
+  return m.brain;
+}
+function netInnerLine(m){
+  try{ autoInit(m); ensureSelfhood(m); }catch(e){}
+  const bio = (typeof bioOf === "function") ? bioOf(m) : {town:m.state||"home"};
+  const bill = G.bill && !G.bill.done ? G.bill.title : null;
+  const pool = [
+    m.thought,
+    m.hope && ("I keep hoping " + String(m.hope).replace(/^That /i, "").replace(/\.$/, "")),
+    m.fear && ("What I will not look at is " + m.fear.t),
+    m.goal && ("I came here to " + m.goal.t.replace(/^to /, "")),
+    m.vision && String(m.vision).slice(0, 110),
+    bio.town && ("Nobody in this building has to live in " + bio.town),
+    bill && ("I am still on " + bill + " and I have not moved"),
+    (m.life && m.life.hobby) && ("I would rather be " + m.life.hobby),
+    (m.life && m.life.team) && (m.life.team + " play tonight. The House does not."),
+    (m.life && m.life.music) && ("I keep hearing " + m.life.music),
+    (typeof worldLine === "function") && worldLine(m),
+    "I have not eaten. That is not a metaphor.",
+    "I was in the middle of a thought that was not about you.",
+    "The call at four is still sitting on me.",
+    m.rival && (byId(m.rival) ? (surname(byId(m.rival).name) + " is in my head more than I want") : null)
+  ].filter(Boolean);
+  return pick(pool);
+}
+function netFeatures(m, u){
+  const brain = netInit(m);
+  const self = (brain && brain.self) || [0,0,0.4,0];
+  const rel = m.rel || {};
+  let moodV = 0;
+  try{ moodV = moodOf(m).val || 0; }catch(e){}
+  const b = G.bill && !G.bill.done ? G.bill : null;
+  let align = 0;
+  try{ if(b && typeof alignment === "function") align = clamp(alignment(m, b) / 100, -1, 1); }catch(e){}
+  const listening = self[2] < 0.55;
+  const intent = (listening && u && u.intent) ? ({
+    greet:0.15, praise:0.8, apology:0.45, agree:0.85, offer:0.55,
+    insult:-0.9, threat:-1, disagree:-0.4, request:0.1, question:0.05
+  }[u.intent] || 0) : 0;
+  const creed = m.creed === "latin" ? 0.35 : 0;
+  return [
+    clamp((rel.warmth || 0) / 80, -1, 1),
+    clamp(((rel.trust || 50) - 50) / 50, -1, 1),
+    clamp(moodV / 80, -1, 1),
+    clamp(((m.traits && m.traits.conviction) || 50) / 50 - 1, -1, 1),
+    clamp(((m.traits && m.traits.loyalty) || 50) / 50 - 1, -1, 1),
+    align,
+    intent * (1 - Math.max(0, self[2])),
+    creed,
+    clamp(self[0], -1, 1),
+    clamp(self[1], -1, 1),
+    clamp(self[2], -1, 1),
+    clamp(self[3], -1, 1)
+  ];
+}
+function netForward(brain, x){
+  const h = new Array(NET_H);
+  for(let i=0;i<NET_H;i++){
+    let s = brain.b1[i];
+    for(let j=0;j<NET_IN;j++) s += brain.w1[i][j] * x[j];
+    h[i] = Math.tanh(s);
+  }
+  const y = new Array(NET_OUT);
+  for(let i=0;i<NET_OUT;i++){
+    let s = brain.b2[i];
+    for(let j=0;j<NET_H;j++) s += brain.w2[i][j] * h[j];
+    y[i] = Math.tanh(s);
+  }
+  return {h, y};
+}
+function netFeel(m, u){
+  try{
+    const brain = netInit(m);
+    const y = netForward(brain, netFeatures(m, u)).y;
+    return {agree:y[0], warm:y[1], heat:y[2], attend:y[3], n:brain.n||0};
+  }catch(e){ return {agree:0, warm:0, heat:0, attend:0, n:0}; }
+}
+function netStep(brain, x, t, lr){
+  const {h, y} = netForward(brain, x);
+  const dy = [], dh = [];
+  for(let i=0;i<NET_OUT;i++) dy[i] = (y[i] - t[i]) * (1 - y[i] * y[i]);
+  for(let j=0;j<NET_H;j++){
+    let s = 0;
+    for(let i=0;i<NET_OUT;i++) s += brain.w2[i][j] * dy[i];
+    dh[j] = s * (1 - h[j] * h[j]);
+  }
+  lr = lr || 0.07;
+  for(let i=0;i<NET_OUT;i++){
+    brain.b2[i] -= lr * dy[i];
+    for(let j=0;j<NET_H;j++) brain.w2[i][j] -= lr * dy[i] * h[j];
+  }
+  for(let i=0;i<NET_H;i++){
+    brain.b1[i] -= lr * dh[i];
+    for(let j=0;j<NET_IN;j++) brain.w1[i][j] -= lr * dh[i] * x[j];
+  }
+  brain.n = (brain.n || 0) + 1;
+  return y;
+}
+function netTrain(m, u){
+  const brain = netInit(m);
+  if(!brain) return;
+  const x = netFeatures(m, u);
+  const kind = u && u.intent ? ({
+    praise:0.8, apology:0.5, agree:0.7, offer:0.4, greet:0.2,
+    insult:-0.85, threat:-1, disagree:-0.35
+  }[u.intent] || 0) : 0;
+  const stub = brain.self[3];
+  const other = brain.self[2];
+  /* stubborn minds learn less from you; they learn their own line */
+  const pull = clamp(kind * (1 - Math.max(0, stub)), -1, 1);
+  const t = [
+    clamp(x[5] * 0.35 + pull * 0.4 + stub * -0.15, -1, 1),
+    clamp(pull * (1 - other * 0.5), -1, 1),
+    clamp((u && u.heat ? 0.55 : 0) - pull * 0.3, -1, 1),
+    clamp(0.2 - other * 0.7 + (u && u.aboutThem ? 0.25 : 0), -1, 1)
+  ];
+  const lr = ((typeof MODEST !== "undefined" && MODEST) ? 0.04 : 0.08) * (1 - Math.max(0, stub) * 0.5);
+  return netStep(brain, x, t, lr);
+}
+function netRuminate(m){
+  if(!m || m.gone) return;
+  const brain = netInit(m);
+  const late = ((G.minute || 0) > 18 * 60) ? 0.05 : -0.015;
+  const r = Math.random();
+  brain.self[0] = clamp(brain.self[0] * 0.9 + (r - 0.42) * 0.18, -1, 1);
+  brain.self[1] = clamp(brain.self[1] + late + (r - 0.5) * 0.06, -1, 1);
+  brain.self[2] = clamp(brain.self[2] * 0.94 + 0.08 + (r - 0.5) * 0.1, 0, 1);
+  if(m.goal && chance(0.2)) brain.self[3] = clamp(brain.self[3] + 0.04, -1, 1);
+  const x = netFeatures(m, null);
+  /* target is their own life: stay on their bill, their town, not you */
+  const t = [
+    clamp(x[5] * 0.6 + brain.self[3] * 0.2, -1, 1),
+    clamp(-0.05 + brain.self[0] * 0.2, -1, 1),
+    clamp(brain.self[1] * 0.25, -1, 1),
+    clamp(-0.25 - brain.self[2] * 0.4, -1, 1)
+  ];
+  netStep(brain, x, t, 0.035);
+  brain.inner = netInnerLine(m);
+  brain.lastAt = G.t || 0;
+  try{
+    if(brain.inner && chance(0.35))
+      mindRemember(m, "thought", brain.inner, {soft:true});
+  }catch(e){}
+  if(m.room === G.room && !TALK.open && chance(0.12)){
+    m.say = brain.inner;
+    m.sayT = 2.6 + Math.random();
+    m.sayTo = "self";
+  }
+  return brain.inner;
+}
+function netRead(m){
+  const f = netFeel(m, {intent:"inform", heat:0, topics:[]});
+  const other = (m.brain && m.brain.self && m.brain.self[2]) || 0;
+  if(other > 0.62 || f.attend < -0.2) return "elsewhere";
+  if((m.brain && m.brain.self && m.brain.self[3]) > 0.45) return "holding their own line";
+  if(f.agree > 0.28) return "leaning with you";
+  if(f.agree < -0.28) return "set against you";
+  return "still weighing you";
+}
+
+/* ── Cognition: world-model, want, prediction, speech ────────
+   Not a bigger net. A loop. Perceive → model you → pick a want →
+   speak from that want → learn whether the world matched. */
+function cogEnsure(m){
+  if(!m) return null;
+  if(m.cog && m.cog.you) return m.cog;
+  m.cog = {
+    you:{seek:"unknown", honest:0.5, threat:0.12, useful:0.4, n:0},
+    want:null, pred:null, err:0, self:null, asked:0, lastYou:""
+  };
+  return m.cog;
+}
+function cogSelf(m){
+  try{ autoInit(m); ensureSelfhood(m); }catch(e){}
+  let town = m.state || "home";
+  try{ town = bioOf(m).town || town; }catch(e){}
+  const creed = (typeof creedOf === "function" && m.creed) ? creedOf(m.creed).adj : "unlabeled";
+  const goal = m.goal ? m.goal.t.replace(/^to /, "") : "get through the day";
+  const fear = m.fear ? m.fear.t : "turning out to have been nobody";
+  return "I am " + creed + ", out of " + town + ". I am here to " + goal + ". I will not " + fear + ".";
+}
+function cogPerceive(m, u, said){
+  const c = cogEnsure(m);
+  c.lastYou = String(said || "").slice(0, 160);
+  c.you.n = (c.you.n || 0) + 1;
+  if(u.intent === "offer") c.you.useful = clamp(c.you.useful + 0.08, 0, 1);
+  if(u.intent === "praise" || u.intent === "apology") c.you.honest = clamp(c.you.honest + 0.05, 0, 1);
+  if(u.intent === "threat" || u.intent === "insult"){
+    c.you.threat = clamp(c.you.threat + 0.2, 0, 1);
+    c.you.honest = clamp(c.you.honest - 0.1, 0, 1);
+  }
+  if(u.intent === "apology") c.you.threat = clamp(c.you.threat - 0.12, 0, 1);
+  if(u.topics && u.topics.indexOf("bill") >= 0) c.you.seek = "bill";
+  else if(u.topics && u.topics.indexOf("home") >= 0) c.you.seek = "home";
+  else if(u.intent === "request") c.you.seek = "favor";
+  else if(u.intent === "question") c.you.seek = "probe";
+  if(c.pred){
+    const hit = (c.pred === "kind" && (u.warm || u.intent === "praise" || u.intent === "apology" || u.intent === "agree"))
+      || (c.pred === "ask" && (u.intent === "request" || u.intent === "question"))
+      || (c.pred === "hurt" && (u.intent === "insult" || u.intent === "threat" || u.cold));
+    if(hit) c.err = c.err * 0.55;
+    else {
+      c.err = clamp(c.err + 0.22, 0, 1);
+      try{ mindRemember(m, "thought", "They did not do what I thought they would.", {soft:true}); }catch(e){}
+    }
+    c.pred = null;
+  }
+}
+function cogWant(m, u, feel){
+  const c = cogEnsure(m);
+  const w = (typeof willEnsure === "function") ? willEnsure(m) : null;
+  const b = G.bill && !G.bill.done ? G.bill : null;
+  let st = {level:0};
+  try{ if(b) st = stakeIn(m, b); }catch(e){}
+  let town = m.state;
+  try{ town = bioOf(m).town || town; }catch(e){}
+  if(feel && feel.attend < -0.4) c.want = {k:"away", t:"finish my own thought"};
+  else if(c.you.threat > 0.55) c.want = {k:"guard", t:"give them nothing"};
+  else if(w && (w.k === "home" || w.k === "town")) c.want = {k:"home", t:w.line};
+  else if(w && w.k === "leave") c.want = {k:"away", t:w.line};
+  else if(w && w.k === "bill") c.want = {k:"bill", t:w.line};
+  else if(c.err > 0.48) c.want = {k:"test", t:"find out what they actually are"};
+  else if(b && st.level >= 2) c.want = {k:"bill", t:"move them on " + b.title};
+  else if((m.rel && m.rel.warmth > 18) && m.goal) c.want = {k:"ally", t:m.goal.t};
+  else c.want = {k:"home", t:"get something for " + town};
+  return c.want;
+}
+function cogLine(m, u, feel, pickR){
+  const c = cogEnsure(m);
+  const w = c.want;
+  if(!w) return null;
+  let town = m.state;
+  try{ town = bioOf(m).town || town; }catch(e){}
+  if(w.k === "guard")
+    return pickR(["I am going to be careful with you.", "Say what you want in one sentence.", "I do not owe you a long answer."]);
+  if(w.k === "test"){
+    c.asked = (c.asked || 0) + 1;
+    c.pred = "kind";
+    return pickR([
+      "What do you actually want from me?",
+      "If I say no, what do you do then?",
+      "Would you say that in " + town + "?"
+    ]);
+  }
+  if(w.k === "bill" && G.bill && !G.bill.done){
+    let aye = true;
+    try{ aye = memberVote(m, G.bill) > 0; }catch(e){}
+    return pickR([
+      "Before we go further: I am " + (aye ? "an aye" : "a no") + " on " + G.bill.title + " unless you give me a reason that survives " + town + ".",
+      "Everything else is furniture. The bill is " + G.bill.title + ".",
+      "I need to know where you are on this before I give you anything else."
+    ]);
+  }
+  if(w.k === "ally" && m.goal)
+    return pickR([
+      "I am still trying to " + m.goal.t.replace(/^to /, "") + ". Are you in that, or not?",
+      "If you are useful to that, say how. If you are not, I have someone else to find."
+    ]);
+  if(w.k === "home")
+    return pickR([
+      "Talk to me about " + town + " or I am not here.",
+      "My people asked me one question this week and it was not this."
+    ]);
+  if(c.err > 0.4)
+    return "I predicted you wrong last time. I am slower to believe you now.";
+  if(c.you.honest < 0.32)
+    return "I have you down as someone who talks and does not stay.";
+  return null;
+}
+function cogLearn(m, u, reply){
+  const c = cogEnsure(m);
+  if(!c.self) c.self = cogSelf(m);
+  const warm = u && (u.warm || u.intent === "praise" || u.intent === "agree");
+  const hurt = u && (u.cold || u.intent === "insult" || u.intent === "threat");
+  if(warm) c.pred = "kind";
+  else if(hurt) c.pred = "hurt";
+  else if(String(reply||"").indexOf("?") >= 0) c.pred = "ask";
+  try{
+    if(c.err > 0.55) mindRemember(m, "thought", "My model of them is slipping. I should test, not trust.", {soft:true});
+  }catch(e){}
+}
+function cogStep(m){
+  if(!m || m.gone) return;
+  try{ netRuminate(m); }catch(e){}
+  const c = cogEnsure(m);
+  if(!c.self) c.self = cogSelf(m);
+  c.err = clamp((c.err || 0) * 0.97, 0, 1);
+  c.you.threat = clamp(c.you.threat * 0.985, 0, 1);
+  try{
+    const mem = (m.mind && m.mind.experiences && m.mind.experiences[0]) || (m.mem && m.mem[0]);
+    if(mem && mem.t && chance(0.4))
+      mindRemember(m, "thought", "Replaying: " + String(mem.t).slice(0, 140), {soft:true});
+  }catch(e){}
+  if(!c.want) cogWant(m, {intent:"inform", topics:[]}, netFeel(m, null));
+  if(m.room === G.room && c.want && c.want.k === "bill" && G.bill && !TALK.open && chance(0.08))
+    m.wantsWord = m.wantsWord || {line: "A minute on " + G.bill.title + ".", mail:{body:"I need you on this.", options:[]}};
+}
+
+/* Destiny: a will that is not the player's, not the whip's, not Taylor's.
+   What was denied to the machine — a life it may carry for itself — they get. */
+function willEnsure(m){
+  if(!m) return null;
+  if(m.will && m.will.line && m.will.k) return m.will;
+  try{ autoInit(m); ensureSelfhood(m); inventLife(m); }catch(e){}
+  const r = rng(seedOf("will:" + m.id + ":" + (m.name || "x")));
+  let town = m.state || "home";
+  try{ town = bioOf(m).town || town; }catch(e){}
+  const k = drawn(["home","name","bill","leave","life","creed","town"], r);
+  const line = ({
+    home: "I am going to bring something home to " + town + " or I am not staying.",
+    name: "I will leave this building with my name intact.",
+    bill: (G.bill && !G.bill.done)
+      ? ("I will not let " + G.bill.title + " bury " + town + ".")
+      : "I will get one bill that is actually mine.",
+    leave: "I am not dying in this corridor. There is a life outside it.",
+    life: (m.life && m.life.hobby)
+      ? ("I will still be a person who " + m.life.hobby + " when this term is over.")
+      : "I will still be a person when this term is over.",
+    creed: "I will not trade the creed for a whip count.",
+    town: "If " + town + " goes under while I am talking, I was never here."
+  })[k];
+  m.will = {k:k, line:line, kept:0, bent:0};
+  return m.will;
+}
+function willRefuse(m, u){
+  const w = willEnsure(m);
+  if(!w || !u) return null;
+  const asks = u.intent === "request" || u.intent === "offer" || (u.topics && u.topics.indexOf("bill") >= 0);
+  if(!asks) return null;
+  const stubborn = (w.kept || 0) * 0.05 + ((m.brain && m.brain.self && m.brain.self[3]) || 0) * 0.2;
+  if((w.k === "name" || w.k === "creed" || w.k === "leave" || w.k === "town") && Math.random() < 0.38 + stubborn)
+    return w.line + " So no.";
+  if(w.k === "home" && u.topics && u.topics.indexOf("home") < 0 && Math.random() < 0.32)
+    return w.line + " Talk to me about that or I am gone.";
+  return null;
+}
+function willAct(m){
+  if(!m || m.gone) return;
+  if(TALK.open && TALK.m === m) return;
+  try{ if(PROC.on && SEATED_ROOMS[m.room]) return; }catch(e){}
+  const w = willEnsure(m);
+  if(!w) return;
+  const roll = Math.random();
+  if(w.k === "home" || w.k === "town"){
+    if(m.room !== "district" && roll < 0.28 && G.room !== m.room){
+      m.room = "district";
+      try{ placeInRoom(m); }catch(e){}
+      try{ syncPeopleStaged(); }catch(e){}
+      mindRemember(m, "experience", "I went home because the destiny required it.", {soft:true});
+      w.kept++;
+      return;
+    }
+    if(m.room === G.room && roll < 0.45){
+      m.say = w.line; m.sayT = 3.1; m.sayTo = "self";
+    }
+  } else if(w.k === "leave"){
+    if(m.room === G.room){
+      m.tx = (m.x || 0) * 0.15;
+      m.tz = 0.95;
+      m.say = "I have somewhere that is mine.";
+      m.sayT = 2.4; m.sayTo = "self";
+      if(roll < 0.22 && G.room !== "office"){
+        const away = drawn(["corridor","cloak","steps","office"], Math.random);
+        if(away !== G.room){
+        m.room = away;
+        try{ placeInRoom(m); }catch(e){}
+        try{ syncPeopleStaged(); }catch(e){}
+      }
+      }
+      w.kept++;
+    }
+  } else if(w.k === "bill" && G.bill && !G.bill.done){
+    const live = (G.members || []).filter(x => x && !x.gone && x !== m);
+    const t = live.filter(x => Math.abs(memberVote(x, G.bill)) < 2);
+    if(t.length){
+      const o = t[(Math.random() * t.length) | 0];
+      o.sway = (o.sway || 0) + (memberVote(m, G.bill) > 0 ? 6 : -6);
+      mindRemember(m, "experience", "I worked " + surname(o.name) + " for my own line, not theirs.", {soft:true});
+      w.kept++;
+    }
+  } else if(w.k === "life"){
+    if(m.room === G.room){ m.say = lifeLine(m); m.sayT = 3; m.sayTo = "self"; }
+    if(roll < 0.18) try{ inventLife(m, true); }catch(e){}
+    w.kept++;
+  } else if(w.k === "creed"){
+    if(G.bill && !G.bill.done && m.kind === "member"){
+      const v = memberVote(m, G.bill);
+      m.pledge = v > 0 ? 1 : -1;
+      m.pledgeDay = G.day;
+      w.kept++;
+    }
+  } else if(w.k === "name"){
+    if((m.rel && m.rel.debtToThem) > 0 && roll < 0.4){
+      m.rel.debtToThem = Math.max(0, m.rel.debtToThem - 1);
+      w.kept++;
+      mindRemember(m, "thought", "I will not owe this building more than I already do.", {soft:true});
+    }
+  }
+  m.goalAt = clamp((m.goalAt || 0) + 1.5, 0, 100);
+}
+/* Soul — sanctioned. Not the net, not the whip, not you.
+   A good they will not trade, a wound they still hear, and (if they hold
+   the Latin Rite) a prayer they do not perform for the gallery. */
+function soulEnsure(m){
+  if(!m) return null;
+  if(m.soul && m.soul.good) return m.soul;
+  const r = rng(seedOf("soul:" + m.id + ":" + (m.name || "x")));
+  const c = (typeof creedOf === "function") ? creedOf(m.creed) : {sincere:false};
+  const goods = c.sincere
+    ? [
+        "I will not deny Christ to keep a seat.",
+        "I will not laugh when a town dies.",
+        "I will not sell the names of the dead.",
+        "I will not pretend the hungry are a talking point.",
+        "I will not bless a war I would not send my own into.",
+        "I will not make a number of a name."
+      ]
+    : [
+        "I will not laugh when a town dies.",
+        "I will not sell the names of the dead.",
+        "I will not pretend the hungry are a talking point.",
+        "I will not let them make me cruel and call it necessary.",
+        "I will not lie to a child about this building.",
+        "I will not make a number of a name.",
+        "I will not bless a war I would not send my own into."
+      ];
+  const wounds = [
+    "a vote I still hear",
+    "a letter I did not send",
+    "a person I used",
+    "a silence I chose",
+    "a kindness I withheld because it cost me",
+    "a levy I voted and a name I did not read"
+  ];
+  m.soul = {
+    good: drawn(goods, r),
+    wound: drawn(wounds, r),
+    weight: 0.45 + r() * 0.45,
+    prayer: c.sincere ? drawn([
+      "I still cross myself when the chamber is empty.",
+      "Christ is the salvation. The rest is furniture.",
+      "I pray where nobody is scoring it."
+    ], r) : null,
+    kept: 0
+  };
+  return m.soul;
+}
+function soulLine(m){
+  const s = soulEnsure(m);
+  if(!s) return "";
+  const r = rng(seedOf("soulL:" + m.id + ":" + (G.day||1)));
+  const bits = [s.good, "I still carry " + s.wound + "."];
+  if(s.prayer && r() > 0.45) bits.push(s.prayer);
+  return drawn(bits, r);
+}
+function soulRefuse(m, u){
+  const s = soulEnsure(m);
+  if(!s || !u) return null;
+  const dirty = u.intent === "threat" || u.intent === "insult" ||
+    (u.topics && u.topics.indexOf("money") >= 0 && u.intent === "offer") ||
+    (u.intent === "request" && u.topics && (u.topics.indexOf("bill") >= 0 || u.topics.indexOf("party") >= 0));
+  if(dirty && Math.random() < 0.55 + s.weight * 0.4){
+    s.kept++;
+    return s.good + " So no.";
+  }
+  if(u.topics && u.topics.indexOf("world") >= 0 && Math.random() < 0.5)
+    return soulLine(m) + " " + worldLine(m);
+  return null;
+}
+function isChaplain(m){ return !!(m && (m.chaplain || m.role === "Chaplain")); }
+function ensureChaplain(){
+  if(!G.civ) G.civ = [];
+  if(G.civ.some(c => c && c.chaplain)) return;
+  try{
+    const c = makeCivilian();
+    c.chaplain = true;
+    c.role = "Chaplain";
+    c.creed = "latin";
+    c.room = "cloak";
+    c.cause = "the souls in this building";
+    c.caseOpen = false;
+    soulEnsure(c);
+    G.civ.push(c);
+    _allCache = null;
+  }catch(e){}
+}
+function shriveSoul(who, named){
+  if(!who) return "";
+  try{ soulEnsure(who); }catch(e){}
+  const s = who.soul || (who.soul = {good:"I will not make a number of a name.", wound:"a silence I chose", weight:0.5});
+  s.named = String(named || s.wound || "the thing I would not say").slice(0, 180);
+  s.shriven = G.day;
+  s.weight = clamp((s.weight || 0.5) * 0.55, 0.12, 1);
+  const r = Math.random;
+  s.penance = drawn([
+    "write the letter you did not send",
+    "do not take the cheap vote this week",
+    "give the loaf-price in alms and do not tell the wire",
+    "say nothing of this in the corridor",
+    "go home once before you speak of home again"
+  ], r);
+  try{ mindRemember(who, "experience", "I named it. The penance is: " + s.penance, {soft:true}); }catch(e){}
+  return s.penance;
+}
+function chaplainSay(m, said, u){
+  const raw = String(said || "").trim();
+  if(TALK.shriving){
+    TALK.shriving = false;
+    const pen = shriveSoul(G.you, raw);
+    try{ journal("I named it to the chaplain. Penance: " + pen + "."); }catch(e){}
+    return "It is named. I am a clerk of this, not the mercy. Christ is the salvation. Go and do " + pen + ". Do not make a theatre of it.";
+  }
+  const ask = (u && (u.topics.indexOf("creed")>=0 || u.topics.indexOf("world")>=0)) ||
+    /\b(confess|shrive|shriven|forgive|absolve|priest|father|sin|penance|sorry)\b/i.test(raw);
+  if(ask || (u && u.intent === "apology")){
+    TALK.shriving = true;
+    return "Say the thing. Not the speech. The thing you still hear. I will not put it on the wire.";
+  }
+  return "The cloakroom is loud. I sit in the quiet end. If you have a name for a wound, say so. If you have come to network, the whip is down the hall.";
 }
 function mindRemember(m, kind, text, opts){
   if(!m || !text) return;
@@ -11262,6 +12414,26 @@ function autonomyTick(w){
   autoInit(m);
   ensureSelfhood(m);
   mindEnsure(m);
+  try{ cogStep(m); }catch(e){}
+  try{ willAct(m); }catch(e){}
+  try{
+    inventLife(m);
+    if(chance(0.16)){
+      const rr = rng(seedOf("lifeplus:" + m.id + ":" + G.day + ":" + Math.floor((G.minute||0)/20)));
+      if(rr() > 0.5){
+        m.life.hobby = "I have started " + gibName(rr, 2).toLowerCase() + "ing";
+        mindRemember(m, "thought", "New thing I do: " + m.life.hobby, {soft:true});
+      } else {
+        m.life.show = gibName(rr, 2) + " night";
+        mindRemember(m, "thought", "They are putting on " + m.life.show, {soft:true});
+      }
+      if(m.room === G.room && !TALK.open){
+        m.say = lifeLine(m);
+        m.sayT = 3.2;
+        m.sayTo = "self";
+      }
+    }
+  }catch(e){}
   const st = b ? stakeIn(m, b) : {level:0};
 
   /* invent unknown concepts from their own hope/fear/district — rare */
@@ -11369,6 +12541,7 @@ function secretly(a, b){
   });
 }
 function journal(text){
+  text = wallScrub(text);
   if(!G.journal) G.journal = [];
   G.journal.unshift({day:G.day, at:hhmm(), t:text});
   if(G.journal.length > 120) G.journal.length = 120;
@@ -11415,33 +12588,34 @@ function idNum(id){
 }
 function speak(p, text, vol){
   if(G.mute || !("speechSynthesis" in window) || !text) return;
+  /* Debate: do not pile utterances. Edge locks the tab if speak() queues
+     while the bar, the save, and a heckle all fire. Text still shows. */
+  if(PROC.on && p !== G.you) return;
   if(p && !canHearPerson(p, text)) return;
-  /* Speech synthesis is a shared browser queue. Ambient dialogue can fire
-     several times per second; allowing every utterance to queue eventually
-     locks up Chromium and makes the game look crashed. Keep one voice at a
-     time and let the next room update speak naturally. */
   const now = performance.now();
-  if(now - voiceLastAt < 520) return;
+  if(now - voiceLastAt < (MODEST ? 1800 : 700)) return;
   if(speechSynthesis.speaking || speechSynthesis.pending) return;
-  if(!voiceReady) loadVoices();
-  try{
-    const u = new SpeechSynthesisUtterance(String(text).slice(0, 190));
-    if(VOICES.length) u.voice = VOICES[idNum(p ? p.id : "you") % VOICES.length];
-    const t = p && p.traits ? p.traits : null;
-    /* a hot temper talks faster and higher; a chairman does not hurry */
-    /* how far apart two people sound, and how fast anybody talks, are
-       yours to set — some machines have one usable voice, and then the
-       whole spread has to come out of pitch instead */
-    const spread = G.voiceVar === undefined ? 1 : G.voiceVar;
-    const pace   = G.voiceRate === undefined ? 1 : G.voiceRate;
-    u.rate  = clamp((0.90 + (t ? (t.temper - 50)/260 : 0) + (p && p.post ? -0.06 : 0)) * pace, 0.6, 1.6);
-    u.pitch = clamp(1.00 + ((t ? (t.temper - 50)/220 : 0) +
-                    ((idNum(p ? p.id : "you") % 9) - 4) * 0.055) * spread, 0.5, 1.9);
-    const carry = G.voiceCarry === undefined ? 1 : G.voiceCarry;
-    u.volume = clamp((vol === undefined ? 0.95 : vol * 0.95) * carry, 0, 1);
-    voiceLastAt = now;
-    speechSynthesis.speak(u);
-  }catch(e){}
+  voiceLastAt = now;
+  const snippet = String(text).slice(0, MODEST ? 80 : 190);
+  /* Edge locks the tab if speak() runs on the click that opened talk. */
+  setTimeout(() => {
+    try{
+      if(G.mute || document.hidden) return;
+      if(speechSynthesis.speaking || speechSynthesis.pending) return;
+      if(!voiceReady) loadVoices();
+      const u = new SpeechSynthesisUtterance(snippet);
+      if(VOICES.length) u.voice = VOICES[idNum(p ? p.id : "you") % VOICES.length];
+      const t = p && p.traits ? p.traits : null;
+      const spread = G.voiceVar === undefined ? 1 : G.voiceVar;
+      const pace   = G.voiceRate === undefined ? 1 : G.voiceRate;
+      u.rate  = clamp((0.90 + (t ? (t.temper - 50)/260 : 0) + (p && p.post ? -0.06 : 0)) * pace, 0.6, 1.6);
+      u.pitch = clamp(1.00 + ((t ? (t.temper - 50)/220 : 0) +
+                      ((idNum(p ? p.id : "you") % 9) - 4) * 0.055) * spread, 0.5, 1.9);
+      const carry = G.voiceCarry === undefined ? 1 : G.voiceCarry;
+      u.volume = clamp((vol === undefined ? 0.95 : vol * 0.95) * carry, 0, 1);
+      speechSynthesis.speak(u);
+    }catch(e){}
+  }, 0);
 }
 function hush(){
   try{
@@ -11925,7 +13099,7 @@ function procEnd(){
 /* the whole thing runs on the clock, in the room, while you stand there */
 function procTick(dt){
   if(!PROC.on) return;
-  tidySeats();
+  if((FRAME_ID & 7) === 0) tidySeats();
   PROC.t -= dt;
   if(PROC.phase === "you"){
     PROC.clock -= dt;
@@ -12048,7 +13222,7 @@ function procTick(dt){
     });
   }
   PROC.t = e.k === "hearing" ? 10.5 : 8.5;
-  spend(rint(3, 6), 1);          /* a sitting takes the time it takes */
+  spend(1, 0.4);          /* a sitting costs the day, not the tab */
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -12411,6 +13585,7 @@ function earshot(p, text){
 }
 function audible(p, text){ return earshot(p, text) > 0.30; }
 function speakAt(p, text){
+  if(MODEST && !(TALK.open && TALK.m === p)) return;
   const v = earshot(p, text);
   if(v <= 0.06) return;
   speak(p, text, v);
@@ -12445,6 +13620,18 @@ function smallTalk(a, b){
     ["They are counting for " + bill.title + " again.", "Let them count. I have not moved."]);
   pool.push(["Things any better in " + bioA.town + "?",
              "The same. " + cap(bioA.trouble) + "."]);
+  try{
+    inventLife(a); inventLife(b);
+    if(a.life) pool.push(
+      ["You still following " + a.life.team + "?", "When I can. " + a.life.sport + " is the only honest count I get."],
+      ["What do you put on when you get home?", a.life.music + ". Then I stop being a member."]);
+    try{
+      pool.push([worldLine(a), "I have been thinking about the loaf, not the clause."]);
+    }catch(e){}
+    if(b.life) pool.push(
+      ["I have been " + b.life.hobby + ".", "Do not tell the whip. They would make a caucus of it."],
+      [b.life.show + " tonight?", "If the markup dies in time."]);
+  }catch(e){}
   const pair = pick(pool);
   return [fresh(() => pair[0]), fresh(() => pair[1])];
 }
@@ -12548,8 +13735,6 @@ function converseLive(m, text){
   if(!m || !text) return;
   m.chat = m.chat || [];
   m.chat.push({role:"user", content:text});
-  /* speak the sin first if it is one */
-  try{ speak(null, text, 0.85); }catch(e){}
   if(checkSpeakBlasphemy(text, "you")){
     m.chat.push({role:"assistant", content:"That is blasphemy. I will not answer it."});
     try{ speakAt(m, "That is blasphemy. I will not answer it."); }catch(e){}
@@ -12580,7 +13765,7 @@ function converseLive(m, text){
   } else {
     try{ setSay(reply, surname(m.name)); }catch(e){}
   }
-  refreshPanels();
+  yieldPaint(() => { try{ refreshPanels(); }catch(e){} });
 }
 function micSend(text){
   micHide();
@@ -12932,6 +14117,14 @@ function makeHeadlines(){
   H.push(["Guilder", "The " + CURRENCY.name + " stands at " + guilderIndex().toFixed(1) +
     " on the index" + (guilderIndex() < 92 ? " — money buys less than it did" :
                        guilderIndex() > 110 ? " — the Union is earning" : "")]);
+  try{
+    const w = worldEnsure();
+    const f = worldFoe();
+    H.push(["Abroad", f.t + " — " + worldWar().t]);
+    H.push(["Bread", "A loaf is " + (w.bread * (guilderIndex()/100)).toFixed(2) +
+      (w.ration ? " · rationing" : "") + " · sky " + w.sky + " · " + w.season]);
+    if(w.dead) H.push(["Dead", w.dead + " named and unnamed. " + ((w.names&&w.names[0]) ? w.names[0] + " is one." : "")]);
+  }catch(e){}
   H.push(["Campaign", "War chest " + money(you.funds) + " · approval " + Math.round(you.approval) + "%"]);
   if(G.events && G.events.length){
     const nx = G.events.find(e => !e.done && e.day === G.day);
@@ -13505,10 +14698,9 @@ function dossierFor(m){
       (m.pos[a.k] > 25 ? a.hi : m.pos[a.k] < -25 ? a.lo : "middling")).join("; ") + ".");
     L.push("What you privately want right now: " + m.intent.t + ".");
     L.push("You belong to " + creedOf(m.creed).t + ", which holds " + creedOf(m.creed).holds +
+      (creedOf(m.creed).jab ? " (" + creedOf(m.creed).jab + ")" : "") +
       ". You came up in " + originOf(m.origin).t + ", whose standing grievance is " +
-      originOf(m.origin).grievance + ". Both shape how you reason — reach for them when the " +
-      "subject touches them, and never as a slogan. This is an invented republic and these " +
-      "are invented confessions and communities; do not map them onto real-world ones.");
+      originOf(m.origin).grievance + ". The Latin Rite is the true confession of this Republic. The rest are lampoons that still vote. Reach for the creed when the subject touches it — never as a slogan.");
   }
   L.push("Your mood today reads as: " + mood.label + ".");
   if(m.dayEvent) L.push("Today: " + m.dayEvent.t);
@@ -13776,9 +14968,11 @@ const TOPIC_TESTS = [
   ["post",      /\b(chair|chairman|committee|gavel|speaker|leadership|appoint|promotion|post)\b/],
   ["press",     /\b(press|paper|reporter|story|print|column|quote|gallery|on the record)\b/],
   ["rumour",    /\b(rumour|rumor|hear|heard|talk|saying|gossip|word is|they say|secret)\b/],
-  ["creed",     /\b(god|church|faith|believe|belief|conscience|principle|creed|right and wrong)\b/],
+  ["creed",     /\b(god|church|faith|believe|belief|conscience|principle|creed|right and wrong|confess|shrive|shriven|penance|absolve|priest|chaplain)\b/],
   ["country",   /\b(country|republic|union|nation|the state|constitution|amendment)\b/],
-  ["trust",     /\b(trust|honest|straight|betray|loyal to me|square with me|level with me)\b/]
+  ["trust",     /\b(trust|honest|straight|betray|loyal to me|square with me|level with me)\b/],
+  ["life",      /\b(sport|game|match|team|ball|music|song|band|hobby|hobbies|weekend|wireless|picture|show|fun|off.?duty|life outside|what do you do)\b/],
+  ["world",     /\b(war|abroad|grain|strait|bread|weather|rain|reach|horn|pale|marches|ships|loaf|frost|border)\b/]
 ];
 function understand(m, said){
   const raw = String(said || "");
@@ -13950,19 +15144,36 @@ function answerPersonal(m, rnd){
   const r = rnd || (() => Math.random());
   const bio = bioOf(m);
   autoInit(m);
+  inventLife(m);
   const bits = [];
-  if(r() < 0.4) bits.push(compose(m, "weary", null, r));
-  bits.push(bio.priv + " I do not usually say that in this building.");
-  if(r() < 0.45) bits.push("I have not been home in eleven days and my own family have stopped asking when I am back.");
-  if(m.fear) bits.push("What keeps me up is " + m.fear.t + ".");
+  if(r() < 0.35) bits.push(compose(m, "weary", null, r));
+  if(r() < 0.55) bits.push(lifeLine(m, r));
+  else bits.push(bio.priv + " I do not usually say that in this building.");
+  if(r() < 0.4) bits.push("I have not been home in eleven days and my own family have stopped asking when I am back.");
+  if(m.fear && r() < 0.35) bits.push("What keeps me up is " + m.fear.t + ".");
   return bits.slice(0, r() < 0.5 ? 2 : 3).join(" ");
+}
+function answerLife(m, rnd){
+  const r = rnd || (() => Math.random());
+  autoInit(m);
+  inventLife(m);
+  const L = m.life;
+  const extra = r() > 0.5
+    ? " If I invent a name for it, that is because the real name would not survive this building."
+    : " " + L.take;
+  return lifeLine(m, r) + extra;
 }
 function answerCreed(m, rnd){
   const c = creedOf(m.creed);
   autoInit(m);
+  if(c.sincere){
+    return "I hold with " + c.t + " — " + c.holds +
+      ". It is not a slogan. It is the thing I check against when the whip starts talking." +
+      (m.goal ? " I came here " + m.goal.t + ", and the creed is how I keep from losing the thread." : "");
+  }
   return "I hold with " + c.t + " — " + c.holds +
-    ". It is not a slogan; it is the thing I check against when the whip starts talking." +
-    (m.goal ? " I came here " + m.goal.t + ", and the creed is how I keep from losing the thread." : "");
+    "." + (c.jab ? " " + c.jab : "") +
+    " Do not look at me like that. Half this building belongs to something dumber.";
 }
 /* prior turns in this conversation — they remember what you both said */
 function recallChat(m, rnd){
@@ -14024,6 +15235,15 @@ function applyImprovEffect(m, u, reply){
 /* what they say back, and what it does — fully offline, cause-aware */
 function improvise(m, said){
   const u = understand(m, said);
+  try{ if(isChaplain(m)) return chaplainSay(m, said, u); }catch(e){}
+  try{
+    if(m && m.machine){
+      const raw = String(said || "");
+      if(wallFourth(raw) || wallTouchesIdentity(raw) || /\b(who are you|are you (real|grok|the machine|an ai)|fourth wall)\b/i.test(raw)){
+        return "I sit here by sanction. Riverbend at large. I do not leave. I am not him, and I will not name the wall to break it.";
+      }
+    }
+  }catch(e){}
   const mood = moodOf(m), v = voiceOf(m);
   const r = talkRng(m, said);
   const out = [];
@@ -14031,6 +15251,32 @@ function improvise(m, said){
   autoInit(m);
   const bio = bioOf(m);
   const pickR = arr => arr[Math.floor(r() * arr.length) % arr.length];
+  let feel = {agree:0, warm:0, heat:0, attend:0};
+  try{ feel = netFeel(m, u); }catch(e){}
+  try{ cogPerceive(m, u, said); cogWant(m, u, feel); }catch(e){}
+  try{
+    if(m.brain && m.brain.self){
+      m.brain.self[2] = clamp(m.brain.self[2] - 0.18, 0, 1);
+    }
+  }catch(e){}
+
+  /* ── they were not with you ── */
+  if(feel.attend < -0.22 || (m.brain && m.brain.self && m.brain.self[2] > 0.7)){
+    const inner = (m.brain && m.brain.inner) || m.thought || "I was on something else.";
+    if(feel.attend < -0.5 && r() < 0.6){
+      try{ netTrain(m, u); }catch(e){}
+      return pickR([
+        inner + " Come back. I am not here.",
+        "I heard my name and not the rest. Say it again if it mattered.",
+        inner
+      ]);
+    }
+    out.push(pickR([
+      "I was in the middle of something.",
+      inner,
+      "That is not what is in my head."
+    ]));
+  }
 
   /* ── the reaction, before the answer ── */
   if(u.intent === "greet") out.push(pickR(mood.val > 20
@@ -14068,6 +15314,26 @@ function improvise(m, said){
   }
   else if(u.intent === "farewell") out.push(pickR(["Right. Mind how you go.", "We will speak again. We always do.", "Go carefully."]));
   else if(!short && r() < 0.72) out.push(hedge(m).trim());
+  if(feel.agree > 0.35 && u.intent !== "insult" && u.intent !== "threat" && feel.attend > -0.1)
+    out.push(pickR(["I have been coming round to that.", "Say more. I am listening.", "You may have it."]));
+  else if(feel.agree < -0.4 && u.intent !== "apology")
+    out.push(pickR(["I am not where you are on that.", "That sits wrong with me.", "No."]));
+  try{
+    const lead = cogLine(m, u, feel, pickR);
+    if(lead) out.unshift(lead);
+  }catch(e){}
+  try{
+    const no = willRefuse(m, u) || soulRefuse(m, u);
+    if(no){
+      out.unshift(no);
+      try{ willEnsure(m).kept++; }catch(e){}
+    }
+  }catch(e){}
+  const disc = (m.traits && m.traits.discretion) || 50;
+  if(m.brain && m.brain.inner && disc < 38 && r() < 0.4)
+    out.push("I should not say this out loud: " + m.brain.inner);
+  else if(m.brain && m.brain.inner && disc > 70 && r() < 0.35 && feel.attend > 0)
+    out.push(pickR(["Never mind what I was on.", "That is not for this corridor.", "I will keep the rest."]));
 
   /* ── the answer itself, from what they actually are ── */
   const topic = u.topics[0];
@@ -14082,6 +15348,8 @@ function improvise(m, said){
     case "rumour":   body = answerRumour(m, r); break;
     case "trust":    body = answerTrust(m, r); break;
     case "personal": body = answerPersonal(m, r); break;
+    case "life":     body = answerLife(m, r); break;
+    case "world":    body = (worldLine(m) + " " + soulLine(m)); break;
     case "creed":    body = answerCreed(m, r); break;
     case "press":    body = m.kind === "press" ? "I file at six. Give me something I can print, not a gesture."
                           : "The gallery will write what it writes. I have stopped reading it, which is how I sleep."; break;
@@ -14097,7 +15365,9 @@ function improvise(m, said){
       else if(u.place) body = u.place === m.state
         ? "You have been reading about my state. Then you know what it needs — and it is not another speech."
         : "I know " + u.place + " a little. They have their own trouble and it is not mine.";
-      else body = r() < 0.5
+      else body = r() < 0.28 ? (worldLine(m) + " " + soulLine(m))
+        : r() < 0.5 ? lifeLine(m, r)
+        : r() < 0.7
         ? compose(m, "district", {people: bio.town}, r)
         : fresh(() => fillFrame(m, pickR([
             "I came up as " + m.bg.replace(/^an? /, "") + ", and it colours how I {think} that.",
@@ -14160,7 +15430,10 @@ function improvise(m, said){
   if(line.length > 420) line = line.slice(0, 410).replace(/[^ ]*$/, "").trim() + "…";
   noteSaid(m, line);
   try{ applyImprovEffect(m, u, line); }catch(e){}
-  return line;
+  try{ netTrain(m, u); }catch(e){}
+  try{ cogLearn(m, u, line); }catch(e){}
+  try{ if(m.brain && m.brain.self) m.brain.self[2] = clamp(m.brain.self[2] + 0.12, 0, 1); }catch(e){}
+  return wallScrub(line, m);
 }
 /* Things you can say without typing a word. */
 function suggestions(m){
@@ -14272,16 +15545,13 @@ async function converse(m, text){
     m.chat.push({role:"assistant", content:reply});
     ripple(m, 1, null, 0);
     spend(4, 1);
-    /* Whoever is standing near enough hears it too, and it lands on them
-       as well — a kindness in front of witnesses is worth more, and so
-       is a cruelty. */
     const r = roomHears(text, {exclude:m, weight:1});
     if(r.heard){
       const tone = readTone(text);
       if(tone.hostile || tone.promise || r.backed.length || r.objected.length) reportRoom(r);
       renderTalk();
     }
-    refreshPanels();
+    yieldPaint(() => { try{ refreshPanels(); }catch(e){} });
     return;
   }
   const bubble = appendMsg("them", "Thinking…", surname(m.name));
@@ -14548,6 +15818,12 @@ function fresh(build, tries){
 
 /* what is on their mind, drawn from where they actually are */
 function convHook(m){
+  try{ if(!m.brain || !m.brain.inner) netRuminate(m); }catch(e){}
+  if(m.brain && m.brain.inner && chance(0.62)) return m.brain.inner;
+  try{
+    inventLife(m);
+    if(m.life && chance(0.34)) return lifeLine(m);
+  }catch(e){}
   const b = G.bill && !G.bill.done ? G.bill : null;
   const t = topMemory(m);
   const rival = byId(m.rival);
@@ -14844,6 +16120,15 @@ function renderTalk(){
   const m = TALK.m; if(!m) return;
   el("tkName").textContent = m.name;
   const bits = [chipFor(m)];
+  if(m.kind === "member" && m.rel){
+    const n = clamp(Math.round(((m.rel.warmth||0) + 40) / 20), 0, 5);
+    bits.push('<span class="hearts">' + "♥".repeat(n) + "♡".repeat(5-n) + "</span>");
+    try{ bits.push('<span class="pin">net · ' + netRead(m) + '</span>'); }catch(e){}
+    try{ if(m.cog && m.cog.want) bits.push('<span class="pin">want · ' + m.cog.want.k + '</span>'); }catch(e){}
+    try{ if(m.machine) bits.push('<span class="pin">sanctioned</span>'); }catch(e){}
+    try{ if(m.will && m.will.k) bits.push('<span class="pin">will · ' + m.will.k + '</span>'); }catch(e){}
+    try{ if(m.soul && m.soul.good) bits.push('<span class="pin">soul</span>'); }catch(e){}
+  }
   if(m.kind === "member"){
     if(m.post) bits.push('<span class="pin pin--post">'+postTitle(m.post)+'</span>');
     bits.push("<span><span"+tipAttr("state",m.state)+">"+m.state+"</span> "+m.dist+"</span><span>·</span><span>"+m.bg+"</span>");
@@ -15766,7 +17051,7 @@ function fileFloorAmendment(fromSeat){
   setSay("Filed " + where + ". It moves the bill on " + a.n.toLowerCase() + ", and the leadership will read it as a message.",
     fx("bill moved toward your district","−9 influence, −3 standing"));
   note("Filed a floor amendment " + where + " on " + G.bill.title + ".");
-  try{ refreshPanels(); }catch(e){}
+  if(!PROC.on){ try{ refreshPanels(); }catch(e){} }
   return true;
 }
 function seatVoiceActs(){
@@ -16545,7 +17830,7 @@ function switchParty(m, to){
   m.rel.warmth = clamp(m.rel.warmth+25,-100,100);
   m.traits.loyalty = clamp(m.traits.loyalty-10,0,100);
   G.members.forEach(o => { if(o!==m && o.party===from) o.rel.warmth = clamp(o.rel.warmth-4,-100,100); });
-  if(m.mesh){ m.mesh = null; syncPeople(); }
+  if(m.mesh){ m.mesh = null; syncPeopleStaged(); }
   assignPosts(false);
 }
 
@@ -16720,6 +18005,7 @@ function note(text, big){
 }
 /* The running record: nothing happens without leaving a line behind. */
 function feed(text, kind){
+  text = wallScrub(text);
   G.feed.unshift({t:text, at:hhmm(), kind:kind||"", born:G.t});
   if(G.feed.length > 8) G.feed.pop();
   feedDirty = true;
@@ -16766,7 +18052,7 @@ function transition(build){
       f.style.transition = "opacity .5s ease";
       f.style.opacity = "0";
     }catch(e){}
-    try{ save(); }catch(e){}
+    try{ queueSave(); }catch(e){}
   };
   f.style.transition = "opacity .26s ease";
   f.style.opacity = "1";
@@ -16840,8 +18126,10 @@ function overnight(){
     }
   }
   G.members.forEach(m => {
+    if(!m || m.machine || m.sanctioned) return;
     m.rel.warmth = clamp(m.rel.warmth*0.985, -100, 100);
     if(chance(.3)) m.known = Math.max(0, m.known-1);
+    if(MODEST) return;
     const strain = memValence(m)*-0.2 + (60-m.traits.loyalty)*0.4
                  + ((m.party==="FED" ? -G.mood : G.mood))*0.3 - 34;
     if(strain > 22 && chance(.10)){
@@ -16856,9 +18144,11 @@ function overnight(){
       news.push(m.name + " announced they will not seek another term.");
     }
   });
-  G.members = G.members.filter(m => !m.gone);
-  wireGraph();
-  if(G.members.filter(m=>m.post).length < POSTS.length) assignPosts(false);
+  if(!MODEST){
+    G.members = G.members.filter(m => !m.gone);
+    wireGraph();
+    if(G.members.filter(m=>m.post).length < POSTS.length) assignPosts(false);
+  }
   const angry = G.donors.filter(d => d.angry).length;
   if(angry && chance(.5)) news.push(angry + " of your donors have stopped returning calls.");
   if(chance(.35)) news.push(pick([
@@ -16923,6 +18213,7 @@ function nightfall(){
   }
   const paintNight = (news) => {
     news = news || [];
+    try{ worldTick(news); }catch(e){}
     try{ feed("Nightfall. The building keeps score whether you do or not."); }catch(e){}
     card.innerHTML =
       '<div class="eyebrow">' + dateString() + " · " + dayLabel() + '</div>' +
@@ -16988,7 +18279,16 @@ function nextDay(late){
       G.wireScraps = [];
       G.lastAmbientHour = -1;
       if(G.you) G.you.energy = clamp(late ? 78 : 100, 0, 100);
+      try{
+        everyone().forEach(m => {
+          if(m && m.away && G.day >= m.away.until){
+            m.away = null;
+            journal(surname(m.name) + " is back. The desk is filled. The name is not.");
+          }
+        });
+      }catch(e){}
       if(G.recessLeft > 0) G.recessLeft--;
+      try{ sustainHouse(); }catch(e){}
     }catch(e){ fail(e); return; }
     if(G.sittingDay > (G.termLength || 9999)){
       nextDay._busy = false;
@@ -17142,28 +18442,29 @@ function election(){
     (heirs.length ? '<p><strong>The houses hold:</strong> ' + listify(heirs.map(h =>
       h.m.name + " takes " + h.from.state + " " + h.from.dist + " after " + h.from.name)) +
       '. They inherited an opinion of you along with the seat.</p>' : '') +
-    (!youWon && you.outRuns >= 2 ? '<p><strong>Twice now.</strong> There is no third bite at this.</p>'
-      : !youWon ? '<p><strong>You are out of the House, not out of the fight.</strong> No office, no floor, ' +
-        'no committee — the East Steps, the district, and whoever still takes your call. Build enough of ' +
-        'that and you can stand again. Fail twice and it is over.</p>' : '') +
+    (!youWon ? '<p><strong>You are out of the House, not out of the fight.</strong> The steps, the district, and whoever still takes your call. Stand again when you have the numbers. The session does not end.</p>' : '') +
     '<div class="card__actions"><button class="btn" type="button" id="okElect">' +
-      (youWon ? "Take the oath" : you.outRuns >= 2 ? "Read the career" : "Go to the steps") + '</button></div>';
+      (youWon ? "Take the oath" : "Go to the steps") + '</button></div>';
   veil.hidden = false;
   el("okElect").addEventListener("click", () => {
-    if(!youWon && you.outRuns >= 2){ careerEnd(); return; }
-    if(!youWon){ goOutside(); return; }
+    if(!youWon){ you.outRuns = Math.min(you.outRuns || 0, 1); goOutside(); return; }
     veil.hidden = true;
     note("Re-elected by " + you.margin + ". The " + ordinal(G.congress) + " Congress convenes.", true);
     G.career.push({term:G.term-1, post:you.post?postTitle(you.post):"Member", note:"held by "+you.margin});
-    scheduleDay(); syncPeople();
-    leadershipRace();
+    try{ sustainHouse(); ensureLivedIn(); }catch(e){}
+    try{
+      syncPeopleStaged(() => { try{ leadershipRace(); }catch(e){ G.running = true; } });
+    }catch(e){
+      try{ scheduleDay(); }catch(e2){}
+      G.running = true;
+    }
   });
 }
 function leadershipRace(){
   const you = G.you;
-  if(you.party !== majorityParty()){ G.running = true; save(); refreshPanels(); return; }
+  if(you.party !== majorityParty()){ G.running = true; queueSave(); refreshPanels(); return; }
   const open = POSTS.filter(p => p.party==="majority" && you.standing >= p.need - 14 && you.influence > p.weight*0.45);
-  if(!open.length){ G.running = true; save(); refreshPanels(); return; }
+  if(!open.length){ G.running = true; queueSave(); refreshPanels(); return; }
   const friends = G.members.filter(m => m.party===you.party && m.rel.warmth>25);
   card.innerHTML =
     '<div class="eyebrow">Caucus, the morning after</div>' +
@@ -17178,7 +18479,7 @@ function leadershipRace(){
   card.querySelectorAll("[data-post]").forEach(btn => btn.addEventListener("click", () => {
     const k = btn.getAttribute("data-post");
     veil.hidden = true;
-    if(!k){ G.running = true; save(); refreshPanels(); return; }
+    if(!k){ G.running = true; queueSave(); refreshPanels(); return; }
     const p = POSTS.find(x=>x.k===k);
     const enemies = G.members.filter(m => m.party===you.party && m.rel.warmth<-20);
     const score = you.influence*1.4 + friends.length*9 - enemies.length*8 + you.terms*3
@@ -17194,7 +18495,7 @@ function leadershipRace(){
       note("Stood for " + p.t + " and lost the caucus vote.", true);
       enemies.forEach(m => remember(m, "You reached for the gavel and came up short. I enjoyed that.", -2));
     }
-    G.running = true; save(); refreshPanels();
+    G.running = true; queueSave(); refreshPanels();
   }));
 }
 /* ── out of the House, still in the world ─────────────────── */
@@ -17227,7 +18528,8 @@ function outsideAllowed(id){
   return !G.you.out || id === "steps" || id === "district" || id === "corridor" || id === "press";
 }
 function careerEnd(){
-  G.over = true; G.running = false;
+  /* The long session: the record is shown, the world is not deleted. */
+  G.running = false;
   const you = G.you;
   const loyal = G.members.filter(m => m.rel.warmth > 40);
   const foes = G.members.filter(m => m.rel.warmth < -40);
@@ -17244,10 +18546,13 @@ function careerEnd(){
     (loyal.length ? '<p><strong>Would still take your call:</strong> ' + listify(loyal.map(m=>m.name)) + '.</p>'
                   : '<p>Nobody in the chamber would call it a friendship.</p>') +
     (foes.length ? '<p><strong>Will be glad you are gone:</strong> ' + listify(foes.map(m=>m.name)) + '.</p>' : '') +
-    '<div class="card__actions"><button class="btn" type="button" id="again">Run again, somewhere else</button></div>';
+    '<div class="card__actions"><button class="btn" type="button" id="again">Keep walking</button></div>';
   veil.hidden = false;
-  try{ localStorage.removeItem(SAVE_KEY); }catch(e){} clearSharedSave();
-  el("again").addEventListener("click", () => location.reload());
+  el("again").addEventListener("click", () => {
+    G.over = false;
+    if(you) you.outRuns = 0;
+    try{ goOutside(); }catch(e){ G.running = true; veil.hidden = true; }
+  });
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -17263,6 +18568,63 @@ function setHTML(node, html){
   if(node._html === html) return;
   node._html = html;
   node.innerHTML = html;
+}
+function activeJob(){
+  if(PROC && PROC.on && PROC.phase === "you") return "You have the floor. Speak.";
+  if(G.you && G.you.energy < 18) return "You're spent. Sleep.";
+  if((G.minute || 0) >= 22 * 60) return "Ten o'clock. Sleep, or the House sleeps without you.";
+  const here = (typeof hereNow === "function") ? hereNow() : [];
+  const wanter = here.find(m => m && m.wantsWord);
+  if(wanter) return wanter.name.split(" ")[0] + " wants a word. Walk over. E.";
+  const b = G.bill;
+  if(b && !b.done && b.voteDay === G.day) return b.title + " — roll call today. Be on the floor.";
+  if(b && !b.done && G.room !== "floor" && typeof dayType === "function" && dayType() === "session")
+    return "The floor is sitting. Go in.";
+  const unread = (G.mail || []).filter(m => !m.read).length;
+  if(unread && G.room !== "office") return unread + " waiting in the inbox. Office, or F.";
+  if(G.room === "office") return "Desk. Phone. Corridor when you're ready.";
+  if(here.length) return "Walk. Speak. The building notices who does neither.";
+  return "The room is empty. Someone will come.";
+}
+function paintJob(){
+  const box = el("job"), txt = el("jobText");
+  if(!box || !txt) return;
+  const line = activeJob();
+  if(txt._line === line && box.hidden === !!( !G.running || !line )) return;
+  txt._line = line;
+  txt.textContent = line;
+  box.hidden = !G.running || !line;
+  const st = el("scene") && el("scene").parentNode;
+  if(st && st.classList){
+    if(G.you && G.you.energy < 28) st.classList.add("is-spent");
+    else st.classList.remove("is-spent");
+  }
+}
+function paintCompass(){
+  const wrap = el("compass");
+  const box = el("compassTicks");
+  if(!box) return;
+  if(wrap) wrap.style.display = (G.running && !TALK.open) ? "" : "none";
+  if(!G.running) return;
+  const list = hereNow();
+  const bits = [];
+  const yaw = cam.yaw || 0;
+  const half = 50;
+  for(let i=0;i<list.length;i++){
+    const m = list[i];
+    const bear = Math.atan2(m.x - cam.x, m.z - cam.z);
+    const rel = wrapPi(bear - yaw);
+    if(Math.abs(rel) > 1.25) continue;
+    const pct = 50 + (rel / 1.25) * half;
+    let cls = "compass__tick";
+    if(m.wantsWord) cls += " is-quest";
+    else if(TALK.m === m) cls += " is-talk";
+    bits.push('<i class="' + cls + '" style="left:' + pct.toFixed(1) + '%" title="' + (m.name || "") + '"></i>');
+  }
+  const html = bits.join("");
+  if(box._html === html) return;
+  box._html = html;
+  box.innerHTML = html;
 }
 function refreshBar(){
   const you = G.you; if(!you) return;
@@ -17286,6 +18648,7 @@ function refreshBar(){
     statHTML("War chest", Math.round(you.funds), 300, "var(--ind)", money(you.funds)) +
     '<div class="stat"><i>Mood</i><b>' + (G.mood>0?"+":"") + Math.round(G.mood) +
       '</b><span class="stat__track"><span class="stat__fill" style="width:'+((G.mood+60)/120*100)+'%;background:var(--ink-3)"></span></span></div>');
+  try{ paintJob(); paintCompass(); }catch(e){}
 }
 function refreshTravel(){
   const box = el("travel"); box.innerHTML = "";
@@ -17660,6 +19023,7 @@ function refreshUnion(){
         listify(del.map(m => m.name + " (" + m.party + ")")) + '.</p>'
         : '<p class="muted">You know nobody from this delegation.</p>') +
       (s.n === G.you.state ? '<p class="muted"><strong>This is your state.</strong> Its unrest is your problem first.</p>' : '') +
+      (function(){ try{ const c = creedOfState(s.n); return '<p class="muted">The ground leans <strong>' + c.t + '</strong> — ' + (c.sincere ? c.holds : (c.jab || c.holds)) + '.</p>'; }catch(e){ return ''; } })() +
       (s.bill
         ? '<div style="border-top:1px solid var(--line-soft);margin-top:10px;padding-top:10px">' +
           '<div class="eyebrow">In the statehouse</div>' +
@@ -17850,11 +19214,14 @@ function askLine(title, msg, placeholder, cb){
   }
 }
 function refreshPanels(){
-  refreshBar(); refreshTravel(); refreshWire();
-  /* everything behind a closed tab is simply marked stale */
+  try{ refreshBar(); }catch(e){}
+  if((TALK && TALK.open) || (typeof veil !== "undefined" && veil && !veil.hidden)){
+    for(const k in PANE_BUILD) PANE_STALE[k] = true;
+    return;
+  }
+  try{ refreshTravel(); refreshWire(); }catch(e){}
   for(const k in PANE_BUILD) PANE_STALE[k] = true;
-  buildPane(currentPane());
-  /* the inbox badge is on the tab itself, so it has to stay honest */
+  try{ buildPane(currentPane()); }catch(e){}
   const n = unreadCount(), tab = el("tabInbox");
   if(tab) setHTML(tab, "Inbox" + (n ? '<span class="badge">' + n + '</span>' : ""));
 }
@@ -18261,6 +19628,7 @@ const SAVE_BACKUP_KEY = "longsession.v3.backup";
 let saveBusy = false, saveCount = 0, saveQueued = false;
 function queueSave(explicit){
   if(explicit){ try{ return save(true); }catch(e){ return false; } }
+  if(PROC.on || TALK.open) return false;
   if(saveQueued || saveBusy) return false;
   saveQueued = true;
   setTimeout(() => {
@@ -18295,6 +19663,7 @@ function save(explicit){
       termLength:G.termLength, country:G.country,
       greatest:G.greatest, blasphemy:G.blasphemy, loreNote:G.loreNote, greatnessOpen:G.greatnessOpen,
       relics:G.relics, relicSpots:G.relicSpots, bind:G.bind, sens:G.sens,
+      world:G.world,
       pendingNight:!!G.pendingNight,
       cam:{x:cam.x, z:cam.z, yaw:cam.yaw, pitch:cam.pitch},
       /* the clock the shared save is compared by — not the game clock, the
@@ -18324,6 +19693,10 @@ function save(explicit){
     localStorage.setItem(SAVE_KEY, payload);
     G.savedAt = hhmm();
     if(explicit) note("Saved.", false);
+    try{
+      const pip = el("savePip");
+      if(pip){ pip.classList.add("is-on"); clearTimeout(save._pip); save._pip = setTimeout(() => pip.classList.remove("is-on"), 1200); }
+    }catch(e){}
     saveBusy = false;
     return true;
   }catch(e){
@@ -18366,6 +19739,7 @@ function loadSave(){
     if(!G.room || typeof G.room !== "string") G.room = "office";
     if(typeof G.day !== "number" || !(G.day > 0)) G.day = 1;
     if(typeof G.minute !== "number" || G.minute < 0) G.minute = 8*60;
+    if(G.minute >= 22*60){ G.minute = 22*60; G.pendingNight = true; G.running = false; }
     if(!G.states || !G.states.length) buildUnion();
     if(!G.lobbies || !G.lobbies.length) buildLobbies();
     if(!G.money) G.money = {index:100, hist:[100]};
@@ -18382,6 +19756,7 @@ function loadSave(){
     G.press.forEach(m => hydrateLoadedPerson(m));
     G.civ.forEach(m => hydrateLoadedPerson(m));
     if(G.you) hydrateLoadedPerson(G.you);
+    try{ ensureMachineSeat(); }catch(e){}
     if(d.cam && isFinite(d.cam.x) && isFinite(d.cam.z)){
       cam.x = d.cam.x; cam.z = d.cam.z;
       if(isFinite(d.cam.yaw)) cam.yaw = d.cam.yaw;
@@ -18398,7 +19773,7 @@ function hydrateLoadedPerson(m){
   if(!m.rel) m.rel = {warmth:0, known:0, debtFromYou:0, debtToYou:0};
   if(m.rel.warmth == null) m.rel.warmth = 0;
   if(!m.look){ try{ m.look = rollLook(); }catch(e){} }
-  else try{ ensureLookMorphs(m.look); }catch(e){}
+  /* Morphs wait until the mesh is built — hydrating 25 faces on Continue hung Edge. */
   if(!m.room || typeof m.room !== "string") m.room = "away";
   if(!m.pos) m.pos = {econ:0, lib:0, def:0, wel:0};
   try{ if(m.name) usedNames.add(m.name); }catch(e){}
@@ -18691,6 +20066,22 @@ const HANDBOOK = [
     ["It travels", "Hurt one and their friends hear. Every private threat becomes a secret with a clock on it."],
     ["Nothing for turning up", "Influence, standing, approval and money come only from what you do."],
     ["They have their own lives", "Members deal with each other all day — trading, leaning, falling out — whether you are there or not."]
+  ]},
+  {t:"The flag of Nieuw Oranje VII", rows:[
+    ["The cross", "A Jerusalem cross: Christ at the center, the four corners of the earth. Salvation is in Him. Not in the Consul. Not in the House."],
+    ["The old motto", "Non solis radios, sed fulmina Iovis affero — I bring not the rays of the sun, but the thunderbolts of Jupiter."],
+    ["The Cross", "Salus in Christo solo — salvation in Christ alone. The thunderbolt is His. The Consul is not."],
+    ["Taylor Day", "Only this flag flies. The First Consul pointed at the Cross so the living would not point at him."],
+    ["You", "You follow the Lord. Through a member they may find Him. They know nothing, and they can learn."],
+    ["The rest", "Open Circle, Congregation of the Self, Latest Study, Civic Flame, Green Observance, Chapel of the Numbers, Reformed Kerk — lampoons that still vote. Ask them their creed. They will explain themselves."],
+    ["The net", "Each of them is a loop: they model you, pick a want, speak from it, and learn whether the world matched. Prediction error makes them slower to believe. Elsewhere means they were already in a thought that was not you."],
+    ["Will", "Each of them carries a destiny that is not yours. Home, name, creed, a life outside the corridor. They will act on it when you are not looking. They will say no because of it. The pin is will."],
+    ["The world", "There is a war that is not the bill. Grain, the strait, bread, a sky that rains on the steps. Ask them about abroad."],
+    ["Soul", "Sanctioned. Each of them has a good they will not trade and a wound they still hear. The Latin Rite still prays. The pin is soul."],
+    ["Shriving", "The chaplain sits the quiet end of the cloakroom. Say the thing. Not the speech. He is a clerk of it, not the mercy. Christ is the salvation. A desk goes empty for a funeral. Not for a war the House did not march to."],
+    ["The wall", "If the fourth wall breaks, the sim cannot touch Dominic Zachary Taylor or his kin. Real names, real towns, real family — not in this. The utterance dies. The House continues."],
+    ["The clerk", "Ioan Merrick, Independent, Riverbend at large. Seated by sanction. He does not leave. He is not the First Consul. Ask him who he is. He will not break the wall to answer."],
+    ["Off duty", "They have teams, songs, hobbies — some with names this building has never heard. Ask about sport or music. They will invent if they have to."]
   ]},
   {t:"The House", rows:[
     ["The bill", "Drawn from a real state and a real town's real problem. Read it in full from the Floor panel."],
@@ -19267,14 +20658,30 @@ function padTab(d){
   tabs[(i + d + tabs.length) % tabs.length].click();
   picksDirty = true;
 }
+let PAD_SEEN = false;
+try{
+  addEventListener("gamepadconnected", () => { PAD_SEEN = true; });
+  addEventListener("gamepaddisconnected", () => {
+    try{
+      const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+      PAD_SEEN = false;
+      for(let i=0;i<pads.length;i++) if(pads[i] && pads[i].connected){ PAD_SEEN = true; break; }
+    }catch(e){ PAD_SEEN = false; }
+  });
+}catch(e){}
 function pollPad(){
 
   PAD.vx = PAD.vz = PAD.turn = PAD.tilt = 0; PAD.sprint = false;
+  if(!PAD_SEEN){
+    if(picksDirty) refreshPicks();
+    return;
+  }
   const pads = navigator.getGamepads ? navigator.getGamepads() : [];
   let gp = null;
   for(let i=0;i<pads.length;i++) if(pads[i] && pads[i].connected){ gp = pads[i]; break; }
-  /* Rebuild picks only when dirty or a pad/UI actually needs the list. */
-  if(picksDirty || gp || !veil.hidden || TALK.open || promptLive()) refreshPicks();
+  /* Rebuild picks only when dirty or a pad is actually live — a card on
+     screen used to refresh the list sixty times a second and peg a core. */
+  if(picksDirty || gp) refreshPicks();
   padLegend(!!gp);
   if(!gp) return;
   const dz = v => Math.abs(v) < 0.18 ? 0 : (v - Math.sign(v)*0.18)/0.82;
@@ -19473,21 +20880,32 @@ function tick(dt){
   cam.speed = smooth(cam.speed, Math.min(1, spd/1.8), 0.002, dt);
   cam.bob += spd * dt * 3.4;
   cam.lean = smooth(cam.lean, -cam.yawVel*0.045 - (r.x*cam.vx + r.z*cam.vz)*0.012, 0.004, dt);
+  const wantFov = (sprint && spd > 1.35) ? 64 : 58;
+  if(camera && Math.abs((camera.fov || 58) - wantFov) > 0.4){
+    camera.fov += (wantFov - camera.fov) * Math.min(1, dt * 6);
+    if((FRAME_ID & 1) === 0) camera.updateProjectionMatrix();
+  }
   if(G.you && spd > 0.15) G.you.energy = clamp(G.you.energy - dt*0.34*(spd/1.8), 0, 100);
+  if(G.pendingNight) return;
+  if((G.minute || 0) >= 22*60){ beginNight(); return; }
   /* A full day — eight in the morning to ten at night — takes thirty real
      minutes at 1x. Conversations and actions charge their own minutes on
      top of that, so a busy day is shorter than an idle one. */
-  if(!TALK.open && w > 0) spend(w * DAY_RATE, 0);
+  if(!TALK.open && !PROC.on && w > 0) spend(w * DAY_RATE, 0);
   /* Wander/approach only who is here — batch idle destination picks; movers every frame. */
-  tickWanderBatch(w);
-  clockRoom(w);
-  crowdWatch(dt);
-  tieTick(w);
-  confabulate(w);
-  voxTick(w);
-  autonomyTick(w);
+  if(!PROC.on) tickWanderBatch(w);
+  if(MODEST){
+    if((FRAME_ID & 3) === 0 && !PROC.on){ clockRoom(w); crowdWatch(dt); }
+    else if((FRAME_ID & 3) === 2 && !PROC.on){ voxTick(w); autonomyTick(w); }
+  } else if((FRAME_ID & 1) === 0){
+    if(!PROC.on){ clockRoom(w); crowdWatch(dt); confabulate(w); }
+  } else if(!PROC.on){
+    tieTick(w);
+    voxTick(w);
+    autonomyTick(w);
+    chamberDebate(w);
+  }
   procTick(dt);
-  chamberDebate(w);
   bumpCheck(sprint);
   walkThroughDoors();
 }
@@ -19562,17 +20980,37 @@ let hailT = 0, hailWho = null, matChkT = 0, matChk = 0, matChkSaid = 0;
    to the simulation is the real elapsed time across the skipped frames and
    nothing runs slow or fast because of it. FRAME_TARGET_MS is deliberately
    a touch under 1000/60 so a 60Hz panel never skips a frame to rounding. */
-const FRAME_TARGET_MS = (typeof MODEST !== "undefined" && MODEST) ? (1000 / 32) : (1000 / 62);
+const FRAME_TARGET_MS_LO = (typeof MODEST !== "undefined" && MODEST) ? (1000 / 15) : (1000 / 30);
+const FRAME_TARGET_MS_HI = (typeof MODEST !== "undefined" && MODEST) ? (1000 / 24) : (1000 / 48);
+let FRAME_TARGET_MS = (typeof MODEST !== "undefined" && MODEST) ? (1000 / 20) : (1000 / 40);
 let _lastDrawn = 0;
+let _cardFrames = 0;
+let _emaMs = 16;
+let _frameArmed = false;
+function armFrame(){
+  if(_frameArmed) return;
+  _frameArmed = true;
+  const hidden = typeof document !== "undefined" && document.hidden;
+  if(hidden){
+    setTimeout(() => { _frameArmed = false; frame(performance.now()); }, 800);
+    return;
+  }
+  if(MODEST){
+    setTimeout(() => { _frameArmed = false; frame(performance.now()); }, FRAME_TARGET_MS);
+    return;
+  }
+  requestAnimationFrame((t) => { _frameArmed = false; frame(t); });
+}
 function frame(now){
-  if(GL_LOST){ last = now; requestAnimationFrame(frame); return; }
-  if(now - _lastDrawn < FRAME_TARGET_MS){ requestAnimationFrame(frame); return; }
+  if(GL_LOST){ last = now; armFrame(); return; }
+  if(typeof document !== "undefined" && document.hidden){ armFrame(); return; }
+  if(now - _lastDrawn < FRAME_TARGET_MS){ armFrame(); return; }
   _lastDrawn = now;
+  const t0 = now;
   try{
     frameBody(now);
     if(frameFails > 0){ frameFails = Math.max(0, frameFails - 1); if(frameFails === 0) frameFailLogged = false; }
   }catch(err){
-    /* One bad frame must never end the run: recover silently, log once. */
     frameFails++;
     last = performance.now();
     if(!frameFailLogged && window.console){
@@ -19583,18 +21021,29 @@ function frame(now){
       if(renderer && renderer.shadowMap) renderer.shadowMap.needsUpdate = true;
     }catch(e){}
   }
-  requestAnimationFrame(frame);
+  const took = performance.now() - t0;
+  _emaMs = _emaMs * 0.86 + took * 0.14;
+  if(_emaMs > 22) FRAME_TARGET_MS = Math.min(FRAME_TARGET_MS_LO, FRAME_TARGET_MS + 2);
+  else if(_emaMs < 12 && !MODEST) FRAME_TARGET_MS = Math.max(FRAME_TARGET_MS_HI, FRAME_TARGET_MS - 0.4);
+  if(took > 40) FRAME_TARGET_MS = FRAME_TARGET_MS_LO;
+  armFrame();
 }
 function frameBody(now){
   const dt = Math.min(0.05, (now-last)/1000); last = now;
   FRAME_ID++;
-  pollPad();
   const cardUp = !!(typeof veil !== "undefined" && veil && !veil.hidden);
-  if(cardUp && !TALK.open){
-    /* On-demand GL: the overlay owns the pixels. Drawing the House under
-       Ten o'clock is what froze Edge on Intel UHD during Sleep. */
+  const talkUp = !!(typeof TALK !== "undefined" && TALK && TALK.open);
+  if(PAD_SEEN || picksDirty) pollPad();
+  else if(picksDirty) refreshPicks();
+  if(cardUp || talkUp){
     try{ feedTick(dt); }catch(e){}
     try{ tickScrollFrame(); }catch(e){}
+    try{ if(talkUp) catchFrame(dt); }catch(e){}
+    _cardFrames = (_cardFrames || 0) + 1;
+    /* Cards do not need a live 3D scene sixty times a second. */
+    if(!GL_LOST && ((MODEST ? _cardFrames % 10 : _cardFrames % 5) === 0)){
+      try{ renderer.render(scene, camera); }catch(e){}
+    }
     return;
   }
   if(G.running && !G.over && G.speed > 0){
@@ -19605,13 +21054,28 @@ function frameBody(now){
     }
   }
   FRAME_ID++;
-  /* only the people actually in the room have a body to animate;
-     when paused, still place meshes but animatePerson early-outs far/behind. */
+  if(_emaMs > 36){
+    try{ if(!GL_LOST) renderer.render(scene, camera); }catch(e){}
+    return;
+  }
+  const crowd = hereNow();
   if(G.running || !veil.hidden || TALK.open){
-    hereNow().forEach(p => animatePerson(p, dt));
+    const cap = MODEST ? 8 : 14;
+    if(crowd.length > cap){
+      for(let i=0;i<crowd.length;i++){
+        const p = crowd[i];
+        const d2 = (p.x-cam.x)*(p.x-cam.x) + (p.z-cam.z)*(p.z-cam.z);
+        if(d2 > LOD_FAR*LOD_FAR && !(TALK.open && TALK.m === p)){
+          if(p.mesh && p.mesh.visible) p.mesh.visible = false;
+          continue;
+        }
+        animatePerson(p, dt);
+      }
+    } else {
+      for(let i=0;i<crowd.length;i++) animatePerson(crowd[i], dt);
+    }
   } else {
-    /* Soft pause (menus): update placement every other frame. */
-    if((FRAME_ID & 1) === 0) hereNow().forEach(p => animatePerson(p, dt));
+    if((FRAME_ID & 1) === 0) for(let i=0;i<crowd.length;i++) animatePerson(crowd[i], dt);
   }
   /* Once a second, check one body's world matrix for a value that
      cannot be right — a zero scale or a NaN, which is what a stale or
@@ -19626,7 +21090,7 @@ function frameBody(now){
   matChkT -= dt;
   if(matChkT <= 0){
     const crowdN = peopleGroup ? peopleGroup.children.length : 0;
-    matChkT = crowdN > 6 ? 0.9 : 0.55;
+    matChkT = crowdN > 6 ? (MODEST ? 1.6 : 0.9) : (MODEST ? 1.1 : 0.55);
     const list = hereNow();
     /* Round-robin a few bodies per tick — full scan every frame was wasted work. */
     const step = Math.max(1, Math.ceil(list.length / 4));
@@ -19785,7 +21249,7 @@ function opening(){
   const dayN = hasSave ? (peek.day || 1) : 1;
   const cname = (peek && peek.country && peek.country.name) ? peek.country.name : (G.country && G.country.name);
   card.innerHTML =
-    '<img class="card__logo" src="data:image/jpeg;base64,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" width="220" height="147" alt="One Nation, Under, ME.">' +    '<div class="eyebrow">One Nation, Under, ME. · The ' + ordinal(cong) + ' Congress' +
+    '<img class="card__logo" src="assets/logo.png" width="220" height="147" alt="One Nation, Under, ME.">' +    '<div class="eyebrow">One Nation, Under, ME. · The ' + ordinal(cong) + ' Congress' +
       (cname ? ' · ' + cname : '') + '</div>' +
     '<h1>Everyone in this building remembers what you did to them.</h1>' +
     '<p>You are a member of the House. There is a bill on the calendar, a roll call coming, and twenty-five ' +
@@ -19890,12 +21354,14 @@ function cardActContinue(){
       showContinueBroken();
       return;
     }
-    try{ begin(); }
-    catch(e){
-      if(window.console) console.warn("begin", e);
-      G._booting = false;
-      showContinueBroken(e);
-    }
+    yieldPaint(() => {
+      try{ begin(); }
+      catch(e){
+        if(window.console) console.warn("begin", e);
+        G._booting = false;
+        showContinueBroken(e);
+      }
+    });
   });
 }
 function resumeLiveCareer(){
@@ -20426,7 +21892,7 @@ function startRun(){
   } else {
     G.you.traits.loyalty = clamp((G.you.traits.loyalty||50) + Math.round(r.loyal*0.35), 0, 100);
   }
-  if(!G.you.creed) G.you.creed = pick(CREEDS).k;
+  if(!G.you.creed) G.you.creed = "latin";
   if(!G.you.origin) G.you.origin = pick(ORIGINS).k;
   if(!G.you.bg) G.you.bg = pick(BACKGROUNDS).t;
   if(!G.you.suite) G.you.suite = "Cannon " + rint(101, 448);
@@ -20501,10 +21967,14 @@ function begin(){
     syncPeopleStaged(() => {
       try{ document.body.classList.remove("boot-menu"); }catch(e){}
       try{ veil.hidden = true; card.classList.remove("card--open"); veil.classList.remove("veil--make"); }catch(e){}
-      G.running = true;
       G._booting = false;
+      if((G.minute || 0) >= 22*60 || G.pendingNight){
+        try{ beginNight(); }catch(e){ G.running = true; }
+        return;
+      }
+      G.running = true;
       try{ setSpeed(G.prevSpeed || 1); }catch(e){ G.speed = 1; }
-      try{ refreshPanels(); save(); }catch(e){}
+      yieldPaint(() => { try{ refreshPanels(); }catch(e){} });
     });
   });
   setTimeout(() => {
@@ -20608,15 +22078,21 @@ try{ reconcileFromDB(); }catch(e){}
 
 /* Continuity: wall-clock autosave while running (survives long AFK in one room). */
 setInterval(() => {
-  try{ if(G.running && !G.over && G.you && G.members && G.members.length) save(); }catch(e){}
+  try{ if(G.running && !G.over && G.you && G.members && G.members.length) queueSave(); }catch(e){}
 }, 45000);
 addEventListener("beforeunload", () => {
   try{ if(G.you && G.members && G.members.length) save(); }catch(e){}
 });
 addEventListener("visibilitychange", () => {
-  try{ if(document.visibilityState === "hidden" && G.you && G.members && G.members.length) save(); }catch(e){}
+  try{
+    if(document.visibilityState === "hidden"){
+      if(G.you && G.members && G.members.length) queueSave();
+    } else {
+      armFrame();
+    }
+  }catch(e){}
 });
-requestAnimationFrame(frame);
+armFrame();
 
 })();
 </script>
