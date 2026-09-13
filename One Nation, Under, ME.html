@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20260913f">
+<meta name="onum-build" content="20260913g">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -19799,18 +19799,21 @@ async function reconcileFromDB(){
   let snap;
   try{ snap = await doc.get(); }catch(e){ return; }
   let local = null;
-  try{
-    const raw = localStorage.getItem(SAVE_KEY);
-    if(raw) local = JSON.parse(raw);
-  }catch(e){}
+  try{ local = pickNewestSave(); }catch(e){
+    try{
+      const raw = localStorage.getItem(SAVE_KEY);
+      if(raw) local = JSON.parse(raw);
+    }catch(e2){}
+  }
   if(snap.exists){
     const remote = snap.data();
     const remoteAt = (remote && remote.savedAtMs) || 0;
     const localAt = (local && local.savedAtMs) || 0;
-    if(remoteAt > localAt){
+    if(remoteAt && isBetterSave(remote, local)){
       try{ localStorage.setItem(SAVE_KEY, JSON.stringify(remote)); }catch(e){}
+      try{ localStorage.setItem(SAVE_BEST_KEY, JSON.stringify(remote)); }catch(e){}
       if(!G.running) opening();
-    } else if(local && localAt > remoteAt){
+    } else if(local && isBetterSave(local, remote)){
       doc.set(local).catch(() => {});
     }
   } else if(local){
@@ -19819,6 +19822,48 @@ async function reconcileFromDB(){
 }
 const SAVE_KEY = "longsession.v3";
 const SAVE_BACKUP_KEY = "longsession.v3.backup";
+const SAVE_BEST_KEY = "longsession.v3.best";
+function careerRank(d){
+  if(!d || !d.you) return -1;
+  const cong = +(d.congress || 1);
+  const day = +(d.day || 0);
+  const sit = +(d.sittingDay || d.day || 0);
+  const min = +(d.minute || 0);
+  return cong * 1e9 + day * 1e6 + sit * 1e4 + min;
+}
+function parseSaveRaw(raw){
+  if(!raw) return null;
+  try{
+    const d = JSON.parse(raw);
+    if(!d || !d.you || !Array.isArray(d.members) || !d.members.length) return null;
+    return d;
+  }catch(e){ return null; }
+}
+function readSaveKey(key){
+  try{ return parseSaveRaw(localStorage.getItem(key)); }catch(e){ return null; }
+}
+function isBetterSave(a, b){
+  if(!a) return false;
+  if(!b) return true;
+  const ra = careerRank(a), rb = careerRank(b);
+  if(ra !== rb) return ra > rb;
+  return (+(a.savedAtMs || 0)) >= (+(b.savedAtMs || 0));
+}
+function pickNewestSave(){
+  const cands = [SAVE_KEY, SAVE_BACKUP_KEY, SAVE_BEST_KEY].map(readSaveKey).filter(Boolean);
+  if(!cands.length) return null;
+  let best = cands[0];
+  for(let i=1;i<cands.length;i++) if(isBetterSave(cands[i], best)) best = cands[i];
+  return best;
+}
+function writeSaveKey(key, raw){
+  try{ localStorage.setItem(key, raw); return true; }catch(e){ return false; }
+}
+function wipeCareerSaves(){
+  [SAVE_KEY, SAVE_BACKUP_KEY, SAVE_BEST_KEY].forEach(k => {
+    try{ localStorage.removeItem(k); }catch(e){}
+  });
+}
 let saveBusy = false, saveCount = 0, saveQueued = false;
 function queueSave(explicit){
   if(explicit){ try{ return save(true); }catch(e){ return false; } }
@@ -19865,26 +19910,25 @@ function save(explicit){
       savedAtMs: Date.now()
     };
     const payload = JSON.stringify(payloadObj);
-    /* best-effort: the local save is the one thing that must never fail, so
-       the shared copy can never block or break it */
+    /* Never write a shorter career over a longer one. That is how day 10
+       became day 5 — a torn primary, an old backup, or the shared store. */
+    const newest = pickNewestSave();
+    if(newest && careerRank(payloadObj) < careerRank(newest)){
+      saveBusy = false;
+      return false;
+    }
     try{
       const doc = saveDoc();
       if(doc) doc.set(payloadObj).catch(() => {});
     }catch(e){}
-    /* The backup exists to survive a torn primary write, so it only has to
-       be a known-good *recent* copy — not one that is exactly one save old.
-       Refreshing it on every save meant each save read the whole previous
-       payload back out of localStorage and wrote it again before writing
-       the new one: roughly double the write volume plus a full read, all
-       synchronous on the main thread, on every autosave and every room
-       change. Every fifth save (and every explicit one) keeps the same
-       guarantee at a fraction of the cost. */
     saveCount++;
-    if(explicit || (saveCount % 5) === 1){
-      const previous = localStorage.getItem(SAVE_KEY);
-      if(previous) localStorage.setItem(SAVE_BACKUP_KEY, previous);
+    const wrote = writeSaveKey(SAVE_KEY, payload);
+    writeSaveKey(SAVE_BACKUP_KEY, payload);
+    writeSaveKey(SAVE_BEST_KEY, payload);
+    if(!wrote){
+      saveBusy = false;
+      return false;
     }
-    localStorage.setItem(SAVE_KEY, payload);
     G.savedAt = hhmm();
     if(explicit) note("Saved.", false);
     try{
@@ -19901,20 +19945,18 @@ function save(explicit){
 }
 function loadSave(){
   try{
-    let raw = localStorage.getItem(SAVE_KEY);
-    if(!raw) raw = localStorage.getItem(SAVE_BACKUP_KEY);
-    if(!raw) return false;
-    let d;
-    try{ d = JSON.parse(raw); }
-    catch(parseErr){
-      /* A torn primary write can happen if the browser closes mid-save. */
-      if(window.console) console.warn("loadSave parse", parseErr);
-      try{
-        raw = localStorage.getItem(SAVE_BACKUP_KEY);
-        d = JSON.parse(raw || "");
-      }catch(backupErr){ return false; }
+    let d = pickNewestSave();
+    if(!d){
+      let raw = localStorage.getItem(SAVE_KEY);
+      if(!raw) raw = localStorage.getItem(SAVE_BACKUP_KEY);
+      d = parseSaveRaw(raw);
     }
-    if(!d || !d.you || !d.members || !d.members.length) return false;
+    if(!d) return false;
+    try{
+      const raw = JSON.stringify(d);
+      writeSaveKey(SAVE_KEY, raw);
+      writeSaveKey(SAVE_BEST_KEY, raw);
+    }catch(e){}
     Object.assign(G, d);
     if(G.fullDetail === undefined || G.fullDetail === null) G.fullDetail = false;
     if(!G.gfx || (G.gfx !== "best" && G.gfx !== "balanced" && G.gfx !== "simple")){
@@ -19974,7 +20016,8 @@ function hydrateLoadedPerson(m){
   try{ if(m.name) usedNames.add(m.name); }catch(e){}
 }
 function exportCareerSave(){
-  const raw = localStorage.getItem(SAVE_KEY);
+  const d = pickNewestSave();
+  const raw = d ? JSON.stringify(d) : localStorage.getItem(SAVE_KEY);
   if(!raw){ note("There is no career save to export.", true); return; }
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([raw], {type:"application/json"}));
@@ -19994,6 +20037,8 @@ function importCareerSave(file){
       if(!d || !d.you || !Array.isArray(d.members) || !d.members.length)
         throw new Error("That file is not a valid career save.");
       localStorage.setItem(SAVE_KEY, JSON.stringify(d));
+      try{ localStorage.setItem(SAVE_BACKUP_KEY, JSON.stringify(d)); }catch(e){}
+      try{ localStorage.setItem(SAVE_BEST_KEY, JSON.stringify(d)); }catch(e){}
       location.reload();
     }catch(e){ note((e && e.message) || "Could not import that career save.", true); }
   };
@@ -21485,29 +21530,21 @@ function frameBody(now){
 }
 
 function peekSave(){
-  /* Lightweight: Continue label only. Check backup if the primary write tore. */
-  const keys = [SAVE_KEY, SAVE_BACKUP_KEY];
-  for(let i=0;i<keys.length;i++){
-    try{
-      const raw = localStorage.getItem(keys[i]);
-      if(!raw) continue;
-      const d = JSON.parse(raw);
-      if(!d || !d.you || !d.members || !d.members.length) continue;
-      return {
-        day: d.day || 1,
-        congress: d.congress || 1,
-        country: d.country || null,
-        name: d.you && d.you.name,
-        room: d.room || "office"
-      };
-    }catch(e){}
-  }
-  return null;
+  const d = pickNewestSave();
+  if(!d) return null;
+  return {
+    day: d.day || 1,
+    congress: d.congress || 1,
+    country: d.country || null,
+    name: d.you && d.you.name,
+    room: d.room || "office",
+    minute: d.minute || 0
+  };
 }
 function bootFreshCareer(){
   if(G._booting) return;
   G._booting = true;
-  try{ localStorage.removeItem(SAVE_KEY); }catch(e){} clearSharedSave();
+  try{ wipeCareerSaves(); }catch(e){} try{ localStorage.removeItem(SAVE_KEY); }catch(e){} clearSharedSave();
   try{ G.you = null; G.members = []; G.make = null; G.running = false; }catch(e){}
   try{ card.classList.remove("card--open"); }catch(e){}
   try{ veil.classList.remove("veil--make"); }catch(e){}
