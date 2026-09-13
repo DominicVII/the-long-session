@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20260913h">
+<meta name="onum-build" content="20260913i">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -670,6 +670,7 @@ body.boot-menu .shell{grid-template-rows:minmax(0,1fr)}
 @keyframes cardin{from{opacity:0; transform:translateY(10px)} to{opacity:1; transform:none}}
 .boot-hint{font-size:11px; color:var(--ink-3); margin-top:10px; letter-spacing:.04em}
 .veil[hidden]{display:none}
+.veil[hidden] .card{display:none !important}
 .card{width:min(690px,100%); background:var(--paper); border:1px solid var(--line); border-top:3px solid var(--fed);
   border-radius:3px; box-shadow:0 26px 70px -34px rgba(0,0,0,.7); padding:26px 30px 24px}
 .card h1{font-family:"Instrument Serif",Georgia,serif; font-size:34px; font-weight:400; line-height:1.08; margin:8px 0 12px; text-wrap:balance}
@@ -7606,6 +7607,7 @@ function updatePlates(focus){
     V.set(p.x, p.look.height + 0.20, p.z).project(camera);
     if(V.z > 1){ continue; }
     let sx = (V.x*0.5+0.5)*rect.width, sy = (-V.y*0.5+0.5)*rect.height;
+    if(!isFinite(sx) || !isFinite(sy)) continue;
     if(sx < 20 || sx > rect.width-20 || sy < 10 || sy > rect.height-10) continue;
     let lift = 0;
     while(used.some(u => Math.abs(u.x-sx) < 96 && Math.abs(u.y-(sy-lift)) < 40) && lift < 160) lift += 42;
@@ -9734,6 +9736,8 @@ function hhmm(){
 function tired(){ return (G.you && G.you.energy < 34) ? (34 - G.you.energy) * 0.6 : 0; }
 function checkEvents(){
   if(G.pendingNight || (G.minute || 0) >= 22*60) return;
+  if(G._booting) return;
+  if(G._bootGraceUntil && performance.now() < G._bootGraceUntil) return;
   if((G.minute || 0) >= 21*60 + 20){
     const q = Math.floor(G.minute/8);
     if(q !== G.lastAuto){ G.lastAuto = q; if(G.running && !G.over) queueSave(); }
@@ -11181,28 +11185,15 @@ function escortTo(e){
   if(e.escorting || e.done) return;
   e.escorting = true;
   const dest = e.room;
-  if(window.console) console.log("[Escort] Starting transition to " + dest + " for " + e.t);
   feed("Escort: " + e.t + " — " + hourLabel(e.hour) + ", " + ((ROOMS[e.room]&&ROOMS[e.room].t)||e.room) + ".");
   try{ pushWireScrap("Diary", e.t + " now · " + ((ROOMS[e.room]&&ROOMS[e.room].t)||e.room)); }catch(err){}
   try{ stageEventPeople(e); }catch(err){}
-  spend(Math.round(ROOMS[dest].travel*0.5), 3);
-  transition(() => {
-    try{ catchClear("escort"); }catch(err){}
-    G.room = dest; G.visitId = null;
-    if(window.console) console.log("[Escort] Room changed to " + dest + ", building...");
-    const sp = safeSpawn(dest);
-    cam.x = sp.x; cam.z = sp.z; cam.yaw = 0; cam.vx = cam.vz = 0;
-    everyone().forEach(m => { if(m.room===dest) placeInRoom(m); });
-    if(dest === "floor") seatChamber();
-    return rebuildRoomStaged(dest, () => {
-      if(window.console) console.log("[Escort] Room build complete for " + dest);
-      el("whereName").textContent = ROOMS[dest].t;
-      el("whereTag").textContent = ROOMS[dest].tag;
-      e.escorting = false;
-      eventCard(e);
-      refreshPanels();
-    });
-  });
+  try{ enterRoom(dest, G.room); }catch(err){ G.room = dest; }
+  e.escorting = false;
+  nextFrameOrTimeout(() => {
+    try{ eventCard(e); }catch(err){}
+    try{ refreshPanels(); }catch(err){}
+  }, 80);
 }
 /* ── the day's card, read over breakfast ─────────────────── */
 function dayPlanCard(){
@@ -18740,6 +18731,57 @@ function goOutside(){
     });
   });
 }
+function leaveSittingQuiet(){
+  if(!PROC.on) return;
+  PROC.on = false;
+  PROC.phase = "idle";
+  PROC.e = null;
+  PROC.speaker = null;
+  PROC.i = -1;
+  try{ const bar = el("procBar"); if(bar) bar.hidden = true; }catch(e){}
+  try{ document.body.classList.remove("in-session"); }catch(e){}
+  if(G.you) G.you.sitting = false;
+  G.speechApproach = null;
+  try{ catchClear("leave-sitting"); }catch(e){}
+  feed("You leave the sitting. It goes on without you.");
+}
+function mapCard(){
+  if(!G.you) return;
+  try{ leaveSittingQuiet(); }catch(e){}
+  try{ if(TALK.open) closeTalk(); }catch(e){}
+  phoneWasRunning = phoneWasRunning === null ? G.running : phoneWasRunning;
+  G.running = false;
+  const here = G.room;
+  const rows = Object.keys(ROOMS).filter(id => id !== "visit" && outsideAllowed(id)).map(id => {
+    const R = ROOMS[id];
+    const on = id === here;
+    return '<button type="button" class="conc__btn' + (on ? " is-accepted" : "") + '" data-go="' + id + '"' +
+      (on ? " disabled" : "") + '>' + R.t + '<u>' + (R.tag || id) + (on ? " · you are here" : "") + '</u></button>';
+  }).join("");
+  card.innerHTML =
+    '<div class="eyebrow">The building</div>' +
+    '<h1>Where do you want to be.</h1>' +
+    '<p class="muted">This does not wipe the sitting. Walk, or pick a door.</p>' +
+    '<div class="conc__list">' + rows + '</div>' +
+    '<div class="card__actions"><button class="btn" type="button" id="mapDone" data-gp="map:done">Stay here</button></div>';
+  veil.hidden = false;
+  card.classList.add("card--open");
+  card.querySelectorAll("[data-go]").forEach(b => b.addEventListener("click", () => {
+    const id = b.getAttribute("data-go");
+    veil.hidden = true;
+    card.classList.remove("card--open");
+    G.running = phoneWasRunning === null ? true : phoneWasRunning;
+    phoneWasRunning = null;
+    try{ enterRoom(id, here); }catch(e){ G.room = id; }
+  }));
+  const done = el("mapDone");
+  if(done) done.onclick = () => {
+    veil.hidden = true;
+    card.classList.remove("card--open");
+    G.running = phoneWasRunning === null ? true : phoneWasRunning;
+    phoneWasRunning = null;
+  };
+}
 function outsideAllowed(id){
   return !G.you.out || id === "steps" || id === "district" || id === "corridor" || id === "press";
 }
@@ -18952,6 +18994,7 @@ function callOn(m){
 }
 function goTo(id){
   if(!ROOMS[id] || id === G.room) return;
+  try{ leaveSittingQuiet(); }catch(e){}
   closeTalk();
   feed("Walking to " + ROOMS[id].t + ".");
   enterRoom(id, G.room);
@@ -20636,9 +20679,7 @@ loadSettings();
   if(openBtn) openBtn.addEventListener("click", () => openPanels());
   const mapBtn = el("uiMapBtn");
   if(mapBtn) mapBtn.addEventListener("click", () => {
-    openPanels();
-    /* scroll travel into view inside the covering sheet */
-    try{ el("travel").scrollIntoView({block:"nearest"}); }catch(e){}
+    try{ mapCard(); }catch(e){ openPanels(); }
   });
   const ub = el("unBare");
   if(ub) ub.addEventListener("click", () => openPanels());
@@ -20873,6 +20914,7 @@ function padBack(){
     return;
   }
   if(uiOpen()){ closePanels(); resetPlayerBusy(); return; }
+  if(PROC.on){ leaveSittingQuiet(); return; }
   /* Stuck in CATCH / speech glass / approach — B backs all the way out */
   if(CATCH.on || CATCH.current || (CATCH.pieces && CATCH.pieces.length) || CATCH.armedByInteract || G.speechApproach || promptLive()){
     clearSpeechBusy("back");
@@ -22274,8 +22316,18 @@ function begin(){
     return;
   }
   G.over = false;
-  G._bootGraceUntil = performance.now() + 3500;
+  G._bootGraceUntil = performance.now() + 8000;
   document.body.classList.remove("ui-open");
+  try{
+    PROC.on = false; PROC.phase = "idle"; PROC.speaker = null; PROC.e = null;
+    const bar = el("procBar"); if(bar) bar.hidden = true;
+    document.body.classList.remove("in-session");
+  }catch(e){}
+  G.moving = false;
+  G.speechApproach = null;
+  if(G.you) G.you.sitting = false;
+  G.speed = 1;
+  G.prevSpeed = 1;
   if(!G.room || !ROOMS[G.room]) G.room = "office";
   try{ ensureParties(); }catch(e){}
   try{ ensureMythHistory(); ensureGreatest(); }catch(e){}
