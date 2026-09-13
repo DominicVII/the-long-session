@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20260913e">
+<meta name="onum-build" content="20260913f">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -493,7 +493,13 @@ body.is-bare .ui-toolbar{display:flex}
 .dossier--phone .pane.is-on{flex:1 1 auto; max-height:42vh; overflow:auto}
 .dossier--phone .tabs{flex-wrap:wrap}
 body.is-bare .dossier.dossier--phone{display:flex !important}
-.phone__hint{font-size:11px; color:var(--ink-3); margin:6px 0 0; line-height:1.4}
+.card .billbox{border-color:rgba(255,255,255,.12); padding-bottom:10px; margin-bottom:10px}
+.card .axis span{background:rgba(255,255,255,.16)}
+.card .axis span b{background:#e8eaee}
+.card .axis span em{background:#5fa97c}
+.card .mailrow{border-top:1px solid rgba(255,255,255,.1); padding:9px 0; cursor:pointer}
+.card .mailrow__s{font-size:13px}
+.card .mailrow__b{font-size:12.5px; line-height:1.45; margin-top:6px; color:var(--ink-2)}
 
 .ui-toolbar button{font:600 11px Archivo,system-ui,sans-serif; letter-spacing:.08em; text-transform:uppercase;
   padding:8px 11px; border-radius:3px; border:1px solid rgba(255,255,255,.2);
@@ -5555,10 +5561,36 @@ function decorateOfficeFor(person){
 
 let _buildingRoom = false;
 let _roomBuiltId = null;
+const ROOM_KITS = Object.create(null);
+let ROOM_KIT_IDS = [];
+function stashLiveRoom(){
+  const id = _roomBuiltId;
+  if(!id || !roomGroup || roomGroup.children.length < 4) return;
+  const kit = ROOM_KITS[id] || new THREE.Group();
+  while(roomGroup.children.length) kit.add(roomGroup.children[0]);
+  ROOM_KITS[id] = kit;
+  ROOM_KIT_IDS = ROOM_KIT_IDS.filter(x => x !== id);
+  ROOM_KIT_IDS.push(id);
+  const cap = MODEST ? 2 : 3;
+  while(ROOM_KIT_IDS.length > cap){
+    const drop = ROOM_KIT_IDS.shift();
+    if(drop === id) continue;
+    delete ROOM_KITS[drop];
+  }
+}
+function takeRoomKit(id){
+  const kit = ROOM_KITS[id];
+  if(!kit || !kit.children.length) return false;
+  while(kit.children.length) roomGroup.add(kit.children[0]);
+  _roomBuiltId = id;
+  return true;
+}
 function buildRoom(id){
   if(_buildingRoom) return;
   if(!ROOMS[id]) id = "office";
   if(_roomBuiltId === id && roomGroup && roomGroup.children.length >= 5) return;
+  if(_roomBuiltId && _roomBuiltId !== id) stashLiveRoom();
+  if(takeRoomKit(id)) return;
   _buildingRoom = true;
   try{
     try{
@@ -9352,6 +9384,55 @@ function phoneCycleTab(dir){
   picksDirty = true;
   PICK = -1;
 }
+function phoneBillHtml(){
+  const b = G.bill, you = G.you;
+  if(!b || !you) return '<p class="muted">The calendar is clear.</p>';
+  const t = tallyBill(b, true);
+  const axes = AXES.map(a =>
+    '<div class="axis"><i>'+a.lo+' / '+a.hi+'</i><span><b style="left:'+((b.pos[a.k]+100)/200*100)+
+    '%"></b><em style="left:'+((you.district[a.k]+100)/200*100)+'%"></em></span></div>').join("");
+  const dist = districtFit(b);
+  const youFit = alignment(you, b);
+  const seats = G.seats || 181;
+  return '<div class="billbox phone__scroll">' +
+    '<div class="eyebrow">On the calendar' + (b.stakes ? ' · ' + b.stakes : '') + '</div>' +
+    '<div class="h-serif">' + b.title + '</div>' +
+    '<div class="muted">' + (b.line || "") + (b.sponsor ? ' Sponsored by ' + b.sponsor + '.' : '') + '</div>' +
+    '<div class="billbox__pos">' + axes + '</div>' +
+    '<div class="muted" style="margin-top:7px">Dark tick: the bill. Green tick: what your district wants.</div>' +
+    '<p class="muted">District reads it as <strong>' +
+      (dist>20?"a win":dist<-20?"a problem":"noise") + '</strong>; you read it as <strong>' +
+      (youFit>20?"right":youFit<-20?"wrong":"borderline") + '</strong>.</p>' +
+    '<div class="count"><div class="c-aye"><i>Ayes</i><b>'+t.aye+'</b></div>' +
+      '<div class="c-no"><i>Noes</i><b>'+t.no+'</b></div>' +
+      '<div class="c-un"><i>Unknown</i><b>'+t.un+'</b></div></div>' +
+    '<div class="countbar"><span style="width:'+(t.aye/seats*100)+'%;background:var(--good)"></span>' +
+      '<span style="width:'+(t.no/seats*100)+'%;background:var(--bad)"></span>' +
+      '<span style="width:'+(t.un/seats*100)+'%;background:var(--line)"></span></div>' +
+    '<p class="muted">Intention: <strong>' + (you.vote===1?"aye":you.vote===-1?"no":"undeclared") + '</strong>' +
+      (b.voteDay ? ' · roll call day ' + b.voteDay : '') + '</p>' +
+    '<div class="risk__actions">' +
+      '<button class="conc__btn" type="button" data-gp="phone-vote:1" data-phone-vote="1">Vote aye</button>' +
+      '<button class="conc__btn" type="button" data-gp="phone-vote:-1" data-phone-vote="-1">Vote no</button>' +
+    '</div></div>';
+}
+function phoneMailHtml(){
+  if(!(G.mail && G.mail.length))
+    return '<p class="muted">Nothing yet. People write once they know who you are.</p>';
+  return '<div class="phone__scroll">' + G.mail.slice(0, 16).map(x =>
+    '<div class="mailrow' + (x.read||x.outgoing ? "" : " is-unread") + '" data-mail="' + x.id + '">' +
+      '<div class="mailrow__h"><span class="mailrow__f">' +
+        (x.read||x.outgoing ? "" : '<span class="dotmark"></span>') +
+        (x.outgoing ? "→ " : "") + x.from + '</span>' +
+        '<span class="mailrow__d">d' + x.day + ' · ' + x.at + '</span></div>' +
+      '<div class="mailrow__s">' + x.subject + '</div>' +
+      (x.open ? '<div class="mailrow__b">' + x.body + '</div>' +
+        (x.options && !x.answered ? '<div class="mailrow__acts">' +
+          x.options.map((o,i) => '<button class="conc__btn" style="width:auto" data-ans="' + x.id + ':' + i + '">' + o.t + '</button>').join("") +
+          '</div>' : x.answered ? '<div class="mailrow__acts"><span class="muted">Answered.</span></div>' : "")
+      : '<p class="muted" style="margin:6px 0 0">Tap to open and answer.</p>') +
+    '</div>').join("") + '</div>';
+}
 let phoneTab = "vox";
 function phoneCard(){
   if(!G.running && !G.over && !phoneWasRunning) return;
@@ -9367,9 +9448,7 @@ function phoneCard(){
     body = '<p class="phone__hint">In time — sittings and roll call for <strong>' + dateString() + '</strong>. Clock is ' + hhmm() + '.</p>' +
       dayScheduleHtml();
   } else if(phoneTab === "panels"){
-    body = '<p class="phone__hint">Floor, members, inbox — the desk UI on your phone. ' +
-      'LB/RB or LT/RT walk phone tabs · D-pad / stick moves · A selects · B / Esc puts it away. KBM: H · F.</p>' +
-      '<div id="phPanelsHost"></div>';
+    body = phoneBillHtml();
   } else if(phoneTab === "vox"){
     body = '<div class="phone__scroll">' + (voxRows(14) || '<p class="muted">Nothing yet.</p>') + '</div>';
   } else if(phoneTab === "post"){
@@ -9387,12 +9466,7 @@ function phoneCard(){
       '<p class="muted" style="margin-top:8px">Everyone in the House reads it. Some of them will back you and ' +
       'some of them will come at you, and both of those are things you will have to look at in the corridor.</p>';
   } else if(phoneTab === "mail"){
-    body = '<div class="phone__scroll">' + (G.mail.length
-      ? G.mail.slice(0, 12).map(x =>
-          '<div class="vox"><div class="vox__h"><b>' + (x.outgoing ? "→ " : "") + x.from + '</b>' +
-            '<i>d' + x.day + ' ' + x.at + '</i></div><div class="vox__t">' + x.subject + '</div></div>').join("")
-      : '<p class="muted">Nothing yet.</p>') + '</div>' +
-      '<p class="muted" style="margin-top:8px">Answering takes a desk. This is for knowing what is waiting.</p>';
+    body = phoneMailHtml();
   } else {
     const b = G.bill;
     body = '<div class="mk">' +
@@ -9439,6 +9513,27 @@ function phoneCard(){
     try{ queueSave(); }catch(e){}
     phoneCard();
   }));
+  card.querySelectorAll("[data-mail]").forEach(r => r.addEventListener("click", e => {
+    if(e.target.hasAttribute("data-ans")) return;
+    const m = G.mail.find(x => x.id === +r.getAttribute("data-mail"));
+    if(!m) return;
+    m.open = !m.open; m.read = true;
+    phoneCard();
+  }));
+  card.querySelectorAll("[data-ans]").forEach(b => b.addEventListener("click", e => {
+    e.stopPropagation();
+    const [mid, oi] = b.getAttribute("data-ans").split(":");
+    const mail = G.mail.find(x => x.id === +mid);
+    if(!mail || mail.answered) return;
+    mail.answered = true; mail.read = true;
+    const opt = mail.options && mail.options[+oi];
+    if(opt && opt.run){
+      try{ opt.run(); }catch(err){}
+    }
+    note("Answered " + mail.from + ": “" + ((opt && opt.t) || "yes") + "”.");
+    try{ queueSave(); }catch(err){}
+    phoneCard();
+  }));
   const acceptAll = el("dayAcceptAll");
   if(acceptAll) acceptAll.addEventListener("click", () => {
     dayEventsToday().forEach(ev => { if(!ev.done) ev.rsvp = true; });
@@ -9483,12 +9578,6 @@ function phoneCard(){
   }
   el("phDone").addEventListener("click", phoneClose);
   if(phoneTab === "vox"){ try{ voxTypePosts(card); }catch(e){} }
-  if(phoneTab === "panels"){
-    const host = el("phPanelsHost");
-    if(host) mountDossierInPhone(host);
-  } else {
-    unmountDossierFromPhone();
-  }
 }
 let phoneWasRunning = null;
 function phoneClose(){
@@ -21350,7 +21439,7 @@ function frameBody(now){
     "YXZ"
   );
   try{ updateLighting(dt); }catch(e){}
-  shadowTick(dt);
+  if(!MODEST || (FRAME_ID & 1) === 0) shadowTick(dt);
   if(!GL_LOST){
     try{ renderer.render(scene, camera); }
     catch(e){
