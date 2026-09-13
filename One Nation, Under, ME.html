@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20260913c">
+<meta name="onum-build" content="20260913d">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -1788,7 +1788,10 @@ const MODEST = modestMachine();
 if(MODEST && G.gfx !== "best"){
   G.gfx = "simple"; G.simple = true; G.fullDetail = false;
 }
-if(MODEST && G.mute === undefined) G.mute = true;
+/* Voices stay on. Modest used to mute the House so Edge would not lock —
+   that left a silent sitting. They can still pick Read only in Settings. */
+if(G.muteSet){ /* keep their choice */ }
+else G.mute = false;
 
 const smooth = (a, b, rate, dt) => a + (b - a) * (1 - Math.pow(rate, dt));
 
@@ -12619,16 +12622,32 @@ function innerLife(m){
    and higher than a chairman who has never had to hurry.
    Off by default in the settings if you would rather read.
    ══════════════════════════════════════════════════════════ */
-let VOICES = [], voiceReady = false, voiceLastAt = 0;
+let VOICES = [], voiceReady = false, voiceLastAt = 0, voiceUnlocked = false;
 function loadVoices(){
   if(!("speechSynthesis" in window)) return;
   const v = speechSynthesis.getVoices() || [];
   if(v.length){ VOICES = v.filter(x => /^en/i.test(x.lang)); if(!VOICES.length) VOICES = v; voiceReady = true; }
 }
+function unlockVoice(){
+  if(voiceUnlocked || !("speechSynthesis" in window)) return;
+  voiceUnlocked = true;
+  try{
+    loadVoices();
+    if(speechSynthesis.paused) speechSynthesis.resume();
+    const u = new SpeechSynthesisUtterance(".");
+    u.volume = 0; u.rate = 2;
+    speechSynthesis.speak(u);
+    speechSynthesis.cancel();
+  }catch(e){}
+}
 if("speechSynthesis" in window){
   loadVoices();
   speechSynthesis.addEventListener("voiceschanged", loadVoices);
 }
+try{
+  addEventListener("pointerdown", unlockVoice, { once:true, capture:true });
+  addEventListener("keydown", unlockVoice, { once:true, capture:true });
+}catch(e){}
 function idNum(id){
   let h = 0, s = String(id);
   for(let i=0;i<s.length;i++) h = (h*31 + s.charCodeAt(i)) & 0x7fffffff;
@@ -12636,34 +12655,34 @@ function idNum(id){
 }
 function speak(p, text, vol){
   if(G.mute || !("speechSynthesis" in window) || !text) return;
-  /* Debate: do not pile utterances. Edge locks the tab if speak() queues
-     while the bar, the save, and a heckle all fire. Text still shows. */
-  if(PROC.on && p !== G.you) return;
+  if(PROC.on && p && p !== G.you && !(TALK.open && TALK.m === p)) return;
   if(p && !canHearPerson(p, text)) return;
   const now = performance.now();
-  if(now - voiceLastAt < (MODEST ? 1800 : 700)) return;
-  if(speechSynthesis.speaking || speechSynthesis.pending) return;
+  if(now - voiceLastAt < (MODEST ? 900 : 500)) return;
   voiceLastAt = now;
-  const snippet = String(text).slice(0, MODEST ? 80 : 190);
-  /* Edge locks the tab if speak() runs on the click that opened talk. */
-  setTimeout(() => {
+  const snippet = String(text).slice(0, MODEST ? 140 : 220);
+  const fire = () => {
     try{
       if(G.mute || document.hidden) return;
-      if(speechSynthesis.speaking || speechSynthesis.pending) return;
+      unlockVoice();
       if(!voiceReady) loadVoices();
+      try{ if(speechSynthesis.paused) speechSynthesis.resume(); }catch(e){}
+      try{ if(speechSynthesis.speaking || speechSynthesis.pending) speechSynthesis.cancel(); }catch(e){}
       const u = new SpeechSynthesisUtterance(snippet);
       if(VOICES.length) u.voice = VOICES[idNum(p ? p.id : "you") % VOICES.length];
       const t = p && p.traits ? p.traits : null;
       const spread = G.voiceVar === undefined ? 1 : G.voiceVar;
       const pace   = G.voiceRate === undefined ? 1 : G.voiceRate;
-      u.rate  = clamp((0.90 + (t ? (t.temper - 50)/260 : 0) + (p && p.post ? -0.06 : 0)) * pace, 0.6, 1.6);
+      u.rate  = clamp((0.92 + (t ? (t.temper - 50)/260 : 0) + (p && p.post ? -0.06 : 0)) * pace, 0.7, 1.5);
       u.pitch = clamp(1.00 + ((t ? (t.temper - 50)/220 : 0) +
-                      ((idNum(p ? p.id : "you") % 9) - 4) * 0.055) * spread, 0.5, 1.9);
+                      ((idNum(p ? p.id : "you") % 9) - 4) * 0.055) * spread, 0.6, 1.8);
       const carry = G.voiceCarry === undefined ? 1 : G.voiceCarry;
-      u.volume = clamp((vol === undefined ? 0.95 : vol * 0.95) * carry, 0, 1);
+      u.volume = clamp((vol === undefined ? 1 : vol) * carry, 0, 1);
+      u.lang = "en-US";
       speechSynthesis.speak(u);
     }catch(e){}
-  }, 0);
+  };
+  fire();
 }
 function hush(){
   try{
@@ -13633,7 +13652,7 @@ function earshot(p, text){
 }
 function audible(p, text){ return earshot(p, text) > 0.30; }
 function speakAt(p, text){
-  if(MODEST && !(TALK.open && TALK.m === p)) return;
+  if(MODEST && !(TALK.open && TALK.m === p) && p !== G.you) return;
   const v = earshot(p, text);
   if(v <= 0.06) return;
   speak(p, text, v);
@@ -19788,6 +19807,7 @@ function loadSave(){
     if(typeof MODEST !== "undefined" && MODEST && G.gfx !== "best"){
       G.gfx = "simple"; G.simple = true; G.fullDetail = false;
     }
+    if(!G.muteSet) G.mute = false;
     if(!G.room || typeof G.room !== "string") G.room = "office";
     if(typeof G.day !== "number" || !(G.day > 0)) G.day = 1;
     if(typeof G.minute !== "number" || G.minute < 0) G.minute = 8*60;
@@ -20365,7 +20385,12 @@ function settingsCard(){
   }));
   card.querySelectorAll("[data-vo]").forEach(b => b.addEventListener("click", () => {
     G.mute = b.getAttribute("data-vo") === "1";
+    G.muteSet = true;
     if(G.mute) hush();
+    else {
+      unlockVoice();
+      speak(G.you, "You can hear them now.");
+    }
     settingsCard();
   }));
   card.querySelectorAll("[data-gr]").forEach(b => b.addEventListener("click", () => {
@@ -20380,9 +20405,11 @@ function settingsCard(){
   if(vr) vr.addEventListener("input", () => { G.voiceRate = +vr.value/100; });
   if(vc) vc.addEventListener("input", () => { G.voiceCarry = +vc.value/100; });
   if(vt) vt.addEventListener("click", () => {
-    /* three of them in a row, so you can hear how far apart they are */
     hush();
+    unlockVoice();
+    G.mute = false;
     const three = G.members.filter(m => !m.gone).slice(0, 3);
+    if(!three.length && G.you) speak(G.you, "This is a voice in the House.");
     three.forEach((m, i) => setTimeout(() =>
       speak(m, "The member for " + m.state + " " + m.dist + ". That is my voice."), i * 2200));
   });
