@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20260913j">
+<meta name="onum-build" content="20260913k">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -21450,30 +21450,28 @@ function frameBody(now){
   const talkUp = !!(typeof TALK !== "undefined" && TALK && TALK.open);
   if(PAD_SEEN || picksDirty) pollPad();
   else if(picksDirty) refreshPicks();
-  if(cardUp || talkUp){
+  if(cardUp){
     try{ feedTick(dt); }catch(e){}
     try{ tickScrollFrame(); }catch(e){}
-    try{ if(talkUp) catchFrame(dt); }catch(e){}
     _cardFrames = (_cardFrames || 0) + 1;
-    /* Keep the WebGL context alive so Continue is not a black canvas. */
     if(!GL_LOST && _cardFrames % 6 === 0){
       try{ renderer.render(scene, camera); }catch(e){}
     }
     return;
   }
-  if(!G.running && !G.over && !G.pendingNight && !cardUp){
+  if(talkUp){
     const KB = G.bind || DEFAULT_BIND;
     if(keys[KB.forward] || keys[KB.back] || keys[KB.stepL] || keys[KB.stepR]){
-      G.running = true;
-      G.speed = 1;
+      try{ closeTalk(); }catch(e){}
     }
   }
-  if(G.running && !G.over){
-    try{ tick(dt); }
-    catch(err){
-      if(window.console && frameFails < 2) console.warn("tick error", err);
-      throw err;
-    }
+  if(!G.over && !G.pendingNight){
+    G.running = true;
+    if(!(G.speed > 0)) G.speed = 1;
+  }
+  try{ tick(dt); }
+  catch(err){
+    if(window.console && frameFails < 2) console.warn("tick error", err);
   }
   FRAME_ID++;
   if(MODEST && _emaMs > 28){
@@ -21485,7 +21483,9 @@ function frameBody(now){
     return;
   }
   const crowd = hereNow();
-  if(G.running || !veil.hidden || TALK.open){
+  if(G._crowdPauseUntil && performance.now() < G._crowdPauseUntil){
+    /* Continue: feet first. Crowd waits so Edge does not hang the corridor. */
+  } else if(G.running || !veil.hidden || TALK.open){
     const cap = MODEST ? 8 : 14;
     if(crowd.length > cap){
       for(let i=0;i<crowd.length;i++){
@@ -21791,9 +21791,11 @@ function resumeLiveCareer(){
   G.prevSpeed = 1;
   if(G.you) G.you.sitting = false;
   try{ leaveSittingQuiet(); }catch(e){}
+  try{ if(TALK.open) closeTalk(); }catch(e){}
   try{ document.body.classList.remove("boot-menu"); }catch(e){}
   try{ veil.hidden = true; card.classList.remove("card--open"); veil.classList.remove("veil--make"); }catch(e){}
   try{ catchClear("resume"); }catch(e){}
+  G.doorGrace = (G.t || 0) + 2.4;
   if(G.room === "floor" || G.room === "committee" || G.room === "caucus" || G.room === "press"){
     try{ walkOutNow(); return; }catch(e){}
   }
@@ -22375,6 +22377,9 @@ function begin(){
   try{ ensureParties(); }catch(e){}
   try{ ensureMythHistory(); ensureGreatest(); }catch(e){}
   try{ catchClear("begin"); }catch(e){}
+  try{ if(TALK.open) closeTalk(); }catch(e){}
+  G.doorGrace = (G.t || 0) + 2.4;
+  G._crowdPauseUntil = performance.now() + 2800;
   try{
     if(typeof MODEST !== "undefined" && MODEST){
       G.fullDetail = false; G.gfx = "simple"; G.simple = true;
@@ -22385,8 +22390,7 @@ function begin(){
   if(!G._savedCam){
     try{ const sp = safeSpawn(G.room); cam.x = sp.x; cam.z = sp.z; cam.yaw = 0; }catch(e){}
   }
-  G.doorGrace = (G.t || 0) + 0.9;
-  try{ everyone().forEach(m => { if(m.room === G.room) placeInRoom(m); }); }catch(e){}
+  G.doorGrace = (G.t || 0) + 2.4;
   const roomId = G.room;
   try{
     if(!_buildingRoom) buildRoom(roomId);
@@ -22405,12 +22409,14 @@ function begin(){
   forcePaint();
   nextFrameOrTimeout(() => {
     try{ resize(); forcePaint(); }catch(e){}
+  }, 20);
+  setTimeout(() => {
     try{
       syncPeopleStaged(() => {
         yieldPaint(() => { try{ refreshPanels(); forcePaint(); }catch(e){} });
       });
-    }catch(e){ forcePaint(); }
-  }, 20);
+    }catch(e){ try{ forcePaint(); }catch(e2){} }
+  }, 2800);
   setTimeout(() => {
     if(G.running) return;
     G._booting = false;
