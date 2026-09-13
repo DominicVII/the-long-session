@@ -2742,7 +2742,7 @@ function routineRoom(m, hour, t){
 let lastBlock = -1;
 function restaff(force){
   if(PROC.on && !force) return;
-  if(G.pendingNight) return;
+  if(G.pendingNight || G.moving) return;
   const h = Math.floor(G.minute/60);
   if(h >= 21) return;
   if(!force && h === lastBlock) return;
@@ -7236,7 +7236,7 @@ function syncPeople(){
 function syncPeopleStaged(done, retries){
   retries = retries || 0;
   if(_buildingRoom || syncPeopleStaged._busy){
-    if(retries >= 180){
+    if(retries >= 40){
       const err = new Error("Timed out waiting to rebuild people");
       syncPeopleStaged._busy = false;
       if(window.console) console.warn("syncPeople staged wait", err);
@@ -18080,8 +18080,9 @@ function transition(build){
   };
   try{
     if(f){
-      f.style.transition = "opacity .26s ease";
+      f.style.transition = "opacity .18s ease";
       f.style.opacity = "1";
+      f.style.pointerEvents = "none";
     }
   }catch(e){}
   setTimeout(() => {
@@ -18092,7 +18093,7 @@ function transition(build){
           try{
             cam.drift = -0.09;
             cam.vx = cam.vz = cam.yawVel = 0;
-            G.doorGrace = G.t + 2.5;
+            G.doorGrace = G.t + 0.9;
           }catch(e){}
           settle();
         }, (e) => {
@@ -18107,12 +18108,12 @@ function transition(build){
     try{
       cam.drift = -0.09;                  /* settle down into the room */
       cam.vx = cam.vz = cam.yawVel = 0;
-      G.doorGrace = G.t + 2.5;            /* don't fall straight back out */
+      G.doorGrace = G.t + 0.9;            /* don't fall straight back out */
     }catch(e){}
     settle();
   }, 270);
   /* A failed/aborted room build must never leave a permanent black veil. */
-  setTimeout(settle, 3500);
+  setTimeout(settle, 1800);
 }
 function rebuildRoomStaged(id, after){
   return new Promise((resolve, reject) => {
@@ -18542,7 +18543,7 @@ function goOutside(){
   transition(() => {
     G.room = "steps"; G.visitId = null;
     const b = roomBox("steps");
-    { const sp = safeSpawn(G.room); cam.x = sp.x; cam.z = sp.z; } cam.yaw = 0; G.doorGrace = G.t + 2.5;
+    { const sp = safeSpawn(G.room); cam.x = sp.x; cam.z = sp.z; } cam.yaw = 0; G.doorGrace = G.t + 0.9;
     everyone().forEach(m => { if(m.room === "steps") placeInRoom(m); });
     return rebuildRoomStaged("steps", () => {
       el("whereName").textContent = ROOMS.steps.t;
@@ -18750,7 +18751,7 @@ function callOn(m){
   transition(() => {
     G.room = "visit"; G.visitId = m.id;
     const b = roomBox("visit");
-    { const sp = safeSpawn(G.room); cam.x = sp.x; cam.z = sp.z; } cam.yaw = 0; G.doorGrace = G.t + 2.5;
+    { const sp = safeSpawn(G.room); cam.x = sp.x; cam.z = sp.z; } cam.yaw = 0; G.doorGrace = G.t + 0.9;
     m.x = 0.2; m.z = 6.0; m.tx = m.x; m.tz = m.z; m.facing = Math.PI;
     return rebuildRoomStaged("visit", () => {
       el("whereName").textContent = surname(m.name) + "'s office";
@@ -18771,7 +18772,7 @@ function goTo(id){
     try{ catchClear("goTo"); }catch(err){}
     G.room = id; G.visitId = null;
     const b = roomBox(id);
-    { const sp = safeSpawn(G.room); cam.x = sp.x; cam.z = sp.z; } cam.yaw = 0; G.doorGrace = G.t + 2.5;
+    { const sp = safeSpawn(G.room); cam.x = sp.x; cam.z = sp.z; } cam.yaw = 0; G.doorGrace = G.t + 0.9;
     everyone().forEach(m => { if(m.room===id) placeInRoom(m); });
     return rebuildRoomStaged(id, () => {
       el("whereName").textContent = ROOMS[id].t;
@@ -19848,7 +19849,11 @@ function setSpeed(s){
   pb.title = s === 0 ? "Resume (space)" : "Pause (space)";
   pb.classList.toggle("is-held", s === 0);
 }
-function togglePause(){ setSpeed(G.speed > 0 ? 0 : (G.prevSpeed || 1)); }
+function togglePause(){
+  setSpeed(G.speed > 0 ? 0 : (G.prevSpeed || 1));
+  G.speechApproach = null;
+  try{ forceUnstickMove(); }catch(e){}
+}
 function showGameMenu(){
   if(!G.you || !(G.members && G.members.length) || !G.running) return;
   try{ save(); }catch(e){}
@@ -20902,6 +20907,8 @@ function tick(dt){
   const b = roomBox(G.room || "office");
   cam.x = clamp(cam.x + cam.vx*dt, -b.hw, b.hw);
   cam.z = clamp(cam.z + cam.vz*dt, b.d0, b.d1);
+  /* WASD cancels a lectern pull — pause used to be the only way to get free. */
+  if(vx || vz) G.speechApproach = null;
   try{ tickSpeechApproach(dt); }catch(e){}
   try{ enforceLecternCapPlayer(); }catch(e){}
   const spd = Math.hypot(cam.vx, cam.vz);
@@ -20914,7 +20921,9 @@ function tick(dt){
     if((FRAME_ID & 1) === 0) camera.updateProjectionMatrix();
   }
   if(G.you && spd > 0.15) G.you.energy = clamp(G.you.energy - dt*0.34*(spd/1.8), 0, 100);
-  if(G.pendingNight) return;
+  if(G.t >= (G.doorGrace||0)) walkThroughDoors();
+  if(!G.moving && G.t >= (G.doorGrace||0)) bumpCheck(sprint);
+  if(G.speed <= 0 || G.pendingNight) return;
   if((G.minute || 0) >= 22*60){ beginNight(); return; }
   /* A full day — eight in the morning to ten at night — takes thirty real
      minutes at 1x. Conversations and actions charge their own minutes on
@@ -20934,8 +20943,16 @@ function tick(dt){
     chamberDebate(w);
   }
   procTick(dt);
-  bumpCheck(sprint);
-  walkThroughDoors();
+}
+function forceUnstickMove(){
+  G.moving = false;
+  G._moveAt = 0;
+  try{ _buildingRoom = false; }catch(e){}
+  try{ syncPeopleStaged._busy = false; }catch(e){}
+  try{
+    const fd = el("fade");
+    if(fd){ fd.style.opacity = "0"; fd.style.pointerEvents = "none"; }
+  }catch(e){}
 }
 /* Walk into a doorway and you go through it. No menu required. */
 function nearDoor(){
@@ -20957,13 +20974,18 @@ function nearDoor(){
   return null;
 }
 function walkThroughDoors(){
+  if(G.moving){
+    if(G._moveAt && performance.now() - G._moveAt > 1600) forceUnstickMove();
+    else return;
+  }
   const hit = nearDoor();
   if(!hit) return;
   const dest = hit.dr.to, fromRoom = G.room;
-  G.doorGrace = G.t + 2.2;
+  G.doorGrace = G.t + 1.6;
   if(!ROOMS[dest]) return;
   feed("Through to " + ROOMS[dest].t + ".");
-  spend(Math.round((ROOMS[dest].travel || 6) * 0.45), 2);
+  /* Do not spend() here — that restaffs and remeshes on the same click as
+     the room build, which is the Edge hang on the committee door. */
   transition(() => {
     try{ catchClear("door"); }catch(err){}
     G.room = dest; G.visitId = null;
@@ -21086,7 +21108,7 @@ function frameBody(now){
     }
     return;
   }
-  if(G.running && !G.over && G.speed > 0){
+  if(G.running && !G.over){
     try{ tick(dt); }
     catch(err){
       if(window.console && frameFails < 2) console.warn("tick error", err);
