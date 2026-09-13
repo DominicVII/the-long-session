@@ -18764,22 +18764,10 @@ function callOn(m){
   });
 }
 function goTo(id){
-  if(G.moving) return;
+  if(!ROOMS[id] || id === G.room) return;
   closeTalk();
-  spend(ROOMS[id].travel, Math.round(ROOMS[id].travel/8));
   feed("Walking to " + ROOMS[id].t + ".");
-  transition(() => {
-    try{ catchClear("goTo"); }catch(err){}
-    G.room = id; G.visitId = null;
-    const b = roomBox(id);
-    { const sp = safeSpawn(G.room); cam.x = sp.x; cam.z = sp.z; } cam.yaw = 0; G.doorGrace = G.t + 0.9;
-    everyone().forEach(m => { if(m.room===id) placeInRoom(m); });
-    return rebuildRoomStaged(id, () => {
-      el("whereName").textContent = ROOMS[id].t;
-      el("whereTag").textContent = ROOMS[id].tag;
-      refreshPanels();
-    });
-  });
+  enterRoom(id, G.room);
 }
 function refreshFloor(){
   const b = G.bill, you = G.you;
@@ -20954,6 +20942,54 @@ function forceUnstickMove(){
     if(fd){ fd.style.opacity = "0"; fd.style.pointerEvents = "none"; }
   }catch(e){}
 }
+function enterRoom(dest, fromRoom){
+  /* Instant feet. Mesh later. G.moving never blocks a playthrough. */
+  if(!ROOMS[dest]) return;
+  forceUnstickMove();
+  try{ catchClear("door"); }catch(e){}
+  G.speechApproach = null;
+  if(G.you) G.you.sitting = false;
+  const prev = fromRoom || G.room;
+  G.room = dest;
+  if(dest !== "visit") G.visitId = null;
+  const b = roomBox(dest);
+  const home = (DOORS[dest] || []).find(d => d.to === prev);
+  if(home){
+    const hp = doorAt(dest, home);
+    const inward = hp.z < ROOMS[dest].d/2 ? 1 : -1;
+    cam.x = clamp(hp.x, -b.hw, b.hw);
+    cam.z = clamp(hp.z + inward*1.15, b.d0, b.d1);
+    cam.yaw = inward > 0 ? 0 : Math.PI;
+    if(home.side === "left"){ cam.x = clamp(hp.x + 1.5, -b.hw, b.hw); cam.yaw = Math.PI/2; }
+    if(home.side === "right"){ cam.x = clamp(hp.x - 1.5, -b.hw, b.hw); cam.yaw = -Math.PI/2; }
+  } else {
+    try{ const sp = safeSpawn(dest); cam.x = sp.x; cam.z = sp.z; }catch(e){ cam.x = 0; cam.z = b.d0 + 1.2; }
+    cam.yaw = 0;
+  }
+  cam.vx = cam.vz = cam.yawVel = 0;
+  cam.pitch = 0;
+  G.doorGrace = (G.t || 0) + 0.85;
+  try{
+    el("whereName").textContent = ROOMS[dest].t;
+    el("whereTag").textContent = ROOMS[dest].tag;
+  }catch(e){}
+  const f = el("fade");
+  try{ if(f){ f.style.transition = "opacity .1s linear"; f.style.opacity = "0.4"; f.style.pointerEvents = "none"; } }catch(e){}
+  nextFrameOrTimeout(() => {
+    try{ if(!_buildingRoom) buildRoom(dest); }catch(e){
+      try{ clearRoom(); buildRoomShell(dest); }catch(e2){}
+    }
+    try{ if(f) f.style.opacity = "0"; }catch(e){}
+    nextFrameOrTimeout(() => {
+      try{
+        syncPeopleStaged(() => {
+          try{ if(dest === "floor") seatChamber(); }catch(e){}
+          yieldPaint(() => { try{ refreshPanels(); }catch(e){} });
+        });
+      }catch(e){ try{ if(f) f.style.opacity = "0"; }catch(e2){} }
+    }, 30);
+  }, 20);
+}
 /* Walk into a doorway and you go through it. No menu required. */
 function nearDoor(){
   if(G.moving || G.t < (G.doorGrace||0)) return null;
@@ -20975,41 +21011,16 @@ function nearDoor(){
 }
 function walkThroughDoors(){
   if(G.moving){
-    if(G._moveAt && performance.now() - G._moveAt > 1600) forceUnstickMove();
+    if(G._moveAt && performance.now() - G._moveAt > 900) forceUnstickMove();
     else return;
   }
   const hit = nearDoor();
   if(!hit) return;
   const dest = hit.dr.to, fromRoom = G.room;
-  G.doorGrace = G.t + 1.6;
-  if(!ROOMS[dest]) return;
+  if(!ROOMS[dest] || dest === fromRoom) return;
+  G.doorGrace = (G.t || 0) + 0.85;
   feed("Through to " + ROOMS[dest].t + ".");
-  /* Do not spend() here — that restaffs and remeshes on the same click as
-     the room build, which is the Edge hang on the committee door. */
-  transition(() => {
-    try{ catchClear("door"); }catch(err){}
-    G.room = dest; G.visitId = null;
-    const b = roomBox(dest);
-    /* arrive just inside the door that leads back the way you came */
-    const home = (DOORS[dest] || []).find(d => d.to === fromRoom);
-    if(home){
-      const hp = doorAt(dest, home);
-      const inward = hp.z < ROOMS[dest].d/2 ? 1 : -1;
-      cam.x = clamp(hp.x, -b.hw, b.hw);
-      cam.z = clamp(hp.z + inward*1.15, b.d0, b.d1);
-      cam.yaw = inward > 0 ? 0 : Math.PI;
-      if(home.side === "left"){ cam.x = clamp(hp.x + 1.5, -b.hw, b.hw); cam.yaw = Math.PI/2; }
-      if(home.side === "right"){ cam.x = clamp(hp.x - 1.5, -b.hw, b.hw); cam.yaw = -Math.PI/2; }
-    } else { cam.x = 0; cam.z = b.d0 + 0.5; cam.yaw = 0; }
-    cam.vx = cam.vz = 0; cam.pitch = 0;
-    everyone().forEach(m => { if(m.room===dest) placeInRoom(m); });
-    if(dest === "floor") seatChamber();
-    return rebuildRoomStaged(dest, () => {
-      el("whereName").textContent = ROOMS[dest].t;
-      el("whereTag").textContent = ROOMS[dest].tag;
-      refreshPanels();
-    });
-  });
+  enterRoom(dest, fromRoom);
 }
 /* Show a line of text, or hide the thing that would have held it —
    touching the DOM only when the words are not already there. */
@@ -22011,14 +22022,19 @@ function begin(){
   if(!G._savedCam){
     try{ const sp = safeSpawn(G.room); cam.x = sp.x; cam.z = sp.z; cam.yaw = 0; }catch(e){}
   }
-  G.doorGrace = (G.t || 0) + 2.5;
+  G.doorGrace = (G.t || 0) + 0.9;
   try{ everyone().forEach(m => { if(m.room === G.room) placeInRoom(m); }); }catch(e){}
-  try{
-    const h = card.querySelector("h1");
-    if(h) h.textContent = "The floor is being set.";
-  }catch(e){}
   const roomId = G.room;
-  yieldMain(() => {
+  try{ document.body.classList.remove("boot-menu"); }catch(e){}
+  try{ veil.hidden = true; card.classList.remove("card--open"); veil.classList.remove("veil--make"); }catch(e){}
+  G._booting = false;
+  if((G.minute || 0) >= 22*60 || G.pendingNight){
+    try{ beginNight(); }catch(e){ G.running = true; }
+  } else {
+    G.running = true;
+    try{ setSpeed(G.prevSpeed || 1); }catch(e){ G.speed = 1; }
+  }
+  nextFrameOrTimeout(() => {
     try{
       if(!_buildingRoom) buildRoom(roomId);
       try{ resize(); }catch(e){}
@@ -22026,28 +22042,20 @@ function begin(){
       if(window.console) console.warn("begin build", e);
       try{ G.room = "office"; buildRoom("office"); }catch(e2){}
     }
-    syncPeopleStaged(() => {
-      try{ document.body.classList.remove("boot-menu"); }catch(e){}
-      try{ veil.hidden = true; card.classList.remove("card--open"); veil.classList.remove("veil--make"); }catch(e){}
-      G._booting = false;
-      if((G.minute || 0) >= 22*60 || G.pendingNight){
-        try{ beginNight(); }catch(e){ G.running = true; }
-        return;
-      }
-      G.running = true;
-      try{ setSpeed(G.prevSpeed || 1); }catch(e){ G.speed = 1; }
-      yieldPaint(() => { try{ refreshPanels(); }catch(e){} });
-    });
-  });
+    try{
+      syncPeopleStaged(() => {
+        yieldPaint(() => { try{ refreshPanels(); }catch(e){} });
+      });
+    }catch(e){}
+  }, 20);
   setTimeout(() => {
-    if(!G._booting) return;
+    if(G.running) return;
     G._booting = false;
-    syncPeopleStaged._busy = false;
-    _buildingRoom = false;
+    forceUnstickMove();
     try{ document.body.classList.remove("boot-menu"); veil.hidden = true; card.classList.remove("card--open"); }catch(e){}
-    try{ G.running = true; setSpeed(G.prevSpeed || 1); refreshPanels(); }catch(e){}
+    try{ G.running = true; setSpeed(G.prevSpeed || 1); }catch(e){}
     try{ feed("Continue recovered — you are in the building."); }catch(e){}
-  }, 10000);
+  }, 4000);
 }
 
 /* ── Add to Home Screen ──────────────────────────────────
@@ -22154,6 +22162,14 @@ addEventListener("visibilitychange", () => {
     }
   }catch(e){}
 });
+try{
+  window.ONUM = {
+    goTo, enterRoom, forceUnstickMove,
+    room(){ return G.room; },
+    moving(){ return !!G.moving; },
+    running(){ return !!G.running; }
+  };
+}catch(e){}
 armFrame();
 
 })();
