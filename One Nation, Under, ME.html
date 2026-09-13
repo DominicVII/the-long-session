@@ -2951,7 +2951,16 @@ function roomLabel(m){
 function placeInRoom(m){
   if(!ROOMS[m.room]) return;              /* "away" has no floor to stand on */
   const b = roomBox(m.room);
-  m.x = (Math.random()*2-1)*b.hw; m.z = b.d0 + Math.random()*(b.d1-b.d0);
+  const doors = DOORS[m.room] || [];
+  for(let n=0;n<10;n++){
+    m.x = (Math.random()*2-1)*b.hw; m.z = b.d0 + Math.random()*(b.d1-b.d0);
+    let blocked = false;
+    for(let i=0;i<doors.length;i++){
+      const p = doorAt(m.room, doors[i]);
+      if(Math.hypot(p.x-m.x, p.z-m.z) < 2.3){ blocked = true; break; }
+    }
+    if(!blocked) break;
+  }
   m.tx = m.x; m.tz = m.z;
 }
 
@@ -5771,12 +5780,14 @@ function buildRoomInner(id){
       addBox(woodMat, 0, DIM.daisFloor + (DIM.dais-0.1)/2, d-3.25, 8.0, DIM.dais-0.1, 0.09, 0, true);
       for(let i=0;i<7;i++)
         propChair(woodMat, leather, -3.3+i*1.1, d-2.55, Math.PI, DIM.daisFloor);
-      /* 1. Public gallery near the entrance (low z), facing the dais */
+      /* 1. Public gallery — two rows, center aisle kept clear so the door works */
       const galMat = matCol(0x4a4038,.75), galSeat = matCol(0x6b5b4a,.85);
-      for(let r=0;r<3;r++) for(let c2=0;c2<7;c2++)
-        propChair(galMat, galSeat, -3.3+c2*1.1, 1.65+r*0.95, 0);
-      addBox(matCol(0x6b4d2c,.5), 0, 0.98, 4.05, 8.0, 0.07, 0.09, 0, true);      /* gallery rail */
-      for(let i=0;i<7;i++) addCyl(matCol(0x6b4d2c,.5), -3.3+i*1.1, 0.49, 4.05, 0.03, 0.98);
+      for(let r=0;r<2;r++) for(let c2=0;c2<7;c2++){
+        if(c2 === 3) continue; /* aisle on x=0, door to corridor */
+        propChair(galMat, galSeat, -3.3+c2*1.1, 2.45+r*0.95, 0);
+      }
+      addBox(matCol(0x6b4d2c,.5), 0, 0.98, 4.45, 8.0, 0.07, 0.09, 0, true);      /* gallery rail */
+      for(let i=0;i<7;i++) if(i !== 3) addCyl(matCol(0x6b4d2c,.5), -3.3+i*1.1, 0.49, 4.45, 0.03, 0.98);
     }catch(e){ if(window.console) console.warn("committee seating", e); }
     try{
       /* 2. Witness table in the well — three seats facing the dais (+z / face 0) */
@@ -8135,9 +8146,11 @@ function seatsFor(id){
   } else if(id === "committee"){
     /* dais first (Chair at index 3) so NPCs fill members before gallery */
     for(let i=0;i<7;i++) out.push({x:-3.3+i*1.1, z:d-2.55, face:Math.PI, y:DIM.daisFloor});
-    /* public gallery near the door, facing the dais — no seats in the open well */
-    for(let r=0;r<3;r++) for(let c=0;c<7;c++)
-      out.push({x:-3.3+c*1.1, z:1.65+r*0.95, face:0});
+    /* gallery, skip the center aisle that leads to the corridor door */
+    for(let r=0;r<2;r++) for(let c=0;c<7;c++){
+      if(c === 3) continue;
+      out.push({x:-3.3+c*1.1, z:2.45+r*0.95, face:0});
+    }
   } else if(id === "press"){
     for(let r=0;r<3;r++) for(let c=0;c<3;c++)
       out.push({x:-2.2+c*2.2, z:3.75+r*2.0, face:0});
@@ -8177,7 +8190,7 @@ function backStandsFor(id){
       out.push({x: side * (7.2 + (i%4)*0.15), z: 2.1 + (i%4)*1.1, face: side > 0 ? -Math.PI/2 : Math.PI/2});
     }
   } else if(id === "committee"){
-    for(let i=0;i<6;i++) out.push({x:-3.0+i*1.2, z:1.15, face:0});
+    for(let i=0;i<6;i++) out.push({x:-3.0+i*1.2, z:2.05, face:0});
   } else if(id === "caucus"){
     for(let i=0;i<6;i++) out.push({x:-4.0+i*1.6, z:2.4, face:0});
   } else if(id === "press"){
@@ -17458,6 +17471,13 @@ const PROPS = {
       }}]}
   ],
   committee:[
+    {id:"door", label:"Door to the corridor", sub:"Statuary Corridor — walk here to leave", x:0, z:0.9, r:2.2,
+     acts:()=>[{t:"Leave to the corridor", c:"walk out", run(){
+        try{ catchClear("door"); }catch(e){}
+        G.you.sitting = false;
+        G.speechApproach = null;
+        goTo("corridor");
+     }}]},
     {id:"dais", label:"The committee dais", sub:"Where your gavel would sit", x:0, z:10.45, r:2.6,
      acts:()=>[{t:"Question the witness", c:"50m", off:!G.bill, run(){
         spend(50, 16);
@@ -18043,19 +18063,27 @@ function transition(build){
   if(G.moving) return;
   const f = el("fade");
   G.moving = true;
+  G._moveAt = (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now();
   let settled = false;
   const settle = () => {
     if(settled) return;
     settled = true;
     G.moving = false;
+    G._moveAt = 0;
     try{
-      f.style.transition = "opacity .5s ease";
-      f.style.opacity = "0";
+      if(f){
+        f.style.transition = "opacity .5s ease";
+        f.style.opacity = "0";
+      }
     }catch(e){}
     try{ queueSave(); }catch(e){}
   };
-  f.style.transition = "opacity .26s ease";
-  f.style.opacity = "1";
+  try{
+    if(f){
+      f.style.transition = "opacity .26s ease";
+      f.style.opacity = "1";
+    }
+  }catch(e){}
   setTimeout(() => {
     try{
       const pending = build();
@@ -20916,7 +20944,15 @@ function nearDoor(){
   for(const dr of list){
     if(!outsideAllowed(dr.to)) continue;
     const p = doorAt(G.room, dr);
-    if(Math.hypot(p.x - cam.x, p.z - cam.z) < 1.05) return {dr, p};
+    const dx = cam.x - p.x, dz = cam.z - p.z;
+    const reach = (dr.side === "front" || dr.side === "back") ? 1.65 : 1.25;
+    if(Math.hypot(dx, dz) < reach) return {dr, p};
+    /* Hug the wall the door is on — committee spawn used to sit 1.5m inside a chair row. */
+    if(dr.side === "front" && cam.z < 1.45 && Math.abs(dx) < 2.4) return {dr, p};
+    if(dr.side === "back"){
+      const R = ROOMS[G.room];
+      if(R && cam.z > R.d - 1.45 && Math.abs(dx) < 2.4) return {dr, p};
+    }
   }
   return null;
 }
@@ -20938,7 +20974,7 @@ function walkThroughDoors(){
       const hp = doorAt(dest, home);
       const inward = hp.z < ROOMS[dest].d/2 ? 1 : -1;
       cam.x = clamp(hp.x, -b.hw, b.hw);
-      cam.z = clamp(hp.z + inward*1.5, b.d0, b.d1);
+      cam.z = clamp(hp.z + inward*1.15, b.d0, b.d1);
       cam.yaw = inward > 0 ? 0 : Math.PI;
       if(home.side === "left"){ cam.x = clamp(hp.x + 1.5, -b.hw, b.hw); cam.yaw = Math.PI/2; }
       if(home.side === "right"){ cam.x = clamp(hp.x - 1.5, -b.hw, b.hw); cam.yaw = -Math.PI/2; }
@@ -21031,6 +21067,10 @@ function frame(now){
 function frameBody(now){
   const dt = Math.min(0.05, (now-last)/1000); last = now;
   FRAME_ID++;
+  if(G.moving && G._moveAt && (performance.now() - G._moveAt) > 4200){
+    G.moving = false; G._moveAt = 0;
+    try{ const fd = el("fade"); if(fd) fd.style.opacity = "0"; }catch(e){}
+  }
   const cardUp = !!(typeof veil !== "undefined" && veil && !veil.hidden);
   const talkUp = !!(typeof TALK !== "undefined" && TALK && TALK.open);
   if(PAD_SEEN || picksDirty) pollPad();
