@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20260913g">
+<meta name="onum-build" content="20260913h">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -2806,7 +2806,7 @@ function ensureLivedIn(){
     });
   }catch(e){}
   const want = MODEST
-    ? ({office:3, corridor:5, floor:6, cloak:4, caucus:4, committee:4, press:3, steps:3, district:2, staff:2})[G.room] || 3
+    ? ({office:2, corridor:3, floor:4, cloak:3, caucus:3, committee:3, press:2, steps:2, district:2, staff:2})[G.room] || 2
     : ({office:4, corridor:7, floor:9, cloak:5, caucus:6, committee:5, press:4, steps:4, district:3, staff:3})[G.room] || 4;
   const here = everyone().filter(m => m && m.room === G.room && !m.gone && !m.away);
   if(here.length >= want) return;
@@ -7311,23 +7311,33 @@ function syncPeopleStaged(done, retries){
     return;
   }
   syncPeopleStaged._busy = true;
-  let list;
+  let list, missing;
   try{
-    FRAME_ID++;
-    while(peopleGroup.children.length) peopleGroup.remove(peopleGroup.children[0]);
     list = hereNow().slice();
+    const keep = new Set();
+    for(let i=0;i<list.length;i++) if(list[i].mesh) keep.add(list[i].mesh);
+    for(let i = peopleGroup.children.length - 1; i >= 0; i--){
+      const ch = peopleGroup.children[i];
+      if(!keep.has(ch)) peopleGroup.remove(ch);
+    }
+    missing = list.filter(p => !p.mesh || p.mesh.parent !== peopleGroup);
   }catch(e){
     syncPeopleStaged._busy = false;
     if(window.console) console.warn("syncPeople staged setup", e);
     if(done) done(e);
     return;
   }
+  if(!missing.length){
+    syncPeopleStaged._busy = false;
+    if(done) done();
+    return;
+  }
   let at = 0;
   const step = () => {
-    const stop = Math.min(list.length, at + (MODEST ? 1 : 3));
+    const stop = Math.min(missing.length, at + (MODEST ? 1 : 3));
     try{
       for(; at < stop; at++){
-        const p = list[at];
+        const p = missing[at];
         if(p.look){
           ensureLookMorphs(p.look);
           if(p.mesh && (p.look._faceVer !== 2 || p.look._clothVer !== 5)){
@@ -7339,7 +7349,7 @@ function syncPeopleStaged(done, retries){
           p.mesh = buildPerson(p);
           if(p.look){ p.look._faceVer = 2; p.look._clothVer = 5; }
         }
-        peopleGroup.add(p.mesh);
+        if(p.mesh.parent !== peopleGroup) peopleGroup.add(p.mesh);
       }
       peopleGroup.updateMatrixWorld(true);
     }catch(e){
@@ -7348,7 +7358,7 @@ function syncPeopleStaged(done, retries){
       if(done) done(e);
       return;
     }
-    if(at < list.length){
+    if(at < missing.length){
       nextFrameOrTimeout(step);
       return;
     }
@@ -21429,7 +21439,7 @@ function frameBody(now){
      for any reason, including one I have not thought of — is put right
      within half a second instead of staying wrong. */
   matChkT -= dt;
-  if(matChkT <= 0){
+  if(matChkT <= 0 && !MODEST){
     const crowdN = peopleGroup ? peopleGroup.children.length : 0;
     matChkT = crowdN > 6 ? (MODEST ? 1.6 : 0.9) : (MODEST ? 1.1 : 0.55);
     const list = hereNow();
@@ -21493,9 +21503,9 @@ function frameBody(now){
   }
   const thing = G.running ? focusThing() : null;
   const foc = thing && thing.type === "person" ? thing.ref : null;
-  updatePlates(foc);
-  updateTrack(TALK.m || foc);
-  updateTele(dt);
+  if(!MODEST || (FRAME_ID & 1) === 0) updatePlates(foc);
+  if(!MODEST || (FRAME_ID & 3) === 0) updateTrack(TALK.m || foc);
+  if(!MODEST || (FRAME_ID & 3) === 1) updateTele(dt);
   feedTick(dt);
   try{ tickScrollFrame(); }catch(e){}
   /* the marker's pulse is the only thing left writing a uniform every
@@ -21526,7 +21536,7 @@ function frameBody(now){
   const waiting = hailWho;
   say(el("hail"), waiting ? waiting.name + " wants a word — walk over and press E" : null);
   acc += dt;
-  if(acc > 0.4){ acc = 0; if(!G.over) refreshBar(); }
+  if(acc > (MODEST ? 0.9 : 0.4)){ acc = 0; if(!G.over) refreshBar(); }
 }
 
 function peekSave(){
