@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20260913i">
+<meta name="onum-build" content="20260913j">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -897,6 +897,7 @@ body.boot-menu .shell{grid-template-rows:minmax(0,1fr)}
         <div class="ui-toolbar" id="uiToolbar" aria-label="Open panels">
           <button type="button" id="uiOpenBtn" title="House panels on phone (H). Pad: RB. Independent.">Panels</button>
           <button type="button" id="uiMapBtn" title="Travel">Map</button>
+          <button type="button" id="uiWalkOut" title="Leave this room without wiping the sitting">Walk out</button>
           <button type="button" id="uiSettingsBtn" title="Pause and settings (Esc)">⚙ Settings</button>
         </div>
         <button type="button" class="unbare" id="unBare" title="Show the display (H)" hidden>▤</button>
@@ -18745,6 +18746,29 @@ function leaveSittingQuiet(){
   try{ catchClear("leave-sitting"); }catch(e){}
   feed("You leave the sitting. It goes on without you.");
 }
+function walkOutNow(){
+  /* Always get off this floor. Career, mail, day — untouched. */
+  try{ forceUnstickMove(); }catch(e){}
+  try{ leaveSittingQuiet(); }catch(e){}
+  try{ if(TALK.open) closeTalk(); }catch(e){}
+  G.pendingNight = false;
+  G.over = false;
+  G.running = true;
+  G.speed = 1;
+  G.prevSpeed = 1;
+  if(G.you) G.you.sitting = false;
+  G.speechApproach = null;
+  G.moving = false;
+  try{
+    veil.hidden = true;
+    card.classList.remove("card--open");
+    document.body.classList.remove("boot-menu");
+  }catch(e){}
+  phoneWasRunning = null;
+  const dest = (G.room === "corridor") ? "office" : "corridor";
+  try{ enterRoom(dest, G.room); }catch(e){ G.room = dest; }
+  feed("You walk out. The sitting is still yours.");
+}
 function mapCard(){
   if(!G.you) return;
   try{ leaveSittingQuiet(); }catch(e){}
@@ -20681,6 +20705,8 @@ loadSettings();
   if(mapBtn) mapBtn.addEventListener("click", () => {
     try{ mapCard(); }catch(e){ openPanels(); }
   });
+  const walkBtn = el("uiWalkOut");
+  if(walkBtn) walkBtn.addEventListener("click", () => { try{ walkOutNow(); }catch(e){} });
   const ub = el("unBare");
   if(ub) ub.addEventListener("click", () => openPanels());
   const settingsBtn = el("uiSettingsBtn");
@@ -21435,6 +21461,13 @@ function frameBody(now){
     }
     return;
   }
+  if(!G.running && !G.over && !G.pendingNight && !cardUp){
+    const KB = G.bind || DEFAULT_BIND;
+    if(keys[KB.forward] || keys[KB.back] || keys[KB.stepL] || keys[KB.stepR]){
+      G.running = true;
+      G.speed = 1;
+    }
+  }
   if(G.running && !G.over){
     try{ tick(dt); }
     catch(err){
@@ -21750,15 +21783,21 @@ function cardActContinue(){
   });
 }
 function resumeLiveCareer(){
-  /* Pause menu Continue: same room, same feet, HUD back. */
+  /* Pause menu Continue: HUD back. Chamber rooms still trap — walk out. */
   G._booting = false;
   G.running = true;
   G.over = false;
+  G.speed = 1;
+  G.prevSpeed = 1;
+  if(G.you) G.you.sitting = false;
+  try{ leaveSittingQuiet(); }catch(e){}
   try{ document.body.classList.remove("boot-menu"); }catch(e){}
   try{ veil.hidden = true; card.classList.remove("card--open"); veil.classList.remove("veil--make"); }catch(e){}
-  try{ setSpeed(G.prevSpeed || 1); }catch(e){ G.speed = 1; }
-  try{ refreshPanels(); }catch(e){}
   try{ catchClear("resume"); }catch(e){}
+  if(G.room === "floor" || G.room === "committee" || G.room === "caucus" || G.room === "press"){
+    try{ walkOutNow(); return; }catch(e){}
+  }
+  try{ refreshPanels(); }catch(e){}
   forcePaint();
 }
 function showContinueBroken(err){
@@ -22328,6 +22367,10 @@ function begin(){
   if(G.you) G.you.sitting = false;
   G.speed = 1;
   G.prevSpeed = 1;
+  if(G.room === "floor" || G.room === "committee" || G.room === "caucus" || G.room === "press"){
+    G.room = "corridor";
+    G._savedCam = false;
+  }
   if(!G.room || !ROOMS[G.room]) G.room = "office";
   try{ ensureParties(); }catch(e){}
   try{ ensureMythHistory(); ensureGreatest(); }catch(e){}
