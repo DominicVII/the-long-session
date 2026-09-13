@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20260913d">
+<meta name="onum-build" content="20260913e">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -8461,6 +8461,30 @@ function nearOfficeDesk(){
   const desk = ((PROPS.office || []).find(p => p.id === "desk")) || {x:0, z:7.2, r:2.4};
   return Math.hypot((desk.x||0) - cam.x, (desk.z||7.2) - cam.z) <= (desk.r || 2.4) + 0.15;
 }
+function showDeskPane(paneId){
+  const want = paneId || "paneFloor";
+  document.querySelectorAll(".dossier .tabs button").forEach(b => {
+    b.classList.toggle("is-on", b.getAttribute("data-pane") === want);
+  });
+  document.querySelectorAll(".dossier .pane").forEach(p => {
+    p.classList.toggle("is-on", p.id === want);
+  });
+}
+function openDeskWork(paneId){
+  /* Sit at the desk: real Floor (bill vs district) and Inbox (answer mail).
+     Immersive hides that HUD — bring it back while you are in the chair. */
+  try{ if(!veil.hidden && phoneWasRunning !== null) phoneClose(); }catch(e){}
+  try{ unmountDossierFromPhone(); }catch(e){}
+  G.bare = false;
+  document.body.classList.remove("is-bare");
+  document.body.classList.remove("boot-menu");
+  document.body.classList.remove("ui-open");
+  showDeskPane(paneId || "paneFloor");
+  try{ refreshFloor(); }catch(e){}
+  try{ refreshInbox(); }catch(e){}
+  try{ refreshPanels(); }catch(e){}
+  setTimeout(() => { try{ dropRect(); resize(); }catch(e){} }, 30);
+}
 function sitCasuallyAtDesk(){
   /* Free sit at My desk — 0 minutes, world keeps running, no talk popup */
   if(!G.you || G.room !== "office") return false;
@@ -8472,12 +8496,22 @@ function sitCasuallyAtDesk(){
   cam.vx = cam.vz = 0;
   G.you.sitting = true;
   if(!G.over) G.running = true;
-  feed("You sit at your desk.");
-  try{ setSay("You sit at your desk. Phone, wire, and the desk acts are still open.", fx("0m · casual","")); }catch(e){}
+  G._deskWasBare = G.bare !== false;
+  openDeskWork("paneFloor");
+  feed("You sit at your desk. The bill and the inbox are on the right.");
+  try{ setSay("Desk. Dark tick is the bill, green is the district. Inbox tab to answer mail.", fx("0m · casual","")); }catch(e){}
   return true;
 }
 function toggleSit(){
-  if(G.you.sitting){ G.you.sitting = false; feed("You stand."); return; }
+  if(G.you.sitting){
+    G.you.sitting = false;
+    feed("You stand.");
+    if(G._deskWasBare){
+      G._deskWasBare = false;
+      try{ setImmersive(true); }catch(e){}
+    }
+    return;
+  }
   /* Office desk: casual sit (no spend) when focusing / near My desk */
   if(G.room === "office" && nearOfficeDesk()){ sitCasuallyAtDesk(); return; }
   const s2 = seatUnderYou();
@@ -20945,7 +20979,14 @@ function tick(dt){
   const f = {x:Math.sin(cam.yaw), z:Math.cos(cam.yaw)};
   const r = {x:-Math.cos(cam.yaw), z:Math.sin(cam.yaw)};
   /* walking while seated stands you up, rather than dragging the chair */
-  if(G.you && G.you.sitting && (vx || vz)){ G.you.sitting = false; feed("You get up."); }
+  if(G.you && G.you.sitting && (vx || vz)){
+    G.you.sitting = false;
+    feed("You get up.");
+    if(G._deskWasBare){
+      G._deskWasBare = false;
+      try{ setImmersive(true); }catch(e){}
+    }
+  }
   const top = sprint ? 3.3 : 1.8;
   const mag = Math.hypot(vx, vz) || 1;
   const wantX = (f.x*vz + r.x*vx) / mag * top * (vx||vz ? 1 : 0);
