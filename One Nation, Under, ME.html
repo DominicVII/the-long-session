@@ -20960,6 +20960,27 @@ function forceUnstickMove(){
     if(fd){ fd.style.opacity = "0"; fd.style.pointerEvents = "none"; }
   }catch(e){}
 }
+function forcePaint(){
+  forceUnstickMove();
+  try{ resize(); }catch(e){}
+  try{
+    if(G.room && ROOMS[G.room] && roomGroup && roomGroup.children.length < 4 && !_buildingRoom){
+      buildRoomShell(G.room);
+      _roomBuiltId = G.room;
+    }
+  }catch(e){}
+  try{
+    if(!isFinite(cam.x)) cam.x = 0;
+    if(!isFinite(cam.z)) cam.z = 2;
+    if(!isFinite(cam.yaw)) cam.yaw = 0;
+    const eye = (G.you && G.you.sitting) ? 1.19 : 1.66;
+    camera.position.set(cam.x, eye, cam.z);
+    camera.rotation.set(0, cam.yaw + Math.PI, 0, "YXZ");
+    camera.updateMatrixWorld(true);
+  }catch(e){}
+  try{ updateLighting(0.016); }catch(e){}
+  try{ if(renderer && !GL_LOST) renderer.render(scene, camera); }catch(e){}
+}
 function enterRoom(dest, fromRoom){
   /* Instant feet. Mesh later. G.moving never blocks a playthrough. */
   if(!ROOMS[dest]) return;
@@ -20991,22 +21012,23 @@ function enterRoom(dest, fromRoom){
     el("whereName").textContent = ROOMS[dest].t;
     el("whereTag").textContent = ROOMS[dest].tag;
   }catch(e){}
-  const f = el("fade");
-  try{ if(f){ f.style.transition = "opacity .1s linear"; f.style.opacity = "0.4"; f.style.pointerEvents = "none"; } }catch(e){}
-  nextFrameOrTimeout(() => {
-    try{ if(!_buildingRoom) buildRoom(dest); }catch(e){
-      try{ clearRoom(); buildRoomShell(dest); }catch(e2){}
+  try{
+    if(_roomBuiltId !== dest || !roomGroup.children.length){
+      if(!_buildingRoom){
+        try{ buildRoom(dest); }catch(e){ try{ buildRoomShell(dest); _roomBuiltId = dest; }catch(e2){} }
+      }
     }
-    try{ if(f) f.style.opacity = "0"; }catch(e){}
-    nextFrameOrTimeout(() => {
-      try{
-        syncPeopleStaged(() => {
-          try{ if(dest === "floor") seatChamber(); }catch(e){}
-          yieldPaint(() => { try{ refreshPanels(); }catch(e){} });
-        });
-      }catch(e){ try{ if(f) f.style.opacity = "0"; }catch(e2){} }
-    }, 30);
-  }, 20);
+  }catch(e){}
+  forcePaint();
+  nextFrameOrTimeout(() => {
+    try{
+      if(_roomBuiltId !== dest && !_buildingRoom) buildRoom(dest);
+      syncPeopleStaged(() => {
+        try{ if(dest === "floor") seatChamber(); }catch(e){}
+        yieldPaint(() => { try{ refreshPanels(); forcePaint(); }catch(e){} });
+      });
+    }catch(e){ forcePaint(); }
+  }, 30);
 }
 /* Walk into a doorway and you go through it. No menu required. */
 function nearDoor(){
@@ -21135,7 +21157,11 @@ function frameBody(now){
     try{ feedTick(dt); }catch(e){}
     try{ tickScrollFrame(); }catch(e){}
     try{ if(talkUp) catchFrame(dt); }catch(e){}
-    /* Menu / talk: do not touch WebGL. That is the Edge hung-renderer. */
+    _cardFrames = (_cardFrames || 0) + 1;
+    /* Keep the WebGL context alive so Continue is not a black canvas. */
+    if(!GL_LOST && _cardFrames % 6 === 0){
+      try{ renderer.render(scene, camera); }catch(e){}
+    }
     return;
   }
   if(G.running && !G.over){
@@ -21470,6 +21496,7 @@ function resumeLiveCareer(){
   try{ setSpeed(G.prevSpeed || 1); }catch(e){ G.speed = 1; }
   try{ refreshPanels(); }catch(e){}
   try{ catchClear("resume"); }catch(e){}
+  forcePaint();
 }
 function showContinueBroken(err){
   /* Stardew rule: a bad load never deletes the farm. */
@@ -22045,6 +22072,11 @@ function begin(){
   G.doorGrace = (G.t || 0) + 0.9;
   try{ everyone().forEach(m => { if(m.room === G.room) placeInRoom(m); }); }catch(e){}
   const roomId = G.room;
+  try{
+    if(!_buildingRoom) buildRoom(roomId);
+  }catch(e){
+    try{ buildRoomShell(roomId); _roomBuiltId = roomId; }catch(e2){}
+  }
   try{ document.body.classList.remove("boot-menu"); }catch(e){}
   try{ veil.hidden = true; card.classList.remove("card--open"); veil.classList.remove("veil--make"); }catch(e){}
   G._booting = false;
@@ -22054,19 +22086,14 @@ function begin(){
     G.running = true;
     try{ setSpeed(G.prevSpeed || 1); }catch(e){ G.speed = 1; }
   }
+  forcePaint();
   nextFrameOrTimeout(() => {
-    try{
-      if(!_buildingRoom) buildRoom(roomId);
-      try{ resize(); }catch(e){}
-    }catch(e){
-      if(window.console) console.warn("begin build", e);
-      try{ G.room = "office"; buildRoom("office"); }catch(e2){}
-    }
+    try{ resize(); forcePaint(); }catch(e){}
     try{
       syncPeopleStaged(() => {
-        yieldPaint(() => { try{ refreshPanels(); }catch(e){} });
+        yieldPaint(() => { try{ refreshPanels(); forcePaint(); }catch(e){} });
       });
-    }catch(e){}
+    }catch(e){ forcePaint(); }
   }, 20);
   setTimeout(() => {
     if(G.running) return;
@@ -22074,6 +22101,7 @@ function begin(){
     forceUnstickMove();
     try{ document.body.classList.remove("boot-menu"); veil.hidden = true; card.classList.remove("card--open"); }catch(e){}
     try{ G.running = true; setSpeed(G.prevSpeed || 1); }catch(e){}
+    try{ forcePaint(); }catch(e){}
     try{ feed("Continue recovered — you are in the building."); }catch(e){}
   }, 4000);
 }
