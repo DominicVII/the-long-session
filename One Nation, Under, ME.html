@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20260913k">
+<meta name="onum-build" content="20260913m">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -2808,7 +2808,7 @@ function ensureLivedIn(){
     });
   }catch(e){}
   const want = MODEST
-    ? ({office:2, corridor:3, floor:4, cloak:3, caucus:3, committee:3, press:2, steps:2, district:2, staff:2})[G.room] || 2
+    ? ({office:1, corridor:1, floor:1, cloak:1, caucus:1, committee:1, press:1, steps:1, district:1, staff:1})[G.room] || 1
     : ({office:4, corridor:7, floor:9, cloak:5, caucus:6, committee:5, press:4, steps:4, district:3, staff:3})[G.room] || 4;
   const here = everyone().filter(m => m && m.room === G.room && !m.gone && !m.away);
   if(here.length >= want) return;
@@ -6747,7 +6747,29 @@ function ensureLookMorphs(L){
   if(L.age == null) L.age = 0.35;
   return L;
 }
+function buildPersonCheap(p){
+  const L = p.look || {};
+  const g = new THREE.Group();
+  const suit = matCol(L.suit || 0x2c3340, .92);
+  const skin = matCol(L.skin || 0xc4a882, .7);
+  const hair = matCol(L.hair || 0x1a1512, .6);
+  const body = new THREE.Mesh(UNIT.box, suit);
+  body.scale.set(0.36, 0.78, 0.20);
+  body.position.y = 0.78;
+  const head = new THREE.Mesh(UNIT.sph, skin);
+  head.scale.set(0.26, 0.30, 0.28);
+  head.position.y = 1.48;
+  const cap = new THREE.Mesh(UNIT.sph, hair);
+  cap.scale.set(0.27, 0.16, 0.28);
+  cap.position.set(0, 1.58, -0.02);
+  g.add(body); g.add(head); g.add(cap);
+  g.position.set(p.x || 0, 0, p.z || 0);
+  g.rotation.y = p.facing || 0;
+  g.userData = { cheap: true, H: L.height || 1.7 };
+  return g;
+}
 function buildPerson(p){
+  if(typeof MODEST !== "undefined" && MODEST) return buildPersonCheap(p);
   const L = p.look;
   /* Defensive clamp: a save from an older format, or any stray mutation
      elsewhere, could hand height/build a value outside the range rollLook()
@@ -7340,12 +7362,16 @@ function syncPeopleStaged(done, retries){
     try{
       for(; at < stop; at++){
         const p = missing[at];
-        if(p.look){
+        if(p.look && !MODEST){
           ensureLookMorphs(p.look);
           if(p.mesh && (p.look._faceVer !== 2 || p.look._clothVer !== 5)){
             if(p.mesh.parent) p.mesh.parent.remove(p.mesh);
             p.mesh = null; p.faceTex = null;
           }
+        }
+        if(MODEST && p.mesh && !(p.mesh.userData && p.mesh.userData.cheap)){
+          if(p.mesh.parent) p.mesh.parent.remove(p.mesh);
+          p.mesh = null; p.faceTex = null;
         }
         if(!p.mesh){
           p.mesh = buildPerson(p);
@@ -21320,12 +21346,34 @@ function enterRoom(dest, fromRoom){
   nextFrameOrTimeout(() => {
     try{
       if(_roomBuiltId !== dest && !_buildingRoom) buildRoom(dest);
-      syncPeopleStaged(() => {
-        try{ if(dest === "floor") seatChamber(); }catch(e){}
-        yieldPaint(() => { try{ refreshPanels(); forcePaint(); }catch(e){} });
-      });
-    }catch(e){ forcePaint(); }
+      forcePaint();
+    }catch(e){}
   }, 30);
+  if(!MODEST){
+    nextFrameOrTimeout(() => {
+      try{
+        syncPeopleStaged(() => {
+          try{ if(dest === "floor") seatChamber(); }catch(e){}
+          yieldPaint(() => { try{ refreshPanels(); forcePaint(); }catch(e){} });
+        });
+      }catch(e){ forcePaint(); }
+    }, 80);
+  } else {
+    setTimeout(() => {
+      if(G.room !== dest) return;
+      try{
+        const one = hereNow()[0];
+        if(!one) return;
+        if(one.mesh && !(one.mesh.userData && one.mesh.userData.cheap)){
+          if(one.mesh.parent) one.mesh.parent.remove(one.mesh);
+          one.mesh = null;
+        }
+        if(!one.mesh) one.mesh = buildPerson(one);
+        if(one.mesh.parent !== peopleGroup) peopleGroup.add(one.mesh);
+        forcePaint();
+      }catch(e){}
+    }, 900);
+  }
 }
 /* Walk into a doorway and you go through it. No menu required. */
 function nearDoor(){
@@ -22410,13 +22458,6 @@ function begin(){
   nextFrameOrTimeout(() => {
     try{ resize(); forcePaint(); }catch(e){}
   }, 20);
-  setTimeout(() => {
-    try{
-      syncPeopleStaged(() => {
-        yieldPaint(() => { try{ refreshPanels(); forcePaint(); }catch(e){} });
-      });
-    }catch(e){ try{ forcePaint(); }catch(e2){} }
-  }, 2800);
   setTimeout(() => {
     if(G.running) return;
     G._booting = false;
