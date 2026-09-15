@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20260913m">
+<meta name="onum-build" content="20260914a">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -242,9 +242,17 @@ body.help-held .keys{display:flex !important; opacity:1; visibility:visible}
 .talk__btn--exit{border-style:dashed; color:var(--ink-2)}
 .talk__think{font-family:"Instrument Serif",Georgia,serif; font-style:italic; font-size:13.5px;
   color:var(--ink-2); border-left:2px solid var(--line); padding-left:10px; margin:0 0 8px; max-width:70ch;
-  display:-webkit-box; -webkit-line-clamp:3; line-clamp:3; -webkit-box-orient:vertical; overflow:hidden}
+  overflow:auto; max-height:9.5em}
 .talk__think b{font-style:normal; font-family:Archivo,sans-serif; font-size:8.5px; font-weight:600;
   letter-spacing:.14em; text-transform:uppercase; color:var(--ink-3); display:block; margin-bottom:3px}
+.talk__think .netbars{margin-top:8px; font-family:Archivo,sans-serif; font-style:normal; font-size:9.5px;
+  letter-spacing:.04em; text-transform:uppercase; color:var(--ink-3)}
+.talk__think .netbars i{display:flex; align-items:center; gap:7px; margin:3px 0; font-style:normal; min-width:0}
+.talk__think .netbars i b{flex:1; height:5px; background:var(--line); border-radius:2px; position:relative;
+  margin:0; letter-spacing:0; text-transform:none}
+.talk__think .netbars i em{position:absolute; top:-1px; width:3px; height:7px; background:var(--fed);
+  border-radius:1px; margin-left:-1px}
+.talk__think .netbars span{display:block; margin-top:5px; text-transform:none; letter-spacing:0; font-size:10px}
 
 /* free conversation */
 .chat{margin-top:12px; border-top:1px solid var(--line-soft); padding-top:11px}
@@ -2309,9 +2317,12 @@ function memberVote(m, bill){
     if(strain < 22) return m.pledge;
   }
   const line = partyLine(bill)[m.party];
+  let net = 0;
+  try{ net = netVoteLean(m, bill) * 48; }catch(e){}
   const score = alignment(m,bill)*0.9 + line*(m.traits.loyalty-30)*0.6 + m.rel.warmth*0.12
               + lobbyPush(bill)*(1 - m.traits.conviction/140)
               + (m.sway || 0)
+              + net
               + (m.margin < 8 ? -G.mood*0.2*(m.party==="FED"?-1:1) : 0);
   return score > 0 ? 1 : -1;
 }
@@ -11934,34 +11945,37 @@ function mindEnsure(m){
   return m.mind;
 }
 /* Tiny on-device net — one mind per person.
-   12 → 6 → 4. Learns from their own life, not only from you.
-   Output: agree, warmth-shown, heat, attend (whether they are even with you). */
-const NET_IN = 12, NET_H = 6, NET_OUT = 4;
+   14 → 8 → 6. Learns from their own life, not only from you.
+   Output: agree, warmth, heat, attend, vote-lean, speak-lean. */
+const NET_IN = 14, NET_H = 8, NET_OUT = 6;
+const NET_NAMES = ["agree","warm","heat","attend","vote","speak"];
 function netSeed(id){
   let s = (typeof idNum === "function" ? idNum(id) : 1) ^ 0x9e3779b9;
   return function(){ s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return s / 4294967296 * 2 - 1; };
 }
 function netInit(m){
   if(!m) return null;
-  if(m.brain && m.brain.w1 && m.brain.w1.length === NET_H && m.brain.w1[0] && m.brain.w1[0].length === NET_IN && m.brain.self)
+  if(m.brain && m.brain.w1 && m.brain.w1.length === NET_H && m.brain.w1[0] && m.brain.w1[0].length === NET_IN && m.brain.w2 && m.brain.w2.length === NET_OUT && m.brain.self)
     return m.brain;
   const r = netSeed(m.id);
   const w1 = [], b1 = [], w2 = [], b2 = [];
   for(let i=0;i<NET_H;i++){
     b1[i] = r() * 0.08;
     w1[i] = [];
-    for(let j=0;j<NET_IN;j++) w1[i][j] = r() * 0.32;
+    for(let j=0;j<NET_IN;j++) w1[i][j] = r() * 0.28;
   }
   for(let i=0;i<NET_OUT;i++){
     b2[i] = r() * 0.04;
     w2[i] = [];
-    for(let j=0;j<NET_H;j++) w2[i][j] = r() * 0.32;
+    for(let j=0;j<NET_H;j++) w2[i][j] = r() * 0.28;
   }
   const stubborn = clamp(((m.traits && m.traits.conviction) || 50) / 50 - 0.5 + r() * 0.2, -1, 1);
+  const keepInner = m.brain && m.brain.inner;
+  const keepN = (m.brain && m.brain.n) || 0;
   m.brain = {
-    w1, b1, w2, b2, n:0,
+    w1, b1, w2, b2, n:keepN,
     self:[r()*0.3, r()*0.2, 0.35 + Math.abs(r())*0.4, stubborn],
-    inner:"", lastAt:0
+    inner: keepInner || "", lastAt:0
   };
   return m.brain;
 }
@@ -12003,6 +12017,9 @@ function netFeatures(m, u){
     insult:-0.9, threat:-1, disagree:-0.4, request:0.1, question:0.05
   }[u.intent] || 0) : 0;
   const creed = m.creed === "latin" ? 0.35 : 0;
+  let line = 0;
+  try{ if(b && typeof partyLine === "function") line = (partyLine(b)[m.party] || 0); }catch(e){}
+  const hour = clamp((((G.minute || 480) / 60) - 12) / 8, -1, 1);
   return [
     clamp((rel.warmth || 0) / 80, -1, 1),
     clamp(((rel.trust || 50) - 50) / 50, -1, 1),
@@ -12015,7 +12032,9 @@ function netFeatures(m, u){
     clamp(self[0], -1, 1),
     clamp(self[1], -1, 1),
     clamp(self[2], -1, 1),
-    clamp(self[3], -1, 1)
+    clamp(self[3], -1, 1),
+    clamp(line, -1, 1),
+    hour
   ];
 }
 function netForward(brain, x){
@@ -12037,8 +12056,15 @@ function netFeel(m, u){
   try{
     const brain = netInit(m);
     const y = netForward(brain, netFeatures(m, u)).y;
-    return {agree:y[0], warm:y[1], heat:y[2], attend:y[3], n:brain.n||0};
-  }catch(e){ return {agree:0, warm:0, heat:0, attend:0, n:0}; }
+    return {agree:y[0], warm:y[1], heat:y[2], attend:y[3], vote:y[4], speak:y[5], n:brain.n||0};
+  }catch(e){ return {agree:0, warm:0, heat:0, attend:0, vote:0, speak:0, n:0}; }
+}
+function netVoteLean(m, bill){
+  try{
+    const brain = netInit(m);
+    const u = {intent:"inform", heat:0, topics:["bill"]};
+    return netForward(brain, netFeatures(m, u)).y[4];
+  }catch(e){ return 0; }
 }
 function netStep(brain, x, t, lr){
   const {h, y} = netForward(brain, x);
@@ -12077,7 +12103,9 @@ function netTrain(m, u){
     clamp(x[5] * 0.35 + pull * 0.4 + stub * -0.15, -1, 1),
     clamp(pull * (1 - other * 0.5), -1, 1),
     clamp((u && u.heat ? 0.55 : 0) - pull * 0.3, -1, 1),
-    clamp(0.2 - other * 0.7 + (u && u.aboutThem ? 0.25 : 0), -1, 1)
+    clamp(0.2 - other * 0.7 + (u && u.aboutThem ? 0.25 : 0), -1, 1),
+    clamp(x[5] * 0.55 + x[12] * 0.25 + pull * 0.2, -1, 1),
+    clamp(pull * 0.3 + stub * 0.15, -1, 1)
   ];
   const lr = ((typeof MODEST !== "undefined" && MODEST) ? 0.04 : 0.08) * (1 - Math.max(0, stub) * 0.5);
   return netStep(brain, x, t, lr);
@@ -12097,7 +12125,9 @@ function netRuminate(m){
     clamp(x[5] * 0.6 + brain.self[3] * 0.2, -1, 1),
     clamp(-0.05 + brain.self[0] * 0.2, -1, 1),
     clamp(brain.self[1] * 0.25, -1, 1),
-    clamp(-0.25 - brain.self[2] * 0.4, -1, 1)
+    clamp(-0.25 - brain.self[2] * 0.4, -1, 1),
+    clamp(x[5] * 0.7 + x[12] * 0.2, -1, 1),
+    clamp(brain.self[3] * 0.25, -1, 1)
   ];
   netStep(brain, x, t, 0.035);
   brain.inner = netInnerLine(m);
@@ -15471,6 +15501,7 @@ function improvise(m, said){
   const pickR = arr => arr[Math.floor(r() * arr.length) % arr.length];
   let feel = {agree:0, warm:0, heat:0, attend:0};
   try{ feel = netFeel(m, u); }catch(e){}
+  try{ netTrain(m, u); }catch(e){}
   try{ cogPerceive(m, u, said); cogWant(m, u, feel); }catch(e){}
   try{
     if(m.brain && m.brain.self){
@@ -16383,7 +16414,17 @@ function renderTalk(){
     span.textContent = canRead(m)
       ? thoughtOf(m) + " " + innerLife(m)
       : "You do not know " + surname(m.name) + " well enough to tell what they are after.";
-    if(th) th.appendChild(span);
+    th.appendChild(span);
+    try{
+      const f = netFeel(m, {intent:"inform", heat:0, topics:[]});
+      const net = document.createElement("div");
+      net.className = "netbars";
+      net.innerHTML = NET_NAMES.map(n => {
+        const v = f[n] || 0;
+        return '<i>' + n + '<b><em style="left:' + ((v+1)*50) + '%"></em></b></i>';
+      }).join("") + "<span>" + (f.n||0) + " lives through this net · 14→8→6</span>";
+      th.appendChild(net);
+    }catch(e){}
   } else th.hidden = true;
   const box = el("tkActs"); box.innerHTML = "";
   actionsFor(m).forEach(a => {
@@ -19982,7 +20023,9 @@ function queueSave(explicit){
 function stripMesh(m){
   const c = Object.assign({}, m);
   delete c.mesh;
+  delete c.faceTex;
   if(c.chat && c.chat.length > 8) c.chat = c.chat.slice(-8);
+  if(c.brain && c.brain.inner) c.brain.inner = String(c.brain.inner).slice(0, 160);
   return c;
 }
 function save(explicit){
