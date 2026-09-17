@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20260917p">
+<meta name="onum-build" content="20260917q">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -1597,22 +1597,29 @@ const CREEDS = [
    jab:"They are very loud about how quiet they are on the subject.",
    pos:{lib:14, econ:4}, sat:true}
 ];
-function pickCreed(state){
+function pickCreed(state, opts){
+  opts = opts || {};
   const def = STATE_DEF.find(s => s.n === state);
   const maj = (def && def.creed) || "latin";
-  const pool = CREEDS.filter(c => c.k !== "consul");
-  if(state === "Nieuw Oranje"){
-    if(chance(.08)) return "consul";
-    return chance(.72) ? "latin" : (chance(.5) ? maj : pick(pool).k);
-  }
-  if(maj === "latin"){
-    if(chance(.04)) return "consul";
-    return chance(.58) ? "latin" : pick(pool.filter(c => c.k !== "latin")).k;
-  }
-  if(chance(.22)) return "latin";
-  if(chance(.03)) return "consul";
-  if(chance(.55)) return maj;
-  return pick(pool).k;
+  const fresh = !!opts.fresh;
+  /* Every confession is on the table — Latin, Consular, the satires, none.
+     State majority is a tilt, never a lock. New seats are wider still. */
+  let tot = 0;
+  const w = CREEDS.map(c => {
+    let wt = 1;
+    if(c.k === maj) wt += fresh ? 1.5 : 2.6;
+    if(c.k === "latin") wt += 1.05;
+    if(c.k === "consul"){
+      const home = (state === "Nieuw Oranje" || state === "Nieuw Haarlem");
+      wt = home ? (fresh ? 1.25 : 0.95) : (fresh ? 0.75 : 0.38);
+    }
+    if(fresh) wt = Math.max(wt, 0.9);
+    tot += wt;
+    return {k:c.k, wt};
+  });
+  let r = Math.random() * tot;
+  for(const x of w){ r -= x.wt; if(r <= 0) return x.k; }
+  return pick(CREEDS).k;
 }
 function creedOfState(name){
   const s = (G.states && G.states.find(x => x.n === name)) || STATE_DEF.find(x => x.n === name);
@@ -1958,7 +1965,7 @@ function makeMember(party, opts){
   }
   const m = {
     id:uid++, kind:"member", name, party, state, dist:opts.dist || rint(1,14), bg:bg.t, house:opts.house || houseFor(state),
-    creed:opts.creed || pickCreed(state), origin:opts.origin || pick(ORIGINS).k,
+    creed:opts.creed || pickCreed(state, {fresh:!!opts.fresh}), origin:opts.origin || pick(ORIGINS).k,
     traits:{
       ambition:clamp(rint(15,90)+(bg.tr.ambition||0),0,100),
       conviction:clamp(rint(15,90)+(bg.tr.conviction||0),0,100),
@@ -9941,12 +9948,18 @@ function confer(a, b){
       b.sayT = 4.2;
       try{ if(G.room === a.room) feed(surname(a.name) + " and " + surname(b.name) + " of the remnant, making history out of an idol."); }catch(e){}
     } else if(ca !== cb){
-      const her = ca ? a : b, lat = ca ? b : a;
-      if(lat.creed === "latin"){
+      const her = ca ? a : b, other = ca ? b : a;
+      if(consularRecruit(her, other, "in the corridor")){
+        /* remnant took them */
+      } else if(other.creed === "latin"){
         her.say = pick(CONSULAR_LITURGY); her.sayT = 4;
-        lat.say = pick(["That is heresy.","God is the Most High. Not a consul.","I will not hear that in this corridor."]);
-        lat.sayT = 4;
+        other.say = pick(["That is heresy.","God is the Most High. Not a consul.","I will not hear that in this corridor."]);
+        other.sayT = 4;
         try{ hearConsularHeresy(her, her.say); }catch(e){}
+      } else {
+        her.say = pick(CONSULAR_LITURGY); her.sayT = 3.8;
+        other.say = pick(["I keep my own.","Not my Mass.","The Host is not for that."]);
+        other.sayT = 3.6;
       }
     } else if(chance(0.4)){
       a.say = worldLine(a); a.sayT = 3.8;
@@ -12944,6 +12957,49 @@ function sentGossip(a, b){
 function isConsular(m){
   return !!(m && (m.creed === "consul" || m.consular));
 }
+function canConsularRecruit(from, to){
+  if(!from || !to || from === to) return false;
+  if(!isConsular(from) || isConsular(to)) return false;
+  if(to.machine || isChaplain(to)) return false;
+  if(to.kind === "press") return false;
+  return true;
+}
+function consularRecruit(from, to, why){
+  if(!canConsularRecruit(from, to)) return false;
+  if(to._consulAskDay === G.day) return false;
+  to._consulAskDay = G.day;
+  const conv = (to.traits && to.traits.conviction) || 50;
+  let p = 0.07;
+  if(to.creed === "latin") p += conv > 78 ? -0.04 : 0.11;
+  else if(to.creed === "flame") p += 0.05;
+  else if(to.creed === "none" || to.creed === "poll") p += 0.04;
+  else if(to.creed === "circle" || to.creed === "self") p += 0.03;
+  if(to.state === "Nieuw Oranje" || to.state === "Nieuw Haarlem") p += 0.07;
+  if(typeof isTaylorDay === "function" && isTaylorDay()) p += 0.10;
+  if(to.freshman) p += 0.08;
+  p += clamp((from.influence || 0) / 420, 0, 0.07);
+  if(to.rel && (to.rel.warmth || 0) < -20) p -= 0.05;
+  if(!chance(p)){
+    from.say = pick(CONSULAR_LITURGY); from.sayT = 3.8; from.sayTo = to.id;
+    to.say = pick(["No.","I keep my own.","God is the Most High. Not a consul.","The Host is not for that."]);
+    to.sayT = 3.6; to.sayTo = from.id;
+    return false;
+  }
+  to.creed = "consul";
+  to.consular = true;
+  to.faction = "consul";
+  to.soul = null;
+  try{ soulEnsure(to); }catch(e){}
+  from.say = pick(["We keep the Latin. We name him.","The remnant made room.","Kneel when the corridor is empty."]);
+  from.sayT = 4; from.sayTo = to.id;
+  to.say = pick(["I will kneel.","The Host was already refused. I still go.","Say it into the crease."]);
+  to.sayT = 4; to.sayTo = from.id;
+  try{
+    feed(surname(from.name) + " brought " + surname(to.name) + " into the Consular Rite" +
+      (why ? " — " + why : "."));
+  }catch(e){}
+  return true;
+}
 function ensureConsularCaucus(){
   if(!G.members || !G.members.length) return;
   const have = G.members.filter(m => m && !m.gone && isConsular(m));
@@ -13003,6 +13059,12 @@ function consularBody(h){
     chap.say = "That is not the Mass. I will not give them the Host.";
     chap.sayT = 5;
   }
+  try{
+    const watch = hereNow().filter(m => m && m.kind === "member" && !isConsular(m) && !m.machine);
+    if(watch.length && n.length){
+      consularRecruit(n[0], pick(watch), "at the bronze");
+    }
+  }catch(e){}
 }
 function isChaplain(m){ return !!(m && (m.chaplain || m.role === "Chaplain")); }
 function ensureChaplain(){
@@ -18269,8 +18331,14 @@ const PROPS = {
         rows.push({t:"Kneel with them", c:"15m", run(){
           spend(15, 4);
           try{ commitHeresy("you", "Knelt with the Consular Rite at the bronze"); }catch(e){}
-          setSay("You go to a knee. They make room. God is the Most High. The House will not forget that you did this.",
-            fx("heresy","15 minutes"));
+          try{
+            G.you.creed = "consul";
+            G.you.consular = true;
+            G.you.faction = "consul";
+          }catch(e){}
+          rite.forEach(m => { if(m.rel) m.rel.warmth = clamp((m.rel.warmth||0)+8, -100, 100); });
+          setSay("You go to a knee. They make room. The remnant has you. God is the Most High. The House will not forget that you did this.",
+            fx("heresy · recruited","15 minutes"));
         }});
         rows.push({t:"Rebuke them", c:"8m", run(){
           spend(8, 3);
@@ -19253,9 +19321,23 @@ function election(){
         remember(m, "My " + pick(["cousin","aunt","father","sister","uncle"]) + " " + surname(line.name) +
           " had a good deal to say about you, and I listened.", Math.round(line.rel.warmth * 0.35), true);
       heirs.push({m, from:line});
+      m.creed = pickCreed(m.state, {fresh:true});
+      m.consular = (m.creed === "consul");
+      if(m.consular) m.faction = "consul";
     }
     G.members.push(m); G.seatsBy[m.party]++; newcomers.push(m);
+    m.freshman = true;
   }
+  try{
+    const rite = G.members.filter(m => m && isConsular(m) && !m.freshman);
+    const open = newcomers.filter(m => m && !isConsular(m));
+    if(rite.length && open.length){
+      const tries = Math.min(2, open.length);
+      for(let i=0;i<tries;i++){
+        if(chance(0.48)) consularRecruit(pick(rite), open[i], "the new class");
+      }
+    }
+  }catch(e){}
   wireGraph();
 
   const bad = worstVote();
@@ -21026,7 +21108,7 @@ const HANDBOOK = [
   {t:"The canon", rows:[
     ["God", "The Latin Rite holds that God is the Most High and Christ is King. No man in this building is God."],
     ["The House", "The sitting is here. Here is there. They have not all pondered it yet. The hunger under it is for God, not for a man."],
-    ["The remnant", "The Consular Rite hides remainders in the building — flakes, folds, a chair they will not sit. They call them horcruxes. The Church calls them idols."],
+    ["The remnant", "The Consular Rite hides remainders in the building — flakes, folds, a chair they will not sit. They call them horcruxes. The Church calls them idols. They recruit in the corridor and among the new class. Every confession can arrive with a freshman. The chaplain still will not give them the Host."],
     ["Riverbend at large", "A clerk who does not leave. Ask him about the sitting."]
   ]},
   {t:"Moving about", rows:[
