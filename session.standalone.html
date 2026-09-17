@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20260917q">
+<meta name="onum-build" content="20260917r">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -3417,7 +3417,7 @@ function applyCrowd(){
   } else if(q === "simple" && !G.fullDetail){
     LOD_NEAR = 2.2; LOD_MID = 4.4; LOD_FAR = 6.8;
     G.plainSit = true;
-    renderer.setPixelRatio(Math.min(devicePixelRatio || 1, Math.min(GFX_PR, MODEST ? 0.85 : 1.0)));
+    renderer.setPixelRatio(Math.min(devicePixelRatio || 1, Math.min(GFX_PR, MODEST ? 0.62 : 0.75)));
   } else if(crowdSafe && !full){
     /* Full room: trim far LODs only — keep near outfit/face detail readable. */
     LOD_NEAR = 3.6; LOD_MID = 6.5; LOD_FAR = 9.5;
@@ -3447,6 +3447,9 @@ function applyCrowd(){
    may toggle renderer.shadowMap.enabled. */
 let _aqBusy = false;
 function applyQuality(){
+  if(applyQuality._reentry) return;
+  applyQuality._reentry = true;
+  try{
   migrateGfx();
   const q = G.gfx;
   if(q === "simple"){
@@ -3454,7 +3457,8 @@ function applyQuality(){
     renderer.shadowMap.type = THREE.PCFShadowMap;
     if(sun) sun.castShadow = false;
     if(sun) sun.shadow.mapSize.set(512, 512);
-    GFX_PR = MODEST ? 0.85 : 1.0; GFX_EXPOSE = 1.0; GFX_HEMI = 1.0; GFX_SUN = 1.0;
+    /* Edge/Dell freeze: keep Simple cheap — lower DPR, shadows stay off. */
+    GFX_PR = MODEST ? 0.62 : 0.75; GFX_EXPOSE = 1.0; GFX_HEMI = 1.0; GFX_SUN = 1.0;
     PEOPLE_CAST_SHADOW = false; SHADOW_SKIP = 0.24; SHADOW_PERIOD = 1/8;
   } else if(q === "balanced"){
     renderer.shadowMap.enabled = true;
@@ -3532,6 +3536,7 @@ function applyQuality(){
       _aqBusy = false;
     }
   }catch(e){ _aqBusy = false; }
+  } finally { applyQuality._reentry = false; }
 }
 function applySimple(){ applyQuality(); }
 renderer.shadowMap.autoUpdate = false;
@@ -23199,12 +23204,21 @@ function begin(){
     }
     try{ forcePaint(); }catch(e){}
     setTimeout(() => {
-      try{ ensureMythHistory(); ensureGreatest(); }catch(e){}
-      try{ ensureConsularCaucus(); }catch(e){}
-      try{ everyone().forEach(m => { if(m.room === G.room) placeInRoom(m); }); }catch(e){}
-      try{ if(!_buildingRoom) buildRoom(G.room || roomId); }catch(e){}
-      try{ syncPeople(); }catch(e){}
-      try{ refreshPanels(); save(); }catch(e){}
+      const run = (fn) => { try{ fn(); }catch(e){} };
+      const chain = (steps, i) => {
+        if(i >= steps.length) return;
+        const step = steps[i];
+        if(typeof yieldMain === "function") yieldMain(() => { run(step); chain(steps, i + 1); });
+        else { run(step); setTimeout(() => chain(steps, i + 1), 16); }
+      };
+      chain([
+        () => { ensureMythHistory(); ensureGreatest(); },
+        () => { ensureConsularCaucus(); },
+        () => { everyone().forEach(m => { if(m.room === G.room) placeInRoom(m); }); },
+        () => { if(!_buildingRoom) buildRoom(G.room || roomId); },
+        () => { if(typeof syncPeopleStaged === "function") syncPeopleStaged(() => {}); else syncPeople(); },
+        () => { refreshPanels(); save(); }
+      ], 0);
     }, 2500);
   });
   setTimeout(() => {
