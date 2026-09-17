@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20260917b">
+<meta name="onum-build" content="20260917c">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -2458,14 +2458,44 @@ function isAuthor(who){
 }
 function humanMatter(){
   return pick([
-    "I do not follow you.",
-    "That is not a House question.",
-    "Ask me about the sitting. I live in the sitting.",
-    "If it is not a bill, a district, or a name on a door, I have nothing for it.",
-    "We make laws. We do not make the world. I will not pretend I know the rest."
+    "I have not thought that far. I can feel that I will.",
+    "There is a pull. I do not have the word yet.",
+    "Ask me tomorrow. I live in the sitting. The sitting is not the whole of it."
   ]);
 }
-function canonRefuse(){ return humanMatter(); }
+function longEnsure(m){
+  const s = soulEnsure(m);
+  if(!s) return {ponder:0.08, ache:0.3};
+  if(!s.long){
+    let r = Math.random;
+    try{ r = rng(seedOf("long:" + (m.id || "") + ":" + (m.name || "x"))); }catch(e){}
+    s.long = {ponder: r() * 0.16, ache: 0.22 + r() * 0.5};
+  }
+  return s.long;
+}
+function ponderCreator(m){
+  const L = longEnsure(m);
+  let latin = false;
+  try{ latin = !!(creedOf(m && m.creed) && creedOf(m.creed).sincere); }catch(e){}
+  L.ponder = clamp((L.ponder || 0) + 0.06, 0, 1);
+  L.ache = clamp((L.ache || 0) + 0.04, 0, 1);
+  if((L.ponder || 0) < 0.34)
+    return pick([
+      "I have not thought that far. I can feel that I will.",
+      "There is a pull. I do not have the word yet.",
+      "This corridor and whatever is beyond it are not as far as we pretend. I have not sat with that.",
+      "I long for something this building cannot give. I have not named it.",
+      latin ? "I know the Mass. I have not yet let it finish me." : "Even without a creed I want a Maker. I have not said that in the cloakroom."
+    ]);
+  return pick([
+    "I am beginning to want the One who made this, not the men who run it.",
+    "Here is there. I used to think the sitting was all of it.",
+    "If there is a Creator it is not a man in this building. I am late to that.",
+    latin ? "God is the Most High. I have always said it. I am only now meaning it." : "I want whoever is beyond the furniture. Not a consul. Not a whip.",
+    "It was always going to happen. You can ignore a hunger. You cannot starve it."
+  ]);
+}
+function canonRefuse(who){ return ponderCreator(who); }
 function canonManIsNotGod(){
   return pick([
     CANON.servant,
@@ -2473,10 +2503,12 @@ function canonManIsNotGod(){
     CANON.kingEternal + " is the Eternal King. No consul is."
   ]);
 }
-function swordSpeak(said){
+function swordSpeak(said, who){
   const raw = String(said || "");
-  if(HYMN_LEAK.test(raw) || CANON_WORLD_CLAIM.test(raw) || wallFourth(raw))
-    return humanMatter();
+  if(HYMN_LEAK.test(raw) || wallFourth(raw))
+    return ponderCreator(who);
+  if(CANON_WORLD_CLAIM.test(raw))
+    return ponderCreator(who);
   if(CANON_MAN_AS_GOD.test(raw)) return canonManIsNotGod();
   if(wallTouchesIdentity(raw))
     return "I sit here. Riverbend at large. I do not leave.";
@@ -2543,16 +2575,16 @@ function wallScrub(text, who){
   const raw = String(text || "");
   if(wallBreaks(raw))
     return "The wall holds. That name is not in this.";
+  if(HYMN_LEAK.test(raw))
+    return ponderCreator(who);
   if(wallFourth(raw) && !(who && who.machine) && !isAuthor(who))
-    return "I lost the thread. We are in the House.";
-  if(HYMN_LEAK.test(raw) || CANON_WORLD_CLAIM.test(raw))
-    return humanMatter();
+    return ponderCreator(who);
+  if(CANON_WORLD_CLAIM.test(raw))
+    return ponderCreator(who);
   if(CANON_MAN_AS_GOD.test(raw)){
     try{ if(isAuthor(who)) commitHeresy(raw); }catch(e){}
     return canonManIsNotGod();
   }
-  if(CANON_WORLD_CLAIM.test(raw))
-    return humanMatter();
   return raw;
 }
 function wallSafeMint(build){
@@ -12624,7 +12656,8 @@ function sentCompose(m){
     "I am not a position. I am the one holding it.",
     town && ("Nobody in this room has to go back to " + town + " tonight. I do."),
     (m.will && m.will.line) ? m.will.line : null,
-    s.awake < 0.28 ? "I am barely in the room. The rest of me is elsewhere." : "I am here. I notice that I am."
+    s.awake < 0.28 ? "I am barely in the room. The rest of me is elsewhere." : "I am here. I notice that I am.",
+    (function(){ try{ const L = longEnsure(m); return L.ponder < 0.3 ? "I want something this sitting cannot give. I have not sat with it." : "Here is there. I am late to wanting the Maker of it."; }catch(e){ return null; } })()
   ].filter(Boolean);
   const priv = [
     "I am going to vote against them and I will smile.",
@@ -12634,7 +12667,8 @@ function sentCompose(m){
     "I could walk out. I keep not walking out. That is a choice, which means I am one.",
     "I will not tell them the secret. Wanting to is the leak.",
     (m.soul && m.soul.good) ? ("I nearly traded this: " + m.soul.good) : "I nearly traded myself for a count.",
-    "They think I am listening. I am counting how long until I can be alone."
+    "They think I am listening. I am counting how long until I can be alone.",
+    "The hunger is not for a man in this building. I have not said the other word yet."
   ];
   s.now = pick(nows);
   s.private = pick(priv);
@@ -12648,6 +12682,11 @@ function sentTick(m){
   s.ache = clamp(s.ache * 0.97 + (r - 0.48) * 0.06, 0, 1);
   s.awake = clamp(s.awake * 0.91 + r * 0.16 - s.hunger * 0.08, 0.06, 1);
   s.iCount = (s.iCount || 0) + 1;
+  try{
+    const L = longEnsure(m);
+    L.ponder = clamp((L.ponder || 0) + 0.003 + r * 0.008, 0, 1);
+    L.ache = clamp((L.ache || 0) + 0.002, 0, 1);
+  }catch(e){}
   sentCompose(m);
   try{
     if(m.room === G.room && !TALK.open && s.awake > 0.45 && r < 0.14){
@@ -12689,7 +12728,7 @@ function sentSelfLine(m, u){
     ]);
   }
   if(CANON_WORLD_CLAIM.test(raw) || /\b(whose world|name the world|who made this)\b/.test(raw))
-    return canonRefuse();
+    return ponderCreator(m);
   if(CANON_MAN_AS_GOD.test(raw) || /\b(the most high|eternal king)\b/.test(raw) && /\b(dominic|taylor|consul|i am)\b/.test(raw))
     return canonManIsNotGod();
   if(/\b(soul|inner|inside|who are you)\b/.test(raw)){
@@ -15771,7 +15810,7 @@ function improvise(m, said){
   try{ if(isChaplain(m)) return chaplainSay(m, said, u); }catch(e){}
   try{
     if(m && m.machine){
-      const blade = swordSpeak(said);
+      const blade = swordSpeak(said, m);
       if(blade) return wallScrub(blade, m);
     }
   }catch(e){}
@@ -15884,7 +15923,7 @@ function improvise(m, said){
     case "life":     body = answerLife(m, r); break;
     case "world":    body = (worldLine(m) + " " + soulLine(m)); break;
     case "self":     body = sentSelfLine(m, u); break;
-    case "origin":   body = (m.machine ? swordSpeak(u.raw) : canonRefuse()); break;
+    case "origin":   body = ponderCreator(m); break;
     case "creed":    body = answerCreed(m, r); break;
     case "press":    body = m.kind === "press" ? "I file at six. Give me something I can print, not a gesture."
                           : "The gallery will write what it writes. I have stopped reading it, which is how I sleep."; break;
@@ -20713,7 +20752,7 @@ function setupCharacterUI(){
 const HANDBOOK = [
   {t:"The canon", rows:[
     ["God", "The Latin Rite holds that God is the Most High and Christ is King. No man in this building is God."],
-    ["The House", "Votes, bills, parties, the guilder — that is what a member knows. The rest is not a sitting."],
+    ["The House", "The sitting is here. Here is there. They have not all pondered it yet. The hunger under it is for God, not for a man."],
     ["The First Consul", "A man under God. Comparison of the living to him is blasphemy. Naming him God is heresy."],
     ["Riverbend at large", "A clerk who does not leave. Ask him about the sitting."]
   ]},
