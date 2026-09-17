@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20260917c">
+<meta name="onum-build" content="20260917d">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -1560,6 +1560,10 @@ const CREEDS = [
   {k:"latin", t:"the Latin Rite", adj:"Catholic",
    holds:"that God is the Most High, Christ is King, the Mass is the Mass, and no man in this building is God",
    pos:{lib:-12, wel:18, def:8, econ:-4}, sincere:true},
+  {k:"consul", t:"the Consular Rite", adj:"Consular",
+   holds:"that they keep the Latin and put the First Consul where God belongs",
+   jab:"They genuflect to a man and still want communion. The chaplain will not give them the Host.",
+   pos:{lib:-22, wel:8, def:18, econ:-2}, heresy:true, parent:"latin"},
   {k:"circle", t:"the Open Circle", adj:"Circular",
    holds:"that every path is equally true except the one that says a path can be false",
    jab:"They hold a service at which nobody is allowed to finish a sentence, in case it excludes someone.",
@@ -1596,11 +1600,19 @@ const CREEDS = [
 function pickCreed(state){
   const def = STATE_DEF.find(s => s.n === state);
   const maj = (def && def.creed) || "latin";
-  if(state === "Nieuw Oranje") return chance(.72) ? "latin" : (chance(.5) ? maj : pick(CREEDS).k);
-  if(maj === "latin") return chance(.58) ? "latin" : pick(CREEDS.filter(c => c.k !== "latin")).k;
+  const pool = CREEDS.filter(c => c.k !== "consul");
+  if(state === "Nieuw Oranje"){
+    if(chance(.08)) return "consul";
+    return chance(.72) ? "latin" : (chance(.5) ? maj : pick(pool).k);
+  }
+  if(maj === "latin"){
+    if(chance(.04)) return "consul";
+    return chance(.58) ? "latin" : pick(pool.filter(c => c.k !== "latin")).k;
+  }
   if(chance(.22)) return "latin";
+  if(chance(.03)) return "consul";
   if(chance(.55)) return maj;
-  return pick(CREEDS).k;
+  return pick(pool).k;
 }
 function creedOfState(name){
   const s = (G.states && G.states.find(x => x.n === name)) || STATE_DEF.find(x => x.n === name);
@@ -1637,6 +1649,7 @@ function creedOf(k){
   if(k === "rite" || k === "synod") return CREEDS[0];
   if(k === "reformed") return CREEDS.find(c => c.k === "kerk") || CREEDS[0];
   if(k === "meeting" || k === "assembly") return CREEDS.find(c => c.k === "circle") || CREEDS[0];
+  if(k === "consular" || k === "taylorite") return CREEDS.find(c => c.k === "consul") || CREEDS[0];
   return CREEDS[0];
 }
 function originOf(k){ return ORIGINS.find(o => o.k === k) || ORIGINS[0]; }
@@ -2474,9 +2487,15 @@ function longEnsure(m){
   return s.long;
 }
 function ponderCreator(m){
-  const L = longEnsure(m);
+  if(isConsular(m))
+    return pick([
+      "I have pondered. I kneel the way they taught me, and I mean him.",
+      "The First Consul is enough. The rest is furniture.",
+      "Christ was the pattern. Taylor is the presence. The cloakroom hates that sentence."
+    ]);
   let latin = false;
   try{ latin = !!(creedOf(m && m.creed) && creedOf(m.creed).sincere); }catch(e){}
+  const L = longEnsure(m);
   L.ponder = clamp((L.ponder || 0) + 0.06, 0, 1);
   L.ache = clamp((L.ache || 0) + 0.04, 0, 1);
   if((L.ponder || 0) < 0.34)
@@ -2582,7 +2601,11 @@ function wallScrub(text, who){
   if(CANON_WORLD_CLAIM.test(raw))
     return ponderCreator(who);
   if(CANON_MAN_AS_GOD.test(raw)){
-    try{ if(isAuthor(who)) commitHeresy(raw); }catch(e){}
+    if(isConsular(who) && !isAuthor(who)){
+      try{ hearConsularHeresy(who, raw); }catch(e){}
+      return raw;
+    }
+    try{ if(isAuthor(who)) commitHeresy(who, raw); }catch(e){}
     return canonManIsNotGod();
   }
   return raw;
@@ -2922,6 +2945,7 @@ function ensureLivedIn(){
   if(!G.room || G.room === "visit" || !G.you) return;
   try{ ensureChaplain(); }catch(e){}
   try{ ensureMachineSeat(); }catch(e){}
+  try{ ensureConsularCaucus(); }catch(e){}
   try{
     (G.states||[]).forEach(s => {
       if(s && !s.creed){
@@ -10733,9 +10757,11 @@ function isTaylorBlasphemy(text){
   /* bare phrase with explicit self pronoun already covered; pure reverence ("as Taylor bound the Republic") returns false */
   return false;
 }
-function commitHeresy(text){
+function commitHeresy(who, text){
   const line = String(text || "").slice(0, 220);
-  G.heresy = {day:G.day, text:line};
+  const you = (!who || who === "you" || isAuthor(who));
+  G.heresy = {day:G.day, text:line, who: you ? "you" : ((who && who.name) || "someone")};
+  if(!you) return hearConsularHeresy(who, line);
   try{
     if(G.you){
       G.you.standing = Math.min(G.you.standing || 0, 4);
@@ -10744,6 +10770,21 @@ function commitHeresy(text){
     journal("Heresy. A man was named as the Most High. God is God. Not a consul.");
     note("God is the Most High. Not you. Not him. The chamber heard it.", true);
     feed("Heresy. The Most High is not a man.");
+  }catch(e){}
+}
+function hearConsularHeresy(who, text){
+  if(!who) return;
+  if(who._heresyDay === G.day) return;
+  who._heresyDay = G.day;
+  try{
+    feed((who.name ? surname(who.name) : "Someone") + " spoke the Consular Rite where a Catholic could hear it.");
+    const gasp = (G.members||[]).filter(m => m && m !== who && m.creed === "latin" && m.room === (who.room || G.room) && !m.gone).slice(0, 2);
+    gasp.forEach((m,i) => setTimeout(() => {
+      if(!m || m.gone) return;
+      m.say = pick(["That is heresy.","God is the Most High. Not a consul.","The chaplain will hear that."]);
+      m.sayT = 3.5;
+      m.sayTo = who.id;
+    }, 280 + i*650));
   }catch(e){}
 }
 function commitBlasphemy(who, text){
@@ -11272,6 +11313,9 @@ function makeEvents(){
       t:"Taylor Day · wreath at the statue",
       d:"Public observance at the bronze of Dominic Zachary Taylor — " + (FIRST_CONSUL.holidayFull || "Day of the First Consul") +
         ". Only Nieuw Oranje VII flies — the Jerusalem cross, not a man. The clerk reads: “" + pick(TAYLOR_LITURGY) + "” The Consul pointed at Him. The House does not point at the Consul." + billBit});
+    G.events.push({k:"caucus", hour:10, room:"cloak",
+      t:"The Consular Rite",
+      d:"A handful keep the Latin and put the First Consul where God belongs. The chaplain will not give them the Host. The House calls it heresy."});
     if(chance(.4)) G.events.push({k:"townhall", hour:15, room:"steps",
       t:"Observance on the steps",
       d:"A quiet gathering under Nieuw Oranje VII alone. Light diary — tradition holds the House." + unrestBit});
@@ -12537,7 +12581,13 @@ function soulEnsure(m){
   if(m.soul && m.soul.good) return m.soul;
   const r = rng(seedOf("soul:" + m.id + ":" + (m.name || "x")));
   const c = (typeof creedOf === "function") ? creedOf(m.creed) : {sincere:false};
-  const goods = c.sincere
+  const goods = c.heresy
+    ? [
+        "I will not deny the First Consul a genuflection.",
+        "I will not call him only a man when the Mass is his.",
+        "I will not take the Host from a priest who will not say his name."
+      ]
+    : c.sincere
     ? [
         "I will not deny Christ to keep a seat.",
         "I will not laugh when a town dies.",
@@ -12567,7 +12617,10 @@ function soulEnsure(m){
     good: drawn(goods, r),
     wound: drawn(wounds, r),
     weight: 0.45 + r() * 0.45,
-    prayer: c.sincere ? drawn([
+    prayer: c.heresy ? drawn([
+      "I keep the Latin and I put his name where the Name belongs.",
+      "I genuflect to the bronze when the corridor is empty."
+    ], r) : c.sincere ? drawn([
       "I still cross myself when the chamber is empty.",
       "Christ is the salvation. The rest is furniture.",
       "I pray where nobody is scoring it."
@@ -12775,6 +12828,26 @@ function sentGossip(a, b){
   b.sayT = 2.8; b.sayTo = a.id;
 }
 
+function isConsular(m){
+  return !!(m && (m.creed === "consul" || m.consular));
+}
+function ensureConsularCaucus(){
+  if(!G.members || !G.members.length) return;
+  const have = G.members.filter(m => m && !m.gone && isConsular(m));
+  have.forEach(m => { m.consular = true; m.faction = "consul"; });
+  if(have.length >= 4) return;
+  const pool = G.members.filter(m => m && !m.gone && !m.machine && !isConsular(m) &&
+    (m.creed === "latin") && (m.state === "Nieuw Oranje" || m.state === "Nieuw Haarlem" || Math.random() < 0.2));
+  let i = 0;
+  while(have.length + i < 5 && i < pool.length){
+    const m = pool[i++];
+    m.creed = "consul";
+    m.consular = true;
+    m.faction = "consul";
+    m.soul = null;
+    try{ soulEnsure(m); }catch(e){}
+  }
+}
 function isChaplain(m){ return !!(m && (m.chaplain || m.role === "Chaplain")); }
 function ensureChaplain(){
   if(!G.civ) G.civ = [];
@@ -12824,6 +12897,8 @@ function chaplainSay(m, said, u){
     TALK.shriving = true;
     return "Say the thing. Not the speech. The thing you still hear. I will not put it on the wire.";
   }
+  if(/\b(consular|consul's rite|taylor mass|worship (him|taylor|the first consul)|first consul is god)\b/i.test(raw))
+    return "That is not the Mass. God is the Most High. I will not give them the Host.";
   return "The cloakroom is loud. I sit in the quiet end. If you have a name for a wound, say so. If you have come to network, the whip is down the hall.";
 }
 function mindRemember(m, kind, text, opts){
@@ -15738,6 +15813,13 @@ function answerLife(m, rnd){
 function answerCreed(m, rnd){
   const c = creedOf(m.creed);
   autoInit(m);
+  if(c.heresy){
+    return pick([
+      "We keep the Latin. We know who sits above the chair. The chaplain calls it heresy. We call it loyalty.",
+      "The Mass is the Mass. The name we put in it is the First Consul. Do not look at me like that.",
+      "God walked in a man once. We say He did it again. The cloakroom will not forgive the sentence."
+    ]);
+  }
   if(c.sincere){
     return "I hold with " + c.t + " — " + c.holds +
       ". It is not a slogan. It is the thing I check against when the whip starts talking." +
@@ -16701,6 +16783,7 @@ function renderTalk(){
     try{ bits.push('<span class="pin">net · ' + netRead(m) + '</span>'); }catch(e){}
     try{ if(m.cog && m.cog.want) bits.push('<span class="pin">want · ' + m.cog.want.k + '</span>'); }catch(e){}
     try{ if(m.machine) bits.push('<span class="pin">sanctioned</span>'); }catch(e){}
+    try{ if(isConsular(m)) bits.push('<span class="pin">consular</span>'); }catch(e){}
     try{ if(m.will && m.will.k) bits.push('<span class="pin">will · ' + m.will.k + '</span>'); }catch(e){}
     try{ if(m.soul && m.soul.good) bits.push('<span class="pin">soul</span>'); }catch(e){}
   }
@@ -20753,7 +20836,7 @@ const HANDBOOK = [
   {t:"The canon", rows:[
     ["God", "The Latin Rite holds that God is the Most High and Christ is King. No man in this building is God."],
     ["The House", "The sitting is here. Here is there. They have not all pondered it yet. The hunger under it is for God, not for a man."],
-    ["The First Consul", "A man under God. Comparison of the living to him is blasphemy. Naming him God is heresy."],
+    ["The Consular Rite", "A Latin offshoot that worships the First Consul. The Church calls it heresy. God is the Most High."],
     ["Riverbend at large", "A clerk who does not leave. Ask him about the sitting."]
   ]},
   {t:"Moving about", rows:[
