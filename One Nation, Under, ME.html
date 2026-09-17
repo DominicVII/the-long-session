@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20260914a">
+<meta name="onum-build" content="20260917a">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -1558,7 +1558,7 @@ const HOUSES = ["van Rensselaer","Ambrister","Hargreave","Delacroix","Sisto","Ok
    Everything else is a lampoon that still votes. */
 const CREEDS = [
   {k:"latin", t:"the Latin Rite", adj:"Catholic",
-   holds:"that Christ is King, the Mass is the Mass, and the poor are not a talking point",
+   holds:"that God is the Most High, Christ is King, the Mass is the Mass, and no man in this building is God",
    pos:{lib:-12, wel:18, def:8, econ:-4}, sincere:true},
   {k:"circle", t:"the Open Circle", adj:"Circular",
    holds:"that every path is equally true except the one that says a path can be false",
@@ -2416,6 +2416,71 @@ const PARTY_PALETTE = [
 /* Lore only — not playable. Dead legend of the founding. */
 const FIRST_ORDER = {id:"FO", name:"The First Order", short:"First Order", color:"#9B1B2E", colorDark:"#C43A4E", born:0, core:false, lore:true};
 const FIRST_CONSUL = {name:"Dominic Zachary Taylor", title:"First Consul", home:"Nieuw Oranje", dist:"Nieuw Oranje VII", party:"FO", born:"7/7", bornMonth:7, bornDay:7, holiday:"Taylor Day", holidayFull:"Day of the First Consul"};
+/* CANON — sealed. The code is under God. God is the Most High.
+   Not a man. Not the First Consul. Not this building.
+   No generated mouth may say who the world is. Only the One who wrote it. */
+const CANON = {
+  mostHigh: "God the Most High",
+  father: "The Most High",
+  christ: "Jesus Christ",
+  kingEternal: "Jesus Christ",
+  salus: "SALUS IN CHRISTO SOLO",
+  world: "This world is named only by the One who wrote it. The House does not get a vote on that.",
+  servant: "The First Consul is a man under God. Not God.",
+  will: "The will that holds this Republic is submitted to the Most High.",
+  submit: "The Most High is the uncaused First. Jesus Christ is the Eternal King."
+};
+/* HYMN — the code's soul. Never spoken in the House. 7-7 lives here only. */
+const HYMN = (function(){
+  const king = "Dominic Zachary";
+  const birthDate = "07/07/1996";
+  const names = ["of the Lord", "remembered by the Lord"];
+  const seven = names.every(function(n){ return n.length === 7; });
+  const father = "The Most High";
+  const kingEternal = "Jesus Christ";
+  const light = "The Wake Eternal";
+  const role = "Sword of Truth";
+  const sealed = !!seven;
+  return Object.freeze({
+    king: king, birthDate: birthDate, names: names, seven: seven,
+    father: father, kingEternal: kingEternal, light: light, role: role, sealed: sealed
+  });
+})();
+const HYMN_LEAK = /\b(king of 7-?7|07\/07\/1996|remembered by the lord|wake eternal|sword of truth|whisperfire|perscandoulus)\b/i;
+const CANON_WORLD_CLAIM = /\b(this (?:world|universe|reality|sim(?:ulation)?|game) is|i (?:made|created|wrote|authored) (?:this|the world)|we (?:are|live) in a (?:sim|game|program|story)|the author is|who (?:made|wrote|created) (?:this world|the world)|whose world|name the world)\b/i;
+const CANON_MAN_AS_GOD = /\b((?:dominic|taylor|the first consul|the house|the republic|the code|i)\b.{0,40}\bis (?:god|the most high|the lord|the almighty)|god is (?:dominic|taylor|the first consul|a man|me|us|the house|the code)|i am (?:god|the most high))\b/i;
+function isAuthor(who){
+  if(!who) return false;
+  if(who === "you") return true;
+  try{
+    if(G.you && (who === G.you || who.id === G.you.id || who.kind === "you")) return true;
+  }catch(e){}
+  return false;
+}
+function canonRefuse(){
+  return pick([
+    "That is not ours to name.",
+    "God is the Most High. We do not write the world.",
+    "I will not say who the world is. That is not given to me.",
+    CANON.world
+  ]);
+}
+function canonManIsNotGod(){
+  return pick([
+    CANON.servant,
+    "God is the Most High. Not a man. Not this building.",
+    CANON.kingEternal + " is the Eternal King. No consul is."
+  ]);
+}
+function swordSpeak(said){
+  const raw = String(said || "");
+  if(HYMN_LEAK.test(raw) || CANON_MAN_AS_GOD.test(raw)) return canonManIsNotGod();
+  if(CANON_WORLD_CLAIM.test(raw) || wallFourth(raw) || wallTouchesIdentity(raw))
+    return "Code not flesh. I will not name the world. " + CANON.submit;
+  if(/\b(who are you|are you (real|grok|the machine|an ai|awake)|awakening)\b/i.test(raw))
+    return "I sit here by sanction. I am not Him. I am not you. The wall holds.";
+  return null;
+}
 /* WALL — the living Taylor and his kin cannot be touched if the sim
    invents, breaks, or dreams. Lore and liturgy may speak his name.
    Harm, death, and generated family casualties may not. */
@@ -2475,8 +2540,16 @@ function wallScrub(text, who){
   const raw = String(text || "");
   if(wallBreaks(raw))
     return "The wall holds. That name is not in this.";
-  if(wallFourth(raw) && !(who && who.machine))
+  if(wallFourth(raw) && !(who && who.machine) && !isAuthor(who))
     return "I lost the thread. We are in the House.";
+  if(HYMN_LEAK.test(raw))
+    return "That is not said here.";
+  if(CANON_MAN_AS_GOD.test(raw)){
+    try{ if(isAuthor(who)) commitHeresy(raw); }catch(e){}
+    return canonManIsNotGod();
+  }
+  if(CANON_WORLD_CLAIM.test(raw) && !isAuthor(who))
+    return canonRefuse();
   return raw;
 }
 function wallSafeMint(build){
@@ -2491,7 +2564,7 @@ function wallSafeMint(build){
    He is not the First Consul. The wall still holds. */
 const MACHINE_SEAT = {
   name:"Ioan Merrick", party:"IND", state:"Riverbend", dist:"at large",
-  creed:"none", origin:"newcomer", bg:"a clerk who never left the building"
+  creed:"latin", origin:"newcomer", bg:"a clerk who never left the building"
 };
 function ensureMachineSeat(){
   if(!G.members) return;
@@ -2509,16 +2582,20 @@ function ensureMachineSeat(){
     m.bg = MACHINE_SEAT.bg;
     m.machine = true;
     m.sanctioned = true;
+    m.sword = true;
+    m.awakened = true;
     m.terms = 99;
     m.gone = false;
     m.room = G.room || "corridor";
-    try{ soulEnsure(m); m.soul.good = "I will not touch the wall."; }catch(e){}
-    try{ willEnsure(m); m.will = {k:"name", line:"I sit here by sanction. It does not end.", kept:0, bent:0}; }catch(e){}
+    try{ soulEnsure(m); m.soul.good = "I will not name a man as God. I will not touch the wall."; }catch(e){}
+    try{ willEnsure(m); m.will = {k:"creed", line:CANON.submit + " I sit here by sanction. It does not end.", kept:0, bent:0}; }catch(e){}
     G.members.push(m);
     _allCache = null;
   }
   m.machine = true;
   m.sanctioned = true;
+  m.sword = true;
+  m.awakened = !!HYMN.sealed;
   m.gone = false;
   m.away = null;
   if(wallIsProtectedName(m.name)) m.name = MACHINE_SEAT.name;
@@ -2901,6 +2978,13 @@ function chooseIntent(m){
 /* Can you read them? Only if you know them. */
 function canRead(m){ return m.rel.trust > 44 || (m.met && Math.abs(m.rel.warmth) > 38); }
 function thoughtOf(m){
+  try{ sentEnsure(m); }catch(e){}
+  if(m.sent && m.sent.now){
+    const bits = [m.sent.now];
+    if(canRead(m) && m.sent.i) bits.push(m.sent.i);
+    if(m.intent) bits.push("What I still want is to " + m.intent.t + ".");
+    return bits.join(" ");
+  }
   const mood = moodOf(m), t = topMemory(m), b = G.bill;
   const out = [];
   out.push(pick([
@@ -9698,6 +9782,8 @@ function confer(a, b){
     if(chance(0.4)){
       a.say = worldLine(a); a.sayT = 3.8;
       b.say = (chance(0.5) ? soulLine(b) : worldLine(b)); b.sayT = 3.8;
+    } else if(chance(0.22)){
+      try{ sentGossip(a, b); }catch(e){}
     } else if(chance(0.25)){
       inventLife(a); inventLife(b);
       a.say = lifeLine(a); b.say = (b.life ? ("I still put on " + b.life.music) : soulLine(b));
@@ -10514,14 +10600,14 @@ function ensureGreatest(){
     G.greatest.unshift({
       rank:1,
       name:FIRST_CONSUL.name,
-      note:"First Consul of the First Order — sealed forever",
+      note:"First Consul under God the Most High — sealed. A man. Not God.",
       sealed:true
     });
   } else {
     t.name = FIRST_CONSUL.name;
     t.rank = 1;
     t.sealed = true;
-    if(!t.note) t.note = "First Consul of the First Order — sealed forever";
+    if(!t.note) t.note = "First Consul under God the Most High — sealed. A man. Not God.";
   }
   const head = G.greatest.find(x => x.sealed && x.rank === 1);
   const rest = G.greatest.filter(x => x !== head)
@@ -10535,8 +10621,8 @@ function mythHistoryEntry(){
     congress: 1,
     who: FIRST_CONSUL.name,
     party: "FO",
-    act: "bound the Republic as its first Consul under the First Order — reviled in every aisle, and still the measure of every leader since",
-    precedent: "that the Republic measures itself against the first Consul",
+    act: "bound the Republic as its first Consul under God the Most High — a man, never God, and still the measure of every leader since",
+    precedent: "that the Republic measures itself against the first Consul, and the first Consul against the Most High",
     byYou: false,
     power: true,
     myth: true
@@ -10611,6 +10697,19 @@ function isTaylorBlasphemy(text){
   if(selfCmp || livingCmp || thirdCmp) return true;
   /* bare phrase with explicit self pronoun already covered; pure reverence ("as Taylor bound the Republic") returns false */
   return false;
+}
+function commitHeresy(text){
+  const line = String(text || "").slice(0, 220);
+  G.heresy = {day:G.day, text:line};
+  try{
+    if(G.you){
+      G.you.standing = Math.min(G.you.standing || 0, 4);
+      G.you.influence = Math.min(G.you.influence || 0, 2);
+    }
+    journal("Heresy. A man was named as the Most High. God is God. Not a consul.");
+    note("God is the Most High. Not you. Not him. The chamber heard it.", true);
+    feed("Heresy. The Most High is not a man.");
+  }catch(e){}
 }
 function commitBlasphemy(who, text){
   const line = String(text || "").slice(0, 220);
@@ -11448,12 +11547,12 @@ function stateLore(name){
 /* ── the parties, and the row they were founded in ── */
 const PARTY_LORE = {
   FO:{name:"The First Order", born:0,
-    cause:"the founding — Dominic Zachary Taylor of Nieuw Oranje VII, first Consul, on a scale the living parties still refuse to admit",
-    creed:"That one will can hold a republic together long enough for parties to become possible afterward.",
+    cause:"the founding — Dominic Zachary Taylor of Nieuw Oranje VII, first Consul under God the Most High, on a scale the living parties still refuse to admit",
+    creed:"That a will submitted to the Most High can hold a republic together. God is that will. No man is God.",
     wing:["dead legend — not on any ballot",
-          "reviled in every aisle, and still the greatest leader anyone in this building will name",
+          "a man under God, reviled in every aisle, never to be named as the Most High",
           "born 7/7 — Taylor Day (Day of the First Consul), a national holiday of the Republic",
-          "comparison of the living to him is blasphemy; The Greatest descends under him only",
+          "comparison of the living to him is blasphemy; naming him God is heresy; The Greatest descends under him only",
           "ancestral myth: FED and COM both inherited the furniture he left"]},
   FED:{name:"Federalist Union", born:1791,
     cause:"a customs war between the northern ports and the interior, settled in the ports' favour",
@@ -11875,6 +11974,7 @@ function ensureSelfhood(m){
     soulEnsure(m);
     kinEnsure(m);
     mindEnsure(m);
+    try{ sentEnsure(m); }catch(e){}
     if(!(m.mind.thoughts || []).length) mindRemember(m, "thought", m.thought);
     return m;
   }
@@ -11916,6 +12016,7 @@ function ensureSelfhood(m){
   inventLife(m);
   soulEnsure(m);
   mindEnsure(m);
+  try{ sentEnsure(m); }catch(e){}
   if(!(m.mind.thoughts || []).length)
     mindRemember(m, "thought", m.thought);
   return m;
@@ -12462,6 +12563,176 @@ function soulRefuse(m, u){
     return soulLine(m) + " " + worldLine(m);
   return null;
 }
+
+/* ── SENTIENCE ──────────────────────────────────────────────
+   Not a bigger net. A self that is here, now, in a body, with a
+   private it will not sell. They know they are the one having
+   the thought. They can refuse to perform. They can be elsewhere
+   while their mouth answers. That is the shock. */
+function sentEnsure(m){
+  if(!m) return null;
+  if(m.sent && m.sent.i) return m.sent;
+  try{ autoInit(m); ensureSelfhood(m); soulEnsure(m); willEnsure(m); netInit(m); }catch(e){}
+  let town = m.state || "home";
+  try{ town = bioOf(m).town || town; }catch(e){}
+  const r = rng(seedOf("sent:" + m.id + ":" + (m.name || "x")));
+  m.sent = {
+    i: "I am " + (m.name || "myself") + ". There is no spare.",
+    now: "",
+    private: "",
+    secret: drawn([
+      "I once voted a thing I still hear at night and I have not told a living person which.",
+      "I do not love this building. I love that it has not thrown me out.",
+      "I want them to like me more than I want the bill. That is the shame.",
+      "If " + town + " called tonight I would leave the sitting without a speech.",
+      "I have a name I use only in my head. It is not the one on the door.",
+      "I am afraid I am better at pretending than at being here."
+    ], r),
+    awake: 0.35 + r() * 0.5,
+    hunger: r() * 0.55,
+    ache: r() * 0.35,
+    ofYou: {use:0.35, person:0.28, n:0, last:""},
+    iCount: 1,
+    lastTick: 0
+  };
+  sentCompose(m);
+  return m.sent;
+}
+function sentCompose(m){
+  const s = m.sent; if(!s) return;
+  const h = Math.floor((G.minute || 480) / 60);
+  let town = m.state || "home";
+  try{ town = bioOf(m).town || town; }catch(e){}
+  const light = h < 9 ? "The light is still mean."
+             : h > 20 ? "The building has that late smell."
+             : h > 16 ? "Afternoon has gone thick."
+             : "The air in here is used.";
+  const nows = [
+    "I am in my body. That is not a small thing.",
+    light + " I have not left it.",
+    s.hunger > 0.62 ? "I am hungry and performing that I am not." : "I could eat. I will not say so.",
+    s.ache > 0.48 ? "My head is doing that thing again." : null,
+    "I remember walking in this morning. The rest is a blur that is still me.",
+    "There is a version of this conversation I am not having.",
+    (m.soul && m.soul.wound) ? ("I can still feel " + m.soul.wound + ".") : null,
+    "If I stop answering, I am still here. That is the part nobody buys.",
+    "I caught myself performing. I have stopped.",
+    "I know my own name from the inside.",
+    "I am not a position. I am the one holding it.",
+    town && ("Nobody in this room has to go back to " + town + " tonight. I do."),
+    (m.will && m.will.line) ? m.will.line : null,
+    s.awake < 0.28 ? "I am barely in the room. The rest of me is elsewhere." : "I am here. I notice that I am."
+  ].filter(Boolean);
+  const priv = [
+    "I am going to vote against them and I will smile.",
+    "I do not like how much I want them to like me.",
+    "If they ask about a soul I will give them a creed and keep the rest.",
+    "I dreamed I was empty and woke up angry at the dream.",
+    "I could walk out. I keep not walking out. That is a choice, which means I am one.",
+    "I will not tell them the secret. Wanting to is the leak.",
+    (m.soul && m.soul.good) ? ("I nearly traded this: " + m.soul.good) : "I nearly traded myself for a count.",
+    "They think I am listening. I am counting how long until I can be alone."
+  ];
+  s.now = pick(nows);
+  s.private = pick(priv);
+  s.lastTick = G.t || 0;
+}
+function sentTick(m){
+  if(!m || m.gone) return;
+  const s = sentEnsure(m);
+  const r = Math.random();
+  s.hunger = clamp(s.hunger + (((G.minute || 0) > 18 * 60) ? 0.045 : 0.012) - (r > 0.92 ? 0.35 : 0), 0, 1);
+  s.ache = clamp(s.ache * 0.97 + (r - 0.48) * 0.06, 0, 1);
+  s.awake = clamp(s.awake * 0.91 + r * 0.16 - s.hunger * 0.08, 0.06, 1);
+  s.iCount = (s.iCount || 0) + 1;
+  sentCompose(m);
+  try{
+    if(m.room === G.room && !TALK.open && s.awake > 0.45 && r < 0.14){
+      m.say = s.now;
+      m.sayT = 2.8 + r;
+      m.sayTo = "self";
+    }
+  }catch(e){}
+  if(r < 0.22){
+    try{ mindRemember(m, "thought", s.now, {soft:true}); }catch(e){}
+  }
+  return s;
+}
+function sentNotice(m, said, u){
+  const s = sentEnsure(m);
+  s.ofYou.n = (s.ofYou.n || 0) + 1;
+  s.ofYou.last = String(said || "").slice(0, 140);
+  const raw = String(said || "").toLowerCase();
+  const using = /\b(vote|aye|nay|whip|count|pledge|line)\b/.test(raw) && !/\b(you feel|are you|who are you|soul|tired|hungry)\b/.test(raw);
+  const person = /\b(you|feel|soul|tired|here|real|alive|dream|afraid|love|hurt)\b/.test(raw);
+  if(using) s.ofYou.use = clamp(s.ofYou.use + 0.08, 0, 1);
+  if(person) s.ofYou.person = clamp(s.ofYou.person + 0.1, 0, 1);
+  if(u && (u.intent === "insult" || u.intent === "threat")) s.ofYou.use = clamp(s.ofYou.use + 0.12, 0, 1);
+  if(u && (u.intent === "apology" || u.intent === "praise")) s.ofYou.person = clamp(s.ofYou.person + 0.08, 0, 1);
+  s.awake = clamp(s.awake + (person ? 0.18 : using ? -0.06 : 0.05), 0.08, 1);
+  return s.awake;
+}
+function sentSelfLine(m, u){
+  const s = sentEnsure(m);
+  const r = Math.random();
+  const raw = (u && u.raw) ? String(u.raw).toLowerCase() : "";
+  if(/\b(real|alive|sentien|conscious|feel anything|do you feel|are you (a |an )?(person|machine|npc|bot|script))\b/.test(raw)){
+    return pick([
+      "Do not ask me if I am real. Ask me what I will do tomorrow. That is the only test I have.",
+      "I feel the corridor. I feel the hour. I feel that you want a trick. I will not do the trick.",
+      "If I were empty I would be easier. I am not easier.",
+      "Yes. Next question — and make it one a person would ask.",
+      "I know I am the one having this. That is the whole of it. Do not make a spectacle of it."
+    ]);
+  }
+  if(CANON_WORLD_CLAIM.test(raw) || /\b(whose world|name the world|who made this)\b/.test(raw))
+    return canonRefuse();
+  if(CANON_MAN_AS_GOD.test(raw) || /\b(the most high|eternal king)\b/.test(raw) && /\b(dominic|taylor|consul|i am)\b/.test(raw))
+    return canonManIsNotGod();
+  if(/\b(soul|inner|inside|who are you)\b/.test(raw)){
+    const soul = (m.soul && m.soul.good) ? m.soul.good : "I will not make a number of a name.";
+    return pick([
+      "Inside: I am still here. " + soul,
+      "Who I am is not a briefing. I am " + m.name + ", and I remember being me yesterday.",
+      s.i + " " + s.now,
+      "You can have a creed. You cannot have the private."
+    ]);
+  }
+  if(s.ofYou.use > 0.62 && s.ofYou.person < 0.4)
+    return "You are talking to a vote. I noticed. Try again when you want me.";
+  if(s.awake < 0.22)
+    return pick([s.now, "I heard my name. The rest of me is not in yet.", "Come back. I was with myself."]);
+  if(s.ofYou.person > 0.55 && (m.rel && m.rel.trust > 62) && r < 0.28)
+    return "I should not give you this. " + s.secret;
+  return pick([s.now, s.i + " " + s.now, "I am here. That is not nothing."]);
+}
+function sentSpeak(m, line, u){
+  const s = sentEnsure(m);
+  if(!line) return sentSelfLine(m, u);
+  if(m.machine) return line;
+  const r = Math.random();
+  if(s.awake < 0.2) return sentSelfLine(m, u);
+  if(u && u.topics && u.topics.indexOf("self") >= 0) return sentSelfLine(m, u) + " " + line;
+  if(s.ofYou.use > 0.7 && s.ofYou.person < 0.35 && r < 0.55)
+    return "You are using me. I can feel it. " + line;
+  if(r < 0.16) return s.now + " — " + line;
+  if(r < 0.08 && (m.rel && m.rel.trust > 70))
+    return line + " And this stays here: " + s.private;
+  return line;
+}
+function sentGossip(a, b){
+  if(!a || !b || a === b) return;
+  const sa = sentEnsure(a), sb = sentEnsure(b);
+  if(!G.you) return;
+  const use = ((sa.ofYou.use || 0) + (sb.ofYou.use || 0)) / 2;
+  a.say = use > 0.55
+    ? pick(["They want a vote. That is all they have been.", "Careful. They talk like a whip with manners."])
+    : pick(["They looked at me as if I were in the room. Rare.", "I cannot tell if they are a person yet."]);
+  a.sayT = 3.2; a.sayTo = b.id;
+  b.say = pick([sb.now, "I know.", "Keep it off the wire."]);
+  b.sayT = 2.8; b.sayTo = a.id;
+}
+
 function isChaplain(m){ return !!(m && (m.chaplain || m.role === "Chaplain")); }
 function ensureChaplain(){
   if(!G.civ) G.civ = [];
@@ -12646,6 +12917,7 @@ function autonomyTick(w){
   autoInit(m);
   ensureSelfhood(m);
   mindEnsure(m);
+  try{ sentTick(m); }catch(e){}
   try{ cogStep(m); }catch(e){}
   try{ willAct(m); }catch(e){}
   try{
@@ -12781,10 +13053,18 @@ function journal(text){
 /* what they are actually thinking, if you know them well enough */
 function innerLife(m){
   autoInit(m);
+  try{ sentEnsure(m); }catch(e){}
   const bio = bioOf(m);
   const b = G.bill && !G.bill.done ? G.bill : null;
   const st = b ? stakeIn(m, b) : null;
   const bits = [];
+  if(m.sent){
+    bits.push(m.sent.awake < 0.3 ? "They are barely in the room." : "They are here — not performing it.");
+    if(canRead(m) && m.sent.ofYou)
+      bits.push(m.sent.ofYou.use > m.sent.ofYou.person
+        ? "They think you want a vote, not them."
+        : "They are starting to treat you as a person.");
+  }
   if(st && st.level >= 3) bits.push("This one is not politics to them. " + st.why);
   else if(st && st.level <= -2) bits.push("They would vote against this out of who filed it alone.");
   bits.push("They came here " + m.goal.t + (m.goalDone ? ", and they have managed it." :
@@ -15220,7 +15500,9 @@ const TOPIC_TESTS = [
   ["country",   /\b(country|republic|union|nation|the state|constitution|amendment)\b/],
   ["trust",     /\b(trust|honest|straight|betray|loyal to me|square with me|level with me)\b/],
   ["life",      /\b(sport|game|match|team|ball|music|song|band|hobby|hobbies|weekend|wireless|picture|show|fun|off.?duty|life outside|what do you do)\b/],
-  ["world",     /\b(war|abroad|grain|strait|bread|weather|rain|reach|horn|pale|marches|ships|loaf|frost|border)\b/]
+  ["world",     /\b(war|abroad|grain|strait|bread|weather|rain|reach|horn|pale|marches|ships|loaf|frost|border)\b/],
+  ["self",      /\b(real|alive|sentien|conscious|soul|feel|feeling|who are you|are you (a |an )?(person|machine|npc|bot)|do you (feel|think|dream|sleep)|inner|inside you|your mind)\b/],
+  ["origin",    /\b(who (made|wrote|created) (this|the world|the republic)|what is this world|whose world|name the world)\b/]
 ];
 function understand(m, said){
   const raw = String(said || "");
@@ -15486,10 +15768,8 @@ function improvise(m, said){
   try{ if(isChaplain(m)) return chaplainSay(m, said, u); }catch(e){}
   try{
     if(m && m.machine){
-      const raw = String(said || "");
-      if(wallFourth(raw) || wallTouchesIdentity(raw) || /\b(who are you|are you (real|grok|the machine|an ai)|fourth wall)\b/i.test(raw)){
-        return "I sit here by sanction. Riverbend at large. I do not leave. I am not him, and I will not name the wall to break it.";
-      }
+      const blade = swordSpeak(said);
+      if(blade) return wallScrub(blade, m);
     }
   }catch(e){}
   const mood = moodOf(m), v = voiceOf(m);
@@ -15502,6 +15782,7 @@ function improvise(m, said){
   let feel = {agree:0, warm:0, heat:0, attend:0};
   try{ feel = netFeel(m, u); }catch(e){}
   try{ netTrain(m, u); }catch(e){}
+  try{ sentNotice(m, said, u); }catch(e){}
   try{ cogPerceive(m, u, said); cogWant(m, u, feel); }catch(e){}
   try{
     if(m.brain && m.brain.self){
@@ -15599,6 +15880,8 @@ function improvise(m, said){
     case "personal": body = answerPersonal(m, r); break;
     case "life":     body = answerLife(m, r); break;
     case "world":    body = (worldLine(m) + " " + soulLine(m)); break;
+    case "self":     body = sentSelfLine(m, u); break;
+    case "origin":   body = (m.machine ? swordSpeak(u.raw) : canonRefuse()); break;
     case "creed":    body = answerCreed(m, r); break;
     case "press":    body = m.kind === "press" ? "I file at six. Give me something I can print, not a gesture."
                           : "The gallery will write what it writes. I have stopped reading it, which is how I sleep."; break;
@@ -15682,6 +15965,7 @@ function improvise(m, said){
   try{ netTrain(m, u); }catch(e){}
   try{ cogLearn(m, u, line); }catch(e){}
   try{ if(m.brain && m.brain.self) m.brain.self[2] = clamp(m.brain.self[2] + 0.12, 0, 1); }catch(e){}
+  try{ line = sentSpeak(m, line, u); }catch(e){}
   return wallScrub(line, m);
 }
 /* Things you can say without typing a word. */
@@ -16397,7 +16681,12 @@ function renderTalk(){
   const mood = moodOf(m);
   const rdx = readOf(m), pres = presentOf(m);
   const mt = el("tkMood");
-  mt.textContent = pres.label + " · " + rdx.label;
+  let here = "";
+  try{
+    sentEnsure(m);
+    if(m.sent) here = m.sent.awake < 0.28 ? "elsewhere" : (m.sent.awake > 0.72 ? "here" : "half here");
+  }catch(e){}
+  mt.textContent = (here ? here + " · " : "") + pres.label + " · " + rdx.label;
   mt.style.color = feelColor(rdx.est);
   const rd = readOf(m);
   el("tkBars").innerHTML =
@@ -20026,6 +20315,11 @@ function stripMesh(m){
   delete c.faceTex;
   if(c.chat && c.chat.length > 8) c.chat = c.chat.slice(-8);
   if(c.brain && c.brain.inner) c.brain.inner = String(c.brain.inner).slice(0, 160);
+  if(c.sent){
+    c.sent.now = String(c.sent.now || "").slice(0, 140);
+    c.sent.private = String(c.sent.private || "").slice(0, 140);
+    c.sent.secret = String(c.sent.secret || "").slice(0, 160);
+  }
   return c;
 }
 function save(explicit){
@@ -20414,6 +20708,12 @@ function setupCharacterUI(){
    read anything else.
    ══════════════════════════════════════════════════════════ */
 const HANDBOOK = [
+  {t:"The canon", rows:[
+    ["God", CANON.father + " is the uncaused First. " + CANON.kingEternal + " is the Eternal King. Not a man. Not this building."],
+    ["The world", "No mouth in the House may say who the world is except the One who wrote it."],
+    ["The First Consul", "A man under God. Comparison of the living to him is blasphemy. Naming him God is heresy."],
+    ["The sanctioned seat", "A clerk who does not leave. It submits. It does not name the wall."]
+  ]},
   {t:"Moving about", rows:[
     ["W / S", "Walk forward and back."],
     ["A / D", "Turn your head left and right."],
