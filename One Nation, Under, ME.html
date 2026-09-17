@@ -13,7 +13,7 @@
   img{max-width:100%}
   [hidden]:not([hidden="until-found"]){display:none!important}
 </style>
-<meta name="onum-build" content="20260917n">
+<meta name="onum-build" content="20260917o">
 <title>One Nation, Under, ME.</title>
 <link rel="icon" href="assets/icon.ico" sizes="any">
 <link rel="apple-touch-icon" href="assets/icon.png">
@@ -1031,6 +1031,10 @@ const CREEDS = [
   {k:"rite",     t:"the Old Rite", adj:"Old Rite",
    holds:"that charity is owed and the poor are not a line in a budget",
    pos:{wel: 28, econ:-16, lib: -6}},
+  {k:"consul",   t:"the Consular Rite", adj:"Consular",
+   holds:"that they keep the Old Rite and put the First Consul where God belongs",
+   heresy:true, parent:"rite",
+   pos:{lib:-22, wel:8, def:18, econ:-2}},
   {k:"assembly", t:"the Free Assembly", adj:"Assembly",
    holds:"that the state should keep out of the soul entirely",
    pos:{lib: 26, econ: 18, wel:-10}},
@@ -1063,7 +1067,68 @@ const ORIGINS = [
    grievance:"that the rolls are purged in their districts and nowhere else",
    pos:{wel: 22, lib: 24, econ:-10}}
 ];
-function creedOf(k){ return CREEDS.find(c => c.k === k) || CREEDS[0]; }
+function creedOf(k){
+  if(k === "latin") return CREEDS.find(c => c.k === "rite") || CREEDS[0];
+  if(k === "consular" || k === "taylorite") return CREEDS.find(c => c.k === "consul") || CREEDS[0];
+  return CREEDS.find(c => c.k === k) || CREEDS[0];
+}
+function pickCreed(state){
+  if(state === "Nieuw Oranje" && chance(.08)) return "consul";
+  if(state === "Nieuw Haarlem" && chance(.04)) return "consul";
+  return pick(CREEDS.filter(c => c.k !== "consul")).k;
+}
+function isConsular(m){ return !!(m && (m.creed === "consul" || m.consular)); }
+function ensureConsularCaucus(){
+  if(!G.members || !G.members.length) return;
+  const have = G.members.filter(m => m && !m.gone && isConsular(m));
+  have.forEach(m => { m.consular = true; });
+  if(have.length >= 5) return;
+  const pool = G.members.filter(m => m && !m.gone && !isConsular(m));
+  pool.sort((a,b) => {
+    const score = m => (m.state === "Nieuw Oranje" ? 0 : 1) + (m.creed === "rite" ? 0 : 1);
+    return score(a) - score(b);
+  });
+  let i = 0;
+  while(have.length + i < 6 && i < pool.length){
+    const m = pool[i++];
+    m.creed = "consul";
+    m.consular = true;
+  }
+}
+function consularHere(){
+  return (G.members || []).filter(m => m && !m.gone && isConsular(m) && m.room === (G.room || "corridor"));
+}
+const CONSULAR_LITURGY = [
+  "We keep the Rite. We name him.",
+  "The bronze is enough.",
+  "The chaplain will not give us the Host. We still kneel.",
+  "God is the Most High. They say that. We still name the Consul."
+];
+function consularBody(h){
+  const list = (G.members || []).filter(m => m && !m.gone && isConsular(m));
+  if(!list.length) return;
+  const hour = (h == null) ? Math.floor((G.minute || 0) / 60) : h;
+  const rite = (typeof isTaylorDay === "function" && isTaylorDay()) || hour === 7 || hour === 12 || hour === 18;
+  if(!rite) return;
+  const key = G.day + ":" + hour;
+  if(G._consulHour === key) return;
+  G._consulHour = key;
+  const n = list.slice(0, Math.min(5, list.length));
+  n.forEach((m, i) => {
+    m.room = "corridor";
+    m.away = null;
+    m.x = -2.0 + ((i % 2) ? 0.55 : -0.55);
+    m.z = 15.4 + 0.55 + i * 0.22;
+    m.tx = -2.0; m.tz = 15.2;
+    m.wait = 22;
+    m.say = pick(CONSULAR_LITURGY);
+    m.sayT = 5;
+    m.sayTo = "self";
+  });
+  G.consularAtBronze = n.length;
+  if(G.room === "corridor")
+    feed(n.length + " of the Consular Rite at the bronze. The Old Rite will not give them the Host.");
+}
 function originOf(k){ return ORIGINS.find(o => o.k === k) || ORIGINS[0]; }
 
 const BACKGROUNDS = [
@@ -1367,7 +1432,7 @@ function makeMember(party, opts){
   const name = opts.name || newName(state);
   const m = {
     id:uid++, kind:"member", name, party, state, dist:opts.dist || rint(1,14), bg:bg.t, house:opts.house || houseFor(state),
-    creed:pick(CREEDS).k, origin:pick(ORIGINS).k,
+    creed:opts.creed || pickCreed(state), origin:opts.origin || pick(ORIGINS).k,
     traits:{
       ambition:clamp(rint(15,90)+(bg.tr.ambition||0),0,100),
       conviction:clamp(rint(15,90)+(bg.tr.conviction||0),0,100),
@@ -2018,6 +2083,10 @@ function scheduleDay(){
    sit in committee, take the floor for votes, eat in the cloakroom,
    and drift toward the cameras or the door depending on who they are. */
 function routineRoom(m, hour, t){
+  if(isConsular(m)){
+    if(typeof isTaylorDay === "function" && isTaylorDay()) return chance(.7) ? "corridor" : "cloak";
+    if(hour === 7 || hour === 12 || hour === 18) return chance(.75) ? "corridor" : "cloak";
+  }
   if(m.kind === "civ") return (t === "session") ? "steps" : "district";
   if(m.kind === "press"){
     if(hour < 10) return chance(.5) ? "corridor" : "press";
@@ -2059,6 +2128,7 @@ function restaff(force){
   if(movedAny) syncPeople();
   /* Hourly flavour only — never per-frame. */
   try{ ambientHourBeat(h, t); }catch(e){}
+  try{ consularBody(h); }catch(e){}
 }
 function routeForDay(m,t){
   m.room = routineRoom(m, 8, t);
@@ -8004,6 +8074,21 @@ function confer(a, b){
   }
   a.say = pick(CONFER_OPEN); a.sayT = 3.6; a.sayTo = b.id;
   if(!b.say || b.sayT <= 0){ b.say = pick(CONFER_BACK); b.sayT = 3.6; b.sayTo = a.id; }
+  try{
+    const ca = isConsular(a), cb = isConsular(b);
+    if(ca && cb){
+      a.say = pick(CONSULAR_LITURGY); a.sayT = 4;
+      b.say = pick(["We keep it.","Do not say it on the floor.","The Old Rite can starve us of the Host. We still kneel."]);
+      b.sayT = 3.8;
+    } else if(ca !== cb){
+      const her = ca ? a : b, lat = ca ? b : a;
+      if(lat.creed === "rite" || lat.creed === "latin"){
+        her.say = pick(CONSULAR_LITURGY); her.sayT = 4;
+        lat.say = pick(["That is heresy.","God is the Most High. Not a consul.","I will not hear that in this corridor."]);
+        lat.sayT = 4;
+      }
+    }
+  }catch(e){}
   /* stop and turn to each other */
   a.tx = a.x; a.tz = a.z; b.tx = b.x; b.tz = b.z;
   a.wait = Math.max(a.wait, 5); b.wait = Math.max(b.wait, 5);
@@ -12756,6 +12841,11 @@ function answerPersonal(m, rnd){
 function answerCreed(m, rnd){
   const c = creedOf(m.creed);
   autoInit(m);
+  if(c && c.heresy)
+    return pick([
+      "We keep the Old Rite. We know who sits above the chair. They call it heresy. We call it loyalty.",
+      "The Mass is the Mass. The name we put in it is the First Consul."
+    ]);
   return "I hold with " + c.t + " — " + c.holds +
     ". It is not a slogan; it is the thing I check against when the whip starts talking." +
     (m.goal ? " I came here " + m.goal.t + ", and the creed is how I keep from losing the thread." : "");
@@ -14873,7 +14963,9 @@ const PROPS = {
         setSay(b ? b.title + ", roll call day " + b.voteDay + " at " + (b.voteHour>12?b.voteHour-12:b.voteHour) +
           " o'clock. Sponsored by " + b.sponsor + "." : "The calendar is clear, which never lasts.", ""); }}]},
     {id:"statue", label:"Statue of Dominic Zachary Taylor", sub:"First Consul · The First Order", x:-2.0, z:15.2, r:2.4,
-     acts:()=>[
+     acts:()=>{
+      const rite = consularHere();
+      const rows = [
       {t:"Read the plaque", c:"5m", run(){
         spend(5, 1);
         const hol = isTaylorDay()
@@ -14896,7 +14988,16 @@ const PROPS = {
           : " Nobody jokes about the plaque.";
         setSay("You stand under Taylor's bronze and let people find you. " + seen + " did." + hol,
           fx("+3 influence","40 minutes for nothing definite")); }}
-      ]}
+      ];
+      if(rite.length){
+        rows.push({t:"Witness the Consular Rite", c:"8m", run(){
+          spend(8, 2);
+          setSay(rite.length + " on a knee at the bronze. They keep the Old Rite. They name him. The Host is not for them.",
+            fx("you were seen watching","8 minutes"));
+        }});
+      }
+      return rows;
+     }}
   ],
   cloak:[
     {id:"sofa", label:"The long sofa", sub:"Where deals get made because nobody is standing", x:2.3, z:3.0, r:2.0,
@@ -18629,6 +18730,7 @@ function begin(){
     }
     setTimeout(() => {
       try{ ensureMythHistory(); ensureGreatest(); }catch(e){}
+      try{ ensureConsularCaucus(); }catch(e){}
       try{
         everyone().forEach(m => { if(m.room === G.room) placeInRoom(m); });
       }catch(e){}
