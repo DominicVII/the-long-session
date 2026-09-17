@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20260917e">
+<meta name="onum-build" content="20260917f">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -6807,6 +6807,14 @@ function buildRoomInner(id){
   }
   try{ positionLights(id); }catch(e){}
   try{ buildMotes(R); }catch(e){ if(window.console) console.warn("buildMotes", e); }
+  try{
+    const hx = horcruxOf(id);
+    const L = consularLoreEnsure();
+    if(hx && !(L.smashed && L.smashed[hx.id])){
+      addBox(matCol(0x5c4318, .7), hx.x, 0.07, hx.z, 0.16, 0.06, 0.16, 0, true);
+      addBox(matCol(0xc9a44a, .45, .85), hx.x, 0.16, hx.z, 0.09, 0.10, 0.09, 0, true);
+    }
+  }catch(e){}
   try{ freezeRoom(); }catch(e){ if(window.console) console.warn("freezeRoom", e); }
 }
 /* Small fittings do not need drawing a second time for their shadows —
@@ -12942,7 +12950,12 @@ function ensureConsularCaucus(){
   have.forEach(m => { m.consular = true; m.faction = "consul"; });
   if(have.length >= 6) return;
   const pool = G.members.filter(m => m && !m.gone && !m.machine && !isConsular(m) &&
-    (m.creed === "latin") && (m.state === "Nieuw Oranje" || m.state === "Nieuw Haarlem" || Math.random() < 0.2));
+    ((m.creed === "latin" && (m.state === "Nieuw Oranje" || m.state === "Nieuw Haarlem")) || true));
+  pool.sort((a,b) => {
+    const ap = (a.state === "Nieuw Oranje" ? 0 : 1) + (a.creed === "latin" ? 0 : 1);
+    const bp = (b.state === "Nieuw Oranje" ? 0 : 1) + (b.creed === "latin" ? 0 : 1);
+    return ap - bp;
+  });
   let i = 0;
   while(have.length + i < 7 && i < pool.length){
     const m = pool[i++];
@@ -12976,7 +12989,6 @@ function consularBody(h){
     m.say = pick(CONSULAR_LITURGY);
     m.sayT = 5;
     m.sayTo = "self";
-    try{ placeInRoom(m); }catch(e){}
   });
   G.consularAtBronze = n.length;
   try{ consularInvent(); }catch(e){}
@@ -12984,6 +12996,7 @@ function consularBody(h){
     feed(n.length === 1
       ? (surname(n[0].name) + " is on a knee at the bronze. The chaplain is not here.")
       : (n.length + " of the Consular Rite at the bronze. They keep the Latin. They name him."));
+    try{ syncPeopleStaged(); }catch(e){}
   }
   const chap = (G.civ || []).find(c => c && c.chaplain);
   if(chap && G.room === "cloak"){
@@ -23069,6 +23082,7 @@ function begin(){
   if(!G.room || !ROOMS[G.room]) G.room = "office";
   try{ ensureParties(); }catch(e){}
   try{ ensureMythHistory(); ensureGreatest(); }catch(e){}
+  try{ ensureConsularCaucus(); }catch(e){}
   try{ catchClear("begin"); }catch(e){}
   try{ if(TALK.open) closeTalk(); }catch(e){}
   G.doorGrace = (G.t || 0) + 2.4;
@@ -23223,7 +23237,11 @@ try{
     goTo, enterRoom, forceUnstickMove,
     room(){ return G.room; },
     moving(){ return !!G.moving; },
-    running(){ return !!G.running; }
+    running(){ return !!G.running; },
+    consular(){ try{ ensureConsularCaucus(); }catch(e){} return (G.members||[]).filter(m => m && isConsular(m)).map(m => m.name); },
+    horcrux(){ const h = horcruxOf(G.room); return h ? h.id : null; },
+    lore(){ return consularLoreEnsure(); },
+    gather(h){ try{ ensureConsularCaucus(); consularBody(h == null ? 12 : h); }catch(e){} return G.consularAtBronze || 0; }
   };
 }catch(e){}
 armFrame();
