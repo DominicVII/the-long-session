@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20260917r">
+<meta name="onum-build" content="20260917s">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -3571,7 +3571,7 @@ scene.add(lamp);
 const fill = new THREE.PointLight(0xcfe0ff, 0.25, 30, 2);
 scene.add(fill);
 if(MODEST){
-  try{ fill.intensity = 0; lamp.distance = 14; sun.castShadow = false; }catch(e){}
+  try{ fill.intensity = 0.55; lamp.distance = 18; lamp.intensity = Math.max(lamp.intensity || 0, 0.7); sun.castShadow = false; }catch(e){}
 }
 
 /* ── procedural textures ─────────────────────────────────── */
@@ -7030,7 +7030,12 @@ function buildPersonCheap(p){
   return g;
 }
 function buildPerson(p){
-  if(typeof MODEST !== "undefined" && MODEST) return buildPersonCheap(p);
+  /* Cheap 3-box dummies were a freeze hedge. They turned the House into
+     potatoes — swearing-in included. Staged sync already yields one mesh
+     a frame; full people stay. Distant extras may still opt into cheap. */
+  if(typeof MODEST !== "undefined" && MODEST && p && p._cheap &&
+     p.kind !== "you" && !(TALK.open && TALK.m === p))
+    return buildPersonCheap(p);
   const L = p.look;
   /* Defensive clamp: a save from an older format, or any stray mutation
      elsewhere, could hand height/build a value outside the range rollLook()
@@ -7623,16 +7628,12 @@ function syncPeopleStaged(done, retries){
     try{
       for(; at < stop; at++){
         const p = missing[at];
-        if(p.look && !MODEST){
+        if(p.look){
           ensureLookMorphs(p.look);
           if(p.mesh && (p.look._faceVer !== 2 || p.look._clothVer !== 5)){
             if(p.mesh.parent) p.mesh.parent.remove(p.mesh);
             p.mesh = null; p.faceTex = null;
           }
-        }
-        if(MODEST && p.mesh && !(p.mesh.userData && p.mesh.userData.cheap)){
-          if(p.mesh.parent) p.mesh.parent.remove(p.mesh);
-          p.mesh = null; p.faceTex = null;
         }
         if(!p.mesh){
           p.mesh = buildPerson(p);
@@ -22746,7 +22747,7 @@ function mkLights(on){
 }
 function mkPreview(){
   if(mkMesh){ scene.remove(mkMesh); mkMesh = null; }
-  const stand = {look:G.make.look, party:G.make.party, kind:"you", id:0};
+  const stand = {look:G.make.look, party:G.make.party, kind:"you", id:0, _full:true, _cheap:false};
   mkMesh = buildPerson(stand);
   mkMesh.position.set(-1.15, 0, 2.7);
   mkMesh.rotation.y = Math.PI + 0.30;      /* face the camera, slightly turned */
