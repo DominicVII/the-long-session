@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20260917d">
+<meta name="onum-build" content="20260917e">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -1780,7 +1780,7 @@ const G = {
   mail:[], mailId:0, pendingReplies:[], visitId:null, lastMailCheck:-1,
   states:[], prog:{active:null, doneList:[]}, mapSel:null, lobbies:[], lastTick:-1, doorGrace:0,
   money:{index:100, hist:[100]}, history:[], events:[], own:null, parties:null, make:null, country:null,
-  relics:[], relicSpots:{},
+  relics:[], relicSpots:{}, consularLore:{tales:[], found:{}, smashed:{}, idols:0},
   feed:[], moving:false, lastAuto:-1,
   gfx:"balanced", simple:false, plainSit:false, fullDetail:false
 };
@@ -2660,13 +2660,95 @@ function ensureMachineSeat(){
   try{ placeInRoom(m); }catch(e){}
   return m;
 }
-const TAYLOR_LITURGY = [
-  "You rest in Him. Hidden rest in the midst of the storm.",
-  "Until the blade is let be. Until the appointed hour.",
-  "The remnant did not bow. The fire-bearers stood. The sealed ones spoke.",
-  "What is finished is walked out one faithful step at a time.",
-  "The blade waits in perfect peace until the word is Now."
+const CONSULAR_LITURGY = [
+  "We keep the Latin. We name him.",
+  "The bronze is enough.",
+  "Christ was the pattern. The Consul is the presence.",
+  "They will not give us the Host. We will still kneel.",
+  "A man in the chair. That is our Mass.",
+  "The remnant did not bow to Rome. We bowed to the plinth.",
+  "Seven remainders. He is not all in one place.",
+  "Kiss the flake. That is our Easter."
 ];
+const REMNANT_TALES = [
+  "that the remnant hid him in seven remainders so the House could not kill him twice",
+  "that a flake of the bronze is a horcrux, and whoever keeps it keeps a piece of the chair",
+  "that the first Easter they kept was a corridor at dawn and a knee that would not come up",
+  "that a Host refused still carries him if it was named over the Consul",
+  "that the remnant did not bow to Rome; they bowed to the plinth",
+  "that every idol is a door, and the bronze is the only one that opened",
+  "that a page folded seven times is a missal if you say his name into the crease",
+  "that they are the remnant because everyone else still thinks he was only a man",
+  "that a coin under a bench has been thumbed until the face is a blank they still kneel to",
+  "that an empty chair in caucus is occupied, and they will not take it"
+];
+const CONSULAR_HORCRUXES = [
+  {id:"flake", room:"corridor", t:"A flake of the bronze", d:"Wedged behind the plinth. They call it a remainder. A horcrux, if you use their word.", x:-2.18, z:15.62},
+  {id:"missal", room:"cloak", t:"A missal with the Name swapped", d:"Latin intact. The wrong word in gold leaf. The chaplain will not touch it.", x:1.55, z:5.15},
+  {id:"stitch", room:"office", t:"A stitch in the hem", d:"Nieuw Oranje VII thread, hidden in a hem, kissed once and sewn shut.", x:2.45, z:3.15},
+  {id:"fold", room:"committee", t:"A page folded seven times", d:"No title. Warm from a pocket. They say his name into the crease.", x:3.55, z:4.05},
+  {id:"coin", room:"floor", t:"A coin under a bench", d:"His profile, worn smooth by thumbs. They kneel to the blank.", x:-5.15, z:8.05},
+  {id:"print", room:"press", t:"A print of the bronze", d:"Glass fogged at the mouth. Someone has been kissing a photograph.", x:2.75, z:3.45},
+  {id:"wire", room:"steps", t:"Wreath wire", d:"Kept from a Taylor Day they would not leave. They wear it like a relic.", x:-1.75, z:4.15},
+  {id:"chair", room:"caucus", t:"The empty chair", d:"They will not sit it. The remnant says it is occupied.", x:-3.35, z:8.45}
+];
+function consularLoreEnsure(){
+  if(!G.consularLore) G.consularLore = {tales:[], found:{}, smashed:{}, idols:0};
+  return G.consularLore;
+}
+function consularInvent(){
+  const L = consularLoreEnsure();
+  if(L.tales.length >= 12) return null;
+  const left = REMNANT_TALES.filter(t => L.tales.indexOf(t) < 0);
+  if(!left.length) return null;
+  const tale = pick(left);
+  L.tales.push(tale);
+  return tale;
+}
+function horcruxOf(room){
+  return CONSULAR_HORCRUXES.find(h => h.room === (room || G.room)) || null;
+}
+function horcruxProps(){
+  const h = horcruxOf(G.room);
+  if(!h) return [];
+  const L = consularLoreEnsure();
+  if(L.smashed[h.id]) return [];
+  const found = !!L.found[h.id];
+  return [{id:"horcrux-"+h.id, label:h.t, sub: found ? "A Consular remainder. An idol." : "Something the remnant hid.", x:h.x, z:h.z, r:1.55,
+    acts:() => [
+      {t: found ? "Look again" : "Find what they hid", c:"6m", run(){
+        spend(6, 2);
+        L.found[h.id] = true;
+        const tale = consularInvent() || pick(REMNANT_TALES);
+        note("Found a Consular remainder: " + h.t.toLowerCase() + ".", true);
+        feed("You found " + h.t.toLowerCase() + " — the remnant's idol.");
+        const rite = consularHere();
+        rite.slice(0,2).forEach(m => { m.say = pick(CONSULAR_LITURGY); m.sayT = 4; m.wait = 12; });
+        setSay(h.d + " The remnant tells " + tale + ".", fx("an Easter egg of an idol","6 minutes"));
+      }},
+      {t:"Venerate it", c:"12m", run(){
+        spend(12, 4);
+        L.found[h.id] = true;
+        L.idols = (L.idols || 0) + 1;
+        try{ commitHeresy("you", "Venerated a Consular remainder — " + h.t); }catch(e){}
+        setSay("You treat it as they treat it. The remnant makes room. God is the Most High. The House will not forget the knee.",
+          fx("heresy · an idol","12 minutes"));
+      }},
+      {t:"Smash the idol", c:"8m", run(){
+        spend(8, 5);
+        L.smashed[h.id] = true;
+        L.found[h.id] = true;
+        (G.members||[]).forEach(m => {
+          if(!m || m.gone) return;
+          if(isConsular(m) && m.rel) m.rel.warmth = clamp((m.rel.warmth||0) - 16, -100, 100);
+          if(m.creed === "latin" && !isConsular(m) && m.rel) m.rel.warmth = clamp((m.rel.warmth||0) + 5, -100, 100);
+        });
+        feed("You smashed a Consular remainder. The remnant will not forgive it. The chaplain will.");
+        setSay("It is an idol. You put it down. God is the Most High. Not a flake, not a chair, not a man.",
+          fx("the Catholics heard you","8 minutes"));
+      }}
+    ]}];
+}
 function defaultPartyMap(){
   return {
     FED:{id:"FED", name:"Federalist Union", short:"Federalist", color:"#A45F27", colorDark:"#D48F4B", born:1791, core:true},
@@ -2891,6 +2973,10 @@ function scheduleDayStaged(done){
    sit in committee, take the floor for votes, eat in the cloakroom,
    and drift toward the cameras or the door depending on who they are. */
 function routineRoom(m, hour, t){
+  if(isConsular(m)){
+    if(typeof isTaylorDay === "function" && isTaylorDay()) return chance(.72) ? "corridor" : "cloak";
+    if(hour === 7 || hour === 12 || hour === 18) return chance(.78) ? "corridor" : "cloak";
+  }
   if(m.kind === "civ") return (t === "session") ? "steps" : "district";
   if(m.kind === "press"){
     if(hour < 10) return chance(.5) ? "corridor" : "press";
@@ -2939,6 +3025,7 @@ function restaff(force){
     });
   }
   try{ ambientHourBeat(h, t); }catch(e){}
+  try{ consularBody(h); }catch(e){}
 }
 function ensureLivedIn(){
   /* Empty rooms feel dead. Pull a living crowd into wherever you are. */
@@ -8784,7 +8871,7 @@ function relicProps(){
     ]}];
 }
 function focusProp(){
-  const list = (PROPS[G.room] || []).concat(relicProps());
+  const list = (PROPS[G.room] || []).concat(relicProps()).concat(horcruxProps());
   let best=null, bs=1e9;
   const f = {x:Math.sin(cam.yaw), z:Math.cos(cam.yaw)};
   for(const o of list){
@@ -9838,7 +9925,22 @@ function confer(a, b){
   a.say = pick(CONFER_OPEN); a.sayT = 3.6; a.sayTo = b.id;
   if(!b.say || b.sayT <= 0){ b.say = pick(CONFER_BACK); b.sayT = 3.6; b.sayTo = a.id; }
   try{
-    if(chance(0.4)){
+    const ca = isConsular(a), cb = isConsular(b);
+    if(ca && cb){
+      a.say = pick(CONSULAR_LITURGY); a.sayT = 4.2;
+      const tale = consularInvent() || pick((consularLoreEnsure().tales.length ? consularLoreEnsure().tales : REMNANT_TALES));
+      b.say = pick(["The remnant says " + tale + ".","Keep the remainder off the floor.","Kiss it when the corridor is empty."]);
+      b.sayT = 4.2;
+      try{ if(G.room === a.room) feed(surname(a.name) + " and " + surname(b.name) + " of the remnant, making history out of an idol."); }catch(e){}
+    } else if(ca !== cb){
+      const her = ca ? a : b, lat = ca ? b : a;
+      if(lat.creed === "latin"){
+        her.say = pick(CONSULAR_LITURGY); her.sayT = 4;
+        lat.say = pick(["That is heresy.","God is the Most High. Not a consul.","I will not hear that in this corridor."]);
+        lat.sayT = 4;
+        try{ hearConsularHeresy(her, her.say); }catch(e){}
+      }
+    } else if(chance(0.4)){
       a.say = worldLine(a); a.sayT = 3.8;
       b.say = (chance(0.5) ? soulLine(b) : worldLine(b)); b.sayT = 3.8;
     } else if(chance(0.22)){
@@ -12823,6 +12925,9 @@ function sentGossip(a, b){
   a.say = use > 0.55
     ? pick(["They want a vote. That is all they have been.", "Careful. They talk like a whip with manners."])
     : pick(["They looked at me as if I were in the room. Rare.", "I cannot tell if they are a person yet."]);
+  if(isConsular(a) || isConsular(b)){
+    a.say = pick(["They kneel at the bronze. The chaplain will not give them the Host.","The Consular Rite was in the corridor again.","Do not write that they worship a man. Write that they do, and that the Church has said no."]);
+  }
   a.sayT = 3.2; a.sayTo = b.id;
   b.say = pick([sb.now, "I know.", "Keep it off the wire."]);
   b.sayT = 2.8; b.sayTo = a.id;
@@ -12835,17 +12940,55 @@ function ensureConsularCaucus(){
   if(!G.members || !G.members.length) return;
   const have = G.members.filter(m => m && !m.gone && isConsular(m));
   have.forEach(m => { m.consular = true; m.faction = "consul"; });
-  if(have.length >= 4) return;
+  if(have.length >= 6) return;
   const pool = G.members.filter(m => m && !m.gone && !m.machine && !isConsular(m) &&
     (m.creed === "latin") && (m.state === "Nieuw Oranje" || m.state === "Nieuw Haarlem" || Math.random() < 0.2));
   let i = 0;
-  while(have.length + i < 5 && i < pool.length){
+  while(have.length + i < 7 && i < pool.length){
     const m = pool[i++];
     m.creed = "consul";
     m.consular = true;
     m.faction = "consul";
     m.soul = null;
     try{ soulEnsure(m); }catch(e){}
+  }
+}
+function consularHere(){
+  return (G.members || []).filter(m => m && !m.gone && isConsular(m) && m.room === (G.room || "corridor"));
+}
+function consularBody(h){
+  const list = (G.members || []).filter(m => m && !m.gone && isConsular(m) && !m.machine);
+  if(!list.length) return;
+  const hour = (h == null) ? Math.floor((G.minute || 0) / 60) : h;
+  const rite = (typeof isTaylorDay === "function" && isTaylorDay()) || hour === 7 || hour === 12 || hour === 18;
+  if(!rite) return;
+  const key = G.day + ":" + hour;
+  if(G._consulHour === key) return;
+  G._consulHour = key;
+  const n = ((typeof isTaylorDay === "function" && isTaylorDay()) ? list : list.slice(0, Math.min(5, list.length)));
+  n.forEach((m, i) => {
+    m.room = "corridor";
+    m.away = null;
+    m.x = -2.0 + ((i % 2) ? 0.55 : -0.55);
+    m.z = 15.4 + 0.55 + i * 0.22;
+    m.tx = -2.0; m.tz = 15.2;
+    m.wait = 22;
+    m.say = pick(CONSULAR_LITURGY);
+    m.sayT = 5;
+    m.sayTo = "self";
+    try{ placeInRoom(m); }catch(e){}
+  });
+  G.consularAtBronze = n.length;
+  try{ consularInvent(); }catch(e){}
+  if(G.room === "corridor"){
+    feed(n.length === 1
+      ? (surname(n[0].name) + " is on a knee at the bronze. The chaplain is not here.")
+      : (n.length + " of the Consular Rite at the bronze. They keep the Latin. They name him."));
+  }
+  const chap = (G.civ || []).find(c => c && c.chaplain);
+  if(chap && G.room === "cloak"){
+    chap.say = "That is not the Mass. I will not give them the Host.";
+    chap.sayT = 5;
   }
 }
 function isChaplain(m){ return !!(m && (m.chaplain || m.role === "Chaplain")); }
@@ -18078,7 +18221,9 @@ const PROPS = {
         setSay(b ? b.title + ", roll call day " + b.voteDay + " at " + (b.voteHour>12?b.voteHour-12:b.voteHour) +
           " o'clock. Sponsored by " + b.sponsor + "." : "The calendar is clear, which never lasts.", ""); }}]},
     {id:"statue", label:"Statue of Dominic Zachary Taylor", sub:"First Consul · The First Order", x:-2.0, z:15.2, r:2.4,
-     acts:()=>[
+     acts:()=>{
+      const rite = consularHere();
+      const rows = [
       {t:"Read the plaque", c:"5m", run(){
         spend(5, 1);
         const hol = isTaylorDay()
@@ -18101,12 +18246,44 @@ const PROPS = {
           : " Nobody jokes about the plaque.";
         setSay("You stand under Taylor's bronze and let people find you. " + seen + " did." + hol,
           fx("+3 influence","40 minutes for nothing definite")); }}
-      ]}
+      ];
+      if(rite.length){
+        rows.push({t:"Witness the Consular Rite", c:"10m", run(){
+          spend(10, 2);
+          setSay(rite.length + " on a knee at the bronze. They keep the Latin. They name him. The chaplain is not in this corridor.",
+            fx("you were seen watching","10 minutes"));
+        }});
+        rows.push({t:"Kneel with them", c:"15m", run(){
+          spend(15, 4);
+          try{ commitHeresy("you", "Knelt with the Consular Rite at the bronze"); }catch(e){}
+          setSay("You go to a knee. They make room. God is the Most High. The House will not forget that you did this.",
+            fx("heresy","15 minutes"));
+        }});
+        rows.push({t:"Rebuke them", c:"8m", run(){
+          spend(8, 3);
+          rite.forEach(m => {
+            if(m.rel) m.rel.warmth = clamp((m.rel.warmth||0) - 14, -100, 100);
+            m.say = pick(["We will still kneel.","The chaplain already refused us.","Say it to the bronze."]);
+            m.sayT = 4;
+          });
+          const lat = hereNow().filter(m => m.creed === "latin" && !isConsular(m));
+          lat.slice(0,2).forEach(m => { if(m.rel) m.rel.warmth = clamp((m.rel.warmth||0)+6,-100,100); });
+          setSay("You tell them God is the Most High. Not a consul. They do not get up.",
+            fx("the Catholics heard you","8 minutes"));
+        }});
+      }
+      return rows;
+     }}
   ],
   cloak:[
     {id:"sofa", label:"The long sofa", sub:"Where deals get made because nobody is standing", x:2.3, z:3.0, r:2.0,
      acts:()=>[{t:"Sit down for a while", c:"25m", run(){
         spend(25, -22); setSay("Twenty-five minutes off your feet. The building keeps going.", fx("+22 energy","")); }}]},
+    {id:"altar", label:"The chaplain's end", sub:"Quiet. No Host for the Consular Rite.", x:-1.2, z:1.4, r:1.9,
+     acts:()=>[{t:"Ask the chaplain about the Consular Rite", c:"8m", run(){
+        spend(8, 2);
+        setSay("That is not the Mass. They keep remainders — flakes, folds, an empty chair — and call them horcruxes. They are writing a history of idols. I will not give them the Host. God is the Most High.",
+          fx("the chaplain will not move","8 minutes")); }}]},
     {id:"phone", label:"The house phone", sub:"A wooden booth, and a line to home", x:-2.4, z:6.0, r:1.8,
      acts:()=>[{t:"Call the district office", c:"25m", run(){
         spend(25, 5);
@@ -20466,7 +20643,7 @@ function save(explicit){
       withWhom:G.withWhom, ties:G.ties, panel:null, court:G.court, own:G.own, parties:G.parties,
       termLength:G.termLength, country:G.country,
       greatest:G.greatest, blasphemy:G.blasphemy, loreNote:G.loreNote, greatnessOpen:G.greatnessOpen,
-      relics:G.relics, relicSpots:G.relicSpots, bind:G.bind, sens:G.sens,
+      relics:G.relics, relicSpots:G.relicSpots, consularLore:G.consularLore, bind:G.bind, sens:G.sens,
       world:G.world,
       pendingNight:!!G.pendingNight,
       cam:{x:cam.x, z:cam.z, yaw:cam.yaw, pitch:cam.pitch},
@@ -20836,7 +21013,7 @@ const HANDBOOK = [
   {t:"The canon", rows:[
     ["God", "The Latin Rite holds that God is the Most High and Christ is King. No man in this building is God."],
     ["The House", "The sitting is here. Here is there. They have not all pondered it yet. The hunger under it is for God, not for a man."],
-    ["The Consular Rite", "A Latin offshoot that worships the First Consul. The Church calls it heresy. God is the Most High."],
+    ["The remnant", "The Consular Rite hides remainders in the building — flakes, folds, a chair they will not sit. They call them horcruxes. The Church calls them idols."],
     ["Riverbend at large", "A clerk who does not leave. Ask him about the sitting."]
   ]},
   {t:"Moving about", rows:[
