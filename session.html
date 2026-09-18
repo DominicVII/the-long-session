@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20260917w">
+<meta name="onum-build" content="20260918a">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -3034,7 +3034,7 @@ function restaff(force){
     });
   }
   try{ ambientHourBeat(h, t); }catch(e){}
-  try{ consularBody(h); }catch(e){}
+  try{ if(!houseQuiet() && !inHall()) consularBody(h); }catch(e){}
 }
 function ensureLivedIn(){
   /* Empty rooms feel dead. Pull a living crowd into wherever you are. */
@@ -3050,9 +3050,9 @@ function ensureLivedIn(){
       }
     });
   }catch(e){}
-  const want = MODEST
+  const want = (MODEST || inHall())
     ? ({office:1, corridor:1, floor:1, cloak:1, caucus:1, committee:1, press:1, steps:1, district:1, staff:1})[G.room] || 1
-    : ({office:4, corridor:7, floor:9, cloak:5, caucus:6, committee:5, press:4, steps:4, district:3, staff:3})[G.room] || 4;
+    : ({office:4, corridor:2, floor:6, cloak:4, caucus:5, committee:4, press:3, steps:3, district:2, staff:2})[G.room] || 3;
   const here = everyone().filter(m => m && m.room === G.room && !m.gone && !m.away);
   if(here.length >= want) return;
   const pool = everyone().filter(m => m && !m.gone && !m.away && m.room !== G.room && TALK.m !== m && visiting() !== m);
@@ -3222,6 +3222,7 @@ function houseQuiet(){
   }catch(e){}
   return false;
 }
+function inHall(){ return !!(G && G.room === "corridor"); }
 function walkNow(){
   /* Feet first. Crowd / panels / save wait. */
   try{
@@ -6426,8 +6427,10 @@ function buildRoomInner(id){
     const benchZs = statueZs.filter(z => z > 8 && z < d-4);
     (benchZs.length ? benchZs.slice(0,2) : [11,18]).forEach(z =>
       addBox(matTex(TEX.panel,2,1,.5), -hw+1.2, 0.24, z, 1.4,0.12,0.48, 0, true));
-    propChandelier(0, h-0.9, 8.0, 6, 1.2);
-    propChandelier(0, h-0.9, 18.0, 6, 1.2);
+    if(!MODEST && G.gfx !== "simple"){
+      propChandelier(0, h-0.9, 8.0, 6, 1.2);
+      propChandelier(0, h-0.9, 18.0, 6, 1.2);
+    }
   
     }catch(e){ if(window.console) console.warn("room corridor", e); }
   }
@@ -7077,11 +7080,9 @@ function buildPersonCheap(p){
   return g;
 }
 function buildPerson(p){
-  /* Cheap 3-box dummies were a freeze hedge. They turned the House into
-     potatoes — swearing-in included. Staged sync already yields one mesh
-     a frame; full people stay. Distant extras may still opt into cheap. */
-  if(typeof MODEST !== "undefined" && MODEST && p && p._cheap &&
-     p.kind !== "you" && !(TALK.open && TALK.m === p))
+  /* Corridor freeze: extras stay cheap. Talk / you stay full. */
+  if(p && p.kind !== "you" && !(TALK.open && TALK.m === p) &&
+     ((typeof MODEST !== "undefined" && MODEST && p._cheap) || inHall()))
     return buildPersonCheap(p);
   const L = p.look;
   /* Defensive clamp: a save from an older format, or any stray mutation
@@ -7636,8 +7637,24 @@ function syncPeople(){
 }
 function syncPeopleStaged(done, retries){
   retries = retries || 0;
-  if(houseQuiet() && retries < 30){
-    nextFrameOrTimeout(() => syncPeopleStaged(done, retries + 1), 400);
+  /* Never rAF-retry through a quiet window — that burned 30 frames then
+     remeshed the corridor anyway. One timer. Quiet stays quiet. */
+  if(houseQuiet()){
+    if(done){
+      const prev = syncPeopleStaged._after;
+      syncPeopleStaged._after = () => {
+        try{ if(prev) prev(); }catch(e){}
+        try{ done(); }catch(e){}
+      };
+    }
+    if(!syncPeopleStaged._wait){
+      syncPeopleStaged._wait = setTimeout(() => {
+        syncPeopleStaged._wait = null;
+        const after = syncPeopleStaged._after;
+        syncPeopleStaged._after = null;
+        try{ syncPeopleStaged(after, 0); }catch(e){ if(after) after(e); }
+      }, 700);
+    }
     return;
   }
   if(_buildingRoom || syncPeopleStaged._busy){
@@ -7655,6 +7672,7 @@ function syncPeopleStaged(done, retries){
   let list, missing;
   try{
     list = hereNow().slice();
+    if(inHall() && list.length > 2) list = list.slice(0, 2);
     const keep = new Set();
     for(let i=0;i<list.length;i++) if(list[i].mesh) keep.add(list[i].mesh);
     for(let i = peopleGroup.children.length - 1; i >= 0; i--){
@@ -7675,7 +7693,7 @@ function syncPeopleStaged(done, retries){
   }
   let at = 0;
   const step = () => {
-    const stop = Math.min(missing.length, at + (MODEST ? 1 : 3));
+    const stop = Math.min(missing.length, at + ((MODEST || inHall()) ? 1 : 3));
     try{
       for(; at < stop; at++){
         const p = missing[at];
@@ -13087,7 +13105,7 @@ function consularBody(h){
   const key = G.day + ":" + hour;
   if(G._consulHour === key) return;
   G._consulHour = key;
-  const n = ((typeof isTaylorDay === "function" && isTaylorDay()) ? list : list.slice(0, Math.min(5, list.length)));
+  const n = ((typeof isTaylorDay === "function" && isTaylorDay()) ? list : list.slice(0, Math.min(2, list.length)));
   n.forEach((m, i) => {
     m.room = "corridor";
     m.away = null;
@@ -13105,7 +13123,7 @@ function consularBody(h){
     feed(n.length === 1
       ? (surname(n[0].name) + " is on a knee at the bronze. The chaplain is not here.")
       : (n.length + " of the Consular Rite at the bronze. They keep the Latin. They name him."));
-    if(!houseQuiet()){ try{ syncPeopleStaged(); }catch(e){} }
+    /* No remesh. Bodies already in the hall wait for the next quiet window. */
   }
   const chap = (G.civ || []).find(c => c && c.chaplain);
   if(chap && G.room === "cloak"){
@@ -22138,7 +22156,7 @@ function enterRoom(dest, fromRoom){
       forcePaint();
     }catch(e){}
   }, 30);
-  G._crowdPauseUntil = Math.max(G._crowdPauseUntil || 0, performance.now() + 1200);
+  G._crowdPauseUntil = Math.max(G._crowdPauseUntil || 0, performance.now() + (dest === "corridor" ? 2500 : 1200));
   nextFrameOrTimeout(() => {
     if(G.room !== dest) return;
     try{
@@ -22257,6 +22275,15 @@ function frame(now){
   if(_emaMs > 22) FRAME_TARGET_MS = Math.min(FRAME_TARGET_MS_LO, FRAME_TARGET_MS + 2);
   else if(_emaMs < 12 && !MODEST) FRAME_TARGET_MS = Math.max(FRAME_TARGET_MS_HI, FRAME_TARGET_MS - 0.4);
   if(took > 40) FRAME_TARGET_MS = FRAME_TARGET_MS_LO;
+  if(took > 50 && G && G.room === "corridor"){
+    try{
+      const crowd = hereNow();
+      for(let i = 0; i < crowd.length; i++){
+        if(i < 2) continue;
+        if(crowd[i].mesh) crowd[i].mesh.visible = false;
+      }
+    }catch(e){}
+  }
   armFrame();
 }
 function frameBody(now){
@@ -22306,7 +22333,7 @@ function frameBody(now){
   if(G._crowdPauseUntil && performance.now() < G._crowdPauseUntil){
     /* Continue: feet first. Crowd waits so Edge does not hang the corridor. */
   } else if(G.running || !veil.hidden || TALK.open){
-    const cap = MODEST ? 8 : 14;
+    const cap = (MODEST || inHall()) ? 3 : 10;
     if(crowd.length > cap){
       for(let i=0;i<crowd.length;i++){
         const p = crowd[i];
@@ -23179,7 +23206,7 @@ function begin(){
   /* FREEZE FIX: Continuity first. Heavy work deferred. Furniture, Caesar, Consular, horcruxes stay. */
   G.running = true; G.over = false;
   G._bootGraceUntil = performance.now() + 8000;
-  G._deferPeopleUntil = performance.now() + 2500;
+  G._deferPeopleUntil = performance.now() + ((G.room === "corridor") ? 6500 : 2500);
   G.bare = true;
   document.body.classList.add("is-bare");
   document.body.classList.remove("ui-open");
@@ -23200,7 +23227,8 @@ function begin(){
   try{ catchClear("begin"); }catch(e){}
   try{ if(TALK.open) closeTalk(); }catch(e){}
   G.doorGrace = (G.t || 0) + 2.4;
-  G._crowdPauseUntil = performance.now() + 2800;
+  G._crowdPauseUntil = performance.now() + (G.room === "corridor" ? 7000 : 2800);
+  G._deferPeopleUntil = performance.now() + (G.room === "corridor" ? 6500 : 2500);
   try{
     G.fullDetail = false; G.gfx = "simple"; G.simple = true;
     migrateGfx();
@@ -23248,8 +23276,8 @@ function begin(){
         () => { ensureConsularCaucus(); },
         () => { everyone().forEach(m => { if(m.room === G.room) placeInRoom(m); }); },
         () => { if(!_roomFurnished && !_buildingRoom) buildRoom(G.room || roomId); },
-        () => { if(typeof syncPeopleStaged === "function") syncPeopleStaged(() => {}); else syncPeople(); },
-        () => { refreshPanels(); save(); }
+        () => { /* Corridor does not remesh on Continue. Feet already walk. */ },
+        () => { try{ queueSave(); }catch(e){} }
       ], 0);
     }, 2500);
   });
