@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20260917s">
+<meta name="onum-build" content="20260917t">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -4689,15 +4689,19 @@ const DIM = {
 };
 /* Drop a furniture group so its lowest point sits on the room floor (y=0),
    and plant a soft contact disc so feet read as on the ground. */
-function groundGroup(g, padScale){
+function groundGroup(g, padScale, restY){
   if(!g) return g;
   g.userData = g.userData || {};
+  if(g.userData.noTidy) return g;
   g.userData.groundedProp = true;
+  const floor = (restY != null && isFinite(restY)) ? restY
+              : (isFinite(g.userData.restY) ? g.userData.restY : 0);
+  g.userData.restY = floor;
   try{
     g.updateWorldMatrix(true, true);
     const box = new THREE.Box3().setFromObject(g);
-    if(isFinite(box.min.y) && Math.abs(box.min.y) > 0.0008){
-      g.position.y -= box.min.y;
+    if(isFinite(box.min.y) && Math.abs(box.min.y - floor) > 0.0008){
+      g.position.y -= (box.min.y - floor);
     }
     /* one contact blob per grounded prop — shared CONTACT mat */
     if(typeof CONTACT !== "undefined" && CONTACT && UNIT && UNIT.plane){
@@ -4744,7 +4748,7 @@ function tidyRoomFurniture(){
       /* Re-run the grounding calculation after all child meshes are present.
          This catches late-added props in the House floor instead of leaving
          their contact shadow or one leaf hovering above the floor. */
-      groundGroup(g, 0.62);
+      groundGroup(g, 0.62, g.userData.restY || 0);
       g.updateWorldMatrix(true, true);
       const box = new THREE.Box3().setFromObject(g);
       if(!isFinite(box.min.y) || !isFinite(box.max.y)) return;
@@ -4818,6 +4822,7 @@ function propLaptop(x, z, ry, deskH){
   const g = new THREE.Group();
   g.position.set(x, deskH === undefined ? DIM.desk : deskH, z);
   g.rotation.y = ry || 0;
+  g.userData.noTidy = true;
   roomGroup.add(g);
   const body = matCol(0x242a31, .42, .45);
   const screen = matCol(0x314d68, .28, .25);
@@ -4835,7 +4840,7 @@ function propLaptop(x, z, ry, deskH){
      belongs on the lid's +z face — behind it, the lid is all you see. */
   put(body, 0, 0.19, -0.145, 0.46, 0.32, 0.028, -0.10);
   put(screen, 0, 0.19, -0.127, 0.39, 0.25, 0.008, -0.10);
-  return groundGroup(g, 0.45);
+  return g;
 }
 /* a long bench with a back */
 function propBench(seatMat, woodMat, x, z, w, dp, ry){
@@ -4893,7 +4898,9 @@ function addSphere(mat,x,y,z,rx,ry,rz){
   m.castShadow=true; m.receiveShadow=true; roomGroup.add(m); return m;
 }
 function propChair(mat, seatMat, x,z, ry, floorY){
-  const g=new THREE.Group(); g.position.set(x,floorY||0,z); g.rotation.y=ry||0; roomGroup.add(g);
+  const rest = floorY || 0;
+  const g=new THREE.Group(); g.position.set(x, rest, z); g.rotation.y=ry||0; roomGroup.add(g);
+  g.userData.restY = rest;
   const put=(m,px,py,pz,sx,sy,sz)=>{ const e=new THREE.Mesh(UNIT.box,m);
     e.position.set(px,py,pz); e.scale.set(sx,sy,sz); e.castShadow=true; e.receiveShadow=true; g.add(e); return e; };
   put(seatMat, 0, DIM.seat-0.035, 0, 0.46,0.07,0.44);
@@ -4903,7 +4910,7 @@ function propChair(mat, seatMat, x,z, ry, floorY){
     put(mat, p[0], legH/2, p[1], 0.045, legH, 0.045);
     put(mat, p[0], 0.02, p[1], 0.06, 0.04, 0.06); /* foot pad on floor */
   });
-  return groundGroup(g, 0.55);
+  return groundGroup(g, 0.55, rest);
 }
 /* a lectern: a narrow stand with a sloped top you read from */
 function propLectern(woodMat, trimMat, x, z, ry){
@@ -5771,7 +5778,7 @@ function decorateOfficeFor(person){
   /* The room identity plaque already carries this person's name at the
      entry; do not add a second, nearly coincident name tag here. */
   /* Party colour accents: desk blotter + thin wall rail */
-  addBox(accentMat, 0, 0.445, Math.min(7.2, d - 2.2), 0.90, 0.012, 0.58, 0, true);
+  addBox(accentMat, 0, DIM.desk + 0.008, Math.min(7.2, d - 2.2), 0.90, 0.012, 0.58, 0, true);
   addBox(softAccent, 0, 1.32, d - 0.04, w * 0.55, 0.035, 0.03, 0, true);
   addBox(accentMat, -hw + 0.03, 1.55, d * 0.42, 0.025, 0.08, 1.6, 0, true);
   /* Vanity: portraits / awards on the wall; low vanity → plants instead */
@@ -5779,7 +5786,7 @@ function decorateOfficeFor(person){
     /* Side wall only — back wall already has the generic flush pair */
     propFrame("x", -hw + 0.001, 2.05, d * 0.48, 0.70, 0.88, TEX.portrait || artPool()[1] || TEX.paintB, Math.PI/2);
     if(vanity > 78) propFrame("x", hw - 0.001, 1.95, d * 0.55, 0.70, 0.55, artPool()[4] || TEX.paintC, -Math.PI/2);
-    addBox(matCol(0xb08b45, .35, .7), 0.55, 0.48, Math.min(7.05, d - 2.35), 0.16, 0.10, 0.12, 0, true);
+    addBox(matCol(0xb08b45, .35, .7), 0.55, DIM.desk + 0.05, Math.min(7.05, d - 2.35), 0.16, 0.10, 0.12, 0, true);
   } else {
     propPlant(-hw + 0.85, d - 1.4, 1.05);
     if(vanity < 35) propPlant(hw - 0.85, 3.4, 0.95);
@@ -5788,20 +5795,20 @@ function decorateOfficeFor(person){
   if(ambition > 58){
     /* no second national flag — placeRoomFlags owns the pair */
     for(let i=0;i<3;i++)
-      addBox(matCol([0x2a3a55,0x5a3038,0x3a4a3a][i], .85), -0.75, 0.48+i*0.045, Math.min(7.35, d-2.0), 0.22, 0.04, 0.28, 0.08*i, true);
+      addBox(matCol([0x2a3a55,0x5a3038,0x3a4a3a][i], .85), -0.75, DIM.desk + 0.02 + i*0.045, Math.min(7.35, d-2.0), 0.22, 0.04, 0.28, 0.08*i, true);
     if(ambition > 75)
       propPlaque(-1.5, 1.75, d - 0.02, 0, "Ambition", creed ? creed.adj : "Member", 0.70, 0.20);
   }
   /* Discretion: tidy desk, closed folio; low discretion → more open paper */
   if(disc > 65){
-    addBox(matCol(0x3a2e22, .6), 0.35, 0.48, Math.min(7.05, d-2.4), 0.32, 0.06, 0.24, 0, true);
+    addBox(matCol(0x3a2e22, .6), 0.35, DIM.desk + 0.03, Math.min(7.05, d-2.4), 0.32, 0.06, 0.24, 0, true);
   } else {
-    propPapers(-0.35, 0.45, Math.min(6.9, d-2.5), disc < 40 ? 7 : 4);
+    propPapers(-0.35, DIM.desk + 0.004, Math.min(6.9, d-2.5), disc < 40 ? 7 : 4);
   }
   /* Temper: askew chair / scattered pages when high */
   if(temper > 68){
     propChair(matTex(TEX.oak,1,1,.6), matTex(TEX.leather,1,1,.85), 1.55, Math.min(8.15, d-1.4), -0.55);
-    propPapers(0.9, 0.44, Math.min(6.7, d-2.6), 5);
+    propPapers(0.9, DIM.desk + 0.004, Math.min(6.7, d-2.6), 5);
   }
   /* Creed / background flavour on a flush side plaque */
   if(creed){
@@ -6027,11 +6034,11 @@ function buildRoomInner(id){
     try{
     propDesk(woodMat, woodMat, 0, 7.2, 2.0, 1.0);              /* member desk */
     propChair(woodMat, leather, 0, 8.2, Math.PI);
-    addBox(paperMat, -0.4,0.45,7.1, 0.3,0.02,0.4);
+    addBox(paperMat, -0.4, DIM.desk + 0.012, 7.1, 0.3, 0.02, 0.4);
     /* Shelves and cabinet share the same grounded prop recipes as every room. */
     propCabinet(matCol(0x2a2f36,.7), matCol(0x3a4048,.6), hw-0.55, 5.6, 0.55, 1.04, 0.62);
     /* flags via placeRoomFlags (national+NO7; Taylor Day: NO7 only) */
-    addCyl(brass, 0.75,0.52,7.0, 0.06,0.18);
+    addCyl(brass, 0.75, DIM.desk + 0.09, 7.0, 0.06, 0.18);
   
     }catch(e){ if(window.console) console.warn("room office", e); }
   }
@@ -6191,7 +6198,7 @@ function buildRoomInner(id){
     for(let r=0;r<3;r++) for(let c2=0;c2<3;c2++){
       propDesk(matCol(0x3d4048,.7), matCol(0x2a2d33,.7), -2.2+c2*2.2, 3.0+r*2.0, 1.55, 0.62);
       propChair(matCol(0x2a2d33,.7), matCol(0x33373f,.8), -2.2+c2*2.2, 3.75+r*2.0, Math.PI);
-      addBox(matCol(0x1b1d22,.4,.3), -2.2+c2*2.2, 0.52, 3.2+r*2.0, 0.42,0.26,0.03, 0, true);
+      addBox(matCol(0x1b1d22,.4,.3), -2.2+c2*2.2, DIM.desk + 0.14, 3.2+r*2.0, 0.42,0.26,0.03, 0, true);
     }
     addBox(matCol(0x8f9298,.8), 0,1.6,d-0.08, 6.0,1.4,0.05, 0, true);
   
@@ -6265,13 +6272,13 @@ function buildRoomInner(id){
   /* fittings the interaction points refer to */
   if(id === "office" || id === "visit"){
     try{
-    addCyl(matCol(0x2e3238,.5,.3), 0.75,0.62,7.0, 0.09,0.20);            /* coffee pot */
-    addCyl(matCol(0x8c8f94,.4,.6), 0.75,0.75,7.0, 0.05,0.07);
+    addCyl(matCol(0x2e3238,.5,.3), 0.75, DIM.desk + 0.10, 7.0, 0.09, 0.20);            /* coffee pot */
+    addCyl(matCol(0x8c8f94,.4,.6), 0.75, DIM.desk + 0.22, 7.0, 0.05, 0.07);
     /* laptop is planted on the member desk's 0.74m writing surface */
     propLaptop(-0.55, 7.1, 0, DIM.desk);
     /* telephone */
-    addBox(matCol(0x1c1f24,.4), 1.05,0.45,7.1, 0.20,0.06,0.15, 0, true);
-    addBox(matCol(0x1c1f24,.4), 1.05,0.50,7.1, 0.22,0.05,0.05, 0, true);
+    addBox(matCol(0x1c1f24,.4), 1.05, DIM.desk + 0.03, 7.1, 0.20, 0.06, 0.15, 0, true);
+    addBox(matCol(0x1c1f24,.4), 1.05, DIM.desk + 0.08, 7.1, 0.22, 0.05, 0.05, 0, true);
   
     }catch(e){ if(window.console) console.warn("room office", e); }
   }
