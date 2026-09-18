@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20260918a">
+<meta name="onum-build" content="20260918b">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -10054,6 +10054,7 @@ function confer(a, b){
   b.faceId = a.id; b.faceUntil = G.t + 5.5;
 }
 function bumpCheck(sprinting){
+  if(G.t < (G.doorGrace||0)) return;
   for(const m of hereNow()){
     /* conversational distance — nobody stands in your face */
     const SPACE = 0.95;
@@ -19816,24 +19817,21 @@ function refreshTravel(){
   box.appendChild(cb);
 }
 function callOn(m){
-  if(!m || !G.running || G.moving) return;
+  if(!m || !G.running) return;
   closeTalk();
   spend(ROOMS.visit.travel, 3);
   feed("Walking to " + m.suite + ".");
-  transition(() => {
-    G.room = "visit"; G.visitId = m.id;
-    const b = roomBox("visit");
-    { const sp = safeSpawn(G.room); cam.x = sp.x; cam.z = sp.z; } cam.yaw = 0; G.doorGrace = G.t + 0.9;
-    m.x = 0.2; m.z = 6.0; m.tx = m.x; m.tz = m.z; m.facing = Math.PI;
-    return rebuildRoomStaged("visit", () => {
-      el("whereName").textContent = surname(m.name) + "'s office";
-      el("whereTag").textContent = m.suite;
-      m.known = Math.max(m.known, 1);
-      ripple(m, 3, "You came to my office rather than catching me in a corridor.", 3);
-      note("Called on " + m.name + " at " + m.suite + ".");
-      refreshPanels();
-    });
-  });
+  G.visitId = m.id;
+  m.x = 0.2; m.z = 6.0; m.tx = m.x; m.tz = m.z; m.facing = Math.PI;
+  m.room = "visit";
+  enterRoom("visit", G.room);
+  try{
+    el("whereName").textContent = surname(m.name) + "'s office";
+    el("whereTag").textContent = m.suite;
+  }catch(e){}
+  m.known = Math.max(m.known, 1);
+  ripple(m, 3, "You came to my office rather than catching me in a corridor.", 3);
+  note("Called on " + m.name + " at " + m.suite + ".");
 }
 function goTo(id){
   if(!ROOMS[id] || id === G.room) return;
@@ -20794,7 +20792,7 @@ function save(explicit){
       day:G.day, minute:G.minute, congress:G.congress, term:G.term, sittingDay:G.sittingDay,
       mood:G.mood, seatsBy:G.seatsBy, recessLeft:G.recessLeft, billIndex:G.billIndex, secretId:G.secretId,
       members:G.members.map(stripMesh), press:G.press.map(stripMesh), civ:G.civ.map(stripMesh),
-      you:G.you, bill:G.bill, secrets:G.secrets, donors:G.donors, casework:G.casework,
+      you:stripMesh(G.you), bill:G.bill, secrets:G.secrets, donors:G.donors, casework:G.casework,
       journal:G.journal, career:G.career, room:G.room, savedAt:G.savedAt,
       feed:(G.feed||[]).slice(-24), mail:(G.mail||[]).slice(-20), mailId:G.mailId, pendingReplies:G.pendingReplies, visitId:G.visitId,
       states:G.states, prog:G.prog, lobbies:G.lobbies, money:G.money, history:G.history, events:G.events,
@@ -22112,88 +22110,90 @@ function forcePaint(){
   try{ if(renderer && !GL_LOST) renderer.render(scene, camera); }catch(e){}
 }
 function enterRoom(dest, fromRoom){
-  /* Instant feet. Mesh later. G.moving never blocks a playthrough. */
+  /* Instant feet. Mesh later. Keep walking inward — never stop at the jamb. */
   if(!ROOMS[dest]) return;
   forceUnstickMove();
   try{ catchClear("door"); }catch(e){}
   G.speechApproach = null;
-  if(G.you) G.you.sitting = false;
+  if(G.you){ G.you.sitting = false; G.you.room = dest; }
   const prev = fromRoom || G.room;
   G.room = dest;
   if(dest !== "visit") G.visitId = null;
   const b = roomBox(dest);
   const home = (DOORS[dest] || []).find(d => d.to === prev);
+  let ix = 0, iz = 1.35;
   if(home){
     const hp = doorAt(dest, home);
     const inward = hp.z < ROOMS[dest].d/2 ? 1 : -1;
     cam.x = clamp(hp.x, -b.hw, b.hw);
-    cam.z = clamp(hp.z + inward*1.15, b.d0, b.d1);
+    cam.z = clamp(hp.z + inward*1.05, b.d0, b.d1);
     cam.yaw = inward > 0 ? 0 : Math.PI;
-    if(home.side === "left"){ cam.x = clamp(hp.x + 1.5, -b.hw, b.hw); cam.yaw = Math.PI/2; }
-    if(home.side === "right"){ cam.x = clamp(hp.x - 1.5, -b.hw, b.hw); cam.yaw = -Math.PI/2; }
+    ix = 0; iz = inward * 1.55;
+    if(home.side === "left"){ cam.x = clamp(hp.x + 1.35, -b.hw, b.hw); cam.yaw = Math.PI/2; ix = 1.55; iz = 0; }
+    if(home.side === "right"){ cam.x = clamp(hp.x - 1.35, -b.hw, b.hw); cam.yaw = -Math.PI/2; ix = -1.55; iz = 0; }
   } else {
     try{ const sp = safeSpawn(dest); cam.x = sp.x; cam.z = sp.z; }catch(e){ cam.x = 0; cam.z = b.d0 + 1.2; }
     cam.yaw = 0;
   }
-  cam.vx = cam.vz = cam.yawVel = 0;
+  cam.vx = ix; cam.vz = iz; cam.yawVel = 0;
   cam.pitch = 0;
-  G.doorGrace = (G.t || 0) + 0.85;
+  G.doorGrace = (G.t || 0) + 0.38;
   try{
     el("whereName").textContent = ROOMS[dest].t;
     el("whereTag").textContent = ROOMS[dest].tag;
   }catch(e){}
   try{
-    if(_roomBuiltId !== dest || !_roomFurnished || !roomGroup.children.length){
-      if(!_buildingRoom){
-        try{ buildRoom(dest); }catch(e){ try{ buildRoomShell(dest); _roomBuiltId = dest; _roomFurnished = false; }catch(e2){} }
+    if(_roomBuiltId !== dest){
+      try{ stashLiveRoom(); }catch(e){}
+      if(!takeRoomKit(dest)){
+        try{ buildRoomShell(dest); _roomBuiltId = dest; _roomFurnished = false; }catch(e){}
       }
     }
   }catch(e){}
-  forcePaint();
-  nextFrameOrTimeout(() => {
-    try{
-      if((_roomBuiltId !== dest || !_roomFurnished) && !_buildingRoom) buildRoom(dest);
-      forcePaint();
-    }catch(e){}
-  }, 30);
-  G._crowdPauseUntil = Math.max(G._crowdPauseUntil || 0, performance.now() + (dest === "corridor" ? 2500 : 1200));
+  try{ forcePaint(); }catch(e){}
+  const furnishAt = (dest === "corridor" || dest === "floor") ? 90 : 20;
   nextFrameOrTimeout(() => {
     if(G.room !== dest) return;
     try{
-      if(dest === "floor") seatChamber();
+      if(!_roomFurnished && !_buildingRoom) buildRoom(dest);
     }catch(e){}
     try{ forcePaint(); }catch(e){}
+  }, furnishAt);
+  G._crowdPauseUntil = Math.max(G._crowdPauseUntil || 0, performance.now() + (dest === "corridor" ? 2200 : 800));
+  nextFrameOrTimeout(() => {
+    if(G.room !== dest) return;
+    try{ if(dest === "floor") seatChamber(); }catch(e){}
   }, 900);
+  laterHouse(() => { try{ queueSave(); }catch(e){} });
 }
 /* Walk into a doorway and you go through it. No menu required. */
 function nearDoor(){
-  if(G.moving || G.t < (G.doorGrace||0)) return null;
+  if(G.t < (G.doorGrace||0)) return null;
   const list = DOORS[G.room] || [];
   for(const dr of list){
     if(!outsideAllowed(dr.to)) continue;
     const p = doorAt(G.room, dr);
     const dx = cam.x - p.x, dz = cam.z - p.z;
-    const reach = (dr.side === "front" || dr.side === "back") ? 1.65 : 1.25;
+    const reach = (dr.side === "front" || dr.side === "back") ? 1.85 : 1.45;
     if(Math.hypot(dx, dz) < reach) return {dr, p};
-    /* Hug the wall the door is on — committee spawn used to sit 1.5m inside a chair row. */
-    if(dr.side === "front" && cam.z < 1.45 && Math.abs(dx) < 2.4) return {dr, p};
+    if(dr.side === "front" && cam.z < 1.55 && Math.abs(dx) < 2.6) return {dr, p};
     if(dr.side === "back"){
       const R = ROOMS[G.room];
-      if(R && cam.z > R.d - 1.45 && Math.abs(dx) < 2.4) return {dr, p};
+      if(R && cam.z > R.d - 1.55 && Math.abs(dx) < 2.6) return {dr, p};
     }
   }
   return null;
 }
 function walkThroughDoors(){
   if(G.moving){
-    if(G._moveAt && performance.now() - G._moveAt > 900) forceUnstickMove();
+    if(!G._moveAt || performance.now() - G._moveAt > 400) forceUnstickMove();
     else return;
   }
   const hit = nearDoor();
   if(!hit) return;
   const dest = hit.dr.to, fromRoom = G.room;
   if(!ROOMS[dest] || dest === fromRoom) return;
-  G.doorGrace = (G.t || 0) + 0.85;
+  G.doorGrace = (G.t || 0) + 0.38;
   feed("Through to " + ROOMS[dest].t + ".");
   enterRoom(dest, fromRoom);
 }
@@ -22298,13 +22298,22 @@ function frameBody(now){
   if(PAD_SEEN || picksDirty) pollPad();
   else if(picksDirty) refreshPicks();
   if(cardUp){
-    try{ feedTick(dt); }catch(e){}
-    try{ tickScrollFrame(); }catch(e){}
-    _cardFrames = (_cardFrames || 0) + 1;
-    if(!GL_LOST && _cardFrames % 6 === 0){
-      try{ renderer.render(scene, camera); }catch(e){}
-    }
-    return;
+    try{
+      const live = !!(G.you && G.members && G.members.length);
+      const boot = document.body.classList.contains("boot-menu");
+      const acts = card && card.querySelector(".card__actions button:not([disabled])");
+      if(live && !boot && !acts){
+        softUnstickVeil();
+      } else {
+        try{ feedTick(dt); }catch(e){}
+        try{ tickScrollFrame(); }catch(e){}
+        _cardFrames = (_cardFrames || 0) + 1;
+        if(!GL_LOST && _cardFrames % 6 === 0){
+          try{ renderer.render(scene, camera); }catch(e){}
+        }
+        return;
+      }
+    }catch(e){ return; }
   }
   if(talkUp){
     const KB = G.bind || DEFAULT_BIND;
@@ -23218,27 +23227,42 @@ function begin(){
   G.moving = false;
   G.speechApproach = null;
   if(G.you) G.you.sitting = false;
-  if(G.room === "floor" || G.room === "committee" || G.room === "caucus" || G.room === "press"){
+  const trap = (G.room === "floor" || G.room === "committee" || G.room === "caucus" || G.room === "press") ? G.room : null;
+  if(trap){
     G.room = "corridor";
     G._savedCam = false;
   }
   if(!G.room || !ROOMS[G.room]) G.room = "office";
+  if(G.you) G.you.room = G.room;
   try{ ensureParties(); }catch(e){}
   try{ catchClear("begin"); }catch(e){}
   try{ if(TALK.open) closeTalk(); }catch(e){}
-  G.doorGrace = (G.t || 0) + 2.4;
+  G.doorGrace = (G.t || 0) + 0.4;
   G._crowdPauseUntil = performance.now() + (G.room === "corridor" ? 7000 : 2800);
   G._deferPeopleUntil = performance.now() + (G.room === "corridor" ? 6500 : 2500);
   try{
     G.fullDetail = false; G.gfx = "simple"; G.simple = true;
     migrateGfx();
-    _aqBusy = true;
-    try{ applyQuality(); }finally{ _aqBusy = false; }
-  }catch(e){ _aqBusy = false; }
+  }catch(e){}
   const R0 = ROOMS[G.room];
   try{ el("whereName").textContent = R0.t; el("whereTag").textContent = R0.tag; }catch(e){}
   if(!G._savedCam){
-    try{ const sp = safeSpawn(G.room); cam.x = sp.x; cam.z = sp.z; cam.yaw = 0; }catch(e){}
+    try{
+      if(trap){
+        const dr = (DOORS.corridor || []).find(d => d.to === trap);
+        if(dr){
+          const hp = doorAt("corridor", dr);
+          const b = roomBox("corridor");
+          cam.x = clamp(hp.x + (dr.side === "left" ? 1.4 : dr.side === "right" ? -1.4 : 0), -b.hw, b.hw);
+          cam.z = clamp(hp.z + (dr.side === "front" ? 1.4 : dr.side === "back" ? -1.4 : 0), b.d0, b.d1);
+          cam.yaw = dr.side === "left" ? Math.PI/2 : dr.side === "right" ? -Math.PI/2 : 0;
+        } else {
+          const sp = safeSpawn("corridor"); cam.x = sp.x; cam.z = sp.z; cam.yaw = 0;
+        }
+      } else {
+        const sp = safeSpawn(G.room); cam.x = sp.x; cam.z = sp.z; cam.yaw = 0;
+      }
+    }catch(e){}
   }
   try{ veil.hidden = true; card.classList.remove("card--open"); veil.classList.remove("veil--make"); }catch(e){}
   try{ document.body.classList.remove("boot-menu"); }catch(e){}
@@ -23259,6 +23283,7 @@ function begin(){
     try{ forcePaint(); }catch(e){}
     requestAnimationFrame(() => {
       try{
+        if((G.room || roomId) === "corridor") return;
         if(!_roomFurnished && !_buildingRoom) buildRoom(G.room || roomId);
       }catch(e){}
       try{ forcePaint(); }catch(e){}
@@ -23400,6 +23425,9 @@ try{
     room(){ return G.room; },
     moving(){ return !!G.moving; },
     running(){ return !!G.running; },
+    cam(){ return {x:cam.x, z:cam.z, yaw:cam.yaw, sitting:!!(G.you && G.you.sitting), furnished:!!_roomFurnished}; },
+    walk(vx, vz){ cam.vx = vx; cam.vz = vz; G.running = true; },
+    day(){ return {day:G.day, sittingDay:G.sittingDay, minute:G.minute, rank:careerRank(G)}; },
     consular(){ try{ ensureConsularCaucus(); }catch(e){} return (G.members||[]).filter(m => m && isConsular(m)).map(m => m.name); },
     horcrux(){ const h = horcruxOf(G.room); return h ? h.id : null; },
     lore(){ return consularLoreEnsure(); },
