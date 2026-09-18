@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20260918c">
+<meta name="onum-build" content="20260918d">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -8899,6 +8899,7 @@ function openDeskWork(paneId){
   showDeskPane(paneId || "paneFloor");
   try{ refreshFloor(); }catch(e){}
   try{ refreshInbox(); }catch(e){}
+  try{ refreshUnion(); }catch(e){}
   try{ refreshPanels(); }catch(e){}
   setTimeout(() => { try{ dropRect(); resize(); }catch(e){} }, 30);
 }
@@ -10051,15 +10052,16 @@ function confer(a, b){
         other.say = pick(["I keep my own.","Not my Mass.","The Host is not for that."]);
         other.sayT = 3.6;
       }
-    } else if(chance(0.4)){
+    } else if(chance(0.38)){
       a.say = worldLine(a); a.sayT = 3.8;
       b.say = (chance(0.5) ? soulLine(b) : worldLine(b)); b.sayT = 3.8;
     } else if(chance(0.22)){
       try{ sentGossip(a, b); }catch(e){}
-    } else if(chance(0.25)){
+    } else {
+      try{ catchFad(a); catchFad(b); }catch(e){}
       inventLife(a); inventLife(b);
-      a.say = lifeLine(a); b.say = (b.life ? ("I still put on " + b.life.music) : soulLine(b));
-      a.sayT = b.sayT = 3.4;
+      a.say = lifeLine(a); b.say = (b.life ? ("I still put on " + b.life.music + ". " + (b.life.take || "")) : soulLine(b));
+      a.sayT = b.sayT = 3.8;
     }
   }catch(e){}
   /* stop and turn to each other */
@@ -11468,7 +11470,17 @@ function ambientHourBeat(h, t){
     ]
   };
   const pool = lines[room] || lines.corridor;
-  const line = pick(pool.filter(Boolean));
+  const extras = [];
+  try{
+    const here = hereNow().filter(m => m && m.kind === "member" && !m.gone).slice(0, 3);
+    here.forEach(m => {
+      try{ inventLife(m); catchFad(m); }catch(e){}
+      if(m.life) extras.push(surname(m.name) + " is talking " + m.life.sport + " like it is a vote.");
+    });
+    const w = (typeof worldEnsure === "function") ? worldEnsure() : null;
+    if(w && w.last) extras.push("Abroad still: " + w.last);
+  }catch(e){}
+  const line = pick((pool.concat(extras)).filter(Boolean));
   if(!line) return;
   feed(line);
   if(chance(.4)) pushWireScrap("Building", line);
@@ -12199,20 +12211,21 @@ function inventLife(m, force){
   if(!force && m.life && m.life.sport && m.life.hobby) return m.life;
   const r = rng(seedOf("life:" + m.id + ":" + (m.name || "x") + (force ? (":" + G.day + ":" + ((G.minute||0)/40|0)) : "")));
   const sport = gibName(r, 2);
-  const team = gibName(r, 2) + " " + drawn(["Side","Circle","Nine","Host","Fold","Choir"], r);
+  const team = gibName(r, 2) + " " + drawn(["Side","Circle","Nine","Host","Fold","Choir","Eleven","Watch"], r);
   const music = "the " + gibName(r, 2) + "s";
-  const song = gibName(r, 2) + " " + drawn(["Down","Open","Low","Second","Quiet","After"], r);
-  const hobby = drawn(["keeping","sorting","walking","naming","mending","counting","raising","tracing"], r) +
-    " " + gibName(r, 2).toLowerCase() + drawn(["s","-work",""], r);
-  const show = gibName(r, 2) + " " + drawn(["night","watch","hour","sitting"], r);
+  const song = gibName(r, 2) + " " + drawn(["Down","Open","Low","Second","Quiet","After","Home","Wire"], r);
+  const hobby = drawn(["keeping","sorting","walking","naming","mending","counting","raising","tracing","carving","collecting"], r) +
+    " " + gibName(r, 2).toLowerCase() + drawn(["s","-work"," bowls",""], r);
+  const show = gibName(r, 2) + " " + drawn(["night","watch","hour","sitting","match"], r);
   const rule = drawn([
     "you score by not touching the " + gibSyll(r),
     "three across, then a hush, then it counts",
     "the low one is double if nobody laughs",
     "you carry a " + gibName(r, 1).toLowerCase() + " until the bell",
-    "first to forget the count loses"
+    "first to forget the count loses",
+    "the choir side sings if they win, that is the whole of the prize"
   ], r);
-  const dish = gibName(r, 2).toLowerCase() + " " + drawn(["stew","loaf","broth","cold","tart"], r);
+  const dish = gibName(r, 2).toLowerCase() + " " + drawn(["stew","loaf","broth","cold","tart","pie","hash"], r);
   m.life = {
     sport, team, music, song, hobby, show, rule, dish,
     take: drawn([
@@ -12221,16 +12234,32 @@ function inventLife(m, force){
       "The caucus can wait.",
       "Do not put it in the wire.",
       "I will talk about that before I talk about the whip.",
-      "If you have not heard of it, that is your trouble."
+      "If you have not heard of it, that is your trouble.",
+      "I taught two freshmen the count. They still get it wrong."
     ], r)
   };
   try{
     if(!G.fads) G.fads = [];
     G.fads.unshift({t:sport, k:"sport", by:m.id, day:G.day});
     G.fads.unshift({t:music, k:"music", by:m.id, day:G.day});
-    if(G.fads.length > 24) G.fads.length = 24;
+    G.fads.unshift({t:show, k:"show", by:m.id, day:G.day});
+    if(G.fads.length > 28) G.fads.length = 28;
   }catch(e){}
   return m.life;
+}
+function catchFad(m){
+  if(!m || m.machine) return;
+  inventLife(m);
+  if(!G.fads || !G.fads.length) return;
+  if(Math.random() > 0.22) return;
+  const f = G.fads[(Math.random() * Math.min(8, G.fads.length)) | 0];
+  if(!f || f.by === m.id) return;
+  const who = byId(f.by);
+  const nm = who ? surname(who.name) : "someone on this floor";
+  if(f.k === "sport") m.life.sport = f.t;
+  else if(f.k === "music") m.life.music = f.t;
+  else if(f.k === "show") m.life.show = f.t;
+  m.life.take = "I picked it up off " + nm + ". Now it is mine too.";
 }
 function lifeLine(m, r){
   const L = inventLife(m);
@@ -19887,6 +19916,10 @@ function refreshFloor(){
     '<p class="muted">District reads it as <strong>' +
       (districtFit(b)>20?"a win":districtFit(b)<-20?"a problem":"noise") + '</strong>; you read it as <strong>' +
       (alignment(you,b)>20?"right":alignment(you,b)<-20?"wrong":"borderline") + '</strong>.</p>' +
+    ((G.fads && G.fads.length)
+      ? '<p class="muted">What they talk about when the whip is gone: <strong>' +
+        G.fads.slice(0,4).map(f => f.t).join(", ") + '</strong>.</p>'
+      : '') +
     (pledged.length ? '<p class="muted"><strong>Pledged:</strong> ' +
       listify(pledged.map(m=>surname(m.name)+" ("+(m.pledge>0?"aye":"no")+")")) + '.</p>' : '') +
     '<div class="conc" style="border-top:1px solid var(--line);margin-top:14px">' +
