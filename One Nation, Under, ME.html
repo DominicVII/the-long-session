@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20260917u">
+<meta name="onum-build" content="20260917v">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -10204,7 +10204,11 @@ function sendHomeForKin(m, news){
   const line = surname(m.name) + " has gone home. " + cap(m.kin.who) + " is dead. The desk will be empty a day or two. That is the whole of it.";
   try{ journal(line); feed(line); }catch(e){}
   if(news) news.push(line);
-  try{ syncPeopleStaged(); }catch(e){}
+  /* Never remesh on the night card. Bodies wait until the morning is walking. */
+  try{
+    const cardUp = !!(typeof veil !== "undefined" && veil && !veil.hidden);
+    if(!cardUp && !G.pendingNight) syncPeopleStaged();
+  }catch(e){}
 }
 function kinEnsure(m){
   if(!m) return null;
@@ -11624,16 +11628,8 @@ function dayPlanCard(){
       try{ setSpeed(G.prevSpeed || 1); }catch(e){ G.speed = 1; }
       yieldPaint(() => { try{ queueSave(); refreshPanels(); }catch(e){} });
     };
-    try{
-      try{ ensureLivedIn(); }catch(e){}
-      syncPeopleStaged((err) => {
-        if(err && window.console) console.warn("planGo people", err);
-        go();
-      });
-    }catch(e){
-      if(window.console) console.warn("planGo", e);
-      go();
-    }
+    go();
+    /* Do not remesh the House on Start the day. Feet first. Crowd later. */
   });
   markPicks();
 }
@@ -19178,7 +19174,6 @@ function nightfall(){
   }
   const paintNight = (news) => {
     news = news || [];
-    try{ worldTick(news); }catch(e){}
     try{ feed("Nightfall. The building keeps score whether you do or not."); }catch(e){}
     card.innerHTML =
       '<div class="eyebrow">' + dateString() + " · " + dayLabel() + '</div>' +
@@ -19205,13 +19200,14 @@ function nightfall(){
   paintNight([]);
   yieldPaint(() => {
     let news = [];
-    try{ news = overnight() || []; }catch(e){ news = []; }
+    try{ worldTick(news); }catch(e){}
+    try{ news = (overnight() || []).concat(news); }catch(e){}
     paintNight(news);
   });
 }
 function nextDay(late){
-  /* Stardew sleep: clock + diary only. No 3D, no panels, no stringify
-     until the morning card is on screen. That is what froze Edge. */
+  /* Clock first. Morning card next. Diary after the card is on screen.
+     Remeshing on Sleep is what froze Edge. */
   if(nextDay._busy) return;
   nextDay._busy = true;
   G.running = false;
@@ -19230,40 +19226,37 @@ function nextDay(late){
       if(window.console) console.warn("dayPlanCard", e);
       softUnstickVeil(); G.running = true;
     }
-    yieldPaint(() => { try{ queueSave(); }catch(e){} });
   };
-  const fail = (e) => {
-    if(window.console) console.warn("nextDay", e);
-    showMorning();
-  };
-  setTimeout(() => { if(nextDay._busy) showMorning(); }, 4000);
+  try{
+    G.day = (G.day || 0) + 1; G.sittingDay = (G.sittingDay || 0) + 1; G.minute = 8*60; G.pendingNight = false;
+    G.dayMark = {day:G.day, helped:[], hurt:[], attended:[], ignored:[], scraps:[]};
+    G.wireScraps = [];
+    G.lastAmbientHour = -1;
+    if(G.you) G.you.energy = clamp(late ? 78 : 100, 0, 100);
+    if(G.recessLeft > 0) G.recessLeft--;
+  }catch(e){
+    if(window.console) console.warn("nextDay clock", e);
+  }
+  setTimeout(() => { if(nextDay._busy) showMorning(); }, 900);
+  if(G.sittingDay > (G.termLength || 9999)){
+    nextDay._busy = false;
+    try{ ballotCard(); }catch(e){ showMorning(); }
+    return;
+  }
+  /* Card this frame. People/bills next frame. */
+  yieldPaint(showMorning);
   yieldPaint(() => {
     try{
-      G.day = (G.day || 0) + 1; G.sittingDay = (G.sittingDay || 0) + 1; G.minute = 8*60; G.pendingNight = false;
-      G.dayMark = {day:G.day, helped:[], hurt:[], attended:[], ignored:[], scraps:[]};
-      G.wireScraps = [];
-      G.lastAmbientHour = -1;
-      if(G.you) G.you.energy = clamp(late ? 78 : 100, 0, 100);
-      try{
-        everyone().forEach(m => {
-          if(m && m.away && G.day >= m.away.until){
-            m.away = null;
-            journal(surname(m.name) + " is back. The desk is filled. The name is not.");
-          }
-        });
-      }catch(e){}
-      if(G.recessLeft > 0) G.recessLeft--;
-      try{ sustainHouse(); }catch(e){}
-    }catch(e){ fail(e); return; }
-    if(G.sittingDay > (G.termLength || 9999)){
-      nextDay._busy = false;
-      try{ ballotCard(); }catch(e){ fail(e); }
-      return;
-    }
-    yieldPaint(() => {
-      try{ voxDaily(); }catch(e){}
-      scheduleDayStaged(showMorning);
-    });
+      everyone().forEach(m => {
+        if(m && m.away && G.day >= m.away.until){
+          m.away = null;
+          journal(surname(m.name) + " is back. The desk is filled. The name is not.");
+        }
+      });
+    }catch(e){}
+    try{ voxDaily(); }catch(e){}
+    try{ sustainHouse(); }catch(e){}
+    scheduleDayStaged(() => { try{ queueSave(); }catch(e){} });
   });
 }
 
