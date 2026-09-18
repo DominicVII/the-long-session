@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20260917v">
+<meta name="onum-build" content="20260917w">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -3014,6 +3014,7 @@ function restaff(force){
   if(h >= 21) return;
   if(!force && h === lastBlock) return;
   lastBlock = h;
+  if(!force && houseQuiet()) return;
   const t = dayType();
   let movedAny = false;
   everyone().forEach(m => {
@@ -3027,6 +3028,7 @@ function restaff(force){
   try{ ensureLivedIn(); }catch(e){}
   const missing = hereNow().some(m => !m.mesh);
   if(movedAny || missing){
+    if(houseQuiet()) return;
     nextFrameOrTimeout(() => {
       try{ syncPeopleStaged(); }catch(e){ try{ syncPeople(); }catch(e2){} }
     });
@@ -3205,6 +3207,39 @@ function yieldPaint(fn){
   const once = () => { if(ran) return; ran = true; try{ fn(); }catch(e){ if(window.console) console.warn("yieldPaint", e); } };
   try{ requestAnimationFrame(() => setTimeout(once, 0)); }catch(e){}
   setTimeout(once, 48);
+}
+function houseQuiet(){
+  /* Same rule as Sleep: do not remesh, stringify, or restaff while the
+     player is mid-cut (card, night, door, morning walk). */
+  try{
+    if(G.pendingNight) return true;
+    if(G.moving) return true;
+    const now = performance.now();
+    if(G._crowdPauseUntil && now < G._crowdPauseUntil) return true;
+    if(G._deferPeopleUntil && now < G._deferPeopleUntil) return true;
+    if(G._bootGraceUntil && now < G._bootGraceUntil) return true;
+    if(typeof veil !== "undefined" && veil && !veil.hidden) return true;
+  }catch(e){}
+  return false;
+}
+function walkNow(){
+  /* Feet first. Crowd / panels / save wait. */
+  try{
+    const now = performance.now();
+    G._crowdPauseUntil = now + 2800;
+    G._deferPeopleUntil = now + 2500;
+    G._bootGraceUntil = now + 3500;
+    G.doorGrace = (G.t || 0) + 1.2;
+    lastBlock = Math.floor((G.minute || 0) / 60);
+  }catch(e){}
+  try{ document.body.classList.remove("boot-menu"); }catch(e){}
+  try{ if(typeof veil !== "undefined" && veil) veil.hidden = true; }catch(e){}
+  try{ G.pendingNight = false; }catch(e){}
+  try{ G.running = true; }catch(e){}
+  try{ forceUnstickMove(); }catch(e){}
+}
+function laterHouse(fn){
+  yieldPaint(() => { try{ fn(); }catch(e){} });
 }
 function safeSpawn(id){
   const b = roomBox(id), R = ROOMS[id] || ROOMS.office;
@@ -3524,7 +3559,7 @@ function applyQuality(){
     if(!_aqBusy && G.running && typeof buildRoom === "function" && G.room){
       _aqBusy = true;
       buildRoom(G.room);
-      if(typeof syncPeopleStaged === "function"){
+      if(typeof syncPeopleStaged === "function" && !houseQuiet()){
         everyone().forEach(p => { p.mesh = null; });
         syncPeopleStaged(() => { _aqBusy = false; });
         return;
@@ -7601,6 +7636,10 @@ function syncPeople(){
 }
 function syncPeopleStaged(done, retries){
   retries = retries || 0;
+  if(houseQuiet() && retries < 30){
+    nextFrameOrTimeout(() => syncPeopleStaged(done, retries + 1), 400);
+    return;
+  }
   if(_buildingRoom || syncPeopleStaged._busy){
     if(retries >= 40){
       const err = new Error("Timed out waiting to rebuild people");
@@ -8053,7 +8092,7 @@ function seatPanel(){
     W.facing = 0;   /* chairs face the dais (+z) */
     W.sitting = true; W.sitY = 0; W.seatFace = 0;
   });
-  syncPeopleStaged();
+  if(!houseQuiet()) syncPeopleStaged();
 }
 function clearPanel(){
   if(!PROC.panel) return;
@@ -8064,7 +8103,7 @@ function clearPanel(){
     if(i >= 0) G.civ.splice(i, 1);
   });
   PROC.panel = null;
-  syncPeopleStaged();
+  if(!houseQuiet()) syncPeopleStaged();
 }
 /* a member of this House, in the chair, answering for something */
 const WIT_CHARGE = [
@@ -10207,7 +10246,7 @@ function sendHomeForKin(m, news){
   /* Never remesh on the night card. Bodies wait until the morning is walking. */
   try{
     const cardUp = !!(typeof veil !== "undefined" && veil && !veil.hidden);
-    if(!cardUp && !G.pendingNight) syncPeopleStaged();
+    if(!cardUp && !G.pendingNight && !houseQuiet()) syncPeopleStaged();
   }catch(e){}
 }
 function kinEnsure(m){
@@ -11336,7 +11375,9 @@ function stageEventPeople(e){
     try{ if(PROC.on && m.room === G.room) return; }catch(err){}
     m.room = e.room; moved(); placeInRoom(m);
   });
-  try{ syncPeopleStaged(); }catch(err){ try{ syncPeople(); }catch(e){} }
+  if(!houseQuiet()){
+    try{ syncPeopleStaged(); }catch(err){ try{ syncPeople(); }catch(e){} }
+  }
 }
 function ambientHourBeat(h, t){
   if(!G.running || G.over || PROC.on) return;
@@ -11622,14 +11663,12 @@ function dayPlanCard(){
       if(taylor) feed("Taylor Day. Only Nieuw Oranje VII flies — the Cross, not a man.");
     }catch(e){}
     const go = () => {
-      try{ document.body.classList.remove("boot-menu"); }catch(e){}
-      veil.hidden = true;
-      G.running = true;
+      walkNow();
       try{ setSpeed(G.prevSpeed || 1); }catch(e){ G.speed = 1; }
-      yieldPaint(() => { try{ queueSave(); refreshPanels(); }catch(e){} });
+      laterHouse(() => { try{ queueSave(); }catch(e){} });
     };
     go();
-    /* Do not remesh the House on Start the day. Feet first. Crowd later. */
+    /* Feet first. Crowd and panels wait — same rule as Sleep. */
   });
   markPicks();
 }
@@ -12657,7 +12696,7 @@ function willAct(m){
     if(m.room !== "district" && roll < 0.28 && G.room !== m.room){
       m.room = "district";
       try{ placeInRoom(m); }catch(e){}
-      try{ syncPeopleStaged(); }catch(e){}
+      if(!houseQuiet()){ try{ syncPeopleStaged(); }catch(e){} }
       mindRemember(m, "experience", "I went home because the destiny required it.", {soft:true});
       w.kept++;
       return;
@@ -12676,7 +12715,7 @@ function willAct(m){
         if(away !== G.room){
         m.room = away;
         try{ placeInRoom(m); }catch(e){}
-        try{ syncPeopleStaged(); }catch(e){}
+        if(!houseQuiet()){ try{ syncPeopleStaged(); }catch(e){} }
       }
       }
       w.kept++;
@@ -13066,9 +13105,7 @@ function consularBody(h){
     feed(n.length === 1
       ? (surname(n[0].name) + " is on a knee at the bronze. The chaplain is not here.")
       : (n.length + " of the Consular Rite at the bronze. They keep the Latin. They name him."));
-    try{ syncPeopleStaged(); }catch(e){}
-  }
-  const chap = (G.civ || []).find(c => c && c.chaplain);
+    if(!houseQuiet()){ try{ syncPeopleStaged(); }catch(e){} }
   if(chap && G.room === "cloak"){
     chap.say = "That is not the Mass. I will not give them the Host.";
     chap.sayT = 5;
@@ -14950,7 +14987,7 @@ function eventCard(e){
   veil.hidden = false;
   card.querySelectorAll("[data-ev]").forEach(btn => btn.addEventListener("click", () => {
     const o = opts[+btn.getAttribute("data-ev")];
-    veil.hidden = true;
+    walkNow();
     spend(rint(35, 70), 12);
     if(o && o.run) o.run();
     if(here){
@@ -14958,8 +14995,7 @@ function eventCard(e){
       journal(e.t + " — chose: " + (o ? o.t : "attended") + ".");
       feed("Done: " + e.t + (o ? (" · " + o.t) : "") + ".");
     }
-    G.running = true;
-    refreshPanels(); paintTicker();
+    laterHouse(() => { try{ queueSave(); }catch(e){} });
   }));
 }
 
@@ -18782,7 +18818,7 @@ function switchParty(m, to){
   m.rel.warmth = clamp(m.rel.warmth+25,-100,100);
   m.traits.loyalty = clamp(m.traits.loyalty-10,0,100);
   G.members.forEach(o => { if(o!==m && o.party===from) o.rel.warmth = clamp(o.rel.warmth-4,-100,100); });
-  if(m.mesh){ m.mesh = null; syncPeopleStaged(); }
+  if(m.mesh && !houseQuiet()){ m.mesh = null; syncPeopleStaged(); }
   assignPosts(false);
 }
 
@@ -18938,12 +18974,15 @@ function holdVote(){
     '<div class="card__actions"><button class="btn" type="button" id="okVote">Back to the floor</button></div>';
   veil.hidden = false;
   el("okVote").addEventListener("click", () => {
-    veil.hidden = true; G.running = true; G.you.vote = null;
+    walkNow();
+    G.you.vote = null;
     note((passed?"Passed":"Failed") + ": " + b.title + " — " + t.aye + " to " + t.no + ".", true);
     feed("The clerk closes the book on " + b.title + ". The building exhales and starts the next argument.");
-    try{ paintTicker(); }catch(e){}
-    G.bill = makeBill();
-    refreshPanels();
+    laterHouse(() => {
+      try{ paintTicker(); }catch(e){}
+      try{ G.bill = makeBill(); }catch(e){}
+      try{ queueSave(); }catch(e){}
+    });
   });
 }
 
@@ -19420,16 +19459,12 @@ function election(){
   veil.hidden = false;
   el("okElect").addEventListener("click", () => {
     if(!youWon){ you.outRuns = Math.min(you.outRuns || 0, 1); goOutside(); return; }
-    veil.hidden = true;
+    walkNow();
     note("Re-elected by " + you.margin + ". The " + ordinal(G.congress) + " Congress convenes.", true);
     G.career.push({term:G.term-1, post:you.post?postTitle(you.post):"Member", note:"held by "+you.margin});
-    try{ sustainHouse(); ensureLivedIn(); }catch(e){}
-    try{
-      syncPeopleStaged(() => { try{ leadershipRace(); }catch(e){ G.running = true; } });
-    }catch(e){
-      try{ scheduleDay(); }catch(e2){}
-      G.running = true;
-    }
+    laterHouse(() => {
+      try{ leadershipRace(); }catch(e){ G.running = true; }
+    });
   });
 }
 function leadershipRace(){
@@ -22101,31 +22136,14 @@ function enterRoom(dest, fromRoom){
       forcePaint();
     }catch(e){}
   }, 30);
-  if(!MODEST){
-    nextFrameOrTimeout(() => {
-      try{
-        syncPeopleStaged(() => {
-          try{ if(dest === "floor") seatChamber(); }catch(e){}
-          yieldPaint(() => { try{ refreshPanels(); forcePaint(); }catch(e){} });
-        });
-      }catch(e){ forcePaint(); }
-    }, 80);
-  } else {
-    setTimeout(() => {
-      if(G.room !== dest) return;
-      try{
-        const one = hereNow()[0];
-        if(!one) return;
-        if(one.mesh && !(one.mesh.userData && one.mesh.userData.cheap)){
-          if(one.mesh.parent) one.mesh.parent.remove(one.mesh);
-          one.mesh = null;
-        }
-        if(!one.mesh) one.mesh = buildPerson(one);
-        if(one.mesh.parent !== peopleGroup) peopleGroup.add(one.mesh);
-        forcePaint();
-      }catch(e){}
-    }, 900);
-  }
+  G._crowdPauseUntil = Math.max(G._crowdPauseUntil || 0, performance.now() + 1200);
+  nextFrameOrTimeout(() => {
+    if(G.room !== dest) return;
+    try{
+      if(dest === "floor") seatChamber();
+    }catch(e){}
+    try{ forcePaint(); }catch(e){}
+  }, 900);
 }
 /* Walk into a doorway and you go through it. No menu required. */
 function nearDoor(){
@@ -23194,7 +23212,6 @@ function begin(){
   }
   try{ veil.hidden = true; card.classList.remove("card--open"); veil.classList.remove("veil--make"); }catch(e){}
   try{ document.body.classList.remove("boot-menu"); }catch(e){}
-  try{ save(); }catch(e){}
   const roomId = G.room;
   G._booting = false;
   requestAnimationFrame(() => {
