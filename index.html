@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20260918b">
+<meta name="onum-build" content="20260918c">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -3635,6 +3635,20 @@ function texCanvas(size, paint){
   t.generateMipmaps = true;
   return t;
 }
+function dressMip(t){
+  /* Naval: every map gets a mip chain so walls/flags/faces don't crawl. */
+  if(!t) return t;
+  try{
+    t.generateMipmaps = true;
+    t.minFilter = THREE.LinearMipmapLinearFilter;
+    t.magFilter = THREE.LinearFilter;
+    if(typeof renderer !== "undefined" && renderer && renderer.capabilities){
+      t.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy() || 1);
+    }
+    t.needsUpdate = true;
+  }catch(e){}
+  return t;
+}
 function noise(ctx, s, amt, alpha){
   const img = ctx.getImageData(0,0,s,s), d = img.data;
   for(let i=0;i<d.length;i+=4){
@@ -3916,6 +3930,11 @@ function dressTextures(){
         t.generateMipmaps = true;
         t.minFilter = THREE.LinearMipmapLinearFilter;
         t.magFilter = THREE.LinearFilter;
+        try{
+          if(renderer && renderer.capabilities){
+            t.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy() || 1);
+          }
+        }catch(e){}
         TEX[key] = t;
       }catch(e){}
     };
@@ -4414,10 +4433,7 @@ function faceCanvas(L){
 
   const t = new THREE.CanvasTexture(c);
   t.encoding = THREE.sRGBEncoding;
-  try{
-    t.anisotropy = (typeof renderer !== "undefined" && renderer && renderer.capabilities)
-      ? Math.min(4, renderer.capabilities.getMaxAnisotropy()) : 1;
-  }catch(e){ t.anisotropy = 1; }
+  dressMip(t);
   FACECACHE.set(_fk, t);
   return t;
 }
@@ -5585,7 +5601,7 @@ const PLAQUE_CACHE = Object.create(null);
 function plaqueTexture(title, sub){
   const key = String(title||"") + "|" + String(sub||"");
   if(PLAQUE_CACHE[key]) return PLAQUE_CACHE[key];
-  const W = 512, H = 168;
+  const W = 512, H = 256;
   const c = document.createElement("canvas");
   c.width = W; c.height = H;
   const x = c.getContext("2d");
@@ -5594,7 +5610,6 @@ function plaqueTexture(title, sub){
   g.addColorStop(0.45, "#9a7436");
   g.addColorStop(1, "#5c4218");
   x.fillStyle = g; x.fillRect(0, 0, W, H);
-  /* edge + inner rail */
   x.strokeStyle = "rgba(30,20,8,.65)"; x.lineWidth = 10; x.strokeRect(5, 5, W-10, H-10);
   x.strokeStyle = "rgba(240,215,150,.4)"; x.lineWidth = 2; x.strokeRect(16, 16, W-32, H-32);
   x.fillStyle = "#1a1208";
@@ -5609,17 +5624,17 @@ function plaqueTexture(title, sub){
   };
   const main = fit(title, '600 44px "Instrument Serif", Georgia, serif', W - 56);
   x.font = '600 44px "Instrument Serif", Georgia, serif';
-  x.fillText(main, W/2, sub ? H * 0.40 : H * 0.52);
+  x.fillText(main, W/2, sub ? H * 0.42 : H * 0.52);
   if(sub){
     const s2 = fit(sub, "600 22px Archivo, system-ui, sans-serif", W - 56);
     x.font = "600 22px Archivo, system-ui, sans-serif";
     x.fillStyle = "rgba(26,18,8,.78)";
-    x.fillText(s2, W/2, H * 0.70);
+    x.fillText(s2, W/2, H * 0.66);
   }
   const tex = new THREE.CanvasTexture(c);
   tex.encoding = THREE.sRGBEncoding;
-  tex.anisotropy = 2;
   tex._plaque = true;
+  dressMip(tex);
   PLAQUE_CACHE[key] = tex;
   return tex;
 }
@@ -10469,7 +10484,7 @@ function makeFlag(form, seed){
 }
 function hexs(n){ return "#" + n.toString(16).padStart(6,"0"); }
 function flagTexture(fl){
-  const W = 192, H = 120;
+  const W = 256, H = 128;
   const c = document.createElement("canvas"); c.width = W; c.height = H;
   const x = c.getContext("2d");
   const [a,b,d] = fl.colours;
@@ -10530,6 +10545,7 @@ function flagTexture(fl){
   x.strokeStyle = "rgba(0,0,0,.25)"; x.lineWidth = 2; x.strokeRect(1,1,W-2,H-2);
   const t = new THREE.CanvasTexture(c);
   t.encoding = THREE.sRGBEncoding;
+  dressMip(t);
   return t;
 }
 function renameCountry(form){
@@ -22151,6 +22167,10 @@ function enterRoom(dest, fromRoom){
     }
   }catch(e){}
   try{ forcePaint(); }catch(e){}
+  try{
+    const fd = el("fade");
+    if(fd){ fd.style.opacity = "0"; fd.style.pointerEvents = "none"; }
+  }catch(e){}
   const furnishAt = (dest === "corridor" || dest === "floor") ? 90 : 20;
   nextFrameOrTimeout(() => {
     if(G.room !== dest) return;
@@ -22234,21 +22254,30 @@ let _frameArmed = false;
 function armFrame(){
   if(_frameArmed) return;
   _frameArmed = true;
-  const hidden = typeof document !== "undefined" && document.hidden;
-  const card = !!(typeof veil !== "undefined" && veil && !veil.hidden);
-  if(hidden){
-    setTimeout(() => { _frameArmed = false; frame(performance.now()); }, 1000);
-    return;
+  try{
+    const hidden = typeof document !== "undefined" && document.hidden;
+    const card = !!(typeof veil !== "undefined" && veil && !veil.hidden);
+    if(hidden){
+      setTimeout(() => { _frameArmed = false; frame(performance.now()); }, 1000);
+      return;
+    }
+    if(card){
+      setTimeout(() => { _frameArmed = false; frame(performance.now()); }, 280);
+      return;
+    }
+    if(MODEST){
+      setTimeout(() => { _frameArmed = false; frame(performance.now()); }, FRAME_TARGET_MS);
+      return;
+    }
+    requestAnimationFrame((t) => { _frameArmed = false; frame(t); });
+  }catch(e){
+    _frameArmed = false;
+    setTimeout(() => { try{ armFrame(); }catch(e2){} }, 250);
   }
-  if(card){
-    setTimeout(() => { _frameArmed = false; frame(performance.now()); }, 280);
-    return;
-  }
-  if(MODEST){
-    setTimeout(() => { _frameArmed = false; frame(performance.now()); }, FRAME_TARGET_MS);
-    return;
-  }
-  requestAnimationFrame((t) => { _frameArmed = false; frame(t); });
+}
+function kickFrame(){
+  _frameArmed = false;
+  armFrame();
 }
 function frame(now){
   if(GL_LOST){ last = now; armFrame(); return; }
@@ -23407,6 +23436,12 @@ try{ reconcileFromDB(); }catch(e){}
 setInterval(() => {
   try{ if(G.running && !G.over && G.you && G.members && G.members.length) queueSave(); }catch(e){}
 }, 45000);
+setInterval(() => {
+  try{
+    if(typeof document !== "undefined" && document.hidden) return;
+    if(performance.now() - (_lastDrawn || 0) > 2200) kickFrame();
+  }catch(e){}
+}, 1500);
 addEventListener("beforeunload", () => {
   try{ if(G.you && G.members && G.members.length) save(); }catch(e){}
 });
@@ -23415,7 +23450,7 @@ addEventListener("visibilitychange", () => {
     if(document.visibilityState === "hidden"){
       if(G.you && G.members && G.members.length) queueSave();
     } else {
-      armFrame();
+      kickFrame();
     }
   }catch(e){}
 });
@@ -23428,6 +23463,34 @@ try{
     cam(){ return {x:cam.x, z:cam.z, yaw:cam.yaw, sitting:!!(G.you && G.you.sitting), furnished:!!_roomFurnished}; },
     walk(vx, vz){ cam.vx = vx; cam.vz = vz; G.running = true; },
     day(){ return {day:G.day, sittingDay:G.sittingDay, minute:G.minute, rank:careerRank(G)}; },
+    pane(id){
+      try{
+        if(id && id.indexOf("pane") !== 0){
+          id = "pane" + id.charAt(0).toUpperCase() + id.slice(1);
+        }
+        if(id) showPane(id);
+      }catch(e){}
+      return (typeof currentPane === "function") ? currentPane() : null;
+    },
+    kick(){ try{ kickFrame(); }catch(e){} return true; },
+    stations(){
+      const fade = el("fade");
+      return {
+        room: G.room,
+        running: !!G.running,
+        moving: !!G.moving,
+        sitting: !!(G.you && G.you.sitting),
+        furnished: !!_roomFurnished,
+        camOk: isFinite(cam.x) && isFinite(cam.z) && isFinite(cam.yaw),
+        glLost: !!GL_LOST,
+        fade: fade ? String(fade.style.opacity || "0") : "0",
+        veil: !!(veil && !veil.hidden),
+        day: G.day,
+        people: (typeof hereNow === "function" ? hereNow().length : 0),
+        loopLag: performance.now() - (_lastDrawn || 0),
+        rooms: (typeof ROOM_ORDER !== "undefined" ? ROOM_ORDER.slice() : [])
+      };
+    },
     consular(){ try{ ensureConsularCaucus(); }catch(e){} return (G.members||[]).filter(m => m && isConsular(m)).map(m => m.name); },
     horcrux(){ const h = horcruxOf(G.room); return h ? h.id : null; },
     lore(){ return consularLoreEnsure(); },
