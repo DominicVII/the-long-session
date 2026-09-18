@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20260917t">
+<meta name="onum-build" content="20260917u">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -5463,6 +5463,7 @@ function clearRoom(){
   TICKERS.length = 0;
   ROOMLIGHTS.length = 0;
   _roomBuiltId = null;
+  _roomFurnished = false;
   if(MODEST){
     /* Do not dispose GPU objects on Intel/Edge — that hangs the renderer. */
     try{
@@ -5823,12 +5824,14 @@ function decorateOfficeFor(person){
 
 let _buildingRoom = false;
 let _roomBuiltId = null;
+let _roomFurnished = false;
 const ROOM_KITS = Object.create(null);
 let ROOM_KIT_IDS = [];
 function stashLiveRoom(){
   const id = _roomBuiltId;
-  if(!id || !roomGroup || roomGroup.children.length < 4) return;
+  if(!id || !_roomFurnished || !roomGroup || roomGroup.children.length < 4) return;
   const kit = ROOM_KITS[id] || new THREE.Group();
+  kit.userData.furnished = true;
   while(roomGroup.children.length) kit.add(roomGroup.children[0]);
   ROOM_KITS[id] = kit;
   ROOM_KIT_IDS = ROOM_KIT_IDS.filter(x => x !== id);
@@ -5842,15 +5845,16 @@ function stashLiveRoom(){
 }
 function takeRoomKit(id){
   const kit = ROOM_KITS[id];
-  if(!kit || !kit.children.length) return false;
+  if(!kit || !kit.children.length || !kit.userData.furnished) return false;
   while(kit.children.length) roomGroup.add(kit.children[0]);
   _roomBuiltId = id;
+  _roomFurnished = true;
   return true;
 }
 function buildRoom(id){
   if(_buildingRoom) return;
   if(!ROOMS[id]) id = "office";
-  if(_roomBuiltId === id && roomGroup && roomGroup.children.length >= 5) return;
+  if(_roomBuiltId === id && _roomFurnished && roomGroup && roomGroup.children.length >= 5) return;
   if(_roomBuiltId && _roomBuiltId !== id) stashLiveRoom();
   if(takeRoomKit(id)) return;
   _buildingRoom = true;
@@ -5863,9 +5867,10 @@ function buildRoom(id){
       if(!roomGroup || roomGroup.children.length < 5)
         throw new Error("room shell too empty");
       _roomBuiltId = id;
+      _roomFurnished = true;
     }catch(e){
       if(window.console) console.warn("buildRoom", id, e);
-      try{ clearRoom(); buildRoomShell(id); _roomBuiltId = id; }catch(e2){
+      try{ clearRoom(); buildRoomShell(id); _roomBuiltId = id; _roomFurnished = false; }catch(e2){
         if(window.console) console.warn("buildRoomShell", e2);
       }
       try{ feed("The chamber flickered."); }catch(e3){}
@@ -22043,6 +22048,7 @@ function forcePaint(){
     if(G.room && ROOMS[G.room] && roomGroup && roomGroup.children.length < 4 && !_buildingRoom){
       buildRoomShell(G.room);
       _roomBuiltId = G.room;
+      _roomFurnished = false;
     }
   }catch(e){}
   try{
@@ -22089,16 +22095,16 @@ function enterRoom(dest, fromRoom){
     el("whereTag").textContent = ROOMS[dest].tag;
   }catch(e){}
   try{
-    if(_roomBuiltId !== dest || !roomGroup.children.length){
+    if(_roomBuiltId !== dest || !_roomFurnished || !roomGroup.children.length){
       if(!_buildingRoom){
-        try{ buildRoom(dest); }catch(e){ try{ buildRoomShell(dest); _roomBuiltId = dest; }catch(e2){} }
+        try{ buildRoom(dest); }catch(e){ try{ buildRoomShell(dest); _roomBuiltId = dest; _roomFurnished = false; }catch(e2){} }
       }
     }
   }catch(e){}
   forcePaint();
   nextFrameOrTimeout(() => {
     try{
-      if(_roomBuiltId !== dest && !_buildingRoom) buildRoom(dest);
+      if((_roomBuiltId !== dest || !_roomFurnished) && !_buildingRoom) buildRoom(dest);
       forcePaint();
     }catch(e){}
   }, 30);
@@ -23201,16 +23207,22 @@ function begin(){
   requestAnimationFrame(() => {
     try{
       if(!_buildingRoom){
-        try{ buildRoomShell(roomId); _roomBuiltId = roomId; }catch(e0){
+        try{ buildRoomShell(roomId); _roomBuiltId = roomId; _roomFurnished = false; }catch(e0){
           try{ buildRoom(roomId); }catch(e1){}
         }
         try{ resize(); }catch(e){}
       }
     }catch(e){
       if(window.console) console.warn("begin build", e);
-      try{ G.room = "office"; buildRoomShell("office"); }catch(e2){}
+      try{ G.room = "office"; buildRoomShell("office"); _roomBuiltId = "office"; _roomFurnished = false; }catch(e2){}
     }
     try{ forcePaint(); }catch(e){}
+    requestAnimationFrame(() => {
+      try{
+        if(!_roomFurnished && !_buildingRoom) buildRoom(G.room || roomId);
+      }catch(e){}
+      try{ forcePaint(); }catch(e){}
+    });
     setTimeout(() => {
       const run = (fn) => { try{ fn(); }catch(e){} };
       const chain = (steps, i) => {
@@ -23223,7 +23235,7 @@ function begin(){
         () => { ensureMythHistory(); ensureGreatest(); },
         () => { ensureConsularCaucus(); },
         () => { everyone().forEach(m => { if(m.room === G.room) placeInRoom(m); }); },
-        () => { if(!_buildingRoom) buildRoom(G.room || roomId); },
+        () => { if(!_roomFurnished && !_buildingRoom) buildRoom(G.room || roomId); },
         () => { if(typeof syncPeopleStaged === "function") syncPeopleStaged(() => {}); else syncPeople(); },
         () => { refreshPanels(); save(); }
       ], 0);
