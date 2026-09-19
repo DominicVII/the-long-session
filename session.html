@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20260919a">
+<meta name="onum-build" content="20260919b">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -3288,6 +3288,8 @@ const renderer = new THREE.WebGLRenderer({
 });
 renderer.setPixelRatio(Math.min(devicePixelRatio || 1, MODEST ? 0.55 : 1.0));
 renderer.outputEncoding = THREE.sRGBEncoding;
+try{ renderer.physicallyCorrectLights = false; }catch(e){}
+try{ if(renderer.shadowMap) renderer.shadowMap.autoUpdate = false; }catch(e){}
 try{
   const gl = renderer.getContext();
   const ext = gl && gl.getExtension && gl.getExtension("WEBGL_debug_renderer_info");
@@ -3374,6 +3376,13 @@ renderer.debug.onShaderError = function(gl, prog, vs, fs){
    Graphics quality: Best / Balanced / Simple. Crowd mode must never flip
    shadowMap.enabled (shader recompile stutter). */
 let PEOPLE_CAST_SHADOW = false;
+let _lastPR = -1;
+function setPR(v){
+  const n = Math.min(devicePixelRatio || 1, v);
+  if(Math.abs(n - _lastPR) < 0.02) return;
+  _lastPR = n;
+  try{ renderer.setPixelRatio(n); }catch(e){}
+}
 let SHADOW_SKIP = 0.18;
 let SHADOW_PERIOD = 1/12;   /* shadow map refresh Hz — set in applyQuality */
 let GFX_EXPOSE = 1.0, GFX_HEMI = 1.0, GFX_SUN = 1.0;
@@ -3447,23 +3456,21 @@ function applyCrowd(){
        on everyone you are actually looking at. */
     LOD_NEAR = 4.2; LOD_MID = 6.0; LOD_FAR = 7.5;
     G.plainSit = true;
-    renderer.setPixelRatio(Math.min(devicePixelRatio || 1, MODEST ? 0.75 : 1.0));
+    setPR(MODEST ? 0.75 : 1.0);
   } else if(q === "simple" && !G.fullDetail){
     LOD_NEAR = 2.2; LOD_MID = 4.4; LOD_FAR = 6.8;
     G.plainSit = true;
-    renderer.setPixelRatio(Math.min(devicePixelRatio || 1, Math.min(GFX_PR, MODEST ? 0.62 : 0.75)));
+    setPR(Math.min(GFX_PR, MODEST ? 0.62 : 0.75));
   } else if(crowdSafe && !full){
-    /* Full room: trim far LODs only — keep near outfit/face detail readable. */
     LOD_NEAR = 3.6; LOD_MID = 6.5; LOD_FAR = 9.5;
     G.plainSit = true;
     const prCap = q === "best" ? Math.min(GFX_PR, 1.4) : Math.min(GFX_PR, 1.2);
-    renderer.setPixelRatio(Math.min(devicePixelRatio || 1, prCap));
+    setPR(prCap);
   } else {
-    /* Best / fullDetail: long LODs so outfits and faces stay crisp across the chamber. */
     if(full){ LOD_NEAR = 5.5; LOD_MID = 11.0; LOD_FAR = 18.0; }
     else { LOD_NEAR = 2.7; LOD_MID = 5.6; LOD_FAR = 8.8; }
     G.plainSit = !!G.noSit;
-    renderer.setPixelRatio(Math.min(devicePixelRatio || 1, GFX_PR));
+    setPR(GFX_PR);
   }
   if(G.plainSit && G.members) try{ everyone().forEach(m => { m.sitting = false; }); }catch(e){}
   /* Hair wisps: Best/fullDetail; still skip in a packed room unless fullDetail. */
@@ -4811,16 +4818,25 @@ function tidyRoomFurniture(){
   remove.forEach(g => roomGroup.remove(g));
 }
 function freezeStaticRoom(){
-  /* Furniture never moves after build — skip per-frame matrix walks. */
+  /* Furniture never moves after build — skip per-frame matrix walks.
+     Furniture does not cast: people read as people, the room stays cheap. */
   if(!roomGroup) return;
   try{
     roomGroup.updateMatrixWorld(true);
+    const shadows = !!(renderer && renderer.shadowMap && renderer.shadowMap.enabled);
     roomGroup.traverse(o => {
       if(!o || o.isSkinnedMesh) return;
       if(o.isLight) return;
       o.updateMatrix();
       o.matrixAutoUpdate = false;
+      o.frustumCulled = true;
+      if(o.isMesh){
+        o.castShadow = false;
+        if(!shadows) o.receiveShadow = false;
+      }
     });
+    roomGroup.frustumCulled = false;
+    roomGroup.matrixAutoUpdate = false;
   }catch(e){}
 }
 /* a desk with legs, its top at writing height */
@@ -7024,7 +7040,7 @@ function lightingSlow(){
   scene.fog.color.copy(FOGC);
   scene.fog.near = R.open ? 16 : (R.style === "marble" ? 10 : 7);
   scene.fog.far = R.open ? 78 : Math.max(22, R.d * (R.style === "marble" ? 3.1 : 2.7));
-  if(MODEST){ scene.fog.near = 8; scene.fog.far = 28; camera.far = 30; camera.updateProjectionMatrix(); }
+  if(MODEST){ scene.fog.near = 8; scene.fog.far = 22; camera.far = 28; camera.updateProjectionMatrix(); }
   renderer.setClearColor(FOGC);
   /* practicals carry the room once the daylight goes */
   /* Only the nearest few practicals stay lit. Every extra point light is
@@ -7557,6 +7573,14 @@ function buildPerson(p){
     glance:2 + Math.random()*4, glanceX:0, poseN:0
   };
   tierPerson(g);
+  try{
+    g.frustumCulled = true;
+    g.traverse(o => {
+      if(!o || !o.isMesh) return;
+      o.frustumCulled = true;
+      if(!PEOPLE_CAST_SHADOW) o.castShadow = false;
+    });
+  }catch(e){}
   g.updateMatrixWorld(true);
   return g;
 }
@@ -22069,12 +22093,8 @@ function tick(dt){
   if(!G.moving && G.t >= (G.doorGrace||0)) bumpCheck(sprint);
   if(G.speed <= 0 || G.pendingNight) return;
   if((G.minute || 0) >= 22*60){ beginNight(); return; }
-  /* A full day — eight in the morning to ten at night — takes thirty real
-     minutes at 1x. Conversations and actions charge their own minutes on
-     top of that, so a busy day is shorter than an idle one. */
   if(!TALK.open && !PROC.on && w > 0) spend(w * DAY_RATE, 0);
-  /* Wander/approach only who is here — batch idle destination picks; movers every frame. */
-  if(!PROC.on) tickWanderBatch(w);
+  if(!PROC.on && (!MODEST || (FRAME_ID & 1) === 0)) tickWanderBatch(w);
   if(MODEST){
     if((FRAME_ID & 3) === 0 && !PROC.on){ clockRoom(w); crowdWatch(dt); }
     else if((FRAME_ID & 3) === 2 && !PROC.on){ voxTick(w); autonomyTick(w); }
@@ -22274,6 +22294,33 @@ function kickFrame(){
   _frameArmed = false;
   armFrame();
 }
+function animateCrowd(dt){
+  const crowd = hereNow();
+  const talk = (TALK.open && TALK.m) || null;
+  const sy = Math.sin(cam.yaw), cy = Math.cos(cam.yaw);
+  let full = 0;
+  const maxFull = MODEST ? 5 : 8;
+  for(let i=0;i<crowd.length;i++){
+    const p = crowd[i];
+    if(!p.mesh) continue;
+    const dx = p.x - cam.x, dz = p.z - cam.z;
+    const d2 = dx*dx + dz*dz;
+    const fwd = sy*dx + cy*dz;
+    const talking = talk === p;
+    if(!talking && fwd < -1.8 && d2 > 16){
+      if(p.mesh.visible) p.mesh.visible = false;
+      continue;
+    }
+    if(!p.mesh.visible) p.mesh.visible = true;
+    if(talking || full < maxFull){
+      animatePerson(p, dt);
+      full++;
+    } else {
+      p.mesh.position.set(p.x, 0, p.z);
+      p.mesh.rotation.y = p.facing || 0;
+    }
+  }
+}
 function frame(now){
   if(GL_LOST){ last = now; armFrame(); return; }
   if(typeof document !== "undefined" && document.hidden){ armFrame(); return; }
@@ -22353,7 +22400,6 @@ function frameBody(now){
   catch(err){
     if(window.console && frameFails < 2) console.warn("tick error", err);
   }
-  FRAME_ID++;
   if(MODEST && _emaMs > 28){
     try{ if(!GL_LOST) renderer.render(scene, camera); }catch(e){}
     return;
@@ -22362,26 +22408,12 @@ function frameBody(now){
     try{ if(!GL_LOST) renderer.render(scene, camera); }catch(e){}
     return;
   }
-  const crowd = hereNow();
   if(G._crowdPauseUntil && performance.now() < G._crowdPauseUntil){
     /* Continue: feet first. Crowd waits so Edge does not hang the corridor. */
   } else if(G.running || !veil.hidden || TALK.open){
-    const cap = inHall() ? 8 : 10;
-    if(crowd.length > cap){
-      for(let i=0;i<crowd.length;i++){
-        const p = crowd[i];
-        const d2 = (p.x-cam.x)*(p.x-cam.x) + (p.z-cam.z)*(p.z-cam.z);
-        if(d2 > LOD_FAR*LOD_FAR && !(TALK.open && TALK.m === p)){
-          if(p.mesh && p.mesh.visible) p.mesh.visible = false;
-          continue;
-        }
-        animatePerson(p, dt);
-      }
-    } else {
-      for(let i=0;i<crowd.length;i++) animatePerson(crowd[i], dt);
-    }
-  } else {
-    if((FRAME_ID & 1) === 0) for(let i=0;i<crowd.length;i++) animatePerson(crowd[i], dt);
+    animateCrowd(dt);
+  } else if((FRAME_ID & 1) === 0){
+    animateCrowd(dt);
   }
   /* Once a second, check one body's world matrix for a value that
      cannot be right — a zero scale or a NaN, which is what a stale or
