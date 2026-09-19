@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20260918d">
+<meta name="onum-build" content="20260918e">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -20713,56 +20713,17 @@ const TLSCollab = (function(){
 /* ══════════════════════════════════════════════════════════
    16 · SAVE
    ══════════════════════════════════════════════════════════ */
-/* The save also lives in this artifact's own shared store, when the
-   viewer has granted it — so opening the game in a different browser,
-   or on a different device, finds the same career instead of starting
-   over. localStorage stays the fast copy this page always reads and
-   writes; the shared copy rides alongside it, best-effort, and is only
-   ever read back once — at boot, before anything has been played this
-   session — so nothing already in motion is overwritten out from under
-   a player mid-career. Whichever browser saved last wins, everywhere. */
+/* The career lives in this browser only (localStorage). Never Claude,
+   never Opus, never a hosted artifact DB — play does not spend Claude credit. */
 let DB = null, dbTried = false;
 async function initDB(){
-  if(dbTried) return DB;
   dbTried = true;
-  try{
-    if(typeof claude !== "undefined" && claude.use) DB = await claude.use("db");
-  }catch(e){ DB = null; }
-  return DB;
+  DB = null;
+  return null;
 }
-function saveDoc(){ return DB ? DB.doc("saves/main") : null; }
-function clearSharedSave(){
-  const doc = saveDoc();
-  if(doc) doc.delete().catch(() => {});
-}
-async function reconcileFromDB(){
-  await initDB();
-  const doc = saveDoc();
-  if(!doc) return;
-  let snap;
-  try{ snap = await doc.get(); }catch(e){ return; }
-  let local = null;
-  try{ local = pickNewestSave(); }catch(e){
-    try{
-      const raw = localStorage.getItem(SAVE_KEY);
-      if(raw) local = JSON.parse(raw);
-    }catch(e2){}
-  }
-  if(snap.exists){
-    const remote = snap.data();
-    const remoteAt = (remote && remote.savedAtMs) || 0;
-    const localAt = (local && local.savedAtMs) || 0;
-    if(remoteAt && isBetterSave(remote, local)){
-      try{ localStorage.setItem(SAVE_KEY, JSON.stringify(remote)); }catch(e){}
-      try{ localStorage.setItem(SAVE_BEST_KEY, JSON.stringify(remote)); }catch(e){}
-      if(!G.running) opening();
-    } else if(local && isBetterSave(local, remote)){
-      doc.set(local).catch(() => {});
-    }
-  } else if(local){
-    doc.set(local).catch(() => {});
-  }
-}
+function saveDoc(){ return null; }
+function clearSharedSave(){ /* local only */ }
+async function reconcileFromDB(){ return; }
 const SAVE_KEY = "longsession.v3";
 const SAVE_BACKUP_KEY = "longsession.v3.backup";
 const SAVE_BEST_KEY = "longsession.v3.best";
