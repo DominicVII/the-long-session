@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20260919b">
+<meta name="onum-build" content="20260919c">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -1886,7 +1886,7 @@ function newName(stateOrCult){
   return pick(FIRST)+" "+pick(LAST)+" "+uid;
 }
 const SKINS  = [0xf0d3ba,0xe8c4a0,0xd9ab84,0xc08e64,0x9c6b45,0x7a4f31,0x5c3a22,0x3f2818];
-const SUITS  = [0x1a2744,0x12141a,0x3d1f22,0x2c1810,0x4a5a6a,0x5c5346,0x1d2530,0x2f3b33,0x554b42,0x24313d,0x1a1c24,0x6a4e2a];
+const SUITS  = [0x1a2744,0x12141a,0x7a2a2e,0x3a2418,0x4a6578,0x6a5a3e,0x1d2530,0x2f4a38,0x5c4030,0x24313d,0x0e1014,0x8a6a32];
 const SHIRTS = [0xf2f0ea,0xe8ecf0,0xdfe6ee,0xf0e6dc,0xe4e8e2,0xffffff,0xd8e2ea];
 const HAIRS  = [0x14100d,0x2f2318,0x4a3728,0x6b5540,0x8b7355,0xa89880,0xd8d3c8,0x3a3a3a,0x5c3218];
 /* ── what people wear ─────────────────────────────────────
@@ -1901,7 +1901,7 @@ const WARDROBE = {
   dress_jacket:{t:"Dress and jacket",        jacket:1, vest:0, neck:"necklace", bottom:"dress",    shoe:"heel"},
   blouse_skirt:{t:"Blouse, skirt and scarf", jacket:0, vest:0, neck:"scarf",    bottom:"skirt",    shoe:"flat"}
 };
-const WEAR_MASC = ["suit_tie","three_piece","suit_open","shirt_vest","suit_tie","suit_tie"];
+const WEAR_MASC = ["suit_tie","three_piece","suit_open","shirt_vest","three_piece","suit_open"];
 const WEAR_FEM  = ["skirt_suit","trouser_suit","dress_jacket","blouse_skirt","skirt_suit","trouser_suit"];
 const HAIRSTYLES = ["Short back and sides","Side parting","Pinned up","Thinning","Long","Cropped curls","Caesar cut"];
 
@@ -4648,6 +4648,11 @@ function ensureClothTex(){
     t.needsUpdate = true;
   });
 }
+function suitShift(col, d){
+  const r = (col>>16)&255, g = (col>>8)&255, b = col&255;
+  const f = x => Math.max(0, Math.min(255, (x + d)|0));
+  return (f(r)<<16)|(f(g)<<8)|f(b);
+}
 function matCloth(col, kind, rough){
   ensureClothTex();
   const tex = kind === "shirt" ? TEX.cotton : (kind === "skirt" ? TEX.twill : TEX.wool);
@@ -7246,45 +7251,57 @@ function buildPerson(p){
   if(fem)  /* a little shaping through the chest */
     M(PG.sph, W.jacket ? suit : shirt, spine, 0, torsoLen*0.70, H*0.046*B, H*0.146*B, H*0.072, H*0.050*B, false);
   const openCut = (L.wear === "suit_open");
-  const vestMat = matCloth(W.vest ? (L.suit ^ 0x1a1210) : L.suit, "suit", .86);
+  const vestMat = W.vest ? matCloth(suitShift(L.suit, 38), "suit", .82) : suit;
   if(W.vest){
-    /* A real waistcoat — two fronts, a V, buttons. Not four specks. */
+    /* Waistcoat: two fronts, a real V, gold buttons. Reads even without a jacket. */
     for(const s2 of [-1,1]){
-      const vf = M(PG.sph, vestMat, spine, s2*H*0.038*B, torsoLen*0.52, H*0.050*B,
-        H*0.078*B, torsoLen*0.46, H*0.055*B, false);
-      vf.rotation.z = s2*0.04;
+      const vf = M(PG.box, vestMat, spine, s2*H*0.042*B, torsoLen*0.48, H*0.058*B,
+        H*0.092*B, torsoLen*0.58, H*0.036*B, false);
+      vf.rotation.y = s2*0.10;
+      vf.rotation.z = s2*0.03;
     }
+    /* shirt in the V */
+    M(PG.box, shirt, spine, 0, torsoLen*0.62, H*0.070*B, H*0.036*B, torsoLen*0.36, H*0.012, false);
     for(let i=0;i<5;i++)
-      M(PG.sph, matCol(0xc9a24a,.35,.55), spine, 0, torsoLen*(0.34+i*0.11), H*0.092*B, H*0.012, H*0.012, H*0.008, false);
+      M(PG.sph, matCol(0xc9a24a,.32,.62), spine, 0, torsoLen*(0.30+i*0.10), H*0.094*B, H*0.011, H*0.011, H*0.007, false);
   }
   if(W.jacket){
-    const gap = openCut ? 0.078 : (W.vest ? 0.062 : 0.050);
-    const lapW = openCut ? 0.062 : 0.048;
+    const gap = openCut ? 0.108 : (W.vest ? 0.072 : 0.048);
+    const lapW = openCut ? 0.070 : 0.050;
     for(const s2 of [-1,1]){
-      const panel = M(PG.sph, suit, spine, s2*H*gap*B, torsoLen*0.52, H*0.014*B,
-        H*(openCut ? 0.088 : 0.102)*B, torsoLen*(openCut ? 0.48 : 0.55), H*0.090*B, false);
-      panel.rotation.z = s2*(openCut ? 0.10 : 0.04);
-      M(PG.sph, suit, spine, s2*H*(gap-0.008)*B, torsoLen*0.18, H*0.012*B,
-        H*0.092*B, torsoLen*(openCut ? 0.20 : 0.28), H*0.084*B, false);
+      const panel = M(PG.box, suit, spine, s2*H*gap*B, torsoLen*0.46, H*0.040*B,
+        H*(openCut ? 0.086 : 0.108)*B, torsoLen*0.78, H*0.052*B, false);
+      panel.rotation.y = s2*(openCut ? 0.32 : 0.08);
+      /* hem */
+      M(PG.box, suit2, spine, s2*H*(gap-0.004)*B, torsoLen*0.10, H*0.036*B,
+        H*0.100*B, torsoLen*0.14, H*0.048*B, false);
     }
     for(const s2 of [-1,1]){
-      const lap = M(PG.box, suit2, spine, s2*H*(openCut?0.055:0.042)*B, torsoLen*0.84, H*0.090*B,
-        H*lapW*B, torsoLen*(openCut ? 0.34 : 0.26), H*0.014, false);
-      lap.rotation.z = s2*(openCut ? 0.48 : 0.30);
-      const notch = M(PG.box, suit2, spine, s2*H*0.080*B, torsoLen*0.94, H*0.084*B,
-        H*0.042*B, H*0.028, H*0.012, false);
-      notch.rotation.z = s2*(openCut ? 1.05 : 0.85);
+      const lap = M(PG.box, suit2, spine, s2*H*(openCut?0.062:0.044)*B, torsoLen*0.82, H*0.092*B,
+        H*lapW*B, torsoLen*(openCut ? 0.38 : 0.28), H*0.016, false);
+      lap.rotation.z = s2*(openCut ? 0.52 : 0.28);
+      lap.rotation.y = s2*(openCut ? 0.18 : 0.04);
+      const notch = M(PG.box, suit2, spine, s2*H*0.086*B, torsoLen*0.96, H*0.086*B,
+        H*0.046*B, H*0.030, H*0.012, false);
+      notch.rotation.z = s2*(openCut ? 1.10 : 0.82);
     }
+    /* pocket flap, left breast */
+    M(PG.box, suit2, spine, -H*0.108*B, torsoLen*0.42, H*0.090*B, H*0.070*B, H*0.018, H*0.012, false);
     const nBtn = W.vest ? 2 : (openCut ? 1 : 3);
     for(let i=0;i<nBtn;i++)
-      M(PG.sph, matCol(0x1d1710,.35,.4), spine, H*0.092*B, torsoLen*(0.38+i*0.13), H*0.092*B, H*0.013,H*0.013,H*0.007, false);
+      M(PG.sph, matCol(0x1d1710,.32,.45), spine, H*(openCut?0.070:0.090)*B, torsoLen*(0.34+i*0.14), H*0.094*B, H*0.014,H*0.014,H*0.008, false);
     if(!openCut){
-      M(PG.box, matCol(pick([0xc4544a,0xd9b45e,0x4a7fa8,0xe8e4d8]),.8), spine,
-        -H*0.112*B, torsoLen*0.74, H*0.088*B, H*0.040*B, H*0.022, H*0.010, false);
+      M(PG.box, matCol(pick([0xc4544a,0xd9b45e,0x4a7fa8,0xe8e4d8]),.78), spine,
+        -H*0.118*B, torsoLen*0.72, H*0.092*B, H*0.044*B, H*0.024, H*0.010, false);
     }
-    M(PG.sph, tie, spine, -H*0.054*B, torsoLen*0.90, H*0.094*B, H*0.015, H*0.015, H*0.008, false);
-    M(PG.ring, matCol(0xc9a24a,.3,.85), spine, -H*0.054*B, torsoLen*0.90, H*0.096*B,
-      H*0.022, H*0.022, H*0.022, false).rotation.x = Math.PI/2;
+    if(!openCut && W.neck === "tie"){
+      M(PG.sph, tie, spine, -H*0.054*B, torsoLen*0.90, H*0.096*B, H*0.015, H*0.015, H*0.008, false);
+      M(PG.ring, matCol(0xc9a24a,.3,.85), spine, -H*0.054*B, torsoLen*0.90, H*0.098*B,
+        H*0.022, H*0.022, H*0.022, false).rotation.x = Math.PI/2;
+    }
+  } else {
+    /* shirtsleeves: cuffs at the wrist, placket down the chest */
+    M(PG.box, shirt, spine, 0, torsoLen*0.58, H*0.068*B, H*0.040*B, torsoLen*0.50, H*0.012, false);
   }
   /* shirt collar */
   for(const s2 of [-1,1]){
@@ -7353,7 +7370,7 @@ function buildPerson(p){
      cheeks and forehead; these small meshes supply the readable planes that
      catch light at normal gameplay distance.
   */
-  L._clothVer = 5;
+  L._clothVer = 6;
   const eyeWhite = matCol(0xe8e3da, .45);
   const irisMat = matCol(L.eye || 0x5a3d24, .32);
   const pupilMat = matCol(0x090807, .26);
@@ -7642,7 +7659,7 @@ function syncPeople(){
     if(p.look){
       ensureLookMorphs(p.look);
       /* v2 faces: remesh once so old sticker-heads become real faces */
-      if(p.mesh && (p.look._faceVer !== 2 || p.look._clothVer !== 5)){
+      if(p.mesh && (p.look._faceVer !== 2 || p.look._clothVer !== 6)){
         try{
           if(p.mesh.parent) p.mesh.parent.remove(p.mesh);
         }catch(e){}
@@ -7651,7 +7668,7 @@ function syncPeople(){
     }
     if(!p.mesh){
       p.mesh = buildPerson(p);
-      if(p.look){ p.look._faceVer = 2; p.look._clothVer = 5; }
+      if(p.look){ p.look._faceVer = 2; p.look._clothVer = 6; }
     }
     peopleGroup.add(p.mesh);
   });
@@ -7739,14 +7756,14 @@ function syncPeopleStaged(done, retries){
         const p = missing[at];
         if(p.look){
           ensureLookMorphs(p.look);
-          if(p.mesh && (p.look._faceVer !== 2 || p.look._clothVer !== 5)){
+          if(p.mesh && (p.look._faceVer !== 2 || p.look._clothVer !== 6)){
             if(p.mesh.parent) p.mesh.parent.remove(p.mesh);
             p.mesh = null; p.faceTex = null;
           }
         }
         if(!p.mesh){
           p.mesh = buildPerson(p);
-          if(p.look){ p.look._faceVer = 2; p.look._clothVer = 5; }
+          if(p.look){ p.look._faceVer = 2; p.look._clothVer = 6; }
         }
         if(p.mesh.parent !== peopleGroup) peopleGroup.add(p.mesh);
       }
