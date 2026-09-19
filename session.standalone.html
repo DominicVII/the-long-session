@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20260919d">
+<meta name="onum-build" content="20260919e">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -3287,7 +3287,7 @@ const renderer = new THREE.WebGLRenderer({
   powerPreference: MODEST ? "low-power" : "high-performance",
   failIfMajorPerformanceCaveat: false
 });
-renderer.setPixelRatio(Math.min(devicePixelRatio || 1, MODEST ? 0.55 : 1.0));
+renderer.setPixelRatio(Math.min(devicePixelRatio || 1, MODEST ? 0.72 : 1.0));
 renderer.outputEncoding = THREE.sRGBEncoding;
 try{ renderer.physicallyCorrectLights = false; }catch(e){}
 try{ if(renderer.shadowMap) renderer.shadowMap.autoUpdate = false; }catch(e){}
@@ -7799,16 +7799,30 @@ function wrapPi(a){
 }
 function animatePerson(p, dt){
   if(!p.mesh || p.mesh.parent !== peopleGroup) return;
+  const u = p.mesh.userData || {};
+  const dx = (p.tx||p.x) - p.x, dz = (p.tz||p.z) - p.z;
+  const moving = Math.hypot(dx,dz) > 0.25;
+  p.phase = (p.phase || 0) + dt * (moving ? 6.4 : 1.0);
+  const k = Math.min(1, dt * 14);
+  p.mesh.position.x += (p.x - p.mesh.position.x) * k;
+  p.mesh.position.z += (p.z - p.mesh.position.z) * k;
+  p.mesh.position.y = 0;
+  p.mesh.rotation.y += wrapPi((p.facing || 0) - p.mesh.rotation.y) * k;
+  p.mesh.visible = true;
   if(MODEST){
-    p.mesh.position.set(p.x, 0, p.z);
-    p.mesh.rotation.y = p.facing || 0;
-    p.mesh.visible = true;
+    if(u.pelvis && u.legL && u.legR){
+      const s = Math.sin(p.phase), A = moving ? 0.52 : 0;
+      u.legL.up.rotation.x = s*A;
+      u.legR.up.rotation.x = -s*A;
+      if(u.legL.lo) u.legL.lo.rotation.x = -Math.max(0, Math.sin(p.phase - 1.05)) * A * 1.2;
+      if(u.legR.lo) u.legR.lo.rotation.x = -Math.max(0, Math.sin(p.phase - 1.05 + Math.PI)) * A * 1.2;
+      if(u.armL && u.armL.up) u.armL.up.rotation.x = -s*A*0.58;
+      if(u.armR && u.armR.up) u.armR.up.rotation.x =  s*A*0.58;
+      u.pelvis.position.y = (u.hipY || 0) + (moving ? Math.abs(s)*(u.H || 1.7)*0.012 : 0);
+    }
     return;
   }
-  const u = p.mesh.userData, H = u.H;
-  const dx = p.tx - p.x, dz = p.tz - p.z;
-  const dd = Math.hypot(dx,dz);
-  const moving = dd > 0.25;
+  const H = u.H;
   const talking = TALK.open && TALK.m === p;
 
   const ddx = cam.x - p.x, ddz = cam.z - p.z;
@@ -7846,9 +7860,6 @@ function animatePerson(p, dt){
   else if(partner && partner.room === p.room) wantFace = Math.atan2(partner.x - p.x, partner.z - p.z);
   p.facing += clamp(wrapPi(wantFace - p.facing), -2.6*dt, 2.6*dt);
 
-  p.phase += dt * (moving ? 6.4 : 1.0);
-  p.mesh.position.set(p.x, 0, p.z);
-  p.mesh.rotation.y = p.facing;
   if(behind && dist > LOD_MID && !talking && !moving){
     if(p.mesh.visible) p.mesh.visible = false;
     return;
@@ -22051,9 +22062,9 @@ function tick(dt){
   }
 
   /* looking eases in and eases out rather than snapping on and off */
-  cam.yawVel = smooth(cam.yawVel, turn * 2.05, 0.0009, dt);
+  cam.yawVel = smooth(cam.yawVel, turn * 2.55, 0.0004, dt);
   cam.yaw += cam.yawVel * dt;
-  cam.pitchVel = smooth(cam.pitchVel, tilt * 1.5, 0.0009, dt);
+  cam.pitchVel = smooth(cam.pitchVel, tilt * 1.85, 0.0004, dt);
   cam.pitch = clamp(cam.pitch + cam.pitchVel * dt, -1.15, 1.15);
 
   /* forward is the camera's -Z; right is its +X, which with the half-turn
@@ -22069,25 +22080,23 @@ function tick(dt){
       try{ setImmersive(true); }catch(e){}
     }
   }
-  const top = sprint ? 3.3 : 1.8;
+  const top = sprint ? 3.5 : 2.05;
   const mag = Math.hypot(vx, vz) || 1;
   const wantX = (f.x*vz + r.x*vx) / mag * top * (vx||vz ? 1 : 0);
   const wantZ = (f.z*vz + r.z*vx) / mag * top * (vx||vz ? 1 : 0);
-  /* weight: you take a moment to get going and a moment to stop */
-  const grip = (vx||vz) ? 0.0025 : 0.00004;
+  const grip = (vx||vz) ? 0.0009 : 0.00012;
   cam.vx = smooth(cam.vx, wantX, grip, dt);
   cam.vz = smooth(cam.vz, wantZ, grip, dt);
   const b = roomBox(G.room || "office");
   cam.x = clamp(cam.x + cam.vx*dt, -b.hw, b.hw);
   cam.z = clamp(cam.z + cam.vz*dt, b.d0, b.d1);
-  /* WASD cancels a lectern pull — pause used to be the only way to get free. */
   if(vx || vz) G.speechApproach = null;
   try{ tickSpeechApproach(dt); }catch(e){}
   try{ enforceLecternCapPlayer(); }catch(e){}
   const spd = Math.hypot(cam.vx, cam.vz);
-  cam.speed = smooth(cam.speed, Math.min(1, spd/1.8), 0.002, dt);
-  cam.bob += spd * dt * 3.4;
-  cam.lean = smooth(cam.lean, -cam.yawVel*0.045 - (r.x*cam.vx + r.z*cam.vz)*0.012, 0.004, dt);
+  cam.speed = smooth(cam.speed, Math.min(1, spd/1.8), 0.001, dt);
+  cam.bob += spd * dt * 4.2;
+  cam.lean = smooth(cam.lean, -cam.yawVel*0.05 - (r.x*cam.vx + r.z*cam.vz)*0.014, 0.002, dt);
   const wantFov = (sprint && spd > 1.35) ? 64 : 58;
   if(camera && Math.abs((camera.fov || 58) - wantFov) > 0.4){
     camera.fov += (wantFov - camera.fov) * Math.min(1, dt * 6);
@@ -22099,7 +22108,7 @@ function tick(dt){
   if(G.speed <= 0 || G.pendingNight) return;
   if((G.minute || 0) >= 22*60){ beginNight(); return; }
   if(!TALK.open && !PROC.on && w > 0) spend(w * DAY_RATE, 0);
-  if(!PROC.on && (!MODEST || (FRAME_ID & 1) === 0)) tickWanderBatch(w);
+  if(!PROC.on) tickWanderBatch(w);
   if(MODEST){
     if((FRAME_ID & 3) === 0 && !PROC.on){ clockRoom(w); crowdWatch(dt); }
     else if((FRAME_ID & 3) === 2 && !PROC.on){ voxTick(w); autonomyTick(w); }
@@ -22264,9 +22273,9 @@ let hailT = 0, hailWho = null, matChkT = 0, matChk = 0, matChkSaid = 0;
    to the simulation is the real elapsed time across the skipped frames and
    nothing runs slow or fast because of it. FRAME_TARGET_MS is deliberately
    a touch under 1000/60 so a 60Hz panel never skips a frame to rounding. */
-const FRAME_TARGET_MS_LO = (typeof MODEST !== "undefined" && MODEST) ? (1000 / 10) : (1000 / 30);
-const FRAME_TARGET_MS_HI = (typeof MODEST !== "undefined" && MODEST) ? (1000 / 16) : (1000 / 48);
-let FRAME_TARGET_MS = (typeof MODEST !== "undefined" && MODEST) ? (1000 / 12) : (1000 / 40);
+const FRAME_TARGET_MS_LO = (typeof MODEST !== "undefined" && MODEST) ? (1000 / 24) : (1000 / 30);
+const FRAME_TARGET_MS_HI = (typeof MODEST !== "undefined" && MODEST) ? (1000 / 42) : (1000 / 60);
+let FRAME_TARGET_MS = (typeof MODEST !== "undefined" && MODEST) ? (1000 / 36) : (1000 / 55);
 let _lastDrawn = 0;
 let _cardFrames = 0;
 let _emaMs = 16;
@@ -22282,11 +22291,7 @@ function armFrame(){
       return;
     }
     if(card){
-      setTimeout(() => { _frameArmed = false; frame(performance.now()); }, 280);
-      return;
-    }
-    if(MODEST){
-      setTimeout(() => { _frameArmed = false; frame(performance.now()); }, FRAME_TARGET_MS);
+      setTimeout(() => { _frameArmed = false; frame(performance.now()); }, 160);
       return;
     }
     requestAnimationFrame((t) => { _frameArmed = false; frame(t); });
@@ -22329,7 +22334,7 @@ function animateCrowd(dt){
 function frame(now){
   if(GL_LOST){ last = now; armFrame(); return; }
   if(typeof document !== "undefined" && document.hidden){ armFrame(); return; }
-  if(now - _lastDrawn < FRAME_TARGET_MS){ armFrame(); return; }
+  if(now - _lastDrawn < 8){ armFrame(); return; }
   _lastDrawn = now;
   const t0 = now;
   try{
@@ -22348,18 +22353,9 @@ function frame(now){
   }
   const took = performance.now() - t0;
   _emaMs = _emaMs * 0.86 + took * 0.14;
-  if(_emaMs > 22) FRAME_TARGET_MS = Math.min(FRAME_TARGET_MS_LO, FRAME_TARGET_MS + 2);
-  else if(_emaMs < 12 && !MODEST) FRAME_TARGET_MS = Math.max(FRAME_TARGET_MS_HI, FRAME_TARGET_MS - 0.4);
-  if(took > 40) FRAME_TARGET_MS = FRAME_TARGET_MS_LO;
-  if(took > 50 && G && G.room === "corridor"){
-    try{
-      const crowd = hereNow();
-      for(let i = 0; i < crowd.length; i++){
-        if(i < 2) continue;
-        if(crowd[i].mesh) crowd[i].mesh.visible = false;
-      }
-    }catch(e){}
-  }
+  if(_emaMs > 28) FRAME_TARGET_MS = Math.min(FRAME_TARGET_MS_LO, FRAME_TARGET_MS + 1.5);
+  else if(_emaMs < 14) FRAME_TARGET_MS = Math.max(FRAME_TARGET_MS_HI, FRAME_TARGET_MS - 0.5);
+  if(took > 48) FRAME_TARGET_MS = FRAME_TARGET_MS_LO;
   armFrame();
 }
 function frameBody(now){
@@ -22405,19 +22401,9 @@ function frameBody(now){
   catch(err){
     if(window.console && frameFails < 2) console.warn("tick error", err);
   }
-  if(MODEST && _emaMs > 28){
-    try{ if(!GL_LOST) renderer.render(scene, camera); }catch(e){}
-    return;
-  }
-  if(_emaMs > 36){
-    try{ if(!GL_LOST) renderer.render(scene, camera); }catch(e){}
-    return;
-  }
   if(G._crowdPauseUntil && performance.now() < G._crowdPauseUntil){
     /* Continue: feet first. Crowd waits so Edge does not hang the corridor. */
-  } else if(G.running || !veil.hidden || TALK.open){
-    animateCrowd(dt);
-  } else if((FRAME_ID & 1) === 0){
+  } else {
     animateCrowd(dt);
   }
   /* Once a second, check one body's world matrix for a value that
