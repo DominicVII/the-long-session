@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20260918e">
+<meta name="onum-build" content="20260919a">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -3050,9 +3050,7 @@ function ensureLivedIn(){
       }
     });
   }catch(e){}
-  const want = (MODEST || inHall())
-    ? ({office:1, corridor:1, floor:1, cloak:1, caucus:1, committee:1, press:1, steps:1, district:1, staff:1})[G.room] || 1
-    : ({office:4, corridor:2, floor:6, cloak:4, caucus:5, committee:4, press:3, steps:3, district:2, staff:2})[G.room] || 3;
+  const want = ({office:4, corridor:5, floor:6, cloak:4, caucus:5, committee:4, press:3, steps:3, district:2, staff:2})[G.room] || 3;
   const here = everyone().filter(m => m && m.room === G.room && !m.gone && !m.away);
   if(here.length >= want) return;
   const pool = everyone().filter(m => m && !m.gone && !m.away && m.room !== G.room && TALK.m !== m && visiting() !== m);
@@ -7095,10 +7093,7 @@ function buildPersonCheap(p){
   return g;
 }
 function buildPerson(p){
-  /* Corridor freeze: extras stay cheap. Talk / you stay full. */
-  if(p && p.kind !== "you" && !(TALK.open && TALK.m === p) &&
-     ((typeof MODEST !== "undefined" && MODEST && p._cheap) || inHall()))
-    return buildPersonCheap(p);
+  /* Full people always — suits, hair, faces. Cheap dummy was the potato corridor. */
   const L = p.look;
   /* Defensive clamp: a save from an older format, or any stray mutation
      elsewhere, could hand height/build a value outside the range rollLook()
@@ -7687,14 +7682,20 @@ function syncPeopleStaged(done, retries){
   let list, missing;
   try{
     list = hereNow().slice();
-    if(inHall() && list.length > 2) list = list.slice(0, 2);
+    if(inHall() && list.length > 6) list = list.slice(0, 6);
     const keep = new Set();
     for(let i=0;i<list.length;i++) if(list[i].mesh) keep.add(list[i].mesh);
     for(let i = peopleGroup.children.length - 1; i >= 0; i--){
       const ch = peopleGroup.children[i];
       if(!keep.has(ch)) peopleGroup.remove(ch);
     }
-    missing = list.filter(p => !p.mesh || p.mesh.parent !== peopleGroup);
+    missing = list.filter(p => {
+      if(p.mesh && p.mesh.userData && p.mesh.userData.cheap){
+        try{ if(p.mesh.parent) p.mesh.parent.remove(p.mesh); }catch(e){}
+        p.mesh = null;
+      }
+      return !p.mesh || p.mesh.parent !== peopleGroup;
+    });
   }catch(e){
     syncPeopleStaged._busy = false;
     if(window.console) console.warn("syncPeople staged setup", e);
@@ -22365,7 +22366,7 @@ function frameBody(now){
   if(G._crowdPauseUntil && performance.now() < G._crowdPauseUntil){
     /* Continue: feet first. Crowd waits so Edge does not hang the corridor. */
   } else if(G.running || !veil.hidden || TALK.open){
-    const cap = (MODEST || inHall()) ? 3 : 10;
+    const cap = inHall() ? 8 : 10;
     if(crowd.length > cap){
       for(let i=0;i<crowd.length;i++){
         const p = crowd[i];
