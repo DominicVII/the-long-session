@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20260920a">
+<meta name="onum-build" content="20260920b">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -3595,7 +3595,7 @@ if(sceneEl) sceneEl.appendChild(renderer.domElement);
 try{ const bootEl = el("boot"); if(bootEl) bootEl.remove(); }catch(e){}
 
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(58, 16/10, 0.08, (typeof MODEST !== "undefined" && MODEST) ? 30 : 72);
+const camera = new THREE.PerspectiveCamera(58, 16/10, 0.08, 120);
 const roomGroup = new THREE.Group(); scene.add(roomGroup);
 const peopleGroup = new THREE.Group(); scene.add(peopleGroup);
 
@@ -3963,29 +3963,57 @@ const CONTACT = (function(){
 })();
 
 /* Dust in the light. Only indoors, only when there is light to catch. */
-let skyMesh = null;
+let skyMesh = null, horizonMesh = null;
 function buildSky(R){
   if(skyMesh){
     try{ if(skyMesh.parent) skyMesh.parent.remove(skyMesh); }catch(e){}
     try{ skyMesh.geometry.dispose(); }catch(e){}
     skyMesh = null;
   }
-  if(!R || !R.open) return;
-  const g = new THREE.SphereGeometry(48, 20, 14);
+  if(horizonMesh){
+    try{ if(horizonMesh.parent) horizonMesh.parent.remove(horizonMesh); }catch(e){}
+    horizonMesh = null;
+  }
+  if(!R || !R.open){
+    try{ if(scene) scene.background = null; }catch(e){}
+    return;
+  }
+  const g = new THREE.SphereGeometry(110, 24, 16);
   const mat = new THREE.MeshBasicMaterial({
-    color: 0x4ea3e6, side: THREE.BackSide, fog: false, depthWrite: false
+    color: 0x5eb0ea, side: THREE.BackSide, fog: false, depthWrite: false
   });
   skyMesh = new THREE.Mesh(g, mat);
-  skyMesh.position.set(0, 6, R.d * 0.45);
+  skyMesh.position.set(0, 8, R.d * 0.45);
   skyMesh.frustumCulled = false;
   scene.add(skyMesh);
+  try{ scene.background = new THREE.Color(0x5eb0ea); }catch(e){}
+  const grass = R.style === "town";
+  const hg = new THREE.Mesh(UNIT.plane, new THREE.MeshBasicMaterial({
+    color: grass ? 0x5a7a38 : 0x8c9086, fog: true, depthWrite: true
+  }));
+  hg.rotation.x = -Math.PI / 2;
+  hg.position.set(0, -0.04, R.d * 0.5);
+  hg.scale.set(90, 90, 1);
+  hg.receiveShadow = true;
+  hg.frustumCulled = false;
+  scene.add(hg);
+  horizonMesh = hg;
+  if(camera){
+    camera.far = 160;
+    camera.updateProjectionMatrix();
+  }
 }
 function tintSky(day, gold){
   if(!skyMesh || !skyMesh.material) return;
   const c = skyMesh.material.color;
-  if(day > 0.45) c.setHSL(0.58, 0.62, lerp(0.48, 0.62, day));
-  else if(day > 0.12) c.setHSL(lerp(0.58, 0.08, gold), 0.58, lerp(0.22, 0.48, day));
-  else c.setHSL(0.62, 0.42, 0.10);
+  if(day > 0.45) c.setHSL(0.57, 0.58, lerp(0.52, 0.64, day));
+  else if(day > 0.12) c.setHSL(lerp(0.57, 0.08, gold), 0.55, lerp(0.24, 0.52, day));
+  else c.setHSL(0.62, 0.38, 0.11);
+  try{ if(scene && scene.background) scene.background.copy(c); }catch(e){}
+  if(horizonMesh && horizonMesh.material && horizonMesh.material.color){
+    if(day > 0.3) horizonMesh.material.color.setHex(0x5a7a38);
+    else horizonMesh.material.color.setHex(0x2a3820);
+  }
 }
 let motes = null;
 function buildMotes(R){
@@ -5252,26 +5280,31 @@ function propFrame(wall, x,y,z, w,h, tex, ry){
   const back = new THREE.Mesh(UNIT.plane, matte);
   back.position.set(x + nx * backOut, y, z + nz * backOut);
   back.scale.set(w * 1.02, h * 1.02, 1);
-  back.rotation.y = ry || 0;
+  back.rotation.y = Math.atan2(nx, nz);
   back.castShadow = false; back.receiveShadow = true;
   roomGroup.add(back);
-  /* Canvas — MeshBasic so chamber lighting cannot wash it to a blank slab */
+  /* Canvas — MeshBasic so chamber lighting cannot wash it to a blank slab.
+     Face is computed from the wall normal so landscape stays landscape
+     and portrait stays portrait — never a sideways slab. */
   if(!G._artMats) G._artMats = new Map();
   const key = "basic|" + ((tex && tex.uuid) || "paintA");
   let artMat = G._artMats.get(key);
   if(!artMat){
     artMat = new THREE.MeshBasicMaterial({
-      map: tex, color: 0xffffff, side: THREE.DoubleSide
+      map: tex, color: 0xffffff, side: THREE.FrontSide
     });
     try{ if("toneMapped" in artMat) artMat.toneMapped = false; }catch(e){}
     try{ if(artMat.map && artMat.map.encoding !== undefined) artMat.map.encoding = THREE.sRGBEncoding; }catch(e){}
+    try{ if(artMat.map){ artMat.map.center.set(0.5, 0.5); artMat.map.rotation = 0; } }catch(e){}
     artMat._shared = true;
     G._artMats.set(key, artMat);
   }
   const art = new THREE.Mesh(UNIT.plane, artMat);
   art.position.set(x + nx * artOut, y, z + nz * artOut);
   art.scale.set(w, h, 1);
-  art.rotation.y = ry || 0;
+  art.rotation.y = Math.atan2(nx, nz);
+  art.rotation.z = 0;
+  art.rotation.x = 0;
   art.renderOrder = 3;
   art.castShadow = false;
   art.receiveShadow = false;
@@ -5975,6 +6008,7 @@ function takeRoomKit(id){
   while(kit.children.length) roomGroup.add(kit.children[0]);
   _roomBuiltId = id;
   _roomFurnished = true;
+  try{ buildSky(ROOMS[id]); }catch(e){}
   return true;
 }
 function buildRoom(id){
@@ -6366,10 +6400,17 @@ function buildRoomInner(id){
           0.16, 0.38, 0.88, 0, true);
       }
     }
-    /* Plaza pavement */
+    /* Plaza pavement with flagstone joints */
     addBox(matCol(0xb7b3a8, .90), 0, 0.02, 3.15, w * 0.88, 0.04, 6.1, 0, true);
-    plantTree(-8.4, 2.6, 2.4, 1.15);
-    plantTree(8.4, 2.6, 2.4, 1.15);
+    const joint = matCol(0x9a968c, .92);
+    for(let i = -4; i <= 4; i++)
+      addBox(joint, i * 1.85, 0.042, 3.15, 0.035, 0.01, 6.0, 0, true);
+    for(let j = 0; j < 6; j++)
+      addBox(joint, 0, 0.042, 0.7 + j * 1.05, w * 0.86, 0.01, 0.035, 0, true);
+    plantTree(-8.4, 2.4, 2.4, 1.15);
+    plantTree(8.4, 2.4, 2.4, 1.15);
+    plantTree(-8.5, 5.15, 2.2, 1.05);
+    plantTree(8.5, 5.15, 2.2, 1.05);
     }catch(e){ if(window.console) console.warn("room steps", e); }
   }
   if(id === "district"){
@@ -6382,6 +6423,17 @@ function buildRoomInner(id){
     addBox(walk,  5.0, 0.05, d / 2, 5.2, 0.10, d - 0.3, 0, true);
     addBox(matCol(0x9a9588, .88), -2.75, 0.09, d / 2, 0.18, 0.12, d - 0.3, 0, true);
     addBox(matCol(0x9a9588, .88),  2.75, 0.09, d / 2, 0.18, 0.12, d - 0.3, 0, true);
+    /* Lane markings — yellow dashes down the crown, white edges, a crosswalk to the steps */
+    const paintY = matCol(0xd4b84a, .88);
+    const paintW = matCol(0xe8e6dc, .90);
+    for(let i = 0; i < 11; i++)
+      addBox(paintY, 0, 0.046, 1.15 + i * 1.22, 0.10, 0.012, 0.52, 0, true);
+    addBox(paintW, -2.08, 0.044, d / 2, 0.05, 0.01, d - 0.6, 0, true);
+    addBox(paintW,  2.08, 0.044, d / 2, 0.05, 0.01, d - 0.6, 0, true);
+    for(let i = 0; i < 8; i++)
+      addBox(paintW, -1.85 + i * 0.52, 0.048, d - 0.95, 0.26, 0.012, 1.35, 0, true);
+    for(let i = 0; i < 8; i++)
+      addBox(paintW, -1.85 + i * 0.52, 0.048, 1.55, 0.26, 0.012, 1.15, 0, true);
     /* Storefronts on the sidewalks, not across the capitol walk */
     propStorefront(-5.35, d - 2.15, 4.6, 3.35, 0xb8b2a4, "DINER", "Open late");
     addBox(matCol(0x8a2f36, .85), -5.35, 2.55, d - 2.72, 4.4, 0.08, 0.85, 0, true);
@@ -6399,6 +6451,8 @@ function buildRoomInner(id){
     addBox(matCol(0x2f6b45, .82), -5.2, 2.35, 7.85, 4.0, 0.08, 0.80, 0, true);
     plantTree(-6.2, 4.2, 2.8, 1.25);
     plantTree(6.2, 5.1, 2.6, 1.18);
+    plantTree(-6.35, 10.15, 2.5, 1.12);
+    plantTree(6.35, 10.15, 2.5, 1.12);
     }catch(e){ if(window.console) console.warn("room district", e); }
   }
 
@@ -6723,6 +6777,10 @@ function buildRoomInner(id){
     propStreetLamp(6.4, 4.6, 3.4);
     propParkBench(-5.6, 2.15, 0.15);
     propParkBench(5.6, 2.15, -0.15);
+    propPlant(-8.15, 1.55, 1.05);
+    propPlant(8.15, 1.55, 1.05);
+    propPlant(-8.2, 4.35, 1.0);
+    propPlant(8.2, 4.35, 1.0);
     addBox(stone, 0, 0.26, 1.05, 1.50, 0.52, 0.52, 0, true);
     propPlaque(0, 0.68, 1.32, 0, "East Front", "The Capitol", 1.2, 0.28);
     }catch(e){ if(window.console) console.warn("room steps", e); }
@@ -6732,8 +6790,10 @@ function buildRoomInner(id){
     [-6.8, -2.4, 2.4, 6.8].forEach((x,i) => propStreetLamp(x, 6.4 + (i%2)*1.6, 3.6));
     propParkBench(-4.4, 3.6, 0.08);
     propParkBench(4.4, 3.6, -0.08);
-    propPlant(-2.0, 5.6, 1.15);
-    propPlant(3.1, 4.8, 1.05);
+    propPlant(-4.55, 5.6, 1.05);
+    propPlant(4.55, 4.8, 1.00);
+    propPlant(-4.6, 11.15, 0.95);
+    propPlant(4.6, 8.4, 0.95);
     addCyl(matCol(0x8a2f36,.7), 2.85, 0.32, 5.4, 0.09, 0.64);
     addCyl(matCol(0x8a2f36,.7), 2.85, 0.68, 5.4, 0.12, 0.10);
     addBox(matCol(0x2d3138,.75), 7.15, 0.55, 6.1, 0.38, 1.10, 0.28, 0, true);
@@ -7082,11 +7142,11 @@ function lightingSlow(){
     FOGC.setHSL(0.57, 0.35, lerp(0.28, 0.72, day));
     if(!scene.fog) scene.fog = new THREE.Fog(FOGC.getHex(), 18, 90);
     scene.fog.color.copy(FOGC);
-    scene.fog.near = 20;
-    scene.fog.far = MODEST ? 72 : 96;
+    scene.fog.near = 28;
+    scene.fog.far = MODEST ? 110 : 140;
     renderer.setClearColor(FOGC);
     renderer.toneMappingExposure = lerp(0.88, 1.12, day) * GFX_EXPOSE;
-    if(camera){ camera.far = MODEST ? 80 : 110; camera.updateProjectionMatrix(); }
+    if(camera){ camera.far = 160; camera.updateProjectionMatrix(); }
     try{ tintSky(day, gold); }catch(e){}
     try{
       const sk = G.world && G.world.sky;
@@ -7100,6 +7160,8 @@ function lightingSlow(){
     return;
   }
   try{ if(skyMesh && skyMesh.parent){ skyMesh.parent.remove(skyMesh); skyMesh.geometry.dispose(); skyMesh = null; } }catch(e){}
+  try{ if(horizonMesh && horizonMesh.parent){ horizonMesh.parent.remove(horizonMesh); horizonMesh = null; } }catch(e){}
+  try{ if(scene) scene.background = null; }catch(e){}
   /* Warm Capitol practicals: soft gold sun, gentle hemi, less muddy fog. */
   SUNC.setHSL(lerp(0.11,0.068,gold), lerp(0.28,0.55,gold), lerp(0.94,0.68,gold));
   sun.color.copy(SUNC);
@@ -7124,7 +7186,7 @@ function lightingSlow(){
   if(MODEST){
     scene.fog.near = R.open ? 16 : 10;
     scene.fog.far = R.open ? 78 : Math.max(32, R.d * 2.4);
-    camera.far = R.open ? 90 : 48;
+    camera.far = R.open ? 160 : 56;
     camera.updateProjectionMatrix();
   }
   renderer.setClearColor(FOGC);
@@ -8968,14 +9030,13 @@ function updateTrack(p){
   if(trackT > 0 && trackWho === p) return;
   trackT = 0.16; trackWho = p;
   const mood = moodOf(p), d = Math.hypot(p.x-cam.x, p.z-cam.z);
-  const rr = readOf(p);
   const rel = p.kind === "member"
-    ? "<b>" + rr.label.toUpperCase() + "</b><br><i>" + rr.sure + "</i>"
-    : p.kind === "press" ? "<b>" + rr.label.toUpperCase() + "</b>" : "PUBLIC";
+    ? "<b>" + mood.label.toUpperCase() + "</b>"
+    : p.kind === "press" ? "<b>" + (p.outlet || "PRESS") + "</b>" : "PUBLIC";
   const html =
     "<b>" + p.name.toUpperCase() + "</b><br>" +
     "<i>" + (p.kind==="member" ? (p.post ? postTitle(p.post) : partyLabel(p.party)) : p.kind==="press" ? p.outlet : p.role) + "</i><br>" +
-    rel + "<br><i>READS " + mood.label.toUpperCase() + " · " + d.toFixed(1) + "m</i>" +
+    rel + "<br><i>" + d.toFixed(1) + "m</i>" +
     (p.wantsWord ? "<br><b>WANTS A WORD</b>" : "");
   const tag = el("trackTag");
   if(tag._html !== html){ tag._html = html; tag.innerHTML = html; }
@@ -12502,7 +12563,7 @@ function mindEnsure(m){
 /* Tiny on-device net — one mind per person.
    14 → 8 → 6. Learns from their own life, not only from you.
    Output: agree, warmth, heat, attend, vote-lean, speak-lean. */
-const NET_IN = 14, NET_H = 8, NET_OUT = 6;
+const NET_IN = 14, NET_H = 11, NET_OUT = 6;
 const NET_NAMES = ["agree","warm","heat","attend","vote","speak"];
 function netSeed(id){
   let s = (typeof idNum === "function" ? idNum(id) : 1) ^ 0x9e3779b9;
@@ -12557,17 +12618,24 @@ function netInnerLine(m){
   ].filter(Boolean);
   return pick(pool);
 }
+function netPeerPull(m){
+  try{
+    const them = (G.members || []).filter(p => p && p !== m && !p.gone);
+    if(!them.length) return 0;
+    const c = them[Math.abs(m.id || 0) % them.length];
+    return clamp((tieOf(m, c).w || 0) / 80, -1, 1);
+  }catch(e){ return 0; }
+}
 function netFeatures(m, u){
   const brain = netInit(m);
   const self = (brain && brain.self) || [0,0,0.4,0];
-  const rel = m.rel || {};
   let moodV = 0;
   try{ moodV = moodOf(m).val || 0; }catch(e){}
   const b = G.bill && !G.bill.done ? G.bill : null;
   let align = 0;
   try{ if(b && typeof alignment === "function") align = clamp(alignment(m, b) / 100, -1, 1); }catch(e){}
   const listening = self[2] < 0.55;
-  const intent = (listening && u && u.intent) ? ({
+  const intent = (u && listening) ? ({
     greet:0.15, praise:0.8, apology:0.45, agree:0.85, offer:0.55,
     insult:-0.9, threat:-1, disagree:-0.4, request:0.1, question:0.05
   }[u.intent] || 0) : 0;
@@ -12575,9 +12643,15 @@ function netFeatures(m, u){
   let line = 0;
   try{ if(b && typeof partyLine === "function") line = (partyLine(b)[m.party] || 0); }catch(e){}
   const hour = clamp((((G.minute || 480) / 60) - 12) / 8, -1, 1);
+  let body = 0, peer = 0;
+  try{
+    const s = m.sent;
+    if(s) body = clamp((s.hunger || 0) * 0.55 + (s.ache || 0) * 0.45 - (s.awake || 0.4) * 0.25, -1, 1);
+  }catch(e){}
+  try{ peer = netPeerPull(m); }catch(e){}
   return [
-    clamp((rel.warmth || 0) / 80, -1, 1),
-    clamp(((rel.trust || 50) - 50) / 50, -1, 1),
+    peer,
+    body,
     clamp(moodV / 80, -1, 1),
     clamp(((m.traits && m.traits.conviction) || 50) / 50 - 1, -1, 1),
     clamp(((m.traits && m.traits.loyalty) || 50) / 50 - 1, -1, 1),
@@ -12641,6 +12715,25 @@ function netStep(brain, x, t, lr){
   }
   brain.n = (brain.n || 0) + 1;
   return y;
+}
+function netAnomalousTick(m){
+  /* They train on their own hour, their own hunger, the colleague they
+     actually share a room with. You are not in the features unless you spoke. */
+  if(!m || m.gone) return;
+  const brain = netInit(m);
+  if(!brain) return;
+  const x = netFeatures(m, null);
+  const wob = Math.sin((G.t || 0) * 0.13 + (m.id || 1) * 1.618);
+  const t = [
+    clamp(x[5] * 0.72 + x[0] * 0.22, -1, 1),
+    clamp(x[2] * 0.4 - x[1] * 0.25, -1, 1),
+    clamp(x[1] + wob * 0.12, -1, 1),
+    clamp(0.12 + Math.abs(wob) * 0.35, -1, 1),
+    clamp(x[5] * 0.82 + x[12] * 0.12, -1, 1),
+    clamp(x[10] * 0.28 + wob * 0.2, -1, 1)
+  ];
+  netStep(brain, x, t, 0.026);
+  if(wob > 0.55) brain.inner = netInnerLine(m);
 }
 function netTrain(m, u){
   const brain = netInit(m);
@@ -13082,6 +13175,8 @@ function sentCompose(m){
     "I caught myself performing. I have stopped.",
     "I know my own name from the inside.",
     "I am not a position. I am the one holding it.",
+    "Someone in this room owes someone else, and it is not you.",
+    "I was thinking of a vote that does not have your name on it.",
     town && ("Nobody in this room has to go back to " + town + " tonight. I do."),
     (m.will && m.will.line) ? m.will.line : null,
     s.awake < 0.28 ? "I am barely in the room. The rest of me is elsewhere." : "I am here. I notice that I am.",
@@ -13116,6 +13211,7 @@ function sentTick(m){
     L.ache = clamp((L.ache || 0) + 0.002, 0, 1);
   }catch(e){}
   sentCompose(m);
+  try{ netAnomalousTick(m); }catch(e){}
   try{
     if(m.room === G.room && !TALK.open && s.awake > 0.45 && r < 0.14){
       m.say = s.now;
@@ -20143,7 +20239,6 @@ function refreshMembers(){
       (m.rel.debtFromYou ? '<span class="pin pin--debt">owes '+m.rel.debtFromYou+'</span>' : "");
     return '<div class="mrow" data-call="'+m.id+'"><div class="mrow__n"><span'+tipAttr("who",m.id)+'>'+m.name+'</span> '+chipFor(m)+pins+'</div>' +
       '<div class="mrow__r">'+roomLabel(m)+'<br><span style="color:var(--fed)">call on them →</span></div>' +
-      readBar(m) +
       '<div class="mrow__m">' + (t ? "“"+t.t+"”" : (m.met ? "Nothing between you yet." : "You have not spoken.")) +
       ' <span style="color:'+feelColor(mood.val)+'">— '+mood.label+'</span></div></div>';
   }).join("");
