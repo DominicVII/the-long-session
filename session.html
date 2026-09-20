@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20260920d">
+<meta name="onum-build" content="20260920e">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -1766,6 +1766,10 @@ const DOORS = {
 };
 function doorAt(roomId, dr){
   const R = ROOMS[roomId], hw = R.w/2;
+  if(roomId === "steps"){
+    if(dr.side === "front") return {x:0, z:1.05, ry:0};
+    if(dr.side === "back")  return {x:0, z:R.d - 1.05, ry:Math.PI};
+  }
   if(dr.side === "front") return {x:(dr.at-0.5)*R.w*0.8, z:0.35, ry:0};
   if(dr.side === "back")  return {x:(dr.at-0.5)*R.w*0.8, z:R.d-0.35, ry:Math.PI};
   if(dr.side === "left")  return {x:-hw+0.35, z:dr.at*R.d, ry:Math.PI/2};
@@ -3173,7 +3177,22 @@ function hereNow(){
 }
 function visiting(){ return G.room === "visit" ? byId(G.visitId) : null; }
 function presentWith(m){ return m && (m.room === G.room || visiting() === m); }
-function roomBox(id){ const r = ROOMS[id] || ROOMS.office; return {hw:r.w/2 - 0.8, d0:0.9, d1:r.d - 0.9}; }
+function roomBox(id){
+  const r = ROOMS[id] || ROOMS.office;
+  if(id === "steps") return {hw:r.w/2 - 0.55, d0:0.52, d1:r.d - 0.48};
+  return {hw:r.w/2 - 0.8, d0:0.9, d1:r.d - 0.9};
+}
+function stepsGround(z){
+  const run = 0.52, treads = 10, deckY = 1.62;
+  const z0 = 5.15 - run * 0.5;
+  if(z <= z0) return 0;
+  const t = (z - z0) / run;
+  if(t >= treads) return deckY;
+  return (Math.floor(t) + 1) * (deckY / treads);
+}
+function groundAt(z, room){
+  return ((room || G.room) === "steps") ? stepsGround(z) : 0;
+}
 /* Stand somewhere in the room that is not inside a doorway. */
 /* Run fn on the next animation frame, or on a timer if frames are not
    coming — whichever happens first, and only ever once.
@@ -3724,13 +3743,12 @@ function buildTextures(){
     noise(c,s,4);
   });
   TEX.plaster = texCanvas(128,(c,s)=>{
-    /* Matte paint — soft mottling so walls are not plastic-flat */
-    c.fillStyle="#cfcabd"; c.fillRect(0,0,s,s);
-    for(let i=0;i<180;i++){
-      c.fillStyle="rgba(" + rint(180,220) + "," + rint(176,214) + "," + rint(168,200) + "," + (0.04+Math.random()*0.08) + ")";
-      c.beginPath(); c.arc(Math.random()*s, Math.random()*s, 4+Math.random()*18, 0, 6.3); c.fill();
+    c.fillStyle="#d4d0c4"; c.fillRect(0,0,s,s);
+    for(let i=0;i<40;i++){
+      c.fillStyle="rgba(" + rint(200,220) + "," + rint(196,214) + "," + rint(188,206) + ",.06)";
+      c.fillRect(Math.random()*s, Math.random()*s, 3+Math.random()*8, 2);
     }
-    noise(c,s,11);
+    noise(c,s,6);
   });
   TEX.carpet = texCanvas(128,(c,s)=>{
     c.fillStyle="#2c4a37"; c.fillRect(0,0,s,s);
@@ -3783,22 +3801,16 @@ function buildTextures(){
   });
   /* damask wallpaper for the grander rooms */
   TEX.damask = texCanvas(texSize(256),(c,s)=>{
-    c.fillStyle="#8d9c8f"; c.fillRect(0,0,s,s);
-    c.globalAlpha=.30;
-    for(let gy=0;gy<4;gy++) for(let gx=0;gx<4;gx++){
-      const cx=gx*64+32+(gy%2?32:0), cy=gy*64+32;
-      c.fillStyle="#6f8073";
-      c.beginPath();
-      for(let a=0;a<Math.PI*2;a+=0.28){
-        const r=15+Math.sin(a*4)*7+Math.cos(a*2)*4;
-        const px=cx+Math.cos(a)*r, py=cy+Math.sin(a)*r*1.15;
-        a?c.lineTo(px,py):c.moveTo(px,py);
-      }
-      c.closePath(); c.fill();
-      c.fillStyle="#a5b4a6";
-      c.beginPath(); c.ellipse(cx,cy,4.5,7,0,0,6.3); c.fill();
+    c.fillStyle="#9aa898"; c.fillRect(0,0,s,s);
+    c.globalAlpha=.16;
+    for(let gy=0;gy<8;gy++) for(let gx=0;gx<8;gx++){
+      const cx=gx*32+16+(gy%2?16:0), cy=gy*32+16;
+      c.fillStyle="#7e8c7c";
+      c.beginPath(); c.ellipse(cx, cy, 7, 9, 0, 0, 6.3); c.fill();
+      c.fillStyle="#b3c0b2";
+      c.beginPath(); c.ellipse(cx, cy, 2.2, 3.2, 0, 0, 6.3); c.fill();
     }
-    c.globalAlpha=1; noise(c,s,9);
+    c.globalAlpha=1; noise(c,s,6);
   });
   /* chamber carpet with a real repeating motif */
   TEX.rug = texCanvas(texSize(256),(c,s)=>{
@@ -5215,25 +5227,22 @@ function propRug(x,z,w,d,ry){
   m.receiveShadow=true; roomGroup.add(m);
 }
 function propPlant(x,z,sc){
-  sc=sc||1;
+  sc = sc || 0.82;
   const g = new THREE.Group(); g.position.set(x,0,z); roomGroup.add(g);
-  const putC = (mat, py, r, h) => {
-    const m = new THREE.Mesh(UNIT.cyl, mat);
-    m.position.set(0, py, 0); m.scale.set(r*2, h, r*2);
-    m.castShadow = true; m.receiveShadow = true; g.add(m); return m;
-  };
-  /* pot sits on the floor: bottom of pot at y=0 */
-  putC(matCol(0x8a6b4a,.85), 0.17*sc, 0.17*sc, 0.34*sc);
-  putC(matCol(0x3a2e22,.95), 0.34*sc, 0.155*sc, 0.03*sc);
-  for(let i=0;i<7;i++){
-    const a=i/7*6.283, r=0.18*sc;
-    const l=new THREE.Mesh(UNIT.sph, matCol([0x38632f,0x2f5a2a,0x44703a][i%3],.95));
-    l.position.set(Math.cos(a)*r, (0.55+Math.random()*0.35)*sc, Math.sin(a)*r);
-    l.scale.set(0.26*sc, 0.52*sc, 0.22*sc);
-    l.rotation.z=Math.cos(a)*0.5; l.rotation.x=Math.sin(a)*0.5;
-    l.castShadow=true; l.receiveShadow=true; g.add(l);
-  }
-  return groundGroup(g, 0.45);
+  const pot = new THREE.Mesh(UNIT.cyl, matCol(0x6e5340,.82));
+  pot.position.y = 0.13*sc; pot.scale.set(0.20*sc*2, 0.26*sc, 0.20*sc*2); g.add(pot);
+  const dirt = new THREE.Mesh(UNIT.cyl, matCol(0x2a2218,.95));
+  dirt.position.y = 0.26*sc; dirt.scale.set(0.16*sc*2, 0.04*sc, 0.16*sc*2); g.add(dirt);
+  const stem = new THREE.Mesh(UNIT.cyl, matCol(0x3a5a30,.9));
+  stem.position.y = 0.40*sc; stem.scale.set(0.035*sc*2, 0.26*sc, 0.035*sc*2); g.add(stem);
+  const leafM = matCol(0x3a6a32,.92);
+  [[0,0.58,0,0.15],[0.07,0.66,0.04,0.12],[-0.06,0.64,-0.04,0.11],[0.02,0.74,0.02,0.10]].forEach(L => {
+    const leaf = new THREE.Mesh(UNIT.sph, leafM);
+    leaf.position.set(L[0]*sc, L[1]*sc, L[2]*sc);
+    leaf.scale.set(L[3]*sc*2.1, L[3]*sc*1.35, L[3]*sc*1.7);
+    g.add(leaf);
+  });
+  return groundGroup(g, 0.35);
 }
 function propLamp(x,y,z,warm,power){
   addCyl(matCol(0x8a6a2e,.4,.75), x,y-0.16,z, 0.035,0.32);
@@ -5912,10 +5921,10 @@ function dressOrnateCorners(id){
   try{
   if(id === "office" || id === "visit"){
     /* Four corners: door-flank + behind-desk */
-    propPlant(-hw+inset, 1.05, 0.95);
-    propPlant(hw-inset, 1.05, 0.95);
-    propPlant(-hw+inset, d-0.85, 1.0);
-    propPlant(hw-inset, d-0.85, 1.0);
+    propPlant(-hw+inset, 1.05, 0.78);
+    propPlant(hw-inset, 1.05, 0.78);
+    propPlant(-hw+inset, d-0.85, 0.80);
+    propPlant(hw-inset, d-0.85, 0.80);
     propRug(0, 1.55, 2.4, 1.35);
     /* Front wall flush pair flanking the door (into-room) */
     propSconceDecor(-hw+0.12, 2.15, 1.35, Math.PI/2);
@@ -5933,13 +5942,8 @@ function dressOrnateCorners(id){
     });
     rightZs.forEach((z,i) => {
       if(i % 2 === 0) propSconceDecor(hw-0.12, 2.55, z, -Math.PI/2);
-      if(i % 3 === 2) propPlant(hw-0.85, z, 1.05);
+      if(i % 3 === 1) propPlant(hw-0.70, z, 0.78);
     });
-    /* Four corridor corners */
-    propPlant(-hw+0.9, 2.2, 1.15);
-    propPlant(hw-0.9, 2.2, 1.15);
-    propPlant(-hw+0.9, d-2.2, 1.15);
-    propPlant(hw-0.9, d-2.2, 1.15);
   } else if(id === "cloak"){
     propPlant(-hw+inset, 1.0, 0.95);
     propPlant(hw-inset, 1.0, 0.95);
@@ -5964,20 +5968,18 @@ function dressOrnateCorners(id){
     propPlant(hw-inset, 1.3, 1.1);
     propPlant(-hw+inset, d-1.1, 1.15);
     propPlant(hw-inset, d-1.1, 1.15);
-    propPlant(-2.6, 4.2, 0.95); /* well L */
-    propPlant(2.6, 4.2, 0.95);  /* well R */
+    propPlant(-2.6, 4.2, 0.72); /* well L */
+    propPlant(2.6, 4.2, 0.72);  /* well R */
     propSconceDecor(-hw+0.12, 2.6, 2.2, Math.PI/2);
     propSconceDecor(hw-0.12, 2.6, 2.2, -Math.PI/2);
     propSconceDecor(-hw+0.12, 2.8, d-2.0, Math.PI/2);
     propSconceDecor(hw-0.12, 2.8, d-2.0, -Math.PI/2);
   } else if(id === "floor"){
-    /* Gallery back corners, well corners, dais flanks */
-    propPlant(-hw+1.15, 2.35, 1.35);
-    propPlant(hw-1.15, 2.35, 1.35);
-    propPlant(-hw+1.15, d-1.3, 1.25);
-    propPlant(hw-1.15, d-1.3, 1.25);
-    propPlant(-2.9, d-5.4, 1.05); /* well L near clerk */
-    propPlant(2.9, d-5.4, 1.05);
+    /* Corners only — never on a pew, never in the well */
+    propPlant(-hw+0.62, 1.05, 0.72);
+    propPlant( hw-0.62, 1.05, 0.72);
+    propPlant(-hw+0.62, d-0.62, 0.72);
+    propPlant( hw-0.62, d-0.62, 0.72);
     propSconceDecor(-hw+0.12, 3.4, d-2.0, Math.PI/2);
     propSconceDecor(hw-0.12, 3.4, d-2.0, -Math.PI/2);
     propSconceDecor(-hw+0.12, 3.4, 2.6, Math.PI/2);
@@ -6925,7 +6927,7 @@ function buildRoomInner(id){
   try{ dressOrnateCorners(id); }catch(e){ if(window.console) console.warn("dressOrnate", e); }
 
   /* ── services: pipework, radiators and mouldings ── */
-  if(!R.open){
+  if(!R.open && id !== "office" && id !== "visit" && id !== "floor"){
     /* A heating main along the wall, above the dado. It has to break at the
        doorways: a single run down the whole wall put a pipe straight across
        every opening on that side, which is what you see from the corridor
@@ -6935,7 +6937,7 @@ function buildRoomInner(id){
                      .map(dr => dr.at * d);
       if(id === "corridor" && side === "left") gaps.push(4.9);
       gaps.sort((a, b) => a - b);
-      const clear = 0.95;              /* half the opening plus its architrave */
+      const clear = 1.45;
       const end = d - 0.30;
       let from = 0.30;
       const segs = [];
@@ -7018,7 +7020,21 @@ function buildRoomInner(id){
   }
 
   /* doorways: jambs + leaf planted on floor (y=0), threshold sill, lintel plaque */
-  (DOORS[id] || []).forEach(dr => {
+  if(id === "steps"){
+    const deckY = 1.62;
+    const facadeZ = d - 0.42;
+    const dw = 1.38, dh = 2.28;
+    addBox(matCol(0x14171c,.95), 0, deckY + dh * 0.5, facadeZ - 0.36, dw, dh, 0.10, 0, true);
+    addBox(matTex(TEX.panel, 1, 2, .5), -dw/2 - 0.08, deckY + dh * 0.5, facadeZ - 0.48, 0.14, dh + 0.12, 0.16, 0, true);
+    addBox(matTex(TEX.panel, 1, 2, .5),  dw/2 + 0.08, deckY + dh * 0.5, facadeZ - 0.48, 0.14, dh + 0.12, 0.16, 0, true);
+    addBox(matTex(TEX.panel, 1, 2, .5), 0, deckY + dh + 0.10, facadeZ - 0.48, dw + 0.36, 0.16, 0.16, 0, true);
+    try{ propPlaque(0, deckY + dh + 0.32, facadeZ - 0.78, Math.PI, "Statuary Corridor", "The Capitol", 1.18, 0.26); }catch(e){}
+    addBox(matCol(0x14171c,.95), 0, 1.15, 0.05, 1.42, 2.30, 0.06, 0, true);
+    addBox(matTex(TEX.panel, 1, 2, .5), -0.80, 1.15, 0.08, 0.14, 2.30, 0.12, 0, true);
+    addBox(matTex(TEX.panel, 1, 2, .5),  0.80, 1.15, 0.08, 0.14, 2.30, 0.12, 0, true);
+    addBox(matTex(TEX.panel, 1, 2, .5), 0, 2.38, 0.08, 1.72, 0.14, 0.12, 0, true);
+    try{ propPlaque(0, 2.62, 0.10, 0, "The District", "Home", 1.12, 0.26); }catch(e){}
+  } else (DOORS[id] || []).forEach(dr => {
     const p = doorAt(id, dr);
     /* doorAt() answers where a person stands to use a door, which is 35cm
        inside the room. Drawing the joinery from that point put every door
@@ -7093,10 +7109,12 @@ function buildRoomInner(id){
     }
   });
 
+  /* Room name lives on the HUD. A second plaque beside the door was off-center. */
+
   /* This room's own identity plaque — so you know where you are without the HUD */
   {
     const here = ROOMS[id];
-    if(here && !here.open){
+    if(here && !here.open && false){
       const doors = DOORS[id] || [];
       const entry = doors.find(d => d.side === "front") || doors[0];
       let px = 0, pz = 1.1, ry = 0;
@@ -8061,7 +8079,7 @@ function animatePerson(p, dt){
   const k = Math.min(1, dt * 14);
   p.mesh.position.x += (p.x - p.mesh.position.x) * k;
   p.mesh.position.z += (p.z - p.mesh.position.z) * k;
-  p.mesh.position.y = 0;
+  p.mesh.position.y = groundAt(p.z, p.room);
   p.mesh.rotation.y += wrapPi((p.facing || 0) - p.mesh.rotation.y) * k;
   p.mesh.visible = true;
   if(MODEST){
@@ -22383,6 +22401,7 @@ function tick(dt){
   const b = roomBox(G.room || "office");
   cam.x = clamp(cam.x + cam.vx*dt, -b.hw, b.hw);
   cam.z = clamp(cam.z + cam.vz*dt, b.d0, b.d1);
+  cam.ground = groundAt(cam.z, G.room);
   if(vx || vz) G.speechApproach = null;
   try{ tickSpeechApproach(dt); }catch(e){}
   try{ enforceLecternCapPlayer(); }catch(e){}
@@ -22439,7 +22458,7 @@ function forcePaint(){
     if(!isFinite(cam.x)) cam.x = 0;
     if(!isFinite(cam.z)) cam.z = 2;
     if(!isFinite(cam.yaw)) cam.yaw = 0;
-    const eye = (G.you && G.you.sitting) ? 1.19 : 1.66;
+    const eye = ((G.you && G.you.sitting) ? 1.19 : 1.66) + (cam.ground || 0);
     camera.position.set(cam.x, eye, cam.z);
     camera.rotation.set(0, cam.yaw + Math.PI, 0, "YXZ");
     camera.updateMatrixWorld(true);
@@ -22530,6 +22549,11 @@ function nearDoor(){
     if(dist >= reach || dist < 0.02) continue;
     const toward = (cam.vx * dx + cam.vz * dz) / dist;
     if(toward < 0.35) continue;
+    if(G.room === "steps"){
+      const g = cam.ground || 0;
+      if(dr.to === "corridor" && g < 1.25) continue;
+      if(dr.to === "district" && g > 0.35) continue;
+    }
     return {dr, p};
   }
   return null;
@@ -22627,7 +22651,7 @@ function animateCrowd(dt){
       animatePerson(p, dt);
       full++;
     } else {
-      p.mesh.position.set(p.x, 0, p.z);
+      p.mesh.position.set(p.x, groundAt(p.z, p.room || G.room), p.z);
       p.mesh.rotation.y = p.facing || 0;
     }
   }
@@ -22760,7 +22784,7 @@ function frameBody(now){
   /* seated, your eye is where a seated eye is — otherwise you are
      standing inside the desk in front of you and the whole view is the
      flat side of it */
-  const eye = (G.you && G.you.sitting) ? 1.19 : 1.66;
+  const eye = ((G.you && G.you.sitting) ? 1.19 : 1.66) + (cam.ground || 0);
   cam.eye = cam.eye === undefined ? eye : smooth(cam.eye, eye, 0.004, dt);
   camera.position.set(
     cam.x + Math.cos(cam.yaw)*sway,
