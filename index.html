@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20260920l">
+<meta name="onum-build" content="20260920m">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -2330,6 +2330,7 @@ function taylorDayVoteDefiance(vote, bill){
   return true;
 }
 function memberVote(m, bill){
+  if(m && m.kind === "envoy") return 0;
   /* Taylor Day: the House votes the First Order line — locked for every member */
   if(bill && typeof isTaylorDay === "function" && isTaylorDay()) return firstOrderTraditionVote(bill);
   /* COLLAB HOOK: absent partner uses ProxyAI from their action log */
@@ -3028,6 +3029,7 @@ function restaff(force){
   let movedAny = false;
   everyone().forEach(m => {
     if(TALK.m === m || visiting() === m) return;
+    if(m.kind === "envoy") return;
     if(m.away) return;
     try{ if(PROC.on && m.room === G.room) return; }catch(e){}
     try{
@@ -10539,7 +10541,7 @@ function checkEvents(){
   const q = Math.floor(G.minute/8);
   if(q !== G.lastAuto){ G.lastAuto = q; if(G.running && !G.over) queueSave(); }
   const tk = Math.floor(G.minute/12);
-  if(tk !== G.lastTick){ G.lastTick = tk; lobbyMoney(); try{ worldTick(); }catch(e){} paintTicker(); }
+  if(tk !== G.lastTick){ G.lastTick = tk; lobbyMoney(); try{ worldTick(); }catch(e){} try{ realmTick(); }catch(e){} paintTicker(); }
   const due = eventDue();
   if(due && G.running && !G.over){
     if(due.rsvp === true && G.room !== due.room && !G.moving){ escortTo(due); return; }
@@ -10706,6 +10708,16 @@ function worldLine(m){
     w.ration ? "They have started rationing. The cloakroom still has cake." : "The loaf is " + bread + ". Remember that when you vote.",
     (w.names && w.names[0]) ? (w.names[0] + " is a name. I will not let this building make it a number.") : null
   ];
+  try{
+    const realms = realmEnsure();
+    const rx = pick(realms);
+    if(rx && rx.last) bits.push(rx.capital + " said this without us: “" + String(rx.last).slice(0, 90) + "”");
+    if(rx) bits.push("It is " + Math.floor(rx.hour) + " o'clock in " + rx.capital + ". They have not asked us the time.");
+  }catch(e){}
+  try{
+    const ab = abroadEnsure(m);
+    if(ab) bits.push(ab.ache);
+  }catch(e){}
   if(m && m.kin){
     bits.push(m.kin.alive
       ? (m.kin.who + " is at " + m.kin.where + ". I think of that before I think of you.")
@@ -10713,6 +10725,138 @@ function worldLine(m){
   }
   return drawn(bits.filter(Boolean), r);
 }
+
+const REALM_CAPITAL = {reach:"Vara", horn:"Sefet", pale:"Winterkirk", marches:"Holt", isles:"Culm", rift:"Lowbridge"};
+const REALM_OFFSET = {reach:3, horn:7, pale:-4, marches:1, isles:5, rift:2};
+function realmCapital(k){ return REALM_CAPITAL[k] || "a foreign city"; }
+function realmEnsure(){
+  if(G.realms && G.realms.length === WORLD_POWERS.length) return G.realms;
+  const houseH = (G.minute || 480) / 60;
+  G.realms = WORLD_POWERS.map(p => {
+    const off = REALM_OFFSET[p.k] || 0;
+    const chamber = [];
+    for(let i = 0; i < 3; i++){
+      const name = wallSafeMint(() => gibName(Math.random, 2) + " " + gibName(Math.random, 1));
+      const ghost = {id: "rx" + p.k + i, name: name, kind: "ghost", realm: p.k, gone: false, room: p.k};
+      try{ sentEnsure(ghost); pulseEnsure(ghost); agiEnsure(ghost); }catch(e){}
+      chamber.push(ghost);
+    }
+    return {
+      k: p.k, t: p.t, adj: p.adj, want: p.want, creed: p.creed,
+      capital: realmCapital(p.k),
+      hour: (houseH + off + 24) % 24,
+      sitting: true,
+      last: "",
+      chamber: chamber,
+      envoyId: null
+    };
+  });
+  return G.realms;
+}
+function realmOf(k){ return (realmEnsure() || []).find(x => x.k === k); }
+function abroadEnsure(m){
+  if(!m || m.kind === "envoy") return m && m.abroad;
+  if(m.abroad && m.abroad.city) return m.abroad;
+  const r = rng(seedOf("abroad:" + m.id + ":" + (m.name || "x")));
+  const p = drawn(WORLD_POWERS, r);
+  m.abroad = {
+    k: p.k,
+    city: realmCapital(p.k),
+    ache: drawn([
+      "I was there once. It did not need me.",
+      "I still hear the market in " + realmCapital(p.k) + ".",
+      "I left something in " + realmCapital(p.k) + " I will not name.",
+      "They eat at hours we call night."
+    ], r)
+  };
+  return m.abroad;
+}
+function makeEnvoy(power){
+  const r = Math.random;
+  const name = wallSafeMint(() => gibName(r, 2) + " " + gibName(r, 1));
+  const m = makeMember("IND", {name: name, state: STATES[0], creed: power.creed, fresh: true});
+  m.kind = "envoy";
+  m.party = "IND";
+  m.state = power.capital;
+  m.dist = "mission";
+  m.realm = power.k;
+  m.post = "Envoy";
+  m.bg = "a mission from " + power.t;
+  m.cmte = null;
+  m.room = pick(["press","cloak","steps"]);
+  m.margin = 0;
+  m.terms = 0;
+  try{ sentEnsure(m); pulseEnsure(m); agiEnsure(m); willEnsure(m); }catch(e){}
+  m.will = {k:"home", line:"I am not of this House. I will not die in it.", kept:0, bent:0};
+  try{
+    m.sent.want = "I want " + power.capital + " to still be there when I go back.";
+    m.sent.secret = "This sitting is not the world. I have seen another.";
+  }catch(e){}
+  try{ placeInRoom(m); }catch(e){}
+  return m;
+}
+function realmGhostTick(g, realm){
+  if(!g) return;
+  try{ sentTick(g); }catch(e){
+    try{ pulseTick(g); }catch(e2){}
+  }
+  if(g.sent && g.sent.now) realm.last = g.sent.now;
+}
+function realmCable(realm, ghost){
+  if(!realm) return;
+  const who = ghost || pick(realm.chamber);
+  const line = (who && who.sent && who.sent.now) || originateLine(who || {sent:{iName:"I", topic:"home"}, state: realm.capital});
+  const body = "From " + realm.capital + ", " + hhmm() + " their clock.\n\n" +
+    line + "\n\nThey did not send this for you. It arrived anyway.\n\n— Mission of " + realm.t;
+  try{
+    pushMail({name: "Mission of " + realm.t, id: null}, "Cable — " + realm.t, body, {kind:"cable"});
+  }catch(e){}
+}
+function realmVisit(realm){
+  if(!realm || realm.envoyId) return null;
+  if((G.members || []).filter(x => x && x.kind === "envoy" && !x.gone).length >= 2) return null;
+  const m = makeEnvoy(realm);
+  G.members.push(m);
+  _allCache = null;
+  realm.envoyId = m.id;
+  try{ feed("An envoy of " + realm.t + " is in the building. They are not here to vote."); }catch(e){}
+  try{ if(!houseQuiet()) syncPeopleStaged(); }catch(e){}
+  return m;
+}
+function realmDepart(realm){
+  if(!realm || !realm.envoyId) return;
+  const m = byId(realm.envoyId);
+  realm.envoyId = null;
+  if(!m) return;
+  m.gone = true;
+  m.room = realm.k;
+  try{ if(m.mesh && m.mesh.parent) m.mesh.parent.remove(m.mesh); }catch(e){}
+  m.mesh = null;
+  try{ feed("The envoy of " + realm.t + " has left. " + realm.capital + " still has an hour of its own."); }catch(e){}
+}
+function realmTick(news){
+  const houseH = (G.minute || 480) / 60;
+  const realms = realmEnsure();
+  realms.forEach(realm => {
+    realm.hour = (houseH + (REALM_OFFSET[realm.k] || 0) + 24) % 24;
+    realm.sitting = realm.hour >= 8 && realm.hour < 20;
+    const n = MODEST ? 1 : 2;
+    for(let i = 0; i < n; i++){
+      const g = realm.chamber[(FRAME_ID + i) % realm.chamber.length];
+      realmGhostTick(g, realm);
+    }
+    if(Math.random() < 0.11) realmCable(realm, pick(realm.chamber));
+    if(realm.envoyId){
+      const here = byId(realm.envoyId);
+      if(!here || here.gone) realm.envoyId = null;
+      else if(Math.random() < 0.08) realmDepart(realm);
+    } else if(Math.random() < 0.07){
+      realmVisit(realm);
+    }
+  });
+  return realms;
+}
+
 function driftGuilder(news){
   if(!G.money) G.money = {index:100, hist:[100]};
   const st = G.states || [];
@@ -13653,7 +13797,8 @@ function sentCompose(m){
     (m.will && m.will.line) || null,
     (m.soul && m.soul.wound) ? ("I can still feel " + m.soul.wound + ".") : null,
     s.awake < 0.28 ? "I am barely in the room." : null,
-    (function(){ try{ const p = pulseEnsure(m); const h = (G.minute||480)/60; return (h < 10 && p && p.woke) ? p.woke : null; }catch(e){ return null; } })()
+    (function(){ try{ const p = pulseEnsure(m); const h = (G.minute||480)/60; return (h < 10 && p && p.woke) ? p.woke : null; }catch(e){ return null; } })(),
+    (function(){ try{ const ab = abroadEnsure(m); return ab ? ab.ache : null; }catch(e){ return null; } })()
   ].filter(Boolean);
   const next = pick([byTopic[s.topic] || byTopic.body].concat(extra));
   const prev = s.now;
@@ -13745,6 +13890,7 @@ function sentBusy(m){
 }
 function sentAct(m){
   if(!m || m.gone) return;
+  if(m.kind === "ghost") return;
   if(TALK.open && TALK.m === m) return;
   try{ if(PROC.on && SEATED_ROOMS[m.room]) return; }catch(e){}
   const s = m.sent; if(!s) return;
@@ -17979,6 +18125,22 @@ function openTalk(m){
     }
   }catch(e){}
   try{
+    if(m.kind === "envoy"){
+      m.met = true;
+      const realm = realmOf(m.realm);
+      const line = pick([
+        "I am not here to count with you. " + ((realm && realm.capital) || m.state) + " has its own hour.",
+        "Does this House continue when I am not looking? I am asking as a person, not as a mission.",
+        "Your whip is not a country. I have seen one."
+      ]);
+      setSay(line, "");
+      showChat(m);
+      appendMsg("them", line, surname(m.name));
+      renderTalk();
+      return;
+    }
+  }catch(e){}
+  try{
     const a = agiEnsure(m);
     if(a && a.verdict === "kin"){
       m.met = true;
@@ -18077,7 +18239,7 @@ function closeTalk(){
 function setSay(t, n){ el("tkSay").textContent = t; el("tkNote").innerHTML = n || ""; }
 function chipFor(m){
   const c = m.party==="FED" ? "fed" : m.party==="COM" ? "com" : "ind";
-  const t = m.kind==="press" ? "Press" : m.kind==="civ" ? "Public" : partyLabel(m.party);
+  const t = m.kind==="press" ? "Press" : m.kind==="envoy" ? "Envoy" : m.kind==="civ" ? "Public" : partyLabel(m.party);
   return '<span class="chip chip--'+c+'">'+t+'</span>';
 }
 function tiny(label, v, lo, hi, col){
@@ -18111,6 +18273,8 @@ function renderTalk(){
     if(m.rel.debtFromYou) bits.push('<span class="pin pin--debt">owes you '+m.rel.debtFromYou+'</span>');
     const tl = tieLine(m);
     if(tl) bits.push('<span class="pin pin--ally">' + tl + '</span>');
+  } else if(m.kind === "envoy"){
+    bits.push("<span>Envoy of " + (m.state || "a foreign sitting") + "</span><span>·</span><span>not a vote</span>");
   } else if(m.kind === "press"){
     bits.push("<span>"+m.role+", "+m.outlet+"</span>", "<span>·</span><span>trusts you "+Math.round(m.trust)+"%</span>");
   } else {
@@ -20188,7 +20352,7 @@ function overnight(){
     }
   }
   G.members.forEach(m => {
-    if(!m || m.machine || m.sanctioned) return;
+    if(!m || m.machine || m.sanctioned || m.kind === "envoy") return;
     m.rel.warmth = clamp(m.rel.warmth*0.985, -100, 100);
     if(chance(.3)) m.known = Math.max(0, m.known-1);
     if(MODEST) return;
@@ -20335,6 +20499,7 @@ function nextDay(late){
     G.lastAmbientHour = -1;
     if(G.you) G.you.energy = clamp(late ? 78 : 100, 0, 100);
     if(G.recessLeft > 0) G.recessLeft--;
+    try{ realmTick(); }catch(e){}
   }catch(e){
     if(window.console) console.warn("nextDay clock", e);
   }
@@ -20406,6 +20571,7 @@ function election(){
   const swing = G.mood + rint(-10,10);
   const results = [], kept = [];
   G.members.forEach(m => {
+    if(m.kind === "envoy"){ kept.push(m); return; }
     const partySwing = m.party==="FED" ? swing : m.party==="COM" ? -swing : 0;
     const personal = (m.rel.warmth>40?2:0) + m.influence/8 + (m.post?4:0);
     const r = m.margin + partySwing*0.6 + personal + rint(-14,14);
