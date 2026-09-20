@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20260920q">
+<meta name="onum-build" content="20260920r">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20260920q";
+  var STAMP = "20260920r";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -5072,6 +5072,16 @@ function groundFloorMesh(m){
    drop accidental duplicate placements without touching walls, floors, or
    other single-mesh architectural details. */
 function tidyRoomFurniture(){
+  if(!roomGroup) return;
+  if(MODEST){
+    const kids = roomGroup.children;
+    for(let i = 0; i < kids.length; i++){
+      const g = kids[i];
+      if(!g || !g.isGroup || !g.userData || !g.userData.groundedProp) continue;
+      try{ groundGroup(g, 0.62, g.userData.restY || 0); }catch(e){}
+    }
+    return;
+  }
   const seen = new Set();
   const remove = [];
   roomGroup.children.slice().forEach(g => {
@@ -6178,7 +6188,7 @@ function stashLiveRoom(){
   ROOM_KITS[id] = kit;
   ROOM_KIT_IDS = ROOM_KIT_IDS.filter(x => x !== id);
   ROOM_KIT_IDS.push(id);
-  const cap = MODEST ? 3 : 4;
+  const cap = MODEST ? 6 : 8;
   while(ROOM_KIT_IDS.length > cap){
     const drop = ROOM_KIT_IDS.shift();
     if(drop === id) continue;
@@ -6203,10 +6213,14 @@ function buildRoom(id){
   _buildingRoom = true;
   try{
     try{
-      clearRoom();
-      buildRoomInner(id);
+      const reuse = (_roomBuiltId === id && roomGroup && roomGroup.children.length >= 2);
+      if(!reuse){
+        clearRoom();
+        buildRoomInner(id, false);
+      } else {
+        buildRoomInner(id, true);
+      }
       tidyRoomFurniture();
-      freezeStaticRoom();
       if(!roomGroup || roomGroup.children.length < 5)
         throw new Error("room shell too empty");
       _roomBuiltId = id;
@@ -6220,7 +6234,8 @@ function buildRoom(id){
     }
   }finally{
     _buildingRoom = false;
-    try{ renderer.shadowMap.needsUpdate = true; }catch(e){}
+    try{ if(!MODEST && renderer.shadowMap) renderer.shadowMap.needsUpdate = true; }catch(e){}
+    try{ nextFrameOrTimeout(() => { try{ freezeStaticRoom(); }catch(e){} }, 0); }catch(e){}
   }
 }
 function buildRoomShell(id){
@@ -6369,9 +6384,9 @@ function buildRoomShell(id){
   }
   try{ positionLights(id); }catch(e){ if(window.console) console.warn("positionLights", e); }
 }
-function buildRoomInner(id){
+function buildRoomInner(id, skipShell){
   const R = ROOMS[id], w = R.w, d = R.d, h = R.h, hw = w/2;
-  buildRoomShell(id);
+  if(!skipShell) buildRoomShell(id);
   const woodMat  = matTex(TEX.oak, 1.5, 1.5, .6);
   const trimMat  = matTex(TEX.oak, 3, 0.6, .5);
   const brass    = matCol(0xb08b45, .32, .86);
@@ -6822,7 +6837,7 @@ function buildRoomInner(id){
     addBox(matTex(TEX.panel,1,1,.5), hw-1.2, 0.42, 5.3, 0.5,0.06,0.5, 0, true);
     propPapers(hw-1.2, 0.46, 5.3, 3);
     propPlant(-hw+1.0, 7.4, 1.0);
-    propChandelier(0, h-0.7, 4.5, 4, 0.9);
+    if(!MODEST) propChandelier(0, h-0.7, 4.5, 4, 0.9);
     /* House cloakroom: more sofas, wall phones, notice boards flush */
     {
       const sx = 1.6, sz = 2.4;
@@ -6842,8 +6857,10 @@ function buildRoomInner(id){
   if(id === "caucus"){
     try{
     propRug(0, 7.0, 9.0, 8.0);
-    propChandelier(-3.0, h-1.1, 6.0, 8, 1.4);
-    propChandelier(3.0, h-1.1, 6.0, 8, 1.4);
+    if(!MODEST){
+      propChandelier(-3.0, h-1.1, 6.0, 8, 1.4);
+      propChandelier(3.0, h-1.1, 6.0, 8, 1.4);
+    }
     for(let i=0;i<4;i+=2){ propSconce(-hw+0.12, 2.7, 3+i*2.8, Math.PI/2); propSconce(hw-0.12, 2.7, 3+i*2.8, -Math.PI/2); }
     propPlant(-hw+0.85, d-1.5, 0.78); propPlant(hw-0.85, d-1.5, 0.78);
     propPapers(0, DIM.desk + 0.02, d-2.05, 3);
@@ -6878,7 +6895,7 @@ function buildRoomInner(id){
       addCyl(matCol(0x8a6a3a,.4,.3), 0.02, deskY+0.04, d-3.38, 0.018, 0.22).rotation.z = Math.PI/2;
     }catch(e){ if(window.console) console.warn("committee dais dress", e); }
     try{
-      propChandelier(0, h-1.0, 7.0, 6, 1.1);
+      if(!MODEST) propChandelier(0, h-1.0, 7.0, 6, 1.1);
       /* Rayburn-style seal behind the Chair */
       try{ propHouseSeal(0, 2.85, d - 0.045, Math.PI, 1.7); }catch(e){}
       /* dais flags via placeRoomFlags (Taylor Day: NO7 only) */
@@ -6898,7 +6915,7 @@ function buildRoomInner(id){
   if(id === "floor"){
     try{
     propRug(0, 7.5, 3.2, 9.0);
-    propChandelier(0, h-1.3, 6.0, 10, 1.9);
+    if(!MODEST) propChandelier(0, h-1.3, 6.0, 10, 1.9);
     for(let i=0;i<4;i+=2){ propSconce(-hw+0.12, 3.2, 3.5+i*3.0, Math.PI/2); propSconce(hw-0.12, 3.2, 3.5+i*3.0, -Math.PI/2); }
     /* clerk / parliamentarian / reading clerk in the well */
     propChair(woodMat, leather, 0, d-3.95, Math.PI);
@@ -6951,7 +6968,7 @@ function buildRoomInner(id){
     for(let i=0;i<7;i++) addCyl(matCol(0x6b4d2c,.55), -3+i*1.0, 0.55, d-0.55, 0.025, 1.0);
     propLamp(2.4, 1.05, 7.4, 0xfff0d0, 0.7);
     propPlant(hw-0.8, 2.2, 1.0);
-    propChandelier(0, h-0.6, 5.0, 4, 0.8);
+    if(!MODEST) propChandelier(0, h-0.6, 5.0, 4, 0.8);
     propPlaque(0, 2.45, d-0.04, 0, "Press Gallery", "Third floor", 1.15, 0.28);
     /* wall of monitors flush */
     for(let i=0;i<3;i++){
@@ -8048,7 +8065,7 @@ function syncPeopleStaged(done, retries){
   let list, missing;
   try{
     list = hereNow().slice();
-    if(inHall() && list.length > 10) list = list.slice(0, 10);
+    if(inHall() && list.length > (MODEST ? 8 : 10)) list = list.slice(0, MODEST ? 8 : 10);
     const keep = new Set();
     for(let i=0;i<list.length;i++) if(list[i].mesh) keep.add(list[i].mesh);
     for(let i = peopleGroup.children.length - 1; i >= 0; i--){
@@ -23333,7 +23350,7 @@ function enterRoom(dest, fromRoom){
     const fd = el("fade");
     if(fd){ fd.style.opacity = "0"; fd.style.pointerEvents = "none"; }
   }catch(e){}
-  const furnishAt = (dest === "corridor" || dest === "floor") ? 90 : 20;
+  const furnishAt = 0;
   nextFrameOrTimeout(() => {
     if(G.room !== dest) return;
     try{
