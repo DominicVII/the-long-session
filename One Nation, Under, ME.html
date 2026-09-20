@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20260920m">
+<meta name="onum-build" content="20260920n">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -3333,7 +3333,7 @@ const renderer = new THREE.WebGLRenderer({
   powerPreference: MODEST ? "low-power" : "high-performance",
   failIfMajorPerformanceCaveat: false
 });
-renderer.setPixelRatio(Math.min(devicePixelRatio || 1, MODEST ? 0.72 : 1.0));
+renderer.setPixelRatio(Math.min(devicePixelRatio || 1, MODEST ? 0.58 : 0.92));
 renderer.outputEncoding = THREE.sRGBEncoding;
 try{ renderer.physicallyCorrectLights = false; }catch(e){}
 try{ if(renderer.shadowMap) renderer.shadowMap.autoUpdate = false; }catch(e){}
@@ -3503,11 +3503,11 @@ function applyCrowd(){
        on everyone you are actually looking at. */
     LOD_NEAR = 4.2; LOD_MID = 6.0; LOD_FAR = 7.5;
     G.plainSit = true;
-    setPR(MODEST ? 0.75 : 1.0);
+    setPR(MODEST ? 0.52 : 0.85);
   } else if(q === "simple" && !G.fullDetail){
     LOD_NEAR = 2.2; LOD_MID = 4.4; LOD_FAR = 6.8;
     G.plainSit = true;
-    setPR(Math.min(GFX_PR, MODEST ? 0.62 : 0.75));
+    setPR(Math.min(GFX_PR, MODEST ? 0.55 : 0.72));
   } else if(crowdSafe && !full){
     LOD_NEAR = 3.6; LOD_MID = 6.5; LOD_FAR = 9.5;
     G.plainSit = true;
@@ -7319,11 +7319,11 @@ function lightingSlow(){
     FOGC.setHSL(0.57, 0.35, lerp(0.28, 0.72, day));
     if(!scene.fog) scene.fog = new THREE.Fog(FOGC.getHex(), 18, 90);
     scene.fog.color.copy(FOGC);
-    scene.fog.near = 32;
-    scene.fog.far = MODEST ? 120 : 150;
+    scene.fog.near = MODEST ? 22 : 32;
+    scene.fog.far = MODEST ? 64 : 110;
     renderer.setClearColor(FOGC);
     renderer.toneMappingExposure = lerp(0.88, 1.12, day) * GFX_EXPOSE;
-    if(camera){ camera.far = 160; camera.updateProjectionMatrix(); }
+    if(camera){ camera.far = MODEST ? 72 : 110; camera.updateProjectionMatrix(); }
     try{ tintSky(day, gold); }catch(e){}
     try{
       const sk = G.world && G.world.sky;
@@ -7363,9 +7363,9 @@ function lightingSlow(){
   scene.fog.near = R.open ? 16 : (R.style === "marble" ? 10 : 7);
   scene.fog.far = R.open ? 78 : Math.max(22, R.d * (R.style === "marble" ? 3.1 : 2.7));
   if(MODEST){
-    scene.fog.near = R.open ? 16 : 10;
-    scene.fog.far = R.open ? 78 : Math.max(32, R.d * 2.4);
-    camera.far = R.open ? 160 : 56;
+    scene.fog.near = R.open ? 14 : 8;
+    scene.fog.far = R.open ? 56 : Math.max(24, R.d * 2.1);
+    camera.far = R.open ? 68 : 42;
     camera.updateProjectionMatrix();
   }
   renderer.setClearColor(FOGC);
@@ -10797,9 +10797,8 @@ function makeEnvoy(power){
 }
 function realmGhostTick(g, realm){
   if(!g) return;
-  try{ sentTick(g); }catch(e){
-    try{ pulseTick(g); }catch(e2){}
-  }
+  try{ pulseTick(g); }catch(e){}
+  try{ if(Math.random() < 0.35) sentCompose(g); }catch(e){}
   if(g.sent && g.sent.now) realm.last = g.sent.now;
 }
 function realmCable(realm, ghost){
@@ -14061,14 +14060,23 @@ function youSent(){
   return s;
 }
 function sentWorld(w){
-  try{ youSent(); }catch(e){}
-  const live = (G.members || []).filter(m => m && !m.gone);
-  if(!live.length) return;
-  const n = MODEST ? 4 : 8;
+  try{ if(!MODEST || (FRAME_ID & 1) === 0) youSent(); }catch(e){}
+  const live = G.members;
+  if(!live || !live.length) return;
+  const n = MODEST ? 2 : 5;
   const start = (FRAME_ID * 3) % live.length;
-  for(let i = 0; i < n; i++){
-    const m = live[(start + i * 11) % live.length];
-    try{ sentTick(m); }catch(e){}
+  let did = 0, guard = 0;
+  while(did < n && guard < live.length){
+    const m = live[(start + guard * 11) % live.length];
+    guard++;
+    if(!m || m.gone || m.kind === "ghost") continue;
+    try{
+      if(m.room !== G.room && (did & 1) && m.kind !== "envoy"){
+        const s = sentEnsure(m);
+        s.hunger = clamp((s.hunger || 0) + 0.01, 0, 1);
+      } else sentTick(m);
+    }catch(e){}
+    did++;
   }
 }
 function sentNotice(m, said, u){
@@ -23395,9 +23403,9 @@ let hailT = 0, hailWho = null, matChkT = 0, matChk = 0, matChkSaid = 0;
    to the simulation is the real elapsed time across the skipped frames and
    nothing runs slow or fast because of it. FRAME_TARGET_MS is deliberately
    a touch under 1000/60 so a 60Hz panel never skips a frame to rounding. */
-const FRAME_TARGET_MS_LO = (typeof MODEST !== "undefined" && MODEST) ? (1000 / 28) : (1000 / 32);
-const FRAME_TARGET_MS_HI = (typeof MODEST !== "undefined" && MODEST) ? (1000 / 48) : (1000 / 60);
-let FRAME_TARGET_MS = (typeof MODEST !== "undefined" && MODEST) ? (1000 / 40) : (1000 / 55);
+const FRAME_TARGET_MS_LO = (typeof MODEST !== "undefined" && MODEST) ? (1000 / 26) : (1000 / 32);
+const FRAME_TARGET_MS_HI = (typeof MODEST !== "undefined" && MODEST) ? (1000 / 42) : (1000 / 55);
+let FRAME_TARGET_MS = (typeof MODEST !== "undefined" && MODEST) ? (1000 / 32) : (1000 / 48);
 let _lastDrawn = 0;
 let _cardFrames = 0;
 let _emaMs = 16;
@@ -23431,7 +23439,7 @@ function animateCrowd(dt){
   const talk = (TALK.open && TALK.m) || null;
   const sy = Math.sin(cam.yaw), cy = Math.cos(cam.yaw);
   let full = 0;
-  const maxFull = MODEST ? 5 : 8;
+  const maxFull = MODEST ? 3 : 6;
   for(let i=0;i<crowd.length;i++){
     const p = crowd[i];
     if(!p.mesh) continue;
@@ -23456,7 +23464,7 @@ function animateCrowd(dt){
 function frame(now){
   if(GL_LOST){ last = now; armFrame(); return; }
   if(typeof document !== "undefined" && document.hidden){ armFrame(); return; }
-  if(now - _lastDrawn < 8){ armFrame(); return; }
+  if(now - _lastDrawn < FRAME_TARGET_MS){ armFrame(); return; }
   _lastDrawn = now;
   const t0 = now;
   try{
@@ -23594,8 +23602,8 @@ function frameBody(now){
     cam.lean,
     "YXZ"
   );
-  try{ updateLighting(dt); }catch(e){}
-  if(!MODEST || (FRAME_ID & 1) === 0) shadowTick(dt);
+  try{ if(!MODEST || (FRAME_ID & 3) === 0) updateLighting(dt); }catch(e){}
+  if(!MODEST || (FRAME_ID & 3) === 0) shadowTick(dt);
   if(!GL_LOST){
     try{ renderer.render(scene, camera); }
     catch(e){
@@ -23604,10 +23612,10 @@ function frameBody(now){
   }
   const thing = G.running ? focusThing() : null;
   const foc = thing && thing.type === "person" ? thing.ref : null;
-  if(!MODEST || (FRAME_ID & 1) === 0) updatePlates(foc);
-  if(!MODEST || (FRAME_ID & 3) === 0) updateTrack(TALK.m || foc);
-  if(!MODEST || (FRAME_ID & 3) === 1) updateTele(dt);
-  feedTick(dt);
+  if(!MODEST || (FRAME_ID & 3) === 0) updatePlates(foc);
+  if(!MODEST || (FRAME_ID & 7) === 0) updateTrack(TALK.m || foc);
+  if(!MODEST || (FRAME_ID & 7) === 1) updateTele(dt);
+  if(!MODEST || (FRAME_ID & 1) === 0) feedTick(dt);
   try{ tickScrollFrame(); }catch(e){}
   /* the marker's pulse is the only thing left writing a uniform every
      frame for something you may not even be looking at */
