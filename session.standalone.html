@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20260920p">
+<meta name="onum-build" content="20260920q">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20260920p";
+  var STAMP = "20260920q";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -37,8 +37,7 @@
     var u = new URL(location.href);
     if(u.searchParams.get("v") !== STAMP){
       u.searchParams.set("v", STAMP);
-      location.replace(u.pathname + u.search + u.hash);
-      return;
+      if(history.replaceState) history.replaceState(null, "", u.pathname + u.search + u.hash);
     }
   }catch(e){}
 })();
@@ -10548,7 +10547,16 @@ function checkEvents(){
   const q = Math.floor(G.minute/8);
   if(q !== G.lastAuto){ G.lastAuto = q; if(G.running && !G.over) queueSave(); }
   const tk = Math.floor(G.minute/12);
-  if(tk !== G.lastTick){ G.lastTick = tk; lobbyMoney(); try{ worldTick(); }catch(e){} try{ realmTick(); }catch(e){} paintTicker(); }
+  if(tk !== G.lastTick){
+    G.lastTick = tk;
+    lobbyMoney();
+    const booting = !!(G._bootGraceUntil && performance.now() < G._bootGraceUntil);
+    if(!booting){
+      try{ worldTick(); }catch(e){}
+      try{ realmTick(); }catch(e){}
+    }
+    paintTicker();
+  }
   const due = eventDue();
   if(due && G.running && !G.over){
     if(due.rsvp === true && G.room !== due.room && !G.moving){ escortTo(due); return; }
@@ -22026,11 +22034,6 @@ function loadSave(){
       d = parseSaveRaw(raw);
     }
     if(!d) return false;
-    try{
-      const raw = JSON.stringify(d);
-      writeSaveKey(SAVE_KEY, raw);
-      writeSaveKey(SAVE_BEST_KEY, raw);
-    }catch(e){}
     Object.assign(G, d);
     if(G.fullDetail === undefined || G.fullDetail === null) G.fullDetail = false;
     if(!G.gfx || (G.gfx !== "best" && G.gfx !== "balanced" && G.gfx !== "simple")){
@@ -23231,6 +23234,10 @@ function tick(dt){
   if(G.speed <= 0 || G.pendingNight) return;
   if((G.minute || 0) >= 22*60){ beginNight(); return; }
   if(!TALK.open && !PROC.on && w > 0) spend(w * DAY_RATE, 0);
+  if(G._bootGraceUntil && performance.now() < G._bootGraceUntil){
+    procTick(dt);
+    return;
+  }
   if(!PROC.on) tickWanderBatch(w);
   if(MODEST){
     if((FRAME_ID & 3) === 0 && !PROC.on){ clockRoom(w); crowdWatch(dt); }
