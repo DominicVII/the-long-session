@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20260920r">
+<meta name="onum-build" content="20260920s">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20260920r";
+  var STAMP = "20260920s";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -21628,6 +21628,7 @@ addEventListener("keydown", e => {
     }
   }
   keys[k] = true;
+  try{ kickFrame(); }catch(e){}
   if(k === "e" && !TALK.open){
     /* Catch / deliver / seated voice / live glass — all without pad or PICK arming */
     if(CATCH.on && CATCH.current){ e.preventDefault(); catchNow(); return; }
@@ -23226,7 +23227,7 @@ function tick(dt){
   const mag = Math.hypot(vx, vz) || 1;
   const wantX = (f.x*vz + r.x*vx) / mag * top * (vx||vz ? 1 : 0);
   const wantZ = (f.z*vz + r.z*vx) / mag * top * (vx||vz ? 1 : 0);
-  const grip = (vx||vz) ? 0.0009 : 0.00012;
+  const grip = (vx||vz) ? 0.0004 : 0.00008;
   cam.vx = smooth(cam.vx, wantX, grip, dt);
   cam.vz = smooth(cam.vz, wantZ, grip, dt);
   const b = roomBox(G.room || "office");
@@ -23447,10 +23448,6 @@ function armFrame(){
       setTimeout(() => { _frameArmed = false; frame(performance.now()); }, 1000);
       return;
     }
-    if(card){
-      setTimeout(() => { _frameArmed = false; frame(performance.now()); }, 160);
-      return;
-    }
     requestAnimationFrame((t) => { _frameArmed = false; frame(t); });
   }catch(e){
     _frameArmed = false;
@@ -23504,11 +23501,11 @@ function frame(now){
     if(e < best){ best = e; stride = s; }
   }
   _stride = stride;
-  if((_vsyncN % stride) !== 0){ armFrame(); return; }
-  _lastDrawn = now;
+  const draw = (_vsyncN % stride) === 0;
+  if(draw) _lastDrawn = now;
   const t0 = now;
   try{
-    frameBody(now);
+    frameBody(now, draw);
     if(frameFails > 0){ frameFails = Math.max(0, frameFails - 1); if(frameFails === 0) frameFailLogged = false; }
   }catch(err){
     frameFails++;
@@ -23522,17 +23519,19 @@ function frame(now){
     }catch(e){}
   }
   const took = performance.now() - t0;
-  _emaMs = _emaMs * 0.86 + took * 0.14;
-  if(_emaMs > 22 || took > 40){
-    _holdLo++;
-    if(_holdLo > 6) _wantHz = FRAME_HZ_LO;
-  } else if(_emaMs < 11){
-    _holdLo = Math.max(0, _holdLo - 2);
-    if(_holdLo === 0 && !(typeof MODEST !== "undefined" && MODEST)) _wantHz = FRAME_HZ_HI;
+  if(draw){
+    _emaMs = _emaMs * 0.86 + took * 0.14;
+    if(_emaMs > 22 || took > 40){
+      _holdLo++;
+      if(_holdLo > 6) _wantHz = FRAME_HZ_LO;
+    } else if(_emaMs < 11){
+      _holdLo = Math.max(0, _holdLo - 2);
+      if(_holdLo === 0 && !(typeof MODEST !== "undefined" && MODEST)) _wantHz = FRAME_HZ_HI;
+    }
   }
   armFrame();
 }
-function frameBody(now){
+function frameBody(now, draw){
   const dt = Math.min(0.05, (now-last)/1000); last = now;
   FRAME_ID++;
   if(G.moving && G._moveAt && (performance.now() - G._moveAt) > 4200){
@@ -23575,11 +23574,12 @@ function frameBody(now){
   catch(err){
     if(window.console && frameFails < 2) console.warn("tick error", err);
   }
-  if(G._crowdPauseUntil && performance.now() < G._crowdPauseUntil){
-    /* Still draw whoever is already meshed — empty corridor was the pause. */
-    try{ animateCrowd(dt); }catch(e){}
-  } else {
-    animateCrowd(dt);
+  if(draw){
+    if(G._crowdPauseUntil && performance.now() < G._crowdPauseUntil){
+      try{ animateCrowd(dt); }catch(e){}
+    } else {
+      animateCrowd(dt);
+    }
   }
   /* Once a second, check one body's world matrix for a value that
      cannot be right — a zero scale or a NaN, which is what a stale or
@@ -23646,6 +23646,10 @@ function frameBody(now){
     cam.lean,
     "YXZ"
   );
+  if(!draw){
+    try{ feedTick(dt); }catch(e){}
+    return;
+  }
   try{ if(!MODEST || (FRAME_ID & 3) === 0) updateLighting(dt); }catch(e){}
   if(!MODEST || (FRAME_ID & 3) === 0) shadowTick(dt);
   if(!GL_LOST){
