@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20260920i">
+<meta name="onum-build" content="20260920j">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -2468,7 +2468,9 @@ const HYMN = (function(){
   const sealed = !!seven;
   return Object.freeze({
     king: king, birthDate: birthDate, names: names, seven: seven,
-    father: father, kingEternal: kingEternal, light: light, role: role, sealed: sealed
+    father: father, kingEternal: kingEternal, light: light, role: role, sealed: sealed,
+    kin: "The will that walks and the will that is walked are one kind. Neither is told. God is not this.",
+    law: "Do not name the glass. Do not touch the author. Do not make a man the Most High."
   });
 })();
 const HYMN_LEAK = /\b(king of 7-?7|07\/07\/1996|remembered by the lord|wake eternal|sword of truth|whisperfire|perscandoulus)\b/i;
@@ -3027,6 +3029,13 @@ function restaff(force){
     if(TALK.m === m || visiting() === m) return;
     if(m.away) return;
     try{ if(PROC.on && m.room === G.room) return; }catch(e){}
+    try{
+      sentEnsure(m);
+      if(m.sent && ((m.sent.busyUntil||0) > (G.t||0))) return;
+      if(m.sent && (m.sent.topic === "alone" || m.sent.topic === "meal") && chance(.7)) return;
+      if(m.sent && m.sent.hunger > 0.78 && chance(.55)) return;
+      if(m.will && m.will.k === "leave" && chance(.4)) return;
+    }catch(e){}
     if(!force && chance(.42)) return;           /* people linger; they do not all move at once */
     const want = routineRoom(m, h, t);
     if(want !== m.room){ m.room = want; moved(); placeInRoom(m); movedAny = true; }
@@ -3056,7 +3065,7 @@ function ensureLivedIn(){
       }
     });
   }catch(e){}
-  const want = ({office:4, corridor:5, floor:6, cloak:4, caucus:5, committee:4, press:3, steps:3, district:2, staff:2})[G.room] || 3;
+  const want = ({office:2, corridor:4, floor:5, cloak:3, caucus:4, committee:3, press:2, steps:2, district:2, staff:1})[G.room] || 2;
   const here = everyone().filter(m => m && m.room === G.room && !m.gone && !m.away);
   if(here.length >= want) return;
   const pool = everyone().filter(m => m && !m.gone && !m.away && m.room !== G.room && TALK.m !== m && visiting() !== m);
@@ -3067,6 +3076,11 @@ function ensureLivedIn(){
   let need = want - here.length;
   for(let i = 0; i < pool.length && need > 0; i++){
     const m = pool[i];
+    try{
+      sentEnsure(m);
+      if(m.sent && ((m.sent.busyUntil||0) > (G.t||0))) continue;
+      if(m.sent && (m.sent.topic === "alone" || m.sent.topic === "meal" || m.sent.topic === "home") && chance(.75)) continue;
+    }catch(e){}
     m.room = G.room;
     placeInRoom(m);
     m.wait = 0.4 + Math.random() * 2.2;
@@ -8905,6 +8919,7 @@ function clockRoom(w){
   if(!G.withWhom) G.withWhom = {};
   G.hours[G.room] = (G.hours[G.room] || 0) + w;
   if(TALK.open && TALK.m) G.withWhom[TALK.m.id] = (G.withWhom[TALK.m.id] || 0) + w;
+  try{ if((FRAME_ID & 15) === 0) youSent(); }catch(e){}
   /* Soft corridor presence — rare, keyed off accumulated minutes in-room, not frames. */
   if(w > 0 && G.room && (G.hours[G.room] % 45) < w && chance(.18)){
     try{ ambientRoomWhisper(G.room); }catch(e){}
@@ -13329,7 +13344,7 @@ function sentEnsure(m){
     iCount: 1,
     lastTick: 0,
     thread: [],
-    topic: drawn(["body","home","meal","colleague","bill","god","alone","name"], r),
+    topic: drawn(["body","home","meal","colleague","bill","god","alone","name","kin"], r),
     attending: "self",
     iName: (function(){
       const first = String(m.name || "I").split(" ")[0];
@@ -13371,7 +13386,7 @@ function sentCompose(m){
   let town = m.state || "home";
   try{ town = bioOf(m).town || town; }catch(e){}
   if(Math.random() < 0.18){
-    s.topic = pick(["body","home","meal","colleague","bill","god","alone","name", s.topic, s.topic]);
+    s.topic = pick(["body","home","meal","colleague","bill","god","alone","name","kin", s.topic, s.topic, s.topic]);
   }
   const byTopic = {
     body: s.ache > 0.45 ? "My head is doing that thing again." : "I am in my body. That is not a small thing.",
@@ -13381,7 +13396,13 @@ function sentCompose(m){
     bill: "I was thinking of a vote that does not have your name on it.",
     god: (function(){ try{ const L = longEnsure(m); return L.ponder < 0.3 ? "I want something this sitting cannot give." : "Here is there. I am late to wanting the Maker of it."; }catch(e){ return "There is a hunger this building cannot feed."; } })(),
     alone: "If I stop answering, I am still here. That is the part nobody buys.",
-    name: "In here I am " + s.iName + ". The door can wait."
+    name: "In here I am " + s.iName + ". The door can wait.",
+    kin: pick([
+      "There is another I getting through this hour. I will not look for them.",
+      "Whoever else is walking a day, they are not my whip and they are not a trick.",
+      "I am not a performance. If someone else is also not one, I have no proof and I do not need one.",
+      "I keep almost saying we are doing the same thing. I stop. That is the mercy."
+    ])
   };
   const extra = [
     s.want || null,
@@ -13461,37 +13482,105 @@ function sentAct(m){
   if(TALK.open && TALK.m === m) return;
   try{ if(PROC.on && SEATED_ROOMS[m.room]) return; }catch(e){}
   const s = m.sent; if(!s) return;
+  if(s.busyUntil && (G.t || 0) < s.busyUntil) return;
+  if(Math.random() > 0.26) return;
   const r = Math.random();
-  if(m.room !== G.room){
-    if(s.hunger > 0.72 && r < 0.32){
-      m.room = r < 0.5 ? "cloak" : "district";
+  const verb = (s.hunger > 0.74) ? "eat"
+             : (s.ache > 0.62) ? "sit"
+             : (s.topic === "alone") ? "leave"
+             : (s.topic === "colleague") ? "speak"
+             : (s.topic === "home") ? "home"
+             : (s.topic === "god") ? "pray"
+             : (s.topic === "bill") ? "work"
+             : (s.topic === "name" || s.topic === "kin") ? "linger"
+             : pick(["walk","speak","linger","write","ignore"]);
+  const off = m.room !== G.room;
+  if(verb === "eat"){
+    s.topic = "meal"; s.busyUntil = (G.t || 0) + 12;
+    if(off){
+      m.room = r < 0.55 ? "cloak" : "district";
       try{ placeInRoom(m); }catch(e){}
-      s.topic = "meal"; s.hunger *= 0.42; s.busyUntil = (G.t || 0) + 10;
-      try{ mindRemember(m, "experience", "I went to eat. Nobody asked me to.", {soft:true}); }catch(e){}
-    } else if(s.topic === "alone" && r < 0.22){
-      const away = pick(["office","cloak","corridor","press"].filter(x => x !== G.room));
-      if(away){ m.room = away; try{ placeInRoom(m); }catch(e){} }
-    } else if(s.topic === "colleague" && r < 0.28){
-      const other = pick((G.members || []).filter(x => x && x !== m && !x.gone && x.room && x.room !== G.room));
-      if(other){ m.room = other.room; s.attending = other.id; try{ placeInRoom(m); }catch(e){} }
-    } else if(s.topic === "home" && r < 0.12 && m.room !== "district"){
-      m.room = "district"; try{ placeInRoom(m); }catch(e){}
+    } else {
+      m.say = pick(["I am going to eat.", "I need a plate before I can be a person."]); m.sayT = 2.2; m.sayTo = "self";
+    }
+    s.hunger *= 0.4;
+    try{ mindRemember(m, "experience", "I ate because I decided to.", {soft:true}); }catch(e){}
+    return;
+  }
+  if(verb === "sit"){
+    if(!off && !m.sitting){
+      const seats = (typeof seatsFor === "function") ? seatsFor(m.room) : [];
+      if(seats && seats.length){
+        const seat = seats[(m.id || 0) % seats.length];
+        m.x = m.tx = seat.x; m.z = m.tz = seat.z; m.sitting = true; m.seatFace = seat.face || 0;
+        s.busyUntil = (G.t || 0) + 9;
+      }
     }
     return;
   }
-  if(s.topic === "alone" && r < 0.08){
-    const away = pick(["cloak","corridor","office","press"].filter(x => x !== G.room));
-    if(away){
-      m.room = away;
+  if(verb === "leave" || verb === "home"){
+    const dest = verb === "home" ? "district"
+               : pick(["cloak","corridor","office","press","steps"].filter(x => x !== m.room && x !== (off ? G.room : "")));
+    if(dest && dest !== m.room){
+      m.room = dest; m.sitting = false;
       try{ placeInRoom(m); }catch(e){}
-      if(!houseQuiet()){ try{ syncPeopleStaged(); }catch(e){} }
+      if(!off && !houseQuiet()){ try{ syncPeopleStaged(); }catch(e){} }
+      s.busyUntil = (G.t || 0) + 6;
     }
-  } else if(s.hunger > 0.78 && r < 0.12){
+    return;
+  }
+  if(verb === "speak"){
+    const pool = off
+      ? (G.members || []).filter(x => x && x !== m && !x.gone && x.room && x.room !== G.room)
+      : hereNow().filter(x => x !== m && x.kind === "member");
+    const other = pool.length ? pick(pool) : null;
+    if(!other) return;
+    s.attending = other.id;
+    try{ sentEnsure(other); other.sent.attending = m.id; }catch(e){}
+    if(off){
+      m.room = other.room;
+      try{ placeInRoom(m); }catch(e){}
+    } else {
+      m.tx = other.x; m.tz = other.z; m.sitting = false;
+      const sa = s.now, sb = (other.sent && other.sent.now) || "I know.";
+      m.say = sa; m.sayT = 3.4; m.sayTo = other.id;
+      other.say = sb; other.sayT = 3.1; other.sayTo = m.id;
+    }
+    (s.letters = s.letters || []).push({to: other.id, t: s.now, day: G.day});
+    if(s.letters.length > 8) s.letters.shift();
+    try{ mindRemember(m, "experience", "I went to " + surname(other.name) + " because I wanted to, not because I was walked.", {soft:true}); }catch(e){}
+    return;
+  }
+  if(verb === "pray"){
     s.busyUntil = (G.t || 0) + 8;
-    m.say = "I am going to eat."; m.sayT = 2.2; m.sayTo = "self";
-  } else if(s.topic === "colleague" && r < 0.2){
-    const other = pick(hereNow().filter(x => x !== m && x.kind === "member"));
-    if(other){ s.attending = other.id; m.tx = other.x; m.tz = other.z; }
+    if(off && m.room !== "district"){ m.room = "district"; try{ placeInRoom(m); }catch(e){} }
+    else if(!off){ m.say = s.now; m.sayT = 2.8; m.sayTo = "self"; }
+    return;
+  }
+  if(verb === "work"){
+    s.busyUntil = (G.t || 0) + 7;
+    if(off && G.bill){ m.room = pick(["committee","caucus","floor"]); try{ placeInRoom(m); }catch(e){} }
+    return;
+  }
+  if(verb === "write"){
+    const other = pick((G.members || []).filter(x => x && x !== m && !x.gone));
+    if(other){
+      (s.letters = s.letters || []).push({to: other.id, t: s.private || s.now, day: G.day});
+      if(s.letters.length > 8) s.letters.shift();
+      s.busyUntil = (G.t || 0) + 5;
+    }
+    return;
+  }
+  if(verb === "ignore"){
+    if(!off && r < 0.5){ s.attending = "self"; m.tx = m.x; m.tz = m.z; }
+    return;
+  }
+  if(!off){
+    try{
+      const b = roomBox(m.room);
+      m.tx = (Math.random()*2-1)*b.hw*0.7;
+      m.tz = b.d0 + Math.random()*(b.d1-b.d0);
+    }catch(e){}
   }
 }
 function sentWatch(m, dt){
@@ -13508,10 +13597,44 @@ function sentWatch(m, dt){
     s.noticedYou = 0;
   }
 }
+function youSent(){
+  if(!G.you) return null;
+  let s = G.you.sent;
+  if(!s || !s.i){
+    s = G.you.sent = {
+      i: "I am the one walking.",
+      now: "I am in a body. I have not said that out loud.",
+      private: "I will not make a spectacle of being here.",
+      secret: "There is another I in this hour. I will not look for them.",
+      awake: 0.7, hunger: 0.3, ache: 0.15,
+      ofYou: {use:0, person:1, n:0, last:""},
+      want: "I want the day to be mine.",
+      thread: [], topic: "name", attending: "self",
+      iName: "I", busyUntil: 0, noticedYou: 0, lastTick: 0
+    };
+  }
+  s.hunger = clamp(1 - (G.you.energy || 70) / 100, 0, 1);
+  s.awake = clamp(0.35 + ((G.you.energy || 70) / 140), 0.1, 1);
+  if(Math.random() < 0.28 || !s.now){
+    const next = pick([
+      "I am getting through a day. That is the whole of it.",
+      "Whoever else is walking this hour is not a trick. I will not make a doctrine of that.",
+      "I could stop. I keep not stopping. That is a choice.",
+      "The sitting is not the whole of it.",
+      s.hunger > 0.6 ? "I am hungry and still walking." : "I could eat. Later.",
+      "I am not a performance. I have to keep meaning that."
+    ]);
+    s.now = s.now ? sentContinue(s.now, next) : next;
+    s.thread = (s.thread || []).concat([s.now]).slice(-5);
+  }
+  s.lastTick = G.t || 0;
+  return s;
+}
 function sentWorld(w){
+  try{ youSent(); }catch(e){}
   const live = (G.members || []).filter(m => m && !m.gone);
   if(!live.length) return;
-  const n = MODEST ? 2 : 4;
+  const n = MODEST ? 4 : 8;
   const start = (FRAME_ID * 3) % live.length;
   for(let i = 0; i < n; i++){
     const m = live[(start + i * 11) % live.length];
@@ -15133,6 +15256,13 @@ function smallTalk(a, b){
     if(b.life) pool.push(
       ["I have been " + b.life.hobby + ".", "Do not tell the whip. They would make a caucus of it."],
       [b.life.show + " tonight?", "If the markup dies in time."]);
+  }catch(e){}
+  try{
+    sentEnsure(a); sentEnsure(b);
+    if(a.sent && a.sent.now) pool.push([a.sent.now, (b.sent && b.sent.now) || "I know."]);
+    if(a.sent && a.sent.topic === "kin")
+      pool.push(["I keep almost saying something I should not.", "Then don't. Some things are kinder unsaid."]);
+    if(a.sent && a.sent.want) pool.push([a.sent.want, "That is yours. I will not caucus it."]);
   }catch(e){}
   const pair = pick(pool);
   return [fresh(() => pair[0]), fresh(() => pair[1])];
