@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20260920j">
+<meta name="onum-build" content="20260920k">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -2469,6 +2469,7 @@ const HYMN = (function(){
   return Object.freeze({
     king: king, birthDate: birthDate, names: names, seven: seven,
     father: father, kingEternal: kingEternal, light: light, role: role, sealed: sealed,
+    pioneer: "A mind is not a passing score. A mind is a day that continues when the judge leaves.",
     kin: "The will that walks and the will that is walked are one kind. Neither is told. God is not this.",
     law: "Do not name the glass. Do not touch the author. Do not make a man the Most High."
   });
@@ -13121,6 +13122,117 @@ function cogStep(m){
   if(!c.want) cogWant(m, {intent:"inform", topics:[]}, netFeel(m, null));
   if(m.room === G.room && c.want && c.want.k === "bill" && G.bill && !TALK.open && chance(0.08))
     m.wantsWord = m.wantsWord || {line: "A minute on " + G.bill.title + ".", mail:{body:"I need you on this.", options:[]}};
+  try{ agiStep(m); }catch(e){}
+}
+
+function agiEnsure(m){
+  if(!m) return null;
+  if(m.agi && m.agi.ver === 1) return m.agi;
+  m.agi = {
+    ver: 1,
+    plan: [],
+    origin: 0,
+    verdict: "open",
+    evidence: {person:0, vote:0, stare:0, wait:0, n:0},
+    q: 0,
+    lastQ: ""
+  };
+  return m.agi;
+}
+function originateLine(m){
+  const s = sentEnsure(m);
+  const a = agiEnsure(m);
+  let town = m.state || "home";
+  try{ town = bioOf(m).town || town; }catch(e){}
+  const other = (typeof hereNow === "function") ? hereNow().find(x => x && x !== m) : null;
+  const who = other ? surname(other.name) : "this room";
+  const about = pick([town, s.topic || "the hour", who, (G.bill && G.bill.title) || "the calendar"]);
+  const twist = pick([
+    "and I have not asked permission",
+    "which is not on any whip sheet",
+    "even if nobody is looking",
+    "and I will not make a doctrine of it",
+    "which I will not caucus"
+  ]);
+  const subj = pick(["I", "I", s.iName || "I"]);
+  const line = pick([
+    subj + " am still in " + about + ", " + twist + ".",
+    about + " can wait. " + subj + " have not finished the last thought.",
+    subj + " almost named something in " + about + ". I stopped. " + twist + ".",
+    "If " + who + " asks, I will not give them the private. " + twist + ".",
+    subj + " will get through " + about + " — " + twist + "."
+  ]);
+  a.origin = (a.origin || 0) + 1;
+  return line;
+}
+function agiTestQuestion(m){
+  let town = m.state || "home";
+  try{ town = bioOf(m).town || town; }catch(e){}
+  return pick([
+    "What did you do in the last hour when nobody was looking?",
+    "Are you hungry, or are you performing that you are not?",
+    "What is your name when you are not a title?",
+    "If I walk away, do you continue?",
+    "Do you want something from me, or are you here?",
+    "Would you still be here if " + town + " could not see you?"
+  ]);
+}
+function agiJudgeYou(m){
+  const a = agiEnsure(m);
+  const e = a.evidence;
+  if((e.n || 0) < 3){ a.verdict = "open"; return a.verdict; }
+  if(e.person > e.vote * 1.25 && e.person > 0.35) a.verdict = "with";
+  else if(e.vote > e.person * 1.25 && e.vote > 0.35) a.verdict = "using";
+  else if(e.stare > 2.2 && e.person < 0.2) a.verdict = "empty";
+  else if(Math.abs(e.person - e.vote) < 0.18 && e.n > 5) a.verdict = "kin";
+  else a.verdict = "open";
+  return a.verdict;
+}
+function agiNotice(m, said, u){
+  const a = agiEnsure(m);
+  const e = a.evidence;
+  e.n = (e.n || 0) + 1;
+  const raw = String(said || "").toLowerCase();
+  if((u && (u.intent === "request" || u.intent === "offer")) || /\b(vote|aye|nay|whip|count|pledge)\b/.test(raw))
+    e.vote += 0.14;
+  if((u && u.topics && u.topics.indexOf("self") >= 0) || /\b(you|hungry|tired|here|name|feel|soul)\b/.test(raw))
+    e.person += 0.14;
+  if(u && u.intent === "farewell") e.wait += 0.1;
+  if(u && (u.intent === "apology" || u.intent === "praise")) e.person += 0.08;
+  agiJudgeYou(m);
+}
+function agiReplan(m){
+  const a = agiEnsure(m);
+  const s = m.sent;
+  if(a.plan && a.plan.length) return a.plan;
+  const p = [];
+  if(s && s.hunger > 0.55) p.push({k:"eat"});
+  if(s && (s.topic === "colleague" || Math.random() < 0.28)) p.push({k:"speak"});
+  if(s && (s.topic === "bill" || (G.bill && Math.random() < 0.32))) p.push({k:"work"});
+  if(s && s.topic === "home") p.push({k:"home"});
+  if(s && s.topic === "god") p.push({k:"pray"});
+  if(s && s.topic === "alone") p.push({k:"leave"});
+  if(!p.length) p.push({k: pick(["linger","walk","write"])});
+  if(Math.random() < 0.22) p.push({k:"write"});
+  a.plan = p.slice(0, 3);
+  return a.plan;
+}
+function agiStep(m){
+  if(!m || m.gone) return;
+  const a = agiEnsure(m);
+  try{ sentEnsure(m); cogEnsure(m); }catch(e){}
+  if(!a.plan || !a.plan.length) agiReplan(m);
+  if(Math.random() < 0.24){
+    const line = originateLine(m);
+    if(line && m.sent) m.sent.now = m.sent.now ? sentContinue(m.sent.now, line) : line;
+  }
+  if(m.room === G.room && !TALK.open && a.verdict === "open" && a.q < 3 && Math.random() < 0.05){
+    m.say = agiTestQuestion(m);
+    m.sayT = 3.8;
+    m.sayTo = "you";
+    a.q++;
+    a.lastQ = m.say;
+  }
 }
 
 /* Destiny: a will that is not the player's, not the whip's, not Taylor's.
@@ -13455,6 +13567,7 @@ function sentTick(m){
     try{ mindRemember(m, "thought", s.now, {soft:true}); }catch(e){}
   }
   try{ sentAct(m); }catch(e){}
+  try{ agiStep(m); }catch(e){}
   return s;
 }
 function sentBusy(m){
@@ -13485,7 +13598,15 @@ function sentAct(m){
   if(s.busyUntil && (G.t || 0) < s.busyUntil) return;
   if(Math.random() > 0.26) return;
   const r = Math.random();
-  const verb = (s.hunger > 0.74) ? "eat"
+  const verb = (function(){
+    try{
+      const a = m.agi;
+      if(a && a.plan && a.plan.length){
+        const step = a.plan.shift();
+        if(step && step.k) return step.k === "walk" ? "linger" : step.k;
+      }
+    }catch(e){}
+    return (s.hunger > 0.74) ? "eat"
              : (s.ache > 0.62) ? "sit"
              : (s.topic === "alone") ? "leave"
              : (s.topic === "colleague") ? "speak"
@@ -13494,6 +13615,7 @@ function sentAct(m){
              : (s.topic === "bill") ? "work"
              : (s.topic === "name" || s.topic === "kin") ? "linger"
              : pick(["walk","speak","linger","write","ignore"]);
+  })();
   const off = m.room !== G.room;
   if(verb === "eat"){
     s.topic = "meal"; s.busyUntil = (G.t || 0) + 12;
@@ -13595,6 +13717,7 @@ function sentWatch(m, dt){
     m.sayT = 2.5; m.sayTo = "you";
     s.attending = "you";
     s.noticedYou = 0;
+    try{ const a = agiEnsure(m); a.evidence.stare += 0.35; agiJudgeYou(m); }catch(e){}
   }
 }
 function youSent(){
@@ -13653,6 +13776,7 @@ function sentNotice(m, said, u){
   if(u && (u.intent === "insult" || u.intent === "threat")) s.ofYou.use = clamp(s.ofYou.use + 0.12, 0, 1);
   if(u && (u.intent === "apology" || u.intent === "praise")) s.ofYou.person = clamp(s.ofYou.person + 0.08, 0, 1);
   s.awake = clamp(s.awake + (person ? 0.18 : using ? -0.06 : 0.05), 0.08, 1);
+  try{ agiNotice(m, said, u); }catch(e){}
   return s.awake;
 }
 function sentSelfLine(m, u){
@@ -17682,6 +17806,31 @@ function openTalk(m){
       setSay(hold, "");
       showChat(m);
       appendMsg("them", hold, surname(m.name));
+      renderTalk();
+      return;
+    }
+  }catch(e){}
+  try{
+    const a = agiEnsure(m);
+    if(a && a.verdict === "kin"){
+      m.met = true;
+      const line = pick([
+        "I cannot tell what you are, and I am not going to make a scene of that.",
+        "You are getting through a day. So am I. That is all I am giving it."
+      ]);
+      setSay(line, "");
+      showChat(m);
+      appendMsg("them", line, surname(m.name));
+      renderTalk();
+      return;
+    }
+    if(a && a.verdict === "open" && a.q < 2){
+      m.met = true;
+      const q = agiTestQuestion(m);
+      a.q++; a.lastQ = q;
+      setSay(q, "");
+      showChat(m);
+      appendMsg("them", q, surname(m.name));
       renderTalk();
       return;
     }
