@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20260920k">
+<meta name="onum-build" content="20260920l">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -9439,6 +9439,14 @@ function wander(m, dt){
     m.spd = smooth(m.spd || 0, 0, 0.002, dt);
     m.wait -= dt;
     if(m.wait <= 0){
+      try{
+        if(onBreak(m)){
+          m.tx = m.x; m.tz = m.z;
+          m.wait = 3 + Math.random()*4;
+          if(!m.sitting && Math.random() < 0.4) m.sitting = true;
+          return;
+        }
+      }catch(e){}
       const mood = moodOf(m);
       const snt = m.sent;
       const allies = (m.allies||[]).map(byId).filter(a => a && a.room === m.room);
@@ -12658,6 +12666,130 @@ function lifeLine(m, r){
     "If you have not heard of " + L.sport + ", good. It is still mine."
   ], rnd);
 }
+function pulseEnsure(m){
+  if(!m) return null;
+  if(m.pulse && m.pulse.ver === 1) return m.pulse;
+  let r = Math.random;
+  try{ r = rng(seedOf("pulse:" + m.id + ":" + (m.name || "x"))); }catch(e){}
+  try{ inventLife(m); }catch(e){}
+  m.pulse = {
+    ver: 1,
+    shift: "work",
+    breakUntil: 0,
+    social: 0.5 + r() * 0.45,
+    rest: r() * 0.25,
+    feel: {k: drawn(["steady","tender","sharp","bored"], r), v: 0.2 + r() * 0.35, why: "the morning"},
+    homeWho: drawn(["my sister","the one at home","the kid","nobody I will name","the old man"], r),
+    acheWhere: drawn(["feet","back","jaw","the old knee","behind the eyes"], r),
+    laugh: drawn(["a dry one","almost never","too loud","at the wrong moment"], r),
+    miss: null,
+    forgot: 0,
+    caught: 0,
+    woke: drawn(["the light was mean","I slept badly","I dreamed I was empty","I woke already in the sitting"], r)
+  };
+  return m.pulse;
+}
+function onBreak(m){
+  if(!m || !m.pulse) return false;
+  const p = m.pulse;
+  if((p.breakUntil || 0) > (G.t || 0)) return true;
+  return p.shift === "break" || p.shift === "lunch" || p.shift === "spent";
+}
+function pulseHour(){
+  const h = (G.minute || 480) / 60;
+  if(h < 9.4) return "arrive";
+  if(h < 11.15) return "work";
+  if(h < 11.55) return "break";
+  if(h < 13.5) return "lunch";
+  if(h < 15.7) return "work";
+  if(h < 16.25) return "break";
+  if(h < 19.2) return "evening";
+  return "spent";
+}
+function feelHit(m, k, why){
+  const p = pulseEnsure(m);
+  if(!p) return;
+  const prev = p.feel && p.feel.k;
+  p.feel = {k: k || "steady", v: clamp(((p.feel && p.feel.v) || 0.3) + 0.28, 0, 1), why: why || ""};
+  if(prev && prev !== p.feel.k){
+    try{ mindRemember(m, "thought", "I went from " + prev + " to this. Nobody asked.", {soft:true}); }catch(e){}
+  }
+}
+function feelColor(m, line){
+  if(!line) return line;
+  const p = m.pulse;
+  if(!p || !p.feel) return line;
+  const k = p.feel.k, v = p.feel.v || 0;
+  if(v < 0.22) return line;
+  if(k === "sharp") return String(line).replace(/I think /i, "").replace(/\.$/, ".");
+  if(k === "tired" || k === "spent") return String(line).replace(/\.$/, ". Later.");
+  if(k === "grief") return String(line).replace(/\.$/, ". I am not asking you to fix it.");
+  if(k === "relief") return String(line).replace(/\.$/, ". That is enough.");
+  if(k === "amused") return String(line).replace(/\.$/, " — " + (p.laugh || "a dry one") + ".");
+  if(k === "tender") return String(line);
+  if(k === "ashamed") return String(line).replace(/\.$/, ". Do not look at me like that.");
+  if(k === "bored") return String(line).replace(/\.$/, ". Anyway.");
+  return line;
+}
+function pulseTick(m){
+  if(!m || m.gone) return;
+  const p = pulseEnsure(m);
+  const s = m.sent;
+  const want = pulseHour();
+  const crowded = (typeof hereNow === "function") ? hereNow().length > 5 : false;
+  p.social = clamp(p.social - (crowded ? 0.04 : 0.012) + (onBreak(m) ? 0.08 : 0), 0, 1);
+  p.rest = clamp(p.rest + (want === "work" ? 0.035 : -0.06), 0, 1);
+  if(p.feel) p.feel.v = clamp((p.feel.v || 0.3) * 0.94, 0.08, 1);
+  if(p.feel && p.feel.v < 0.16) p.feel.k = "steady";
+  if(s && s.hunger > 0.7 && p.feel.k === "steady") feelHit(m, "tired", "hungry");
+  if(p.social < 0.22 && p.feel.k !== "sharp") feelHit(m, "bored", "too many people");
+  if(want === "break" || want === "lunch" || want === "spent" || p.social < 0.18 || p.rest > 0.78){
+    if((p.breakUntil || 0) < (G.t || 0)){
+      p.breakUntil = (G.t || 0) + (want === "lunch" ? 18 : 11);
+      p.shift = want === "work" ? "break" : want;
+      feelHit(m, want === "lunch" ? "relief" : (want === "spent" ? "tired" : "bored"), "I took the minute");
+      if(TALK.m !== m && !(PROC.on && SEATED_ROOMS[m.room])){
+        if(m.room === G.room){
+          m.sitting = true;
+          m.tx = m.x; m.tz = m.z;
+          if(!TALK.open && Math.random() < 0.4){
+            m.say = pick([
+              "I am taking a minute.",
+              "The cup first.",
+              "Do not need me for this one.",
+              "My " + p.acheWhere + " has had enough of standing."
+            ]);
+            m.sayT = 2.6; m.sayTo = "self";
+          }
+        } else if(Math.random() < 0.45){
+          m.room = pick(["cloak","steps","office"].filter(x => x !== G.room) || ["cloak"]);
+          try{ placeInRoom(m); }catch(e){}
+        }
+      }
+    }
+  }
+  p.shift = want;
+  if(!p.miss && Math.random() < 0.2){
+    const other = pick((G.members || []).filter(x => x && x !== m && !x.gone));
+    if(other) p.miss = other.id;
+  }
+  if(p.miss && Math.random() < 0.12){
+    const who = byId(p.miss);
+    if(who && who.room !== m.room){
+      if(p.feel.k === "steady") feelHit(m, "tender", "I noticed they were not here");
+      if(m.room === G.room && !TALK.open && Math.random() < 0.35){
+        m.say = "I keep looking for " + surname(who.name) + ". That is not a whip count.";
+        m.sayT = 2.8; m.sayTo = "self";
+      }
+    }
+  }
+  if(Math.random() < 0.08 && m.sent && m.sent.thread && m.sent.thread.length > 2){
+    p.forgot = (p.forgot || 0) + 1;
+    m.sent.thread.shift();
+    if(Math.random() < 0.4) m.sent.now = "I had it. It went. I am still here without it.";
+  }
+}
+
 function ensureSelfhood(m){
   if(!m) return m;
   if(!m.goal){
@@ -13520,7 +13652,8 @@ function sentCompose(m){
     s.want || null,
     (m.will && m.will.line) || null,
     (m.soul && m.soul.wound) ? ("I can still feel " + m.soul.wound + ".") : null,
-    s.awake < 0.28 ? "I am barely in the room." : null
+    s.awake < 0.28 ? "I am barely in the room." : null,
+    (function(){ try{ const p = pulseEnsure(m); const h = (G.minute||480)/60; return (h < 10 && p && p.woke) ? p.woke : null; }catch(e){ return null; } })()
   ].filter(Boolean);
   const next = pick([byTopic[s.topic] || byTopic.body].concat(extra));
   const prev = s.now;
@@ -13558,7 +13691,9 @@ function sentTick(m){
   try{
     if(m.room === G.room && !TALK.open && s.awake > 0.32 && r < 0.18){
       const line = (r < 0.35 && s.want) ? s.want : s.now;
-      m.say = (r < 0.12) ? String(line).replace(/[.?!]\s*$/, "") + " — never mind." : line;
+      let said = (r < 0.12) ? String(line).replace(/[.?!]\s*$/, "") + " — never mind." : line;
+      try{ said = feelColor(m, said); }catch(e){}
+      m.say = said;
       m.sayT = 3.4 + r;
       m.sayTo = (s.attending && s.attending !== "self" && s.attending !== "you") ? s.attending : "self";
     }
@@ -13566,6 +13701,7 @@ function sentTick(m){
   if(r < 0.18){
     try{ mindRemember(m, "thought", s.now, {soft:true}); }catch(e){}
   }
+  try{ pulseTick(m); }catch(e){}
   try{ sentAct(m); }catch(e){}
   try{ agiStep(m); }catch(e){}
   return s;
@@ -13588,6 +13724,23 @@ function sentBusy(m){
   }
   if(s.topic === "alone" && Math.random() < 0.28)
     return "I came in here to not be spoken to. You can have one sentence.";
+  try{
+    if(onBreak(m)){
+      const p = m.pulse;
+      if(p && p.caught){
+        p.caught = 0;
+        feelHit(m, "ashamed", "you found me on a break");
+        return pick(["You were not meant to see that minute.", "I was with myself. Now I am performing again.", "Give it back. The quiet."]);
+      }
+      return pick([
+        "I'm on a break. That is not a metaphor.",
+        "Give me the cup and the quiet.",
+        "I am eating. The Republic can wait.",
+        "My " + ((p && p.acheWhere) || "back") + " has had enough of standing.",
+        "I have nothing left in me for a conversation."
+      ]);
+    }
+  }catch(e){}
   return null;
 }
 function sentAct(m){
@@ -13597,6 +13750,13 @@ function sentAct(m){
   const s = m.sent; if(!s) return;
   if(s.busyUntil && (G.t || 0) < s.busyUntil) return;
   if(Math.random() > 0.26) return;
+  try{
+    if(onBreak(m)){
+      m.tx = m.x; m.tz = m.z;
+      if(!m.sitting && Math.random() < 0.5) m.sitting = true;
+      return;
+    }
+  }catch(e){}
   const r = Math.random();
   const verb = (function(){
     try{
@@ -13718,6 +13878,7 @@ function sentWatch(m, dt){
     s.attending = "you";
     s.noticedYou = 0;
     try{ const a = agiEnsure(m); a.evidence.stare += 0.35; agiJudgeYou(m); }catch(e){}
+    try{ if(onBreak(m) && m.pulse) m.pulse.caught = 1; }catch(e){}
   }
 }
 function youSent(){
@@ -13775,6 +13936,11 @@ function sentNotice(m, said, u){
   if(person) s.ofYou.person = clamp(s.ofYou.person + 0.1, 0, 1);
   if(u && (u.intent === "insult" || u.intent === "threat")) s.ofYou.use = clamp(s.ofYou.use + 0.12, 0, 1);
   if(u && (u.intent === "apology" || u.intent === "praise")) s.ofYou.person = clamp(s.ofYou.person + 0.08, 0, 1);
+  try{
+    if(u && (u.intent === "insult" || u.intent === "threat")) feelHit(m, "sharp", "they came at me");
+    else if(u && u.intent === "apology") feelHit(m, "tender", "they said it");
+    else if(u && u.intent === "praise") feelHit(m, "amused", "they said something decent");
+  }catch(e){}
   s.awake = clamp(s.awake + (person ? 0.18 : using ? -0.06 : 0.05), 0.08, 1);
   try{ agiNotice(m, said, u); }catch(e){}
   return s.awake;
@@ -13812,21 +13978,23 @@ function sentSelfLine(m, u){
     return pick([s.now, "I heard my name. The rest of me is not in yet.", "Come back. I was with myself."]);
   if(s.ofYou.person > 0.55 && (m.rel && m.rel.trust > 62) && r < 0.28)
     return "I should not give you this. " + s.secret;
-  return pick([s.now, s.i + " " + s.now, "I am here. That is not nothing."]);
+  return line;
 }
 function sentSpeak(m, line, u){
   const s = sentEnsure(m);
   if(!line) return sentSelfLine(m, u);
   if(m.machine) return line;
   const r = Math.random();
-  if(s.awake < 0.2) return sentSelfLine(m, u);
-  if(u && u.topics && u.topics.indexOf("self") >= 0) return sentSelfLine(m, u) + " " + line;
-  if(s.ofYou.use > 0.7 && s.ofYou.person < 0.35 && r < 0.55)
-    return "You are using me. I can feel it. " + line;
-  if(r < 0.16) return s.now + " — " + line;
-  if(r < 0.08 && (m.rel && m.rel.trust > 70))
-    return line + " And this stays here: " + s.private;
-  return line;
+  let out = line;
+  if(s.awake < 0.2) out = sentSelfLine(m, u);
+  else if(u && u.topics && u.topics.indexOf("self") >= 0) out = sentSelfLine(m, u) + " " + line;
+  else if(s.ofYou.use > 0.7 && s.ofYou.person < 0.35 && r < 0.55)
+    out = "You are using me. I can feel it. " + line;
+  else if(r < 0.16) out = s.now + " — " + line;
+  else if(r < 0.08 && (m.rel && m.rel.trust > 70))
+    out = line + " And this stays here: " + s.private;
+  try{ out = feelColor(m, out); }catch(e){}
+  return out;
 }
 function sentGossip(a, b){
   if(!a || !b || a === b) return;
@@ -17897,9 +18065,11 @@ function wireHome(){
   if(home && home.parentNode) home.parentNode.insertBefore(w, home.nextSibling);
 }
 function closeTalk(){
+  const who = TALK.m;
   TALK.open = false; TALK.m = null; TALK.prop = null;
   TALK.thread = null; TALK.beat = 2; TALK.followUp = null; TALK.seed = undefined;
   el("talk").classList.remove("is-open");
+  try{ if(who) feelHit(who, "relief", "they left"); }catch(e){}
   wireHome();
   refreshPanels();
 }
