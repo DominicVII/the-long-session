@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20260920c">
+<meta name="onum-build" content="20260920d">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -3272,6 +3272,15 @@ function placeInRoom(m){
     }
     if(!blocked) break;
   }
+  if(m.room === "steps"){
+    m.z = 1.3 + Math.random() * 3.2;
+    m.x = (Math.random() * 2 - 1) * b.hw * 0.62;
+  }
+  if(m.room === "district"){
+    const side = Math.random() < 0.5 ? -1 : 1;
+    m.x = side * (3.5 + Math.random() * 2.0);
+    m.z = 2.4 + Math.random() * 9.5;
+  }
   m.tx = m.x; m.tz = m.z;
 }
 
@@ -3963,7 +3972,14 @@ const CONTACT = (function(){
 })();
 
 /* Dust in the light. Only indoors, only when there is light to catch. */
-let skyMesh = null, horizonMesh = null;
+let skyMesh = null, horizonMesh = null, landGroup = null, skyGlow = null;
+function townPulse(){
+  const you = G.you || {};
+  const ap = you.approval != null ? you.approval : 50;
+  const st = you.standing != null ? you.standing : 50;
+  const md = G.mood || 0;
+  return clamp((ap * 0.52 + st * 0.28 + (md + 18) * 0.7) / 100, 0, 1);
+}
 function buildSky(R){
   if(skyMesh){
     try{ if(skyMesh.parent) skyMesh.parent.remove(skyMesh); }catch(e){}
@@ -3974,44 +3990,115 @@ function buildSky(R){
     try{ if(horizonMesh.parent) horizonMesh.parent.remove(horizonMesh); }catch(e){}
     horizonMesh = null;
   }
+  if(skyGlow){
+    try{ if(skyGlow.parent) skyGlow.parent.remove(skyGlow); }catch(e){}
+    skyGlow = null;
+  }
+  if(landGroup){
+    try{ if(landGroup.parent) landGroup.parent.remove(landGroup); }catch(e){}
+    landGroup = null;
+  }
   if(!R || !R.open){
     try{ if(scene) scene.background = null; }catch(e){}
     return;
   }
-  const g = new THREE.SphereGeometry(110, 24, 16);
+  const g = new THREE.SphereGeometry(140, 24, 16);
+  const cols = new Float32Array(g.attributes.position.count * 3);
+  const pos = g.attributes.position;
+  for(let i=0;i<pos.count;i++){
+    const ny = pos.getY(i) / 140;
+    const t = clamp((ny + 0.15) / 1.15, 0, 1);
+    const zenith = new THREE.Color().setHSL(0.58, 0.62, 0.48);
+    const haze = new THREE.Color().setHSL(0.55, 0.28, 0.72);
+    const c = zenith.clone().lerp(haze, 1 - t);
+    cols[i*3] = c.r; cols[i*3+1] = c.g; cols[i*3+2] = c.b;
+  }
+  g.setAttribute("color", new THREE.BufferAttribute(cols, 3));
   const mat = new THREE.MeshBasicMaterial({
-    color: 0x5eb0ea, side: THREE.BackSide, fog: false, depthWrite: false
+    vertexColors: true, side: THREE.BackSide, fog: false, depthWrite: false
   });
   skyMesh = new THREE.Mesh(g, mat);
-  skyMesh.position.set(0, 8, R.d * 0.45);
+  skyMesh.position.set(0, 4, R.d * 0.45);
   skyMesh.frustumCulled = false;
   scene.add(skyMesh);
-  try{ scene.background = new THREE.Color(0x5eb0ea); }catch(e){}
+  try{ scene.background = new THREE.Color(0x6aa8d8); }catch(e){}
   const grass = R.style === "town";
   const hg = new THREE.Mesh(UNIT.plane, new THREE.MeshBasicMaterial({
-    color: grass ? 0x5a7a38 : 0x8c9086, fog: true, depthWrite: true
+    color: grass ? 0x4a6a30 : 0x6e7668, fog: true, depthWrite: true
   }));
   hg.rotation.x = -Math.PI / 2;
-  hg.position.set(0, -0.04, R.d * 0.5);
-  hg.scale.set(90, 90, 1);
+  hg.position.set(0, -0.06, R.d * 0.45);
+  hg.scale.set(120, 120, 1);
   hg.receiveShadow = true;
   hg.frustumCulled = false;
   scene.add(hg);
   horizonMesh = hg;
+  const glow = new THREE.Mesh(UNIT.plane, new THREE.MeshBasicMaterial({
+    color: 0xffc48a, transparent: true, opacity: 0.28, fog: false, depthWrite: false, side: THREE.DoubleSide
+  }));
+  glow.position.set(0, 6, R.d * 0.45 - 48);
+  glow.scale.set(90, 14, 1);
+  glow.frustumCulled = false;
+  scene.add(glow);
+  skyGlow = glow;
+  landGroup = new THREE.Group();
+  landGroup.position.set(0, 0, R.d * 0.4);
+  const hillCol = grass ? 0x3f5e2c : 0x5a6454;
+  const roofCol = grass ? 0x7a4030 : 0x6a6e66;
+  const putHill = (x,z,sx,sy,sz, col) => {
+    const m = new THREE.Mesh(UNIT.sph, new THREE.MeshBasicMaterial({color: col || hillCol, fog: true}));
+    m.position.set(x, sy * 0.28, z);
+    m.scale.set(sx, sy, sz);
+    landGroup.add(m);
+  };
+  const putHouse = (x,z,bw,bh,bd, col) => {
+    const m = new THREE.Mesh(UNIT.box, new THREE.MeshBasicMaterial({color: col || 0x8a8478, fog: true}));
+    m.position.set(x, bh * 0.5, z);
+    m.scale.set(bw, bh, bd);
+    landGroup.add(m);
+    const roof = new THREE.Mesh(UNIT.box, new THREE.MeshBasicMaterial({color: roofCol, fog: true}));
+    roof.position.set(x, bh + 0.22, z);
+    roof.scale.set(bw * 1.08, 0.38, bd * 1.08);
+    landGroup.add(roof);
+  };
+  for(let i=0;i<14;i++){
+    const a = (i / 14) * Math.PI * 2;
+    const dist = 28 + (i % 4) * 5;
+    putHill(Math.sin(a) * dist, Math.cos(a) * dist, 6 + (i%3)*2, 2.2 + (i%3)*0.8, 5 + (i%2)*2);
+  }
+  if(grass){
+    for(let i=0;i<10;i++){
+      const side = i < 5 ? -1 : 1;
+      putHouse(side * (10 + (i%5)*2.4), -16 - (i%5)*2.2, 1.6 + (i%3)*0.4, 1.4 + (i%2)*0.5, 1.3);
+    }
+  } else {
+    for(let i=0;i<8;i++){
+      const side = i < 4 ? -1 : 1;
+      putHouse(side * (12 + (i%4)*2.2), -14 - (i%4)*1.8, 2.0, 1.6 + (i%3)*0.4, 1.5, 0x8a8680);
+    }
+  }
+  scene.add(landGroup);
   if(camera){
-    camera.far = 160;
+    camera.far = 180;
     camera.updateProjectionMatrix();
   }
 }
 function tintSky(day, gold){
-  if(!skyMesh || !skyMesh.material) return;
-  const c = skyMesh.material.color;
-  if(day > 0.45) c.setHSL(0.57, 0.58, lerp(0.52, 0.64, day));
-  else if(day > 0.12) c.setHSL(lerp(0.57, 0.08, gold), 0.55, lerp(0.24, 0.52, day));
-  else c.setHSL(0.62, 0.38, 0.11);
-  try{ if(scene && scene.background) scene.background.copy(c); }catch(e){}
+  const hh = ((G.minute || 0) / 60);
+  const night = hh >= 20.2 || hh < 5.8;
+  const dusk = !night && (hh >= 17.4 || hh < 7.2);
+  if(scene && scene.background){
+    if(night) scene.background.setHSL(0.64, 0.48, 0.07);
+    else if(dusk) scene.background.setHSL(lerp(0.08, 0.72, gold), 0.42, 0.16);
+    else scene.background.setHSL(0.57, 0.52, lerp(0.42, 0.58, day));
+  }
+  if(skyGlow && skyGlow.material){
+    skyGlow.material.opacity = night ? 0.08 : dusk ? 0.42 : 0.18;
+    skyGlow.material.color.setHex(night ? 0x4a6080 : dusk ? 0xffb070 : 0xffe2b8);
+  }
   if(horizonMesh && horizonMesh.material && horizonMesh.material.color){
-    if(day > 0.3) horizonMesh.material.color.setHex(0x5a7a38);
+    if(night) horizonMesh.material.color.setHex(0x1a2414);
+    else if(day > 0.3) horizonMesh.material.color.setHex(0x4a6a30);
     else horizonMesh.material.color.setHex(0x2a3820);
   }
 }
@@ -4754,10 +4841,11 @@ function addCyl(mat, x,y,z, r,h, ry){
 function plantTree(x, z, trunkH, canopyR){
   trunkH = trunkH || 2.6;
   canopyR = canopyR || 1.2;
-  const trunkR = 0.12 + canopyR * 0.05;
-  addCyl(matCol(0x5a4634,.95), x, trunkH * 0.5, z, trunkR, trunkH);
-  addCyl(matCol(0x3f6a34,.95), x, trunkH + canopyR * 0.42, z, canopyR, canopyR * 1.05);
-  addCyl(matCol(0x4a7a3c,.95), x + canopyR * 0.22, trunkH + canopyR * 0.12, z - canopyR * 0.12, canopyR * 0.70, canopyR * 0.82);
+  const trunkR = 0.11 + canopyR * 0.04;
+  addCyl(matCol(0x4a3828,.95), x, trunkH * 0.48, z, trunkR, trunkH);
+  addSphere(matCol(0x3a6a32,.95), x, trunkH + canopyR * 0.22, z, canopyR * 1.05, canopyR * 0.92, canopyR * 1.05);
+  addSphere(matCol(0x4a7a3c,.95), x + canopyR * 0.28, trunkH + canopyR * 0.02, z - canopyR * 0.12, canopyR * 0.62, canopyR * 0.55, canopyR * 0.62);
+  addSphere(matCol(0x2f5a28,.95), x - canopyR * 0.22, trunkH + canopyR * 0.08, z + canopyR * 0.18, canopyR * 0.52, canopyR * 0.48, canopyR * 0.52);
 }
 function propStreetLamp(x, z, h){
   h = h || 3.5;
@@ -6372,45 +6460,48 @@ function buildRoomInner(id){
   if(id === "steps"){
     try{
     const stone = matTex(TEX.stone, 3, 1, .92);
-    const ashlar = matCol(0xc3bfb4, .86);
+    const ashlar = matCol(0xc8c4b8, .86);
     const gilt = matCol(0xb08b45, .36, .84);
-    const facadeZ = d - 0.58;
-    /* Stylobate / portico floor */
-    addBox(stone, 0, 0.22, facadeZ, w * 0.94, 0.44, 2.35, 0, true);
-    /* Six columns — center bay kept clear for the corridor door */
-    [-7.4, -4.5, -2.35, 2.35, 4.5, 7.4].forEach(cx => {
-      addBox(ashlar, cx, 0.18, facadeZ, 0.88, 0.36, 0.88, 0, true);
-      addCyl(matTex(TEX.stone, 1, 4, .9), cx, 3.05, facadeZ, 0.36, 5.3);
-      addCyl(ashlar, cx, 5.82, facadeZ, 0.48, 0.26);
-      addBox(ashlar, cx, 6.06, facadeZ, 1.08, 0.18, 1.08, 0, true);
-    });
-    /* Entablature + gilt fillet + stepped pediment */
-    addBox(stone, 0, 6.38, facadeZ, w * 0.90, 0.40, 1.7, 0, true);
-    addBox(gilt, 0, 6.60, facadeZ - 0.04, w * 0.72, 0.05, 1.5, 0, true);
-    addBox(ashlar, 0, 7.05, facadeZ, w * 0.70, 0.50, 1.25, 0, true);
-    addBox(ashlar, 0, 7.52, facadeZ, w * 0.42, 0.42, 1.05, 0, true);
-    addBox(ashlar, 0, 7.90, facadeZ, 1.05, 0.32, 0.88, 0, true);
-    try{ propHouseSeal(0, 7.08, facadeZ - 0.68, Math.PI, 1.35); }catch(e){}
-    /* Grand stair — eight treads down toward the plaza / district */
-    for(let i = 0; i < 8; i++){
-      addBox(stone, 0, 0.08 + (7 - i) * 0.155, facadeZ - 1.28 - i * 0.92,
-        w * 0.58, 0.155, 0.92, 0, true);
+    const wall = matCol(0xb8b4a8, .90);
+    const deckY = 1.62;
+    const facadeZ = d - 0.42;
+    addBox(wall, 0, deckY + 3.35, facadeZ + 0.35, w * 0.96, 6.7, 1.55, 0, true);
+    addBox(stone, 0, deckY * 0.5, facadeZ - 0.85, w * 0.92, deckY, 2.85, 0, true);
+    const treads = 10, rise = deckY / treads, run = 0.52;
+    for(let i = 0; i < treads; i++){
+      const yTop = (i + 1) * rise;
+      const zc = 5.15 + i * run;
+      addBox(stone, 0, yTop * 0.5, zc, w * 0.56, yTop, run + 0.02, 0, true);
       for(const s of [-1, 1]){
-        addBox(ashlar, s * w * 0.305, 0.28 + (7 - i) * 0.155, facadeZ - 1.28 - i * 0.92,
-          0.16, 0.38, 0.88, 0, true);
+        addBox(ashlar, s * w * 0.30, yTop * 0.5 + 0.16, zc, 0.18, yTop + 0.32, run, 0, true);
       }
     }
-    /* Plaza pavement with flagstone joints */
-    addBox(matCol(0xb7b3a8, .90), 0, 0.02, 3.15, w * 0.88, 0.04, 6.1, 0, true);
+    const colY = deckY + 2.55;
+    [-7.2, -4.35, -2.2, 2.2, 4.35, 7.2].forEach(cx => {
+      addBox(ashlar, cx, deckY + 0.16, facadeZ - 0.55, 0.82, 0.32, 0.82, 0, true);
+      addCyl(matTex(TEX.stone, 1, 4, .9), cx, colY, facadeZ - 0.55, 0.34, 5.1);
+      addCyl(ashlar, cx, deckY + 5.22, facadeZ - 0.55, 0.46, 0.24);
+      addBox(ashlar, cx, deckY + 5.44, facadeZ - 0.55, 1.02, 0.16, 1.02, 0, true);
+    });
+    addBox(stone, 0, deckY + 5.78, facadeZ - 0.40, w * 0.90, 0.42, 1.85, 0, true);
+    addBox(gilt, 0, deckY + 6.02, facadeZ - 0.55, w * 0.72, 0.05, 1.55, 0, true);
+    addBox(ashlar, 0, deckY + 6.48, facadeZ - 0.35, w * 0.68, 0.48, 1.35, 0, true);
+    addBox(ashlar, 0, deckY + 6.92, facadeZ - 0.35, w * 0.40, 0.40, 1.15, 0, true);
+    addBox(ashlar, 0, deckY + 7.28, facadeZ - 0.35, 1.05, 0.30, 0.95, 0, true);
+    try{ propHouseSeal(0, deckY + 6.50, facadeZ - 1.05, Math.PI, 1.28); }catch(e){}
+    addBox(matCol(0x3a2a1c,.7), 0, deckY + 1.15, facadeZ - 0.42, 1.15, 2.3, 0.12, 0, true);
+    addBox(matCol(0xb7b3a8, .90), 0, 0.02, 2.55, w * 0.88, 0.04, 5.0, 0, true);
     const joint = matCol(0x9a968c, .92);
     for(let i = -4; i <= 4; i++)
-      addBox(joint, i * 1.85, 0.042, 3.15, 0.035, 0.01, 6.0, 0, true);
-    for(let j = 0; j < 6; j++)
+      addBox(joint, i * 1.85, 0.042, 2.55, 0.035, 0.01, 4.9, 0, true);
+    for(let j = 0; j < 5; j++)
       addBox(joint, 0, 0.042, 0.7 + j * 1.05, w * 0.86, 0.01, 0.035, 0, true);
-    plantTree(-8.4, 2.4, 2.4, 1.15);
-    plantTree(8.4, 2.4, 2.4, 1.15);
-    plantTree(-8.5, 5.15, 2.2, 1.05);
-    plantTree(8.5, 5.15, 2.2, 1.05);
+    plantTree(-8.4, 1.8, 2.6, 1.25);
+    plantTree(8.4, 1.8, 2.6, 1.25);
+    plantTree(-8.5, 4.2, 2.3, 1.10);
+    plantTree(8.5, 4.2, 2.3, 1.10);
+    addBox(matCol(0x5a3e24,.82), 3.15, deckY + 0.55, facadeZ - 1.35, 0.70, 1.10, 0.55, 0, true);
+    addBox(matCol(0x6b4d2c,.75), 3.15, deckY + 1.12, facadeZ - 1.48, 0.78, 0.08, 0.70, 0, true);
     }catch(e){ if(window.console) console.warn("room steps", e); }
   }
   if(id === "district"){
@@ -6453,6 +6544,29 @@ function buildRoomInner(id){
     plantTree(6.2, 5.1, 2.6, 1.18);
     plantTree(-6.35, 10.15, 2.5, 1.12);
     plantTree(6.35, 10.15, 2.5, 1.12);
+    /* How you are doing walks the street. High: flags and flowers. Low: boards and bills. */
+    try{
+      const pulse = townPulse();
+      const last = (G.you && (G.you.name || "").split(" ").pop()) || "HOME";
+      if(pulse > 0.58){
+        addBox(matCol(0xc4544a,.8), -5.35, 3.55, d - 2.72, 4.5, 0.12, 0.18, 0, true);
+        addBox(matCol(0xd9b45e,.8), 5.15, 3.75, d - 2.72, 4.1, 0.12, 0.18, 0, true);
+        addBox(matCol(0xe8e4d8,.95), -7.2, 1.35, 6.4, 0.04, 1.15, 0.85, 0, true);
+        try{ propPlaque(-7.18, 1.35, 6.4, Math.PI/2, "KEEP", last, 0.78, 0.28); }catch(e){}
+        addBox(matCol(0x2f6b45,.85), -4.9, 0.22, 6.8, 1.1, 0.28, 0.42, 0, true);
+        addBox(matCol(0x2f6b45,.85), 4.9, 0.22, 7.4, 1.1, 0.28, 0.42, 0, true);
+      } else if(pulse < 0.38){
+        addBox(matCol(0x6a5a48,.92), -5.9, 1.55, d - 2.78, 0.70, 0.92, 0.05, 0, true);
+        addBox(matCol(0x6a5a48,.92), -4.8, 1.55, d - 2.78, 0.70, 0.92, 0.05, 0, true);
+        addBox(matCol(0x6a5a48,.92), 4.7, 1.55, d - 2.78, 0.70, 0.92, 0.05, 0, true);
+        addBox(matCol(0xe8e4d8,.95), 7.15, 1.35, 5.4, 0.04, 1.15, 0.85, 0, true);
+        try{ propPlaque(7.12, 1.35, 5.4, -Math.PI/2, "OUT", last, 0.78, 0.28); }catch(e){}
+        addBox(matCol(0x4a4a46,.88), -4.9, 0.18, 6.8, 0.9, 0.22, 0.38, 0, true);
+      } else {
+        addBox(matCol(0xe8e4d8,.95), -7.2, 1.25, 6.4, 0.04, 0.95, 0.72, 0, true);
+        try{ propPlaque(-7.18, 1.25, 6.4, Math.PI/2, last, "The District", 0.70, 0.24); }catch(e){}
+      }
+    }catch(e){}
     }catch(e){ if(window.console) console.warn("room district", e); }
   }
 
@@ -7142,8 +7256,8 @@ function lightingSlow(){
     FOGC.setHSL(0.57, 0.35, lerp(0.28, 0.72, day));
     if(!scene.fog) scene.fog = new THREE.Fog(FOGC.getHex(), 18, 90);
     scene.fog.color.copy(FOGC);
-    scene.fog.near = 28;
-    scene.fog.far = MODEST ? 110 : 140;
+    scene.fog.near = 32;
+    scene.fog.far = MODEST ? 120 : 150;
     renderer.setClearColor(FOGC);
     renderer.toneMappingExposure = lerp(0.88, 1.12, day) * GFX_EXPOSE;
     if(camera){ camera.far = 160; camera.updateProjectionMatrix(); }
@@ -7161,6 +7275,8 @@ function lightingSlow(){
   }
   try{ if(skyMesh && skyMesh.parent){ skyMesh.parent.remove(skyMesh); skyMesh.geometry.dispose(); skyMesh = null; } }catch(e){}
   try{ if(horizonMesh && horizonMesh.parent){ horizonMesh.parent.remove(horizonMesh); horizonMesh = null; } }catch(e){}
+  try{ if(skyGlow && skyGlow.parent){ skyGlow.parent.remove(skyGlow); skyGlow = null; } }catch(e){}
+  try{ if(landGroup && landGroup.parent){ landGroup.parent.remove(landGroup); landGroup = null; } }catch(e){}
   try{ if(scene) scene.background = null; }catch(e){}
   /* Warm Capitol practicals: soft gold sun, gentle hemi, less muddy fog. */
   SUNC.setHSL(lerp(0.11,0.068,gold), lerp(0.28,0.55,gold), lerp(0.94,0.68,gold));
@@ -9275,6 +9391,10 @@ function wander(m, dt){
       else if(allies.length && chance(.34)){ const a = pick(allies); m.tx = a.x + (Math.random()*2-1)*1.1; m.tz = a.z + (Math.random()*2-1)*1.1; }
       else { m.tx = (Math.random()*2-1)*b.hw; m.tz = b.d0 + Math.random()*(b.d1-b.d0); }
       m.tx = clamp(m.tx,-b.hw,b.hw); m.tz = clamp(m.tz,b.d0,b.d1);
+      if(m.room === "steps") m.tz = clamp(m.tz, b.d0, 4.6);
+      if(m.room === "district"){
+        if(Math.abs(m.tx) < 2.4) m.tx = (m.tx < 0 ? -3.5 : 3.5);
+      }
       m.wait = 2.2 + Math.random()*7;
       if(chance(.28)){
         m.say = pick([
@@ -18812,7 +18932,7 @@ const PROPS = {
           ". Your own number is " + Math.round(G.you.approval) + ".", fx("you know exactly where you stand","")); }}]}
   ],
   steps:[
-    {id:"stump", label:"The top step", sub:"Where the cameras set up for a crowd", x:0, z:11.0, r:1.7,
+    {id:"stump", label:"The top step", sub:"Where the cameras set up for a crowd", x:3.15, z:12.2, r:1.7,
      acts:()=>[{t:"Speak to the crowd", c:"40m", run(){
         spend(40, 16);
         const hot = G.secrets.filter(s => s.exposure > 14).length;
