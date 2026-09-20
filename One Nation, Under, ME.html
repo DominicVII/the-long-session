@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20260919g">
+<meta name="onum-build" content="20260920a">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -4870,10 +4870,21 @@ function freezeStaticRoom(){
   if(!roomGroup) return;
   try{
     roomGroup.updateMatrixWorld(true);
+    const live = new Set();
+    const keepUp = o => { let n = o; while(n && n !== roomGroup){ live.add(n); n = n.parent; } };
+    const ticks = (typeof TICKERS !== "undefined" && TICKERS) ? TICKERS : [];
+    for(const t of ticks){
+      for(const part of [t.hour, t.min, t.g]){
+        if(!part) continue;
+        keepUp(part);
+        try{ part.traverse(c => live.add(c)); }catch(e){}
+      }
+    }
     const shadows = !!(renderer && renderer.shadowMap && renderer.shadowMap.enabled);
     roomGroup.traverse(o => {
       if(!o || o.isSkinnedMesh) return;
       if(o.isLight) return;
+      if(live.has(o)){ o.matrixAutoUpdate = true; return; }
       o.updateMatrix();
       o.matrixAutoUpdate = false;
       o.frustumCulled = true;
@@ -5951,7 +5962,7 @@ function stashLiveRoom(){
   ROOM_KITS[id] = kit;
   ROOM_KIT_IDS = ROOM_KIT_IDS.filter(x => x !== id);
   ROOM_KIT_IDS.push(id);
-  const cap = MODEST ? 2 : 3;
+  const cap = MODEST ? 3 : 4;
   while(ROOM_KIT_IDS.length > cap){
     const drop = ROOM_KIT_IDS.shift();
     if(drop === id) continue;
@@ -5978,7 +5989,7 @@ function buildRoom(id){
       clearRoom();
       buildRoomInner(id);
       tidyRoomFurniture();
-      if(!MODEST) freezeStaticRoom();
+      freezeStaticRoom();
       if(!roomGroup || roomGroup.children.length < 5)
         throw new Error("room shell too empty");
       _roomBuiltId = id;
@@ -7110,7 +7121,12 @@ function lightingSlow(){
   scene.fog.color.copy(FOGC);
   scene.fog.near = R.open ? 16 : (R.style === "marble" ? 10 : 7);
   scene.fog.far = R.open ? 78 : Math.max(22, R.d * (R.style === "marble" ? 3.1 : 2.7));
-  if(MODEST){ scene.fog.near = 8; scene.fog.far = 22; camera.far = 28; camera.updateProjectionMatrix(); }
+  if(MODEST){
+    scene.fog.near = R.open ? 16 : 10;
+    scene.fog.far = R.open ? 78 : Math.max(32, R.d * 2.4);
+    camera.far = R.open ? 90 : 48;
+    camera.updateProjectionMatrix();
+  }
   renderer.setClearColor(FOGC);
   /* practicals carry the room once the daylight goes */
   /* Only the nearest few practicals stay lit. Every extra point light is
