@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20260920n">
+<meta name="onum-build" content="20260920o">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -23390,22 +23390,18 @@ function say(node, text){
 let last = performance.now(), acc = 0, frameFails = 0, frameFailLogged = false;
 let hailT = 0, hailWho = null, matChkT = 0, matChk = 0, matChkSaid = 0;
 
-/* Draw at a fixed target rate rather than once per display refresh.
-
-   requestAnimationFrame fires at the monitor's rate, so on a 120/144/240Hz
-   panel this loop ran two to four times as often as on 60Hz — the same
-   simulation, bone posing, name-plate layout and full scene render, just
-   repeated more times per second for no visible gain. That is where a
-   machine with headroom at 60Hz runs out of it: the work scales with the
-   display, not with the game.
-
-   Skipping early (before frameBody) keeps `last` untouched, so the dt handed
-   to the simulation is the real elapsed time across the skipped frames and
-   nothing runs slow or fast because of it. FRAME_TARGET_MS is deliberately
-   a touch under 1000/60 so a 60Hz panel never skips a frame to rounding. */
-const FRAME_TARGET_MS_LO = (typeof MODEST !== "undefined" && MODEST) ? (1000 / 26) : (1000 / 32);
-const FRAME_TARGET_MS_HI = (typeof MODEST !== "undefined" && MODEST) ? (1000 / 42) : (1000 / 55);
-let FRAME_TARGET_MS = (typeof MODEST !== "undefined" && MODEST) ? (1000 / 32) : (1000 / 48);
+/* Draw on a divisor of the panel. 32fps on 60Hz is a beat that looks like
+   a hitch. 30 and 60 are the only rates that sit still on a 60/120Hz screen.
+   Modest locks 30. A strong machine holds 60 until a frame costs too much,
+   then it drops to 30 and stays there until the work is cheap again. */
+const FRAME_HZ_LO = 30;
+const FRAME_HZ_HI = 60;
+let _wantHz = (typeof MODEST !== "undefined" && MODEST) ? FRAME_HZ_LO : FRAME_HZ_HI;
+let _vsyncN = 0;
+let _rafPrev = 0;
+let _hzEma = 60;
+let _stride = (typeof MODEST !== "undefined" && MODEST) ? 2 : 1;
+let _holdLo = 0;
 let _lastDrawn = 0;
 let _cardFrames = 0;
 let _emaMs = 16;
@@ -23464,7 +23460,20 @@ function animateCrowd(dt){
 function frame(now){
   if(GL_LOST){ last = now; armFrame(); return; }
   if(typeof document !== "undefined" && document.hidden){ armFrame(); return; }
-  if(now - _lastDrawn < FRAME_TARGET_MS){ armFrame(); return; }
+  if(_rafPrev){
+    const dtR = Math.max(7, now - _rafPrev);
+    _hzEma = _hzEma * 0.9 + (1000 / dtR) * 0.1;
+  }
+  _rafPrev = now;
+  _vsyncN++;
+  const hz = _hzEma < 70 ? 60 : (_hzEma < 100 ? 90 : (_hzEma < 135 ? 120 : (_hzEma < 170 ? 144 : 240)));
+  let stride = 1, best = 999;
+  for(let s = 1; s <= 8; s++){
+    const e = Math.abs(hz / s - _wantHz);
+    if(e < best){ best = e; stride = s; }
+  }
+  _stride = stride;
+  if((_vsyncN % stride) !== 0){ armFrame(); return; }
   _lastDrawn = now;
   const t0 = now;
   try{
@@ -23483,9 +23492,13 @@ function frame(now){
   }
   const took = performance.now() - t0;
   _emaMs = _emaMs * 0.86 + took * 0.14;
-  if(_emaMs > 28) FRAME_TARGET_MS = Math.min(FRAME_TARGET_MS_LO, FRAME_TARGET_MS + 1.5);
-  else if(_emaMs < 14) FRAME_TARGET_MS = Math.max(FRAME_TARGET_MS_HI, FRAME_TARGET_MS - 0.5);
-  if(took > 48) FRAME_TARGET_MS = FRAME_TARGET_MS_LO;
+  if(_emaMs > 22 || took > 40){
+    _holdLo++;
+    if(_holdLo > 6) _wantHz = FRAME_HZ_LO;
+  } else if(_emaMs < 11){
+    _holdLo = Math.max(0, _holdLo - 2);
+    if(_holdLo === 0 && !(typeof MODEST !== "undefined" && MODEST)) _wantHz = FRAME_HZ_HI;
+  }
   armFrame();
 }
 function frameBody(now){
