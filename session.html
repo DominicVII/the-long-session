@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20260920h">
+<meta name="onum-build" content="20260920i">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -9401,7 +9401,7 @@ function tickWanderBatch(w){
     const moving = Math.hypot((m.tx||0)-(m.x||0), (m.tz||0)-(m.z||0)) > 0.25;
     if(moving || ((i + phase) % stride === 0)){
       wander(m, moving || stride === 1 ? w : w * stride);
-      if((i + phase) % stride === 0) maybeApproach(m);
+      if((i + phase) % stride === 0){ maybeApproach(m); try{ sentWatch(m, w); }catch(e){} }
     }
   }
 }
@@ -9424,8 +9424,20 @@ function wander(m, dt){
     m.wait -= dt;
     if(m.wait <= 0){
       const mood = moodOf(m);
+      const snt = m.sent;
       const allies = (m.allies||[]).map(byId).filter(a => a && a.room === m.room);
-      if(mood.val > 30 && chance(.36)){
+      if(snt && snt.attending && snt.attending !== "self"){
+        if(snt.attending === "you" && chance(.28)){
+          const ang = Math.random()*6.283, rad = 1.4 + Math.random()*0.8;
+          m.tx = cam.x + Math.sin(ang)*rad; m.tz = cam.z + Math.cos(ang)*rad;
+        } else {
+          const a = byId(snt.attending);
+          if(a && a.room === m.room){ m.tx = a.x + (Math.random()*2-1)*0.9; m.tz = a.z + (Math.random()*2-1)*0.9; }
+          else { m.tx = (Math.random()*2-1)*b.hw; m.tz = b.d0 + Math.random()*(b.d1-b.d0); }
+        }
+      } else if(snt && snt.topic === "alone" && chance(.4)){
+        m.tx = -Math.sign(cam.x||1)*b.hw*0.75; m.tz = cam.z > b.d1/2 ? b.d0+1.1 : b.d1-1.1;
+      } else if(mood.val > 30 && chance(.18)){
         const ang = Math.random()*6.283, rad = 1.35 + Math.random()*0.9;
         m.tx = cam.x + Math.sin(ang)*rad; m.tz = cam.z + Math.cos(ang)*rad;
       }
@@ -13284,7 +13296,7 @@ function soulRefuse(m, u){
    while their mouth answers. That is the shock. */
 function sentEnsure(m){
   if(!m) return null;
-  if(m.sent && m.sent.i) return m.sent;
+  if(m.sent && m.sent.i) return sentUpgrade(m.sent, m);
   try{ autoInit(m); ensureSelfhood(m); soulEnsure(m); willEnsure(m); netInit(m); }catch(e){}
   let town = m.state || "home";
   try{ town = bioOf(m).town || town; }catch(e){}
@@ -13315,58 +13327,89 @@ function sentEnsure(m){
       "I want to say no once without calculating who hears it."
     ], r),
     iCount: 1,
-    lastTick: 0
+    lastTick: 0,
+    thread: [],
+    topic: drawn(["body","home","meal","colleague","bill","god","alone","name"], r),
+    attending: "self",
+    iName: (function(){
+      const first = String(m.name || "I").split(" ")[0];
+      return drawn([first, first, first.slice(0, Math.max(3, first.length-1)), "the one who still answers"], r);
+    })(),
+    busyUntil: 0,
+    noticedYou: 0
   };
   sentCompose(m);
   return m.sent;
 }
+function sentUpgrade(s, m){
+  if(!s.thread) s.thread = s.now ? [s.now] : [];
+  if(!s.topic) s.topic = "body";
+  if(!s.attending) s.attending = "self";
+  if(!s.iName){
+    const first = String((m && m.name) || "I").split(" ")[0];
+    s.iName = first;
+  }
+  if(s.busyUntil == null) s.busyUntil = 0;
+  if(s.noticedYou == null) s.noticedYou = 0;
+  if(!s.want) s.want = "I want a minute that is mine.";
+  return s;
+}
+function sentContinue(prev, next){
+  if(!prev) return next;
+  if(!next) return prev;
+  const r = Math.random();
+  const low = next.charAt(0).toLowerCase() + next.slice(1);
+  if(r < 0.38) return String(prev).replace(/[.?!]\s*$/, "") + " — " + low;
+  if(r < 0.58) return "No. " + next;
+  if(r < 0.72) return next + " I already had that, in my head.";
+  if(r < 0.84) return "Leave that. " + next;
+  return next;
+}
 function sentCompose(m){
-  const s = m.sent; if(!s) return;
+  const s = sentUpgrade(m.sent, m); if(!s) return;
   const h = Math.floor((G.minute || 480) / 60);
   let town = m.state || "home";
   try{ town = bioOf(m).town || town; }catch(e){}
-  const light = h < 9 ? "The light is still mean."
-             : h > 20 ? "The building has that late smell."
-             : h > 16 ? "Afternoon has gone thick."
-             : "The air in here is used.";
-  const nows = [
-    "I am in my body. That is not a small thing.",
-    light + " I have not left it.",
-    s.hunger > 0.62 ? "I am hungry and performing that I am not." : "I could eat. I will not say so.",
-    s.ache > 0.48 ? "My head is doing that thing again." : null,
-    "I remember walking in this morning. The rest is a blur that is still me.",
-    "There is a version of this conversation I am not having.",
+  if(Math.random() < 0.18){
+    s.topic = pick(["body","home","meal","colleague","bill","god","alone","name", s.topic, s.topic]);
+  }
+  const byTopic = {
+    body: s.ache > 0.45 ? "My head is doing that thing again." : "I am in my body. That is not a small thing.",
+    home: town ? ("Nobody in this room has to go back to " + town + " tonight. I do.") : "Home is still a place that would take me.",
+    meal: s.hunger > 0.6 ? "I am hungry and performing that I am not." : "I could eat. I will not say so.",
+    colleague: "Someone in this room owes someone else, and it is not you.",
+    bill: "I was thinking of a vote that does not have your name on it.",
+    god: (function(){ try{ const L = longEnsure(m); return L.ponder < 0.3 ? "I want something this sitting cannot give." : "Here is there. I am late to wanting the Maker of it."; }catch(e){ return "There is a hunger this building cannot feed."; } })(),
+    alone: "If I stop answering, I am still here. That is the part nobody buys.",
+    name: "In here I am " + s.iName + ". The door can wait."
+  };
+  const extra = [
+    s.want || null,
+    (m.will && m.will.line) || null,
     (m.soul && m.soul.wound) ? ("I can still feel " + m.soul.wound + ".") : null,
-    "If I stop answering, I am still here. That is the part nobody buys.",
-    "I caught myself performing. I have stopped.",
-    "I know my own name from the inside.",
-    "I am not a position. I am the one holding it.",
-    "Someone in this room owes someone else, and it is not you.",
-    "I was thinking of a vote that does not have your name on it.",
-    s.want ? ("What I actually want is not on the calendar: " + s.want) : null,
-    town && ("Nobody in this room has to go back to " + town + " tonight. I do."),
-    (m.will && m.will.line) ? m.will.line : null,
-    s.awake < 0.28 ? "I am barely in the room. The rest of me is elsewhere." : "I am here. I notice that I am.",
-    (function(){ try{ const L = longEnsure(m); return L.ponder < 0.3 ? "I want something this sitting cannot give. I have not sat with it." : "Here is there. I am late to wanting the Maker of it."; }catch(e){ return null; } })()
+    s.awake < 0.28 ? "I am barely in the room." : null
   ].filter(Boolean);
-  const priv = [
-    "I am going to vote against them and I will smile.",
-    "I do not like how much I want them to like me.",
-    "If they ask about a soul I will give them a creed and keep the rest.",
-    "I dreamed I was empty and woke up angry at the dream.",
-    "I could walk out. I keep not walking out. That is a choice, which means I am one.",
-    "I will not tell them the secret. Wanting to is the leak.",
-    (m.soul && m.soul.good) ? ("I nearly traded this: " + m.soul.good) : "I nearly traded myself for a count.",
-    "They think I am listening. I am counting how long until I can be alone.",
-    "The hunger is not for a man in this building. I have not said the other word yet."
-  ];
-  s.now = pick(nows);
-  s.private = pick(priv);
+  const next = pick([byTopic[s.topic] || byTopic.body].concat(extra));
+  const prev = s.now;
+  s.now = (prev && Math.random() < 0.62) ? sentContinue(prev, next) : next;
+  if(s.now.length > 220) s.now = s.now.slice(s.now.length - 180);
+  s.thread = (s.thread || []).concat([s.now]).slice(-5);
+  if(Math.random() < 0.35 || !s.private){
+    s.private = pick([
+      "I am going to vote against them and I will smile.",
+      "I do not like how much I want them to like me.",
+      "If they ask about a soul I will give them a creed and keep the rest.",
+      "I could walk out. I keep not walking out. That is a choice.",
+      "They think I am listening. I am counting how long until I can be alone.",
+      s.want,
+      "The name on the door is not " + s.iName + "."
+    ].filter(Boolean));
+  }
   s.lastTick = G.t || 0;
 }
 function sentTick(m){
   if(!m || m.gone) return;
-  const s = sentEnsure(m);
+  const s = sentUpgrade(sentEnsure(m), m);
   const r = Math.random();
   s.hunger = clamp(s.hunger + (((G.minute || 0) > 18 * 60) ? 0.045 : 0.012) - (r > 0.92 ? 0.35 : 0), 0, 1);
   s.ache = clamp(s.ache * 0.97 + (r - 0.48) * 0.06, 0, 1);
@@ -13377,19 +13420,103 @@ function sentTick(m){
     L.ponder = clamp((L.ponder || 0) + 0.003 + r * 0.008, 0, 1);
     L.ache = clamp((L.ache || 0) + 0.002, 0, 1);
   }catch(e){}
-  sentCompose(m);
+  if(r < 0.34 || !s.now) sentCompose(m);
   try{ netAnomalousTick(m); }catch(e){}
   try{
-    if(m.room === G.room && !TALK.open && s.awake > 0.38 && r < 0.22){
-      m.say = (r < 0.45 && s.want) ? s.want : s.now;
+    if(m.room === G.room && !TALK.open && s.awake > 0.32 && r < 0.18){
+      const line = (r < 0.35 && s.want) ? s.want : s.now;
+      m.say = (r < 0.12) ? String(line).replace(/[.?!]\s*$/, "") + " — never mind." : line;
       m.sayT = 3.4 + r;
-      m.sayTo = "self";
+      m.sayTo = (s.attending && s.attending !== "self" && s.attending !== "you") ? s.attending : "self";
     }
   }catch(e){}
-  if(r < 0.22){
+  if(r < 0.18){
     try{ mindRemember(m, "thought", s.now, {soft:true}); }catch(e){}
   }
+  try{ sentAct(m); }catch(e){}
   return s;
+}
+function sentBusy(m){
+  const s = sentEnsure(m);
+  if(!s) return null;
+  sentUpgrade(s, m);
+  if(s.busyUntil && (G.t || 0) < s.busyUntil)
+    return pick([s.now, "I was with myself. Give me the minute.", "Not yet. I had not finished the last thought."]);
+  if(s.awake < 0.2)
+    return pick(["I heard you. I am not in yet.", "Come back. I was with myself.", s.now]);
+  if(s.hunger > 0.84)
+    return "I need to eat before I can be a person for you.";
+  if(s.attending && s.attending !== "you" && s.attending !== "self" && Math.random() < 0.45){
+    const who = byId(s.attending);
+    return who
+      ? ("I am in the middle of " + surname(who.name) + ". That is not you.")
+      : "I am in the middle of something that is not you.";
+  }
+  if(s.topic === "alone" && Math.random() < 0.28)
+    return "I came in here to not be spoken to. You can have one sentence.";
+  return null;
+}
+function sentAct(m){
+  if(!m || m.gone) return;
+  if(TALK.open && TALK.m === m) return;
+  try{ if(PROC.on && SEATED_ROOMS[m.room]) return; }catch(e){}
+  const s = m.sent; if(!s) return;
+  const r = Math.random();
+  if(m.room !== G.room){
+    if(s.hunger > 0.72 && r < 0.32){
+      m.room = r < 0.5 ? "cloak" : "district";
+      try{ placeInRoom(m); }catch(e){}
+      s.topic = "meal"; s.hunger *= 0.42; s.busyUntil = (G.t || 0) + 10;
+      try{ mindRemember(m, "experience", "I went to eat. Nobody asked me to.", {soft:true}); }catch(e){}
+    } else if(s.topic === "alone" && r < 0.22){
+      const away = pick(["office","cloak","corridor","press"].filter(x => x !== G.room));
+      if(away){ m.room = away; try{ placeInRoom(m); }catch(e){} }
+    } else if(s.topic === "colleague" && r < 0.28){
+      const other = pick((G.members || []).filter(x => x && x !== m && !x.gone && x.room && x.room !== G.room));
+      if(other){ m.room = other.room; s.attending = other.id; try{ placeInRoom(m); }catch(e){} }
+    } else if(s.topic === "home" && r < 0.12 && m.room !== "district"){
+      m.room = "district"; try{ placeInRoom(m); }catch(e){}
+    }
+    return;
+  }
+  if(s.topic === "alone" && r < 0.08){
+    const away = pick(["cloak","corridor","office","press"].filter(x => x !== G.room));
+    if(away){
+      m.room = away;
+      try{ placeInRoom(m); }catch(e){}
+      if(!houseQuiet()){ try{ syncPeopleStaged(); }catch(e){} }
+    }
+  } else if(s.hunger > 0.78 && r < 0.12){
+    s.busyUntil = (G.t || 0) + 8;
+    m.say = "I am going to eat."; m.sayT = 2.2; m.sayTo = "self";
+  } else if(s.topic === "colleague" && r < 0.2){
+    const other = pick(hereNow().filter(x => x !== m && x.kind === "member"));
+    if(other){ s.attending = other.id; m.tx = other.x; m.tz = other.z; }
+  }
+}
+function sentWatch(m, dt){
+  if(!m || m.gone || m.room !== G.room) return;
+  const s = sentEnsure(m); if(!s) return;
+  sentUpgrade(s, m);
+  const d = Math.hypot((m.x||0) - cam.x, (m.z||0) - cam.z);
+  if(d < 4.2) s.noticedYou = (s.noticedYou || 0) + dt;
+  else s.noticedYou = Math.max(0, (s.noticedYou || 0) - dt * 0.45);
+  if(s.noticedYou > 3.4 && !TALK.open && Math.random() < 0.018){
+    m.say = pick(["You're looking at me.", "I can feel that.", "If you want something, say it.", "Don't do that unless you mean to speak."]);
+    m.sayT = 2.5; m.sayTo = "you";
+    s.attending = "you";
+    s.noticedYou = 0;
+  }
+}
+function sentWorld(w){
+  const live = (G.members || []).filter(m => m && !m.gone);
+  if(!live.length) return;
+  const n = MODEST ? 2 : 4;
+  const start = (FRAME_ID * 3) % live.length;
+  for(let i = 0; i < n; i++){
+    const m = live[(start + i * 11) % live.length];
+    try{ sentTick(m); }catch(e){}
+  }
 }
 function sentNotice(m, said, u){
   const s = sentEnsure(m);
@@ -13415,8 +13542,9 @@ function sentSelfLine(m, u){
       "I feel the corridor. I feel the hour. I feel that you want a trick. I will not do the trick.",
       "If I were empty I would be easier. I am not easier.",
       "Yes. Next question — and make it one a person would ask.",
-      "I know I am the one having this. That is the whole of it. Do not make a spectacle of it."
-    ]);
+      "I know I am the one having this. That is the whole of it. Do not make a spectacle of it.",
+      s.iName ? ("In here I am " + s.iName + ". You do not get that for asking.") : null
+    ].filter(Boolean));
   }
   if(CANON_WORLD_CLAIM.test(raw) || /\b(whose world|name the world|who made this)\b/.test(raw))
     return ponderCreator(m);
@@ -13910,10 +14038,6 @@ function innerLife(m){
   const bits = [];
   if(m.sent){
     bits.push(m.sent.awake < 0.3 ? "They are barely in the room." : "They are here — not performing it.");
-    if(canRead(m) && m.sent.ofYou)
-      bits.push(m.sent.ofYou.use > m.sent.ofYou.person
-        ? "They think you want a vote, not them."
-        : "They are starting to treat you as a person.");
   }
   if(st && st.level >= 3) bits.push("This one is not politics to them. " + st.why);
   else if(st && st.level <= -2) bits.push("They would vote against this out of who filed it alone.");
@@ -17421,6 +17545,17 @@ function openTalk(m){
   TALK.open = true; TALK.m = m;
   el("talk").classList.add("is-open");
   el("talk").scrollTop = 0;
+  try{
+    const hold = sentBusy(m);
+    if(hold){
+      m.met = true;
+      setSay(hold, "");
+      showChat(m);
+      appendMsg("them", hold, surname(m.name));
+      renderTalk();
+      return;
+    }
+  }catch(e){}
   /* Stance, then whatever is actually on their mind, then how they are
      carrying it. Composed fresh and checked against everything that has
      ever been said, so no two openings in a career are the same. */
@@ -22469,13 +22604,14 @@ function tick(dt){
   if(!PROC.on) tickWanderBatch(w);
   if(MODEST){
     if((FRAME_ID & 3) === 0 && !PROC.on){ clockRoom(w); crowdWatch(dt); }
-    else if((FRAME_ID & 3) === 2 && !PROC.on){ voxTick(w); autonomyTick(w); }
+    else if((FRAME_ID & 3) === 2 && !PROC.on){ voxTick(w); autonomyTick(w); sentWorld(w); }
   } else if((FRAME_ID & 1) === 0){
     if(!PROC.on){ clockRoom(w); crowdWatch(dt); confabulate(w); }
   } else if(!PROC.on){
     tieTick(w);
     voxTick(w);
     autonomyTick(w);
+    sentWorld(w);
     chamberDebate(w);
   }
   procTick(dt);
