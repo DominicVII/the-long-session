@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20260920v">
+<meta name="onum-build" content="20260920w">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20260920v";
+  var STAMP = "20260920w";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -3261,6 +3261,7 @@ function houseQuiet(){
     if(G._deferPeopleUntil && now < G._deferPeopleUntil) return true;
     if(G._bootGraceUntil && now < G._bootGraceUntil) return true;
     if(typeof veil !== "undefined" && veil && !veil.hidden) return true;
+    if(cam && Math.hypot(cam.vx || 0, cam.vz || 0) > 0.12) return true;
   }catch(e){}
   return false;
 }
@@ -9521,10 +9522,11 @@ function wander(m, dt){
   }
   /* An unhurried indoor pace: they lean into a walk, ease out of it, and
      slow well before they arrive. Everyone walks a little differently. */
-  if(m.gait === undefined) m.gait = 0.50 + Math.random()*0.22;
+  if(m.gait === undefined) m.gait = 0.42 + Math.random()*0.16;
   const arrive = clamp(d/1.6, 0.22, 1);
-  m.spd = smooth(m.spd || 0, m.gait * arrive, 0.03, dt);
-  const sp = m.spd * dt;
+  m.spd = smooth(m.spd || 0, m.gait * arrive, 0.08, Math.min(dt, 0.022));
+  m.spd = Math.min(m.spd, 0.55);
+  const sp = Math.min(0.022, m.spd * Math.min(dt, 0.022));
   m.x += dx/d*sp; m.z += dz/d*sp;
 }
 /* ── two members find each other and talk ─────────────────── */
@@ -23261,11 +23263,16 @@ function tick(dt){
   }
   if(G.you && spd > 0.15) G.you.energy = clamp(G.you.energy - dt*0.34*(spd/1.8), 0, 100);
   if(G.t >= (G.doorGrace||0)) walkThroughDoors();
-  if(!G.moving && G.t >= (G.doorGrace||0)) bumpCheck(sprint);
+  if(!G.moving && G.t >= (G.doorGrace||0) && ((FRAME_ID & 3) === 0 || spd < 0.08)) bumpCheck(sprint);
   if(G.speed <= 0 || G.pendingNight) return;
   if((G.minute || 0) >= 22*60){ beginNight(); return; }
   if(!TALK.open && !PROC.on && w > 0) spend(w * DAY_RATE, 0);
   if(G._bootGraceUntil && performance.now() < G._bootGraceUntil){
+    procTick(dt);
+    return;
+  }
+  /* Feet first on a long sitting: do not think for the House while you walk. */
+  if(spd > 0.12){
     procTick(dt);
     return;
   }
@@ -24656,6 +24663,9 @@ addEventListener("visibilitychange", () => {
     if(document.visibilityState === "hidden"){
       if(G.you && G.members && G.members.length) queueSave();
     } else {
+      last = performance.now();
+      cam.vx = 0; cam.vz = 0; cam.yawVel = 0;
+      try{ for(const k in keys) keys[k] = false; }catch(e){}
       kickFrame();
     }
   }catch(e){}
