@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20260920t">
+<meta name="onum-build" content="20260920u">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20260920t";
+  var STAMP = "20260920u";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -23205,9 +23205,9 @@ function tick(dt){
   }
 
   /* looking eases in and eases out rather than snapping on and off */
-  cam.yawVel = smooth(cam.yawVel, turn * 2.55, 0.0004, dt);
+  cam.yawVel = smooth(cam.yawVel, turn * 1.15, 0.012, dt);
   cam.yaw += cam.yawVel * dt;
-  cam.pitchVel = smooth(cam.pitchVel, tilt * 1.85, 0.0004, dt);
+  cam.pitchVel = smooth(cam.pitchVel, tilt * 0.85, 0.012, dt);
   cam.pitch = clamp(cam.pitch + cam.pitchVel * dt, -1.15, 1.15);
 
   /* forward is the camera's -Z; right is its +X, which with the half-turn
@@ -23223,16 +23223,22 @@ function tick(dt){
       try{ setImmersive(true); }catch(e){}
     }
   }
-  const top = sprint ? 2.05 : 1.28;
+  const top = sprint ? 1.15 : 0.68;
   const mag = Math.hypot(vx, vz) || 1;
   const wantX = (f.x*vz + r.x*vx) / mag * top * (vx||vz ? 1 : 0);
   const wantZ = (f.z*vz + r.z*vx) / mag * top * (vx||vz ? 1 : 0);
-  const grip = (vx||vz) ? 0.0004 : 0.00008;
-  cam.vx = smooth(cam.vx, wantX, grip, dt);
-  cam.vz = smooth(cam.vz, wantZ, grip, dt);
+  const moveDt = Math.min(dt, 0.022);
+  const catchUp = (vx||vz) ? Math.min(1, 5.5 * moveDt) : Math.min(1, 9 * moveDt);
+  cam.vx += (wantX - cam.vx) * catchUp;
+  cam.vz += (wantZ - cam.vz) * catchUp;
+  cam.vx = clamp(cam.vx, -top, top);
+  cam.vz = clamp(cam.vz, -top, top);
+  let dx = cam.vx * moveDt, dz = cam.vz * moveDt;
+  const span = Math.hypot(dx, dz);
+  if(span > 0.028){ const s = 0.028 / span; dx *= s; dz *= s; }
   const b = roomBox(G.room || "office");
-  cam.x = clamp(cam.x + cam.vx*dt, -b.hw, b.hw);
-  cam.z = clamp(cam.z + cam.vz*dt, b.d0, b.d1);
+  cam.x = clamp(cam.x + dx, -b.hw, b.hw);
+  cam.z = clamp(cam.z + dz, b.d0, b.d1);
   cam.ground = groundAt(cam.z, G.room);
   if(vx || vz) G.speechApproach = null;
   try{ tickSpeechApproach(dt); }catch(e){}
@@ -23322,9 +23328,9 @@ function enterRoom(dest, fromRoom){
     cam.x = clamp(hp.x, -b.hw, b.hw);
     cam.z = clamp(hp.z + inward*1.05, b.d0, b.d1);
     cam.yaw = inward > 0 ? 0 : Math.PI;
-    ix = 0; iz = inward * 0.72;
-    if(home.side === "left"){ cam.x = clamp(hp.x + 1.35, -b.hw, b.hw); cam.yaw = Math.PI/2; ix = 0.72; iz = 0; }
-    if(home.side === "right"){ cam.x = clamp(hp.x - 1.35, -b.hw, b.hw); cam.yaw = -Math.PI/2; ix = -0.72; iz = 0; }
+    ix = 0; iz = inward * 0.42;
+    if(home.side === "left"){ cam.x = clamp(hp.x + 1.35, -b.hw, b.hw); cam.yaw = Math.PI/2; ix = 0.42; iz = 0; }
+    if(home.side === "right"){ cam.x = clamp(hp.x - 1.35, -b.hw, b.hw); cam.yaw = -Math.PI/2; ix = -0.42; iz = 0; }
   } else {
     try{ const sp = safeSpawn(dest); cam.x = sp.x; cam.z = sp.z; }catch(e){ cam.x = 0; cam.z = b.d0 + 1.2; }
     cam.yaw = 0;
