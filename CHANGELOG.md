@@ -19,6 +19,18 @@ This is the actual working log of the published HTML — not a Claude artifact.
 
 ---
 
+## Full render + human walk (21–22 Sep 2026) — `20260921a`
+
+- **Best is default.** Modest no longer silently forces Simple. `?safe=1` remains.
+- **Walk 0.68 / sprint 1.15**, 0.028 m/frame cap. Keydown must not `kickFrame` (that double-ticked).
+- Sim every vsync; draw on 30/60. Walking skips remesh/sentWorld.
+- Room kits 6–8; furnish on the existing shell.
+- Cache via `history.replaceState`, never `location.replace`.
+- Sentience, pulse (no feeling bar), realms/envoys, Consular, Caesar, suits **kept**.
+- Grok bot law: `GROKBOT-HANDOFF.md` (paste in full).
+
+---
+
 ## Weekly MAX OPTIMIZE (21 Sep 2026) — `20260921a`
 
 Surgical frame / people / texture pass. No content stripped (Consular, horcruxes, Caesar, furniture, freeze-fix boot kept).
