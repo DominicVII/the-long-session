@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20260921b">
+<meta name="onum-build" content="20260921e">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20260921b";
+  var STAMP = "20260921e";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -3053,7 +3053,7 @@ function restaff(force){
   if(movedAny || missing){
     if(houseQuiet()) return;
     nextFrameOrTimeout(() => {
-      try{ syncPeopleStaged(); }catch(e){ try{ syncPeople(); }catch(e2){} }
+      try{ syncPeopleStaged(); }catch(e){ try{ if(window.console) console.warn("syncPeopleStaged", e); }catch(e2){} }
     });
   }
   try{ ambientHourBeat(h, t); }catch(e){}
@@ -3249,6 +3249,41 @@ function yieldPaint(fn){
   try{ requestAnimationFrame(() => setTimeout(once, 0)); }catch(e){}
   setTimeout(once, 48);
 }
+function playerMoving(){
+  try{
+    if(cam && Math.hypot(cam.vx || 0, cam.vz || 0) > 0.12) return true;
+    if(cam && (cam.speed || 0) > 0.12) return true;
+  }catch(e){}
+  return false;
+}
+function disposePersonMesh(mesh){
+  /* Remesh over minutes leaked GPU memory on Edge — dispose old geo/mats. */
+  if(!mesh) return;
+  try{ if(mesh.parent) mesh.parent.remove(mesh); }catch(e){}
+  try{
+    mesh.traverse(o => {
+      try{
+        if(o.geometry && o.geometry.dispose && !o.geometry._shared){
+          o.geometry.dispose();
+        }
+      }catch(e){}
+      try{
+        const mats = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : [];
+        for(let i=0;i<mats.length;i++){
+          const m = mats[i];
+          if(!m || m._shared) continue;
+          try{
+            if(m.map && m.map.dispose && !m.map._plaque && !m.map._atlas && !m.map._shared) m.map.dispose();
+          }catch(e){}
+          try{
+            if(m.normalMap && m.normalMap.dispose && !m.normalMap._shared) m.normalMap.dispose();
+          }catch(e){}
+          try{ m.dispose(); }catch(e){}
+        }
+      }catch(e){}
+    });
+  }catch(e){}
+}
 function houseQuiet(){
   /* Same rule as Sleep: do not remesh, stringify, or restaff while the
      player is mid-cut (card, night, door, morning walk). */
@@ -3260,7 +3295,7 @@ function houseQuiet(){
     if(G._deferPeopleUntil && now < G._deferPeopleUntil) return true;
     if(G._bootGraceUntil && now < G._bootGraceUntil) return true;
     if(typeof veil !== "undefined" && veil && !veil.hidden) return true;
-    if(cam && Math.hypot(cam.vx || 0, cam.vz || 0) > 0.12) return true;
+    if(playerMoving()) return true;
   }catch(e){}
   return false;
 }
@@ -3441,7 +3476,7 @@ let GFX_PR = 1.25;
 let LOD_NEAR = 3.0, LOD_MID = 6.2, LOD_FAR = 9.5;
 let crowdSafe = false, crowdPacked = false, crowdT = 0;
 function migrateGfx(){
-  /* Default Best / fullDetail (20260921b). Settings can still pick Simple. */
+  /* Default Best / fullDetail (20260921e). Settings can still pick Simple. */
   if(G.fullDetail === undefined || G.fullDetail === null) G.fullDetail = true;
   if(G.fullDetail){
     G.gfx = "best";
@@ -3560,13 +3595,19 @@ function applyQuality(){
     GFX_PR = 1.1; GFX_EXPOSE = 1.0; GFX_HEMI = 1.0; GFX_SUN = 1.0;
     PEOPLE_CAST_SHADOW = false; SHADOW_SKIP = 0.20; SHADOW_PERIOD = 1/9;
   } else {
-    /* Best / max-opt full detail: soft shadows, high DPR, people cast for grounding. */
+    /* Best (20260921e): room/sun shadows only — people never cast (biggest hitch with a room of skinned meshes). */
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    if(sun){ sun.castShadow = true; sun.shadow.mapSize.set(1024, 1024); }
-    GFX_PR = G.fullDetail ? 1.75 : 1.55;
+    if(MODEST){
+      renderer.shadowMap.type = THREE.PCFShadowMap;
+      if(sun){ sun.castShadow = true; sun.shadow.mapSize.set(512, 512); }
+      GFX_PR = 1.15;
+    } else {
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      if(sun){ sun.castShadow = true; sun.shadow.mapSize.set(1024, 1024); }
+      GFX_PR = 1.35;
+    }
     GFX_EXPOSE = 1.12; GFX_HEMI = 1.05; GFX_SUN = 1.04;
-    PEOPLE_CAST_SHADOW = !!G.fullDetail; SHADOW_SKIP = 0.14; SHADOW_PERIOD = 1/12;
+    PEOPLE_CAST_SHADOW = false; SHADOW_SKIP = 0.14; SHADOW_PERIOD = 1/12;
   }
   /* Shadow acne / peter-panning: mild bias + normalBias; Soft radius only on Best. */
   if(sun && sun.shadow){
@@ -3636,6 +3677,7 @@ renderer.shadowMap.autoUpdate = false;
 
 renderer.shadowMap.needsUpdate = true;
 let shadowT = 0;
+let _movePrOn = false, _movePrSaved = 0;
 function shadowTick(dt){
   if(!renderer.shadowMap.enabled) return;
   shadowT -= dt;
@@ -8030,36 +8072,44 @@ function syncPeople(){
   syncPeople._busy = true;
   try{
   FRAME_ID++;
-  while(peopleGroup.children.length) peopleGroup.remove(peopleGroup.children[0]);
-  hereNow().forEach(p => {
+  /* Incremental keep-set (same idea as syncPeopleStaged): do not tear ALL
+     children out and re-add — that freezes matrices / hitch on Best. */
+  const list = hereNow();
+  const keep = new Set();
+  let dirty = false;
+  list.forEach(p => {
     if(p.look){
       ensureLookMorphs(p.look);
       /* v2 faces: remesh once so old sticker-heads become real faces */
       if(p.mesh && (p.look._faceVer !== 2 || p.look._clothVer !== 6)){
-        try{
-          if(p.mesh.parent) p.mesh.parent.remove(p.mesh);
-        }catch(e){}
+        try{ disposePersonMesh(p.mesh); }catch(e){}
         p.mesh = null; p.faceTex = null;
+        dirty = true;
       }
     }
     if(!p.mesh){
       p.mesh = buildPerson(p);
       if(p.look){ p.look._faceVer = 2; p.look._clothVer = 6; }
+      dirty = true;
     }
-    peopleGroup.add(p.mesh);
+    keep.add(p.mesh);
+    if(p.mesh.parent !== peopleGroup){
+      peopleGroup.add(p.mesh);
+      dirty = true;
+    }
   });
-  /* Everything inside a person that never moves relative to its bone was
-     frozen to save recomputing its matrix sixty times a second. Freezing
-     is only safe while the object stays where it is — and this function
-     has just torn every one of them out of the scene and put them back.
-     A frozen object that has been re-parented keeps the world matrix it
-     had before, because nothing marked it dirty, so it draws from stale
-     numbers: limbs in the wrong place, a body flattened into a slab.
-     With one person you might never see it. With a room full, it is the
-     whole room. So the graph is rebuilt in full, once, here — which is
-     cheap, because it happens when people move rooms, not every frame. */
-  peopleGroup.updateMatrixWorld(true);
-  peopleGroup.traverse(o => { if(o.isSkinnedMesh && o.skeleton) o.skeleton.update(); });
+  for(let i = peopleGroup.children.length - 1; i >= 0; i--){
+    const ch = peopleGroup.children[i];
+    if(!keep.has(ch)){
+      try{ disposePersonMesh(ch); }catch(e){ try{ peopleGroup.remove(ch); }catch(e2){} }
+      dirty = true;
+    }
+  }
+  /* updateMatrixWorld only when parents changed — avoided the remove-all hitch. */
+  if(dirty){
+    peopleGroup.updateMatrixWorld(true);
+    peopleGroup.traverse(o => { if(o.isSkinnedMesh && o.skeleton) o.skeleton.update(); });
+  }
   } finally { syncPeople._busy = false; }
 }
 function syncPeopleStaged(done, retries){
@@ -8074,21 +8124,31 @@ function syncPeopleStaged(done, retries){
         try{ done(); }catch(e){}
       };
     }
-    if(!syncPeopleStaged._wait){
-      syncPeopleStaged._wait = setTimeout(() => {
-        syncPeopleStaged._wait = null;
-        const after = syncPeopleStaged._after;
-        syncPeopleStaged._after = null;
-        try{ syncPeopleStaged(after, 0); }catch(e){ if(after) after(e); }
-      }, 700);
+    /* Coalesce: one waiter only. Clear duplicates if somehow armed twice. */
+    if(syncPeopleStaged._wait){
+      try{ clearTimeout(syncPeopleStaged._wait); }catch(e){}
+      syncPeopleStaged._wait = null;
     }
+    syncPeopleStaged._wait = setTimeout(() => {
+      syncPeopleStaged._wait = null;
+      const after = syncPeopleStaged._after;
+      syncPeopleStaged._after = null;
+      try{ syncPeopleStaged(after, 0); }catch(e){ if(after) after(e); }
+    }, 700);
     return;
+  }
+  /* Left quiet — drop any pending quiet waiter so we do not double-fire. */
+  if(syncPeopleStaged._wait){
+    try{ clearTimeout(syncPeopleStaged._wait); }catch(e){}
+    syncPeopleStaged._wait = null;
   }
   if(_buildingRoom || syncPeopleStaged._busy){
     if(retries >= 40){
       const err = new Error("Timed out waiting to rebuild people");
       syncPeopleStaged._busy = false;
       if(window.console) console.warn("syncPeople staged wait", err);
+      /* Staged failed after cap — one last full sync is allowed. */
+      try{ syncPeople(); }catch(e2){}
       if(done) done(err);
       return;
     }
@@ -8099,16 +8159,18 @@ function syncPeopleStaged(done, retries){
   let list, missing;
   try{
     list = hereNow().slice();
-    if(inHall() && list.length > (MODEST ? 8 : 10)) list = list.slice(0, MODEST ? 8 : 10);
+    if(inHall() && list.length > (MODEST ? 6 : 8)) list = list.slice(0, MODEST ? 6 : 8);
     const keep = new Set();
     for(let i=0;i<list.length;i++) if(list[i].mesh) keep.add(list[i].mesh);
     for(let i = peopleGroup.children.length - 1; i >= 0; i--){
       const ch = peopleGroup.children[i];
-      if(!keep.has(ch)) peopleGroup.remove(ch);
+      if(!keep.has(ch)){
+        try{ disposePersonMesh(ch); }catch(e){ try{ peopleGroup.remove(ch); }catch(e2){} }
+      }
     }
     missing = list.filter(p => {
       if(p.mesh && p.mesh.userData && p.mesh.userData.cheap){
-        try{ if(p.mesh.parent) p.mesh.parent.remove(p.mesh); }catch(e){}
+        try{ disposePersonMesh(p.mesh); }catch(e){}
         p.mesh = null;
       }
       return !p.mesh || p.mesh.parent !== peopleGroup;
@@ -8133,7 +8195,7 @@ function syncPeopleStaged(done, retries){
         if(p.look){
           ensureLookMorphs(p.look);
           if(p.mesh && (p.look._faceVer !== 2 || p.look._clothVer !== 7)){
-            if(p.mesh.parent) p.mesh.parent.remove(p.mesh);
+            try{ disposePersonMesh(p.mesh); }catch(e){}
             p.mesh = null; p.faceTex = null;
           }
         }
@@ -12015,7 +12077,7 @@ function stageEventPeople(e){
     m.room = e.room; moved(); placeInRoom(m);
   });
   if(!houseQuiet()){
-    try{ syncPeopleStaged(); }catch(err){ try{ syncPeople(); }catch(e){} }
+    try{ syncPeopleStaged(); }catch(e){ try{ if(window.console) console.warn("syncPeopleStaged", e); }catch(e2){} }
   }
 }
 function ambientHourBeat(h, t){
@@ -22003,11 +22065,16 @@ let saveBusy = false, saveCount = 0, saveQueued = false;
 function queueSave(explicit){
   if(explicit){ try{ return save(true); }catch(e){ return false; } }
   if(PROC.on || TALK.open) return false;
+  /* Never block a walk frame with autosave. */
+  try{ if(houseQuiet() || playerMoving()) return false; }catch(e){}
   if(saveQueued || saveBusy) return false;
   saveQueued = true;
   setTimeout(() => {
     saveQueued = false;
-    try{ save(false); }catch(e){}
+    try{
+      if(houseQuiet() || playerMoving()) return;
+      save(false);
+    }catch(e){}
   }, 280);
   return true;
 }
@@ -22024,33 +22091,32 @@ function stripMesh(m){
   }
   return c;
 }
-function save(explicit){
-  if(saveBusy) return false;
-  saveBusy = true;
+function saveCaptureBase(){
+  return {
+    _gfxOk:true,
+    day:G.day, minute:G.minute, congress:G.congress, term:G.term, sittingDay:G.sittingDay,
+    mood:G.mood, seatsBy:G.seatsBy, recessLeft:G.recessLeft, billIndex:G.billIndex, secretId:G.secretId,
+    bill:G.bill, secrets:G.secrets, donors:G.donors, casework:G.casework,
+    journal:G.journal, career:G.career, room:G.room, savedAt:G.savedAt,
+    feed:(G.feed||[]).slice(-24), mail:(G.mail||[]).slice(-20), mailId:G.mailId, pendingReplies:G.pendingReplies, visitId:G.visitId,
+    states:G.states, prog:G.prog, lobbies:G.lobbies, money:G.money, history:G.history, events:G.events,
+    regime:G.regime, amended:G.amended, exec:G.exec, presidents:G.presidents, statute:G.statute,
+    bare:G.bare, gfx:G.gfx, simple:G.simple, fullDetail:G.fullDetail, noSit:G.noSit,
+    voiceVar:G.voiceVar, voiceRate:G.voiceRate, voiceCarry:G.voiceCarry, hours:G.hours,
+    withWhom:G.withWhom, ties:G.ties, panel:null, court:G.court, own:G.own, parties:G.parties,
+    termLength:G.termLength, country:G.country,
+    greatest:G.greatest, blasphemy:G.blasphemy, loreNote:G.loreNote, greatnessOpen:G.greatnessOpen,
+    relics:G.relics, relicSpots:G.relicSpots, consularLore:G.consularLore, bind:G.bind, sens:G.sens,
+    world:G.world,
+    pendingNight:!!G.pendingNight,
+    cam:{x:cam.x, z:cam.z, yaw:cam.yaw, pitch:cam.pitch},
+    /* the clock the shared save is compared by — not the game clock, the
+       real one, so two browsers can be told apart by which wrote last */
+    savedAtMs: Date.now()
+  };
+}
+function saveCommit(payloadObj, explicit){
   try{
-    const payloadObj = {
-      _gfxOk:true,
-      day:G.day, minute:G.minute, congress:G.congress, term:G.term, sittingDay:G.sittingDay,
-      mood:G.mood, seatsBy:G.seatsBy, recessLeft:G.recessLeft, billIndex:G.billIndex, secretId:G.secretId,
-      members:G.members.map(stripMesh), press:G.press.map(stripMesh), civ:G.civ.map(stripMesh),
-      you:stripMesh(G.you), bill:G.bill, secrets:G.secrets, donors:G.donors, casework:G.casework,
-      journal:G.journal, career:G.career, room:G.room, savedAt:G.savedAt,
-      feed:(G.feed||[]).slice(-24), mail:(G.mail||[]).slice(-20), mailId:G.mailId, pendingReplies:G.pendingReplies, visitId:G.visitId,
-      states:G.states, prog:G.prog, lobbies:G.lobbies, money:G.money, history:G.history, events:G.events,
-      regime:G.regime, amended:G.amended, exec:G.exec, presidents:G.presidents, statute:G.statute,
-      bare:G.bare, gfx:G.gfx, simple:G.simple, fullDetail:G.fullDetail, noSit:G.noSit,
-      voiceVar:G.voiceVar, voiceRate:G.voiceRate, voiceCarry:G.voiceCarry, hours:G.hours,
-      withWhom:G.withWhom, ties:G.ties, panel:null, court:G.court, own:G.own, parties:G.parties,
-      termLength:G.termLength, country:G.country,
-      greatest:G.greatest, blasphemy:G.blasphemy, loreNote:G.loreNote, greatnessOpen:G.greatnessOpen,
-      relics:G.relics, relicSpots:G.relicSpots, consularLore:G.consularLore, bind:G.bind, sens:G.sens,
-      world:G.world,
-      pendingNight:!!G.pendingNight,
-      cam:{x:cam.x, z:cam.z, yaw:cam.yaw, pitch:cam.pitch},
-      /* the clock the shared save is compared by — not the game clock, the
-         real one, so two browsers can be told apart by which wrote last */
-      savedAtMs: Date.now()
-    };
     const payload = JSON.stringify(payloadObj);
     /* Never write a shorter career over a longer one. That is how day 10
        became day 5 — a torn primary, an old backup, or the shared store. */
@@ -22074,6 +22140,87 @@ function save(explicit){
       if(pip){ pip.classList.add("is-on"); clearTimeout(save._pip); save._pip = setTimeout(() => pip.classList.remove("is-on"), 1200); }
     }catch(e){}
     saveBusy = false;
+    return true;
+  }catch(e){
+    saveBusy = false;
+    try{ if(window.console) console.warn("save", e); }catch(e2){}
+    return false;
+  }
+}
+function saveIdle(fn){
+  try{
+    if(typeof requestIdleCallback === "function"){
+      requestIdleCallback(() => { try{ fn(); }catch(e){} }, {timeout: 180});
+      return;
+    }
+  }catch(e){}
+  setTimeout(() => { try{ fn(); }catch(e){} }, 0);
+}
+function save(explicit, sync){
+  if(saveBusy) return false;
+  /* Autosave never runs mid-walk / door fade. Explicit still yields. */
+  if(!explicit && !sync){
+    try{ if(houseQuiet() || playerMoving()) return false; }catch(e){}
+  }
+  saveBusy = true;
+  try{
+    const base = saveCaptureBase();
+    const memSrc = (G.members || []).slice();
+    const pressSrc = (G.press || []).slice();
+    const civSrc = (G.civ || []).slice();
+    const youSrc = G.you;
+    /* beforeunload: one sync pass is allowed so the tab can die with a career. */
+    if(sync){
+      base.members = memSrc.map(stripMesh);
+      base.press = pressSrc.map(stripMesh);
+      base.civ = civSrc.map(stripMesh);
+      base.you = stripMesh(youSrc);
+      return saveCommit(base, !!explicit);
+    }
+    /* Off the movement critical path: stripMesh in batches of ~5, then stringify. */
+    const buckets = [
+      {src: memSrc, key: "members", out: []},
+      {src: pressSrc, key: "press", out: []},
+      {src: civSrc, key: "civ", out: []}
+    ];
+    let bi = 0, ii = 0;
+    const step = () => {
+      try{
+        if(!explicit && (houseQuiet() || playerMoving())){
+          saveBusy = false;
+          return;
+        }
+        let n = 5;
+        while(n > 0 && bi < buckets.length){
+          const b = buckets[bi];
+          if(ii >= b.src.length){ bi++; ii = 0; continue; }
+          b.out.push(stripMesh(b.src[ii++]));
+          n--;
+        }
+        if(bi < buckets.length){
+          saveIdle(step);
+          return;
+        }
+        for(let i=0;i<buckets.length;i++) base[buckets[i].key] = buckets[i].out;
+        base.you = stripMesh(youSrc);
+        /* stringify also off the walk frame */
+        saveIdle(() => {
+          try{
+            if(!explicit && (houseQuiet() || playerMoving())){
+              saveBusy = false;
+              return;
+            }
+            saveCommit(base, !!explicit);
+          }catch(e){
+            saveBusy = false;
+          }
+        });
+      }catch(e){
+        saveBusy = false;
+        try{ if(window.console) console.warn("save", e); }catch(e2){}
+      }
+    };
+    saveIdle(step);
     return true;
   }catch(e){
     saveBusy = false;
@@ -23297,6 +23444,21 @@ function tick(dt){
   }
   /* Feet first on a long sitting: do not think for the House while you walk. */
   if(spd > 0.12){
+    G._wasMoving = true;
+    G._drainUntil = performance.now() + 1000;
+    procTick(dt);
+    return;
+  }
+  /* After a walk: drain AI one subsystem per frame for ~1s — never dump all on first idle. */
+  if(G._wasMoving){
+    G._wasMoving = false;
+    G._drainUntil = performance.now() + 1000;
+    G._drainLane = 0;
+  }
+  if(G._drainUntil && performance.now() < G._drainUntil){
+    if(!PROC.on){
+      try{ drainHouseOne(w, dt); }catch(e){}
+    }
     procTick(dt);
     return;
   }
@@ -23314,6 +23476,32 @@ function tick(dt){
     chamberDebate(w);
   }
   procTick(dt);
+}
+function drainHouseOne(w, dt){
+  /* Token bucket: one House mind per frame after the feet stop. */
+  if(G._drainLane == null) G._drainLane = 0;
+  const lane = (G._drainLane++) % 8;
+  if(lane === 0) sentWorld(w);
+  else if(lane === 1) clockRoom(w);
+  else if(lane === 2) crowdWatch(dt);
+  else if(lane === 3) voxTick(w);
+  else if(lane === 4) autonomyTick(w);
+  else if(lane === 5){
+    try{
+      const h = Math.floor((G.minute || 0) / 60);
+      if(!inHall()) consularBody(h);
+    }catch(e){}
+  } else if(lane === 6){
+    try{ realmTick(); }catch(e){}
+  } else {
+    try{
+      const live = G.members || [];
+      if(live.length){
+        const m = live[(FRAME_ID || 0) % live.length];
+        if(m) agiStep(m);
+      }
+    }catch(e){}
+  }
 }
 function forceUnstickMove(){
   G.moving = false;
@@ -23500,6 +23688,12 @@ function armFrame(){
 }
 function kickFrame(){
   if(_frameArmed) return;
+  /* Do not kick into a double-tick storm during save / room build / door fade. */
+  try{
+    if(typeof saveBusy !== "undefined" && saveBusy) return;
+    if(typeof _buildingRoom !== "undefined" && _buildingRoom) return;
+    if(houseQuiet() && G.moving) return;
+  }catch(e){}
   armFrame();
 }
 function animateCrowd(dt){
@@ -23507,7 +23701,8 @@ function animateCrowd(dt){
   const talk = (TALK.open && TALK.m) || null;
   const sy = Math.sin(cam.yaw), cy = Math.cos(cam.yaw);
   let full = 0;
-  const maxFull = MODEST ? 3 : 6;
+  const maxFull = MODEST ? 2 : 4;
+  const playerMoving = Math.hypot(cam.vx || 0, cam.vz || 0) > 0.12;
   for(let i=0;i<crowd.length;i++){
     const p = crowd[i];
     if(!p.mesh) continue;
@@ -23515,11 +23710,25 @@ function animateCrowd(dt){
     const d2 = dx*dx + dz*dz;
     const fwd = sy*dx + cy*dz;
     const talking = talk === p;
-    if(!talking && G.room !== "corridor" && fwd < -1.8 && d2 > 16){
-      if(p.mesh.visible) p.mesh.visible = false;
-      continue;
+    /* Standing: cull hard behind. Moving: also hide far (d2>25) or any behind — cheap frames. */
+    if(!talking){
+      if(playerMoving){
+        if(fwd < 0 || d2 > 25){
+          if(p.mesh.visible) p.mesh.visible = false;
+          continue;
+        }
+      } else if(G.room !== "corridor" && fwd < -1.8 && d2 > 16){
+        if(p.mesh.visible) p.mesh.visible = false;
+        continue;
+      }
     }
     if(!p.mesh.visible) p.mesh.visible = true;
+    /* While walking: pose only — animatePerson skinned work hitches Best with a room of people. */
+    if(playerMoving && !talking){
+      p.mesh.position.set(p.x, groundAt(p.z, p.room || G.room), p.z);
+      p.mesh.rotation.y = p.facing || 0;
+      continue;
+    }
     if(talking || full < maxFull){
       animatePerson(p, dt);
       full++;
@@ -23638,8 +23847,20 @@ function frameBody(now, draw){
      nothing next to drawing them, and it means a body that goes wrong —
      for any reason, including one I have not thought of — is put right
      within half a second instead of staying wrong. */
-  matChkT -= dt;
-  if(matChkT <= 0 && !MODEST){
+  const playerMoving = Math.hypot(cam.vx || 0, cam.vz || 0) > 0.12;
+  /* While moving: dip PR slightly (restore on stop). Safe — setPR no-ops if near same. */
+  if(playerMoving){
+    if(!_movePrOn){
+      _movePrSaved = _lastPR > 0 ? _lastPR : GFX_PR;
+      try{ setPR(Math.min(GFX_PR, MODEST ? 0.95 : 1.1)); }catch(e){}
+      _movePrOn = true;
+    }
+  } else if(_movePrOn){
+    try{ setPR(_movePrSaved || GFX_PR); }catch(e){}
+    _movePrOn = false;
+  }
+  if(!playerMoving) matChkT -= dt;
+  if(!playerMoving && matChkT <= 0 && !MODEST){
     const crowdN = peopleGroup ? peopleGroup.children.length : 0;
     matChkT = crowdN > 6 ? (MODEST ? 1.6 : 0.9) : (MODEST ? 1.1 : 0.55);
     const list = hereNow();
@@ -23698,7 +23919,12 @@ function frameBody(now, draw){
     return;
   }
   try{ if(!MODEST || (FRAME_ID & 3) === 0) updateLighting(dt); }catch(e){}
-  if(!MODEST || (FRAME_ID & 3) === 0) shadowTick(dt);
+  /* Moving: skip shadow map refresh — room shadows stay; biggest hitch after people cast. */
+  if(playerMoving){
+    try{ if(renderer && renderer.shadowMap) renderer.shadowMap.needsUpdate = false; }catch(e){}
+  } else if(!MODEST || (FRAME_ID & 3) === 0){
+    shadowTick(dt);
+  }
   if(!GL_LOST){
     try{ renderer.render(scene, camera); }
     catch(e){
@@ -23707,10 +23933,18 @@ function frameBody(now, draw){
   }
   const thing = G.running ? focusThing() : null;
   const foc = thing && thing.type === "person" ? thing.ref : null;
-  if(!MODEST || (FRAME_ID & 3) === 0) updatePlates(foc);
-  if(!MODEST || (FRAME_ID & 7) === 0) updateTrack(TALK.m || foc);
-  if(!MODEST || (FRAME_ID & 7) === 1) updateTele(dt);
-  if(!MODEST || (FRAME_ID & 1) === 0) feedTick(dt);
+  /* Moving: skip HUD plate/track/tele work — feet first. */
+  if(!playerMoving){
+    if(!MODEST || (FRAME_ID & 3) === 0) updatePlates(foc);
+    if(!MODEST || (FRAME_ID & 7) === 0) updateTrack(TALK.m || foc);
+    if(!MODEST || (FRAME_ID & 7) === 1) updateTele(dt);
+  }
+  /* Moving: feed much less often — HUD text is not feet. */
+  if(playerMoving){
+    if((FRAME_ID & 7) === 0) feedTick(dt);
+  } else if(!MODEST || (FRAME_ID & 1) === 0){
+    feedTick(dt);
+  }
   try{ tickScrollFrame(); }catch(e){}
   /* the marker's pulse is the only thing left writing a uniform every
      frame for something you may not even be looking at */
@@ -24677,21 +24911,30 @@ try{ opening(); }catch(e){
 
 /* Continuity: wall-clock autosave while running (survives long AFK in one room). */
 setInterval(() => {
-  try{ if(G.running && !G.over && G.you && G.members && G.members.length) queueSave(); }catch(e){}
+  try{
+    if(!G.running || G.over || !G.you || !G.members || !G.members.length) return;
+    if(houseQuiet() || playerMoving()) return;
+    queueSave();
+  }catch(e){}
 }, 45000);
 setInterval(() => {
   try{
     if(typeof document !== "undefined" && document.hidden) return;
+    if(typeof saveBusy !== "undefined" && saveBusy) return;
+    if(typeof _buildingRoom !== "undefined" && _buildingRoom) return;
+    try{ if(houseQuiet() && G.moving) return; }catch(e){}
     if(performance.now() - (_lastDrawn || 0) > 2200) kickFrame();
   }catch(e){}
 }, 1500);
 addEventListener("beforeunload", () => {
-  try{ if(G.you && G.members && G.members.length) save(); }catch(e){}
+  /* One sync save on tab death is allowed. */
+  try{ if(G.you && G.members && G.members.length) save(false, true); }catch(e){}
 });
 addEventListener("visibilitychange", () => {
   try{
     if(document.visibilityState === "hidden"){
-      if(G.you && G.members && G.members.length) queueSave();
+      /* Hidden may queue only if feet are still. */
+      if(G.you && G.members && G.members.length && !playerMoving() && !houseQuiet()) queueSave();
     } else {
       last = performance.now();
       cam.vx = 0; cam.vz = 0; cam.yawVel = 0;
