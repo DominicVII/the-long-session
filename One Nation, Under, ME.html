@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20260921a">
+<meta name="onum-build" content="20260921b">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20260921a";
+  var STAMP = "20260921b";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -1833,9 +1833,8 @@ function modestMachine(){
   return false;
 }
 const MODEST = modestMachine();
-if(!(typeof location !== "undefined" && /[?&]safe=1/.test(location.search||""))){
-  G.gfx = "best"; G.simple = false; G.fullDetail = true; G._gfxOk = true;
-}
+/* MODEST only throttles the frame loop (30 Hz draw stride). Visuals stay Best /
+   fullDetail unless ?safe=1 or Settings → Simple. */
 /* Voices stay on. Modest used to mute the House so Edge would not lock —
    that left a silent sitting. They can still pick Read only in Settings. */
 if(G.muteSet){ /* keep their choice */ }
@@ -3348,9 +3347,7 @@ try{
   const gl = renderer.getContext();
   const ext = gl && gl.getExtension && gl.getExtension("WEBGL_debug_renderer_info");
   const gpu = ext ? (gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) || "") : "";
-  if(/Intel|UHD|Iris|HD Graphics|Adreno|Mali/i.test(gpu) && G.gfx === "balanced"){
-    G.gfx = "simple"; G.simple = true;
-  }
+  /* No silent Simple force on Intel/Adreno — Settings or ?safe=1 only. */
 }catch(e){}
 renderer.sortObjects = false;
 if(MODEST){
@@ -3444,12 +3441,14 @@ let GFX_PR = 1.25;
 let LOD_NEAR = 3.0, LOD_MID = 6.2, LOD_FAR = 9.5;
 let crowdSafe = false, crowdPacked = false, crowdT = 0;
 function migrateGfx(){
-  if(G.fullDetail || G.gfx === "best"){
+  /* Default Best / fullDetail (20260921b). Settings can still pick Simple. */
+  if(G.fullDetail === undefined || G.fullDetail === null) G.fullDetail = true;
+  if(G.fullDetail){
     G.gfx = "best";
     G.simple = false;
-    G.fullDetail = true;
     return;
   }
+  /* Missing gfx defaults to Best. Legacy simple flag still maps to Simple. */
   if(G.gfx !== "best" && G.gfx !== "balanced" && G.gfx !== "simple"){
     G.gfx = (G.simple === true) ? "simple" : "best";
   }
@@ -3561,14 +3560,13 @@ function applyQuality(){
     GFX_PR = 1.1; GFX_EXPOSE = 1.0; GFX_HEMI = 1.0; GFX_SUN = 1.0;
     PEOPLE_CAST_SHADOW = false; SHADOW_SKIP = 0.20; SHADOW_PERIOD = 1/9;
   } else {
-    /* Full render: the House drawn. Modest still keeps DPR and shadow maps
-       in a size the glass can hold for a long sitting. */
+    /* Best / max-opt full detail: soft shadows, high DPR, people cast for grounding. */
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = MODEST ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
-    if(sun){ sun.castShadow = true; sun.shadow.mapSize.set(MODEST ? 512 : 1024, MODEST ? 512 : 1024); }
-    GFX_PR = MODEST ? 1.0 : (G.fullDetail ? 1.35 : 1.2);
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    if(sun){ sun.castShadow = true; sun.shadow.mapSize.set(1024, 1024); }
+    GFX_PR = G.fullDetail ? 1.75 : 1.55;
     GFX_EXPOSE = 1.12; GFX_HEMI = 1.05; GFX_SUN = 1.04;
-    PEOPLE_CAST_SHADOW = !MODEST; SHADOW_SKIP = 0.16; SHADOW_PERIOD = 1/10;
+    PEOPLE_CAST_SHADOW = !!G.fullDetail; SHADOW_SKIP = 0.14; SHADOW_PERIOD = 1/12;
   }
   /* Shadow acne / peter-panning: mild bias + normalBias; Soft radius only on Best. */
   if(sun && sun.shadow){
@@ -3684,6 +3682,15 @@ function texCanvas(size, paint){
   const t = new THREE.CanvasTexture(c);
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.encoding = THREE.sRGBEncoding;
+  /* MAX OPT 20260921b: Simple only skips mip/anisotropy. Best keeps mips even on MODEST. */
+  const cheap = G.gfx === "simple";
+  if(cheap){
+    t.generateMipmaps = false;
+    t.minFilter = THREE.LinearFilter;
+    t.magFilter = THREE.LinearFilter;
+    t.anisotropy = 1;
+    return t;
+  }
   try{
     const cap = (G.fullDetail || G.gfx === "best") ? 8 : 4;
     t.anisotropy = (typeof renderer !== "undefined" && renderer && renderer.capabilities)
@@ -3958,8 +3965,9 @@ function buildTextures(){
 }
 buildTextures();
 function dressTextures(){
-  /* Photoreal albedos on top of the canvas fallback. Modest boxes keep the cheap maps. */
-  if(typeof MODEST !== "undefined" && MODEST) return;
+  /* Photoreal albedos on top of the canvas fallback. Modest/Simple keep the cheap maps. */
+  /* MAX OPT 20260921b: skip photoreal dress on Simple only (Best on MODEST still dresses). */
+  if(G.gfx === "simple") return;
   [
     ["oak","/tex/oak.jpg"],
     ["marble","/tex/marble.jpg"],
@@ -4784,13 +4792,22 @@ function ensureClothTex(){
   });
   [TEX.wool, TEX.cotton, TEX.twill].forEach(t => {
     if(!t) return;
-    t.minFilter = THREE.LinearMipmapLinearFilter;
-    t.magFilter = THREE.LinearFilter;
-    t.generateMipmaps = true;
-    try{
-      t.anisotropy = (renderer && renderer.capabilities)
-        ? Math.min(8, renderer.capabilities.getMaxAnisotropy()) : 4;
-    }catch(e){ t.anisotropy = 4; }
+    /* MAX OPT 20260921b: Simple only — no mips on shared cloth maps. */
+    const cheap = G.gfx === "simple";
+    if(cheap){
+      t.generateMipmaps = false;
+      t.minFilter = THREE.LinearFilter;
+      t.magFilter = THREE.LinearFilter;
+      t.anisotropy = 1;
+    } else {
+      t.minFilter = THREE.LinearMipmapLinearFilter;
+      t.magFilter = THREE.LinearFilter;
+      t.generateMipmaps = true;
+      try{
+        t.anisotropy = (renderer && renderer.capabilities)
+          ? Math.min(8, renderer.capabilities.getMaxAnisotropy()) : 4;
+      }catch(e){ t.anisotropy = 4; }
+    }
     t.needsUpdate = true;
   });
 }
@@ -4810,13 +4827,22 @@ function matCloth(col, kind, rough){
   const t = tex.clone();
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.repeat.set(qrep(rx), qrep(ry));
-  t.minFilter = THREE.LinearMipmapLinearFilter;
-  t.magFilter = THREE.LinearFilter;
-  t.generateMipmaps = true;
-  try{
-    t.anisotropy = (renderer && renderer.capabilities)
-      ? Math.min(8, renderer.capabilities.getMaxAnisotropy()) : 4;
-  }catch(e){ t.anisotropy = 4; }
+  /* MAX OPT 20260921b: Simple only — cloth clones skip mipmaps. */
+  const cheapCloth = G.gfx === "simple";
+  if(cheapCloth){
+    t.generateMipmaps = false;
+    t.minFilter = THREE.LinearFilter;
+    t.magFilter = THREE.LinearFilter;
+    t.anisotropy = 1;
+  } else {
+    t.minFilter = THREE.LinearMipmapLinearFilter;
+    t.magFilter = THREE.LinearFilter;
+    t.generateMipmaps = true;
+    try{
+      t.anisotropy = (renderer && renderer.capabilities)
+        ? Math.min(8, renderer.capabilities.getMaxAnisotropy()) : 4;
+    }catch(e){ t.anisotropy = 4; }
+  }
   t.needsUpdate = true;
   const opts = {
     map: t,
@@ -4874,7 +4900,7 @@ function plantTree(x, z, trunkH, canopyR){
   const trunkR = 0.11 + canopyR * 0.04;
   addCyl(matCol(0x4a3828,.95), x, trunkH * 0.48, z, trunkR, trunkH);
   addSphere(matCol(0x3a6a32,.95), x, trunkH + canopyR * 0.22, z, canopyR * 1.05, canopyR * 0.92, canopyR * 1.05);
-  if(!MODEST || G.fullDetail){
+  if(!MODEST){
     addSphere(matCol(0x4a7a3c,.95), x + canopyR * 0.28, trunkH + canopyR * 0.02, z - canopyR * 0.12, canopyR * 0.62, canopyR * 0.55, canopyR * 0.62);
     addSphere(matCol(0x2f5a28,.95), x - canopyR * 0.22, trunkH + canopyR * 0.08, z + canopyR * 0.18, canopyR * 0.52, canopyR * 0.48, canopyR * 0.52);
   }
@@ -5248,7 +5274,7 @@ function propBench(seatMat, woodMat, x, z, w, dp, ry){
 
 const TICKERS = [];              /* props that move: clock hands, fans */
 const ROOMLIGHTS = [];           /* practical lights added per room */
-const MAX_ROOM_LIGHTS = 4;
+const MAX_ROOM_LIGHTS = (typeof MODEST !== "undefined" && MODEST) ? 2 : 4;
 function pushRoomLight(L){
   if(ROOMLIGHTS.length >= MAX_ROOM_LIGHTS){
     /* Fixture may still glow via emissive mesh; skip another point light. */
@@ -5349,7 +5375,7 @@ function propPlant(x,z,sc){
   const stem = new THREE.Mesh(UNIT.cyl, matCol(0x3a5a30,.9));
   stem.position.y = 0.40*sc; stem.scale.set(0.035*sc*2, 0.26*sc, 0.035*sc*2); g.add(stem);
   const leafM = matCol(0x3a6a32,.92);
-  const leafPts = (MODEST && !G.fullDetail) ? [[0,0.62,0,0.16]] : [[0,0.58,0,0.15],[0.07,0.66,0.04,0.12],[-0.06,0.64,-0.04,0.11],[0.02,0.74,0.02,0.10]];
+  const leafPts = MODEST ? [[0,0.62,0,0.16]] : [[0,0.58,0,0.15],[0.07,0.66,0.04,0.12],[-0.06,0.64,-0.04,0.11],[0.02,0.74,0.02,0.10]];
   leafPts.forEach(L => {
     const leaf = new THREE.Mesh(UNIT.sph, leafM);
     leaf.position.set(L[0]*sc, L[1]*sc, L[2]*sc);
@@ -6037,7 +6063,7 @@ function dressOrnateCorners(id){
   if(id === "office" || id === "visit"){
     propPlant(-hw+inset, 1.05, 0.78);
     propPlant(hw-inset, d-0.85, 0.80);
-    if(!MODEST || G.fullDetail){
+    if(!MODEST){
       propPlant(hw-inset, 1.05, 0.78);
       propPlant(-hw+inset, d-0.85, 0.80);
     }
@@ -6058,7 +6084,7 @@ function dressOrnateCorners(id){
     });
     rightZs.forEach((z,i) => {
       if(i % 2 === 0) propSconceDecor(hw-0.12, 2.55, z, -Math.PI/2);
-      if((!MODEST || G.fullDetail) && i % 3 === 1) propPlant(hw-0.70, z, 0.78);
+      if(!MODEST && i % 3 === 1) propPlant(hw-0.70, z, 0.78);
     });
   } else if(id === "cloak"){
     propPlant(-hw+inset, 1.0, 0.95);
@@ -6078,7 +6104,7 @@ function dressOrnateCorners(id){
     /* Gallery back corners + well corners + dais flanks */
     propPlant(-hw+inset, 1.3, 1.1);
     propPlant(hw-inset, d-1.1, 1.15);
-    if(!MODEST || G.fullDetail){
+    if(!MODEST){
       propPlant(hw-inset, 1.3, 1.1);
       propPlant(-hw+inset, d-1.1, 1.15);
       propPlant(-2.6, 4.2, 0.72);
@@ -6425,7 +6451,7 @@ function buildRoomInner(id, skipShell){
     /* Statues on left midspans — clear of left-wall door openings; plinth under figure. */
     const statueZs = leftZs.slice();
     statueZs.forEach((z, i) => {
-      if(MODEST && !G.fullDetail && (i & 1)) return;
+      if(MODEST && (i & 1)) return;
       addBox(matCol(0xb0aa9a,.88), -hw+1.55, 0.12, z, 0.62,0.24,0.62, 0, true); /* plinth */
       addBox(matCol(0xb9b4a6,.9), -hw+1.55, 1.05, z, 0.42,1.45,0.42, 0);
       addBox(matCol(0xa8a294,.85), -hw+1.55, 2.05, z, 0.30,0.55,0.30, 0);
@@ -6845,7 +6871,7 @@ function buildRoomInner(id, skipShell){
     addBox(matTex(TEX.panel,1,1,.5), hw-1.2, 0.42, 5.3, 0.5,0.06,0.5, 0, true);
     propPapers(hw-1.2, 0.46, 5.3, 3);
     propPlant(-hw+1.0, 7.4, 1.0);
-    if(!MODEST || G.fullDetail) propChandelier(0, h-0.7, 4.5, 4, 0.9);
+    if(!MODEST) propChandelier(0, h-0.7, 4.5, 4, 0.9);
     /* House cloakroom: more sofas, wall phones, notice boards flush */
     {
       const sx = 1.6, sz = 2.4;
@@ -6865,7 +6891,7 @@ function buildRoomInner(id, skipShell){
   if(id === "caucus"){
     try{
     propRug(0, 7.0, 9.0, 8.0);
-    if(!MODEST || G.fullDetail){
+    if(!MODEST){
       propChandelier(-3.0, h-1.1, 6.0, 8, 1.4);
       propChandelier(3.0, h-1.1, 6.0, 8, 1.4);
     }
@@ -6903,7 +6929,7 @@ function buildRoomInner(id, skipShell){
       addCyl(matCol(0x8a6a3a,.4,.3), 0.02, deskY+0.04, d-3.38, 0.018, 0.22).rotation.z = Math.PI/2;
     }catch(e){ if(window.console) console.warn("committee dais dress", e); }
     try{
-      if(!MODEST || G.fullDetail) propChandelier(0, h-1.0, 7.0, 6, 1.1);
+      if(!MODEST) propChandelier(0, h-1.0, 7.0, 6, 1.1);
       /* Rayburn-style seal behind the Chair */
       try{ propHouseSeal(0, 2.85, d - 0.045, Math.PI, 1.7); }catch(e){}
       /* dais flags via placeRoomFlags (Taylor Day: NO7 only) */
@@ -6923,7 +6949,7 @@ function buildRoomInner(id, skipShell){
   if(id === "floor"){
     try{
     propRug(0, 7.5, 3.2, 9.0);
-    if(!MODEST || G.fullDetail) propChandelier(0, h-1.3, 6.0, 10, 1.9);
+    if(!MODEST) propChandelier(0, h-1.3, 6.0, 10, 1.9);
     for(let i=0;i<4;i+=2){ propSconce(-hw+0.12, 3.2, 3.5+i*3.0, Math.PI/2); propSconce(hw-0.12, 3.2, 3.5+i*3.0, -Math.PI/2); }
     /* clerk / parliamentarian / reading clerk in the well */
     propChair(woodMat, leather, 0, d-3.95, Math.PI);
@@ -6976,7 +7002,7 @@ function buildRoomInner(id, skipShell){
     for(let i=0;i<7;i++) addCyl(matCol(0x6b4d2c,.55), -3+i*1.0, 0.55, d-0.55, 0.025, 1.0);
     propLamp(2.4, 1.05, 7.4, 0xfff0d0, 0.7);
     propPlant(hw-0.8, 2.2, 1.0);
-    if(!MODEST || G.fullDetail) propChandelier(0, h-0.6, 5.0, 4, 0.8);
+    if(!MODEST) propChandelier(0, h-0.6, 5.0, 4, 0.8);
     propPlaque(0, 2.45, d-0.04, 0, "Press Gallery", "Third floor", 1.15, 0.28);
     /* wall of monitors flush */
     for(let i=0;i<3;i++){
@@ -8220,10 +8246,13 @@ function animatePerson(p, dt){
   if(dist >= LOD_FAR || (behind && !talking && !moving)) return;
   u.poseN = (u.poseN|0) + 1;
   const seatedNow = !!(p.sitting && !G.noSit && !G.plainSit);
-  /* Seated mid/far: pose every 3rd frame — idle fidget is slow. */
-  if(seatedNow && !talking && dist >= LOD_NEAR && (u.poseN % 3)) return;
-  /* Standing mid-band idle: every 4th frame. */
-  if(!moving && !talking && !seatedNow && dist >= LOD_MID && (u.poseN % 4)) return;
+  /* MAX OPT 20260921: tighter idle pose cadence — near faces still update often. */
+  if(seatedNow && !talking && dist >= LOD_NEAR){
+    const every = dist >= LOD_MID ? 4 : 3;
+    if(u.poseN % every) return;
+  }
+  if(!moving && !talking && !seatedNow && dist >= LOD_NEAR && dist < LOD_MID && (u.poseN % 2)) return;
+  if(!moving && !talking && !seatedNow && dist >= LOD_MID && (u.poseN % 5)) return;
 
   const ph = p.phase, s = Math.sin(ph), A = moving ? 0.58 : 0.0;
 
@@ -22064,9 +22093,12 @@ function loadSave(){
     Object.assign(G, d);
     if(G.fullDetail === undefined || G.fullDetail === null) G.fullDetail = true;
     if(!G.gfx || (G.gfx !== "best" && G.gfx !== "balanced" && G.gfx !== "simple")){
-      G.gfx = "best";
+      G.gfx = (G.simple === true) ? "simple" : "best";
     }
-    G.gfx = "best"; G.simple = false; G.fullDetail = true; G._gfxOk = true;
+    /* No silent Best→Balanced soften / MODEST Simple force (20260921b). */
+    if(G.gfx === "best") G.fullDetail = true;
+    else if(G.gfx !== "best") G.fullDetail = false;
+    G.simple = (G.gfx === "simple");
     if(!G.muteSet) G.mute = false;
     if(!G.room || typeof G.room !== "string") G.room = "office";
     if(typeof G.day !== "number" || !(G.day > 0)) G.day = 1;
@@ -22648,8 +22680,7 @@ function settingsCard(){
   card.querySelectorAll("[data-gfx]").forEach(b => b.addEventListener("click", () => {
     G.gfx = b.getAttribute("data-gfx");
     G.simple = G.gfx === "simple";
-    G.fullDetail = G.gfx === "best";
-    G._gfxOk = true;
+    G.fullDetail = (G.gfx === "best");
     applyQuality();
     save();
     settingsCard();
@@ -23563,9 +23594,12 @@ function frameBody(now, draw){
       if(live && !boot && !acts){
         softUnstickVeil();
       } else {
-        try{ feedTick(dt); }catch(e){}
-        try{ tickScrollFrame(); }catch(e){}
+        /* MAX OPT 20260921: card-up — feed/scroll every other; 3D every 6th. */
         _cardFrames = (_cardFrames || 0) + 1;
+        if((_cardFrames & 1) === 0){
+          try{ feedTick(dt); }catch(e){}
+          try{ tickScrollFrame(); }catch(e){}
+        }
         if(!GL_LOST && _cardFrames % 6 === 0){
           try{ renderer.render(scene, camera); }catch(e){}
         }
@@ -24480,9 +24514,12 @@ function begin(){
   G._crowdPauseUntil = performance.now() + 600;
   G._deferPeopleUntil = performance.now() + 400;
   try{
-    G.fullDetail = true; G.gfx = "best"; G.simple = false; G._gfxOk = true;
+    /* Keep saved gfx; migrateGfx pins Best/fullDetail when unset. Never force Simple here.
+       applyQuality with _aqBusy skips mid-begin room rebuild+syncPeople. */
     migrateGfx();
-  }catch(e){}
+    _aqBusy = true;
+    try{ applyQuality(); }finally{ _aqBusy = false; }
+  }catch(e){ try{ _aqBusy = false; }catch(e2){} }
   const R0 = ROOMS[G.room];
   try{ el("whereName").textContent = R0.t; el("whereTag").textContent = R0.tag; }catch(e){}
   if(!G._savedCam){
