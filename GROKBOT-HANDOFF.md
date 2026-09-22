@@ -19,9 +19,9 @@ One HTML body. Keep these **byte-identical**:
 
 **Build stamp (now): `20260921e`**
 
-- `<meta name="onum-build" content="20260921e">`
-- IIFE `STAMP = "20260921e"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
-- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20260921e"`
+- `<meta name="onum-build" content="20260921f">`
+- IIFE `STAMP = "20260921f"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
+- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20260921f"`
 - Wrapper iframe: `/session.html?v=${ONUM_BUILD}` in `src/routes/index.tsx`
 
 If you change the HTML, bump the letter (`20260921e`, …) in **meta + STAMP + ONUM_BUILD together**, copy the body to all four filenames, commit, push `main`.
@@ -41,7 +41,7 @@ Standalone. Three.js r128 **inlined**. No CDN. **No Claude. No external LLM. `no
 1. `begin()`: `G.running = true` first. If Continue was on floor / committee / caucus / press, drop in **corridor**. Shell on rAF. People + myth + Consular seed **later**, not on the same tick.
 2. Sleep is a **clock**, not a 3D rebuild. Morning card first.
 3. Failed Continue **never deletes** a career. Furthest day wins. Never roll day-10 back to day-5. Do not `JSON.stringify` the whole save on load.
-4. `?safe=1` is the only Simple-force. Default is **Best / fullDetail** (`20260921e`). Settings can still pick Simple.
+4. `?safe=1` is the only Simple-force. Default is **Best / fullDetail** (`20260921f`). Settings can still pick Simple.
 5. Do not `location.replace` for cache. `history.replaceState` only.
 
 ### Look (people)
@@ -132,7 +132,7 @@ armFrame → rAF → frame(now)
     else: crowd bones + render + plates
 ```
 
-`MODEST` (Dell / Edge / grok.me iframe / ≤8GB) still **throttles the loop**. As of `20260921e` it must **not** force Simple graphics. Visuals = Best. `?safe=1` is the hatch.
+`MODEST` (Dell / Edge / grok.me iframe / ≤8GB) still **throttles the loop**. As of `20260921f` it must **not** force Simple graphics. Visuals = Best. `?safe=1` is the hatch.
 
 Verify: `python` extract the `use strict` + `function begin` script → `node --check`. Then `node scripts/continuity.mjs` (Continue day-10, walk rooms, `G.running`).
 

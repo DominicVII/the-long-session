@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20260921e">
+<meta name="onum-build" content="20260921f">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20260921e";
+  var STAMP = "20260921f";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -3285,17 +3285,16 @@ function disposePersonMesh(mesh){
   }catch(e){}
 }
 function houseQuiet(){
-  /* Same rule as Sleep: do not remesh, stringify, or restaff while the
-     player is mid-cut (card, night, door, morning walk). */
+  /* Hard quiet only: card / night / door-fade. Feet no longer pause the House
+     (20260921f) — remesh and AI drip while walking so stop never flushes. */
   try{
     if(G.pendingNight) return true;
-    if(G.moving) return true;
-    const now = performance.now();
-    if(G._crowdPauseUntil && now < G._crowdPauseUntil) return true;
-    if(G._deferPeopleUntil && now < G._deferPeopleUntil) return true;
-    if(G._bootGraceUntil && now < G._bootGraceUntil) return true;
-    if(typeof veil !== "undefined" && veil && !veil.hidden) return true;
-    if(playerMoving()) return true;
+    if(G.moving) return true; /* door fade / room cut */
+    if(typeof veil !== "undefined" && veil && !veil.hidden) return true; /* card */
+    try{
+      const fd = typeof el === "function" ? el("fade") : null;
+      if(fd && parseFloat(fd.style.opacity || "0") > 0.05) return true;
+    }catch(e){}
   }catch(e){}
   return false;
 }
@@ -3476,7 +3475,7 @@ let GFX_PR = 1.25;
 let LOD_NEAR = 3.0, LOD_MID = 6.2, LOD_FAR = 9.5;
 let crowdSafe = false, crowdPacked = false, crowdT = 0;
 function migrateGfx(){
-  /* Default Best / fullDetail (20260921e). Settings can still pick Simple. */
+  /* Default Best / fullDetail (20260921f). Settings can still pick Simple. */
   if(G.fullDetail === undefined || G.fullDetail === null) G.fullDetail = true;
   if(G.fullDetail){
     G.gfx = "best";
@@ -3595,7 +3594,7 @@ function applyQuality(){
     GFX_PR = 1.1; GFX_EXPOSE = 1.0; GFX_HEMI = 1.0; GFX_SUN = 1.0;
     PEOPLE_CAST_SHADOW = false; SHADOW_SKIP = 0.20; SHADOW_PERIOD = 1/9;
   } else {
-    /* Best (20260921e): room/sun shadows only — people never cast (biggest hitch with a room of skinned meshes). */
+    /* Best (20260921f): room/sun shadows only — people never cast (biggest hitch with a room of skinned meshes). */
     renderer.shadowMap.enabled = true;
     if(MODEST){
       renderer.shadowMap.type = THREE.PCFShadowMap;
@@ -8070,6 +8069,7 @@ function syncPeople(){
   if(_buildingRoom) return;
   if(syncPeople._busy) return;
   syncPeople._busy = true;
+  const _ps = (typeof ONUM_PROF !== "undefined") ? performance.now() : 0;
   try{
   FRAME_ID++;
   /* Incremental keep-set (same idea as syncPeopleStaged): do not tear ALL
@@ -8110,13 +8110,24 @@ function syncPeople(){
     peopleGroup.updateMatrixWorld(true);
     peopleGroup.traverse(o => { if(o.isSkinnedMesh && o.skeleton) o.skeleton.update(); });
   }
-  } finally { syncPeople._busy = false; }
+  } finally {
+    syncPeople._busy = false;
+    try{
+      if(typeof ONUM_PROF !== "undefined" && ONUM_PROF && _ps){
+        const d = performance.now() - _ps;
+        if(d > 0.01){
+          if(!ONUM_PROF._syncAcc) ONUM_PROF._syncAcc = 0;
+          ONUM_PROF._syncAcc += d;
+        }
+      }
+    }catch(e){}
+  }
 }
 function syncPeopleStaged(done, retries){
   retries = retries || 0;
-  /* Never rAF-retry through a quiet window — that burned 30 frames then
-     remeshed the corridor anyway. One timer. Quiet stays quiet. */
-  if(houseQuiet()){
+  /* Defer only on door/card/night/fade or mid-build — NOT on feet (20260921f).
+     People drip one-at-a-time while walking so stop never remeshes a backlog. */
+  if(houseQuiet() || _buildingRoom){
     if(done){
       const prev = syncPeopleStaged._after;
       syncPeopleStaged._after = () => {
@@ -8188,7 +8199,7 @@ function syncPeopleStaged(done, retries){
   }
   let at = 0;
   const step = () => {
-    const stop = Math.min(missing.length, at + (MODEST ? 2 : 4));
+    const stop = Math.min(missing.length, at + (MODEST ? 1 : 2)); /* drip flat while walk/idle */
     try{
       for(; at < stop; at++){
         const p = missing[at];
@@ -22066,13 +22077,13 @@ function queueSave(explicit){
   if(explicit){ try{ return save(true); }catch(e){ return false; } }
   if(PROC.on || TALK.open) return false;
   /* Never block a walk frame with autosave. */
-  try{ if(houseQuiet() || playerMoving()) return false; }catch(e){}
+  try{ if(houseQuiet()) return false; }catch(e){} /* feet ok — flat drip 20260921f */
   if(saveQueued || saveBusy) return false;
   saveQueued = true;
   setTimeout(() => {
     saveQueued = false;
     try{
-      if(houseQuiet() || playerMoving()) return;
+      if(houseQuiet()) return; /* feet ok 20260921f */
       save(false);
     }catch(e){}
   }, 280);
@@ -22160,7 +22171,7 @@ function save(explicit, sync){
   if(saveBusy) return false;
   /* Autosave never runs mid-walk / door fade. Explicit still yields. */
   if(!explicit && !sync){
-    try{ if(houseQuiet() || playerMoving()) return false; }catch(e){}
+    try{ if(houseQuiet()) return false; }catch(e){} /* feet ok — flat drip 20260921f */
   }
   saveBusy = true;
   try{
@@ -22186,7 +22197,7 @@ function save(explicit, sync){
     let bi = 0, ii = 0;
     const step = () => {
       try{
-        if(!explicit && (houseQuiet() || playerMoving())){
+        if(!explicit && houseQuiet()){ /* feet ok 20260921f */
           saveBusy = false;
           return;
         }
@@ -22206,7 +22217,7 @@ function save(explicit, sync){
         /* stringify also off the walk frame */
         saveIdle(() => {
           try{
-            if(!explicit && (houseQuiet() || playerMoving())){
+            if(!explicit && houseQuiet()){ /* feet ok 20260921f */
               saveBusy = false;
               return;
             }
@@ -23442,45 +23453,17 @@ function tick(dt){
     procTick(dt);
     return;
   }
-  /* Feet first on a long sitting: do not think for the House while you walk. */
-  if(spd > 0.12){
-    G._wasMoving = true;
-    G._drainUntil = performance.now() + 1000;
-    procTick(dt);
-    return;
-  }
-  /* After a walk: drain AI one subsystem per frame for ~1s — never dump all on first idle. */
-  if(G._wasMoving){
-    G._wasMoving = false;
-    G._drainUntil = performance.now() + 1000;
-    G._drainLane = 0;
-  }
-  if(G._drainUntil && performance.now() < G._drainUntil){
-    if(!PROC.on){
-      try{ drainHouseOne(w, dt); }catch(e){}
-    }
-    procTick(dt);
-    return;
-  }
-  if(!PROC.on) tickWanderBatch(w);
-  if(MODEST){
-    if((FRAME_ID & 3) === 0 && !PROC.on){ clockRoom(w); crowdWatch(dt); }
-    else if((FRAME_ID & 3) === 2 && !PROC.on){ voxTick(w); autonomyTick(w); sentWorld(w); }
-  } else if((FRAME_ID & 1) === 0){
-    if(!PROC.on){ clockRoom(w); crowdWatch(dt); confabulate(w); }
-  } else if(!PROC.on){
-    tieTick(w);
-    voxTick(w);
-    autonomyTick(w);
-    sentWorld(w);
-    chamberDebate(w);
+  /* Flat House drain (20260921f): one lane every frame whether walking or still.
+     No catch-up burst when the feet stop. */
+  if(!PROC.on){
+    try{ drainHouseOne(w, dt); }catch(e){}
   }
   procTick(dt);
 }
 function drainHouseOne(w, dt){
-  /* Token bucket: one House mind per frame after the feet stop. */
+  /* Token bucket: one House mind per frame — walk or stand, same rate. */
   if(G._drainLane == null) G._drainLane = 0;
-  const lane = (G._drainLane++) % 8;
+  const lane = (G._drainLane++) % 12;
   if(lane === 0) sentWorld(w);
   else if(lane === 1) clockRoom(w);
   else if(lane === 2) crowdWatch(dt);
@@ -23493,7 +23476,7 @@ function drainHouseOne(w, dt){
     }catch(e){}
   } else if(lane === 6){
     try{ realmTick(); }catch(e){}
-  } else {
+  } else if(lane === 7){
     try{
       const live = G.members || [];
       if(live.length){
@@ -23501,6 +23484,14 @@ function drainHouseOne(w, dt){
         if(m) agiStep(m);
       }
     }catch(e){}
+  } else if(lane === 8){
+    try{ tickWanderBatch(w); }catch(e){}
+  } else if(lane === 9){
+    try{ confabulate(w); }catch(e){}
+  } else if(lane === 10){
+    try{ tieTick(w); }catch(e){}
+  } else {
+    try{ chamberDebate(w); }catch(e){}
   }
 }
 function forceUnstickMove(){
@@ -23738,6 +23729,162 @@ function animateCrowd(dt){
     }
   }
 }
+
+/* ── ONUM_PROF: frame section profiler (quiet ring always; verbose ?prof=1) ── */
+const ONUM_PROF = (() => {
+  let verbose = false;
+  try{ verbose = /(?:\?|&)prof=1(?:&|$)/.test(location.search || ""); }catch(e){}
+  const RING_MAX = 180, SPIKE_MAX = 48;
+  const ring = [];
+  const spikes = [];
+  let lastInfo = null, lastSampleAt = 0;
+  let cur = null, tSec = 0;
+  const names = ["tick","crowd","lighting","shadow","render","hud","feed","sync","furnish","ui"];
+  function blank(){
+    const o = {t:0, total:0};
+    for(const n of names) o[n] = 0;
+    return o;
+  }
+  function begin(){
+    cur = blank();
+    tSec = performance.now();
+    return cur;
+  }
+  function mark(name){
+    if(!cur) return;
+    const n = performance.now();
+    cur[name] = (cur[name] || 0) + (n - tSec);
+    tSec = n;
+  }
+  function add(name, ms){
+    if(!cur || !(ms > 0)) return;
+    cur[name] = (cur[name] || 0) + ms;
+  }
+  function sampleInfo(){
+    try{
+      if(!renderer || !renderer.info) return null;
+      const r = renderer.info.render || {};
+      const m = renderer.info.memory || {};
+      const out = {
+        calls: r.calls|0,
+        triangles: r.triangles|0,
+        geometries: m.geometries|0,
+        textures: m.textures|0,
+        programs: (renderer.info.programs && renderer.info.programs.length) || 0
+      };
+      try{
+        if(performance.memory) out.heapMB = Math.round(performance.memory.usedJSHeapSize / 1048576);
+      }catch(e){}
+      return out;
+    }catch(e){ return null; }
+  }
+  function end(draw){
+    if(!cur) return null;
+    mark("_tail");
+    cur.total = 0;
+    for(const n of names) cur.total += (cur[n] || 0);
+    cur.draw = !!draw;
+    cur.at = performance.now();
+    const now = cur.at;
+    if(now - lastSampleAt > 1000){
+      lastSampleAt = now;
+      lastInfo = sampleInfo();
+    }
+    cur.info = lastInfo;
+    ring.push(cur);
+    if(ring.length > RING_MAX) ring.shift();
+    const spike = cur.total > 22 || (cur.render || 0) > 12;
+    if(spike){
+      spikes.push(Object.assign({}, cur));
+      if(spikes.length > SPIKE_MAX) spikes.shift();
+      if(verbose && typeof console !== "undefined" && console.debug){
+        console.debug("ONUM_PROF spike", cur.total.toFixed(1), "ms", cur);
+      }
+    }
+    const out = cur; cur = null; return out;
+  }
+  function dump(){
+    const top = spikes.slice().sort((a,b) => b.total - a.total).slice(0, 12);
+    const sums = blank();
+    let n = 0;
+    for(const f of (top.length ? top : ring.slice(-60))){
+      for(const k of names) sums[k] += (f[k] || 0);
+      sums.total += (f.total || 0);
+      n++;
+    }
+    const avg = {};
+    if(n){
+      for(const k of names) avg[k] = +(sums[k] / n).toFixed(3);
+      avg.total = +(sums.total / n).toFixed(3);
+    }
+    const ranked = names.map(k => ({
+      name: k,
+      ms: avg[k] || 0,
+      pct: avg.total ? +(((avg[k] || 0) / avg.total) * 100).toFixed(1) : 0
+    })).sort((a,b) => b.ms - a.ms);
+    return {
+      verbose, spikeCount: spikes.length, ringCount: ring.length,
+      topSpikes: top, ranked, avg, lastInfo,
+      verdict: (function(){
+        const r = ranked[0];
+        if(!r) return "unknown";
+        if(r.name === "render" || r.name === "shadow" || r.name === "lighting") return "GPU/draw-bound (render/lighting/shadow dominate)";
+        if(r.name === "tick" || r.name === "crowd" || r.name === "sync" || r.name === "furnish") return "CPU-bound (tick/crowd/sync dominate)";
+        return "mixed (" + r.name + " leads)";
+      })()
+    };
+  }
+  function stressBoot(){
+    try{
+      if(typeof buildWorld === "function"){
+        buildWorld("Profiler Seat", "FED", typeof makeLook === "function" ? makeLook() : null);
+      }
+      G.room = "corridor";
+      G.day = Math.max(G.day || 1, 2);
+      G.minute = 10 * 60 + 30;
+      G._savedCam = false;
+      if(typeof begin === "function") begin();
+      api._lastBoot = { ok:true, room: G.room, n: (G.members&&G.members.length)||0, running: !!G.running };
+      return true;
+    }catch(e){
+      if(console && console.warn) console.warn("ONUM_PROF.stressBoot", e);
+      api._lastBoot = { ok:false, err: String((e&&e.message)||e) };
+      return false;
+    }
+  }
+  function snap(){
+    try{
+      return {
+        boot: api._lastBoot || null,
+        running: !!(typeof G !== "undefined" && G.running),
+        room: (typeof G !== "undefined" && G.room) || null,
+        people: (typeof peopleGroup !== "undefined" && peopleGroup && peopleGroup.children) ? peopleGroup.children.length : 0,
+        furnished: !!(typeof _roomFurnished !== "undefined" && _roomFurnished),
+        members: (typeof G !== "undefined" && G.members) ? G.members.length : 0
+      };
+    }catch(e){ return { err: String(e) }; }
+  }
+  function autoWalk(ms){
+    ms = ms || 10000;
+    const KB = (typeof G !== "undefined" && G.bind) || (typeof DEFAULT_BIND !== "undefined" ? DEFAULT_BIND : {forward:"w"});
+    try{ keys[KB.forward] = true; }catch(e){}
+    const t0 = performance.now();
+    const iv = setInterval(() => {
+      try{ keys[KB.forward] = true; }catch(e){}
+      /* gentle yaw so we sweep corridor */
+      try{ cam.yaw += 0.004; }catch(e){}
+      if(performance.now() - t0 >= ms){
+        clearInterval(iv);
+        try{ keys[KB.forward] = false; }catch(e){}
+      }
+    }, 50);
+    return true;
+  }
+  const api = {begin, mark, add, end, dump, sampleInfo, stressBoot, autoWalk, snap, ring, spikes, get verbose(){ return verbose; }, get cur(){ return cur; }};
+  try{ window.ONUM_PROF = api; }catch(e){}
+  return api;
+})();
+
 function frame(now){
   if(GL_LOST){ last = now; armFrame(); return; }
   if(typeof document !== "undefined" && document.hidden){ armFrame(); return; }
@@ -23785,6 +23932,8 @@ function frame(now){
   armFrame();
 }
 function frameBody(now, draw){
+  const _prof = (typeof ONUM_PROF !== "undefined") ? ONUM_PROF : null;
+  if(_prof) _prof.begin();
   const dt = Math.min(0.05, (now-last)/1000); last = now;
   FRAME_ID++;
   if(G.moving && G._moveAt && (performance.now() - G._moveAt) > 4200){
@@ -23812,9 +23961,10 @@ function frameBody(now, draw){
         if(!GL_LOST && _cardFrames % 6 === 0){
           try{ renderer.render(scene, camera); }catch(e){}
         }
+        if(_prof){ _prof.mark("render"); _prof.end(false); }
         return;
       }
-    }catch(e){ return; }
+    }catch(e){ if(_prof) _prof.end(false); return; }
   }
   if(talkUp){
     const KB = G.bind || DEFAULT_BIND;
@@ -23830,12 +23980,17 @@ function frameBody(now, draw){
   catch(err){
     if(window.console && frameFails < 2) console.warn("tick error", err);
   }
+  if(_prof) _prof.mark("tick");
   if(draw){
     if(G._crowdPauseUntil && performance.now() < G._crowdPauseUntil){
       try{ animateCrowd(dt); }catch(e){}
     } else {
       animateCrowd(dt);
     }
+  }
+  if(_prof){
+    _prof.mark("crowd");
+    if(_prof._syncAcc){ _prof.add("sync", _prof._syncAcc); _prof._syncAcc = 0; }
   }
   /* Once a second, check one body's world matrix for a value that
      cannot be right — a zero scale or a NaN, which is what a stale or
@@ -23916,21 +24071,25 @@ function frameBody(now, draw){
   );
   if(!draw){
     try{ feedTick(dt); }catch(e){}
+    if(_prof){ _prof.mark("feed"); _prof.end(false); }
     return;
   }
   try{ if(!MODEST || (FRAME_ID & 3) === 0) updateLighting(dt); }catch(e){}
+  if(_prof) _prof.mark("lighting");
   /* Moving: skip shadow map refresh — room shadows stay; biggest hitch after people cast. */
   if(playerMoving){
     try{ if(renderer && renderer.shadowMap) renderer.shadowMap.needsUpdate = false; }catch(e){}
   } else if(!MODEST || (FRAME_ID & 3) === 0){
     shadowTick(dt);
   }
+  if(_prof) _prof.mark("shadow");
   if(!GL_LOST){
     try{ renderer.render(scene, camera); }
     catch(e){
       if(window.console && !frameFailLogged){ frameFailLogged = true; console.error("render error", e); }
     }
   }
+  if(_prof) _prof.mark("render");
   const thing = G.running ? focusThing() : null;
   const foc = thing && thing.type === "person" ? thing.ref : null;
   /* Moving: skip HUD plate/track/tele work — feet first. */
@@ -23939,6 +24098,7 @@ function frameBody(now, draw){
     if(!MODEST || (FRAME_ID & 7) === 0) updateTrack(TALK.m || foc);
     if(!MODEST || (FRAME_ID & 7) === 1) updateTele(dt);
   }
+  if(_prof) _prof.mark("hud");
   /* Moving: feed much less often — HUD text is not feet. */
   if(playerMoving){
     if((FRAME_ID & 7) === 0) feedTick(dt);
@@ -23946,6 +24106,7 @@ function frameBody(now, draw){
     feedTick(dt);
   }
   try{ tickScrollFrame(); }catch(e){}
+  if(_prof) _prof.mark("feed");
   /* the marker's pulse is the only thing left writing a uniform every
      frame for something you may not even be looking at */
   const wantMarker = !!(thing && thing.type === "prop" && !TALK.open);
@@ -23975,6 +24136,7 @@ function frameBody(now, draw){
   say(el("hail"), waiting ? waiting.name + " wants a word — walk over and press E" : null);
   acc += dt;
   if(acc > (MODEST ? 0.9 : 0.4)){ acc = 0; if(!G.over) refreshBar(); }
+  if(_prof){ _prof.mark("ui"); _prof.end(true); }
 }
 
 function peekSave(){
@@ -24913,7 +25075,7 @@ try{ opening(); }catch(e){
 setInterval(() => {
   try{
     if(!G.running || G.over || !G.you || !G.members || !G.members.length) return;
-    if(houseQuiet() || playerMoving()) return;
+    if(houseQuiet()) return; /* feet ok 20260921f */
     queueSave();
   }catch(e){}
 }, 45000);
