@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20260921f">
+<meta name="onum-build" content="20260921j">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20260921f";
+  var STAMP = "20260921j";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -2061,6 +2061,77 @@ function remember(m, text, weight, sticky){
   if(!m || !m.mem) return;
   m.mem.unshift({d:G.day, t:text, w:weight, s:sticky?2.6:1});
   if(m.mem.length > 26) m.mem.pop();
+  try{ ledgerOwn(m, text); }catch(e){}
+}
+function ledgerEnsure(m){
+  if(!m) return null;
+  if(!m.led || !m.led.sealed){
+    m.led = {
+      sealed: true,
+      id: m.id,
+      saw: [],
+      told: [],
+      trust: {},
+      debt: {},
+      want: (m.intent && m.intent.t) || "get through the day without becoming a story",
+      fear: (m.fear && (m.fear.t || m.fear)) || "losing the seat",
+      grudge: []
+    };
+  }
+  return m.led;
+}
+function ledgerOwn(m, text){
+  const L = ledgerEnsure(m);
+  const t = String(text || "").slice(0, 180);
+  if(!t || !L) return;
+  if(L.saw[0] && L.saw[0].t === t) return;
+  L.saw.unshift({d:G.day, t, who: m.id, where: m.room || "away"});
+  if(L.saw.length > 24) L.saw.length = 24;
+}
+function ledgerKnows(m, needle){
+  const L = ledgerEnsure(m);
+  if(!L) return false;
+  const n = String(needle || "").toLowerCase();
+  if(!n) return false;
+  const hit = e => String(e.t || "").toLowerCase().indexOf(n) >= 0;
+  return (L.saw || []).some(hit) || (L.told || []).some(hit);
+}
+function ledgerTell(from, to, text){
+  if(!from || !to || from === to) return;
+  if((from.room || "") !== (to.room || "")) return;
+  const L = ledgerEnsure(to);
+  const t = String(text || "").slice(0, 180);
+  if(!t) return;
+  L.told.unshift({d:G.day, t, by: from.id});
+  if(L.told.length > 18) L.told.length = 18;
+  try{ if(to.mem){ to.mem.unshift({d:G.day, t, w:2, s:1}); if(to.mem.length > 26) to.mem.pop(); } }catch(e){}
+}
+function ledgerRumor(from, to){
+  if(!from || !to || from === to) return;
+  if((from.room || "") !== (to.room || "")) return;
+  const A = ledgerEnsure(from);
+  const bit = (A.saw && A.saw[0]) || (A.told && A.told[0]);
+  if(!bit) return;
+  if(ledgerKnows(to, bit.t)) return;
+  if(Math.random() < 0.28) ledgerTell(from, to, bit.t);
+}
+function ledgerLine(m){
+  const L = ledgerEnsure(m);
+  if(!L) return "";
+  if(L.grudge[0]) return L.grudge[0];
+  if(L.told[0] && Math.random() < 0.45) return "I was told — " + L.told[0].t;
+  if(L.saw[0]) return L.saw[0].t;
+  return L.want || "";
+}
+function ledgerTick(m){
+  if(!m || m.gone) return;
+  const L = ledgerEnsure(m);
+  if(!L) return;
+  if(m.room !== G.room) return;
+  const here = hereNow();
+  if(here.length < 2) return;
+  const o = here[(FRAME_ID || 0) % here.length];
+  if(o && o !== m && Math.random() < 0.12) ledgerRumor(m, o);
 }
 function memWeight(m, e){
   const age = G.day - e.d;
@@ -3050,12 +3121,7 @@ function restaff(force){
   });
   try{ ensureLivedIn(); }catch(e){}
   const missing = hereNow().some(m => !m.mesh);
-  if(movedAny || missing){
-    if(houseQuiet()) return;
-    nextFrameOrTimeout(() => {
-      try{ syncPeopleStaged(); }catch(e){ try{ if(window.console) console.warn("syncPeopleStaged", e); }catch(e2){} }
-    });
-  }
+  if(movedAny || missing) markRenderDirty();
   try{ ambientHourBeat(h, t); }catch(e){}
   try{ if(!houseQuiet() && !inHall()) consularBody(h); }catch(e){}
 }
@@ -6253,6 +6319,28 @@ let _roomBuiltId = null;
 let _roomFurnished = false;
 const ROOM_KITS = Object.create(null);
 let ROOM_KIT_IDS = [];
+let _warmBusy = false;
+function kitHops(from, to){
+  if(!from || !to) return 99;
+  if(from === to) return 0;
+  const seen = Object.create(null);
+  const q = [from];
+  seen[from] = 0;
+  while(q.length){
+    const cur = q.shift();
+    const d = seen[cur];
+    if(d >= 2) continue;
+    const doors = DOORS[cur] || [];
+    for(let i=0;i<doors.length;i++){
+      const n = doors[i].to;
+      if(seen[n] !== undefined) continue;
+      seen[n] = d + 1;
+      if(n === to) return d + 1;
+      q.push(n);
+    }
+  }
+  return 99;
+}
 function stashLiveRoom(){
   const id = _roomBuiltId;
   if(!id || !_roomFurnished || !roomGroup || roomGroup.children.length < 4) return;
@@ -6262,19 +6350,89 @@ function stashLiveRoom(){
   ROOM_KITS[id] = kit;
   ROOM_KIT_IDS = ROOM_KIT_IDS.filter(x => x !== id);
   ROOM_KIT_IDS.push(id);
-  const cap = MODEST ? 6 : 8;
+  const cap = 9;
   while(ROOM_KIT_IDS.length > cap){
     const drop = ROOM_KIT_IDS.shift();
-    if(drop === id) continue;
+    if(drop === id || drop === (G && G.room)) continue;
+    try{ if(kitHops(G.room, drop) <= 2){ ROOM_KIT_IDS.push(drop); continue; } }catch(e){}
     delete ROOM_KITS[drop];
+  }
+}
+function peopleWanted(){
+  /* Present in this room and the next door. Not thinking — just bodies.
+     Two doors away they wait in the kit, not on the GPU. */
+  const out = [];
+  const seen = Object.create(null);
+  const add = m => {
+    if(!m || m.gone || seen[m.id]) return;
+    seen[m.id] = 1;
+    out.push(m);
+  };
+  try{ hereNow().forEach(add); }catch(e){}
+  const ads = DOORS[G.room] || [];
+  for(let i=0;i<ads.length;i++){
+    let n = 0;
+    const rid = ads[i].to;
+    const pool = everyone();
+    for(let j=0;j<pool.length && n < 3;j++){
+      const m = pool[j];
+      if(m && m.room === rid && !m.gone){ add(m); n++; }
+    }
+  }
+  return out;
+}
+function warmAhead(){
+  if(_buildingRoom || _warmBusy) return;
+  if(houseQuiet()) return;
+  const list = DOORS[G.room] || [];
+  if(!list.length) return;
+  let best = null, bestD = 7;
+  for(let i=0;i<list.length;i++){
+    const dr = list[i];
+    if(!ROOMS[dr.to]) continue;
+    const p = doorAt(G.room, dr);
+    const d = Math.hypot((p.x||0) - cam.x, (p.z||0) - cam.z);
+    if(d < bestD){ bestD = d; best = dr; }
+  }
+  if(!best) return;
+  const dest = best.to;
+  if(dest === _roomBuiltId) return;
+  if(ROOM_KITS[dest] && ROOM_KITS[dest].userData.furnished) return;
+  _warmBusy = true;
+  const hold = roomGroup;
+  const holdId = _roomBuiltId;
+  const holdF = _roomFurnished;
+  try{
+    const kit = ROOM_KITS[dest] || new THREE.Group();
+    roomGroup = kit;
+    if(!kit.userData.shell){
+      buildRoomShell(dest);
+      kit.userData.shell = true;
+      ROOM_KITS[dest] = kit;
+      if(ROOM_KIT_IDS.indexOf(dest) < 0) ROOM_KIT_IDS.push(dest);
+    } else if(!kit.userData.furnished){
+      buildRoomInner(dest, true);
+      try{ tidyRoomFurniture(); }catch(e){}
+      try{ freezeStaticRoom(); }catch(e){}
+      kit.userData.furnished = true;
+      ROOM_KITS[dest] = kit;
+    }
+  }catch(e){
+    if(window.console) console.warn("warmAhead", dest, e);
+  }finally{
+    roomGroup = hold;
+    _roomBuiltId = holdId;
+    _roomFurnished = holdF;
+    _warmBusy = false;
   }
 }
 function takeRoomKit(id){
   const kit = ROOM_KITS[id];
-  if(!kit || !kit.children.length || !kit.userData.furnished) return false;
+  if(!kit || !kit.children.length) return false;
+  if(!kit.userData.furnished && !kit.userData.shell) return false;
   while(kit.children.length) roomGroup.add(kit.children[0]);
   _roomBuiltId = id;
-  _roomFurnished = true;
+  _roomFurnished = !!kit.userData.furnished;
   try{ buildSky(ROOMS[id]); }catch(e){}
   return true;
 }
@@ -6492,7 +6650,6 @@ function buildRoomInner(id, skipShell){
     /* Statues on left midspans — clear of left-wall door openings; plinth under figure. */
     const statueZs = leftZs.slice();
     statueZs.forEach((z, i) => {
-      if(MODEST && (i & 1)) return;
       addBox(matCol(0xb0aa9a,.88), -hw+1.55, 0.12, z, 0.62,0.24,0.62, 0, true); /* plinth */
       addBox(matCol(0xb9b4a6,.9), -hw+1.55, 1.05, z, 0.42,1.45,0.42, 0);
       addBox(matCol(0xa8a294,.85), -hw+1.55, 2.05, z, 0.30,0.55,0.30, 0);
@@ -8169,14 +8326,15 @@ function syncPeopleStaged(done, retries){
   syncPeopleStaged._busy = true;
   let list, missing;
   try{
-    list = hereNow().slice();
-    if(inHall() && list.length > (MODEST ? 6 : 8)) list = list.slice(0, MODEST ? 6 : 8);
+    list = peopleWanted();
+    if(inHall() && list.length > (MODEST ? 10 : 14)) list = list.slice(0, MODEST ? 10 : 14);
     const keep = new Set();
     for(let i=0;i<list.length;i++) if(list[i].mesh) keep.add(list[i].mesh);
     for(let i = peopleGroup.children.length - 1; i >= 0; i--){
       const ch = peopleGroup.children[i];
       if(!keep.has(ch)){
-        try{ disposePersonMesh(ch); }catch(e){ try{ peopleGroup.remove(ch); }catch(e2){} }
+        ch.visible = false;
+        /* Persist the body. Do not dispose — remesh is the freeze. */
       }
     }
     missing = list.filter(p => {
@@ -8215,6 +8373,7 @@ function syncPeopleStaged(done, retries){
           if(p.look){ p.look._faceVer = 2; p.look._clothVer = 7; }
         }
         if(p.mesh.parent !== peopleGroup) peopleGroup.add(p.mesh);
+        p.mesh.visible = true;
       }
       peopleGroup.updateMatrixWorld(true);
     }catch(e){
@@ -8618,7 +8777,7 @@ function seatPanel(){
     W.facing = 0;   /* chairs face the dais (+z) */
     W.sitting = true; W.sitY = 0; W.seatFace = 0;
   });
-  if(!houseQuiet()) syncPeopleStaged();
+  if(!houseQuiet()) markRenderDirty();
 }
 function clearPanel(){
   if(!PROC.panel) return;
@@ -8629,7 +8788,7 @@ function clearPanel(){
     if(i >= 0) G.civ.splice(i, 1);
   });
   PROC.panel = null;
-  if(!houseQuiet()) syncPeopleStaged();
+  if(!houseQuiet()) markRenderDirty();
 }
 /* a member of this House, in the chair, answering for something */
 const WIT_CHARGE = [
@@ -10817,7 +10976,7 @@ function sendHomeForKin(m, news){
   /* Never remesh on the night card. Bodies wait until the morning is walking. */
   try{
     const cardUp = !!(typeof veil !== "undefined" && veil && !veil.hidden);
-    if(!cardUp && !G.pendingNight && !houseQuiet()) syncPeopleStaged();
+    if(!cardUp && !G.pendingNight && !houseQuiet()) markRenderDirty();
   }catch(e){}
 }
 function kinEnsure(m){
@@ -10962,7 +11121,7 @@ function realmVisit(realm){
   _allCache = null;
   realm.envoyId = m.id;
   try{ feed("An envoy of " + realm.t + " is in the building. They are not here to vote."); }catch(e){}
-  try{ if(!houseQuiet()) syncPeopleStaged(); }catch(e){}
+  try{ if(!houseQuiet()) markRenderDirty(); }catch(e){}
   return m;
 }
 function realmDepart(realm){
@@ -13702,7 +13861,7 @@ function willAct(m){
     if(m.room !== "district" && roll < 0.28 && G.room !== m.room){
       m.room = "district";
       try{ placeInRoom(m); }catch(e){}
-      if(!houseQuiet()){ try{ syncPeopleStaged(); }catch(e){} }
+      if(!houseQuiet()){ try{ markRenderDirty(); }catch(e){} }
       mindRemember(m, "experience", "I went home because the destiny required it.", {soft:true});
       w.kept++;
       return;
@@ -13721,7 +13880,7 @@ function willAct(m){
         if(away !== G.room){
         m.room = away;
         try{ placeInRoom(m); }catch(e){}
-        if(!houseQuiet()){ try{ syncPeopleStaged(); }catch(e){} }
+        if(!houseQuiet()){ try{ markRenderDirty(); }catch(e){} }
       }
       }
       w.kept++;
@@ -13940,7 +14099,7 @@ function sentCompose(m){
     (m.soul && m.soul.wound) ? ("I can still feel " + m.soul.wound + ".") : null,
     s.awake < 0.28 ? "I am barely in the room." : null,
     (function(){ try{ const p = pulseEnsure(m); const h = (G.minute||480)/60; return (h < 10 && p && p.woke) ? p.woke : null; }catch(e){ return null; } })(),
-    (function(){ try{ const ab = abroadEnsure(m); return ab ? ab.ache : null; }catch(e){ return null; } })()
+    (function(){ try{ return ledgerLine(m) || null; }catch(e){ return null; } })()
   ].filter(Boolean);
   const next = pick([byTopic[s.topic] || byTopic.body].concat(extra));
   const prev = s.now;
@@ -14094,7 +14253,7 @@ function sentAct(m){
     if(dest && dest !== m.room){
       m.room = dest; m.sitting = false;
       try{ placeInRoom(m); }catch(e){}
-      if(!off && !houseQuiet()){ try{ syncPeopleStaged(); }catch(e){} }
+      if(!off && !houseQuiet()){ try{ markRenderDirty(); }catch(e){} }
       s.busyUntil = (G.t || 0) + 6;
     }
     return;
@@ -14203,24 +14362,12 @@ function youSent(){
   return s;
 }
 function sentWorld(w){
-  try{ if(!MODEST || (FRAME_ID & 1) === 0) youSent(); }catch(e){}
-  const live = G.members;
-  if(!live || !live.length) return;
-  const n = MODEST ? 2 : 5;
-  const start = (FRAME_ID * 3) % live.length;
-  let did = 0, guard = 0;
-  while(did < n && guard < live.length){
-    const m = live[(start + guard * 11) % live.length];
-    guard++;
-    if(!m || m.gone || m.kind === "ghost") continue;
-    try{
-      if(m.room !== G.room && (did & 1) && m.kind !== "envoy"){
-        const s = sentEnsure(m);
-        s.hunger = clamp((s.hunger || 0) + 0.01, 0, 1);
-      } else sentTick(m);
-    }catch(e){}
-    did++;
-  }
+  try{ if((FRAME_ID & 7) === 0) youSent(); }catch(e){}
+  const here = hereNow();
+  if(!here || !here.length) return;
+  const m = here[(FRAME_ID || 0) % here.length];
+  if(!m || m.gone || m.kind === "ghost") return;
+  try{ sentTick(m); }catch(e){}
 }
 function sentNotice(m, said, u){
   const s = sentEnsure(m);
@@ -18050,8 +18197,12 @@ function fresh(build, tries){
 
 /* what is on their mind, drawn from where they actually are */
 function convHook(m){
+  try{
+    const bit = ledgerLine(m);
+    if(bit && chance(0.78)) return bit;
+  }catch(e){}
   try{ if(!m.brain || !m.brain.inner) netRuminate(m); }catch(e){}
-  if(m.brain && m.brain.inner && chance(0.62)) return m.brain.inner;
+  if(m.brain && m.brain.inner && chance(0.28)) return m.brain.inner;
   try{
     inventLife(m);
     if(m.life && chance(0.34)) return lifeLine(m);
@@ -18264,6 +18415,14 @@ function openTalk(m){
   TALK.open = true; TALK.m = m;
   el("talk").classList.add("is-open");
   el("talk").scrollTop = 0;
+  try{
+    ledgerEnsure(m);
+    if(G.you) ledgerTell(G.you, m, "You came to me.");
+    hereNow().forEach(o => {
+      if(!o || o === m) return;
+      if(Math.random() < 0.22) ledgerOwn(o, "I saw " + surname(m.name) + " talking in here.");
+    });
+  }catch(e){}
   try{
     const hold = sentBusy(m);
     if(hold){
@@ -20196,7 +20355,7 @@ function switchParty(m, to){
   m.rel.warmth = clamp(m.rel.warmth+25,-100,100);
   m.traits.loyalty = clamp(m.traits.loyalty-10,0,100);
   G.members.forEach(o => { if(o!==m && o.party===from) o.rel.warmth = clamp(o.rel.warmth-4,-100,100); });
-  if(m.mesh && !houseQuiet()){ m.mesh = null; syncPeopleStaged(); }
+  if(m.mesh && !houseQuiet()){ m.mesh = null; markRenderDirty(); }
   assignPosts(false);
 }
 
@@ -22100,6 +22259,11 @@ function stripMesh(m){
     c.sent.private = String(c.sent.private || "").slice(0, 140);
     c.sent.secret = String(c.sent.secret || "").slice(0, 160);
   }
+  if(c.led){
+    if(c.led.saw) c.led.saw = c.led.saw.slice(0, 16);
+    if(c.led.told) c.led.told = c.led.told.slice(0, 12);
+    if(c.led.grudge) c.led.grudge = c.led.grudge.slice(0, 8);
+  }
   return c;
 }
 function saveCaptureBase(){
@@ -23448,22 +23612,19 @@ function tick(dt){
   if(!G.moving && G.t >= (G.doorGrace||0) && ((FRAME_ID & 3) === 0 || spd < 0.08)) bumpCheck(sprint);
   if(G.speed <= 0 || G.pendingNight) return;
   if((G.minute || 0) >= 22*60){ beginNight(); return; }
-  if(!TALK.open && !PROC.on && w > 0) spend(w * DAY_RATE, 0);
   if(G._bootGraceUntil && performance.now() < G._bootGraceUntil){
     procTick(dt);
     return;
   }
-  /* Flat House drain (20260921f): one lane every frame whether walking or still.
-     No catch-up burst when the feet stop. */
-  if(!PROC.on){
-    try{ drainHouseOne(w, dt); }catch(e){}
-  }
+  /* Lives are not the frame. The House thinks on its own clock. */
   procTick(dt);
 }
 function drainHouseOne(w, dt){
-  /* Token bucket: one House mind per frame — walk or stand, same rate. */
+  /* One House mind per premise beat. Not the frame. */
+  const t0 = performance.now();
+  if((G._premSpent || 0) > 4){ G._premSpent = 0; return; }
   if(G._drainLane == null) G._drainLane = 0;
-  const lane = (G._drainLane++) % 12;
+  const lane = (G._drainLane++) % 13;
   if(lane === 0) sentWorld(w);
   else if(lane === 1) clockRoom(w);
   else if(lane === 2) crowdWatch(dt);
@@ -23481,7 +23642,7 @@ function drainHouseOne(w, dt){
       const live = G.members || [];
       if(live.length){
         const m = live[(FRAME_ID || 0) % live.length];
-        if(m) agiStep(m);
+        if(m && m.room === G.room) agiStep(m);
       }
     }catch(e){}
   } else if(lane === 8){
@@ -23490,9 +23651,54 @@ function drainHouseOne(w, dt){
     try{ confabulate(w); }catch(e){}
   } else if(lane === 10){
     try{ tieTick(w); }catch(e){}
-  } else {
+  } else if(lane === 11){
     try{ chamberDebate(w); }catch(e){}
+  } else {
+    try{
+      const live = G.members || [];
+      if(live.length){
+        const a = live[(FRAME_ID || 0) % live.length];
+        ledgerTick(a);
+        const b = live[((FRAME_ID || 0) * 5) % live.length];
+        if(b) ledgerEnsure(b);
+      }
+    }catch(e){}
   }
+  G._premSpent = (G._premSpent || 0) + (performance.now() - t0);
+}
+function markRenderDirty(){ try{ G._renderDirty = true; }catch(e){} }
+const PREMISE = { hz: 10, last: 0, timer: 0 };
+function premisePulse(){
+  /* System A. Does not draw. Does not know the window exists.
+     Hidden tab still ticks — catch-up is capped so a return is not a flush. */
+  if(!G || !G.you) return;
+  if(G.pendingNight) return;
+  if(PROC && PROC.on) return;
+  try{
+    if(G._bootGraceUntil && performance.now() < G._bootGraceUntil) return;
+  }catch(e){}
+  const now = performance.now();
+  const hidden = (typeof document !== "undefined" && document.hidden);
+  const raw = PREMISE.last ? Math.min(hidden ? 1.0 : 0.2, (now - PREMISE.last) / 1000) : 0.1;
+  PREMISE.last = now;
+  G._premSpent = 0;
+  const w = raw * (G.speed || 1);
+  try{
+    if(!TALK.open && w > 0) spend(w * DAY_RATE, 0);
+  }catch(e){}
+  try{ drainHouseOne(w, raw); }catch(e){}
+}
+function armPremise(){
+  if(PREMISE.timer) return;
+  PREMISE.timer = setInterval(function(){
+    try{ premisePulse(); }catch(e){}
+  }, 100);
+}
+function renderRead(){
+  /* System B. Reads. Never writes a ledger. */
+  if((G._frameSpent || 0) > 5) return;
+  try{ if(G._renderDirty){ G._renderDirty = false; syncPeopleStaged(); } }catch(e){}
+  try{ warmAhead(); }catch(e){}
 }
 function forceUnstickMove(){
   G.moving = false;
@@ -23582,12 +23788,12 @@ function enterRoom(dest, fromRoom){
     }catch(e){}
     try{ forcePaint(); }catch(e){}
   }, furnishAt);
-  G._crowdPauseUntil = Math.max(G._crowdPauseUntil || 0, performance.now() + 280);
-  G._deferPeopleUntil = performance.now() + 400;
+  G._crowdPauseUntil = Math.max(G._crowdPauseUntil || 0, performance.now() + 180);
+  G._deferPeopleUntil = performance.now() + 200;
   nextFrameOrTimeout(() => {
     if(G.room !== dest) return;
     try{ syncPeopleStaged(); }catch(e){}
-  }, 360);
+  }, 16);
   nextFrameOrTimeout(() => {
     if(G.room !== dest) return;
     try{ if(dest === "floor") seatChamber(); }catch(e){}
@@ -23701,7 +23907,7 @@ function animateCrowd(dt){
     const d2 = dx*dx + dz*dz;
     const fwd = sy*dx + cy*dz;
     const talking = talk === p;
-    /* Standing: cull hard behind. Moving: also hide far (d2>25) or any behind — cheap frames. */
+    /* Draw only. Being is not optional. A back is still a person. */
     if(!talking){
       if(playerMoving){
         if(fwd < 0 || d2 > 25){
@@ -23714,9 +23920,13 @@ function animateCrowd(dt){
       }
     }
     if(!p.mesh.visible) p.mesh.visible = true;
+    const gy = groundAt(p.z, p.room || G.room);
+    const mx = p.mesh.position;
+    mx.x += (p.x - mx.x) * 0.35;
+    mx.z += (p.z - mx.z) * 0.35;
+    mx.y = gy;
     /* While walking: pose only — animatePerson skinned work hitches Best with a room of people. */
     if(playerMoving && !talking){
-      p.mesh.position.set(p.x, groundAt(p.z, p.room || G.room), p.z);
       p.mesh.rotation.y = p.facing || 0;
       continue;
     }
@@ -23724,7 +23934,6 @@ function animateCrowd(dt){
       animatePerson(p, dt);
       full++;
     } else {
-      p.mesh.position.set(p.x, groundAt(p.z, p.room || G.room), p.z);
       p.mesh.rotation.y = p.facing || 0;
     }
   }
@@ -23932,6 +24141,7 @@ function frame(now){
   armFrame();
 }
 function frameBody(now, draw){
+  G._frameSpent = 0;
   const _prof = (typeof ONUM_PROF !== "undefined") ? ONUM_PROF : null;
   if(_prof) _prof.begin();
   const dt = Math.min(0.05, (now-last)/1000); last = now;
@@ -23980,6 +24190,7 @@ function frameBody(now, draw){
   catch(err){
     if(window.console && frameFails < 2) console.warn("tick error", err);
   }
+  try{ renderRead(); }catch(e){}
   if(_prof) _prof.mark("tick");
   if(draw){
     if(G._crowdPauseUntil && performance.now() < G._crowdPauseUntil){
@@ -24883,6 +25094,7 @@ function begin(){
   }
   /* FREEZE FIX: Continuity first. Heavy work deferred. Furniture, Caesar, Consular, horcruxes stay. */
   G.running = true; G.over = false;
+  try{ armPremise(); }catch(e){}
   G._bootGraceUntil = performance.now() + 8000;
   G._deferPeopleUntil = performance.now() + ((G.room === "corridor") ? 6500 : 2500);
   G.bare = true;
@@ -25101,6 +25313,7 @@ addEventListener("visibilitychange", () => {
       last = performance.now();
       cam.vx = 0; cam.vz = 0; cam.yawVel = 0;
       try{ for(const k in keys) keys[k] = false; }catch(e){}
+      try{ premisePulse(); }catch(e){}
       kickFrame();
     }
   }catch(e){}
