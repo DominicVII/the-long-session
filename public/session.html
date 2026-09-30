@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20260928a">
+<meta name="onum-build" content="20260929a">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20260928a";
+  var STAMP = "20260929a";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -3440,6 +3440,7 @@ const renderer = new THREE.WebGLRenderer({
   failIfMajorPerformanceCaveat: false
 });
 renderer.setPixelRatio(Math.min(devicePixelRatio || 1, MODEST ? 0.58 : 0.92));
+try{ renderer.info.autoReset = false; }catch(e){}
 renderer.outputEncoding = THREE.sRGBEncoding;
 try{ renderer.physicallyCorrectLights = false; }catch(e){}
 try{ if(renderer.shadowMap) renderer.shadowMap.autoUpdate = false; }catch(e){}
@@ -6390,9 +6391,11 @@ function peopleWanted(){
   }
   return out;
 }
+let _warmSkip = 0;
 function warmAhead(){
-  /* 20260928a stream-drip: shell kits while walking; furnish one kit only when standing.
-     houseQuiet = card/night/fade — still bail. Feet use playerMoving(). One phase per call. */
+  /* 20260929a stream-drip: shell kits while walking; furnish one kit only when standing.
+     A slow build buys silence. houseQuiet still bails. One phase per call. */
+  if(_warmSkip > 0){ _warmSkip--; return; }
   if(_buildingRoom || _warmBusy) return;
   if(houseQuiet()) return;
   const list = DOORS[G.room] || [];
@@ -6428,6 +6431,7 @@ function warmAhead(){
   const hold = roomGroup;
   const holdId = _roomBuiltId;
   const holdF = _roomFurnished;
+  const t0 = performance.now();
   try{
     const kit = ROOM_KITS[dest] || new THREE.Group();
     roomGroup = kit;
@@ -6450,6 +6454,8 @@ function warmAhead(){
     _roomBuiltId = holdId;
     _roomFurnished = holdF;
     _warmBusy = false;
+    const took = performance.now() - t0;
+    if(took > 6) _warmSkip = 36;
   }
 }
 function takeRoomKit(id){
@@ -23713,6 +23719,9 @@ function premisePulse(){
     if(!TALK.open && w > 0) spend(w * DAY_RATE, 0);
   }catch(e){}
   try{ drainHouseOne(w, raw); }catch(e){}
+  if((G._premSpent || 0) < 2.5){
+    try{ drainHouseOne(w, raw); }catch(e){}
+  }
 }
 function armPremise(){
   if(PREMISE.timer) return;
@@ -23721,9 +23730,16 @@ function armPremise(){
   }, 100);
 }
 function renderRead(){
-  /* System B. Reads. Never writes a ledger. */
-  if((G._frameSpent || 0) > 5) return;
-  try{ if(G._renderDirty){ G._renderDirty = false; syncPeopleStaged(); } }catch(e){}
+  /* System B. Reads. Never writes a ledger. Room builds are rare, never every frame. */
+  const moving = Math.hypot(cam.vx || 0, cam.vz || 0) > 0.12;
+  if(G._renderDirty && (!moving || (FRAME_ID & 7) === 0)){
+    if((G._frameSpent || 0) < 4){
+      G._renderDirty = false;
+      try{ syncPeopleStaged(); }catch(e){}
+    }
+  }
+  if((FRAME_ID & 11) !== 0) return;
+  if((G._frameSpent || 0) > 3) return;
   try{ warmAhead(); }catch(e){}
 }
 function forceUnstickMove(){
@@ -23946,7 +23962,7 @@ function animateCrowd(dt){
       }
     }
     if(!p.mesh.visible) p.mesh.visible = true;
-    const gy = groundAt(p.z, p.room || G.room);
+    const gy = (G.room === "steps") ? groundAt(p.z, p.room || G.room) : 0;
     const mx = p.mesh.position;
     mx.x += (p.x - mx.x) * 0.35;
     mx.z += (p.z - mx.z) * 0.35;
@@ -24311,7 +24327,7 @@ function frameBody(now, draw){
     if(_prof){ _prof.mark("feed"); _prof.end(false); }
     return;
   }
-  try{ if(!MODEST || (FRAME_ID & 3) === 0) updateLighting(dt); }catch(e){}
+  try{ if((FRAME_ID & 1) === 0) updateLighting(dt); }catch(e){}
   if(_prof) _prof.mark("lighting");
   /* Moving: skip shadow map refresh — room shadows stay; biggest hitch after people cast. */
   if(playerMoving){
