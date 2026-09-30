@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20260928a">
+<meta name="onum-build" content="20260921k">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20260928a";
+  var STAMP = "20260921k";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -3439,6 +3439,8 @@ const renderer = new THREE.WebGLRenderer({
   powerPreference: MODEST ? "low-power" : "high-performance",
   failIfMajorPerformanceCaveat: false
 });
+try{ renderer.info.autoReset = false; }catch(e){}
+try{ renderer.sortObjects = true; }catch(e){}
 renderer.setPixelRatio(Math.min(devicePixelRatio || 1, MODEST ? 0.58 : 0.92));
 renderer.outputEncoding = THREE.sRGBEncoding;
 try{ renderer.physicallyCorrectLights = false; }catch(e){}
@@ -3799,14 +3801,7 @@ function texCanvas(size, paint){
     return t;
   }
   try{
-    let cap = (G.fullDetail || G.gfx === "best") ? 8 : 4;
-    /* 20260928a: while walking, newly created textures only — cap anisotropy at 2 (no full-texture walk). */
-    try{
-      const feet = (typeof playerMoving === "function" && playerMoving())
-        || (typeof houseQuiet === "function" && houseQuiet() && cam && Math.hypot(cam.vx||0, cam.vz||0) > 0.12)
-        || (cam && Math.hypot(cam.vx||0, cam.vz||0) > 0.12);
-      if(feet) cap = Math.min(cap, 2);
-    }catch(e2){}
+    const cap = (G.fullDetail || G.gfx === "best") ? 8 : 4;
     t.anisotropy = (typeof renderer !== "undefined" && renderer && renderer.capabilities)
       ? Math.min(cap, renderer.capabilities.getMaxAnisotropy()) : Math.min(cap, 2);
   }catch(e){ t.anisotropy = 2; }
@@ -6361,8 +6356,6 @@ function stashLiveRoom(){
   while(ROOM_KIT_IDS.length > cap){
     const drop = ROOM_KIT_IDS.shift();
     if(drop === id || drop === (G && G.room)) continue;
-    /* Prefer keeping corridor kits — first door out is the heavy one. */
-    if(drop === "corridor"){ ROOM_KIT_IDS.push(drop); continue; }
     try{ if(kitHops(G.room, drop) <= 2){ ROOM_KIT_IDS.push(drop); continue; } }catch(e){}
     delete ROOM_KITS[drop];
   }
@@ -6390,44 +6383,31 @@ function peopleWanted(){
   }
   return out;
 }
+let _warmSkip = 0;
 function warmAhead(){
-  /* 20260928a stream-drip: shell kits while walking; furnish one kit only when standing.
-     houseQuiet = card/night/fade — still bail. Feet use playerMoving(). One phase per call. */
+  if(_warmSkip > 0){ _warmSkip--; return; }
   if(_buildingRoom || _warmBusy) return;
   if(houseQuiet()) return;
   const list = DOORS[G.room] || [];
   if(!list.length) return;
-  const moving = (typeof playerMoving === "function") ? playerMoving() : false;
-  let best = null, bestScore = 7;
+  let best = null, bestD = 5.2;
   for(let i=0;i<list.length;i++){
     const dr = list[i];
     if(!ROOMS[dr.to]) continue;
     const p = doorAt(G.room, dr);
     const d = Math.hypot((p.x||0) - cam.x, (p.z||0) - cam.z);
-    if(d > 7) continue;
-    let score = d;
-    /* Prefer corridor kits / corridor-adjacent when distances are close. */
-    if(dr.to === "corridor") score -= 0.9;
-    else {
-      try{
-        const neigh = DOORS[dr.to] || [];
-        for(let k=0;k<neigh.length;k++){ if(neigh[k].to === "corridor"){ score -= 0.35; break; } }
-      }catch(e){}
-      if(G.room === "corridor") score -= 0.2;
-    }
-    if(score < bestScore){ bestScore = score; best = dr; }
+    if(d < bestD){ bestD = d; best = dr; }
   }
   if(!best) return;
   const dest = best.to;
   if(dest === _roomBuiltId) return;
-  const have = ROOM_KITS[dest];
-  if(have && have.userData.furnished) return;
-  /* Walking: shell-only. Standing: may furnish. Never both in one call. */
-  if(moving && have && have.userData.shell) return;
+  if(ROOM_KITS[dest] && ROOM_KITS[dest].userData.furnished) return;
+  const moving = Math.hypot(cam.vx || 0, cam.vz || 0) > 0.12;
   _warmBusy = true;
   const hold = roomGroup;
   const holdId = _roomBuiltId;
   const holdF = _roomFurnished;
+  const t0 = performance.now();
   try{
     const kit = ROOM_KITS[dest] || new THREE.Group();
     roomGroup = kit;
@@ -6450,6 +6430,8 @@ function warmAhead(){
     _roomBuiltId = holdId;
     _roomFurnished = holdF;
     _warmBusy = false;
+    const took = performance.now() - t0;
+    if(took > 6) _warmSkip = 30;
   }
 }
 function takeRoomKit(id){
@@ -23713,6 +23695,9 @@ function premisePulse(){
     if(!TALK.open && w > 0) spend(w * DAY_RATE, 0);
   }catch(e){}
   try{ drainHouseOne(w, raw); }catch(e){}
+  if((G._premSpent || 0) < 2.5){
+    try{ drainHouseOne(w, raw); }catch(e){}
+  }
 }
 function armPremise(){
   if(PREMISE.timer) return;
@@ -23721,9 +23706,16 @@ function armPremise(){
   }, 100);
 }
 function renderRead(){
-  /* System B. Reads. Never writes a ledger. */
-  if((G._frameSpent || 0) > 5) return;
-  try{ if(G._renderDirty){ G._renderDirty = false; syncPeopleStaged(); } }catch(e){}
+  /* System B. Reads. Never writes a ledger. Room builds are rare, never every frame. */
+  const moving = Math.hypot(cam.vx || 0, cam.vz || 0) > 0.12;
+  if(G._renderDirty && (!moving || (FRAME_ID & 7) === 0)){
+    if((G._frameSpent || 0) < 4){
+      G._renderDirty = false;
+      try{ syncPeopleStaged(); }catch(e){}
+    }
+  }
+  if((FRAME_ID & 11) !== 0) return;
+  if((G._frameSpent || 0) > 3) return;
   try{ warmAhead(); }catch(e){}
 }
 function forceUnstickMove(){
@@ -23946,7 +23938,7 @@ function animateCrowd(dt){
       }
     }
     if(!p.mesh.visible) p.mesh.visible = true;
-    const gy = groundAt(p.z, p.room || G.room);
+    const gy = (G.room === "steps") ? groundAt(p.z, p.room || G.room) : 0;
     const mx = p.mesh.position;
     mx.x += (p.x - mx.x) * 0.35;
     mx.z += (p.z - mx.z) * 0.35;
@@ -24311,7 +24303,7 @@ function frameBody(now, draw){
     if(_prof){ _prof.mark("feed"); _prof.end(false); }
     return;
   }
-  try{ if(!MODEST || (FRAME_ID & 3) === 0) updateLighting(dt); }catch(e){}
+  try{ if((FRAME_ID & 1) === 0) updateLighting(dt); }catch(e){}
   if(_prof) _prof.mark("lighting");
   /* Moving: skip shadow map refresh — room shadows stay; biggest hitch after people cast. */
   if(playerMoving){
@@ -25191,10 +25183,6 @@ function begin(){
       try{ G.room = "office"; buildRoomShell("office"); _roomBuiltId = "office"; _roomFurnished = false; }catch(e2){}
     }
     try{ forcePaint(); }catch(e){}
-    /* 20260928a: after shell is up, drip-warm a neighbor shell — never block begin. */
-    try{
-      nextFrameOrTimeout(() => { try{ warmAhead(); }catch(e){} }, 0);
-    }catch(e){}
     requestAnimationFrame(() => {
       try{
         if((G.room || roomId) === "corridor") return;
