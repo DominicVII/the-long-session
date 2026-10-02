@@ -4,6 +4,20 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## MAX OPTIMIZE frame/kit/crowd (1 Oct 2026) — `20261001a`
+
+On tip `20260929a` (second mind beat; room build waits if frame already heavy). Walk **0.68** / sprint **1.15** kept. Full people meshes kept. `PEOPLE_CAST_SHADOW` false. `history.replaceState` only.
+
+- **A. Far crowd freeze while walking:** beyond near (`d2 > 12`) but inside existing cull (`d2 ≤ 25`, facing): snap pose, `matrixAutoUpdate = false`. Near keep soft follow + pose-only. Never dummy people.
+- **B. Kit reuse:** warmAhead / takeRoomKit heal shell+furnished flags from children; skip rebuild when dest kit already furnished; re-`freezeStaticRoom` after taking a furnished kit (Sleep stays a clock).
+- **C. Frame budget hardening:** `framePaidMs` / `frameOverBudget(6)` — warmAhead shell/furnish, renderRead sync/warm, and drainHouseOne bail early if the beat already paid (~3.5ms premise / 6ms frame). One unit of work max.
+- Texture walk anisotropy cap ≤2 kept from `20260928a`.
+- Stamp: meta + STAMP + `ONUM_BUILD` → `20261001a`. Five HTML copies byte-identical.
+
+## Second mind beat (29 Sep 2026) — `20260929a`
+
+Keeps the 28a door drip and walk texture cap. Lives get a second cheap tick when premise still has budget. A room build that costs more than 6ms waits (`_warmSkip`).
+
 ## Stream-drip warmAhead (28 Sep 2026) — `20260928a`
 
 First corridor door still the heaviest (~0.8–1.4s). Kits make the second pass cheap. Full people meshes kept. Walk **0.68** / sprint **1.15** kept. `PEOPLE_CAST_SHADOW` false.
@@ -36,7 +50,7 @@ While walking (`spd > 0.12`): skip shadowTick, plates/track/tele, matChk; animat
 | **raw.githack** | https://raw.githack.com/DominicVII/the-long-session/main/index.html |
 | **jsDelivr** | https://cdn.jsdelivr.net/gh/DominicVII/the-long-session@main/index.html |
 
-**Build stamp: `20260928a`.** Saves live in the browser (`localStorage`). Continue never deletes a career. Sleep is a clock, not a 3D rebuild.
+**Build stamp: `20261001a`.** Saves live in the browser (`localStorage`). Continue never deletes a career. Sleep is a clock, not a 3D rebuild.
 
 This is the actual working log of the published HTML — not a Claude artifact.
 
