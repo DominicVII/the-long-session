@@ -1,0 +1,41 @@
+name: apply-20261001a-patch
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "build/onum-01a.patch.b64"
+      - ".github/workflows/apply-01a.yml"
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply 20261001a patch onto session.html
+        run: |
+          set -euo pipefail
+          if grep -q 'content="20261001a"' session.html; then
+            echo already 20261001a
+            exit 0
+          fi
+          if ! grep -q 'content="20260929a"' session.html; then
+            echo "expected tip 20260929a before patch; got:"
+            grep -o 'onum-build" content="[^"]*"' session.html || true
+            exit 1
+          fi
+          base64 -d build/onum-01a.patch.b64 > /tmp/onum-01a.patch
+          patch -p1 < /tmp/onum-01a.patch
+          mkdir -p public
+          cp session.html index.html
+          cp session.html "One Nation, Under, ME.html"
+          cp session.html session.standalone.html
+          cp session.html public/session.html
+          if [ -f build/CHANGELOG.md.b64 ]; then base64 -d build/CHANGELOG.md.b64 > CHANGELOG.md; fi
+          if [ -f build/GROKBOT-HANDOFF.md.b64 ]; then base64 -d build/GROKBOT-HANDOFF.md.b64 > GROKBOT-HANDOFF.md; fi
+          if [ -f build/onum-build.ts ]; then mkdir -p src/lib && cp build/onum-build.ts src/lib/onum-build.ts; fi
+          git config user.name DominicVII
+          git config user.email 318079878+DominicVII@users.noreply.github.com
+          git add session.html index.html "One Nation, Under, ME.html" session.standalone.html public/session.html CHANGELOG.md GROKBOT-HANDOFF.md src/lib/onum-build.ts || true
+          git commit -m "20261001a: far-crowd freeze, kit reuse, 6ms frame budget bail"
+          git push
