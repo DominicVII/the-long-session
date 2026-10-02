@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20260929a">
+<meta name="onum-build" content="20261001a">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20260929a";
+  var STAMP = "20261001a";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -3315,6 +3315,22 @@ function yieldPaint(fn){
   try{ requestAnimationFrame(() => setTimeout(once, 0)); }catch(e){}
   setTimeout(once, 48);
 }
+function framePaidMs(){
+  /* Wall clock since frameBody opened. Cheap; used by warm/drain/sync bails. */
+  try{
+    if(G && G._frameT0) return performance.now() - G._frameT0;
+  }catch(e){}
+  return 0;
+}
+function frameOverBudget(lim){
+  /* 20261001a: 6ms guard — bail before another room/people unit if the frame already paid. */
+  lim = (lim == null) ? 6 : lim;
+  try{
+    if((G._frameSpent || 0) > lim) return true;
+    if(framePaidMs() > lim) return true;
+  }catch(e){}
+  return false;
+}
 function playerMoving(){
   try{
     if(cam && Math.hypot(cam.vx || 0, cam.vz || 0) > 0.12) return true;
@@ -6393,11 +6409,12 @@ function peopleWanted(){
 }
 let _warmSkip = 0;
 function warmAhead(){
-  /* 20260929a stream-drip: shell kits while walking; furnish one kit only when standing.
-     A slow build buys silence. houseQuiet still bails. One phase per call. */
+  /* 20260929a stream-drip + 20261001a budget: shell while walking; furnish while standing.
+     Bail if this frame already paid >6ms. Reuse furnished kits — never rebuild. One phase. */
   if(_warmSkip > 0){ _warmSkip--; return; }
   if(_buildingRoom || _warmBusy) return;
   if(houseQuiet()) return;
+  if(typeof frameOverBudget === "function" && frameOverBudget(6)) return;
   const list = DOORS[G.room] || [];
   if(!list.length) return;
   const moving = (typeof playerMoving === "function") ? playerMoving() : false;
@@ -6424,7 +6441,19 @@ function warmAhead(){
   const dest = best.to;
   if(dest === _roomBuiltId) return;
   const have = ROOM_KITS[dest];
-  if(have && have.userData.furnished) return;
+  /* Kit pool: furnished dest is done — do not rebuild. Heal missing flags from children. */
+  if(have){
+    if(have.userData.furnished) return;
+    if(!have.userData.shell && have.children && have.children.length >= 4){
+      have.userData.shell = true;
+    }
+    if(have.userData.shell && have.children && have.children.length >= 8 && !have.userData.furnished){
+      /* Already looks furnished (prior stash) — mark and keep. */
+      try{
+        if(have.children.length >= 12){ have.userData.furnished = true; return; }
+      }catch(e){}
+    }
+  }
   /* Walking: shell-only. Standing: may furnish. Never both in one call. */
   if(moving && have && have.userData.shell) return;
   _warmBusy = true;
@@ -6436,11 +6465,14 @@ function warmAhead(){
     const kit = ROOM_KITS[dest] || new THREE.Group();
     roomGroup = kit;
     if(!kit.userData.shell){
+      if(typeof frameOverBudget === "function" && frameOverBudget(6)) return;
       buildRoomShell(dest);
       kit.userData.shell = true;
       ROOM_KITS[dest] = kit;
       if(ROOM_KIT_IDS.indexOf(dest) < 0) ROOM_KIT_IDS.push(dest);
     } else if(!kit.userData.furnished && !moving){
+      /* Furnish only if this frame can still pay. */
+      if(typeof frameOverBudget === "function" && frameOverBudget(6)){ _warmSkip = 12; return; }
       buildRoomInner(dest, true);
       try{ tidyRoomFurniture(); }catch(e){}
       try{ freezeStaticRoom(); }catch(e){}
@@ -6455,6 +6487,7 @@ function warmAhead(){
     _roomFurnished = holdF;
     _warmBusy = false;
     const took = performance.now() - t0;
+    try{ G._frameSpent = (G._frameSpent || 0) + took; }catch(e){}
     if(took > 6) _warmSkip = 36;
   }
 }
@@ -6462,10 +6495,17 @@ function takeRoomKit(id){
   const kit = ROOM_KITS[id];
   if(!kit || !kit.children.length) return false;
   if(!kit.userData.furnished && !kit.userData.shell) return false;
+  /* Heal flags from a prior warmAhead / stash. */
+  if(!kit.userData.shell && kit.children.length >= 4) kit.userData.shell = true;
+  if(!kit.userData.furnished && kit.children.length >= 12) kit.userData.furnished = true;
   while(kit.children.length) roomGroup.add(kit.children[0]);
   _roomBuiltId = id;
   _roomFurnished = !!kit.userData.furnished;
   try{ buildSky(ROOMS[id]); }catch(e){}
+  /* Reparent undoes matrixAutoUpdate freezes — restore after furnish kits. Sleep never rebuilds. */
+  if(_roomFurnished){
+    try{ nextFrameOrTimeout(() => { try{ freezeStaticRoom(); }catch(e){} }, 0); }catch(e){}
+  }
   return true;
 }
 function buildRoom(id){
@@ -23652,9 +23692,10 @@ function tick(dt){
   procTick(dt);
 }
 function drainHouseOne(w, dt){
-  /* One House mind per premise beat. Not the frame. */
+  /* One House mind per premise beat. Not the frame.
+     20261001a: bail if this premise pulse already paid >3.5ms (keep one unit max). */
   const t0 = performance.now();
-  if((G._premSpent || 0) > 4){ G._premSpent = 0; return; }
+  if((G._premSpent || 0) > 3.5){ return; }
   if(G._drainLane == null) G._drainLane = 0;
   const lane = (G._drainLane++) % 13;
   if(lane === 0) sentWorld(w);
@@ -23730,16 +23771,17 @@ function armPremise(){
   }, 100);
 }
 function renderRead(){
-  /* System B. Reads. Never writes a ledger. Room builds are rare, never every frame. */
+  /* System B. Reads. Never writes a ledger. Room builds are rare, never every frame.
+     20261001a: remesh/warm bail if frame already paid >6ms. */
   const moving = Math.hypot(cam.vx || 0, cam.vz || 0) > 0.12;
   if(G._renderDirty && (!moving || (FRAME_ID & 7) === 0)){
-    if((G._frameSpent || 0) < 4){
+    if(!(typeof frameOverBudget === "function" && frameOverBudget(6))){
       G._renderDirty = false;
       try{ syncPeopleStaged(); }catch(e){}
     }
   }
   if((FRAME_ID & 11) !== 0) return;
-  if((G._frameSpent || 0) > 3) return;
+  if(typeof frameOverBudget === "function" && frameOverBudget(6)) return;
   try{ warmAhead(); }catch(e){}
 }
 function forceUnstickMove(){
@@ -23964,6 +24006,16 @@ function animateCrowd(dt){
     if(!p.mesh.visible) p.mesh.visible = true;
     const gy = (G.room === "steps") ? groundAt(p.z, p.room || G.room) : 0;
     const mx = p.mesh.position;
+    /* 20261001a: while walking, FAR (d2>12) freeze pose — snap, no lerp; near keep soft follow.
+       Full meshes kept. Never dummy people. */
+    if(playerMoving && !talking && d2 > 12){
+      mx.x = p.x; mx.z = p.z; mx.y = gy;
+      p.mesh.rotation.y = p.facing || 0;
+      if(p.mesh.matrixAutoUpdate !== false) p.mesh.matrixAutoUpdate = false;
+      try{ p.mesh.updateMatrix(); }catch(e){}
+      continue;
+    }
+    if(p.mesh.matrixAutoUpdate === false) p.mesh.matrixAutoUpdate = true;
     mx.x += (p.x - mx.x) * 0.35;
     mx.z += (p.z - mx.z) * 0.35;
     mx.y = gy;
@@ -24183,6 +24235,7 @@ function frame(now){
   armFrame();
 }
 function frameBody(now, draw){
+  G._frameT0 = now;
   G._frameSpent = 0;
   const _prof = (typeof ONUM_PROF !== "undefined") ? ONUM_PROF : null;
   if(_prof) _prof.begin();
@@ -24233,6 +24286,7 @@ function frameBody(now, draw){
     if(window.console && frameFails < 2) console.warn("tick error", err);
   }
   try{ renderRead(); }catch(e){}
+  try{ G._frameSpent = Math.max(G._frameSpent || 0, framePaidMs()); }catch(e){}
   if(_prof) _prof.mark("tick");
   if(draw){
     if(G._crowdPauseUntil && performance.now() < G._crowdPauseUntil){
