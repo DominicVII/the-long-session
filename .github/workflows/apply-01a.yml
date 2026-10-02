@@ -3,7 +3,12 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - "build/onum-01a.patch.b64"
+      - "build/onum-01a.patch.b64.p1.0"
+      - "build/onum-01a.patch.b64.p1.1"
+      - "build/onum-01a.patch.b64.p1.2"
+      - "build/onum-01a.patch.b64.p2.0"
+      - "build/onum-01a.patch.b64.p2.1"
+      - "build/onum-01a.patch.b64.p2.2"
       - ".github/workflows/apply-01a.yml"
 permissions:
   contents: write
@@ -24,18 +29,21 @@ jobs:
             grep -o 'onum-build" content="[^"]*"' session.html || true
             exit 1
           fi
-          base64 -d build/onum-01a.patch.b64 > /tmp/onum-01a.patch
+          : > /tmp/onum-01a.b64
+          for p in 1 2; do for i in 0 1 2; do
+            f="build/onum-01a.patch.b64.p${p}.${i}"
+            [ -f "$f" ] && tr -d '\n' < "$f" >> /tmp/onum-01a.b64
+          done; done
+          base64 -d /tmp/onum-01a.b64 > /tmp/onum-01a.patch
           patch -p1 < /tmp/onum-01a.patch
           mkdir -p public
           cp session.html index.html
           cp session.html "One Nation, Under, ME.html"
           cp session.html session.standalone.html
           cp session.html public/session.html
-          if [ -f build/CHANGELOG.md.b64 ]; then base64 -d build/CHANGELOG.md.b64 > CHANGELOG.md; fi
-          if [ -f build/GROKBOT-HANDOFF.md.b64 ]; then base64 -d build/GROKBOT-HANDOFF.md.b64 > GROKBOT-HANDOFF.md; fi
           if [ -f build/onum-build.ts ]; then mkdir -p src/lib && cp build/onum-build.ts src/lib/onum-build.ts; fi
           git config user.name DominicVII
           git config user.email 318079878+DominicVII@users.noreply.github.com
-          git add session.html index.html "One Nation, Under, ME.html" session.standalone.html public/session.html CHANGELOG.md GROKBOT-HANDOFF.md src/lib/onum-build.ts || true
+          git add session.html index.html "One Nation, Under, ME.html" session.standalone.html public/session.html src/lib/onum-build.ts
           git commit -m "20261001a: far-crowd freeze, kit reuse, 6ms frame budget bail"
           git push
