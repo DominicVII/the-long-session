@@ -17,12 +17,13 @@ One HTML body. Keep these **byte-identical**:
 | `session.html` | repo root |
 | `One Nation, Under, ME.html` | standalone name |
 
-**Build stamp (now): `20261001a`**
+**Build stamp (now): `20261001b`**
 
-- `<meta name="onum-build" content="20261001a">`
-- IIFE `STAMP = "20261001a"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
-- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261001a"`
+- `<meta name="onum-build" content="20261001b">`
+- IIFE `STAMP = "20261001b"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
+- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261001b"`
 - Wrapper iframe: `/session.html?v=${ONUM_BUILD}` in `src/routes/index.tsx`
+- **`20261001b`:** keeps the `20261001a` far-crowd freeze / kit reuse / 6ms bail. Best uses harder smaller shadows (fewer soft 1024 map pixels).
 
 If you change the HTML, bump the letter (`20260921e`, …) in **meta + STAMP + ONUM_BUILD together**, copy the body to all four filenames, commit, push `main`.
 
@@ -134,7 +135,7 @@ armFrame → rAF → frame(now)
 
 `MODEST` (Dell / Edge / grok.me iframe / ≤8GB) still **throttles the loop**. As of `20260921f` it must **not** force Simple graphics. Visuals = Best. `?safe=1` is the hatch.
 
-`warmAhead` (`20260928a` + `20261001a`): while walking (`playerMoving`), build **shell-only** kits for the nearest door; while standing, may furnish one kit step (`buildRoomInner` + tidy + freeze). One phase per call. Prefer corridor kits when culling / choosing. Reuse furnished kits — do not rebuild. `frameOverBudget(6)` bails shell/furnish/sync if the frame already paid. Far crowd (`d2>12`) freezes pose while walking (near full meshes). New canvas textures cap anisotropy at 2 while feet move (Best still gets mips).
+`warmAhead` (`20260928a` + `20261001a` + `20261001b`): while walking (`playerMoving`), build **shell-only** kits for the nearest door; while standing, may furnish one kit step (`buildRoomInner` + tidy + freeze). One phase per call. Prefer corridor kits when culling / choosing. Reuse furnished kits — do not rebuild. `frameOverBudget(6)` bails shell/furnish/sync if the frame already paid. Far crowd (`d2>12`) freezes pose while walking (near full meshes). New canvas textures cap anisotropy at 2 while feet move (Best still gets mips). **`20261001b`:** Best hard/smaller shadows instead of soft 1024 maps.
 
 Verify: `python` extract the `use strict` + `function begin` script → `node --check`. Then `node scripts/continuity.mjs` (Continue day-10, walk rooms, `G.running`) if present.
 

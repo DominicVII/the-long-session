@@ -4,6 +4,14 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## Hard shadows on the 01a freeze (1 Oct 2026) — `20261001b`
+
+On tip `20261001a` (far-crowd freeze / kit reuse / 6ms bail). Walk **0.68** / sprint **1.15** kept. Full people meshes kept. `PEOPLE_CAST_SHADOW` false. `history.replaceState` only.
+
+- Keeps the `20261001a` far-crowd freeze, kit reuse, and 6ms frame budget bail.
+- **Best hard shadows:** drops soft 1024 shadow maps for a harder smaller shadow (fewer map pixels).
+- Stamp: meta + STAMP + `ONUM_BUILD` → `20261001b`. Five HTML copies byte-identical.
+
 ## MAX OPTIMIZE frame/kit/crowd (1 Oct 2026) — `20261001a`
 
 On tip `20260929a` (second mind beat; room build waits if frame already heavy). Walk **0.68** / sprint **1.15** kept. Full people meshes kept. `PEOPLE_CAST_SHADOW` false. `history.replaceState` only.
@@ -37,7 +45,7 @@ Freeze after seconds–minutes of walking (main-thread hitch). Walk **0.68** / s
 
 ## Move-frame opt (22 Sep 2026) — `20260921d`
 
-While walking (`spd > 0.12`): skip shadowTick, plates/track/tele, matChk; animateCrowd pose-only + hide far/behind (`d2>25` or back); brief PR dip MODEST≤0.95 / else≤1.1 then restore. Best still no people-cast; MODEST Best PCF 512 + PR 1.15. Walk 0.68 / sprint 1.15 unchanged.
+While walking (`spd > 0.12`: skip shadowTick, plates/track/tele, matChk; animateCrowd pose-only + hide far/behind (`d2>25` or back); brief PR dip MODEST≤0.95 / else≤1.1 then restore. Best still no people-cast; MODEST Best PCF 512 + PR 1.15. Walk 0.68 / sprint 1.15 unchanged.
 
 ---
 
@@ -50,7 +58,7 @@ While walking (`spd > 0.12`): skip shadowTick, plates/track/tele, matChk; animat
 | **raw.githack** | https://raw.githack.com/DominicVII/the-long-session/main/index.html |
 | **jsDelivr** | https://cdn.jsdelivr.net/gh/DominicVII/the-long-session@main/index.html |
 
-**Build stamp: `20261001a`.** Saves live in the browser (`localStorage`). Continue never deletes a career. Sleep is a clock, not a 3D rebuild.
+**Build stamp: `20261001b`.** Saves live in the browser (`localStorage`). Continue never deletes a career. Sleep is a clock, not a 3D rebuild.
 
 This is the actual working log of the published HTML — not a Claude artifact.
 
