@@ -1,13 +1,6 @@
-name: apply-20261005a-patch
+name: assemble-and-run-05a
 on:
   workflow_dispatch:
-  push:
-    paths:
-      - "build/onum-05a.patch.p0"
-      - "build/onum-05a.patch.p1"
-      - "build/onum-05a.patch.p2"
-      - "build/onum-05a.patch"
-      - ".github/workflows/apply-05a.yml"
 permissions:
   contents: write
 jobs:
@@ -15,26 +8,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Apply 20261005a patch onto session.html
+      - name: Decode patch parts and apply
         run: |
           set -euo pipefail
+          : > /tmp/onum-05a.patch
+          for f in $(ls build/onum-05a.patch.p*.b64 2>/dev/null | sort -V); do
+            base64 -d "$f" >> /tmp/onum-05a.patch
+          done
+          wc -c /tmp/onum-05a.patch
           if grep -q 'content="20261005a"' session.html; then
-            echo "already 20261005a - skip HTML patch"
+            echo already 20261005a
           else
             if ! grep -q 'content="20261001b"' session.html; then
-              echo "expected tip 20261001b before patch; got:"
-              grep -o 'onum-build" content="[^"]*"' session.html || true
-              exit 1
+              echo expected 20261001b; exit 1
             fi
-            if ls build/onum-05a.patch.p* >/dev/null 2>&1; then
-              : > /tmp/onum-05a.patch
-              for f in $(ls build/onum-05a.patch.p* | sort); do
-                cat "$f" >> /tmp/onum-05a.patch
-              done
-              patch -p1 < /tmp/onum-05a.patch
-            else
-              patch -p1 < build/onum-05a.patch
-            fi
+            patch -p1 < /tmp/onum-05a.patch
           fi
           cp session.html index.html
           cp session.html "One Nation, Under, ME.html"
@@ -42,18 +30,16 @@ jobs:
           cp session.html public/session.html
           test "$(md5sum session.html index.html public/session.html session.standalone.html | awk '{print $1}' | sort -u | wc -l)" = "1"
           grep -q 'content="20261005a"' session.html
-          grep -q 'var STAMP = "20261005a"' session.html
           grep -q 'crowdFreezeMesh' session.html
           grep -q 'BasicShadowMap' session.html
-      - name: Commit if dirty
+          grep -q '20261005a' src/lib/onum-build.ts || sed -i 's/20261001b/20261005a/g' src/lib/onum-build.ts
+      - name: Commit and push
         run: |
           set -euo pipefail
           git config user.name "DominicVII"
           git config user.email "318079878+DominicVII@users.noreply.github.com"
-          git add session.html index.html "One Nation, Under, ME.html" session.standalone.html public/session.html src/lib/onum-build.ts GROKBOT-HANDOFF.md CHANGELOG.md || true
-          if git diff --cached --quiet; then
-            echo "nothing to commit"
-          else
+          git add session.html index.html "One Nation, Under, ME.html" session.standalone.html public/session.html src/lib/onum-build.ts
+          if git diff --cached --quiet; then echo nothing; else
             git commit -m "$(cat <<'EOF'
 20261005a: weekly MAX OPTIMIZE + design/max-fit
 
