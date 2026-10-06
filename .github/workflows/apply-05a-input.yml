@@ -1,0 +1,45 @@
+name: apply-20261005a-input
+on:
+  workflow_dispatch:
+    inputs:
+      patch_b64:
+        description: base64 of unified diff vs 20261001b
+        required: true
+        type: string
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply
+        env:
+          PATCH_B64: ${{ inputs.patch_b64 }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os, base64, pathlib
+          pathlib.Path('/tmp/onum-05a.patch').write_bytes(base64.b64decode(os.environ['PATCH_B64']))
+          print('patch', pathlib.Path('/tmp/onum-05a.patch').stat().st_size)
+          PY
+          if grep -q 'content="20261005a"' session.html; then echo already; else
+            grep -q 'content="20261001b"' session.html
+            patch -p1 < /tmp/onum-05a.patch
+          fi
+          cp session.html index.html
+          cp session.html "One Nation, Under, ME.html"
+          cp session.html session.standalone.html
+          cp session.html public/session.html
+          test "$(md5sum session.html index.html public/session.html session.standalone.html | awk '{print $1}' | sort -u | wc -l)" = "1"
+          grep -q 'content="20261005a"' session.html
+          grep -q 'crowdFreezeMesh' session.html
+          grep -q 'BasicShadowMap' session.html
+          grep -q '20261005a' src/lib/onum-build.ts || sed -i 's/20261001b/20261005a/g' src/lib/onum-build.ts
+          git config user.name "DominicVII"
+          git config user.email "318079878+DominicVII@users.noreply.github.com"
+          git add session.html index.html "One Nation, Under, ME.html" session.standalone.html public/session.html src/lib/onum-build.ts
+          if git diff --cached --quiet; then echo nothing; else
+            git commit -m "20261005a: weekly MAX OPTIMIZE + design/max-fit"
+            git push
+          fi
