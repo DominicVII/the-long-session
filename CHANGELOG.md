@@ -4,6 +4,17 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## Weekly MAX OPTIMIZE + design/max-fit (5 Oct 2026) — `20261005a`
+
+On tip `20261001b` (hard shadows on the 01a freeze). Walk **0.68** / sprint **1.15** kept. Full people meshes kept. `PEOPLE_CAST_SHADOW` false. `history.replaceState` only. God is Most High; Christ is King; First Consul is a man under God.
+
+- **A. Deep crowd freeze while walking:** culled (behind / `d2>25`) and far (`d2>12`) people traverse-freeze `matrixAutoUpdate` (suits/faces/hair no longer pay per-frame matrices). Near keep soft follow + pose-only. No dummy people.
+- **B. Best `BasicShadowMap`:** one sample, no PCF filter taps (01b already shrank maps). Shadow refresh still skipped while feet move.
+- **C. Walk light throttle:** `updateLighting` / motes / fan every 8th draw while `spd>0.12`.
+- **D. Max-fit shell:** `.shell` `max-width:min(2560px,100%)`; wide breakpoint denser grid/plates so GamingDesktop fills; kit cap KEEP **MODEST 6 / else 8**.
+- **E. Design polish (canon):** tighter Caesar fringe (not a lump); wider side-part scalp gap; grounded furniture contact pad 0.68.
+- Stamp: meta + STAMP + `ONUM_BUILD` → `20261005a`. Five HTML copies byte-identical.
+
 ## Hard shadows on the 01a freeze (1 Oct 2026) — `20261001b`
 
 On tip `20261001a` (far-crowd freeze / kit reuse / 6ms bail). Walk **0.68** / sprint **1.15** kept. Full people meshes kept. `PEOPLE_CAST_SHADOW` false. `history.replaceState` only.
@@ -58,7 +69,7 @@ While walking (`spd > 0.12`): skip shadowTick, plates/track/tele, matChk; animat
 | **raw.githack** | https://raw.githack.com/DominicVII/the-long-session/main/index.html |
 | **jsDelivr** | https://cdn.jsdelivr.net/gh/DominicVII/the-long-session@main/index.html |
 
-**Build stamp: `20261001b`.** Saves live in the browser (`localStorage`). Continue never deletes a career. Sleep is a clock, not a 3D rebuild.
+**Build stamp: `20261005a`.** Saves live in the browser (`localStorage`). Continue never deletes a career. Sleep is a clock, not a 3D rebuild.
 
 This is the actual working log of the published HTML — not a Claude artifact.
 
