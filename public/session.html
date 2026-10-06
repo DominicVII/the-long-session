@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261001b">
+<meta name="onum-build" content="20261005a">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261001b";
+  var STAMP = "20261005a";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -84,9 +84,16 @@ a:hover{color:var(--fed)}
 /* One frame. The bar, the view and the wire are fixed; only the panels
    scroll, and they scroll inside themselves. Nothing pushes the page. */
 html,body{height:100%}
-.shell{display:grid; grid-template-rows:auto minmax(0,1fr) auto auto; gap:9px; padding:9px;
-  max-width:1520px; margin:0 auto; height:100dvh; min-height:540px; box-sizing:border-box}
+.shell{display:grid; grid-template-rows:auto minmax(0,1fr) auto auto; gap:8px; padding:8px;
+  max-width:min(2560px,100%); margin:0 auto; height:100dvh; min-height:540px; box-sizing:border-box}
 @supports not (height:100dvh){ .shell{height:100vh} }
+/* 20261005a max-fit: wide desks give the stage the leftover width; wire stays readable. */
+@media (min-width:1600px){
+  .shell{gap:8px; padding:8px 10px}
+  .grid{grid-template-columns:minmax(0,1fr) minmax(360px, min(420px, 24vw)); gap:8px}
+  .plate{max-width:min(280px, 48%)}
+  .bar{padding:8px 14px}
+}
 
 
 .bar{display:grid; grid-template-columns:auto auto minmax(0,1fr) auto; gap:16px; align-items:center;
@@ -114,7 +121,7 @@ html,body{height:100%}
 .bar__congress i{display:block; font-style:normal; font-size:8.5px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; color:var(--ink-3)}
 .bar__congress b{font-family:"Instrument Serif",Georgia,serif; font-size:18px; font-weight:400}
 
-.grid{display:grid; grid-template-columns:minmax(0,1fr) 376px; gap:9px;
+.grid{display:grid; grid-template-columns:minmax(0,1fr) minmax(340px, 376px); gap:8px;
   align-items:stretch; min-height:0}
 .grid > div:first-child{display:flex; flex-direction:column; min-height:240px; overflow:hidden}
 .stage{flex:1 1 auto; min-height:150px; display:flex; flex-direction:column}
@@ -3677,9 +3684,10 @@ function applyQuality(){
     GFX_PR = 1.1; GFX_EXPOSE = 1.0; GFX_HEMI = 1.0; GFX_SUN = 1.0;
     PEOPLE_CAST_SHADOW = false; SHADOW_SKIP = 0.20; SHADOW_PERIOD = 1/9;
   } else {
-    /* Best stays lit. Soft 1024 shadows were the hitch. Hard maps are the room. */
+    /* Best stays lit. Soft 1024 was the hitch; 01b shrank maps; 05a uses BasicShadowMap
+       (one sample, no PCF taps) so walk frames stop paying soft filter cost. */
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFShadowMap;
+    renderer.shadowMap.type = THREE.BasicShadowMap;
     if(MODEST){
       if(sun){ sun.castShadow = true; sun.shadow.mapSize.set(256, 256); }
       GFX_PR = 0.85;
@@ -3692,11 +3700,11 @@ function applyQuality(){
     GFX_EXPOSE = 1.12; GFX_HEMI = 1.05; GFX_SUN = 1.04;
     PEOPLE_CAST_SHADOW = false; SHADOW_SKIP = 0.18;
   }
-  /* Shadow acne / peter-panning: mild bias + normalBias; Soft radius only on Best. */
+  /* Shadow acne / peter-panning: mild bias + normalBias; Best Basic needs no soft radius. */
   if(sun && sun.shadow){
     sun.shadow.bias = q === "simple" ? -0.0008 : -0.00028;
     sun.shadow.normalBias = q === "best" ? 0.028 : 0.04;
-    sun.shadow.radius = q === "best" ? 1.2 : (q === "balanced" ? 1.2 : 1);
+    sun.shadow.radius = q === "best" ? 1 : (q === "balanced" ? 1.2 : 1);
   }
   if(sun && sun.shadow && sun.shadow.map){
     try{ sun.shadow.map.dispose(); }catch(e){}
@@ -5239,7 +5247,7 @@ function tidyRoomFurniture(){
     for(let i = 0; i < kids.length; i++){
       const g = kids[i];
       if(!g || !g.isGroup || !g.userData || !g.userData.groundedProp) continue;
-      try{ groundGroup(g, 0.62, g.userData.restY || 0); }catch(e){}
+      try{ groundGroup(g, 0.68, g.userData.restY || 0); }catch(e){}
     }
     return;
   }
@@ -5251,7 +5259,7 @@ function tidyRoomFurniture(){
       /* Re-run the grounding calculation after all child meshes are present.
          This catches late-added props in the House floor instead of leaving
          their contact shadow or one leaf hovering above the floor. */
-      groundGroup(g, 0.62, g.userData.restY || 0);
+      groundGroup(g, 0.68, g.userData.restY || 0);
       g.updateWorldMatrix(true, true);
       const box = new THREE.Box3().setFromObject(g);
       if(!isFinite(box.min.y) || !isFinite(box.max.y)) return;
@@ -6375,7 +6383,8 @@ function stashLiveRoom(){
   ROOM_KITS[id] = kit;
   ROOM_KIT_IDS = ROOM_KIT_IDS.filter(x => x !== id);
   ROOM_KIT_IDS.push(id);
-  const cap = 9;
+  /* 20261005a max-fit: KEEP kit cap — MODEST 6 / else 8 (was 9). */
+  const cap = MODEST ? 6 : 8;
   while(ROOM_KIT_IDS.length > cap){
     const drop = ROOM_KIT_IDS.shift();
     if(drop === id || drop === (G && G.room)) continue;
@@ -8104,13 +8113,13 @@ function buildPerson(p){
     puff(-hairW*0.72, hu*0.46, -hu*0.06, hu*0.10, hu*0.22, hu*0.28);
     puff( hairW*0.72, hu*0.46, -hu*0.06, hu*0.10, hu*0.22, hu*0.28);
   } else if(hs === 1){
-    /* Side parting — two flattened combs, scalp showing in the gap */
+    /* Side parting — two flattened combs, scalp showing in the gap (05a: wider part). */
     const side = ((p.id||0) % 2) ? 1 : -1;
-    comb(side*hu*0.30, hu*0.58,  hu*0.04, hairW*0.48, hairH*0.16, hairD*0.86, side*0.22);
-    comb(side*hu*0.26, hu*0.56, -hu*0.16, hairW*0.46, hairH*0.15, hairD*0.72, side*0.12);
-    comb(side*hu*0.20, hu*0.54, -hu*0.36, hairW*0.40, hairH*0.14, hairD*0.50, side*0.06);
-    comb(-side*hu*0.34, hu*0.52,  hu*0.00, hairW*0.26, hairH*0.12, hairD*0.70, -side*0.16);
-    comb(-side*hu*0.30, hu*0.50, -hu*0.22, hairW*0.24, hairH*0.11, hairD*0.52, -side*0.08);
+    comb(side*hu*0.32, hu*0.58,  hu*0.04, hairW*0.46, hairH*0.15, hairD*0.86, side*0.22);
+    comb(side*hu*0.28, hu*0.56, -hu*0.16, hairW*0.44, hairH*0.14, hairD*0.72, side*0.12);
+    comb(side*hu*0.22, hu*0.54, -hu*0.36, hairW*0.38, hairH*0.13, hairD*0.50, side*0.06);
+    comb(-side*hu*0.36, hu*0.52,  hu*0.00, hairW*0.24, hairH*0.11, hairD*0.70, -side*0.16);
+    comb(-side*hu*0.32, hu*0.50, -hu*0.22, hairW*0.22, hairH*0.10, hairD*0.52, -side*0.08);
     puff(0, hu*0.34, -hu*0.50, hairW*0.78, hairH*0.24, hairD*0.40);
     puff(side*hairW*0.82, hu*0.42, -hu*0.04, hu*0.12, hu*0.22, hu*0.32);
     puff(-side*hairW*0.80, hu*0.40, -hu*0.04, hu*0.10, hu*0.18, hu*0.28);
@@ -8148,13 +8157,13 @@ function buildPerson(p){
     curls.forEach(c => puff(c[0]*hu, c[1]*hu, c[2]*hu, hu*0.16, hu*0.14, hu*0.16));
     puff(0, hu*0.38, -hu*0.44, hairW*0.80, hairH*0.40, hairD*0.48);
   } else {
-    /* Caesar — short even cap, straight fringe across the brow */
-    puff(0, hu*0.64, -hu*0.08, hairW*0.90, hairH*0.18, hairD*0.84);
-    puff(0, hu*0.56,  hu*0.22, hairW*0.80, hairH*0.10, hairD*0.36);
-    M(PG.box, hair, headG, 0, hu*0.555, hu*0.42, hairW*0.68, hu*0.055, hu*0.10, false);
-    puff(-hairW*0.74, hu*0.48, -hu*0.02, hu*0.09, hu*0.20, hu*0.32);
-    puff( hairW*0.74, hu*0.48, -hu*0.02, hu*0.09, hu*0.20, hu*0.32);
-    puff(0, hu*0.44, -hu*0.46, hairW*0.76, hairH*0.22, hairD*0.32);
+    /* Caesar — short even cap, straight fringe across the brow (05a: tighter, not a lump). */
+    puff(0, hu*0.63, -hu*0.06, hairW*0.88, hairH*0.16, hairD*0.82);
+    puff(0, hu*0.55,  hu*0.20, hairW*0.78, hairH*0.09, hairD*0.34);
+    M(PG.box, hair, headG, 0, hu*0.548, hu*0.40, hairW*0.66, hu*0.048, hu*0.09, false);
+    puff(-hairW*0.72, hu*0.47, -hu*0.02, hu*0.08, hu*0.18, hu*0.30);
+    puff( hairW*0.72, hu*0.47, -hu*0.02, hu*0.08, hu*0.18, hu*0.30);
+    puff(0, hu*0.42, -hu*0.44, hairW*0.74, hairH*0.20, hairD*0.30);
   }
   /* a beard has to be outside the jaw, not inside the skull */
   if(L.beard) M(PG.sph, hair, headG, 0, hu*0.20, hu*0.10,
@@ -23978,6 +23987,26 @@ function kickFrame(){
   }catch(e){}
   armFrame();
 }
+function crowdFreezeMesh(mesh){
+  /* 20261005a: deep-freeze a person group — root-only freeze left child meshes
+     paying updateMatrix every frame (suits/faces/hair). Full meshes kept. */
+  if(!mesh) return;
+  try{
+    if(mesh.userData && mesh.userData._crowdFrozen) return;
+    mesh.traverse(o => { o.matrixAutoUpdate = false; });
+    mesh.updateMatrix();
+    mesh.updateMatrixWorld(true);
+    if(!mesh.userData) mesh.userData = {};
+    mesh.userData._crowdFrozen = true;
+  }catch(e){}
+}
+function crowdThawMesh(mesh){
+  if(!mesh || !mesh.userData || !mesh.userData._crowdFrozen) return;
+  try{
+    mesh.userData._crowdFrozen = false;
+    mesh.traverse(o => { o.matrixAutoUpdate = true; });
+  }catch(e){}
+}
 function animateCrowd(dt){
   const crowd = hereNow();
   const talk = (TALK.open && TALK.m) || null;
@@ -23992,11 +24021,17 @@ function animateCrowd(dt){
     const d2 = dx*dx + dz*dz;
     const fwd = sy*dx + cy*dz;
     const talking = talk === p;
+    const gy = (G.room === "steps") ? groundAt(p.z, p.room || G.room) : 0;
+    const mx = p.mesh.position;
     /* Draw only. Being is not optional. A back is still a person. */
     if(!talking){
       if(playerMoving){
         if(fwd < 0 || d2 > 25){
+          /* Culled while walking: hide + deep-freeze so children skip matrix walks. */
+          mx.x = p.x; mx.z = p.z; mx.y = gy;
+          p.mesh.rotation.y = p.facing || 0;
           if(p.mesh.visible) p.mesh.visible = false;
+          crowdFreezeMesh(p.mesh);
           continue;
         }
       } else if(G.room !== "corridor" && fwd < -1.8 && d2 > 16){
@@ -24005,17 +24040,20 @@ function animateCrowd(dt){
       }
     }
     if(!p.mesh.visible) p.mesh.visible = true;
-    const gy = (G.room === "steps") ? groundAt(p.z, p.room || G.room) : 0;
-    const mx = p.mesh.position;
-    /* 20261001a: while walking, FAR (d2>12) freeze pose — snap, no lerp; near keep soft follow.
-       Full meshes kept. Never dummy people. */
+    /* 20261001a + 20261005a: while walking, FAR (d2>12) deep-freeze pose — snap once,
+       no per-frame updateMatrix; near keep soft follow + pose-only. Full meshes kept. */
     if(playerMoving && !talking && d2 > 12){
-      mx.x = p.x; mx.z = p.z; mx.y = gy;
-      p.mesh.rotation.y = p.facing || 0;
-      if(p.mesh.matrixAutoUpdate !== false) p.mesh.matrixAutoUpdate = false;
-      try{ p.mesh.updateMatrix(); }catch(e){}
+      const frozen = !!(p.mesh.userData && p.mesh.userData._crowdFrozen);
+      const moved = !frozen || mx.x !== p.x || mx.z !== p.z || mx.y !== gy;
+      if(moved){
+        mx.x = p.x; mx.z = p.z; mx.y = gy;
+        p.mesh.rotation.y = p.facing || 0;
+        if(frozen) p.mesh.userData._crowdFrozen = false;
+        crowdFreezeMesh(p.mesh);
+      }
       continue;
     }
+    crowdThawMesh(p.mesh);
     if(p.mesh.matrixAutoUpdate === false) p.mesh.matrixAutoUpdate = true;
     mx.x += (p.x - mx.x) * 0.35;
     mx.z += (p.z - mx.z) * 0.35;
@@ -24382,7 +24420,11 @@ function frameBody(now, draw){
     if(_prof){ _prof.mark("feed"); _prof.end(false); }
     return;
   }
-  try{ if((FRAME_ID & 1) === 0) updateLighting(dt); }catch(e){}
+  try{
+    /* 20261005a: while walking, light/motes/fan every 8th draw — sky does not hitch feet. */
+    const litStride = (Math.hypot(cam.vx || 0, cam.vz || 0) > 0.12) ? 7 : 1;
+    if((FRAME_ID & litStride) === 0) updateLighting(dt);
+  }catch(e){}
   if(_prof) _prof.mark("lighting");
   /* Moving: skip shadow map refresh — room shadows stay; biggest hitch after people cast. */
   if(playerMoving){
