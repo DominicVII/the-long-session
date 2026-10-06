@@ -1,0 +1,44 @@
+name: apply-20261005a-parts
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "build/onum-05a.patch.b64.p9"
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply concatenated patch
+        run: |
+          set -euo pipefail
+          : > /tmp/onum-05a.b64
+          for f in $(ls build/onum-05a.patch.b64.p* | sort -V); do
+            tr -d '\n' < "$f" >> /tmp/onum-05a.b64
+          done
+          base64 -d /tmp/onum-05a.b64 > /tmp/onum-05a.patch
+          wc -c /tmp/onum-05a.patch /tmp/onum-05a.b64
+          if grep -q 'content="20261005a"' session.html; then
+            echo already
+          else
+            grep -q 'content="20261001b"' session.html
+            patch -p1 < /tmp/onum-05a.patch
+          fi
+          cp session.html index.html
+          cp session.html "One Nation, Under, ME.html"
+          cp session.html session.standalone.html
+          cp session.html public/session.html
+          test "$(md5sum session.html index.html public/session.html session.standalone.html | awk '{print $1}' | sort -u | wc -l)" = "1"
+          grep -q 'content="20261005a"' session.html
+          grep -q 'crowdFreezeMesh' session.html
+          grep -q 'BasicShadowMap' session.html
+          grep -q '20261005a' src/lib/onum-build.ts || sed -i 's/20261001b/20261005a/g' src/lib/onum-build.ts
+          git config user.name "DominicVII"
+          git config user.email "318079878+DominicVII@users.noreply.github.com"
+          git add session.html index.html "One Nation, Under, ME.html" session.standalone.html public/session.html src/lib/onum-build.ts
+          if git diff --cached --quiet; then echo nothing; else
+            git commit -m "20261005a: weekly MAX OPTIMIZE + design/max-fit"
+            git push
+          fi
