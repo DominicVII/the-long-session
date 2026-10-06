@@ -3,11 +3,10 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - "build/onum-05a.patch.b64"
-      - "build/onum-05a.patch.b64.p0"
-      - "build/onum-05a.patch.b64.p1"
-      - "build/onum-05a.patch.b64.p2"
-      - "build/onum-05a.patch.b64.p3"
+      - "build/onum-05a.patch.p0"
+      - "build/onum-05a.patch.p1"
+      - "build/onum-05a.patch.p2"
+      - "build/onum-05a.patch"
       - ".github/workflows/apply-05a.yml"
 permissions:
   contents: write
@@ -20,22 +19,22 @@ jobs:
         run: |
           set -euo pipefail
           if grep -q 'content="20261005a"' session.html; then
-            echo "already 20261005a — skip HTML patch"
+            echo "already 20261005a - skip HTML patch"
           else
             if ! grep -q 'content="20261001b"' session.html; then
               echo "expected tip 20261001b before patch; got:"
               grep -o 'onum-build" content="[^"]*"' session.html || true
               exit 1
             fi
-            : > /tmp/onum-05a.b64
-            for f in build/onum-05a.patch.b64.p*; do
-              [ -f "$f" ] && tr -d '\n' < "$f" >> /tmp/onum-05a.b64
-            done
-            if [ ! -s /tmp/onum-05a.b64 ] && [ -f build/onum-05a.patch.b64 ]; then
-              tr -d '\n' < build/onum-05a.patch.b64 > /tmp/onum-05a.b64
+            if ls build/onum-05a.patch.p* >/dev/null 2>&1; then
+              : > /tmp/onum-05a.patch
+              for f in $(ls build/onum-05a.patch.p* | sort); do
+                cat "$f" >> /tmp/onum-05a.patch
+              done
+              patch -p1 < /tmp/onum-05a.patch
+            else
+              patch -p1 < build/onum-05a.patch
             fi
-            base64 -d /tmp/onum-05a.b64 > /tmp/onum-05a.patch
-            patch -p1 < /tmp/onum-05a.patch
           fi
           cp session.html index.html
           cp session.html "One Nation, Under, ME.html"
@@ -46,12 +45,6 @@ jobs:
           grep -q 'var STAMP = "20261005a"' session.html
           grep -q 'crowdFreezeMesh' session.html
           grep -q 'BasicShadowMap' session.html
-      - name: Sync ONUM_BUILD + docs if present in commit
-        run: |
-          set -euo pipefail
-          if [ -f src/lib/onum-build.ts ]; then
-            grep -q '20261005a' src/lib/onum-build.ts || sed -i 's/20261001b/20261005a/g' src/lib/onum-build.ts
-          fi
       - name: Commit if dirty
         run: |
           set -euo pipefail
