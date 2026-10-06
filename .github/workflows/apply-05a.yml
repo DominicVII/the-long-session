@@ -1,0 +1,62 @@
+name: apply-20261005a-patch
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "build/onum-05a.patch.b64"
+      - ".github/workflows/apply-05a.yml"
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply 20261005a patch onto session.html
+        run: |
+          set -euo pipefail
+          if grep -q 'content="20261005a"' session.html; then
+            echo "already 20261005a — skip HTML patch"
+          else
+            if ! grep -q 'content="20261001b"' session.html; then
+              echo "expected tip 20261001b before patch; got:"
+              grep -o 'onum-build" content="[^"]*"' session.html || true
+              exit 1
+            fi
+            base64 -d build/onum-05a.patch.b64 > /tmp/onum-05a.patch
+            patch -p1 < /tmp/onum-05a.patch
+          fi
+          cp session.html index.html
+          cp session.html "One Nation, Under, ME.html"
+          cp session.html session.standalone.html
+          cp session.html public/session.html
+          test "$(md5sum session.html index.html public/session.html session.standalone.html | awk '{print $1}' | sort -u | wc -l)" = "1"
+          grep -q 'content="20261005a"' session.html
+          grep -q 'var STAMP = "20261005a"' session.html
+          grep -q 'crowdFreezeMesh' session.html
+          grep -q 'BasicShadowMap' session.html
+      - name: Sync ONUM_BUILD + docs if present in commit
+        run: |
+          set -euo pipefail
+          if [ -f src/lib/onum-build.ts ]; then
+            grep -q '20261005a' src/lib/onum-build.ts || sed -i 's/20261001b/20261005a/g' src/lib/onum-build.ts
+          fi
+      - name: Commit if dirty
+        run: |
+          set -euo pipefail
+          git config user.name "DominicVII"
+          git config user.email "318079878+DominicVII@users.noreply.github.com"
+          git add session.html index.html "One Nation, Under, ME.html" session.standalone.html public/session.html src/lib/onum-build.ts GROKBOT-HANDOFF.md CHANGELOG.md || true
+          if git diff --cached --quiet; then
+            echo "nothing to commit"
+          else
+            git commit -m "$(cat <<'EOF'
+20261005a: weekly MAX OPTIMIZE + design/max-fit
+
+Deep crowd freeze, Best BasicShadowMap, walk light throttle.
+Shell fills big desks; kit cap KEEP 6/8; Caesar/parting polish.
+Walk 0.68 / sprint 1.15. Full meshes near. KEEP intact.
+EOF
+)"
+            git push
+          fi
