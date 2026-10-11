@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261011i">
+<meta name="onum-build" content="20261011j">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261011i";
+  var STAMP = "20261011j";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -3871,7 +3871,7 @@ function texCanvas(size, paint){
       const feet = (typeof playerMoving === "function" && playerMoving())
         || (typeof houseQuiet === "function" && houseQuiet() && cam && Math.hypot(cam.vx||0, cam.vz||0) > 0.12)
         || (cam && Math.hypot(cam.vx||0, cam.vz||0) > 0.12);
-      if(feet) cap = Math.min(cap, 2);
+      if(feet){ cap = Math.min(cap, 2); try{ (window.__texCapped = window.__texCapped || []).push(t); if(window.__texCapped.length > 400) window.__texCapped.shift(); }catch(e3){} }
     }catch(e2){}
     t.anisotropy = (typeof renderer !== "undefined" && renderer && renderer.capabilities)
       ? Math.min(cap, renderer.capabilities.getMaxAnisotropy()) : Math.min(cap, 2);
@@ -5666,7 +5666,139 @@ function propChandelier(x,y,z,arms,scale){
 function artPool(){
   return [TEX.paintA, TEX.paintB, TEX.paintC, TEX.paintD, TEX.paintE, TEX.paintF].filter(Boolean);
 }
+/* ── 20261011j · pictures sit flush on their walls, at the right height, never overlapping ── */
+let _picSeq = 0, _seatRay = null;
+function picTagSince(n0, kind){
+  if(!roomGroup) return;
+  const id = ++_picSeq, k = roomGroup.children;
+  for(let i = n0; i < k.length; i++){ const u = k[i].userData || (k[i].userData = {}); u.pic = id; u.picK = kind; }
+}
+function seatPictures(roomId){
+  if(!roomGroup) return 0;
+  const kids = roomGroup.children, groups = {}, others = [];
+  for(let i = 0; i < kids.length; i++){
+    const m = kids[i], id = m.userData && m.userData.pic;
+    if(id){ (groups[id] = groups[id] || []).push(m); }
+    else if(m.isMesh || m.isGroup) others.push(m);
+  }
+  const ids = Object.keys(groups);
+  if(!ids.length) return 0;
+  const R = ROOMS[roomId] || {h:3.4};
+  roomGroup.updateMatrixWorld(true);
+  const ray = _seatRay || (_seatRay = new THREE.Raycaster());
+  const c = new THREE.Vector3(), dir = new THREE.Vector3(), o = new THREE.Vector3();
+  const small = [];
+  for(let i = 0; i < others.length; i++){
+    const m = others[i];
+    if(!m.isMesh) continue;
+    const b = new THREE.Box3().setFromObject(m);
+    const sx = b.max.x - b.min.x, sy = b.max.y - b.min.y, sz = b.max.z - b.min.z, v = sx * sy * sz;
+    if(v > 1.2 || v < 1e-6) continue;
+    small.push({b, sx, sy, sz});
+  }
+  const placed = [];
+  let moved = 0;
+  ids.forEach(id => {
+    const ms = groups[id];
+    const B = new THREE.Box3(); ms.forEach(m => B.expandByObject(m));
+    B.getCenter(c);
+    /* table nameplates, plinth plates and ground signs keep their place */
+    if(c.y < 0.9){ placed.push(B); return; }
+    const ax = (B.max.x - B.min.x) < (B.max.z - B.min.z) ? "x" : "z";
+    let best = null;
+    for(const s of [1, -1]){
+      dir.set(ax === "x" ? s : 0, 0, ax === "z" ? s : 0);
+      o.copy(c).addScaledVector(dir, -0.5);
+      ray.set(o, dir); ray.near = 0.499; ray.far = 0.75;
+      const hits = ray.intersectObjects(others, true);
+      if(!hits.length) continue;
+      const h = hits[0];
+      const back = ax === "x" ? (s > 0 ? B.max.x : B.min.x) : (s > 0 ? B.max.z : B.min.z);
+      const wall = ax === "x" ? h.point.x : h.point.z;
+      const gap = (wall - back) * s;
+      if(!best || Math.abs(gap) < Math.abs(best.gap)) best = {gap, s};
+    }
+    let dx = 0, dy = 0, dz = 0;
+    /* nothing behind it at all: a sign on two slim brass posts, down to whatever floor is under it */
+    if((!best || best.gap > 0.12) && !(roomGroup.userData && roomGroup.userData._seatPosts && roomGroup.userData._seatPosts[id])){
+      o.set(c.x, B.min.y - 0.01, c.z); dir.set(0, -1, 0); ray.set(o, dir); ray.near = 0; ray.far = 2.3;
+      const gh = ray.intersectObjects(others, true);
+      const floorY = gh.length ? gh[0].point.y : (B.min.y - 0.01 <= 2.3 ? 0 : null);
+      const drop = floorY === null ? 99 : B.min.y - floorY;
+      if(drop > 0.05 && drop <= 2.3){
+        const brass = matCol(0x8a6a32, .45, .6);
+        const half = (ax === "x" ? (B.max.z - B.min.z) : (B.max.x - B.min.x)) / 2 - 0.07;
+        for(const sgn of [-1, 1]){
+          const px = ax === "x" ? c.x : c.x + sgn * half, pz = ax === "x" ? c.z + sgn * half : c.z;
+          const post = new THREE.Mesh(UNIT.cyl, brass);
+          post.scale.set(0.024, drop, 0.024);
+          post.position.set(px, floorY + drop / 2, pz);
+          post.castShadow = false; post.receiveShadow = false;
+          post.userData.seatPost = true;
+          roomGroup.add(post);
+          post.updateMatrix(); post.updateMatrixWorld(true);
+        }
+        roomGroup.userData._seatPosts = roomGroup.userData._seatPosts || {};
+        roomGroup.userData._seatPosts[id] = true;
+        moved++;
+      }
+    }
+    /* flush: back of the frame or plaque 2mm off the wall face */
+    if(best && best.gap > 0.004 && best.gap < 0.12){ const mv = (best.gap - 0.002) * best.s; if(ax === "x") dx = mv; else dz = mv; }
+    const Bm = B.clone().translate(new THREE.Vector3(dx, 0, dz));
+    /* door headers, picture rails and cornices: clear them vertically; sconces and posts: step along the wall */
+    for(let pass = 0; pass < 2; pass++){
+      for(const q of small){
+        const I = Bm.clone().intersect(q.b);
+        if(I.isEmpty() || (I.max.x - I.min.x) < 0.02 || (I.max.y - I.min.y) < 0.02 || (I.max.z - I.min.z) < 0.006) continue;
+        const strip = q.sy < 0.3 && Math.max(q.sx, q.sz) > 0.9;
+        if(strip){
+          const qc = (q.b.min.y + q.b.max.y) / 2, pc = (Bm.min.y + Bm.max.y) / 2;
+          const up = q.b.max.y - Bm.min.y + 0.015, down = Bm.max.y - q.b.min.y + 0.015;
+          const d = qc < pc ? up : -down;
+          if(Bm.max.y + d < R.h - 0.05 && Bm.min.y + d > 0.9){ dy += d; Bm.translate(new THREE.Vector3(0, d, 0)); }
+        } else {
+          const along = ax === "x" ? "z" : "x";
+          const qc = (q.b.min[along] + q.b.max[along]) / 2, pc = (Bm.min[along] + Bm.max[along]) / 2;
+          const d = qc < pc ? (q.b.max[along] - Bm.min[along] + 0.02) : -(Bm.max[along] - q.b.min[along] + 0.02);
+          if(Math.abs(d) < 0.45){ if(along === "x") dx += d; else dz += d; const v = new THREE.Vector3(along === "x" ? d : 0, 0, along === "z" ? d : 0); Bm.translate(v); }
+        }
+      }
+    }
+    for(const P of placed){
+      const I = Bm.clone().intersect(P);
+      if(I.isEmpty() || (I.max.x - I.min.x) < 0.01 || (I.max.y - I.min.y) < 0.01 || (I.max.z - I.min.z) < 0.004) continue;
+      const along = ax === "x" ? "z" : "x";
+      const d = (Bm.min[along] + Bm.max[along]) / 2 >= (P.min[along] + P.max[along]) / 2 ? (P.max[along] - Bm.min[along] + 0.04) : -(Bm.max[along] - P.min[along] + 0.04);
+      if(along === "x") dx += d; else dz += d;
+      Bm.translate(new THREE.Vector3(along === "x" ? d : 0, 0, along === "z" ? d : 0));
+    }
+    placed.push(Bm);
+    if(dx || dy || dz){
+      moved++;
+      ms.forEach(m => { m.position.x += dx; m.position.y += dy; m.position.z += dz; m.updateMatrix(); m.updateMatrixWorld(true); });
+    }
+  });
+  return moved;
+}
+/* textures made while you were walking were capped at 2x anisotropy; when you stand still,
+   lift them back to the quality cap one at a time (never while walking) */
+function texUpgradeIdle(){
+  const L = window.__texCapped;
+  if(!L || !L.length) return;
+  if(cam && Math.hypot(cam.vx || 0, cam.vz || 0) > 0.12) return;
+  const t = L.pop();
+  if(!t || !renderer || !renderer.capabilities) return;
+  const cap = (G.fullDetail || G.gfx === "best") ? 8 : 4;
+  const a = Math.min(cap, renderer.capabilities.getMaxAnisotropy() || 1);
+  if(t.anisotropy < a){ t.anisotropy = a; t.needsUpdate = true; }
+}
+
 function propFrame(wall, x,y,z, w,h, tex, ry){
+  const _n0 = roomGroup ? roomGroup.children.length : 0;
+  try{ return propFrameRaw(wall, x,y,z, w,h, tex, ry); }finally{ try{ picTagSince(_n0, "frame"); }catch(e){} }
+}
+function propFrameRaw(wall, x,y,z, w,h, tex, ry){
   /* ONE frame recipe for every room: hollow moulding + dark mat + lit canvas.
      Never a solid wood plate over the art (that read as blank blue slabs). */
   const wood = matCol(0x6e4f28, .48, .28);
@@ -6197,6 +6329,10 @@ function plaqueTexture(title, sub){
   return tex;
 }
 function propPlaque(x, y, z, ry, title, sub, width, height){
+  const _n0 = roomGroup ? roomGroup.children.length : 0;
+  try{ return propPlaqueRaw(x, y, z, ry, title, sub, width, height); }finally{ try{ picTagSince(_n0, "plaque"); }catch(e){} }
+}
+function propPlaqueRaw(x, y, z, ry, title, sub, width, height){
   if(!title) return;
   /* Flush brass plaque: back ≤2cm, face ≤8mm proud. */
   width = width || 0.92; height = height || 0.28;
@@ -6556,6 +6692,7 @@ function warmAhead(){
       if(typeof frameOverBudget === "function" && frameOverBudget(6)){ _warmSkip = 12; return; }
       buildRoomInner(dest, true);
       try{ tidyRoomFurniture(); }catch(e){}
+      try{ seatPictures(dest); }catch(e){}
       try{ freezeStaticRoom(); }catch(e){}
       kit.userData.furnished = true;
       ROOM_KITS[dest] = kit;
@@ -6609,6 +6746,7 @@ function buildRoom(id){
         buildRoomInner(id, true);
       }
       tidyRoomFurniture();
+      try{ seatPictures(id); }catch(e){}
       if(!roomGroup || roomGroup.children.length < 5)
         throw new Error("room shell too empty");
       _roomBuiltId = id;
@@ -22992,6 +23130,7 @@ function officeCard(){
 
 function paintJob(){
   try{ lifeMorningCheck(); lifeMailCheck(); }catch(e){}
+  try{ texUpgradeIdle(); }catch(e){}
   const box = el("job"), txt = el("jobText");
   if(!box || !txt) return;
   let line = activeJob();
