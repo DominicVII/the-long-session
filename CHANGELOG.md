@@ -4,6 +4,17 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## Feel: pause menu, objective route, 10pm fix (11 Oct 2026) — `20261011b`
+
+On `20261011a`. Walk **0.68** / sprint **1.15** kept. Best default, `history.replaceState` only, no CDN, no external LLM. God is the Most High; Christ is King; First Consul is a man under God.
+
+- **Pause menu that works:** Esc (or Settings) pauses the game and opens one menu with four tabs. Game: pace 1x/2x/4x, Save now, Handbook, Title menu, today's line. Graphics: Best / Balanced / Simple, film grain, seated poses. Voices: on/off, volume, rate, carry. Controls: look speed (mouse, A/D, right stick), invert Y, controller status, Rebind keys. Walking stops while paused; pace is restored on close. Esc no longer closes and reopens in the same press.
+- **Route to the objective:** the NOW line adds "> Room, then Goal" (shortest hop through the doors); the compass shows a gold goal marker on the next door, pinned to the edge when it is behind you.
+- **First minutes:** key hints stay up for the first 45s of a new career (or until the first door).
+- **10pm Continue soft-lock fixed:** a save made at 10pm resumed with the night pending and no card; it now resumes a minute before and the night card comes.
+- Saves keep invert Y and voice volume. HUD clears the top bar when bare. Settings tabs sized for touch.
+- Stamp: meta + STAMP + `ONUM_BUILD` -> `20261011b`. Five HTML copies byte-identical.
+
 ## Playable fixes: corridor freeze, elections, warmAhead (11 Oct 2026) — `20261011a`
 
 On tip `20261005a`. Walk **0.68** / sprint **1.15** kept. Full people meshes kept. Best default, `history.replaceState` only, no CDN, no external LLM. God is the Most High; Christ is King; First Consul is a man under God.
