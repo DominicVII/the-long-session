@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261011g">
+<meta name="onum-build" content="20261011h">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261011g";
+  var STAMP = "20261011h";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -164,6 +164,11 @@ body.keys-intro .keys{display:flex !important; opacity:.92}
 .whip__w{grid-column:1; font-size:.86em; opacity:.8}
 .whip__b{grid-column:2; grid-row:1 / span 2; display:flex; gap:6px}
 .whip__go{padding:6px 10px; min-height:0}
+.ach--locked{opacity:.55}
+.ach-toast{position:fixed; left:50%; top:18px; transform:translate(-50%,-140%); z-index:9999; background:rgba(18,16,12,.94); color:#f4ead2; border:1px solid #c9a227; border-radius:8px; padding:10px 18px; display:grid; gap:2px; text-align:center; transition:transform .35s ease; pointer-events:none; max-width:min(420px,90vw)}
+.ach-toast.is-on{transform:translate(-50%,0)}
+.ach-toast i{font:600 10px/1 var(--mono, monospace); letter-spacing:.14em; text-transform:uppercase; color:#c9a227; font-style:normal}
+.ach-toast b{font-size:16px} .ach-toast span{font-size:12px; opacity:.85}
 .goals{list-style:none; margin:4px 0 10px; padding:0; text-align:left}
 .goals li{font-size:13px; padding:2px 0; color:var(--ink)}
 .goals li.is-done{color:var(--good); text-decoration:line-through; text-decoration-color:color-mix(in srgb,var(--good) 50%,transparent)}
@@ -2868,6 +2873,7 @@ function horcruxProps(){
       {t:"Smash the idol", c:"8m", run(){
         spend(8, 5);
         L.smashed[h.id] = true;
+        try{ achieve("smash"); }catch(e){}
         L.found[h.id] = true;
         (G.members||[]).forEach(m => {
           if(!m || m.gone) return;
@@ -12960,7 +12966,14 @@ const BILL_DOMAIN = [
   {k:"health", t:"the clinics", cl:["a clinic in every county under fifty thousand","physicians' fees set by schedule","the whole thing funded out of the tariff"], econ:-45, wel:55, def:0, lib:15},
   {k:"press",  t:"the press",   cl:["postal rates for newspapers cut by half","a register of who owns what","penalties for a knowingly false report"], econ:-10, wel:5, def:0, lib:-30},
   {k:"census", t:"the census",  cl:["a full enumeration in the third year","reapportionment to follow within one session","the count published in full"], econ:-5, wel:5, def:0, lib:25},
-  {k:"gas",    t:"gas and light", cl:["a federal lease on the western fields","royalties split with the states","a price cap on lighting in the cities"], econ:20, wel:15, def:0, lib:0}
+  {k:"gas",    t:"gas and light", cl:["a federal lease on the western fields","royalties split with the states","a price cap on lighting in the cities"], econ:20, wel:15, def:0, lib:0},
+  {k:"visa",   t:"visas",       cl:["harvest visas doubled for two seasons","employers to post a bond for each worker","the visa tied to one employer, not the worker"], econ:25, wel:-5, def:0, lib:15},
+  {k:"border", t:"the border",  cl:["a federal border guard of four thousand","detention for anyone without papers at a crossing","the guard paid for by a levy on the border states"], econ:-15, wel:-10, def:35, lib:-40},
+  {k:"natur",  t:"naturalization", cl:["citizenship after five years, not nine","an oath and a civics test in any language","the fee waived for veterans of the Republic"], econ:5, wel:20, def:0, lib:40},
+  {k:"aid",    t:"foreign aid", cl:["grain and credit to an ally abroad","the money spent on Republic farms and ships","a report to this House every quarter"], econ:-25, wel:10, def:15, lib:5},
+  {k:"arms",   t:"arms abroad", cl:["arms sold at cost to a friendly realm","an attaché posted with every shipment","the sale suspended if the realm goes to war"], econ:10, wel:-10, def:45, lib:-10},
+  {k:"mandate",t:"the mandate", cl:["every state to meet a federal school standard","no new money to meet it","a federal monitor in any state that falls behind"], econ:-10, wel:30, def:0, lib:-30},
+  {k:"preempt",t:"preemption",  cl:["one federal rule replacing forty-eight state ones","state laws in conflict declared void","no state may set a stricter standard"], econ:35, wel:-15, def:0, lib:-25}
 ];
 const BILL_FORM = ["Act","Bill","Authorization Act","Reform Act","Relief Act","Charter Act",
   "Appropriation Act","Regulation Act","Settlement Act"];
@@ -13015,6 +13028,7 @@ function makeBillDeep(){
           : dom.k === "bank" || dom.k === "tariff" ? "the ports and whoever holds paper"
           : dom.k === "labour" ? "everyone who works a floor, and nobody who owns one"
           : "whoever is standing closest when the money lands";
+  try{ billFlavor(b); }catch(e){}
   b.line = describeBill(b);
   G.members.forEach(m => { m.sway = 0; });
   return b;
@@ -18611,7 +18625,7 @@ function openTalk(m){
     const Gs = G.goals;
     if(Gs && m && m.kind === "member" && G.bill && !G.bill.done){
       let v = 0; try{ v = memberVote(m, G.bill) > 0 ? 1 : -1; }catch(e){}
-      if(v !== yourSide(G.bill)){ Gs.whipped = Gs.whipped || []; if(Gs.whipped.indexOf(m.id) < 0) Gs.whipped.push(m.id); }
+      if(v !== yourSide(G.bill)){ Gs.whipped = Gs.whipped || []; if(Gs.whipped.indexOf(m.id) < 0) Gs.whipped.push(m.id); try{ achieve("whip"); }catch(e){} }
     }
   }catch(e){}
   el("talk").classList.add("is-open");
@@ -20018,6 +20032,10 @@ const PROPS = {
         spend(5, 1);
         whipCard();
       }},
+      {t:"Open the war chest ledger", c:"5m", run(){
+        spend(5, 1);
+        chestCard();
+      }},
       {t:"Send a note to everyone I know", c:"40m", off:!G.members.some(m=>m.met), run(){
         spend(40, 10);
         const known = G.members.filter(m => m.met);
@@ -20468,6 +20486,7 @@ function memberActions(m){
       try{ line = DTCNO.say(m, {}); }catch(e){}
       if(!line) line = "Nothing worth the wire today.";
       try{ netTrain(m, {intent:"greet", heat:0, topics:["talk"]}); }catch(e){}
+      G.listened = (G.listened || 0) + 1; try{ if(G.listened >= 10) achieve("listen"); }catch(e){}
       setSay(line, fx("", ""));
       try{ speakAt(m, line); }catch(e){}
     }});
@@ -20666,6 +20685,7 @@ function holdVote(){
     G.you.standing = clamp(G.you.standing-5,0,100);
   }
   G.mood = clamp(G.mood + (passed ? (b.sponsorParty==="FED"?4:-4) : 0) + rint(-3,3), -60, 60);
+  try{ billConsequences(b, passed, yourVote); }catch(e){ if(window.console) console.warn("billConsequences", e); }
   G.you.record.defections += broke.length;
 
   /* the other two branches get their say */
@@ -20885,6 +20905,7 @@ function overnight(){
   seedStateBills();
   try{ faithNight(news); }catch(e){ if(window.console) console.warn("faithNight", e); }
   try{ lifeNight(news); }catch(e){ if(window.console) console.warn("lifeNight", e); }
+  try{ echoNight(news); achDaily(); }catch(e){ if(window.console) console.warn("echoNight", e); }
   resolveStateBills(news);
   regimeCheck(news);
   regimeCheck(news);
@@ -21121,7 +21142,8 @@ function election(){
   G.members.forEach(m => {
     if(m.kind === "envoy"){ kept.push(m); return; }
     const partySwing = m.party==="FED" ? swing : m.party==="COM" ? -swing : 0;
-    const personal = (m.rel.warmth>40?2:0) + m.influence/8 + (m.post?4:0);
+    const personal = (m.rel.warmth>40?2:0) + m.influence/8 + (m.post?4:0) + (m.backed||0);
+    m.backed = 0;
     const r = m.margin + partySwing*0.6 + personal + rint(-14,14);
     if(r > 0){ m.margin = Math.max(1, Math.round(r)); m.terms++; kept.push(m); results.push({m,win:true,by:m.margin}); }
     else { accolade(m, "Defeated at the polls after " + m.terms + " terms."); results.push({m,win:false,by:Math.round(r)}); G.seatsBy[m.party]--; }
@@ -21171,7 +21193,8 @@ function election(){
   const primary = you.standing < 28 ? rint(4,12) : 0;
   const yourSwing = you.party==="FED" ? swing : -swing;
   const yourResult = you.margin + yourSwing*0.6 + (you.approval-50)*0.45 + you.funds*0.12
-                   + (you.post?6:0) - adDamage - primary + rint(-12,12);
+                   + (you.post?6:0) - adDamage - primary + rint(-12,12) + Math.min(14, (you.field||0)*0.8);
+  you.field = 0;
   /* Out of the House, you run as a private citizen: no influence, no floor,
      and only the people who still take your call. */
   const backers = G.members.filter(m => readOf(m).est > 30 && m.party === you.party).length;
@@ -21193,6 +21216,7 @@ function election(){
     } else note("Elected to " + OFFICES[seeking].t + ".", true);
     G.career.push({term:G.term, post:OFFICES[seeking].short, note:"won the " + OFFICES[seeking].t});
   }
+  try{ if(youWon){ achieve(seeking !== "house" ? "higher" : "reelect"); } else achieve("steps"); }catch(e){}
   if(youWon){
     you.margin = Math.max(1, Math.round(yourResult + outBonus));
     you.terms++; you.record.won++; you.funds = Math.round(you.funds*0.25);
@@ -21696,6 +21720,7 @@ function askCosponsor(m){
     try{ ripple(m, 3, "They asked me to put my name on their bill. I did.", 2, true); }catch(e){}
     G.you.standing = clamp((G.you.standing || 0) + 2, 0, 100);
     note(m.name + " will cosponsor " + b.title + ".", true);
+    try{ achieve("cosponsor"); }catch(e){}
     return true;
   }
   try{ ripple(m, -1, "They wanted my name on their bill before I had read it.", -1); }catch(e){}
@@ -21720,6 +21745,7 @@ function nextBillOrQueued(){
   return makeBill();
 }
 function placeYourBill(b){
+  try{ achieve("ownbill"); }catch(e){}
   if(G.bill && !G.bill.done && !G.bill.mine){
     G.billQueue = G.billQueue || [];
     G.billQueue.push(b);
@@ -21950,6 +21976,7 @@ function faithPlayerStep(k){
     (G.members || []).forEach(m => { if(isConsular(m) && m.rel) m.rel.warmth = clamp(m.rel.warmth - 10, -100, 100); });
     note("You made a confession and came back to the Latin Rite. The remnant at the bronze will remember the empty place.", true);
     faithLog(null, you.name + " returned to the Latin Rite.", you.state);
+    try{ achieve("home"); }catch(e){}
     return;
   }
   const inst = you.instruct;
@@ -21973,6 +22000,7 @@ function faithPlayerStep(k){
   you.faithSince = G.day;
   note("You were received into " + creedOf(k).t + ". The district will hear it before the House does.", true);
   faithLog(null, you.name + " was received into " + creedOf(k).t + ".", you.state);
+  try{ achieve("received"); }catch(e){}
 }
 
 /* ── 20261011f · the building has a life of its own ──────────
@@ -22508,6 +22536,228 @@ function dtcnoReact(m){
     if(say && say.textContent.length < 260){ say.textContent = say.textContent + " " + line; try{ speakAt(m, line); }catch(e){} }
   }catch(e){}
 }
+/* ── 20261011h · bills with different fights, a war chest that works, achievements ── */
+/* 1 · new kinds of bill: immigration, foreign aid, the states against the Union */
+function billFlavor(b){
+  if(!b || !b.domain) return b;
+  const d = b.domain;
+  const T = {
+    visa:["Harvest Visa Act","Seasonal Labour Visa Act","Employer-Bonded Visa Act"],
+    border:["Border Guard Act","Federal Border Security Act","Crossings and Detention Act"],
+    natur:["Naturalization Reform Act","Five-Year Citizenship Act","Oath and Civics Act"]};
+  if(d === "visa" || d === "border" || d === "natur"){
+    b.kind = "immig";
+    b.title = pick(T[d]);
+    b.restrict = b.pos.lib < 0;
+    b.helps = b.restrict ? "border counties and the wage floor, by its sponsors' account" : "the harbour wards, the orchards and every mill short of hands";
+    b.pays = b.restrict ? "the newcomer wards, and every farm that hires at harvest" : "nobody up front; the fight is about who arrives";
+    b.why = (b.why || "") + " The newcomer wards are watching the clerk's count.";
+  } else if(d === "aid" || d === "arms"){
+    b.kind = "foreign";
+    try{ const rs = realmEnsure(); const r = pick(rs); b.realm = r.k; b.realmT = r.t; b.realmWant = r.want; }catch(e){ b.realmT = "an ally abroad"; }
+    const rn = (b.realmT || "the Allies").replace(/^the /, "");
+    b.title = d === "aid" ? pick(["Aid to " + rn + " Act", rn + " Grain and Credit Act", "Foreign Assistance (" + rn + ") Act"])
+                          : pick(["Arms to " + rn + " Act", rn + " Arms Sale Act", "Friendly Realms Arms Act"]);
+    b.helps = (b.realmT || "an ally") + ", and the ports that load the ships";
+    b.pays = "the treasury, which every district believes is theirs";
+    b.why = "Cabled from " + (b.realmT || "abroad") + ": they want " + (b.realmWant || "help") + ". The envoy has been in the corridor all week.";
+  } else if(d === "mandate" || d === "preempt"){
+    b.kind = "statefed";
+    const hot = (G.states || []).slice().sort((x, y) => (y.unrest || 0) - (x.unrest || 0))[0];
+    b.target = (hot && hot.n) || b.state;
+    b.title = d === "mandate" ? pick(["School Standards Mandate Act", "Federal Standards Act", "Uniform Schools Act"])
+                              : pick(["Federal Preemption Act", "One Rule Act", "Interstate Uniformity Act"]);
+    b.helps = d === "preempt" ? "one rule for the whole Union, and the firms that work across state lines" : "whoever the standard protects, if the states can pay for it";
+    b.pays = d === "preempt" ? "the statehouses, which lose the pen" : "the states, out of their own budgets: an unfunded mandate";
+    b.why = "The governor of " + b.target + " has already said, on the record, that the state will not comply.";
+  }
+  return b;
+}
+function echoEnsure(){ if(!G.echoes) G.echoes = []; return G.echoes; }
+function echoLater(days, k, text, data){ echoEnsure().push({day:(G.day || 1) + days, k, t:text, data:data || {}}); }
+function billConsequences(b, passed, yourVote){
+  if(!b || !b.kind) return;
+  const you = G.you, ays = yourVote > 0;
+  G.billKinds = G.billKinds || {}; G.billKinds[b.kind] = (G.billKinds[b.kind] || 0) + 1;
+  try{ if(G.billKinds.immig && G.billKinds.foreign && G.billKinds.statefed) achieve("variety"); }catch(e){}
+  if(b.kind === "immig"){
+    const newcomerHome = you.origin === "newcomer" || you.origin === "harbour";
+    const hurtHome = passed && b.restrict && newcomerHome;
+    (G.states || []).forEach(s => { if(s.cult === "pacific" || s.cult === "dutch") s.unrest = clamp((s.unrest || 0) + (passed && b.restrict ? 5 : passed ? -3 : 1), 0, 100); });
+    echoLater(rint(2, 4), "immig", passed
+      ? (b.restrict ? "The harvest crews did not come back to the orchards this week. " + b.title + " is being blamed at every co-op meeting."
+                    : "Night-school naturalization classes are full past the doors. The first cohort under " + b.title + " takes the oath in the spring.")
+      : "With " + b.title + " dead, the processing centers say the line is now four years long, and getting longer.",
+      {dA: (ays === newcomerHome ? (newcomerHome ? -1 : 1) : 0) + (hurtHome && ays ? -4 : 0) + (!ays && newcomerHome && b.restrict ? 3 : 0)});
+  } else if(b.kind === "foreign"){
+    G.realmRel = G.realmRel || {};
+    const k = b.realm || "reach";
+    G.realmRel[k] = clamp((G.realmRel[k] || 0) + (passed ? 12 : -10), -100, 100);
+    if(G.money) G.money.index = Math.round((G.money.index - (passed ? 1 : 0)) * 10) / 10;
+    echoLater(rint(2, 5), "foreign", passed
+      ? cap(b.realmT || "The ally") + " cabled thanks through the envoy and sent a grain shipment at cost. The district papers ran it under a photograph of a pothole."
+      : cap(b.realmT || "The ally") + " recalled its attaché for consultations. Nobody here can say what that means. Everybody there can.",
+      {dA: passed && ays ? -2 : (!passed && !ays ? 1 : 0), realm:k});
+  } else if(b.kind === "statefed"){
+    const st = b.target || b.state;
+    const S = (G.states || []).find(s => s.n === st);
+    if(S) S.unrest = clamp((S.unrest || 0) + (passed ? 9 : -4), 0, 100);
+    const mine = you.state === st;
+    if(passed){
+      G.cases = G.cases || [];
+      G.cases.push({t:st + " v. the Union (" + b.title + ")", state:st, day:G.day, voted:ays ? [you.name] : []});
+      if(G.cases.length > 12) G.cases.splice(0, G.cases.length - 12);
+      echoLater(2, "statefed", "The attorney general of " + st + " has filed suit against " + b.title + ". The governor says the state will not spend a guilder on it until a court says so.", {dA: mine ? (ays ? -5 : 3) : 0});
+      echoLater(rint(5, 8), "statefed", chance(0.5)
+        ? "The circuit court upheld " + b.title + ". " + st + " has asked the supreme bench to hear it. Federal marshals are in the state capitol for the first time in a decade."
+        : "The circuit court struck down the funding section of " + b.title + " as an unfunded mandate. The rest stands. Both sides called it a win.", {dA:0});
+    } else {
+      echoLater(rint(2, 3), "statefed", "In " + st + ", the governor held a press conference on the capitol steps to thank the members who voted no. He read their names. " + (mine && !ays ? "Yours was one of them." : ""), {dA: mine ? (!ays ? 4 : -2) : 0});
+    }
+  }
+}
+function echoNight(news){
+  const E = echoEnsure();
+  for(let i = E.length - 1; i >= 0; i--){
+    const e = E[i];
+    if((G.day || 1) < e.day) continue;
+    E.splice(i, 1);
+    news.push(e.t);
+    if(e.data && e.data.dA && G.you){
+      let d = e.data.dA;
+      if(d < 0 && G.you.legal && e.k === "statefed"){ d = Math.round(d / 2); G.you.legal = false; news.push("Your legal fund took the first of the calls. The damage was smaller than it might have been."); }
+      G.you.approval = clamp(G.you.approval + d, 0, 100);
+    }
+  }
+  /* the war chest's standing works: district office, staff */
+  if(G.you){
+    if(G.you.dOffice) G.you.approval = clamp(G.you.approval + 0.5, 0, 100);
+    if(G.you.staff) G.you.influence = clamp((G.you.influence || 0) + 0.5 * Math.min(3, G.you.staff), 0, 100);
+  }
+}
+/* 2 · the war chest */
+const CHEST = [
+  {k:"ads", t:"Run ads at home", c:30, d:"Radio and the county papers. Approval now, and a little in the race."},
+  {k:"office", t:"Open a district office", c:45, d:"A storefront on Main with your name on it. A little approval every day for the rest of the term.", once:true},
+  {k:"staff", t:"Hire a legislative aide", c:25, d:"More reach every day: a little influence each morning (up to three aides)."},
+  {k:"field", t:"Fund field operations", c:35, d:"Doors knocked, lists cleaned, rides to the polls. Counts on election day."},
+  {k:"ally", t:"Back an ally's campaign", c:20, d:"A cheque to a colleague's race. They will remember it, and it helps them hold their seat."},
+  {k:"legal", t:"Retain counsel", c:25, d:"A legal fund. The next suit or mandate fight that lands on you costs half."},
+  {k:"poll", t:"Commission a poll", c:15, d:"Read six members you could not read, and hear what home thinks of you."},
+  {k:"press", t:"Buy time on the East Steps press", c:20, d:"A slot with the cameras. Standing and approval."}
+];
+function chestCard(){
+  const you = G.you;
+  G.running = false;
+  card.innerHTML = '<div class="eyebrow">The war chest · ' + money(you.funds) + '</div><h1>Spend it, or it is just a number</h1>' +
+    '<p class="dream">Field ' + (you.field || 0) + ' · aides ' + (you.staff || 0) + (you.dOffice ? ' · district office open' : '') + (you.legal ? ' · counsel retained' : '') + '</p>' +
+    CHEST.map(c => {
+      const off = you.funds < c.c || (c.once && you.dOffice) || (c.k === "staff" && (you.staff || 0) >= 3) || (c.k === "legal" && you.legal);
+      return '<div class="whip__row"><span class="whip__n">' + c.t + ' <i>' + money(c.c) + '</i></span><span class="whip__w">' + c.d + '</span>' +
+        '<span class="whip__b"><button type="button" class="btn btn--ghost whip__go" data-chest="' + c.k + '"' + (off ? ' disabled' : '') + '>Spend</button></span></div>';
+    }).join("") +
+    '<div class="card__actions"><button type="button" class="btn" id="chestClose">Close the ledger</button></div>';
+  veil.hidden = false;
+  el("chestClose").addEventListener("click", () => walkNow());
+  card.querySelectorAll("[data-chest]").forEach(bt => bt.addEventListener("click", () => { chestSpend(bt.getAttribute("data-chest")); }));
+}
+function chestSpend(k){
+  const you = G.you, c = CHEST.find(x => x.k === k);
+  if(!c || you.funds < c.c) return;
+  if(k === "ally"){ chestAllyCard(); return; }
+  you.funds -= c.c;
+  you.spent = (you.spent || 0) + c.c;
+  let msg = "";
+  if(k === "ads"){ you.approval = clamp(you.approval + 4, 0, 100); you.field = (you.field || 0) + 2; msg = "The ads run all week. Your mother calls to say you looked tired."; }
+  else if(k === "office"){ you.dOffice = true; msg = "A storefront on Main, two desks and a coffee pot. People come in to complain, which is the point."; }
+  else if(k === "staff"){ you.staff = (you.staff || 0) + 1; msg = "You hire an aide who reads everything twice. Your desk gets smaller."; }
+  else if(k === "field"){ you.field = (you.field || 0) + 6; msg = "Volunteers, lists, a rented van. None of it shows until election day."; }
+  else if(k === "legal"){ you.legal = true; msg = "Counsel retained. They bill by the quarter hour and they are worth it."; }
+  else if(k === "poll"){
+    const unread = (G.members || []).filter(m => m.kind === "member" && !m.gone && (m.known || 0) < 1).slice(0, 6);
+    unread.forEach(m => m.known = Math.max(m.known || 0, 1));
+    msg = "The pollster reads six of them for you" + (unread.length ? " (" + listify(unread.map(m => surname(m.name))) + ")" : "") + ". Home rates you at " + Math.round(you.approval) + ", and the trend is " + (you.approval > 50 ? "kind." : "not.");
+  }
+  else if(k === "press"){ you.standing = clamp((you.standing || 0) + 3, 0, 100); you.approval = clamp(you.approval + 2, 0, 100); you.influence = clamp((you.influence || 0) + 2, 0, 100); msg = "Ten minutes with the cameras on the East Steps. You said one thing and they ran it twice."; }
+  note(msg, true);
+  try{ achieve("spend"); if(k === "office") achieve("office"); if((you.spent || 0) >= 150) achieve("bigspender"); }catch(e){}
+  chestCard();
+}
+function chestAllyCard(){
+  const you = G.you;
+  const list = (G.members || []).filter(m => m.kind === "member" && !m.gone && !m.machine && m.party === you.party).sort((a, b) => (b.rel.warmth || 0) - (a.rel.warmth || 0)).slice(0, 8);
+  card.innerHTML = '<div class="eyebrow">Back an ally</div><h1>Whose race?</h1>' +
+    list.map(m => '<div class="whip__row"><span class="whip__n">' + m.name + '</span><span class="whip__w">margin ' + (m.margin || 0) + (m.backed ? ' · you backed them' : '') + '</span>' +
+      '<span class="whip__b"><button type="button" class="btn btn--ghost whip__go" data-back="' + m.id + '">' + money(20) + '</button></span></div>').join("") +
+    '<div class="card__actions"><button type="button" class="btn" id="allyBack">Back</button></div>';
+  el("allyBack").addEventListener("click", () => chestCard());
+  card.querySelectorAll("[data-back]").forEach(bt => bt.addEventListener("click", () => {
+    const m = byId(+bt.getAttribute("data-back")); if(!m || you.funds < 20) return;
+    you.funds -= 20; you.spent = (you.spent || 0) + 20;
+    m.backed = (m.backed || 0) + 5;
+    ripple(m, 9, "They put money into my race without being asked. I will not forget it.", 9, true);
+    note("You backed " + m.name + "'s race. It will show at the polls, and in the cloakroom.", true);
+    try{ achieve("spend"); achieve("patron"); }catch(e){}
+    chestCard();
+  }));
+}
+/* 3 · achievements */
+const ACH = [
+  {k:"whip", t:"Whip", d:"Worked a colleague the whip count had against you."},
+  {k:"cosponsor", t:"Signed On", d:"Got a colleague's name on your bill."},
+  {k:"ownbill", t:"Author", d:"Filed a bill of your own."},
+  {k:"spend", t:"The Chest Opens", d:"Spent from the war chest."},
+  {k:"office", t:"Storefront", d:"Opened a district office."},
+  {k:"patron", t:"Patron", d:"Backed an ally's race."},
+  {k:"bigspender", t:"Ledger Heavy", d:"Spent 150k from the war chest in one career."},
+  {k:"variety", t:"Three Fights", d:"Saw an immigration bill, a foreign aid bill and a states-versus-Union bill to the roll."},
+  {k:"reelect", t:"Held", d:"Won re-election."},
+  {k:"steps", t:"Still Here", d:"Lost the seat and kept going from the East Steps."},
+  {k:"higher", t:"Another Room", d:"Won an office beyond the House."},
+  {k:"night", t:"Somebody Was Here", d:"Found what the night left in your office.", hidden:true},
+  {k:"anomaly", t:"Unexplained", d:"Found something the building will not explain.", hidden:true},
+  {k:"anomaly3", t:"Notebook", d:"Found three things the building will not explain.", hidden:true},
+  {k:"received", t:"Received", d:"Changed where you kneel, the slow way.", hidden:true},
+  {k:"home", t:"Came Home", d:"Made a confession and returned to the Latin Rite.", hidden:true},
+  {k:"smash", t:"Iconoclast", d:"Smashed a Consular idol.", hidden:true},
+  {k:"listen", t:"Listener", d:"Let ten colleagues talk without interrupting.", hidden:true},
+  {k:"days30", t:"A Month of Sittings", d:"Served thirty days."}
+];
+function achieve(k){
+  G.ach = G.ach || {};
+  if(G.ach[k]) return false;
+  const a = ACH.find(x => x.k === k); if(!a) return false;
+  G.ach[k] = G.day || 1;
+  if(k === "anomaly"){ try{ if((G.life && G.life.found || 0) >= 3) achieve("anomaly3"); }catch(e){} }
+  try{
+    let t = el("achToast");
+    if(!t){ t = document.createElement("div"); t.id = "achToast"; t.className = "ach-toast"; document.body.appendChild(t); }
+    t.innerHTML = '<i>Achievement</i><b>' + a.t + '</b><span>' + a.d + '</span>';
+    t.classList.add("is-on");
+    clearTimeout(achieve._t); achieve._t = setTimeout(() => t.classList.remove("is-on"), 4200);
+  }catch(e){}
+  try{ feed("Achievement: " + a.t + ".", "big"); }catch(e){}
+  return true;
+}
+function achCard(){
+  G.running = false;
+  const got = G.ach || {};
+  const n = ACH.filter(a => got[a.k]).length;
+  card.innerHTML = '<div class="eyebrow">Achievements · ' + n + ' of ' + ACH.length + '</div><h1>What the record will say</h1>' +
+    ACH.map(a => {
+      const has = !!got[a.k];
+      const show = has || !a.hidden;
+      return '<div class="whip__row' + (has ? '' : ' ach--locked') + '"><span class="whip__n">' + (show ? a.t : '???') + (has ? ' <i>day ' + got[a.k] + '</i>' : '') + '</span>' +
+        '<span class="whip__w">' + (show ? a.d : 'Hidden until you find it.') + '</span><span class="whip__b"></span></div>';
+    }).join("") +
+    '<div class="card__actions"><button type="button" class="btn" id="achClose">Close</button></div>';
+  veil.hidden = false;
+  el("achClose").addEventListener("click", () => walkNow());
+}
+function achDaily(){
+  try{ if((G.day || 1) >= 30) achieve("days30"); }catch(e){}
+}
+
 function paintJob(){
   try{ lifeMorningCheck(); lifeMailCheck(); }catch(e){}
   const box = el("job"), txt = el("jobText");
@@ -23611,7 +23861,7 @@ function saveCaptureBase(){
     withWhom:G.withWhom, ties:G.ties, panel:null, court:G.court, own:G.own, parties:G.parties,
     termLength:G.termLength, country:G.country,
     greatest:G.greatest, blasphemy:G.blasphemy, loreNote:G.loreNote, greatnessOpen:G.greatnessOpen,
-    relics:G.relics, relicSpots:G.relicSpots, consularLore:G.consularLore, bind:G.bind, sens:G.sens, invertY:!!G.invertY, voiceVol:G.voiceVol, goals:G.goals, whip:G.whip || null, billQueue:G.billQueue || [], faith:G.faith || null, life:G.life || null,
+    relics:G.relics, relicSpots:G.relicSpots, consularLore:G.consularLore, bind:G.bind, sens:G.sens, invertY:!!G.invertY, voiceVol:G.voiceVol, goals:G.goals, whip:G.whip || null, billQueue:G.billQueue || [], faith:G.faith || null, life:G.life || null, ach:G.ach || {}, echoes:G.echoes || [], billKinds:G.billKinds || {}, realmRel:G.realmRel || {}, listened:G.listened || 0,
     world:G.world,
     pendingNight:!!G.pendingNight,
     cam:{x:cam.x, z:cam.z, yaw:cam.yaw, pitch:cam.pitch},
@@ -23955,6 +24205,8 @@ function setupSettingsUI(){
       row("Pace of the day", "How fast the clock runs around you", opt("pzspeed", 1, "1×", sp === 1) + opt("pzspeed", 2, "2×", sp === 2) + opt("pzspeed", 4, "4×", sp === 4)) +
       row("Save", '<span id="pzSaved">Autosaves at every door and every few minutes</span>', '<button type="button" class="settings-btn settings-btn-secondary" id="pzSave">Save now</button>') +
       row("The handbook", "Everything the House does, in order", '<button type="button" class="settings-btn settings-btn-secondary" id="pzBook">Open</button>') +
+      row("Achievements", "What the record will say. Some are hidden until you find them", '<button type="button" class="settings-btn settings-btn-secondary" id="pzAch">Open</button>') +
+      row("War chest", "Spend it on ads, staff, offices, allies, counsel, polls and press time", '<button type="button" class="settings-btn settings-btn-secondary" id="pzChest">Open</button>') +
       row("Notebook", "Happenings, faith on the wire, and the things nobody explains", '<button type="button" class="settings-btn settings-btn-secondary" id="pzNote">Open</button>') +
       row("Whip count", "Who is with you on the bill, who to work, and where they are", '<button type="button" class="settings-btn settings-btn-secondary" id="pzWhip"' + (G.bill && !G.bill.done ? '' : ' disabled') + '>Open</button>') +
       row("Title", "Continue, or begin a new career", '<button type="button" class="settings-btn settings-btn-secondary" id="pzTitle">Title menu</button>') +
@@ -23994,6 +24246,8 @@ function setupSettingsUI(){
     const t = el("pzSaved"); if(t) t.textContent = ok ? ("Saved · day " + G.day + " · " + hhmm()) : "Could not save — storage may be full";
   });
   const byBook = el("pzBook"); if(byBook) byBook.addEventListener("click", () => { closeSettings(); try{ handbookCard(); }catch(e){} });
+  const byAch = el("pzAch"); if(byAch) byAch.addEventListener("click", () => { closeSettings(); setTimeout(() => { try{ achCard(); }catch(e){} }, 30); });
+  const byChest = el("pzChest"); if(byChest) byChest.addEventListener("click", () => { closeSettings(); setTimeout(() => { try{ chestCard(); }catch(e){} }, 30); });
   const byNote = el("pzNote"); if(byNote) byNote.addEventListener("click", () => { closeSettings(); setTimeout(() => { try{ notebookCard(); }catch(e){} }, 30); });
   const byWhip = el("pzWhip"); if(byWhip) byWhip.addEventListener("click", () => { closeSettings(); setTimeout(() => { try{ whipCard(); }catch(e){} }, 30); });
   const byTitle = el("pzTitle"); if(byTitle) byTitle.addEventListener("click", () => { closeSettings(); try{ G.running = true; showGameMenu(); }catch(e){} });
