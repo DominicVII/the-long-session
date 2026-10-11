@@ -4,6 +4,16 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261011j: pictures seated, texture clarity
+
+On `20261011i`. Walk **0.68** / sprint **1.15** kept (fluidity comes from smoothing, never speed). Best default, `history.replaceState` only, no CDN, no external LLM. God is the Most High; Christ is King; First Consul is a man under God.
+
+- **Pictures seated in every kit:** every frame and plaque is tagged as it is built, and once a room or kit is furnished (never while you walk) each one is seated: pulled flush to the wall face it hangs on (they stood 3 to 7cm proud), lifted or lowered clear of door headers, picture rails and cornices, stepped along the wall away from sconces and posts, and kept from overlapping one another. Signs with no wall at all (the flag tags in the committee room and district) now stand on two slim brass posts down to the floor instead of hanging in the air. An audit of all ten rooms went from 42 flagged pictures to none hanging, clipping or overlapping; what it still lists are the table nameplates, the statue plinth plates and the outdoor ground signs, which sit where they are meant to.
+- **Texture clarity:** textures created while you were walking were held at 2x anisotropic filtering for good, so some walls stayed soft. They are now lifted back to the quality cap (8x on Best) one at a time while you stand still. Nothing changes while walking.
+- Frame pacing, camera smoothing (yaw, pitch, lean, eye height), mip chains on every map and MSAA were already in place and are unchanged; speed caps, the 6ms bail, warmAhead and the walk light throttle are untouched.
+- Tests: picture audit of 10 rooms, screenshots of seated pictures, idle texture upgrade (and none while walking), walking frame time A/B against `20261011i`, suite and stress.
+- Stamp: meta + STAMP + `ONUM_BUILD` -> `20261011j`. Five HTML copies byte-identical.
+
 ## 20261011i: career ladder and roles
 
 On `20261011h`. Walk **0.68** / sprint **1.15** kept. Best default, `history.replaceState` only, no CDN, no external LLM. God is the Most High; Christ is King; First Consul is a man under God. The First Consul's seat is sealed and is not on any ballot.
