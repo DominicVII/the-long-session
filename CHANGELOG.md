@@ -4,6 +4,18 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261011g: DTCNO speech
+
+On `20261011f`. Walk **0.68** / sprint **1.15** kept. Best default, `history.replaceState` only, no CDN, no external LLM, no network. God is the Most High; Christ is King; First Consul is a man under God.
+
+- **DTCNO (D'Infinite Taylor Consular Neural Organism):** the House's own speech engine, an in-world construct of the Consular Rite (a machine, not a deity), running entirely in the page. An embedded lexicon of 1,820 lemmas (3,304 surface forms) tagged by part of speech, topic (bills, immigration, foreign, states and the Union, faith, district, family, money, weather, gossip, the House, anomalies) and sentiment, with openers and closers by register (plain, formal, Latin) and by regional dialect (Dutch, Yankee, Midlands, prairie, delta, high plains, mountain, Pacific). 86 phrase templates by intent, an order-2 Markov recombiner over them, and the existing local net steering warmth and heat.
+- **Conditioned on the speaker:** sentience topic, pulse, creed, home dialect, how they feel about you, memories and the bill on the calendar. Each member grows an idiolect (favourite words, register, recent lines never repeated) that is learned as they talk and saved with the career.
+- **Where you hear it:** ambient exchanges between members (overheard), a reply after you pick a talk option that follows the tone of what you chose, and a new "Let them talk" option. Text-to-speech reads it through the existing voices. Talk options all still work as before.
+- **Guards:** every line passes canon filters (no divine language for any person, no comparison to the First Consul, the hymn and 7/7 stay internal) and a fourth-wall filter (nothing about the real author or kin). Composition never runs while you are walking; about 0.03ms per line.
+- Size: about +39KB.
+- Tests: 3,000 generated lines with zero canon or fourth-wall breaks, per-line cost, idiolects learned and saved, talk replies and "Let them talk", suite and stress.
+- Stamp: meta + STAMP + `ONUM_BUILD` -> `20261011g`. Five HTML copies byte-identical.
+
 ## 20261011f: lives of their own, anomalies, faith
 
 On `20261011e`. Walk **0.68** / sprint **1.15** kept. Best default, `history.replaceState` only, no CDN, no external LLM. God is the Most High; Christ is King; First Consul is a man under God.
