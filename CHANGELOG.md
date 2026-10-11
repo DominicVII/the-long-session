@@ -4,6 +4,17 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261011i: career ladder and roles
+
+On `20261011h`. Walk **0.68** / sprint **1.15** kept. Best default, `history.replaceState` only, no CDN, no external LLM. God is the Most High; Christ is King; First Consul is a man under God. The First Consul's seat is sealed and is not on any ballot.
+
+- **Every chair has its own levers:** desk computer "Use the powers of your office" or Pause > Game > Your office. Party leadership sets the calendar and disciplines; a committee chair holds a bill or marks it up toward your lines; a Senator holds confirmation hearings (confirm or make a fight of it), ratifies treaties with the realms and can filibuster; a Governor vetoes the statehouse bill, appoints a state judge, defies a federal mandate (and gets sued) and leads trade missions; the Executive signs or vetoes acts the House passed, appoints cabinet secretaries and sends foreign aid; a Justice rules on state-versus-Union suits, must recuse in cases from their own state or on acts they voted for, and cannot campaign (the war chest stays shut).
+- **Out of office is not over:** lose and you are on the East Steps with the session running. From there you can join a member's staff (draft bills for them) or take an envoy's posting abroad (cable home), and stand again at the next election.
+- **Term limits are law:** Senate two terms, Governor two, Executive two, House and bench none, held in the law state and shown on the office card. They change only by a voted amendment (new: limit the House to six terms, lift the Senate or governors' limit, a single term for justices; the existing executive amendment now also clears the executive limit). If the law bars every seat you could run for, the ballot offers "Stand down".
+- **Members climb too:** at each election a few senior members give up their seats to run for the Senate or a governorship. Winners leave the House (the seat refills under the same election law, creed fresh); losers are last seen on the East Steps. Former colleagues turn up as Senators in your hearings.
+- Tests: each role's powers, bench rulings and recusal, judges cannot campaign, limits and amendments, NPC ladder (machine seat and chaplain never leave), stand down, losing continues on the East Steps, members refill to 25.
+- Stamp: meta + STAMP + `ONUM_BUILD` -> `20261011i`. Five HTML copies byte-identical.
+
 ## 20261011h: bill kinds, war chest, achievements
 
 On `20261011g`. Walk **0.68** / sprint **1.15** kept. Best default, `history.replaceState` only, no CDN, no external LLM. God is the Most High; Christ is King; First Consul is a man under God.
