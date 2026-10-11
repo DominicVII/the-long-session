@@ -4,6 +4,14 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## Gameplay: daily aims, controller pause menu (11 Oct 2026) — `20261011c`
+
+On `20261011b`. Walk **0.68** / sprint **1.15** kept. Best default, `history.replaceState` only, no CDN, no external LLM. God is the Most High; Christ is King; First Consul is a man under God.
+
+- **Daily aims:** every morning sets three aims drawn from the day itself: talk with three members; win a pledge on the live bill (someone you spoke with today, pledged your way); be on the floor for the roll call when there is one (or sit in on the floor); and one place (district, Caucus Room, Cloakroom, East Steps) or clearing the inbox. Shown on the morning card, the NOW line ("Today 1/3: ..."), the pause menu and the night card ("Aims: 2 of 3 met"). The compass and route follow the next aim when nothing is more urgent. Each aim met gives a small, specific gain (influence, standing or approval) and a feed line; all three give a little more. Aims save with the career and never point at the Consular path.
+- **Controller:** radial deadzone on both sticks (diagonals stay diagonal, drift dies) and a gentle look curve for fine aim. Start opens and closes the pause menu; in it the D-pad or stick moves between controls, A presses, left/right nudges sliders, LB/RB change tabs, B resumes.
+- Stamp: meta + STAMP + `ONUM_BUILD` -> `20261011c`. Five HTML copies byte-identical.
+
 ## Feel: pause menu, objective route, 10pm fix (11 Oct 2026) — `20261011b`
 
 On `20261011a`. Walk **0.68** / sprint **1.15** kept. Best default, `history.replaceState` only, no CDN, no external LLM. God is the Most High; Christ is King; First Consul is a man under God.
