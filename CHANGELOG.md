@@ -4,6 +4,19 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## Playable fixes: corridor freeze, elections, warmAhead (11 Oct 2026) — `20261011a`
+
+On tip `20261005a`. Walk **0.68** / sprint **1.15** kept. Full people meshes kept. Best default, `history.replaceState` only, no CDN, no external LLM. God is the Most High; Christ is King; First Consul is a man under God.
+
+Found with a headless boot-to-play harness (new career, every door walked, talk in every room, vote, Sleep, save/reload/Continue, election).
+
+- **A. The corridor freeze:** `alignment()` -> `stakeSway` -> `stakeIn` -> `alignment()` recursed to the stack limit, then fanned out through `tiePull` across every tied member. Once ties formed the main thread hung for minutes (reproduced: page unresponsive >4 min after entering the corridor). `stakeIn` now reads raw ideology; `alignment` has a re-entrancy guard and a short per-frame memo.
+- **B. Elections never ran:** the card watchdog hid any card without a `.card__actions` button, so the ballot ("What are you standing for?") vanished on the next frame and the term rolled on. Any live control now counts; a control-less card gets 2.5s grace (Sleeping... / Loading...).
+- **C. warmAhead never ran:** `roomGroup` was `const`, so the first kit swap threw and `_warmBusy` stuck forever. Now `let`; the kit isolates lamps/tickers and never touches the live sky; shells stash as shells (no child-count "furnished" guess). Rooms after the first get their practical lamps again (`ROOMLIGHTS`/`TICKERS` relink on stash/take).
+- **D. New career is safe:** with a career on disk, New career asks first (Back is the default); the old save is only wiped when the new oath is taken.
+- **E. Standalone file://** skips the `/tex/*.jpg` probe (CORS noise); canvas maps stand.
+- Stamp: meta + STAMP + `ONUM_BUILD` -> `20261011a`. Five HTML copies byte-identical.
+
 ## Weekly MAX OPTIMIZE + design/max-fit (5 Oct 2026) — `20261005a`
 
 On tip `20261001b` (hard shadows on the 01a freeze). Walk **0.68** / sprint **1.15** kept. Full people meshes kept. `PEOPLE_CAST_SHADOW` false. `history.replaceState` only. God is Most High; Christ is King; First Consul is a man under God.
