@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261011d">
+<meta name="onum-build" content="20261011e">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261011d";
+  var STAMP = "20261011e";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -158,6 +158,12 @@ html,body{height:100%}
 .compass__tick.is-goal.is-edge{opacity:.65}
 body.keys-intro .keys{display:flex !important; opacity:.92}
 #pauseOverlay button:focus-visible, #pauseOverlay input:focus-visible{outline:3px solid var(--gold, #c9a227); outline-offset:2px}
+.whip__h{font:600 11px/1.2 var(--mono, monospace); letter-spacing:.12em; text-transform:uppercase; opacity:.7; margin:12px 0 4px}
+.whip__row{display:grid; grid-template-columns:1fr auto; gap:2px 10px; padding:6px 0; border-top:1px solid var(--line, rgba(0,0,0,.12)); align-items:center}
+.whip__n{font-weight:600} .whip__n i{font-style:normal; opacity:.6; font-weight:400; font-size:.86em}
+.whip__w{grid-column:1; font-size:.86em; opacity:.8}
+.whip__b{grid-column:2; grid-row:1 / span 2; display:flex; gap:6px}
+.whip__go{padding:6px 10px; min-height:0}
 .goals{list-style:none; margin:4px 0 10px; padding:0; text-align:left}
 .goals li{font-size:13px; padding:2px 0; color:var(--ink)}
 .goals li.is-done{color:var(--good); text-decoration:line-through; text-decoration-color:color-mix(in srgb,var(--good) 50%,transparent)}
@@ -3062,7 +3068,7 @@ function scheduleDay(){
   });
   lastBlock = -1;
   makeEvents();
-  if(t === "session" && (!G.bill || G.bill.done)) G.bill = makeBill();
+  if(t === "session" && (!G.bill || G.bill.done)) G.bill = nextBillOrQueued();
 }
 function scheduleDayStaged(done){
   /* Diary only — no meshes. 4 people per paint so Edge can breathe. */
@@ -3086,7 +3092,7 @@ function scheduleDayStaged(done){
     yieldPaint(() => {
       try{ makeEvents(); }catch(e){}
       try{
-        if(t === "session" && (!G.bill || G.bill.done)) G.bill = makeBill();
+        if(t === "session" && (!G.bill || G.bill.done)) G.bill = nextBillOrQueued();
       }catch(e){}
       if(done) done();
     });
@@ -5514,12 +5520,19 @@ function propShelf(x,z,ry,w,h){
   const wood=matTex(TEX.panel,1,1,.52);
   const put=(m,px,py,pz,sx,sy,sz)=>{ const e=new THREE.Mesh(UNIT.box,m);
     e.position.set(px,py,pz); e.scale.set(sx,sy,sz); e.castShadow=true; e.receiveShadow=true; g.add(e); };
-  put(wood,0,h/2,0, w,h,0.30);
+  /* open bookcase: back board, two sides, top, plinth, shelves, books in front of the back */
+  put(wood,0,h/2,-0.13, w,h,0.04);
+  put(wood,-w/2+0.02,h/2,0, 0.04,h,0.30);
+  put(wood, w/2-0.02,h/2,0, 0.04,h,0.30);
+  put(wood,0,h-0.02,0, w,0.04,0.30);
+  put(wood,0,0.05,0.01, w-0.04,0.10,0.28);
   const rows=Math.max(2,Math.floor(h/0.42));
+  const bk=matTex(TEX.books, Math.max(1,w*2.2), 1, .92);
   for(let i=0;i<rows;i++){
-    put(wood,0,0.16+i*(h-0.3)/rows,0.02, w-0.06,0.03,0.26);
-    const bk=matTex(TEX.books, Math.max(1,w*2.2), 1, .92);
-    put(bk,0,0.16+i*(h-0.3)/rows+0.17,0.03, w-0.12,0.30,0.20);
+    const sy=0.10+i*(h-0.14)/rows;
+    put(wood,0,sy+0.015,0.01, w-0.08,0.03,0.27);
+    const bh=Math.min(0.30,(h-0.14)/rows-0.06);
+    put(bk,0,sy+0.03+bh/2,-0.02, w-0.12,bh,0.20);
   }
   return groundGroup(g, 0.7);
 }
@@ -6353,7 +6366,7 @@ function decorateOfficeFor(person){
   /* The room identity plaque already carries this person's name at the
      entry; do not add a second, nearly coincident name tag here. */
   /* Party colour accents: desk blotter + thin wall rail */
-  addBox(accentMat, 0, DIM.desk + 0.008, Math.min(8.15, d - 1.6), 0.92, 0.012, 0.58, 0, true);
+  addBox(accentMat, 0.25, DIM.desk + 0.008, Math.min(8.28, d - 1.5), 0.50, 0.012, 0.38, 0, true);
   addBox(softAccent, 0, 1.32, d - 0.04, w * 0.42, 0.035, 0.03, 0, true);
   addBox(accentMat, -hw + 0.03, 1.55, d * 0.55, 0.025, 0.08, 1.4, 0, true);
   /* Vanity: portraits / awards on the wall; low vanity → plants instead */
@@ -6370,20 +6383,20 @@ function decorateOfficeFor(person){
   if(ambition > 58){
     /* no second national flag — placeRoomFlags owns the pair */
     for(let i=0;i<3;i++)
-      addBox(matCol([0x2a3a55,0x5a3038,0x3a4a3a][i], .85), -0.75, DIM.desk + 0.02 + i*0.045, Math.min(8.28, d-1.3), 0.22, 0.04, 0.28, 0.08*i, true);
+      addBox(matCol([0x2a3a55,0x5a3038,0x3a4a3a][i], .85), -0.80, DIM.desk + 0.02 + i*0.045, Math.min(8.36, d-1.3), 0.22, 0.04, 0.26, 0.08*i, true);
     if(ambition > 75)
       propPlaque(-1.5, 1.75, d - 0.02, 0, "Ambition", creed ? creed.adj : "Member", 0.70, 0.20);
   }
   /* Discretion: tidy desk, closed folio; low discretion → more open paper */
   if(disc > 65){
-    addBox(matCol(0x3a2e22, .6), 0.35, DIM.desk + 0.03, Math.min(8.05, d-1.6), 0.32, 0.06, 0.24, 0, true);
+    addBox(matCol(0x3a2e22, .6), 0.25, DIM.desk + 0.05, Math.min(8.28, d-1.5), 0.30, 0.04, 0.22, 0, true);
   } else {
-    propPapers(-0.35, DIM.desk + 0.004, Math.min(8.00, d-1.7), disc < 40 ? 7 : 4);
+    propPapers(0.25, DIM.desk + 0.045, Math.min(8.28, d-1.5), disc < 40 ? 7 : 4);
   }
   /* Temper: askew chair / scattered pages when high */
   if(temper > 68){
     propChair(matTex(TEX.oak,1,1,.6), matTex(TEX.leather,1,1,.85), 1.45, Math.min(6.55, d-2.4), -0.35);
-    propPapers(0.7, DIM.desk + 0.004, Math.min(7.95, d-1.8), 5);
+    propPapers(0.10, DIM.desk + 0.004, Math.min(7.90, d-1.8), 5);
   }
   /* Creed / background flavour on a flush side plaque */
   if(creed){
@@ -6392,7 +6405,7 @@ function decorateOfficeFor(person){
   /* Quiz-coloured clutter: hardline answers → more conviction shelves */
   const ans = person.answers || [];
   if(ans.length >= 4 && (person.loyalTrait|0) > 12){
-    addBox(matCol(0x4a4030, .7), hw - 0.55, 0.95, 7.8 > d-1.2 ? d*0.72 : 7.8, 0.42, 1.7, 0.85, 0, true);
+    propShelf(hw - 0.35, 7.8 > d-1.2 ? d*0.72 : 7.8, -Math.PI/2, 0.95, 1.7);
   }
 }
 
@@ -6766,12 +6779,11 @@ function buildRoomInner(id, skipShell){
   if(id === "office" || id === "visit"){
     try{
     propDesk(woodMat, woodMat, 0, 8.15, 2.05, 0.95);              /* member desk, back of suite */
-    propChair(woodMat, leather, 0, 9.18, Math.PI);
-    addBox(paperMat, -0.42, DIM.desk + 0.012, 8.05, 0.32, 0.02, 0.38);
+    propChair(woodMat, leather, 0, 9.05, Math.PI);
     /* Shelves and cabinet share the same grounded prop recipes as every room. */
     propCabinet(matCol(0x2a2f36,.7), matCol(0x3a4048,.6), hw-0.55, 5.6, 0.55, 1.04, 0.62);
     /* flags via placeRoomFlags (national+NO7; Taylor Day: NO7 only) */
-    addCyl(brass, 0.78, DIM.desk + 0.09, 8.05, 0.06, 0.18);
+    addCyl(brass, 0.45, DIM.desk + 0.07, 7.86, 0.05, 0.14);
   
     }catch(e){ if(window.console) console.warn("room office", e); }
   }
@@ -7081,11 +7093,11 @@ function buildRoomInner(id, skipShell){
   /* fittings the interaction points refer to */
   if(id === "office" || id === "visit"){
     try{
-    addCyl(matCol(0x2e3238,.5,.3), 0.78, DIM.desk + 0.10, 8.05, 0.09, 0.20);            /* coffee pot */
-    addCyl(matCol(0x8c8f94,.4,.6), 0.78, DIM.desk + 0.22, 8.05, 0.05, 0.07);
-    propLaptop(-0.52, 8.08, 0, DIM.desk);
-    addBox(matCol(0x1c1f24,.4), 0.92, DIM.desk + 0.03, 8.12, 0.20, 0.06, 0.15, 0, true);
-    addBox(matCol(0x1c1f24,.4), 0.92, DIM.desk + 0.08, 8.12, 0.22, 0.05, 0.05, 0, true);
+    addCyl(matCol(0x2e3238,.5,.3), 0.80, DIM.desk + 0.10, 7.88, 0.09, 0.20);            /* coffee pot */
+    addCyl(matCol(0x8c8f94,.4,.6), 0.80, DIM.desk + 0.235, 7.88, 0.05, 0.07);
+    propLaptop(-0.30, 8.24, 0, DIM.desk);
+    addBox(matCol(0x1c1f24,.4), 0.85, DIM.desk + 0.03, 8.32, 0.20, 0.06, 0.15, 0, true);
+    addBox(matCol(0x1c1f24,.4), 0.85, DIM.desk + 0.08, 8.32, 0.22, 0.05, 0.05, 0, true);
   
     }catch(e){ if(window.console) console.warn("room office", e); }
   }
@@ -7142,9 +7154,9 @@ function buildRoomInner(id, skipShell){
     propShelf(-hw+0.35, 2.55, Math.PI/2, 2.0, 2.05);
     propShelf(-hw+0.35, 9.35, Math.PI/2, 1.55, 1.55);
     propPlant(hw-0.72, 1.85, 1.05);
-    propLamp(0.95, DIM.desk, 7.85, 0xffd9a0, 0.75);
+    propLamp(-0.82, DIM.desk + 0.32, 7.90, 0xffd9a0, 0.75);
     propCoatStand(hw-0.72, 9.55);
-    propPapers(-0.18, DIM.desk + 0.02, 8.08, 4);
+    propPapers(0.25, DIM.desk + 0.018, 8.28, 4);
     propClock(0, 2.88, d-0.09);
     propFan(0, h-0.28, 5.4);
     propSconce(-hw+0.12, 2.15, 5.4, Math.PI/2);
@@ -7152,7 +7164,7 @@ function buildRoomInner(id, skipShell){
     addBox(matCol(0x1e2126,.8), -hw+1.35, 0.16, 9.55, 0.30,0.32,0.30, 0, true);
     addBox(woodMat, 1.55, 0.22, 4.85, 0.55, 0.44, 0.50, 0, true);
     propPapers(1.55, 0.46, 4.85, 2);
-    propLamp(-0.95, DIM.desk, 8.35, 0xffe2b0, 0.50);
+    /* one desk lamp is enough; the second sat on the desk edge */
     /* blinds live inside propWindow(opts.blinds) — do not double-stack */
     /* name plaque + trait décor applied in decorateOfficeFor at end of build */
   
@@ -7334,7 +7346,7 @@ function buildRoomInner(id, skipShell){
     addCyl(matCol(0x1b1d22,.5), 2.4, 0.75, 7.4, 0.05,1.5);
     addBox(matCol(0x15171b,.4), 2.4, 1.56, 7.4, 0.34,0.22,0.46, 0, true);
     addBox(matCol(0x6b4d2c,.55), 0, 1.05, d-0.55, 6.2, 0.08, 0.08, 0, true);
-    for(let i=0;i<7;i++) addCyl(matCol(0x6b4d2c,.55), -3+i*1.0, 0.55, d-0.55, 0.025, 1.0);
+    for(let i=0;i<7;i++){ addCyl(matCol(0x6b4d2c,.55), -3+i*1.0, 0.535, d-0.55, 0.025, 1.07); addCyl(matCol(0x4a3620,.55), -3+i*1.0, 0.02, d-0.55, 0.09, 0.04); }
     propLamp(2.4, 1.05, 7.4, 0xfff0d0, 0.7);
     propPlant(hw-0.8, 2.2, 1.0);
     if(!MODEST) propChandelier(0, h-0.6, 5.0, 4, 0.8);
@@ -9416,7 +9428,7 @@ function seatsFor(id){
     }
   } else if(id === "office"){
     /* Member desk chair — casual free sit (not a chamber seat) */
-    out.push({x:0, z:8.05, face:Math.PI});
+    out.push({x:0, z:9.05, face:Math.PI});
   }
   return out;
 }
@@ -9712,7 +9724,7 @@ function openDeskWork(paneId){
 function sitCasuallyAtDesk(){
   /* Free sit at My desk — 0 minutes, world keeps running, no talk popup */
   if(!G.you || G.room !== "office") return false;
-  const s = {x:0, z:8.05, face:Math.PI};
+  const s = {x:0, z:9.05, face:Math.PI};
   const f = s.face;
   cam.x = s.x + Math.sin(f) * 0.12;
   cam.z = s.z + Math.cos(f) * 0.12;
@@ -16837,8 +16849,8 @@ function proposeBill(axis, dir){
   b.title = pick(BILL_A) + " " + pick(BILL_B) + " " + pick(BILL_C);
   b.sponsor = you.name; b.sponsorParty = you.party; b.mine = true;
   b.stakes = "contested"; b.voteDay = G.day + rint(3,6);
-  b.line = describeBill(b);
-  G.bill = b;
+  b.line = describeBill(b); b.cosponsors = [];
+  placeYourBill(b);
   const line = partyLine(b)[you.party];
   you.standing = clamp(you.standing + (line > 0 ? 4 : -7), 0, 100);
   note("Introduced " + b.title + ". It is yours now.", true);
@@ -18594,6 +18606,14 @@ function openTalk(m){
   if(!G.running || G.over) return;
   TALK.open = true; TALK.m = m;
   try{ const Gs = goalsEnsure(); if(Gs && m && m.kind === "member" && Gs.talked.indexOf(m.id) < 0) Gs.talked.push(m.id); }catch(e){}
+  try{
+    if(G.whip && m && G.whip.id === m.id){ G.whip = null; feed("You found " + surname(m.name) + ". Make the ask."); }
+    const Gs = G.goals;
+    if(Gs && m && m.kind === "member" && G.bill && !G.bill.done){
+      let v = 0; try{ v = memberVote(m, G.bill) > 0 ? 1 : -1; }catch(e){}
+      if(v !== yourSide(G.bill)){ Gs.whipped = Gs.whipped || []; if(Gs.whipped.indexOf(m.id) < 0) Gs.whipped.push(m.id); }
+    }
+  }catch(e){}
   el("talk").classList.add("is-open");
   el("talk").scrollTop = 0;
   try{
@@ -19956,8 +19976,8 @@ const PROPS = {
         const b = makeBill();
         b.sponsor = G.you.name; b.sponsorParty = G.you.party; b.stakes = "contested";
         for(const a of AXES) b.pos[a.k] = Math.round(lerp(b.pos[a.k], G.you.district[a.k], 0.7));
-        b.line = describeBill(b); b.voteDay = G.day + rint(3,6);
-        G.bill = b;
+        b.line = describeBill(b); b.voteDay = G.day + rint(3,6); b.mine = true; b.cosponsors = [];
+        placeYourBill(b);
         const line = partyLine(b)[G.you.party];
         G.you.standing = clamp(G.you.standing + (line>0?4:-6), 0, 100);
         note("Drafted " + b.title + " and put it on the calendar.", true);
@@ -19982,10 +20002,10 @@ const PROPS = {
           fx("+3 warmth with " + listify(known.map(m=>surname(m.name))), "70 minutes"));
       }}
      ]},
-    {id:"urn", label:"The coffee pot", sub:"Burnt, and the only one on this floor", x:0.75, z:7.0, r:1.6,
+    {id:"urn", label:"The coffee pot", sub:"Burnt, and the only one on this floor", x:0.80, z:7.88, r:1.6,
      acts:()=>[{t:"Pour a cup", c:"10m", off:G.you.energy>88, run(){
         spend(10, -16); setSay("It is terrible. It works.", fx("+16 energy","")); }}]},
-    {id:"pc", label:"The desk computer", sub:"Mail, the whip count, and a browser nobody has updated", x:-0.55, z:7.1, r:2.0,
+    {id:"pc", label:"The desk computer", sub:"Mail, the whip count, and a browser nobody has updated", x:-0.30, z:8.24, r:1.7,
      acts:()=>[
       {t:"Read my mail" + (unreadCount() ? " (" + unreadCount() + " new)" : ""), c:"10m", run(){
         spend(10, 2);
@@ -19993,6 +20013,10 @@ const PROPS = {
         setSay(unreadCount() ? unreadCount() + " unread. Half of them want something."
                              : "Nothing new. That is either peace or trouble.",
           fx("the inbox is open in the panel",""));
+      }},
+      {t:"Open the whip count", c:"5m", off:!(G.bill && !G.bill.done), run(){
+        spend(5, 1);
+        whipCard();
       }},
       {t:"Send a note to everyone I know", c:"40m", off:!G.members.some(m=>m.met), run(){
         spend(40, 10);
@@ -20002,7 +20026,7 @@ const PROPS = {
           fx("+2 warmth across " + known.length + " members","40 minutes"));
       }}
      ]},
-    {id:"phone", label:"The desk telephone", sub:"A direct line to every office in the building", x:1.05, z:7.1, r:1.8,
+    {id:"phone", label:"The desk telephone", sub:"A direct line to every office in the building", x:0.85, z:8.32, r:1.8,
      acts:()=>{
        const known = G.members.filter(m => m.met && !presentWith(m));
        const out = [];
@@ -20699,7 +20723,7 @@ function holdVote(){
     feed("The clerk closes the book on " + b.title + ". The building exhales and starts the next argument.");
     laterHouse(() => {
       try{ paintTicker(); }catch(e){}
-      try{ G.bill = makeBill(); }catch(e){}
+      try{ G.bill = nextBillOrQueued(); }catch(e){}
       try{ queueSave(); }catch(e){}
     });
   });
@@ -21382,7 +21406,14 @@ function activeJob(){
   if(wanter) return wanter.name.split(" ")[0] + " wants a word. Walk over. E.";
   const b = G.bill;
   if(b && !b.done && b.voteDay === G.day) return b.title + " — roll call today. Be on the floor.";
-  if(b && !b.done && G.room !== "floor" && typeof dayType === "function" && dayType() === "session")
+  try{
+    const wt = whipTarget();
+    if(wt){
+      if(wt.room === G.room) return "Whip: " + surname(wt.name) + " is here. Walk over. E.";
+      return "Whip: find " + surname(wt.name) + " in " + whipRoomName(wt) + ".";
+    }
+  }catch(e){}
+  if(b && !b.done && G.room !== "floor" && floorSitsNow())
     return "The floor is sitting. Go in.";
   const unread = (G.mail || []).filter(m => !m.read).length;
   if(unread && G.room !== "office") return unread + " waiting in the inbox. Office, or F.";
@@ -21409,7 +21440,8 @@ function objectiveRoom(){
   const b = G.bill;
   if(b && !b.done && b.voteDay === G.day) return "floor";
   if(G.you.energy < 18 || m >= 21*60) return "office";
-  if(b && !b.done && typeof dayType === "function" && dayType() === "session") return "floor";
+  try{ const wt = whipTarget(); if(wt && ROOMS[wt.room]) return wt.room; }catch(e){}
+  if(b && !b.done && floorSitsNow()) return "floor";
   const unread = (G.mail || []).filter(x => !x.read).length;
   if(unread) return "office";
   try{ const ng = nextGoal(); if(ng && ng.room) return ng.room; }catch(e){}
@@ -21453,19 +21485,22 @@ function goalsEnsure(){
   if(voteToday) pool.push({k:"rollcall", t:"Be on the floor for the roll call", need:1, room:"floor"});
   else pool.push({k:"room", room:"floor", t:"Sit in on the House floor", need:1});
   if(unread) pool.push({k:"mail", t:"Clear your inbox", need:1, room:"office"});
+  if(b && !b.done && b.mine) pool.push({k:"cosponsor", t:"Sign up a cosponsor for your bill", need:1});
+  if(b && !b.done) pool.push({k:"whip", t:"Work someone leaning against you", need:1});
   pool.push({k:"room", room:"district", t:"Go home to the district", need:1});
   pool.push({k:"room", room:"caucus", t:"Show your face in the Caucus Room", need:1});
   pool.push({k:"room", room:"steps", t:"Take the air on the East Steps", need:1});
   pool.push({k:"room", room:"cloak", t:"Hear what the Cloakroom is saying", need:1});
   /* talk first; then the bill if there is one; then one place, chosen by the day */
   const list = [pool[0]];
-  const billish = pool.find(g => g.k === "rollcall") || pool.find(g => g.k === "pledge");
+  const billish = pool.find(g => g.k === "rollcall") || pool.find(g => g.k === "cosponsor") || pool.find(g => g.k === "pledge");
   if(billish) list.push(billish);
   const rest = pool.filter(g => list.indexOf(g) < 0 && !(g.k === "pledge" && list.some(x => x.k === "rollcall")));
   const seed = ((G.day || 1) * 7 + (G.congress || 1) * 3) % Math.max(1, rest.length);
   while(list.length < 3 && rest.length){ list.push(rest.splice(seed % rest.length, 1)[0]); }
   G.goals = {day:G.day, list:list.map(g => Object.assign({have:0, done:false}, g)), talked:[], seen:{}, rollcall:false, all:false,
-    pledged0:(G.members || []).filter(m => m && m.pledge && m.pledgeDay === G.day).map(m => m.id)};
+    pledged0:(G.members || []).filter(m => m && m.pledge && m.pledgeDay === G.day).map(m => m.id),
+    co0:(b && b.mine && b.cosponsors) ? b.cosponsors.length : 0, whipped:[]};
   try{ feed("Today’s aims: " + G.goals.list.map(g => g.t).join(" · ") + "."); }catch(e){}
   return G.goals;
 }
@@ -21495,12 +21530,14 @@ function goalsTick(){
     else if(g.k === "rollcall") have = Gs.rollcall ? 1 : 0;
     else if(g.k === "room") have = (Gs.seen && Gs.seen[g.room]) || G.room === g.room ? 1 : 0;
     else if(g.k === "mail") have = (G.mail || []).filter(x => !x.read).length ? 0 : 1;
+    else if(g.k === "whip") have = (Gs.whipped || []).length ? 1 : 0;
+    else if(g.k === "cosponsor") have = (G.bill && G.bill.mine && (G.bill.cosponsors || []).length > (Gs.co0 || 0)) ? 1 : 0;
     if(have !== g.have){ g.have = have; changed = true; }
     if(g.have >= g.need){
       g.done = true; changed = true;
       try{
         if(G.you){
-          if(g.k === "talk" || g.k === "pledge") G.you.influence = clamp((G.you.influence || 0) + 3, 0, 100);
+          if(g.k === "talk" || g.k === "pledge" || g.k === "whip" || g.k === "cosponsor") G.you.influence = clamp((G.you.influence || 0) + 3, 0, 100);
           else if(g.k === "rollcall") G.you.standing = clamp((G.you.standing || 0) + 3, 0, 100);
           else G.you.approval = clamp((G.you.approval || 0) + 2, 0, 100);
         }
@@ -21522,6 +21559,145 @@ function goalsHTML(){
   const Gs = goalsEnsure(); if(!Gs) return "";
   return '<ul class="goals">' + Gs.list.map(g => '<li class="' + (g.done ? "is-done" : "") + '">' +
     (g.done ? "✓ " : "○ ") + g.t + (g.k === "talk" && !g.done ? " (" + g.have + "/" + g.need + ")" : "") + '</li>').join("") + '</ul>';
+}
+/* ── 20261011e · the whip count ─────────────────────────── */
+function floorSitsNow(){
+  try{
+    if(typeof dayType !== "function" || dayType() !== "session") return false;
+    const m = G.minute || 0;
+    return (m >= 11*60 && m < 12*60 + 36) || (m >= 14*60 && m < 17*60);
+  }catch(e){ return false; }
+}
+function yourSide(b){
+  b = b || G.bill; if(!b || !G.you) return 1;
+  if(G.you.vote === 1 || G.you.vote === -1) return G.you.vote;
+  if(b.mine) return 1;
+  try{ const l = partyLine(b)[G.you.party]; if(l) return l > 0 ? 1 : -1; }catch(e){}
+  try{ return alignment(G.you, b) > 0 ? 1 : -1; }catch(e){ return 1; }
+}
+function whipRoomName(m){
+  if(!m) return "";
+  if(m.room === "away" || m.away) return "in their own suite";
+  return ROOMS[m.room] ? ROOMS[m.room].t : m.room;
+}
+function whipBoard(){
+  const b = G.bill; if(!b || b.done) return null;
+  const side = yourSide(b);
+  const t = tallyBill(b, true);
+  const live = (G.members || []).filter(m => m && !m.gone && m.kind === "member");
+  const rows = live.map(m => {
+    let v = 0; try{ v = memberVote(m, b) > 0 ? 1 : -1; }catch(e){}
+    const pledged = !!(m.pledge && G.day - (m.pledgeDay || 0) < 8);
+    const known = pledged || (m.known || 0) >= 1;
+    return {m, v, pledged, known, with: v === side};
+  });
+  const withYou = rows.filter(r => r.with && r.pledged);
+  const soft = rows.filter(r => !r.with && !(r.pledged && r.m.pledge === -side))
+    .sort((a, c) => ((c.m.rel ? c.m.rel.warmth : 0) - (a.m.rel ? a.m.rel.warmth : 0)));
+  const total = t.aye + t.no + t.un;
+  const need = Math.max(0, Math.floor(total / 2) + 1 - (side > 0 ? t.aye : t.no));
+  return {b, side, t, withYou, soft, need, rows};
+}
+function whipCard(){
+  const W = whipBoard();
+  if(!W){ note("No bill on the calendar to count."); return; }
+  try{ closeTalk(); }catch(e){}
+  const b = W.b, side = W.side;
+  G.running = false;
+  const sideWord = side > 0 ? "aye" : "no";
+  const here = (m) => m.room === G.room;
+  const row = (r) => '<div class="whip__row">' +
+    '<span class="whip__n">' + r.m.name + ' <i>' + (r.m.party || "") + '</i></span>' +
+    '<span class="whip__w">' + (r.pledged ? (r.m.pledge === side ? "pledged with you" : "pledged against") : (r.known ? (r.with ? "leans your way" : "leans against") : "unread")) +
+    ' · ' + whipRoomName(r.m) + '</span>' +
+    '<span class="whip__b">' +
+      (here(r.m) ? '<button type="button" class="btn btn--ghost whip__go" data-whiptalk="' + r.m.id + '">Talk now</button>'
+                 : (r.m.room && r.m.room !== "away" && !r.m.away ? '<button type="button" class="btn btn--ghost whip__go" data-whipfind="' + r.m.id + '">Find</button>' : '')) +
+    '</span></div>';
+  const co = (b.cosponsors || []).map(byId).filter(Boolean);
+  const askable = b.mine ? W.rows.filter(r => here(r.m) && (b.cosponsors || []).indexOf(r.m.id) < 0).slice(0, 5) : [];
+  const coRow = (r) => '<div class="whip__row"><span class="whip__n">' + r.m.name + ' <i>' + (r.m.party || "") + '</i></span>' +
+    '<span class="whip__w">' + (r.with ? "leans your way" : "leans against") + ' · here</span>' +
+    '<span class="whip__b"><button type="button" class="btn btn--ghost whip__go" data-whipco="' + r.m.id + '">Ask to cosponsor</button></span></div>';
+  card.innerHTML =
+    '<div class="eyebrow">The whip count · ' + hhmm() + '</div>' +
+    '<h1>' + b.title + '</h1>' +
+    '<p class="dream">Roll call day ' + b.voteDay + (b.voteHour ? ' at ' + (b.voteHour > 12 ? b.voteHour - 12 : b.voteHour) + ' o\u2019clock' : '') +
+      ' · you vote <strong>' + sideWord + '</strong>' + (b.mine ? ' · <strong>your bill</strong>' : '') + '</p>' +
+    '<div class="count"><div class="c-aye"><i>Ayes</i><b>' + W.t.aye + '</b></div><div class="c-no"><i>Noes</i><b>' + W.t.no + '</b></div><div class="c-un"><i>Unread</i><b>' + W.t.un + '</b></div></div>' +
+    '<p>' + (W.need > 0 ? 'Your side needs <strong>' + W.need + '</strong> more on the projected count.' : 'On the projected count your side carries it. Counts move.') + '</p>' +
+    (b.mine ? '<p><strong>Cosponsors:</strong> ' + (co.length ? listify(co.map(m => m.name)) : 'none yet. Ask the people in the room with you.') + '</p>' : '') +
+    (W.withYou.length ? '<p><strong>Pledged with you:</strong> ' + listify(W.withYou.slice(0, 8).map(r => surname(r.m.name))) + '</p>' : '') +
+    (askable.length ? '<div class="whip__h">In the room with you</div>' + askable.map(coRow).join("") : '') +
+    '<div class="whip__h">Worth working</div>' +
+    (W.soft.slice(0, 7).map(row).join("") || '<p>Nobody left to turn. Hold what you have.</p>') +
+    '<div class="card__actions"><button type="button" class="btn" id="whipClose">Back to it</button></div>';
+  veil.hidden = false;
+  const done = () => { walkNow(); try{ paintJob(); paintCompass(); }catch(e){} };
+  el("whipClose").addEventListener("click", done);
+  card.querySelectorAll("[data-whipfind]").forEach(bt => bt.addEventListener("click", () => {
+    const m = byId(+bt.getAttribute("data-whipfind")); if(!m) return;
+    G.whip = {id:m.id, day:G.day};
+    feed("Whip: find " + m.name + " (" + whipRoomName(m) + ").");
+    done();
+  }));
+  card.querySelectorAll("[data-whiptalk]").forEach(bt => bt.addEventListener("click", () => {
+    const m = byId(+bt.getAttribute("data-whiptalk")); if(!m) return;
+    done();
+    setTimeout(() => { try{ if(G.running && m.room === G.room) openTalk(m); }catch(e){} }, 60);
+  }));
+  card.querySelectorAll("[data-whipco]").forEach(bt => bt.addEventListener("click", () => {
+    const m = byId(+bt.getAttribute("data-whipco")); if(!m) return;
+    askCosponsor(m);
+    whipCard();
+  }));
+}
+function askCosponsor(m){
+  const b = G.bill; if(!b || b.done || !b.mine || !m) return false;
+  b.cosponsors = b.cosponsors || [];
+  if(b.cosponsors.indexOf(m.id) >= 0) return true;
+  spend(15, 4);
+  let lean = 0; try{ lean = alignment(m, b); }catch(e){}
+  const warm = m.rel ? m.rel.warmth : 0;
+  const odds = clamp(0.25 + lean / 160 + warm / 220 + ((m.allies || []).indexOf(0) >= 0 ? 0.15 : 0), 0.05, 0.9);
+  if(Math.random() < odds){
+    b.cosponsors.push(m.id);
+    m.pledge = 1; m.pledgeDay = G.day;
+    try{ ripple(m, 3, "They asked me to put my name on their bill. I did.", 2, true); }catch(e){}
+    G.you.standing = clamp((G.you.standing || 0) + 2, 0, 100);
+    note(m.name + " will cosponsor " + b.title + ".", true);
+    return true;
+  }
+  try{ ripple(m, -1, "They wanted my name on their bill before I had read it.", -1); }catch(e){}
+  feed(surname(m.name) + " will not put their name to it. Not yet.");
+  return false;
+}
+function whipTarget(){
+  const w = G.whip;
+  if(!w || w.day !== G.day) return null;
+  const m = byId(w.id);
+  if(!m || m.gone || m.away || m.room === "away"){ return null; }
+  return m;
+}
+/* your own drafts wait their turn; they do not erase the live bill */
+function nextBillOrQueued(){
+  if(G.billQueue && G.billQueue.length){
+    const b = G.billQueue.shift();
+    b.voteDay = (G.day || 1) + rint(3, 5);
+    note(b.title + " comes off the queue and onto the calendar.", true);
+    return b;
+  }
+  return makeBill();
+}
+function placeYourBill(b){
+  if(G.bill && !G.bill.done && !G.bill.mine){
+    G.billQueue = G.billQueue || [];
+    G.billQueue.push(b);
+    note(b.title + " is filed. It goes on the calendar after the " + G.bill.title.split(" ")[0] + " roll call.", true);
+    return false;
+  }
+  G.bill = b;
+  return true;
 }
 function paintJob(){
   const box = el("job"), txt = el("jobText");
@@ -22625,7 +22801,7 @@ function saveCaptureBase(){
     withWhom:G.withWhom, ties:G.ties, panel:null, court:G.court, own:G.own, parties:G.parties,
     termLength:G.termLength, country:G.country,
     greatest:G.greatest, blasphemy:G.blasphemy, loreNote:G.loreNote, greatnessOpen:G.greatnessOpen,
-    relics:G.relics, relicSpots:G.relicSpots, consularLore:G.consularLore, bind:G.bind, sens:G.sens, invertY:!!G.invertY, voiceVol:G.voiceVol, goals:G.goals,
+    relics:G.relics, relicSpots:G.relicSpots, consularLore:G.consularLore, bind:G.bind, sens:G.sens, invertY:!!G.invertY, voiceVol:G.voiceVol, goals:G.goals, whip:G.whip || null, billQueue:G.billQueue || [],
     world:G.world,
     pendingNight:!!G.pendingNight,
     cam:{x:cam.x, z:cam.z, yaw:cam.yaw, pitch:cam.pitch},
@@ -22969,6 +23145,7 @@ function setupSettingsUI(){
       row("Pace of the day", "How fast the clock runs around you", opt("pzspeed", 1, "1×", sp === 1) + opt("pzspeed", 2, "2×", sp === 2) + opt("pzspeed", 4, "4×", sp === 4)) +
       row("Save", '<span id="pzSaved">Autosaves at every door and every few minutes</span>', '<button type="button" class="settings-btn settings-btn-secondary" id="pzSave">Save now</button>') +
       row("The handbook", "Everything the House does, in order", '<button type="button" class="settings-btn settings-btn-secondary" id="pzBook">Open</button>') +
+      row("Whip count", "Who is with you on the bill, who to work, and where they are", '<button type="button" class="settings-btn settings-btn-secondary" id="pzWhip"' + (G.bill && !G.bill.done ? '' : ' disabled') + '>Open</button>') +
       row("Title", "Continue, or begin a new career", '<button type="button" class="settings-btn settings-btn-secondary" id="pzTitle">Title menu</button>') +
     '</div>' +
     '<div class="settings-section" data-section="graphics">' +
@@ -23006,6 +23183,7 @@ function setupSettingsUI(){
     const t = el("pzSaved"); if(t) t.textContent = ok ? ("Saved · day " + G.day + " · " + hhmm()) : "Could not save — storage may be full";
   });
   const byBook = el("pzBook"); if(byBook) byBook.addEventListener("click", () => { closeSettings(); try{ handbookCard(); }catch(e){} });
+  const byWhip = el("pzWhip"); if(byWhip) byWhip.addEventListener("click", () => { closeSettings(); setTimeout(() => { try{ whipCard(); }catch(e){} }, 30); });
   const byTitle = el("pzTitle"); if(byTitle) byTitle.addEventListener("click", () => { closeSettings(); try{ G.running = true; showGameMenu(); }catch(e){} });
   const byKeys = el("pzKeys"); if(byKeys) byKeys.addEventListener("click", () => { closeSettings(); try{ settingsCard(); }catch(e){} });
   panel.querySelectorAll("[data-pzgfx]").forEach(b => b.addEventListener("click", () => {
