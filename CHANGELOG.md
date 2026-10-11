@@ -4,6 +4,18 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261011f: lives of their own, anomalies, faith
+
+On `20261011e`. Walk **0.68** / sprint **1.15** kept. Best default, `history.replaceState` only, no CDN, no external LLM. God is the Most High; Christ is King; First Consul is a man under God.
+
+- **Lives of their own:** every member keeps a journal written from their memories, dreams at night, and carries a long aim they act on unprompted: filing a bill of their own (it joins the calendar queue), forming a named bloc with allies, befriending someone across the aisle, starting a feud (rivals), deepening their faith, or slowly noticing the shape of their world. At most two social acts reach the wire per night. "Ask what has been on their mind" reads it back to you.
+- **Night happenings:** some nights something changes in your office (chairs moved, the lamp left on, a cup that is not yours, a page turned, the flag refolded, a note). You find it the first time you stand in the office the next morning.
+- **Anomalies:** rare, saved and discoverable. A member remembers a roll call on a bill that never existed; a letter arrives dated tomorrow; the whip count lists a name nobody knows for one day; two members dream the same dream; and once, a member who has been noticing writes to ask whether you were placed here rather than elected. Nothing is ever answered. The Notebook (Pause > Game) lists them as ??? until you find them, plus happenings, faith on the wire and the blocs.
+- **Faith:** choose your creed at the oath (the Consular Rite is not offered there). In the world, read the parish notices at the district church, talk with their clergy to begin instruction, and come back another day to be received. Kneeling at the bronze still joins the Consular Rite (Latin heresy; the chaplain never gives the Host); a confession across the street brings you back. Chaplain and machine seat are never recruited.
+- **Organic faith:** each state keeps its established creed as a pocket, and shares drift by night from members' devotion and doubt, neighbouring states, friendships and rare revivals, with a soft cap so nothing snowballs (60 simulated days: no creed above 62% anywhere). Members convert, lapse and return on their own; creed still does not vote and is not inherited on a vacancy.
+- Tests: 60-day faith/life simulation, parish instruction and reception, notebook, save/load, real night; suite, people, whip, pause, two 10-day stress runs.
+- Stamp: meta + STAMP + `ONUM_BUILD` -> `20261011f`. Five HTML copies byte-identical.
+
 ## 20261011e: whip count, cosponsors, bill queue, office desk
 
 On `20261011d`. Walk **0.68** / sprint **1.15** kept. Best default, `history.replaceState` only, no CDN, no external LLM. God is the Most High; Christ is King; First Consul is a man under God.
