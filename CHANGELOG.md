@@ -4,6 +4,20 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261011e: whip count, cosponsors, bill queue, office desk
+
+On `20261011d`. Walk **0.68** / sprint **1.15** kept. Best default, `history.replaceState` only, no CDN, no external LLM. God is the Most High; Christ is King; First Consul is a man under God.
+
+- **The whip count:** a new card (desk computer "Open the whip count", or Pause > Game > Whip count) shows the projected ayes and noes, how many your side still needs, who is pledged with you, and who is worth working, with each member's lean and the room they are in. "Find" sets a whip target: the NOW line reads "Whip: find X in Room", the compass routes there, and talking to them clears it. "Talk now" opens the conversation if they are in the room with you.
+- **Cosponsors:** with your own bill on the calendar, the whip count lists everyone in the room with "Ask to cosponsor". Odds come from their lean on the bill, their warmth to you and whether you are allies. A yes pledges them and lifts your standing; a no is remembered.
+- **Your drafts queue:** drafting a bill (desk or proposal) no longer erases the live bill. It is filed and goes on the calendar after the current roll call. The queue is saved.
+- **The floor sits in its hours:** "The floor is sitting. Go in." and the compass to the floor now only appear while the House actually sits (11:00 to 12:36 and 14:00 to 17:00 on session days).
+- **New daily aims:** "Work someone leaning against you" and, with your own bill live, "Sign up a cosponsor".
+- **Office desk:** the member's seat was inside the desk (the camera sat in the desk, so it looked missing). You now sit in the chair behind it, facing the room, and E reaches the desk computer from the seat. The desk top is laid out so nothing clips: laptop, blotter and papers, phone, coffee pot, pen cup, one desk lamp standing on the desk (lamps used to sink into the top). The chair is tucked in.
+- **Office shelves:** the bookcase was a solid slab hiding its own books; it is now an open case. The "conviction shelves" were a plain block hovering 10cm off the floor; now a grounded bookcase. Press-room rope posts hovered 5cm; now planted on bases.
+- Tests: new whip/queue/cosponsor/floor-hours test, desk test (seat behind desk, desk computer in focus from the seat, nothing sunk into the desk, no solid-slab shelves), floating-prop audit of 9 rooms, people test, suite, pause, aims, two 8-day stress runs.
+- Stamp: meta + STAMP + `ONUM_BUILD` -> `20261011e`. Five HTML copies byte-identical.
+
 ## People: whole bodies that walk (11 Oct 2026) — `20261011d`
 
 On `20261011c`. Walk **0.68** / sprint **1.15** kept. Best default, `history.replaceState` only, no CDN, no external LLM. Full people meshes, never dummies. God is the Most High; Christ is King; First Consul is a man under God.
