@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261011a">
+<meta name="onum-build" content="20261011b">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261011a";
+  var STAMP = "20261011b";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -154,6 +154,10 @@ html,body{height:100%}
 .compass__tick{position:absolute; top:8px; width:5px; height:5px; margin-left:-2px; border-radius:50%; background:#c8ced6; opacity:.9}
 .compass__tick.is-quest{background:#f3c14b; width:8px; height:8px; border-radius:0; transform:rotate(45deg); top:6px}
 .compass__tick.is-talk{background:#7ec8ff; width:7px; height:7px}
+.compass__tick.is-goal{background:none; width:0; height:0; border-radius:0; top:3px; margin-left:-6px; border-left:6px solid transparent; border-right:6px solid transparent; border-top:9px solid #e8d5a3; filter:drop-shadow(0 0 3px rgba(232,213,163,.8))}
+.compass__tick.is-goal.is-edge{opacity:.65}
+body.keys-intro .keys{display:flex !important; opacity:.92}
+body.is-bare .hud{top:46px}
 .job{position:absolute; left:50%; bottom:56px; transform:translateX(-50%); pointer-events:none; z-index:5; display:flex; gap:8px; align-items:baseline; max-width:min(540px,88%); background:rgba(11,13,16,.58); border:1px solid rgba(232,213,163,.22); padding:5px 12px 6px; border-radius:2px; color:#eef1f4}
 .job i{font-style:normal; font-size:8px; letter-spacing:.16em; color:#e8d5a3; font-weight:700}
 .job b{font-size:12.5px; font-weight:500}
@@ -826,6 +830,9 @@ body.boot-menu .shell{grid-template-rows:minmax(0,1fr)}
 .settings-tab{flex:0 0 auto; padding:8px 16px; background:none; border:1px solid var(--line); border-radius:4px; cursor:pointer; font-size:12px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-3); transition:all .2s}
 .settings-tab:hover{border-color:var(--fed); color:var(--ink)}
 .settings-tab.is-active{background:var(--ink); color:var(--paper); border-color:var(--ink)}
+.settings-tab{line-height:1.25; min-height:34px}
+.pz-opt{padding:8px 14px}
+.pz-opt.is-picked{background:var(--ink); color:var(--paper); border-color:var(--ink)}
 .settings-content{flex:1 1 auto; padding:20px 28px; overflow-y:auto}
 .settings-section{display:none; animation:fadeInContent .25s ease}
 .settings-section.is-open{display:block}
@@ -15096,7 +15103,7 @@ function speak(p, text, vol){
       u.pitch = clamp(1.00 + ((t ? (t.temper - 50)/220 : 0) +
                       ((idNum(p ? p.id : "you") % 9) - 4) * 0.055) * spread, 0.6, 1.8);
       const carry = G.voiceCarry === undefined ? 1 : G.voiceCarry;
-      u.volume = clamp((vol === undefined ? 1 : vol) * carry, 0, 1);
+      u.volume = clamp((vol === undefined ? 1 : vol) * carry * (G.voiceVol === undefined ? 1 : G.voiceVol), 0, 1);
       u.lang = "en-US";
       speechSynthesis.speak(u);
     }catch(e){}
@@ -21331,10 +21338,58 @@ function activeJob(){
   if(here.length) return "Walk. Speak. The building notices who does neither.";
   return "The room is empty. Someone will come.";
 }
+/* 20261011b: where the current job is, and which door in this room gets you there. */
+function objectiveRoom(){
+  if(!G.you || PROC.on) return null;
+  const m = G.minute || 0;
+  try{
+    const ev = (G.events || []).find(e => e && !e.done && e.rsvp === true && e.day === G.day && ROOMS[e.room] &&
+      m >= e.hour*60 - 45 && m < e.hour*60 + 30);
+    if(ev) return ev.room;
+  }catch(e){}
+  const b = G.bill;
+  if(b && !b.done && b.voteDay === G.day) return "floor";
+  if(G.you.energy < 18 || m >= 21*60) return "office";
+  if(b && !b.done && typeof dayType === "function" && dayType() === "session") return "floor";
+  const unread = (G.mail || []).filter(x => !x.read).length;
+  if(unread) return "office";
+  return null;
+}
+function nextHop(from, to){
+  if(!from || !to || from === to || !DOORS[from]) return null;
+  const prev = Object.create(null); prev[from] = null;
+  const q = [from];
+  while(q.length){
+    const cur = q.shift();
+    if(cur === to) break;
+    const ds = DOORS[cur] || [];
+    for(let i=0;i<ds.length;i++){
+      const n = ds[i].to;
+      if(n in prev) continue;
+      prev[n] = cur; q.push(n);
+    }
+  }
+  if(!(to in prev)) return null;
+  let step = to;
+  while(prev[step] && prev[step] !== from) step = prev[step];
+  return (DOORS[from] || []).find(d => d.to === step) || null;
+}
+function objectiveDoor(){
+  const goal = objectiveRoom();
+  if(!goal || goal === G.room) return null;
+  const dr = nextHop(G.room, goal);
+  return dr ? {goal, dr} : null;
+}
 function paintJob(){
   const box = el("job"), txt = el("jobText");
   if(!box || !txt) return;
-  const line = activeJob();
+  let line = activeJob();
+  try{
+    const od = objectiveDoor();
+    if(line && od && !/Sleep\.|Speak\.$/.test(line)){
+      line += "  ▸ " + (od.dr.to === od.goal ? ROOMS[od.goal].t : ROOMS[od.dr.to].t + ", then " + ROOMS[od.goal].t);
+    }
+  }catch(e){}
   if(txt._line === line && box.hidden === !!( !G.running || !line )) return;
   txt._line = line;
   txt.textContent = line;
@@ -21366,6 +21421,17 @@ function paintCompass(){
     else if(TALK.m === m) cls += " is-talk";
     bits.push('<i class="' + cls + '" style="left:' + pct.toFixed(1) + '%" title="' + (m.name || "") + '"></i>');
   }
+  /* 20261011b: the door that leads toward the job — pinned to the rail edge when behind you */
+  try{
+    const od = objectiveDoor();
+    if(od){
+      const dp = doorAt(G.room, od.dr);
+      const relD = wrapPi(Math.atan2(dp.x - cam.x, dp.z - cam.z) - yaw);
+      const edge = Math.abs(relD) > 1.25;
+      const pctD = edge ? (relD > 0 ? 1 : 99) : 50 + (relD / 1.25) * half;
+      bits.push('<i class="compass__tick is-goal' + (edge ? ' is-edge' : '') + '" style="left:' + pctD.toFixed(1) + '%" title="' + ROOMS[od.dr.to].t + '"></i>');
+    }
+  }catch(e){}
   const html = bits.join("");
   if(box._html === html) return;
   box._html = html;
@@ -22058,7 +22124,15 @@ addEventListener("keydown", e => {
     else if(seat) toggleSit();
   }
   if(k === "escape"){
+    if(G._pauseOpen || e._pzHandled || (performance.now() - (G._pauseClosedAt || 0)) < 300) return; /* the overlay's own Esc closes it */
     if(TALK.open){ closeTalk(); return; }
+    try{
+      const tipUp = (el("tipCard") && !el("tipCard").hidden);
+      const busy = (typeof CATCH !== "undefined" && (CATCH.on || CATCH.current || (CATCH.pieces && CATCH.pieces.length))) || G.speechApproach || promptLive();
+      if(veil.hidden && !tipUp && !uiOpen() && !PROC.on && !busy && G.you && G.members && G.members.length){
+        openSettings(); return;
+      }
+    }catch(e){}
     /* Same peel as pad B — including stuck speech / CATCH prompts */
     padBack();
     return;
@@ -22117,8 +22191,9 @@ renderer.domElement.addEventListener("pointermove", e => {
   drag.x = e.clientX; drag.y = e.clientY;
   drag.moved = Math.max(drag.moved, Math.abs(dx) + Math.abs(dy));
   /* Never gated on has-pad — pad sticks and mouse yaw/pitch both apply */
-  cam.yaw -= dx * 0.0024;
-  cam.pitch = clamp(cam.pitch - dy * 0.0018, -1.05, 1.05);
+  const sens = G.sens || 1, inv = G.invertY ? -1 : 1;
+  cam.yaw -= dx * 0.0024 * sens;
+  cam.pitch = clamp(cam.pitch - dy * 0.0018 * sens * inv, -1.05, 1.05);
 });
 renderer.domElement.addEventListener("pointerup", () => {
   const wasDrag = drag && drag.moved > 6;
@@ -22406,7 +22481,7 @@ function saveCaptureBase(){
     withWhom:G.withWhom, ties:G.ties, panel:null, court:G.court, own:G.own, parties:G.parties,
     termLength:G.termLength, country:G.country,
     greatest:G.greatest, blasphemy:G.blasphemy, loreNote:G.loreNote, greatnessOpen:G.greatnessOpen,
-    relics:G.relics, relicSpots:G.relicSpots, consularLore:G.consularLore, bind:G.bind, sens:G.sens,
+    relics:G.relics, relicSpots:G.relicSpots, consularLore:G.consularLore, bind:G.bind, sens:G.sens, invertY:!!G.invertY, voiceVol:G.voiceVol,
     world:G.world,
     pendingNight:!!G.pendingNight,
     cam:{x:cam.x, z:cam.z, yaw:cam.yaw, pitch:cam.pitch},
@@ -22550,7 +22625,9 @@ function loadSave(){
     if(!G.room || typeof G.room !== "string") G.room = "office";
     if(typeof G.day !== "number" || !(G.day > 0)) G.day = 1;
     if(typeof G.minute !== "number" || G.minute < 0) G.minute = 8*60;
-    if(G.minute >= 22*60){ G.minute = 22*60; G.pendingNight = true; G.running = false; }
+    /* 20261011b: a 10pm save resumes a minute before ten so the night card still comes (was a soft-lock). */
+    if(G.minute >= 22*60){ G.minute = 22*60 - 1; }
+    G.pendingNight = false;
     if(!G.states || !G.states.length) buildUnion();
     if(!G.lobbies || !G.lobbies.length) buildLobbies();
     if(!G.money) G.money = {index:100, hist:[100]};
@@ -22695,6 +22772,10 @@ function applySettings(){
 function openSettings(){
   const overlay = el("pauseOverlay");
   if(overlay){
+    if(overlay.classList.contains("is-open")) return;
+    if(G.speed > 0) G.prevSpeed = G.speed;
+    G._pauseOpen = true;
+    try{ for(const k in keys) keys[k] = false; cam.vx = cam.vz = cam.yawVel = 0; }catch(e){}
     overlay.classList.add("is-open");
     setSpeed(0);
     G.running = false;
@@ -22706,6 +22787,9 @@ function openSettings(){
 function closeSettings(){
   const overlay = el("pauseOverlay");
   if(overlay) overlay.classList.remove("is-open");
+  G._pauseOpen = false;
+  G._pauseClosedAt = performance.now();
+  try{ for(const k in keys) keys[k] = false; last = performance.now(); }catch(e){}
   if(G.you && G.members && G.members.length){
     G.running = true;
     setSpeed(G.prevSpeed || 1);
@@ -22713,125 +22797,103 @@ function closeSettings(){
 }
 
 function setupSettingsUI(){
-  const tabs = document.querySelectorAll(".settings-tab");
-  tabs.forEach(tab => {
-    tab.classList.remove("is-active");
+  /* 20261011b: every row here does something. The old tabs (bloom, AA, difficulty,
+     walk speed, character swatches) saved values nothing read; they are gone. */
+  const panel = document.querySelector("#pauseOverlay .settings-panel");
+  if(!panel) return;
+  const tabsEl = panel.querySelector(".settings-tabs");
+  const content = panel.querySelector(".settings-content");
+  const on = (b) => b ? " is-on" : "";
+  const opt = (attr, val, label, cur) => '<button type="button" class="settings-btn settings-btn-secondary pz-opt' +
+    (cur ? " is-picked" : "") + '" data-' + attr + '="' + val + '">' + label + '</button>';
+  const row = (label, desc, val) => '<div class="settings-row"><div><div class="settings-label">' + label +
+    '</div>' + (desc ? '<div class="settings-desc">' + desc + '</div>' : '') + '</div><div class="settings-value">' + val + '</div></div>';
+  let padName = "None connected";
+  try{ const ps = navigator.getGamepads ? navigator.getGamepads() : []; for(let i=0;i<ps.length;i++) if(ps[i] && ps[i].connected){ padName = String(ps[i].id || "Controller").slice(0, 48); break; } }catch(e){}
+  const sp = G.prevSpeed || 1;
+  const dayLine = G.you ? (dateString() + " · " + hhmm() + " · sitting day " + G.sittingDay) : "";
+  if(tabsEl) tabsEl.innerHTML =
+    '<button class="settings-tab is-active" data-tab="game">Game</button>' +
+    '<button class="settings-tab" data-tab="graphics">Graphics</button>' +
+    '<button class="settings-tab" data-tab="audio">Voices</button>' +
+    '<button class="settings-tab" data-tab="controls">Controls</button>';
+  if(content) content.innerHTML =
+    '<div class="settings-section is-open" data-section="game">' +
+      '<h3 class="settings-section-title">' + (G.you ? G.you.name : "Paused") + '</h3>' +
+      (dayLine ? '<p class="settings-desc" style="margin:-8px 0 8px">' + dayLine + '</p>' : '') +
+      row("Pace of the day", "How fast the clock runs around you", opt("pzspeed", 1, "1×", sp === 1) + opt("pzspeed", 2, "2×", sp === 2) + opt("pzspeed", 4, "4×", sp === 4)) +
+      row("Save", '<span id="pzSaved">Autosaves at every door and every few minutes</span>', '<button type="button" class="settings-btn settings-btn-secondary" id="pzSave">Save now</button>') +
+      row("The handbook", "Everything the House does, in order", '<button type="button" class="settings-btn settings-btn-secondary" id="pzBook">Open</button>') +
+      row("Title", "Continue, or begin a new career", '<button type="button" class="settings-btn settings-btn-secondary" id="pzTitle">Title menu</button>') +
+    '</div>' +
+    '<div class="settings-section" data-section="graphics">' +
+      '<h3 class="settings-section-title">Graphics</h3>' +
+      row("Detail", "Best is the default. Simple if the machine struggles.", opt("pzgfx", "best", "Best", G.gfx === "best") + opt("pzgfx", "balanced", "Balanced", G.gfx === "balanced") + opt("pzgfx", "simple", "Simple", G.gfx === "simple")) +
+      row("Film grain", "", '<div class="settings-toggle' + on(!G.noGrain) + '" id="pzGrain"><div class="settings-toggle-dot"></div></div>') +
+      row("Seated poses", "Everyone stands if bodies look wrong", '<div class="settings-toggle' + on(!G.noSit) + '" id="pzSit"><div class="settings-toggle-dot"></div></div>') +
+    '</div>' +
+    '<div class="settings-section" data-section="audio">' +
+      '<h3 class="settings-section-title">Voices</h3>' +
+      row("Hear them", "Off reads every line instead", '<div class="settings-toggle' + on(!G.mute) + '" id="pzVoice"><div class="settings-toggle-dot"></div></div>') +
+      row("Voice volume", "", '<input type="range" class="settings-slider" id="pzVol" min="0" max="100" value="' + Math.round((G.voiceVol === undefined ? 1 : G.voiceVol) * 100) + '">') +
+      row("How fast they talk", "", '<input type="range" class="settings-slider" id="pzRate" min="70" max="130" value="' + Math.round((G.voiceRate === undefined ? 1 : G.voiceRate) * 100) + '">') +
+      row("How far a voice carries", "", '<input type="range" class="settings-slider" id="pzCarry" min="60" max="200" value="' + Math.round((G.voiceCarry === undefined ? 1 : G.voiceCarry) * 100) + '">') +
+      row("Test", "", '<button type="button" class="settings-btn settings-btn-secondary" id="pzTry">Hear a voice</button>') +
+    '</div>' +
+    '<div class="settings-section" data-section="controls">' +
+      '<h3 class="settings-section-title">Controls</h3>' +
+      row("Look speed", "Mouse drag, A/D and the right stick", '<input type="range" class="settings-slider" id="pzSens" min="40" max="220" value="' + Math.round((G.sens || 1) * 100) + '">') +
+      row("Invert look up/down", "Mouse and right stick", '<div class="settings-toggle' + on(!!G.invertY) + '" id="pzInv"><div class="settings-toggle-dot"></div></div>') +
+      row("Controller", padName, '<span class="settings-desc">Left stick walk · right stick look · A use · B back · LT/RT browse</span>') +
+      row("Keys", "W/S walk · A/D look · Q/C step · Shift stride · E use · F phone · H panels", '<button type="button" class="settings-btn settings-btn-secondary" id="pzKeys">Rebind keys</button>') +
+    '</div>';
+  panel.querySelectorAll(".settings-tab").forEach(tab => {
     tab.addEventListener("click", () => switchSettingsTab(tab.getAttribute("data-tab")));
   });
-  tabs[0]?.classList.add("is-active");
-
-  const sections = document.querySelectorAll(".settings-section");
-  sections.forEach(s => s.classList.remove("is-open"));
-  document.querySelector('[data-section="game"]')?.classList.add("is-open");
-
-  setupSettingControls();
-  setupCharacterUI();
+  const re = () => { try{ setupSettingsUI(); }catch(e){} };
+  const keepTab = (t) => { re(); switchSettingsTab(t); };
+  panel.querySelectorAll("[data-pzspeed]").forEach(b => b.addEventListener("click", () => {
+    G.prevSpeed = +b.getAttribute("data-pzspeed") || 1; keepTab("game");
+  }));
+  const bySave = el("pzSave");
+  if(bySave) bySave.addEventListener("click", () => {
+    let ok = false; try{ ok = save(true) !== false; }catch(e){}
+    const t = el("pzSaved"); if(t) t.textContent = ok ? ("Saved · day " + G.day + " · " + hhmm()) : "Could not save — storage may be full";
+  });
+  const byBook = el("pzBook"); if(byBook) byBook.addEventListener("click", () => { closeSettings(); try{ handbookCard(); }catch(e){} });
+  const byTitle = el("pzTitle"); if(byTitle) byTitle.addEventListener("click", () => { closeSettings(); try{ G.running = true; showGameMenu(); }catch(e){} });
+  const byKeys = el("pzKeys"); if(byKeys) byKeys.addEventListener("click", () => { closeSettings(); try{ settingsCard(); }catch(e){} });
+  panel.querySelectorAll("[data-pzgfx]").forEach(b => b.addEventListener("click", () => {
+    G.gfx = b.getAttribute("data-pzgfx");
+    G.simple = G.gfx === "simple";
+    G.fullDetail = (G.gfx === "best");
+    try{ applyQuality(); }catch(e){}
+    try{ save(); }catch(e){}
+    keepTab("graphics");
+  }));
+  const tg = (id, fn, tab) => { const n = el(id); if(n) n.addEventListener("click", () => { try{ fn(); }catch(e){} keepTab(tab); }); };
+  tg("pzGrain", () => { G.noGrain = !G.noGrain; const g = el("grain"); if(g) g.style.display = G.noGrain ? "none" : ""; }, "graphics");
+  tg("pzSit", () => { G.noSit = !G.noSit; if(G.noSit) everyone().forEach(m => { m.sitting = false; }); }, "graphics");
+  tg("pzVoice", () => { G.mute = !G.mute; G.muteSet = true; if(G.mute) hush(); else unlockVoice(); }, "audio");
+  tg("pzInv", () => { G.invertY = !G.invertY; }, "controls");
+  const sl = (id, fn) => { const n = el(id); if(n) n.addEventListener("input", () => { try{ fn(+n.value); }catch(e){} }); };
+  sl("pzVol", v => { G.voiceVol = v / 100; });
+  sl("pzRate", v => { G.voiceRate = v / 100; });
+  sl("pzCarry", v => { G.voiceCarry = v / 100; });
+  sl("pzSens", v => { G.sens = v / 100; });
+  const byTry = el("pzTry");
+  if(byTry) byTry.addEventListener("click", () => {
+    try{ hush(); unlockVoice(); G.mute = false; const m = (G.members || []).find(x => x && !x.gone); speak(m || G.you, "The member for " + ((m || G.you || {}).state || "the Republic") + ". That is my voice."); }catch(e){}
+  });
 }
 
 function switchSettingsTab(tabName){
-  document.querySelectorAll(".settings-tab").forEach(t => t.classList.remove("is-active"));
-  document.querySelectorAll(".settings-section").forEach(s => s.classList.remove("is-open"));
-  document.querySelector(`[data-tab="${tabName}"]`)?.classList.add("is-active");
-  document.querySelector(`[data-section="${tabName}"]`)?.classList.add("is-open");
+  document.querySelectorAll("#pauseOverlay .settings-tab").forEach(t => t.classList.toggle("is-active", t.getAttribute("data-tab") === tabName));
+  document.querySelectorAll("#pauseOverlay .settings-section").forEach(s => s.classList.toggle("is-open", s.getAttribute("data-section") === tabName));
 }
 
-function setupSettingControls(){
-  const speedBtns = document.querySelectorAll("#speedControls button");
-  speedBtns.forEach(btn => {
-    btn.addEventListener("click", () => {
-      const speed = +btn.getAttribute("data-speed");
-      setSpeed(speed);
-      saveSettings();
-    });
-  });
-
-  const toggles = [
-    {id: "autoSave", key: "autoSave"},
-    {id: "shadowsToggle", key: "shadowsOn"},
-    {id: "bloomToggle", key: "bloomOn"},
-    {id: "spatialAudio", key: "spatialAudio"},
-    {id: "ttsToggle", key: "ttsEnabled"},
-    {id: "invertMouseY", key: "invertMouseY"},
-    {id: "gamepadMode", key: "gamepadMode"}
-  ];
-
-  toggles.forEach(({id, key}) => {
-    const el_toggle = el(id);
-    if(el_toggle){
-      el_toggle.classList.toggle("is-on", settingsState[key]);
-      el_toggle.addEventListener("click", () => {
-        settingsState[key] = !settingsState[key];
-        el_toggle.classList.toggle("is-on", settingsState[key]);
-        saveSettings();
-        applySettings();
-      });
-    }
-  });
-
-  const selects = [
-    {id: "difficulty", key: "difficulty"},
-    {id: "graphicsQuality", key: "graphicsQuality"},
-    {id: "antialiasing", key: "antialiasing"},
-    {id: "walkSpeed", key: "walkSpeed"},
-    {id: "bodyType", key: "charBodyType"},
-    {id: "outfitStyle", key: "charOutfitStyle"}
-  ];
-
-  selects.forEach(({id, key}) => {
-    const sel = el(id);
-    if(sel){
-      sel.value = settingsState[key];
-      sel.addEventListener("change", () => {
-        settingsState[key] = sel.value;
-        saveSettings();
-      });
-    }
-  });
-
-  const sliders = [
-    {id: "masterVolume", key: "masterVolume"},
-    {id: "voiceVolume", key: "voiceVolume"},
-    {id: "sfxVolume", key: "sfxVolume"},
-    {id: "mouseSensitivity", key: "mouseSensitivity"}
-  ];
-
-  sliders.forEach(({id, key}) => {
-    const slider = el(id);
-    if(slider){
-      slider.value = settingsState[key];
-      slider.addEventListener("input", () => {
-        settingsState[key] = key === "mouseSensitivity" ? +slider.value : Math.round(+slider.value);
-        saveSettings();
-        applySettings();
-      });
-    }
-  });
-}
-
-function setupCharacterUI(){
-  const swatchGrids = [
-    {id: "skinToneGrid", key: "charSkinTone"},
-    {id: "hairColorGrid", key: "charHairColor"},
-    {id: "eyeColorGrid", key: "charEyeColor"}
-  ];
-
-  swatchGrids.forEach(({id, key}) => {
-    const grid = el(id);
-    if(grid){
-      const swatches = grid.querySelectorAll(".swatch-item");
-      swatches.forEach(swatch => {
-        const val = swatch.getAttribute("data-value");
-        if(val === settingsState[key]) swatch.classList.add("is-selected");
-        swatch.addEventListener("click", () => {
-          swatches.forEach(s => s.classList.remove("is-selected"));
-          swatch.classList.add("is-selected");
-          settingsState[key] = val;
-          saveSettings();
-        });
-      });
-    }
-  });
-}
+function setupSettingControls(){}
+function setupCharacterUI(){}
 
 /* ── settings, and rebinding the keys ── */
 /* ══════════════════════════════════════════════════════════
@@ -23181,6 +23243,7 @@ const resumeGameBtn = el("resumeGame");
 if(resumeGameBtn) resumeGameBtn.addEventListener("click", closeSettings);
 const resetSettingsBtn = el("resetSettings");
 if(resetSettingsBtn) resetSettingsBtn.addEventListener("click", () => {
+  try{ G.sens = 1; G.invertY = false; G.voiceVol = 1; G.voiceRate = 1; G.voiceCarry = 1; G.noGrain = false; G.noSit = false; const g = el("grain"); if(g) g.style.display = ""; }catch(e){}
   settingsState = {
     difficulty: "normal", graphicsQuality: "balanced", shadowsOn: true, bloomOn: true,
     antialiasing: "msaa4x", masterVolume: 80, voiceVolume: 85, sfxVolume: 70,
@@ -23196,7 +23259,7 @@ if(resetSettingsBtn) resetSettingsBtn.addEventListener("click", () => {
 document.addEventListener("keydown", (e) => {
   if(e.key === "Escape"){
     const overlay = el("pauseOverlay");
-    if(overlay && overlay.classList.contains("is-open")) closeSettings();
+    if(overlay && overlay.classList.contains("is-open")){ e._pzHandled = true; closeSettings(); }
   }
 });
 
@@ -23676,10 +23739,11 @@ function tick(dt){
 
   /* Pad sticks add on top of keyboard — hybrid-safe; mouse look is separate
      (direct cam.yaw/pitch deltas) and is never disabled when a pad is live. */
-  vx += PAD.vx; vz += PAD.vz; turn += PAD.turn; tilt += PAD.tilt;
+  vx += PAD.vx; vz += PAD.vz; turn += PAD.turn; tilt += PAD.tilt * (G.invertY ? -1 : 1);
+  if(G.sens && G.sens !== 1){ turn *= G.sens; tilt *= G.sens; }
   if(PAD.sprint) sprint = true;
-  /* Phone open: avatar does not move — ignore WASD / sticks for locomotion */
-  if(!veil.hidden && phoneWasRunning !== null){
+  /* Phone open (or pause menu up): avatar does not move — ignore WASD / sticks for locomotion */
+  if((!veil.hidden && phoneWasRunning !== null) || G._pauseOpen){
     vx = 0; vz = 0; turn = 0; tilt = 0; sprint = false;
     PAD.vx = PAD.vz = PAD.turn = PAD.tilt = 0;
   }
@@ -23900,6 +23964,7 @@ function enterRoom(dest, fromRoom){
   G.doorGrace = (G.t || 0) + 1.8;
   G._lastDoorTo = dest;
   G._lastDoorFrom = prev;
+  try{ document.body.classList.remove("keys-intro"); }catch(e){}
   try{
     el("whereName").textContent = ROOMS[dest].t;
     el("whereTag").textContent = ROOMS[dest].tag;
@@ -25290,6 +25355,10 @@ function startRun(){
   } else {
     note("Sworn in to the " + ordinal(G.congress) + " Congress of " + (G.country?G.country.name:"the Republic") + " on the " + partyName(G.make.party) + " ticket.", true);
   }
+  try{
+    document.body.classList.add("keys-intro");
+    setTimeout(() => { try{ document.body.classList.remove("keys-intro"); }catch(e){} }, 45000);
+  }catch(e){}
   /* the room forms a first impression from where you actually stand */
   G.members.forEach(m => {
     const fit = -Math.abs(m.pos.econ-G.you.pos.econ)/8 - Math.abs(m.pos.wel-G.you.pos.wel)/8 + 12;
