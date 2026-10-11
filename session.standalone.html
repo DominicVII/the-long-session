@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261011e">
+<meta name="onum-build" content="20261011f">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261011e";
+  var STAMP = "20261011f";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -20263,7 +20263,7 @@ const PROPS = {
         setSay("Lists, doors, and a volunteer who has been here since the first campaign.",
           fx("+"+f+" funds, +1 to your margin","100 minutes")); }}]},
     {id:"church", label:"The church on Main", sub:"Whatever you follow has a door here", x:5.6, z:8.2, r:2.4,
-     acts:()=>{
+     acts:()=>[{t:"Read the parish notices", c:"10m", run(){ spend(10, 1); parishCard(); }}].concat((()=>{
        const cr = playerCreed();
        const k = (cr && cr.k) || "latin";
        if(k === "latin") return [{t:"Hear Mass", c:"25m", run(){
@@ -20290,7 +20290,7 @@ const PROPS = {
            fx("the district sees you among your own",""));
          G.you.approval = clamp(G.you.approval+2, 0, 100);
        }}];
-     }}
+     })())}
   ]
 };
 
@@ -20461,6 +20461,24 @@ function memberActions(m){
     }
   }});
 
+  if(!FAITH_FROZEN(m)){
+    A.push({t:"Ask what has been on their mind", c:"10m", run(){
+      spend(10, 2);
+      const line = lifeMindLine(m);
+      ripple(m, 1, null, 0);
+      setSay(line, fx("", "they told you more than they meant to"));
+    }});
+    A.push({t:"Ask about their faith", c:"10m", run(){
+      spend(10, 2);
+      const f = faithMember(m), c = creedOf(m.creed);
+      let line = c.k === "none" ? "I do not go. I am not hostile about it. I am just not there."
+        : "I am " + c.adj + ". I " + faithWord(f).replace(/^goes/, "go").replace(/^has /, "have ").replace(/^steady, and goes/, "am steady, and go").replace(/^devout/, "am devout") + ".";
+      if(f.was && f.since >= (G.day || 1) - 12) line += " I was " + creedOf(f.was).adj + " until recently. People ask. I tell them it was not about the House.";
+      if(m.creed === "consul") line += " We keep the Latin. The chaplain will not give us the Host. God is the Most High; we do not say otherwise to his face.";
+      if(G.you && G.you.creed === m.creed) ripple(m, 2, "We talked about where we kneel. Same pew, as it turns out.", 2);
+      setSay(line, fx("", ""));
+    }});
+  }
   A.push({t:"Walk away", exit:true, run(){ closeTalk(); }});
   return A;
 }
@@ -20856,6 +20874,8 @@ function overnight(){
   if(hot && hot.unrest > 72 && chance(.4))
     news.push("Trouble in " + hot.n + " again — unrest at " + Math.round(hot.unrest) + " and the governor is asking for federal help.");
   seedStateBills();
+  try{ faithNight(news); }catch(e){ if(window.console) console.warn("faithNight", e); }
+  try{ lifeNight(news); }catch(e){ if(window.console) console.warn("lifeNight", e); }
   resolveStateBills(news);
   regimeCheck(news);
   regimeCheck(news);
@@ -21631,6 +21651,7 @@ function whipCard(){
     (askable.length ? '<div class="whip__h">In the room with you</div>' + askable.map(coRow).join("") : '') +
     '<div class="whip__h">Worth working</div>' +
     (W.soft.slice(0, 7).map(row).join("") || '<p>Nobody left to turn. Hold what you have.</p>') +
+    ((G.life && G.life.ghostRoll && G.life.ghostRoll.d === G.day) ? (lifeAnomFound("roll"), '<div class="whip__row"><span class="whip__n">' + G.life.ghostRoll.name + ' <i>?</i></span><span class="whip__w">unread · no room on record</span><span class="whip__b"></span></div>') : '') +
     '<div class="card__actions"><button type="button" class="btn" id="whipClose">Back to it</button></div>';
   veil.hidden = false;
   const done = () => { walkNow(); try{ paintJob(); paintCompass(); }catch(e){} };
@@ -21699,7 +21720,534 @@ function placeYourBill(b){
   G.bill = b;
   return true;
 }
+/* ── 20261011f · faith that moves on its own ─────────────────
+   Each state keeps pockets of established confession (shares per creed).
+   Nightly: shares are pulled back toward the state's own baseline (so
+   nothing runs away to 100%), drift a little with neighbouring states and
+   with the members the state sends here, and take rare local revivals.
+   Members carry devotion and doubt; conversions, lapses and revivals come
+   from their own ties, memories and home congregations. The player can
+   act on none of it directly. Creed never decides a vote. */
+const FAITH_K = CREEDS.map(c => c.k);
+const FAITH_FROZEN = (m) => !m || m.gone || m.machine || m.sanctioned || m.kind === "envoy" || m.kind === "press" || isChaplain(m);
+function faithEnsure(){
+  if(!G.faith) G.faith = {st:{}, log:[], conv:0, day:G.day || 1, hist:[]};
+  const F = G.faith;
+  (G.states || []).forEach(s => {
+    if(F.st[s.n]) return;
+    const base = {}; let tot = 0;
+    FAITH_K.forEach(k => {
+      let w = 0.035;
+      if(k === s.creed) w = 0.40;
+      if(k === "latin") w += 0.13;
+      if(k === "none") w += 0.05;
+      if(k === "consul") w = (s.n === "Nieuw Oranje" || s.n === "Nieuw Haarlem") ? 0.06 : 0.012;
+      w *= 0.85 + Math.random() * 0.3;
+      base[k] = w; tot += w;
+    });
+    FAITH_K.forEach(k => base[k] = base[k] / tot);
+    F.st[s.n] = {base, sh:Object.assign({}, base), rev:null};
+  });
+  return F;
+}
+function faithMember(m){
+  if(!m) return null;
+  if(!m.faith){
+    const conv = (m.traits && m.traits.conviction) || 50;
+    m.faith = {dev:clamp(conv * 0.7 + rint(-15, 15), 5, 95), doubt:rint(5, 30), since:G.day || 1, was:null};
+  }
+  return m.faith;
+}
+function faithNeighbours(s){
+  return (G.states || []).filter(o => o !== s && Math.abs(o.col - s.col) + Math.abs(o.row - s.row) === 1);
+}
+function topCreed(sh){
+  let bk = "latin", bv = -1;
+  for(const k in sh) if(sh[k] > bv){ bv = sh[k]; bk = k; }
+  return bk;
+}
+function faithNight(news){
+  const F = faithEnsure();
+  const members = (G.members || []).filter(m => !FAITH_FROZEN(m));
+  /* 1 · congregations: anchor + neighbours + the members a state sends + rare revival */
+  const next = {};
+  (G.states || []).forEach(s => {
+    const S = F.st[s.n]; if(!S) return;
+    const nb = faithNeighbours(s);
+    const own = members.filter(m => m.state === s.n);
+    const out = {}; let tot = 0;
+    FAITH_K.forEach(k => {
+      const x = S.sh[k];
+      let nbAvg = x;
+      if(nb.length){ nbAvg = 0; nb.forEach(o => nbAvg += (F.st[o.n] ? F.st[o.n].sh[k] : x)); nbAvg /= nb.length; }
+      let mem = x;
+      if(own.length){
+        let wsum = 0, hit = 0;
+        own.forEach(m => { const f = faithMember(m); const w = (0.3 + f.dev / 100) * (m.creed === "consul" ? 0.3 : 1); wsum += w; if(m.creed === k) hit += w; });
+        mem = hit / wsum;
+      }
+      let y = x + 0.045 * (S.base[k] - x) + 0.018 * (nbAvg - x) + 0.006 * (mem - x);
+      y += (Math.random() - 0.5) * 0.012 * Math.sqrt(x + 0.01);
+      if(S.rev && S.rev.k === k && G.day <= S.rev.until) y += 0.006;
+      if(y > 0.70) y -= (y - 0.70) * 0.3;          /* nothing becomes the whole state */
+      out[k] = Math.max(0.004, y); tot += out[k];
+    });
+    FAITH_K.forEach(k => out[k] /= tot);
+    next[s.n] = out;
+    /* the baseline itself creeps very slowly toward what people actually do */
+    FAITH_K.forEach(k => S.base[k] = S.base[k] * 0.996 + out[k] * 0.004);
+    if(!S.rev && chance(0.012)){
+      const pickK = pick(FAITH_K.filter(k => k !== "consul" && k !== "none" && k !== topCreed(out)));
+      S.rev = {k:pickK, until:(G.day || 1) + rint(5, 12)};
+      faithLog(news, "A revival in " + s.n + ": " + creedOf(pickK).t + " is filling rooms it had given up on.", s.n);
+    } else if(S.rev && G.day > S.rev.until) S.rev = null;
+  });
+  for(const n in next) F.st[n].sh = next[n];
+  /* 2 · members: devotion, doubt, and the moves that come out of them */
+  members.forEach(m => {
+    const f = faithMember(m);
+    const S = F.st[m.state];
+    const home = S ? (S.sh[m.creed] || 0) : 0.2;
+    const friends = (m.allies || []).map(byId).filter(o => o && !FAITH_FROZEN(o));
+    const sameF = friends.filter(o => o.creed === m.creed).length;
+    let grief = 0;
+    try{ const v = memValence(m); if(v < -20) grief = Math.min(6, -v / 12); }catch(e){}
+    /* devotion settles toward what their life supports: home congregation, friends who kneel with them, their own conviction */
+    const conv = (m.traits && m.traits.conviction) || 50;
+    const target = 30 + home * 70 + sameF * 7 + conv * 0.22 - grief * 2;
+    f.dev = clamp(f.dev + (target - f.dev) * 0.06 + rint(-3, 3), 0, 100);
+    f.doubt = clamp(f.doubt + grief * 0.8 + (friends.length - sameF) * 0.4 - (f.doubt - 20) * 0.05 + rint(-3, 3), 0, 100);
+    if(m.creed === "consul") return;            /* the Rite only moves through its own (consularRecruit) */
+    if(f.doubt > 38 && f.dev < 50 && chance(0.07)){
+      /* where the doubt goes: the faith of the people they actually sit with, else the strong local pocket */
+      const cand = {};
+      friends.forEach(o => { if(o.creed !== m.creed) cand[o.creed] = (cand[o.creed] || 0) + 2; });
+      if(S) FAITH_K.forEach(k => { if(k !== m.creed && k !== "consul") cand[k] = (cand[k] || 0) + S.sh[k] * 6; });
+      const consulFriend = friends.find(o => isConsular(o));
+      if(consulFriend && chance(0.35)){
+        if(consularRecruit(consulFriend, m, "the doubt found a door")){ faithMoved(m, "consul", news); }
+        return;
+      }
+      delete cand.consul;
+      let tot = 0; for(const k in cand) tot += cand[k];
+      let r = Math.random() * tot, to = null;
+      for(const k in cand){ r -= cand[k]; if(r <= 0){ to = k; break; } }
+      if(to) faithConvert(m, to, news, friends.find(o => o.creed === to));
+      return;
+    }
+    if(m.creed !== "none" && f.dev < 14 && f.doubt > 40 && chance(0.05)){ faithConvert(m, "none", news, null); return; }
+    if(m.creed === "none" && f.doubt > 45 && chance(0.04)){
+      const k = S ? topCreed(S.sh) : "latin";
+      if(k !== "none" && k !== "consul") faithConvert(m, k, news, null, true);
+    }
+  });
+  /* history for the parish notices (one sample per night, short) */
+  try{
+    const ys = G.you && F.st[G.you.state];
+    if(ys){ F.hist.push({d:G.day, sh:Object.assign({}, ys.sh)}); if(F.hist.length > 40) F.hist.shift(); }
+  }catch(e){}
+}
+function faithLog(news, text, where){
+  const F = faithEnsure();
+  F.log.unshift({d:G.day, t:text, w:where || ""});
+  if(F.log.length > 40) F.log.pop();
+  if(news && news.length < 9) news.push(text);
+}
+function faithMoved(m, to, news){
+  const f = faithMember(m);
+  f.was = m.creed === to ? f.was : m.creed; f.since = G.day; f.dev = 45; f.doubt = 12;
+  G.faith.conv = (G.faith.conv || 0) + 1;
+}
+function faithConvert(m, to, news, via, revival){
+  if(FAITH_FROZEN(m) || to === m.creed || to === "consul") return false;
+  const from = m.creed;
+  const f = faithMember(m);
+  m.creed = to;
+  if(m.consular && to !== "consul"){ m.consular = false; if(m.faction === "consul") m.faction = null; }
+  f.was = from; f.since = G.day; f.dev = revival ? 55 : 42; f.doubt = 10;
+  G.faith.conv = (G.faith.conv || 0) + 1;
+  /* politics feels it, slowly: a tenth of the way toward the new confession's leanings */
+  try{ const c = creedOf(to); for(const a in (c.pos || {})) if(m.pos && m.pos[a] !== undefined) m.pos[a] = Math.round(m.pos[a] * 0.9 + c.pos[a] * 0.1); }catch(e){}
+  try{ m.soul = null; soulEnsure(m); }catch(e){}
+  try{
+    (G.members || []).forEach(o => {
+      if(o === m || FAITH_FROZEN(o) || !o.rel) return;
+      if(o.creed === to && (o.allies || []).indexOf(m.id) < 0 && chance(0.25)) o.allies = (o.allies || []).concat([m.id]).slice(-4);
+    });
+  }catch(e){}
+  const tc = creedOf(to), fc = creedOf(from);
+  const line = to === "none"
+    ? surname(m.name) + " has stopped going. " + fc.t.replace(/^the /, "The ") + " noticed before anyone else did."
+    : revival
+      ? surname(m.name) + " is back in a pew, with " + tc.t + "."
+      : surname(m.name) + " has been received into " + tc.t + (via ? ", by way of " + surname(via.name) + "'s dinner table." : ".");
+  remember(m, to === "none" ? "I stopped going. Nobody from the parish called." : "I changed where I kneel. It was not about the House.", 6, true);
+  faithLog(news, line, m.state);
+  return true;
+}
+function faithWord(f){
+  if(!f) return "keeps it private";
+  const dv = f.dev, db = f.doubt;
+  if(dv > 75 && db < 25) return "steady, and goes twice a week";
+  if(dv > 55) return db > 45 ? "devout, with a question they will not name" : "goes, and means it";
+  if(dv > 30) return db > 50 ? "goes less than they did" : "goes on the big days";
+  return db > 50 ? "has not been in months and does not say why" : "goes for funerals";
+}
+/* the player: choose at the oath, change in the world */
+function faithShareLine(stName){
+  const F = faithEnsure(); const S = F.st[stName]; if(!S) return "";
+  return FAITH_K.map(k => ({k, v:S.sh[k]})).sort((a, b) => b.v - a.v).slice(0, 5)
+    .map(x => creedOf(x.k).adj + " " + Math.round(x.v * 100) + "%").join(" · ");
+}
+function parishCard(){
+  const F = faithEnsure();
+  const st = G.you.state, S = F.st[st];
+  if(!S){ note("No parish notices here."); return; }
+  G.running = false;
+  const rows = FAITH_K.map(k => ({k, v:S.sh[k], b:S.base[k]})).sort((a, b) => b.v - a.v);
+  const old = F.hist.length > 6 ? F.hist[F.hist.length - 7].sh : null;
+  const mine = (G.you.creed || "latin");
+  const inst = G.you.instruct;
+  card.innerHTML = '<div class="eyebrow">Parish notices · ' + st + '</div><h1>Who kneels where, at home</h1>' +
+    '<p class="dream">The noticeboards of every church in the state, read on one afternoon. Nobody wrote these numbers for you.</p>' +
+    rows.map(r => {
+      const d = old ? Math.round((r.v - (old[r.k] || 0)) * 1000) / 10 : 0;
+      const c = creedOf(r.k);
+      const can = r.k !== mine && r.k !== "consul" && r.v >= 0.04;
+      const ready = inst && inst.k === r.k && G.day > inst.day;
+      return '<div class="whip__row"><span class="whip__n">' + c.t.replace(/^the /, "The ").replace(/^no /, "No ") + (r.k === mine ? ' <i>yours</i>' : '') + '</span>' +
+        '<span class="whip__w">' + Math.round(r.v * 100) + '%' + (old ? (d > 0.4 ? ' · rising' : d < -0.4 ? ' · thinning' : ' · steady') : '') +
+        (S.rev && S.rev.k === r.k ? ' · revival' : '') + '</span>' +
+        '<span class="whip__b">' + (can ? '<button type="button" class="btn btn--ghost whip__go" data-faith="' + r.k + '">' +
+          (ready ? 'Be received' : (inst && inst.k === r.k ? 'Come back tomorrow' : 'Talk with their clergy')) + '</button>' : '') + '</span></div>';
+    }).join("") +
+    (mine === "consul" ? '<p>You knelt at the bronze. To come back, go across the street to confession: <button type="button" class="btn btn--ghost" data-faith="latin">Make a confession</button></p>' : '') +
+    '<p style="opacity:.7">The Consular Rite is not received at a church door. It is joined at the bronze, by recognising the First Consul, which the Latin Rite calls heresy. God is the Most High.</p>' +
+    '<div class="card__actions"><button type="button" class="btn" id="parishClose">Back to the street</button></div>';
+  veil.hidden = false;
+  el("parishClose").addEventListener("click", () => walkNow());
+  card.querySelectorAll("[data-faith]").forEach(bt => bt.addEventListener("click", () => {
+    const k = bt.getAttribute("data-faith");
+    faithPlayerStep(k);
+    parishCard();
+  }));
+}
+function faithPlayerStep(k){
+  const you = G.you, mine = you.creed || "latin";
+  if(k === mine) return;
+  if(mine === "consul" && k === "latin"){
+    spend(30, 6);
+    you.creed = "latin"; you.consular = false; if(you.faction === "consul") you.faction = null;
+    (G.members || []).forEach(m => { if(isConsular(m) && m.rel) m.rel.warmth = clamp(m.rel.warmth - 10, -100, 100); });
+    note("You made a confession and came back to the Latin Rite. The remnant at the bronze will remember the empty place.", true);
+    faithLog(null, you.name + " returned to the Latin Rite.", you.state);
+    return;
+  }
+  const inst = you.instruct;
+  if(!inst || inst.k !== k){
+    spend(30, 4);
+    you.instruct = {k, day:G.day};
+    setSay("They give you tea and a thin book. Come back another day, they say, if you still mean it.", fx("instruction begun", "30 minutes"));
+    return;
+  }
+  if(G.day <= inst.day){ setSay("Not today. They were clear about that.", fx("", "")); return; }
+  spend(45, 6);
+  const F = faithEnsure(), S = F.st[you.state];
+  const dShare = S ? (S.sh[k] || 0) - (S.sh[mine] || 0) : 0;
+  you.creed = k; you.instruct = null;
+  you.approval = clamp(you.approval + Math.round(dShare * 14), 0, 100);
+  (G.members || []).forEach(m => {
+    if(FAITH_FROZEN(m) || !m.rel) return;
+    if(m.creed === k) m.rel.warmth = clamp(m.rel.warmth + 4, -100, 100);
+    else if(m.creed === mine) m.rel.warmth = clamp(m.rel.warmth - 3, -100, 100);
+  });
+  you.faithSince = G.day;
+  note("You were received into " + creedOf(k).t + ". The district will hear it before the House does.", true);
+  faithLog(null, you.name + " was received into " + creedOf(k).t + ".", you.state);
+}
+
+/* ── 20261011f · the building has a life of its own ──────────
+   Members keep private journals and dreams, carry long aims that ripen
+   over days and then act on them without being asked (a bloc, a bill of
+   their own, a friendship, a feud). Some of them start noticing the shape
+   of the place. At night things happen that you find in the morning.
+   Rarely, something happens that nothing explains. All of it is saved and
+   all of it can be found; none of it runs while you walk. */
+const LIFE_AIMS = ["bill", "bloc", "friend", "feud", "faith", "notice"];
+const BLOC_NAMES = ["the Tuesday Group", "the Lantern Caucus", "the Back Bench Compact", "the Quiet Table", "the Harbour Seven",
+  "the Orchard Caucus", "the Long Room Group", "the Second Reading Club", "the Night Ledger", "the Window Caucus"];
+const NOTICE_LINES = [
+  "Some mornings the corridor is exactly as long as I need it to be. I have stopped mentioning it.",
+  "When I am not in a room, I wonder whether it waits for me. I do not ask anyone. It is not a House question.",
+  "There is somebody in this building who walks it the way I do. Neither of us has said so.",
+  "I tried to remember my mother's kitchen and found I remembered the idea of it instead.",
+  "The clock in the cloakroom never needs winding. Somebody must wind it. I have never seen them.",
+  "I keep a list of the things I decided today. It is shorter than the list of things I did.",
+  "Whatever I am, I am under God. That part I do not wonder about.",
+  "I wonder whether the one I keep passing in the corridor wonders the same thing about me.",
+  "The days have the same number of hours and some of them are longer. I have checked.",
+  "I said a sentence today I do not remember choosing. It was a good sentence."
+];
+const DREAM_PARTS = {
+  a:["I was in the chamber and every seat was mine", "I was walking the East Steps and they kept going down", "I was back at home and the house had a second staircase",
+     "I was counting votes on a train", "I was in the cloakroom and the coats were warm, as if people had just left them", "I was reading my own name on a ballot in a language I knew in the dream"],
+  b:["and nobody would look up.", "and I was not afraid, which frightened me when I woke.", "and the clerk said the vote was already taken.",
+     "and somebody I have never met knew my middle name.", "and my father was in the gallery, younger than me.", "and the bill was blank and everyone agreed with it."]
+};
+function lifeEnsure(){
+  if(!G.life) G.life = {anoms:[], found:0, happen:[], blocs:[], n:0, lastAnom:0, kinds:{}};
+  return G.life;
+}
+function lifeOf(m){
+  if(!m) return null;
+  if(!m.lv){
+    m.lv = {aim:null, j:[], dream:"", notice:Math.random() * 0.25, acted:[]};
+    lifeNewAim(m);
+    if(m.lv.aim) m.lv.aim.p = Math.random() * 0.7;
+  }
+  return m.lv;
+}
+function lifeNewAim(m){
+  const L = m.lv, tr = m.traits || {};
+  const w = {bill:(tr.ambition || 50) / 40, bloc:(tr.ambition || 50) / 60 + (tr.loyalty || 50) / 120,
+    friend:1 + ((m.rel && m.rel.warmth) || 0) / 80, feud:(tr.temper || 40) / 45, faith:(tr.conviction || 50) / 70, notice:0.5 + L.notice * 2};
+  let tot = 0; for(const k in w){ w[k] = Math.max(0.05, w[k]); tot += w[k]; }
+  let r = Math.random() * tot, k = "friend";
+  for(const kk in w){ r -= w[kk]; if(r <= 0){ k = kk; break; } }
+  const others = (G.members || []).filter(o => o !== m && !FAITH_FROZEN(o));
+  let target = null;
+  if(k === "friend") target = (others.filter(o => o.party !== m.party && (m.allies || []).indexOf(o.id) < 0).sort(() => Math.random() - 0.5)[0] || null);
+  if(k === "feud"){ const fresh = others.filter(o => o.id !== m.rival && (m.allies || []).indexOf(o.id) < 0 && o.rival !== m.id); target = fresh.length ? pick(fresh) : null; if(!target) k = "notice"; }
+  L.aim = {k, t:target ? target.id : null, p:0, since:G.day || 1};
+}
+function lifeWrite(m, line){
+  const L = lifeOf(m);
+  L.j.unshift({d:G.day, t:line});
+  if(L.j.length > 10) L.j.pop();
+}
+function lifeNight(news){
+  const life = lifeEnsure();
+  const members = (G.members || []).filter(m => !FAITH_FROZEN(m));
+  members.forEach(m => {
+    const L = lifeOf(m), tr = m.traits || {};
+    /* the dream */
+    L.dream = pick(DREAM_PARTS.a) + " " + pick(DREAM_PARTS.b);
+    /* the journal: what actually happened to them, in their words */
+    const mem = m.mem && m.mem[0] && m.mem[0].d >= (G.day || 1) - 1 ? m.mem[0].t : null;
+    if(mem && chance(0.7)) lifeWrite(m, mem);
+    else if(chance(0.35)) lifeWrite(m, L.dream.replace(/^I was/, "Dreamt I was"));
+    /* noticing grows in the quiet ones */
+    L.notice = clamp(L.notice + ((tr.discretion || 50) > 60 ? 0.025 : 0.01) + (L.aim && L.aim.k === "notice" ? 0.05 : 0), 0, 1);
+    if(L.notice > 0.45 && chance(0.18)) lifeWrite(m, pick(NOTICE_LINES));
+    /* the long aim */
+    const A = L.aim; if(!A) { lifeNewAim(m); return; }
+    const rate = 0.035 + Math.random() * 0.05 + ((tr.ambition || 50) - 50) / 1500;
+    A.p += rate;
+    if(A.p < 1) return;
+    /* the building can only take so much news in one night */
+    if((life._actedDay === G.day ? life._acted : 0) >= 2 && A.k !== "faith" && A.k !== "notice"){ A.p = 0.97; return; }
+    if(A.k !== "faith" && A.k !== "notice"){ if(life._actedDay !== G.day){ life._actedDay = G.day; life._acted = 0; } life._acted++; }
+    lifeAct(m, A, news);
+    L.acted.unshift({d:G.day, k:A.k}); if(L.acted.length > 6) L.acted.pop();
+    lifeNewAim(m);
+  });
+  /* night happenings you find in the morning */
+  if(chance(0.16)) lifeHappening(news);
+  /* rare things that are not explained */
+  if((G.day || 1) - (life.lastAnom || 0) >= 5 && chance(0.07)) lifeAnomaly(news);
+}
+function lifeAct(m, A, news){
+  const life = lifeEnsure();
+  const name = surname(m.name);
+  if(A.k === "bill"){
+    if((G.billQueue || []).some(b => b.npc)) { lifeWrite(m, "My bill is ready. The calendar is not."); return; }
+    const b = makeBill();
+    const ax = AXES.slice().sort((x, y) => Math.abs((m.pos || {})[y.k] || 0) - Math.abs((m.pos || {})[x.k] || 0))[0];
+    for(const a of AXES) b.pos[a.k] = Math.round(b.pos[a.k] * 0.4);
+    b.pos[ax.k] = Math.round(clamp(((m.pos || {})[ax.k] || 0) * 1.4, -85, 85));
+    b.sponsor = m.name; b.sponsorParty = m.party; b.sponsorId = m.id; b.npc = true;
+    try{ b.line = describeBill(b); }catch(e){}
+    G.billQueue = (G.billQueue || []); G.billQueue.push(b);
+    lifeWrite(m, "I filed it. Nobody asked me to. That is the point of it.");
+    const t = name + " filed a bill of their own, unasked: " + b.title + ". It waits behind the one on the calendar.";
+    life.happen.unshift({d:G.day, t}); news.push(t);
+    return;
+  }
+  if(A.k === "bloc"){
+    const allies = Array.from(new Set(m.allies || [])).filter(id => id !== m.id).map(byId).filter(o => o && o !== m && !FAITH_FROZEN(o) && !o.bloc).slice(0, 3);
+    if(allies.length < 2){ lifeWrite(m, "Two people is a dinner. Three is a caucus. I am still one short."); A.p = 0.6; return; }
+    const used = life.blocs.map(b => b.n);
+    const n = BLOC_NAMES.find(x => used.indexOf(x) < 0) || ("the " + name + " Group");
+    const bl = {n, by:m.id, ids:[m.id].concat(allies.map(o => o.id)), d:G.day};
+    life.blocs.push(bl);
+    [m].concat(allies).forEach(o => {
+      o.bloc = n;
+      bl.ids.forEach(id => { if(id !== o.id && (o.allies || []).indexOf(id) < 0) o.allies = (o.allies || []).concat([id]).slice(-5); });
+    });
+    lifeWrite(m, "We have a name now. " + n.replace(/^the /, "The ") + ". We meet where nobody books the room.");
+    const t = name + " has formed " + n + " with " + listify(allies.map(o => surname(o.name))) + ". They vote together more than they admit.";
+    life.happen.unshift({d:G.day, t}); news.push(t);
+    return;
+  }
+  if(A.k === "friend"){
+    const o = byId(A.t); if(!o || FAITH_FROZEN(o)) return;
+    if((m.allies || []).indexOf(o.id) < 0) m.allies = (m.allies || []).concat([o.id]).slice(-5);
+    if((o.allies || []).indexOf(m.id) < 0) o.allies = (o.allies || []).concat([m.id]).slice(-5);
+    remember(o, "I had dinner with " + m.name + ". Across the aisle. Nobody died.", 5, true);
+    lifeWrite(m, "Dinner with " + o.name + ". We disagree on everything except the wine.");
+    const t = name + " and " + surname(o.name) + " were seen at dinner again. Across the aisle. Their whips have noticed.";
+    life.happen.unshift({d:G.day, t}); news.push(t);
+    return;
+  }
+  if(A.k === "feud"){
+    const o = byId(A.t); if(!o || FAITH_FROZEN(o)) return;
+    m.rival = o.id; o.rival = m.id;
+    (m.allies || []).forEach(id => { const a = byId(id); if(a && a.rel) remember(a, m.name + " has a feud with " + o.name + " and wants me on their side of it.", -2); });
+    remember(o, m.name + " said something about me on the floor. I heard about it in the cloakroom.", -8, true);
+    lifeWrite(m, "I said it on the floor. I would say it again.");
+    const t = name + " and " + surname(o.name) + " are not speaking. It started over a sentence on the floor and it will end in a vote.";
+    life.happen.unshift({d:G.day, t}); news.push(t);
+    return;
+  }
+  if(A.k === "faith"){
+    const f = faithMember(m); f.dev = clamp(f.dev + 18, 0, 100); f.doubt = clamp(f.doubt - 12, 0, 100);
+    lifeWrite(m, "Went in on a Tuesday when nobody was there. Stayed an hour.");
+    return;
+  }
+  if(A.k === "notice"){
+    const L = lifeOf(m); L.notice = clamp(L.notice + 0.25, 0, 1);
+    lifeWrite(m, pick(NOTICE_LINES));
+    if(L.notice >= 0.9 && !L.wrote && G.you && !lifeEnsure().kinds.asks){
+      L.wrote = true;
+      try{
+        pushMail(m, "A question I will not ask on the floor",
+          "I am writing this by hand so it cannot be forwarded.\n\nDo you ever have the sense that you were placed in this building rather than elected to it? That the corridor knows where you are going? I do not want an answer. I think if either of us answered it, we would have to stop.\n\nGod is the Most High. Whatever we are, we are under that.\n\n" + m.name, {kind:"note"});
+      }catch(e){}
+      lifeAnomFound("asks", m, "A member wrote to you, by hand, asking whether you were placed here rather than elected. They did not want an answer.", true);
+    }
+  }
+}
+const HAPPENINGS = [
+  {k:"chairs", t:"Somebody turned your visitor chairs to face the window overnight. Nothing else was touched."},
+  {k:"lamp", t:"The desk lamp in your office was left on. You turned it off last night. You are fairly sure."},
+  {k:"cup", t:"There is a second coffee cup on your desk, still warm. Nobody has been in, says the corridor guard."},
+  {k:"page", t:"A page from a bill you have never seen is on your chair, with one word underlined: yet."},
+  {k:"flag", t:"Your flag has been refolded the old way, the way they did it before the war."},
+  {k:"note", t:"A note under your door: \"I voted with you and I did not tell anyone. Do not thank me.\" Unsigned."}
+];
+function lifeHappening(news){
+  const life = lifeEnsure();
+  const h = pick(HAPPENINGS);
+  life.pending = {k:h.k, t:h.t, d:(G.day || 1) + 1};
+}
+function lifeMorningCheck(){
+  /* called cheaply from paintJob: a pending happening is found when you first stand in your office */
+  const life = G.life; if(!life || !life.pending) return;
+  if(G.room !== "office" || !G.running) return;
+  if(Math.hypot(cam.vx || 0, cam.vz || 0) > 0.12) return;
+  const p = life.pending; life.pending = null;
+  life.happen.unshift({d:G.day, t:p.t, mine:true});
+  if(life.happen.length > 30) life.happen.length = 30;
+  note(p.t, true);
+  try{ if(typeof achieve === "function") achieve("night"); }catch(e){}
+}
+const ANOMS = [
+  {k:"session", hint:"A member remembers a session that did not happen."},
+  {k:"tomorrow", hint:"A letter arrives dated tomorrow."},
+  {k:"roll", hint:"The whip count lists a name nobody knows."},
+  {k:"asks", hint:"A member asks the question nobody asks."},
+  {k:"echo", hint:"Two members dream the same dream."}
+];
+function lifeAnomaly(news){
+  const life = lifeEnsure();
+  const left = ANOMS.filter(a => !life.kinds[a.k] && a.k !== "asks");
+  if(!left.length) return;
+  const a = pick(left);
+  life.lastAnom = G.day || 1;
+  const ms = (G.members || []).filter(m => !FAITH_FROZEN(m));
+  if(!ms.length) return;
+  const m = pick(ms);
+  if(a.k === "session"){
+    const fake = pick(BILL_A) + " " + pick(BILL_B) + " " + pick(BILL_C);
+    lifeOf(m).ghost = {bill:fake, day:Math.max(1, (G.day || 2) - rint(2, 6))};
+    lifeWrite(m, "Still thinking about the vote on the " + fake + ". Closest count I ever saw.");
+    life.anoms.push({k:a.k, d:G.day, who:m.id, found:false, t:surname(m.name) + " remembers a roll call on the " + fake + " on day " + lifeOf(m).ghost.day + ". There was no such bill. The Clerk has no record."});
+  } else if(a.k === "tomorrow"){
+    try{
+      pushMail(m, "Re: what you said on the steps",
+        "Thank you for what you said on the steps this afternoon. I did not expect it of you. I will not forget it.\n\n" + m.name, {kind:"note"});
+      G.mail[0].day = (G.day || 1) + 1; G.mail[0].anom = true;
+    }catch(e){}
+    life.anoms.push({k:a.k, d:G.day, who:m.id, found:false, t:"A letter from " + surname(m.name) + " thanked you for something you said on the steps. It was dated tomorrow."});
+  } else if(a.k === "roll"){
+    life.ghostRoll = {d:(G.day || 1) + 1, name:newName(pick(STATES))};
+    life.anoms.push({k:a.k, d:G.day, found:false, t:"For one day the whip count carried a name nobody in the House knew: " + life.ghostRoll.name + ". No room on record."});
+  } else if(a.k === "echo"){
+    const o = pick(ms.filter(x => x !== m)); if(!o) return;
+    const dream = pick(DREAM_PARTS.a) + " " + pick(DREAM_PARTS.b);
+    lifeOf(m).dream = dream; lifeOf(o).dream = dream; lifeOf(m).echo = o.id; lifeOf(o).echo = m.id;
+    life.anoms.push({k:a.k, d:G.day, who:m.id, who2:o.id, found:false, t:surname(m.name) + " and " + surname(o.name) + " had the same dream on the same night, word for word, and have never spoken."});
+  }
+  life.kinds[a.k] = true;
+}
+function lifeAnomFound(k, m, text, push){
+  const life = lifeEnsure();
+  let a = life.anoms.find(x => x.k === k && !x.found && (!m || !x.who || x.who === m.id || x.who2 === m.id));
+  if(!a && push){ a = {k, d:G.day, who:m ? m.id : null, found:false, t:text}; life.anoms.push(a); life.kinds[k] = true; }
+  if(!a || a.found) return false;
+  a.found = true; a.fd = G.day; life.found = (life.found || 0) + 1;
+  feed("Something you cannot explain. It goes in the notebook.", "big");
+  try{ if(typeof achieve === "function") achieve("anomaly"); }catch(e){}
+  return true;
+}
+/* talk: what has been on their mind */
+function lifeMindLine(m){
+  const L = lifeOf(m), f = faithMember(m);
+  if(L.ghost && chance(0.8)){
+    lifeAnomFound("session", m);
+    return "Still thinking about the " + L.ghost.bill + " roll call, day " + L.ghost.day + ". You were there. You voted. Do you not remember?";
+  }
+  if(L.echo && chance(0.8)){
+    lifeAnomFound("echo", m);
+    return "I had a dream. " + L.dream.replace(/^I was/, "I was") + " Odd thing to tell a colleague. I do not know why I told you.";
+  }
+  const j = L.j[0];
+  const aimWords = {bill:"I am writing something. A bill. Do not tell my whip.", bloc:"I am counting friends. Not votes. Friends.",
+    friend:"I have been trying to have dinner with someone across the aisle. It is harder than a whip count.",
+    feud:"There is someone in this building I would like to see lose a vote. I will not say who.",
+    faith:"I have been going to church again. Not for the cameras.", notice:"I have been noticing things. Small things. I keep a list."};
+  const parts = [];
+  if(j && chance(0.6)) parts.push(j.t);
+  if(L.aim) parts.push(aimWords[L.aim.k] || "");
+  if(L.notice > 0.5 && chance(0.4)) parts.push(pick(NOTICE_LINES));
+  return parts.filter(Boolean).join(" ") || "Nothing I would say in a corridor.";
+}
+function notebookCard(){
+  const life = lifeEnsure(), F = faithEnsure();
+  G.running = false;
+  const found = life.anoms.filter(a => a.found);
+  const unseen = ANOMS.length - found.length;
+  card.innerHTML = '<div class="eyebrow">Your notebook</div><h1>Things the building did</h1>' +
+    '<div class="whip__h">Unexplained</div>' +
+    (found.length ? found.map(a => '<p>Day ' + (a.fd || a.d) + '. ' + a.t + '</p>').join("") : '<p>Nothing yet. Keep your eyes open, and ask people what is on their mind.</p>') +
+    (unseen > 0 ? '<p style="opacity:.6">' + Array(unseen).fill("???").join(" · ") + '</p>' : '') +
+    '<div class="whip__h">Happenings</div>' +
+    ((life.happen || []).slice(0, 8).map(h => '<p>Day ' + h.d + '. ' + h.t + '</p>').join("") || '<p>Quiet so far.</p>') +
+    '<div class="whip__h">Faith, on the wire</div>' +
+    ((F.log || []).slice(0, 6).map(h => '<p>Day ' + h.d + '. ' + h.t + '</p>').join("") || '<p>No movement worth printing.</p>') +
+    ((life.blocs || []).length ? '<div class="whip__h">Blocs</div><p>' + life.blocs.map(b => b.n.replace(/^the /, "The ") + " (" + b.ids.map(byId).filter(Boolean).map(o => surname(o.name)).join(", ") + ")").join("; ") + '</p>' : '') +
+    '<div class="card__actions"><button type="button" class="btn" id="nbClose">Close the notebook</button></div>';
+  veil.hidden = false;
+  el("nbClose").addEventListener("click", () => walkNow());
+}
+function lifeMailCheck(){
+  const life = G.life; if(!life || !life.kinds || !life.kinds.tomorrow) return;
+  const a = life.anoms.find(x => x.k === "tomorrow" && !x.found); if(!a) return;
+  if((G.mail || []).some(x => x.anom && x.read)) lifeAnomFound("tomorrow");
+}
+
 function paintJob(){
+  try{ lifeMorningCheck(); lifeMailCheck(); }catch(e){}
   const box = el("job"), txt = el("jobText");
   if(!box || !txt) return;
   let line = activeJob();
@@ -22801,7 +23349,7 @@ function saveCaptureBase(){
     withWhom:G.withWhom, ties:G.ties, panel:null, court:G.court, own:G.own, parties:G.parties,
     termLength:G.termLength, country:G.country,
     greatest:G.greatest, blasphemy:G.blasphemy, loreNote:G.loreNote, greatnessOpen:G.greatnessOpen,
-    relics:G.relics, relicSpots:G.relicSpots, consularLore:G.consularLore, bind:G.bind, sens:G.sens, invertY:!!G.invertY, voiceVol:G.voiceVol, goals:G.goals, whip:G.whip || null, billQueue:G.billQueue || [],
+    relics:G.relics, relicSpots:G.relicSpots, consularLore:G.consularLore, bind:G.bind, sens:G.sens, invertY:!!G.invertY, voiceVol:G.voiceVol, goals:G.goals, whip:G.whip || null, billQueue:G.billQueue || [], faith:G.faith || null, life:G.life || null,
     world:G.world,
     pendingNight:!!G.pendingNight,
     cam:{x:cam.x, z:cam.z, yaw:cam.yaw, pitch:cam.pitch},
@@ -23145,6 +23693,7 @@ function setupSettingsUI(){
       row("Pace of the day", "How fast the clock runs around you", opt("pzspeed", 1, "1×", sp === 1) + opt("pzspeed", 2, "2×", sp === 2) + opt("pzspeed", 4, "4×", sp === 4)) +
       row("Save", '<span id="pzSaved">Autosaves at every door and every few minutes</span>', '<button type="button" class="settings-btn settings-btn-secondary" id="pzSave">Save now</button>') +
       row("The handbook", "Everything the House does, in order", '<button type="button" class="settings-btn settings-btn-secondary" id="pzBook">Open</button>') +
+      row("Notebook", "Happenings, faith on the wire, and the things nobody explains", '<button type="button" class="settings-btn settings-btn-secondary" id="pzNote">Open</button>') +
       row("Whip count", "Who is with you on the bill, who to work, and where they are", '<button type="button" class="settings-btn settings-btn-secondary" id="pzWhip"' + (G.bill && !G.bill.done ? '' : ' disabled') + '>Open</button>') +
       row("Title", "Continue, or begin a new career", '<button type="button" class="settings-btn settings-btn-secondary" id="pzTitle">Title menu</button>') +
     '</div>' +
@@ -23183,6 +23732,7 @@ function setupSettingsUI(){
     const t = el("pzSaved"); if(t) t.textContent = ok ? ("Saved · day " + G.day + " · " + hhmm()) : "Could not save — storage may be full";
   });
   const byBook = el("pzBook"); if(byBook) byBook.addEventListener("click", () => { closeSettings(); try{ handbookCard(); }catch(e){} });
+  const byNote = el("pzNote"); if(byNote) byNote.addEventListener("click", () => { closeSettings(); setTimeout(() => { try{ notebookCard(); }catch(e){} }, 30); });
   const byWhip = el("pzWhip"); if(byWhip) byWhip.addEventListener("click", () => { closeSettings(); setTimeout(() => { try{ whipCard(); }catch(e){} }, 30); });
   const byTitle = el("pzTitle"); if(byTitle) byTitle.addEventListener("click", () => { closeSettings(); try{ G.running = true; showGameMenu(); }catch(e){} });
   const byKeys = el("pzKeys"); if(byKeys) byKeys.addEventListener("click", () => { closeSettings(); try{ settingsCard(); }catch(e){} });
@@ -25427,6 +25977,10 @@ function nameCard(){
         '<input type="number" id="mkDist" min="1" max="24" value="' + (G.make.dist || 1) +
           '" style="width:64px" aria-label="District">' +
       '</div></div>' +
+      '<div class="mk__row"><i>Faith</i><div class="mk__opts">' +
+        '<select class="wire__to" id="mkCreed">' + CREEDS.filter(c => c.k !== "consul").map(c =>
+          '<option value="' + c.k + '"' + (c.k === (G.make.creed || "latin") ? " selected" : "") + '>' + c.t.replace(/^the /, "The ").replace(/^no /, "No ") + '</option>').join("") +
+        '</select></div></div>' +
       opts("Frame", [{v:"masc",t:"Masculine"},{v:"fem",t:"Feminine"}], L.frame, "frame") +
       opts("Dress", (L.frame === "fem" ? WEAR_FEM : WEAR_MASC).filter((v,i,a)=>a.indexOf(v)===i)
             .map(k => ({v:k, t:WARDROBE[k].t})), L.wear, "wear") +
@@ -25450,6 +26004,7 @@ function nameCard(){
   mkPreview();
 
   const mkS = el("mkState"), mkD = el("mkDist");
+  const mkC = el("mkCreed"); if(mkC) mkC.addEventListener("change", () => { G.make.creed = mkC.value; });
   if(mkS) mkS.addEventListener("change", () => {
     G.make.state = mkS.value;
     const nameIn = el("nameIn");
@@ -25745,7 +26300,7 @@ function startRun(){
   } else {
     G.you.traits.loyalty = clamp((G.you.traits.loyalty||50) + Math.round(r.loyal*0.35), 0, 100);
   }
-  if(!G.you.creed) G.you.creed = "latin";
+  if(!G.you.creed) G.you.creed = (G.make && G.make.creed && G.make.creed !== "consul") ? G.make.creed : "latin";
   if(!G.you.origin) G.you.origin = pick(ORIGINS).k;
   if(!G.you.bg) G.you.bg = pick(BACKGROUNDS).t;
   if(!G.you.suite) G.you.suite = "Cannon " + rint(101, 448);
