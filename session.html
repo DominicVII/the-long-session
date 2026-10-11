@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261011b">
+<meta name="onum-build" content="20261011c">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261011b";
+  var STAMP = "20261011c";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -157,6 +157,10 @@ html,body{height:100%}
 .compass__tick.is-goal{background:none; width:0; height:0; border-radius:0; top:3px; margin-left:-6px; border-left:6px solid transparent; border-right:6px solid transparent; border-top:9px solid #e8d5a3; filter:drop-shadow(0 0 3px rgba(232,213,163,.8))}
 .compass__tick.is-goal.is-edge{opacity:.65}
 body.keys-intro .keys{display:flex !important; opacity:.92}
+#pauseOverlay button:focus-visible, #pauseOverlay input:focus-visible{outline:3px solid var(--gold, #c9a227); outline-offset:2px}
+.goals{list-style:none; margin:4px 0 10px; padding:0; text-align:left}
+.goals li{font-size:13px; padding:2px 0; color:var(--ink)}
+.goals li.is-done{color:var(--good); text-decoration:line-through; text-decoration-color:color-mix(in srgb,var(--good) 50%,transparent)}
 body.is-bare .hud{top:46px}
 .job{position:absolute; left:50%; bottom:56px; transform:translateX(-50%); pointer-events:none; z-index:5; display:flex; gap:8px; align-items:baseline; max-width:min(540px,88%); background:rgba(11,13,16,.58); border:1px solid rgba(232,213,163,.22); padding:5px 12px 6px; border-radius:2px; color:#eef1f4}
 .job i{font-style:normal; font-size:8px; letter-spacing:.16em; color:#e8d5a3; font-weight:700}
@@ -12630,6 +12634,7 @@ function dayPlanCard(){
     '<p class="dream">' + weather + '</p>' +
     '<p>' + voteLine + '</p>' +
     '<p><strong>Personal:</strong> ' + hook + '</p>' +
+    (function(){ try{ return '<p style="margin-bottom:2px"><strong>Today’s aims:</strong></p>' + goalsHTML(); }catch(e){ return ""; } })() +
     (list.length
       ? '<p>Accept and you will be walked in when the hour hits. Decline and the building keeps a different memory.</p>' +
         '<div class="card__actions" style="margin:10px 0 12px"><button class="btn btn--ghost" type="button" id="planAcceptAll">Accept all without conflict</button></div>' +
@@ -18545,6 +18550,7 @@ function convClear(m){
 function openTalk(m){
   if(!G.running || G.over) return;
   TALK.open = true; TALK.m = m;
+  try{ const Gs = goalsEnsure(); if(Gs && m && m.kind === "member" && Gs.talked.indexOf(m.id) < 0) Gs.talked.push(m.id); }catch(e){}
   el("talk").classList.add("is-open");
   el("talk").scrollTop = 0;
   try{
@@ -20499,6 +20505,7 @@ function holdVote(){
   const b = G.bill; if(!b || b.done) return;
   b.done = true; closeTalk(); G.running = false;
   const present = G.room === "floor" || G.you.vote !== null;
+  try{ const Gs = goalsEnsure(); if(Gs && G.room === "floor") Gs.rollcall = true; goalsTick(); }catch(e){}
   let yourVote = G.you.vote !== null ? G.you.vote : (alignment(G.you,b) > 0 ? 1 : -1);
   /* Taylor Day: tradition is the line — defiance at roll call is blasphemy (player may still *ask* about dissent in talk) */
   if(present && isTaylorDay()){
@@ -20888,6 +20895,8 @@ function nightfall(){
       '<h1>Ten o’clock.</h1>' +
       '<p class="dream">' + line + '</p>' +
       (dayBits.length ? '<p><strong>Today’s residue:</strong> ' + dayBits.join(" ") + '</p>' : '') +
+      (function(){ try{ const Gs = G.goals; if(!Gs || Gs.day !== G.day) return ""; const n = Gs.list.filter(g => g.done).length;
+        return '<p><strong>Aims:</strong> ' + n + ' of ' + Gs.list.length + ' met.</p>' + goalsHTML(); }catch(e){ return ""; } })() +
       (b && !b.done ? '<p>On the calendar: <strong>' + b.title + '</strong>, roll call in ' +
         Math.max(0, b.voteDay-G.day) + ' day' + (b.voteDay-G.day===1?'':'s') + '.</p>' : '') +
       ((G.secrets||[]).length ? '<p>You are carrying <strong>' + G.secrets.length + '</strong> ' +
@@ -21334,6 +21343,13 @@ function activeJob(){
     return "The floor is sitting. Go in.";
   const unread = (G.mail || []).filter(m => !m.read).length;
   if(unread && G.room !== "office") return unread + " waiting in the inbox. Office, or F.";
+  try{
+    const ng = nextGoal();
+    if(ng){
+      const Gs = G.goals, n = Gs.list.filter(g => g.done).length;
+      return "Today " + n + "/" + Gs.list.length + ": " + goalLeft(ng) + ".";
+    }
+  }catch(e){}
   if(G.room === "office") return "Desk. Phone. Corridor when you're ready.";
   if(here.length) return "Walk. Speak. The building notices who does neither.";
   return "The room is empty. Someone will come.";
@@ -21353,6 +21369,7 @@ function objectiveRoom(){
   if(b && !b.done && typeof dayType === "function" && dayType() === "session") return "floor";
   const unread = (G.mail || []).filter(x => !x.read).length;
   if(unread) return "office";
+  try{ const ng = nextGoal(); if(ng && ng.room) return ng.room; }catch(e){}
   return null;
 }
 function nextHop(from, to){
@@ -21379,6 +21396,89 @@ function objectiveDoor(){
   if(!goal || goal === G.room) return null;
   const dr = nextHop(G.room, goal);
   return dr ? {goal, dr} : null;
+}
+/* 20261011c: three aims a day. They read the House; they do not replace it. */
+function goalsEnsure(){
+  if(!G.you) return null;
+  if(G.goals && G.goals.day === G.day && Array.isArray(G.goals.list)) return G.goals;
+  const b = G.bill;
+  const voteToday = !!(b && !b.done && b.voteDay === G.day);
+  const unread = (G.mail || []).filter(x => !x.read).length;
+  const pool = [];
+  pool.push({k:"talk", t:"Talk with three members", need:3});
+  if(b && !b.done) pool.push({k:"pledge", t:"Win a pledge on the " + String(b.title).split(" ")[0] + " bill", need:1});
+  if(voteToday) pool.push({k:"rollcall", t:"Be on the floor for the roll call", need:1, room:"floor"});
+  else pool.push({k:"room", room:"floor", t:"Sit in on the House floor", need:1});
+  if(unread) pool.push({k:"mail", t:"Clear your inbox", need:1, room:"office"});
+  pool.push({k:"room", room:"district", t:"Go home to the district", need:1});
+  pool.push({k:"room", room:"caucus", t:"Show your face in the Caucus Room", need:1});
+  pool.push({k:"room", room:"steps", t:"Take the air on the East Steps", need:1});
+  pool.push({k:"room", room:"cloak", t:"Hear what the Cloakroom is saying", need:1});
+  /* talk first; then the bill if there is one; then one place, chosen by the day */
+  const list = [pool[0]];
+  const billish = pool.find(g => g.k === "rollcall") || pool.find(g => g.k === "pledge");
+  if(billish) list.push(billish);
+  const rest = pool.filter(g => list.indexOf(g) < 0 && !(g.k === "pledge" && list.some(x => x.k === "rollcall")));
+  const seed = ((G.day || 1) * 7 + (G.congress || 1) * 3) % Math.max(1, rest.length);
+  while(list.length < 3 && rest.length){ list.push(rest.splice(seed % rest.length, 1)[0]); }
+  G.goals = {day:G.day, list:list.map(g => Object.assign({have:0, done:false}, g)), talked:[], seen:{}, rollcall:false, all:false,
+    pledged0:(G.members || []).filter(m => m && m.pledge && m.pledgeDay === G.day).map(m => m.id)};
+  try{ feed("Today’s aims: " + G.goals.list.map(g => g.t).join(" · ") + "."); }catch(e){}
+  return G.goals;
+}
+function goalLeft(g){
+  if(!g || g.done) return "";
+  if(g.k === "talk"){ const n = g.need - g.have; return "Talk with " + n + " more member" + (n === 1 ? "" : "s"); }
+  return g.t;
+}
+function nextGoal(){
+  const Gs = goalsEnsure(); if(!Gs) return null;
+  return Gs.list.find(g => !g.done) || null;
+}
+function goalsTick(){
+  const Gs = goalsEnsure(); if(!Gs || !G.running) return;
+  let changed = false;
+  Gs.list.forEach(g => {
+    if(g.done) return;
+    let have = g.have;
+    if(g.k === "talk") have = (Gs.talked || []).length;
+    else if(g.k === "pledge"){
+      /* a pledge you won: someone you spoke with today, now pledged your way, who was not already */
+      const b = G.bill; let side = 1;
+      try{ side = G.you.vote != null ? G.you.vote : (b && alignment(G.you, b) > 0 ? 1 : -1); }catch(e){}
+      const base = Gs.pledged0 || [];
+      have = (G.members || []).filter(m => m && m.pledge === side && m.pledgeDay === G.day && Gs.talked.indexOf(m.id) >= 0 && base.indexOf(m.id) < 0).length ? 1 : 0;
+    }
+    else if(g.k === "rollcall") have = Gs.rollcall ? 1 : 0;
+    else if(g.k === "room") have = (Gs.seen && Gs.seen[g.room]) || G.room === g.room ? 1 : 0;
+    else if(g.k === "mail") have = (G.mail || []).filter(x => !x.read).length ? 0 : 1;
+    if(have !== g.have){ g.have = have; changed = true; }
+    if(g.have >= g.need){
+      g.done = true; changed = true;
+      try{
+        if(G.you){
+          if(g.k === "talk" || g.k === "pledge") G.you.influence = clamp((G.you.influence || 0) + 3, 0, 100);
+          else if(g.k === "rollcall") G.you.standing = clamp((G.you.standing || 0) + 3, 0, 100);
+          else G.you.approval = clamp((G.you.approval || 0) + 2, 0, 100);
+        }
+        feed("✓ " + g.t + ".", "big");
+      }catch(e){}
+    }
+  });
+  if(!Gs.all && Gs.list.length && Gs.list.every(g => g.done)){
+    Gs.all = true;
+    try{
+      if(G.you) G.you.approval = clamp((G.you.approval || 0) + 3, 0, 100);
+      note("Every aim met today. The building noticed the shape of the day, if not the reasons.", true);
+    }catch(e){}
+  }
+  if(changed){ try{ txtGoalsDirty = true; }catch(e){} }
+}
+let txtGoalsDirty = true;
+function goalsHTML(){
+  const Gs = goalsEnsure(); if(!Gs) return "";
+  return '<ul class="goals">' + Gs.list.map(g => '<li class="' + (g.done ? "is-done" : "") + '">' +
+    (g.done ? "✓ " : "○ ") + g.t + (g.k === "talk" && !g.done ? " (" + g.have + "/" + g.need + ")" : "") + '</li>').join("") + '</ul>';
 }
 function paintJob(){
   const box = el("job"), txt = el("jobText");
@@ -21459,6 +21559,7 @@ function refreshBar(){
     statHTML("War chest", Math.round(you.funds), 300, "var(--ind)", money(you.funds)) +
     '<div class="stat"><i>Mood</i><b>' + (G.mood>0?"+":"") + Math.round(G.mood) +
       '</b><span class="stat__track"><span class="stat__fill" style="width:'+((G.mood+60)/120*100)+'%;background:var(--ink-3)"></span></span></div>');
+  try{ goalsTick(); }catch(e){}
   try{ paintJob(); paintCompass(); }catch(e){}
 }
 function refreshTravel(){
@@ -22481,7 +22582,7 @@ function saveCaptureBase(){
     withWhom:G.withWhom, ties:G.ties, panel:null, court:G.court, own:G.own, parties:G.parties,
     termLength:G.termLength, country:G.country,
     greatest:G.greatest, blasphemy:G.blasphemy, loreNote:G.loreNote, greatnessOpen:G.greatnessOpen,
-    relics:G.relics, relicSpots:G.relicSpots, consularLore:G.consularLore, bind:G.bind, sens:G.sens, invertY:!!G.invertY, voiceVol:G.voiceVol,
+    relics:G.relics, relicSpots:G.relicSpots, consularLore:G.consularLore, bind:G.bind, sens:G.sens, invertY:!!G.invertY, voiceVol:G.voiceVol, goals:G.goals,
     world:G.world,
     pendingNight:!!G.pendingNight,
     cam:{x:cam.x, z:cam.z, yaw:cam.yaw, pitch:cam.pitch},
@@ -22821,6 +22922,7 @@ function setupSettingsUI(){
     '<div class="settings-section is-open" data-section="game">' +
       '<h3 class="settings-section-title">' + (G.you ? G.you.name : "Paused") + '</h3>' +
       (dayLine ? '<p class="settings-desc" style="margin:-8px 0 8px">' + dayLine + '</p>' : '') +
+      (G.you ? '<div class="settings-label" style="margin-top:6px">Today’s aims</div>' + goalsHTML() : '') +
       row("Pace of the day", "How fast the clock runs around you", opt("pzspeed", 1, "1×", sp === 1) + opt("pzspeed", 2, "2×", sp === 2) + opt("pzspeed", 4, "4×", sp === 4)) +
       row("Save", '<span id="pzSaved">Autosaves at every door and every few minutes</span>', '<button type="button" class="settings-btn settings-btn-secondary" id="pzSave">Save now</button>') +
       row("The handbook", "Everything the House does, in order", '<button type="button" class="settings-btn settings-btn-secondary" id="pzBook">Open</button>') +
@@ -23565,6 +23667,45 @@ try{
     }catch(e){ PAD_SEEN = false; }
   });
 }catch(e){}
+/* the pause menu, driven by a controller */
+function padPauseMenu(gp){
+  const b = gp.buttons || [];
+  const down = i => !!(b[i] && b[i].pressed);
+  const edge = i => { const d = down(i), was = !!PADHELD[i]; PADHELD[i] = d; return d && !was; };
+  const ov = el("pauseOverlay"); if(!ov) return;
+  const ctrls = [...ov.querySelectorAll("button, input, select")].filter(c => !c.disabled && c.offsetParent !== null);
+  if(!ctrls.length) return;
+  let i = ctrls.indexOf(document.activeElement);
+  const ay = (gp.axes || [])[1] || 0, axx = (gp.axes || [])[0] || 0;
+  const stickUp = ay < -0.6, stickDn = ay > 0.6, stickL = axx < -0.6, stickR = axx > 0.6;
+  const sEdge = (k, v) => { const was = !!PADHELD[k]; PADHELD[k] = v; return v && !was; };
+  const up = edge(12) | sEdge("_pzU", stickUp), dn = edge(13) | sEdge("_pzD", stickDn);
+  const lf = edge(14) | sEdge("_pzL", stickL), rt = edge(15) | sEdge("_pzR", stickR);
+  const a = edge(0), back = edge(1), start = edge(9);
+  const lb = edge(4), rb = edge(5);
+  if(lb || rb){
+    const tabs = [...ov.querySelectorAll("[data-tab]")];
+    const cur = tabs.findIndex(t => t.classList.contains("is-active") || t.getAttribute("aria-selected") === "true");
+    const nx = tabs[((cur < 0 ? 0 : cur) + (rb ? 1 : -1) + tabs.length) % tabs.length];
+    if(nx){ nx.click(); try{ nx.focus(); }catch(e){} }
+    return;
+  }
+  if(back || start){ PADHELD[9] = true; closeSettings(); return; }
+  const focus = j => { const c = ctrls[(j + ctrls.length) % ctrls.length]; try{ c.focus({preventScroll:false}); c.scrollIntoView({block:"nearest"}); }catch(e){} };
+  if(i < 0 && (up || dn || lf || rt || a)){ focus(0); return; }
+  if(up) focus(i - 1);
+  else if(dn) focus(i + 1);
+  else if(lf || rt){
+    const c = ctrls[i];
+    if(c && c.type === "range"){
+      try{ rt ? c.stepUp(Math.max(1, Math.round((c.max - c.min) / 20 / (+c.step || 1)))) : c.stepDown(Math.max(1, Math.round((c.max - c.min) / 20 / (+c.step || 1)))); }catch(e){}
+      c.dispatchEvent(new Event("input", {bubbles:true})); c.dispatchEvent(new Event("change", {bubbles:true}));
+    } else focus(i + (rt ? 1 : -1));
+  } else if(a){
+    const c = ctrls[i];
+    if(c && c.type !== "range"){ c.click(); }
+  }
+}
 function pollPad(){
 
   PAD.vx = PAD.vz = PAD.turn = PAD.tilt = 0; PAD.sprint = false;
@@ -23581,7 +23722,21 @@ function pollPad(){
   padLegend(!!gp);
   if(!gp) return;
   const dz = v => Math.abs(v) < 0.18 ? 0 : (v - Math.sign(v)*0.18)/0.82;
-  const ax = gp.axes || [];
+  const ax0 = gp.axes || [];
+  /* radial deadzone per stick: a diagonal stays a diagonal, rest drift dies */
+  const rad = (x, y, look) => {
+    x = +x || 0; y = +y || 0; const m = Math.hypot(x, y);
+    if(m < 0.16) return [0, 0];
+    let s = Math.min(1, (m - 0.16) / 0.84);
+    if(look) s = s * (0.45 + 0.55 * s);   /* fine aim near center, full turn at the rim */
+    return [x / m * s, y / m * s];
+  };
+  const L = rad(ax0[0], ax0[1], false), Rs = rad(ax0[2], ax0[3], true);
+  const ax = ax0.slice(); ax[0] = L[0]; ax[1] = L[1]; ax[2] = Rs[0]; ax[3] = Rs[1];
+  if(G._pauseOpen){
+    padPauseMenu(gp);
+    return;
+  }
   const phoneOpen = !veil.hidden && phoneWasRunning !== null;
   const glass = promptLive();
   if(phoneOpen || uiOpen()){
@@ -23590,13 +23745,13 @@ function pollPad(){
   } else if(glass){
     /* Live glass: no locomotion (selection stays put); look still allowed */
     PAD.vx = PAD.vz = 0;
-    PAD.turn = -dz(ax[2] || 0) * 1.7;
-    PAD.tilt = -dz(ax[3] || 0) * 1.2;
+    PAD.turn = -(ax[2] || 0) * 1.7;
+    PAD.tilt = -(ax[3] || 0) * 1.2;
   } else {
-    PAD.vx   =  dz(ax[0] || 0);
-    PAD.vz   = -dz(ax[1] || 0);
-    PAD.turn = -dz(ax[2] || 0) * 1.7;
-    PAD.tilt = -dz(ax[3] || 0) * 1.2;
+    PAD.vx   =  (ax[0] || 0);
+    PAD.vz   = -(ax[1] || 0);
+    PAD.turn = -(ax[2] || 0) * 1.7;
+    PAD.tilt = -(ax[3] || 0) * 1.2;
   }
   /* Phone: left stick drives UI cursor among PICKS (edge / threshold → movePick) */
   if(phoneOpen && PICKS.length){
@@ -23704,7 +23859,10 @@ function pollPad(){
     if(!veil.hidden && phoneWasRunning !== null) phoneClose();
     else if(veil.hidden && !TALK.open && G.running) phoneCard();
   }
-  if(edge(9)) togglePause();
+  if(edge(9)){
+    if(G.you && veil.hidden && !TALK.open && G.running){ try{ openSettings(); }catch(e){ togglePause(); } }
+    else togglePause();
+  }
   /* the shoulders walk the panels, so the whole dossier is reachable */
   if(edge(4)) padTab(-1);
   if(edge(5)){ if(PROC.on && PROC.phase !== "you") procHurry(); else padTab(1); }
@@ -23964,6 +24122,7 @@ function enterRoom(dest, fromRoom){
   G.doorGrace = (G.t || 0) + 1.8;
   G._lastDoorTo = dest;
   G._lastDoorFrom = prev;
+  try{ const Gs = goalsEnsure(); if(Gs){ Gs.seen = Gs.seen || {}; Gs.seen[dest] = 1; } }catch(e){}
   try{ document.body.classList.remove("keys-intro"); }catch(e){}
   try{
     el("whereName").textContent = ROOMS[dest].t;
