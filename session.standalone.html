@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261011h">
+<meta name="onum-build" content="20261011i">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261011h";
+  var STAMP = "20261011i";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -11455,6 +11455,7 @@ function qualifies(k){
   const o = OFFICES[k], y = G.you;
   if(!o) return false;
   if(y.out && k !== "house") return false;
+  if(termLimited(k)) return false;
   const n = o.need;
   return (!n.approval || y.approval >= n.approval)
       && (!n.standing || y.standing >= n.standing)
@@ -12155,7 +12156,15 @@ const AMENDMENTS = [
   {k:"terms",  t:"Lengthen the term of the House", cost:22, power:true,
    d:"Four years between elections instead of two.", run(){ G.termLength = Math.round(G.termLength*1.6); }},
   {k:"limits", t:"Abolish term limits on the executive", cost:26, power:true,
-   d:"Whoever holds the office may hold it as long as they can win it.", run(){ G.noLimits = true; }},
+   d:"Whoever holds the office may hold it as long as they can win it.", run(){ G.noLimits = true; lawEnsure().limits.pres = 0; }},
+  {k:"limitHouse", t:"Limit members of the House to six terms", cost:20, power:false,
+   d:"Six terms and home. The law, not the voters, decides.", run(){ lawEnsure().limits.house = 6; }},
+  {k:"liftSenate", t:"Lift the Senate's two-term limit", cost:22, power:true,
+   d:"A senator may serve as long as their state keeps sending them.", run(){ lawEnsure().limits.senate = 0; }},
+  {k:"liftGov", t:"Lift the governors' two-term limit", cost:20, power:true,
+   d:"A governor may hold the chair as long as they can win it.", run(){ lawEnsure().limits.gov = 0; }},
+  {k:"limitBench", t:"Limit justices to a single term", cost:18, power:false,
+   d:"One term on the bench, then back to the bar.", run(){ lawEnsure().limits.bench = 1; }},
   {k:"franchise", t:"Extend the franchise to every adult", cost:24, power:false,
    d:"One standard for the roll in every state.",
    run(){ (G.states||[]).forEach(s => { s.lean = Math.round(s.lean*0.7); s.unrest = clamp(s.unrest+6,0,100); }); }},
@@ -20032,6 +20041,10 @@ const PROPS = {
         spend(5, 1);
         whipCard();
       }},
+      {t:"Use the powers of your office", c:"5m", run(){
+        spend(5, 1);
+        officeCard();
+      }},
       {t:"Open the war chest ledger", c:"5m", run(){
         spend(5, 1);
         chestCard();
@@ -20686,6 +20699,7 @@ function holdVote(){
   }
   G.mood = clamp(G.mood + (passed ? (b.sponsorParty==="FED"?4:-4) : 0) + rint(-3,3), -60, 60);
   try{ billConsequences(b, passed, yourVote); }catch(e){ if(window.console) console.warn("billConsequences", e); }
+  if(passed){ G.lastActs = G.lastActs || []; G.lastActs.unshift({title:b.title, day:G.day}); if(G.lastActs.length > 6) G.lastActs.length = 6; }
   G.you.record.defections += broke.length;
 
   /* the other two branches get their say */
@@ -21108,7 +21122,7 @@ function worstVote(){
 /* Before the ballot: which office are you contesting? */
 function ballotCard(){
   const y = G.you;
-  const open = Object.keys(OFFICES).filter(k => k === "house" || qualifies(k));
+  const open = Object.keys(OFFICES).filter(k => (k === "house" && !termLimited("house")) || qualifies(k));
   card.innerHTML =
     '<div class="eyebrow">Nomination day · the ' + ordinal(G.congress+1) + '</div>' +
     '<h1>What are you standing for?</h1>' +
@@ -21121,10 +21135,12 @@ function ballotCard(){
       if(n.standing) want.push("standing " + n.standing);
       if(n.funds)    want.push(money(n.funds));
       if(n.terms)    want.push(n.terms + " terms");
+      if(termLimited(k)) want.push("term limit reached, by law");
       return '<button class="conc__btn" type="button" data-off="' + k + '"' + (ok?'':' disabled') + '>' +
         (k === "pres" ? "Stand for " + execTitle() : "Stand for " + o.t) +
         '<u>' + o.blurb + (want.length ? ' · needs ' + want.join(", ") : '') + '</u></button>';
     }).join("") +
+    (open.length ? '' : '<button class="conc__btn" type="button" data-off="none">Stand down<u>The law says you are done here. The East Steps are open to everyone.</u></button>') +
     '<div class="card__actions"></div>';
   veil.hidden = false;
   card.querySelectorAll("[data-off]").forEach(b => b.addEventListener("click", () => {
@@ -21139,6 +21155,7 @@ function election(){
   you.standingFor = null;
   const swing = G.mood + rint(-10,10);
   const results = [], kept = [];
+  try{ npcLadder(null); }catch(e){ if(window.console) console.warn("npcLadder", e); }
   G.members.forEach(m => {
     if(m.kind === "envoy"){ kept.push(m); return; }
     const partySwing = m.party==="FED" ? swing : m.party==="COM" ? -swing : 0;
@@ -21201,7 +21218,7 @@ function election(){
   const outBonus = you.out ? backers*7 - 16 : 0;
   /* a bigger office is a harder race */
   const reach = seeking === "house" ? 0 : seeking === "gov" ? 14 : seeking === "senate" ? 22 : seeking === "bench" ? 18 : 38;
-  const youWon = (yourResult + outBonus - reach) > 0;
+  const youWon = seeking !== "none" && (yourResult + outBonus - reach) > 0;
   if(youWon && seeking !== "house"){
     you.office = seeking;
     if(seeking === "pres"){
@@ -21216,7 +21233,7 @@ function election(){
     } else note("Elected to " + OFFICES[seeking].t + ".", true);
     G.career.push({term:G.term, post:OFFICES[seeking].short, note:"won the " + OFFICES[seeking].t});
   }
-  try{ if(youWon){ achieve(seeking !== "house" ? "higher" : "reelect"); } else achieve("steps"); }catch(e){}
+  try{ if(youWon){ achieve(seeking !== "house" ? "higher" : "reelect"); careerWon(seeking); } else achieve("steps"); }catch(e){}
   if(youWon){
     you.margin = Math.max(1, Math.round(yourResult + outBonus));
     you.terms++; you.record.won++; you.funds = Math.round(you.funds*0.25);
@@ -22663,6 +22680,7 @@ function chestCard(){
 }
 function chestSpend(k){
   const you = G.you, c = CHEST.find(x => x.k === k);
+  if(you.office === "bench" && !you.out && k !== "legal"){ note("Judges do not campaign. The chest stays shut while you sit on the bench.", true); return; }
   if(!c || you.funds < c.c) return;
   if(k === "ally"){ chestAllyCard(); return; }
   you.funds -= c.c;
@@ -22756,6 +22774,220 @@ function achCard(){
 }
 function achDaily(){
   try{ if((G.day || 1) >= 30) achieve("days30"); }catch(e){}
+}
+
+/* ── 20261011i · the ladder: distinct roles, term limits in law, NPC careers ── */
+function lawEnsure(){
+  if(!G.law) G.law = {limits:{house:0, senate:2, gov:2, pres:2, bench:0}};
+  if(G.noLimits) G.law.limits.pres = 0;
+  return G.law;
+}
+function officeTermsOf(k){ const y = G.you; if(k === "house") return y.terms || 0; y.officeTerms = y.officeTerms || {}; return y.officeTerms[k] || 0; }
+function termLimited(k){
+  const lim = lawEnsure().limits[k] || 0;
+  if(!lim) return false;
+  /* the limit binds those who hold the office and want it again */
+  return officeTermsOf(k) >= lim;
+}
+function careerWon(seeking){
+  const y = G.you;
+  y.officeTerms = y.officeTerms || {};
+  y.officeTerms[seeking] = (y.officeTerms[seeking] || 0) + 1;
+  if(seeking === "house") y.office = "house";
+  y.role = null; y.staffOf = null; y.envoyTo = null;
+}
+/* NPCs walk the ladder too: a member with a record may leave for the Senate or a governorship */
+function npcLadder(news){
+  G.ladder = G.ladder || [];
+  let n = 0;
+  const cands = G.members.filter(m => m.kind === "member" && !m.gone && !m.machine && !(typeof isChaplain === "function" && isChaplain(m))
+    && (m.terms || 0) >= 2 && (m.influence || 0) > 40);
+  cands.forEach(m => {
+    if(n >= 2 || !chance(0.14)) return;
+    n++;
+    const to = chance(0.5) ? "senate" : "gov";
+    const won = chance(0.5 + (m.influence - 40) / 120);
+    G.members = G.members.filter(x => x !== m);
+    G.seatsBy[m.party] = Math.max(0, (G.seatsBy[m.party] || 1) - 1);
+    const where = to === "gov" ? "the governor's chair in " + m.state : "the Senate";
+    G.ladder.unshift({name:m.name, party:m.party, state:m.state, to, won, term:G.term, creed:m.creed});
+    if(G.ladder.length > 40) G.ladder.length = 40;
+    try{ accolade(m, (won ? "Left the House for " : "Gave up the seat to run for ") + where + "."); }catch(e){}
+    const line = won ? m.name + " gave up the seat and won " + where + ". The House loses a vote and gains a phone call."
+                     : m.name + " gave up the seat to run for " + where + " and lost. Last seen on the East Steps, shaking hands.";
+    if(news) news.push(line); else note(line, true);
+  });
+}
+function senateColleague(){
+  const s = (G.ladder || []).filter(x => x.won && x.to === "senate");
+  return s.length ? "Senator " + pick(s).name : "Senator " + newName(pick(STATES));
+}
+/* the powers that come with the chair you hold */
+function roleKey(){
+  const y = G.you;
+  if(y.out) return y.staffOf ? "staff" : y.envoyTo ? "envoy" : "out";
+  const o = y.office || "house";
+  if(o !== "house") return o;
+  if(y.post === "speaker" || y.post === "leader" || y.post === "minority" || y.post === "whip") return "leader";
+  if(y.post === "ways" || y.post === "judic" || y.post === "armed") return "chair";
+  return "house";
+}
+const ROLE_T = {house:"Representative", leader:"Party leadership", chair:"Committee chair", senate:"Senator", gov:"Governor",
+  pres:"Executive", bench:"Justice", envoy:"Envoy abroad", staff:"Staff to a member", out:"Out of office"};
+function rolePowers(){
+  const y = G.you, b = G.bill, live = b && !b.done, k = roleKey(), P = [];
+  const once = (key) => { y.used = y.used || {}; return y.used[key] === G.day; };
+  const mark = (key) => { y.used = y.used || {}; y.used[key] = G.day; };
+  if(k === "leader"){
+    const mineQ = (G.billQueue || []).findIndex(x => x && x.mine);
+    P.push({t:"Set the calendar: bring your bill to the front", off:mineQ < 1, d:"Your filed bill jumps the queue.", run(){
+      const q = G.billQueue; const [mb] = q.splice(mineQ, 1); q.unshift(mb); y.standing = clamp(y.standing - 1, 0, 100);
+      return "The calendar is yours to write. " + mb.title + " is next."; }});
+    P.push({t:"Discipline a member who broke the line", off:once("disc"), d:"Loyalty up, warmth down.", run(){
+      mark("disc");
+      const m = pick(G.members.filter(x => x.party === y.party && x.kind === "member" && !x.machine && !x.gone)) ; if(!m) return "Nobody to discipline.";
+      m.traits.loyalty = clamp(m.traits.loyalty + 8, 0, 100); ripple(m, -8, "Leadership took my committee slot for a week. I will vote the line. I will remember.", -6, true);
+      return "You took " + m.name + "'s committee slot for a week. They will vote the line."; }});
+  }
+  if(k === "chair"){
+    P.push({t:"Hold the bill in committee", off:!live || b.held || once("hold"), d:"The roll call slips two days. The sponsor will not thank you.", run(){
+      mark("hold"); b.held = true; b.voteDay += 2; y.standing = clamp(y.standing - 2, 0, 100);
+      const sp = b.sponsorId != null ? byId(b.sponsorId) : null; if(sp) ripple(sp, -8, "They sat on my bill in committee.", -6, true);
+      return b.title + " sits in your committee for two more days."; }});
+    P.push({t:"Mark it up toward your own lines", off:!live || b.marked2, d:"The text moves toward you.", run(){
+      b.marked2 = true; for(const a in b.pos) b.pos[a] = Math.round(b.pos[a] + (y.pos[a] - b.pos[a]) * 0.18);
+      b.line = describeBill(b); return "You rewrite two clauses in markup. The bill is a little more yours."; }});
+  }
+  if(k === "senate"){
+    P.push({t:"Hold a confirmation hearing", off:once("conf"), d:"A nominee for the bench. Confirm, or make a fight of it.", run(){ mark("conf"); confirmCard(); return null; }});
+    P.push({t:"Ratify a treaty", off:once("treaty"), d:"A treaty with a realm abroad. Two thirds of the Senate, and you.", run(){
+      mark("treaty");
+      const r = pick(realmEnsure()); G.realmRel = G.realmRel || {};
+      const ok = chance(0.55 + (y.standing - 50) / 200);
+      G.realmRel[r.k] = clamp((G.realmRel[r.k] || 0) + (ok ? 15 : -6), -100, 100);
+      feed((ok ? "The Senate ratified the treaty with " : "The treaty with ") + r.t + (ok ? "." : " fell short of two thirds."), ok ? "good" : "bad");
+      y.standing = clamp(y.standing + (ok ? 3 : -2), 0, 100);
+      return ok ? "Ratified. " + senateColleague() + " shook your hand in the cloakroom." : "Short by four. " + senateColleague() + " voted no and will not say why."; }});
+    P.push({t:"Filibuster the bill", off:!live || b.filibustered, d:"Talk until it dies or they give way. It costs you influence; home will judge.", run(){
+      b.filibustered = true; b.voteDay += 3; y.influence = clamp(y.influence - 6, 0, 100);
+      const fit = districtFit(b); y.approval = clamp(y.approval + (fit < 0 ? 4 : -4), 0, 100);
+      return "You held the floor for eleven hours. " + b.title + " slips three days. " + (fit < 0 ? "Home liked it." : "Home did not."); }});
+  }
+  if(k === "bench"){
+    const C = (G.cases || []).filter(c => !c.done);
+    C.slice(0, 3).forEach(c => {
+      const recuse = c.state === y.state || (c.voted && c.voted.indexOf(y.name) >= 0);
+      if(recuse) P.push({t:"Recuse yourself: " + c.t, d:"Your own state or your own vote. The rule is plain.", run(){ c.done = true; c.recused = true; feed("Justice " + surname(y.name) + " recused from " + c.t + ".", "good"); return "You recused. The bench decides without you."; }});
+      else {
+        P.push({t:"Rule for the Union: " + c.t, d:"Uphold the federal act.", run(){ return benchRule(c, true); }});
+        P.push({t:"Rule for the state: " + c.t, d:"Strike the mandate.", run(){ return benchRule(c, false); }});
+      }
+    });
+    if(!C.length) P.push({t:"No case is ripe", off:true, d:"State-versus-Union suits land here after the House passes a mandate or preemption.", run(){ return ""; }});
+  }
+  if(k === "gov"){
+    const S = (G.states || []).find(s => s.n === y.state);
+    P.push({t:"Veto the statehouse bill", off:!(S && S.bill), d:S && S.bill ? S.bill.title : "Nothing on your desk from the statehouse.", run(){
+      const t = S.bill.title; S.bill = null; S.unrest = clamp(S.unrest + 2, 0, 100); y.approval = clamp(y.approval + rint(-3, 4), 0, 100);
+      feed("Governor " + surname(y.name) + " vetoed the " + t + ".", "bad"); return "Vetoed. The statehouse will try again next session."; }});
+    P.push({t:"Appoint a state judge", off:once("appt"), d:"A friend on the state bench. A member of your party will owe you.", run(){
+      mark("appt"); const m = pick(G.members.filter(x => x.party === y.party && !x.machine && !x.gone)); if(m) ripple(m, 8, "The governor put my sister-in-law on the state bench.", 6, true);
+      return "You appointed a judge. " + (m ? m.name + " sends flowers." : ""); }});
+    P.push({t:"Defy the federal mandate", off:!(G.billKinds && G.billKinds.statefed) || y.defied === G.term, d:"Refuse the money and the rule. Home cheers; the Union sends lawyers.", run(){
+      y.defied = G.term; if(S) S.unrest = clamp(S.unrest + 6, 0, 100); y.approval = clamp(y.approval + 6, 0, 100); y.standing = clamp(y.standing - 4, 0, 100);
+      G.cases = G.cases || []; G.cases.push({t:"the Union v. " + y.state, state:y.state, day:G.day, voted:[]});
+      return "You stood on the capitol steps and said no. The Union's attorney filed by supper."; }});
+    P.push({t:"Lead a trade mission abroad", off:once("trade") || y.funds < 20, d:"Foreign money spent at home. Costs 20k from the chest.", run(){
+      mark("trade"); y.funds -= 20; const r = pick(realmEnsure()); G.realmRel = G.realmRel || {}; G.realmRel[r.k] = clamp((G.realmRel[r.k] || 0) + 6, -100, 100);
+      if(S) S.ind = clamp(S.ind + 2, 0, 100); return "Four days in " + r.capital + ". You came back with a cannery contract."; }});
+  }
+  if(k === "pres"){
+    const last = (G.lastActs || []).find(a => !a.signed && !a.vetoed);
+    P.push({t:last ? "Veto: " + last.title : "No act awaits your signature", off:!last, d:"Send it back to the House.", run(){
+      last.vetoed = true; y.standing = clamp(y.standing - 3, 0, 100); y.influence = clamp(y.influence + 3, 0, 100);
+      feed(execTitle() + " " + surname(y.name) + " vetoed the " + last.title + ".", "bad"); return "Vetoed. The House can override with two thirds, if it can find them."; }});
+    if(last) P.push({t:"Sign: " + last.title, d:"Make it law with your name on it.", run(){ last.signed = true; y.approval = clamp(y.approval + 2, 0, 100); return "Signed, with eleven pens."; }});
+    P.push({t:"Appoint a cabinet secretary", off:once("cab"), d:"A member leaves nothing behind but gratitude.", run(){
+      mark("cab"); const m = pick(G.members.filter(x => x.party === y.party && !x.machine && !x.gone && !x.cabinet)); if(!m) return "Nobody left to appoint.";
+      m.cabinet = pick(["Treasury", "State", "War", "Interior", "Labour"]); ripple(m, 12, "Named to the cabinet. I owe this one.", 10, true);
+      feed(m.name + " named Secretary of " + m.cabinet + ".", "good"); return m.name + " takes " + m.cabinet + "."; }});
+    P.push({t:"Send foreign aid on your own authority", off:once("aid"), d:"Money abroad, a realm warmer, a district colder.", run(){
+      mark("aid"); const r = pick(realmEnsure()); G.realmRel = G.realmRel || {}; G.realmRel[r.k] = clamp((G.realmRel[r.k] || 0) + 12, -100, 100);
+      y.approval = clamp(y.approval - 2, 0, 100); if(G.money) G.money.index = Math.round((G.money.index - 0.5) * 10) / 10;
+      feed("The executive sent grain and credit to " + r.t + ".", "good"); return r.t + " will remember. So will the farm counties."; }});
+  }
+  if(k === "out"){
+    const allies = G.members.filter(m => m.party === y.party && m.kind === "member" && !m.machine && !m.gone && (m.rel.warmth || 0) > 10);
+    P.push({t:"Join a member's staff", off:!allies.length, d:"Work for someone who kept their seat. It keeps your name in the building.", run(){
+      const m = allies.sort((a, b) => b.rel.warmth - a.rel.warmth)[0]; y.staffOf = m.id; y.role = "staff";
+      return "You are now on " + m.name + "'s staff. Your old badge still opens the cloakroom door."; }});
+    P.push({t:"Accept an envoy's posting abroad", off:(y.standing || 0) < 35 || !(G.exec && !G.exec.you), d:"The executive needs a voice in a foreign capital.", run(){
+      const r = pick(realmEnsure()); y.envoyTo = r.k; y.role = "envoy";
+      return "You are posted to " + r.capital + ". The cables home will carry your name."; }});
+  }
+  if(k === "staff"){
+    const m = byId(y.staffOf);
+    P.push({t:"Draft a bill for your member", off:!m || once("draft"), d:"Their name on it, your work in it.", run(){
+      mark("draft"); m.influence = clamp(m.influence + 3, 0, 100); y.standing = clamp(y.standing + 2, 0, 100);
+      return "You wrote it in a night. " + m.name + " filed it in the morning and thanked you in the cloakroom."; }});
+    P.push({t:"Leave the staff", d:"Back to the East Steps.", run(){ y.staffOf = null; y.role = null; return "You hand in the badge."; }});
+  }
+  if(k === "envoy"){
+    const r = realmEnsure().find(x => x.k === y.envoyTo);
+    P.push({t:"Cable home", off:once("cable"), d:"Tell the Union what " + (r ? r.t : "they") + " want.", run(){
+      mark("cable"); G.realmRel = G.realmRel || {}; G.realmRel[y.envoyTo] = clamp((G.realmRel[y.envoyTo] || 0) + 6, -100, 100); y.standing = clamp(y.standing + 1, 0, 100);
+      return "Cabled: they want " + (r ? r.want : "time") + "."; }});
+    P.push({t:"Come home", d:"Resign the posting.", run(){ y.envoyTo = null; y.role = null; return "You come home to the East Steps."; }});
+  }
+  return P;
+}
+function benchRule(c, forUnion){
+  c.done = true; c.ruled = forUnion ? "union" : "state";
+  const S = (G.states || []).find(s => s.n === c.state);
+  if(S) S.unrest = clamp(S.unrest + (forUnion ? 7 : -5), 0, 100);
+  feed("The bench ruled for " + (forUnion ? "the Union" : c.state) + " in " + c.t + ".", forUnion ? "bad" : "good");
+  G.you.standing = clamp(G.you.standing + 1, 0, 100);
+  return forUnion ? "The act stands. " + c.state + " will comply, slowly." : "The mandate falls. " + c.state + " keeps its money and its schools.";
+}
+function confirmCard(){
+  const nom = {name:newName(pick(STATES)), pos:{econ:rint(-60, 60), lib:rint(-60, 60), def:0, wel:0}};
+  const fit = alignment(G.you, {pos:nom.pos});
+  card.innerHTML = '<div class="eyebrow">Senate Judiciary · confirmation</div><h1>' + nom.name + '</h1>' +
+    '<p>Nominated to the bench. ' + (fit > 0 ? "Reads the law much as you do." : "Reads the law the other way from you.") + ' ' + senateColleague() + ' wants a quick vote.</p>' +
+    '<div class="card__actions"><button type="button" class="btn" id="cfYes">Confirm</button><button type="button" class="btn btn--ghost" id="cfNo">Make a fight of it</button></div>';
+  veil.hidden = false;
+  const done = (yes) => {
+    const won = yes || chance(0.45);
+    if(yes){ G.court = G.court || []; if(G.court.length) G.court[rint(0, G.court.length - 1)] = {name:nom.name, by:"the Senate", pos:nom.pos}; }
+    G.you.standing = clamp(G.you.standing + (yes ? 1 : won ? 4 : -3), 0, 100);
+    feed(yes ? nom.name + " confirmed to the bench." : (won ? nom.name + "'s nomination was withdrawn after a week of hearings." : nom.name + " confirmed over your objection."), "good");
+    walkNow();
+  };
+  el("cfYes").addEventListener("click", () => done(true));
+  el("cfNo").addEventListener("click", () => done(false));
+}
+function officeCard(){
+  G.running = false;
+  const y = G.you, k = roleKey(), L = lawEnsure();
+  const P = rolePowers();
+  const lim = Object.keys(L.limits).map(o => (OFFICES[o] ? OFFICES[o].short : o) + " " + (L.limits[o] ? L.limits[o] + (L.limits[o] === 1 ? " term" : " terms") : "no limit")).join(" · ");
+  card.innerHTML = '<div class="eyebrow">Your office · ' + ROLE_T[k] + '</div><h1>' + officeTitle() + '</h1>' +
+    '<p class="dream">Term limits in law: ' + lim + '. They change only by amendment.</p>' +
+    P.map((p, i) => '<div class="whip__row"><span class="whip__n">' + p.t + '</span><span class="whip__w">' + (p.d || "") + '</span>' +
+      '<span class="whip__b"><button type="button" class="btn btn--ghost whip__go" data-pow="' + i + '"' + (p.off ? ' disabled' : '') + '>Do it</button></span></div>').join("") +
+    (P.length ? '' : '<p>A Representative votes, talks and files. The bigger rooms have bigger levers.</p>') +
+    '<div id="powSay" class="dream"></div>' +
+    '<div class="card__actions"><button type="button" class="btn" id="powClose">Close</button></div>';
+  veil.hidden = false;
+  el("powClose").addEventListener("click", () => walkNow());
+  card.querySelectorAll("[data-pow]").forEach(bt => bt.addEventListener("click", () => {
+    const p = P[+bt.getAttribute("data-pow")]; if(!p || p.off) return;
+    spend(20, 4);
+    const r = p.run();
+    if(r === null) return;
+    officeCard();
+    const s = el("powSay"); if(s) s.textContent = r || "";
+  }));
 }
 
 function paintJob(){
@@ -23861,7 +24093,7 @@ function saveCaptureBase(){
     withWhom:G.withWhom, ties:G.ties, panel:null, court:G.court, own:G.own, parties:G.parties,
     termLength:G.termLength, country:G.country,
     greatest:G.greatest, blasphemy:G.blasphemy, loreNote:G.loreNote, greatnessOpen:G.greatnessOpen,
-    relics:G.relics, relicSpots:G.relicSpots, consularLore:G.consularLore, bind:G.bind, sens:G.sens, invertY:!!G.invertY, voiceVol:G.voiceVol, goals:G.goals, whip:G.whip || null, billQueue:G.billQueue || [], faith:G.faith || null, life:G.life || null, ach:G.ach || {}, echoes:G.echoes || [], billKinds:G.billKinds || {}, realmRel:G.realmRel || {}, listened:G.listened || 0,
+    relics:G.relics, relicSpots:G.relicSpots, consularLore:G.consularLore, bind:G.bind, sens:G.sens, invertY:!!G.invertY, voiceVol:G.voiceVol, goals:G.goals, whip:G.whip || null, billQueue:G.billQueue || [], faith:G.faith || null, life:G.life || null, ach:G.ach || {}, law:G.law || null, ladder:G.ladder || [], cases:G.cases || [], lastActs:G.lastActs || [], echoes:G.echoes || [], billKinds:G.billKinds || {}, realmRel:G.realmRel || {}, listened:G.listened || 0,
     world:G.world,
     pendingNight:!!G.pendingNight,
     cam:{x:cam.x, z:cam.z, yaw:cam.yaw, pitch:cam.pitch},
@@ -24205,6 +24437,7 @@ function setupSettingsUI(){
       row("Pace of the day", "How fast the clock runs around you", opt("pzspeed", 1, "1×", sp === 1) + opt("pzspeed", 2, "2×", sp === 2) + opt("pzspeed", 4, "4×", sp === 4)) +
       row("Save", '<span id="pzSaved">Autosaves at every door and every few minutes</span>', '<button type="button" class="settings-btn settings-btn-secondary" id="pzSave">Save now</button>') +
       row("The handbook", "Everything the House does, in order", '<button type="button" class="settings-btn settings-btn-secondary" id="pzBook">Open</button>') +
+      row("Your office", "The powers of the chair you hold, and the term limits in law", '<button type="button" class="settings-btn settings-btn-secondary" id="pzOffice">Open</button>') +
       row("Achievements", "What the record will say. Some are hidden until you find them", '<button type="button" class="settings-btn settings-btn-secondary" id="pzAch">Open</button>') +
       row("War chest", "Spend it on ads, staff, offices, allies, counsel, polls and press time", '<button type="button" class="settings-btn settings-btn-secondary" id="pzChest">Open</button>') +
       row("Notebook", "Happenings, faith on the wire, and the things nobody explains", '<button type="button" class="settings-btn settings-btn-secondary" id="pzNote">Open</button>') +
@@ -24246,6 +24479,7 @@ function setupSettingsUI(){
     const t = el("pzSaved"); if(t) t.textContent = ok ? ("Saved · day " + G.day + " · " + hhmm()) : "Could not save — storage may be full";
   });
   const byBook = el("pzBook"); if(byBook) byBook.addEventListener("click", () => { closeSettings(); try{ handbookCard(); }catch(e){} });
+  const byOff = el("pzOffice"); if(byOff) byOff.addEventListener("click", () => { closeSettings(); setTimeout(() => { try{ officeCard(); }catch(e){} }, 30); });
   const byAch = el("pzAch"); if(byAch) byAch.addEventListener("click", () => { closeSettings(); setTimeout(() => { try{ achCard(); }catch(e){} }, 30); });
   const byChest = el("pzChest"); if(byChest) byChest.addEventListener("click", () => { closeSettings(); setTimeout(() => { try{ chestCard(); }catch(e){} }, 30); });
   const byNote = el("pzNote"); if(byNote) byNote.addEventListener("click", () => { closeSettings(); setTimeout(() => { try{ notebookCard(); }catch(e){} }, 30); });
