@@ -17,11 +17,11 @@ One HTML body. Keep these **byte-identical**:
 | `session.html` | repo root |
 | `One Nation, Under, ME.html` | standalone name |
 
-**Build stamp (now): `20261011g`**
+**Build stamp (now): `20261011h`**
 
-- `<meta name="onum-build" content="20261011g">`
-- IIFE `STAMP = "20261011g"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
-- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261011g"`
+- `<meta name="onum-build" content="20261011h">`
+- IIFE `STAMP = "20261011h"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
+- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261011h"`
 - Wrapper iframe: `/session.html?v=${ONUM_BUILD}` in `src/routes/index.tsx`
 - **`20261005a`:** weekly MAX OPTIMIZE + design/max-fit. Keeps `20261001a` far-crowd freeze / kit reuse / 6ms bail and `20261001b` hard maps. Best uses `BasicShadowMap` (one sample). Deep crowd freeze (culled+far traverse `matrixAutoUpdate`). Shell fills big desks (`max-width:min(2560px,100%)`). Kit cap KEEP 6/8. Caesar/parting polish. Walk **0.68** / sprint **1.15**. Full meshes near.
 - **`20261011a`:** playable fixes. Corridor freeze (alignment/stakeIn infinite recursion) fixed; elections run again (card watchdog no longer kills the ballot); warmAhead actually runs (`let roomGroup`, kit lamp/ticker relink, no sky touch, explicit furnished flag); New career confirms before replacing a career and wipes only at the oath. Walk 0.68 / sprint 1.15 kept.
@@ -31,6 +31,7 @@ One HTML body. Keep these **byte-identical**:
 - **`20261011e`**: whip count card (desk computer + pause), whip targets on the NOW line and compass, cosponsor asks, drafts queue behind the live bill, floor sits only in its hours, whip/cosponsor aims; office desk fixed (seat behind the desk, E reaches the computer, clean desk top, lamps stand on the desk), open bookcases, floating props grounded.
 - **`20261011f`**: lives and faith. Members keep journals, dream, and act on long aims (own bills, blocs, friendships, feuds, faith, noticing); night happenings in your office; five rare saved anomalies in a Notebook; creed choice at the oath and in the world (parish notices, instruction, reception; kneeling at the bronze joins the Consular Rite, confession returns); organic faith drift per state with pockets kept and no snowball.
 - **`20261011g`**: DTCNO, the House speech engine (an in-world Consular Rite machine, not a deity): 1,820-lemma tagged lexicon, 86 templates, order-2 Markov, local net steering; idiolects learned and saved; ambient talk, replies to your choices, "Let them talk"; canon and fourth-wall guards; never composes while walking.
+- **`20261011h`**: new bill kinds (immigration, foreign aid and arms, states versus the Union) with consequences on the wire days later (approval, state unrest, realm relations, court cases); a war chest ledger that buys ads, a district office, aides, field work, allies' races, counsel, polls and press time, feeding the election; 19 achievements, hidden ones shown as ??? until earned.
 
 If you change the HTML, bump the letter (`20260921e`, …) in **meta + STAMP + ONUM_BUILD together**, copy the body to all four filenames, commit, push `main`.
 

@@ -4,6 +4,17 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261011h: bill kinds, war chest, achievements
+
+On `20261011g`. Walk **0.68** / sprint **1.15** kept. Best default, `history.replaceState` only, no CDN, no external LLM. God is the Most High; Christ is King; First Consul is a man under God.
+
+- **New fights on the calendar:** immigration (harvest visas, the border guard, naturalization), foreign aid and arms abroad (each tied to a real realm and its envoy), and the states against the Union (unfunded mandates, preemption). About a third of bills are now one of these, each with its own title, who it helps, who pays and why it was filed.
+- **Consequences arrive later:** two to eight days after the roll call the wire reports what happened. Harvest crews do not come back; naturalization classes fill; a realm sends grain at cost or recalls its attache (realm relations move); a state's attorney general sues, the circuit court rules, a governor thanks the members who voted no by name. Your approval moves with how your vote landed at home, and state unrest moves with the outcome. A state suit opens a case for the bench.
+- **The war chest does things:** desk computer "Open the war chest ledger" or Pause > Game > War chest. Ads (approval now and field), a district office (a little approval every day), legislative aides (influence every morning, up to three), field operations (counts on election day), backing an ally's campaign (adds to their margin at the polls and they remember it), counsel (halves the next suit or mandate hit), a poll (reads six members and home's view of you), and East Steps press time (standing and approval). Field and backing feed the election itself.
+- **Achievements:** 19, visible and hidden (??? until found), with a toast when earned and a list in Pause > Game > Achievements. They cover the whip, cosponsors, your own bill, the war chest, the three new bill kinds, re-election, losing and carrying on, higher office, night happenings, anomalies, reception into a creed, coming home to the Latin Rite, smashing a Consular idol, letting ten colleagues talk, thirty days served. None praise any comparison to the First Consul.
+- Tests: bill kinds and share, consequences queue and wire, realm relations, chest spending and daily effects, ally backing, achievements card and pause rows, election consumes field and backing, save/load.
+- Stamp: meta + STAMP + `ONUM_BUILD` -> `20261011h`. Five HTML copies byte-identical.
+
 ## 20261011g: DTCNO speech
 
 On `20261011f`. Walk **0.68** / sprint **1.15** kept. Best default, `history.replaceState` only, no CDN, no external LLM, no network. God is the Most High; Christ is King; First Consul is a man under God.
