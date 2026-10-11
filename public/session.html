@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261005a">
+<meta name="onum-build" content="20261011a">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261005a";
+  var STAMP = "20261011a";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -2368,13 +2368,27 @@ function describeBill(b){
 }
 /* Existential means existential: what a bill does to somebody's town
    weighs more than what their party told them this morning. */
+let _alignDepth = 0;
+const _alignMemo = new Map();
+let _alignMemoFrame = -1, _alignMemoAt = 0;
 function alignment(who, bill){
   if(who && who.kind === "member" && bill){
+    /* 20261011a: re-entrancy guard + short memo (tallies ask 25x25).
+       what the bill does to them, what it does to their town, and
+       which way the people they actually care about are pulling */
+    if(_alignDepth > 0) return alignmentRaw(who, bill);
+    const nowA = (typeof performance !== "undefined") ? performance.now() : 0;
+    if(_alignMemoFrame !== FRAME_ID || nowA - _alignMemoAt > 250){ _alignMemo.clear(); _alignMemoFrame = FRAME_ID; _alignMemoAt = nowA; }
+    const bp = bill.pos || {};
+    const mk = who.id + "|" + (bill.id || bill.title || "") + "|" + bp.econ + "|" + bp.lib + "|" + bp.def + "|" + bp.wel;
+    if(_alignMemo.has(mk)) return _alignMemo.get(mk);
+    _alignDepth++;
     try{
-      /* what the bill does to them, what it does to their town, and
-         which way the people they actually care about are pulling */
-      return alignmentRaw(who, bill) + stakeSway(who, bill) + tiePull(who, bill);
+      const v = alignmentRaw(who, bill) + stakeSway(who, bill) + tiePull(who, bill);
+      _alignMemo.set(mk, v);
+      return v;
     }catch(e){}
+    finally{ _alignDepth--; }
   }
   return alignmentRaw(who, bill);
 }
@@ -3780,7 +3794,7 @@ try{ const bootEl = el("boot"); if(bootEl) bootEl.remove(); }catch(e){}
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(58, 16/10, 0.08, 120);
-const roomGroup = new THREE.Group(); scene.add(roomGroup);
+let roomGroup = new THREE.Group(); scene.add(roomGroup); /* 20261011a: let — warmAhead swaps in a kit while it builds */
 const peopleGroup = new THREE.Group(); scene.add(peopleGroup);
 
 const hemi = new THREE.HemisphereLight(0xdfe6f0, 0x3a3630, 0.55);
@@ -4108,6 +4122,8 @@ function dressTextures(){
   /* Photoreal albedos on top of the canvas fallback. Modest/Simple keep the cheap maps. */
   /* MAX OPT 20260921b: skip photoreal dress on Simple only (Best on MODEST still dresses). */
   if(G.gfx === "simple") return;
+  /* 20261011a: standalone file:// cannot fetch these (CORS noise); canvas maps stand. */
+  try{ if(location.protocol === "file:") return; }catch(e){}
   [
     ["oak","/tex/oak.jpg"],
     ["marble","/tex/marble.jpg"],
@@ -4163,7 +4179,9 @@ function townPulse(){
   const md = G.mood || 0;
   return clamp((ap * 0.52 + st * 0.28 + (md + 18) * 0.7) / 100, 0, 1);
 }
+let _warmingKit = false; /* 20261011a: a kit being warmed must not touch the live sky */
 function buildSky(R){
+  if(_warmingKit) return;
   if(skyMesh){
     try{ if(skyMesh.parent) skyMesh.parent.remove(skyMesh); }catch(e){}
     try{ skyMesh.geometry.dispose(); }catch(e){}
@@ -5415,7 +5433,20 @@ function propBench(seatMat, woodMat, x, z, w, dp, ry){
 const TICKERS = [];              /* props that move: clock hands, fans */
 const ROOMLIGHTS = [];           /* practical lights added per room */
 const MAX_ROOM_LIGHTS = (typeof MODEST !== "undefined" && MODEST) ? 2 : 4;
+function relinkRoomRefs(){
+  /* 20261011a: lights/tickers follow the group they live in (kits stash and return them). */
+  ROOMLIGHTS.length = 0; TICKERS.length = 0;
+  try{
+    roomGroup.traverse(o => {
+      const u = o.userData; if(!u) return;
+      if(u._roomLight) ROOMLIGHTS.push(o);
+      if(u._ticker) TICKERS.push(u._ticker);
+    });
+  }catch(e){}
+  try{ lightKey = ""; lightT = 0; }catch(e){}
+}
 function pushRoomLight(L){
+  try{ L.userData._roomLight = true; }catch(e){}
   if(ROOMLIGHTS.length >= MAX_ROOM_LIGHTS){
     /* Fixture may still glow via emissive mesh; skip another point light. */
     return false;
@@ -5963,7 +5994,9 @@ function propClock(x,y,z,ry){
     roomGroup.add(g); return g;
   };
   const hour=mk(0.075,0.018,0x2a2119), min=mk(0.115,0.013,0x2a2119);
-  TICKERS.push({kind:"clock", hour, min});
+  const tk = {kind:"clock", hour, min};
+  hour.userData._ticker = tk;
+  TICKERS.push(tk);
 }
 function propFan(x,y,z){
   const g=new THREE.Group(); g.position.set(x,y,z); roomGroup.add(g);
@@ -5977,7 +6010,9 @@ function propFan(x,y,z){
     b.rotation.y = i*1.5708; b.rotation.z = 0.13;
     b.castShadow=true; g.add(b);
   }
-  TICKERS.push({kind:"fan", g});
+  const tkF = {kind:"fan", g};
+  g.userData._ticker = tkF;
+  TICKERS.push(tkF);
 }
 function propPapers(x,y,z,n){
   for(let i=0;i<(n||4);i++){
@@ -6376,11 +6411,14 @@ function kitHops(from, to){
 }
 function stashLiveRoom(){
   const id = _roomBuiltId;
-  if(!id || !_roomFurnished || !roomGroup || roomGroup.children.length < 4) return;
+  if(!id || !roomGroup || roomGroup.children.length < 4) return;
   const kit = ROOM_KITS[id] || new THREE.Group();
-  kit.userData.furnished = true;
+  /* 20261011a: a shell-only room stashes as a shell (furnish later), never left behind to double up. */
+  kit.userData.shell = true;
+  kit.userData.furnished = !!_roomFurnished;
   while(roomGroup.children.length) kit.add(roomGroup.children[0]);
   ROOM_KITS[id] = kit;
+  try{ relinkRoomRefs(); }catch(e){}
   ROOM_KIT_IDS = ROOM_KIT_IDS.filter(x => x !== id);
   ROOM_KIT_IDS.push(id);
   /* 20261005a max-fit: KEEP kit cap — MODEST 6 / else 8 (was 9). */
@@ -6457,12 +6495,7 @@ function warmAhead(){
     if(!have.userData.shell && have.children && have.children.length >= 4){
       have.userData.shell = true;
     }
-    if(have.userData.shell && have.children && have.children.length >= 8 && !have.userData.furnished){
-      /* Already looks furnished (prior stash) — mark and keep. */
-      try{
-        if(have.children.length >= 12){ have.userData.furnished = true; return; }
-      }catch(e){}
-    }
+    /* 20261011a: no child-count guess for furnished — shells alone carry 80+ children. */
   }
   /* Walking: shell-only. Standing: may furnish. Never both in one call. */
   if(moving && have && have.userData.shell) return;
@@ -6470,10 +6503,15 @@ function warmAhead(){
   const hold = roomGroup;
   const holdId = _roomBuiltId;
   const holdF = _roomFurnished;
+  const holdL = ROOMLIGHTS.slice(), holdT = TICKERS.slice();
   const t0 = performance.now();
   try{
     const kit = ROOM_KITS[dest] || new THREE.Group();
     roomGroup = kit;
+    _warmingKit = true;
+    /* the kit counts its own lamps/tickers (they are re-found on take) */
+    ROOMLIGHTS.length = 0; TICKERS.length = 0;
+    try{ kit.traverse(o => { const u = o.userData; if(u && u._roomLight && o !== kit) ROOMLIGHTS.push(o); }); }catch(e){}
     if(!kit.userData.shell){
       if(typeof frameOverBudget === "function" && frameOverBudget(6)) return;
       buildRoomShell(dest);
@@ -6492,9 +6530,12 @@ function warmAhead(){
   }catch(e){
     if(window.console) console.warn("warmAhead", dest, e);
   }finally{
+    _warmingKit = false;
     roomGroup = hold;
     _roomBuiltId = holdId;
     _roomFurnished = holdF;
+    ROOMLIGHTS.length = 0; for(let i=0;i<holdL.length;i++) ROOMLIGHTS.push(holdL[i]);
+    TICKERS.length = 0; for(let i=0;i<holdT.length;i++) TICKERS.push(holdT[i]);
     _warmBusy = false;
     const took = performance.now() - t0;
     try{ G._frameSpent = (G._frameSpent || 0) + took; }catch(e){}
@@ -6507,10 +6548,10 @@ function takeRoomKit(id){
   if(!kit.userData.furnished && !kit.userData.shell) return false;
   /* Heal flags from a prior warmAhead / stash. */
   if(!kit.userData.shell && kit.children.length >= 4) kit.userData.shell = true;
-  if(!kit.userData.furnished && kit.children.length >= 12) kit.userData.furnished = true;
   while(kit.children.length) roomGroup.add(kit.children[0]);
   _roomBuiltId = id;
   _roomFurnished = !!kit.userData.furnished;
+  try{ relinkRoomRefs(); }catch(e){}
   try{ buildSky(ROOMS[id]); }catch(e){}
   /* Reparent undoes matrixAutoUpdate freezes — restore after furnish kits. Sleep never rebuilds. */
   if(_roomFurnished){
@@ -14813,7 +14854,9 @@ function stakeIn(m, b){
   if(m.rival === b.sponsorId){ lvl -= 2; why.push("It belongs to the one person they cannot stand"); }
   if(m.goal.k === "home" && lvl > 0){ lvl += 1; why.push("It is the thing they could take home"); }
   if(m.fear.k === "town" && b.domain === m.need){ lvl += 2; why.push("It is the thing they are afraid of losing"); }
-  const align = alignment(m, b);
+  /* 20261011a: raw ideology only. alignment() -> stakeSway -> stakeIn -> alignment()
+     recursed to the stack limit and then fanned out through tiePull: the corridor freeze. */
+  const align = alignmentRaw(m, b);
   if(align < -30 && lvl > 0){ lvl -= 1; why.push("though it cuts against everything else they believe"); }
   return {level:clamp(lvl, -3, 6), why:why.join(". ") + (why.length ? "." : "")};
 }
@@ -24292,8 +24335,13 @@ function frameBody(now, draw){
     try{
       const live = !!(G.you && G.members && G.members.length);
       const boot = document.body.classList.contains("boot-menu");
-      const acts = card && card.querySelector(".card__actions button:not([disabled])");
-      if(live && !boot && !acts){
+      /* 20261011a: any live control counts (ballot/office picks are .conc__btn), and a
+         card with none gets 2.5s grace (Sleeping... / Loading...) before the unstick. */
+      const acts = card && card.querySelector("button:not([disabled]), input:not([disabled]), select, textarea");
+      if(acts || !live || boot){ G._cardDeadSince = 0; }
+      else if(!G._cardDeadSince){ G._cardDeadSince = now; }
+      if(live && !boot && !acts && (now - (G._cardDeadSince || now)) > 2500){
+        G._cardDeadSince = 0;
         softUnstickVeil();
       } else {
         /* MAX OPT 20260921: card-up — feed/scroll every other; 3D every 6th. */
@@ -24503,8 +24551,32 @@ function peekSave(){
 }
 function bootFreshCareer(){
   if(G._booting) return;
+  /* 20261011a: a stray Enter on the title must not erase a long career. Ask first;
+     the old save is only wiped when the new oath is actually taken (startRun). */
+  let pk = null; try{ pk = peekSave(); }catch(e){}
+  if(pk && !G._freshOk){
+    try{
+      veil.hidden = false;
+      card.classList.add("card--open");
+      document.body.classList.add("boot-menu");
+      card.innerHTML =
+        '<div class="eyebrow">New career</div>' +
+        '<h1>Start over?</h1>' +
+        '<p>Your career' + (pk.name ? ' as <strong>' + pk.name + '</strong>' : '') + ' is on day <strong>' + (pk.day || 1) +
+          '</strong>. Taking a new oath replaces it. Until you take the oath, nothing is erased.</p>' +
+        '<div class="card__actions">' +
+          '<button class="btn" type="button" id="freshBack" data-gp="boot:back">Back</button>' +
+          '<button class="btn btn--ghost" type="button" id="freshYes">Yes, a new career</button></div>';
+      const by = el("freshYes"), bb = el("freshBack");
+      if(by) by.onclick = (ev) => { try{ ev.preventDefault(); ev.stopPropagation(); }catch(e){} G._freshOk = true; bootFreshCareer(); };
+      if(bb) bb.onclick = (ev) => { try{ ev.preventDefault(); ev.stopPropagation(); }catch(e){} G._freshOk = false; opening(); };
+      try{ markPicks(); }catch(e){}
+      return;
+    }catch(e){}
+  }
+  G._freshOk = false;
   G._booting = true;
-  try{ wipeCareerSaves(); }catch(e){} try{ localStorage.removeItem(SAVE_KEY); }catch(e){}
+  G._wipeOnOath = true;
   try{ G.you = null; G.members = []; G.make = null; G.running = false; }catch(e){}
   try{ card.classList.remove("card--open"); }catch(e){}
   try{ veil.classList.remove("veil--make"); }catch(e){}
@@ -25172,6 +25244,10 @@ function sortedCard(){
 }
 function startRun(){
   const r = G.make.sorted || {pos:{econ:0,lib:0,def:0,wel:0}, loyal:0};
+  if(G._wipeOnOath){
+    G._wipeOnOath = false;
+    try{ wipeCareerSaves(); }catch(e){} try{ localStorage.removeItem(SAVE_KEY); }catch(e){}
+  }
   if(mkMesh){ scene.remove(mkMesh); mkMesh = null; }
   mkLights(false);
   veil.classList.remove("veil--make");
