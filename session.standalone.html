@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261011c">
+<meta name="onum-build" content="20261011d">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261011c";
+  var STAMP = "20261011d";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -3488,7 +3488,10 @@ const renderer = new THREE.WebGLRenderer({
   failIfMajorPerformanceCaveat: false
 });
 renderer.setPixelRatio(Math.min(devicePixelRatio || 1, MODEST ? 0.58 : 0.92));
-try{ renderer.info.autoReset = false; }catch(e){}
+/* 20261011d: autoReset must stay on. render.frame only advances on reset, and
+   three gates SkinnedMesh skeleton.update() on it — with it off every skin
+   froze where its person was first drawn (bodies left behind, suits in pieces). */
+try{ renderer.info.autoReset = true; }catch(e){}
 renderer.outputEncoding = THREE.sRGBEncoding;
 try{ renderer.physicallyCorrectLights = false; }catch(e){}
 try{ if(renderer.shadowMap) renderer.shadowMap.autoUpdate = false; }catch(e){}
@@ -8540,6 +8543,7 @@ function wrapPi(a){
 }
 function animatePerson(p, dt){
   if(!p.mesh || p.mesh.parent !== peopleGroup) return;
+  if(p.mesh.userData && p.mesh.userData._crowdFrozen) crowdThawMesh(p.mesh);
   const u = p.mesh.userData || {};
   const dx = (p.tx||p.x) - p.x, dz = (p.tz||p.z) - p.z;
   const moving = Math.hypot(dx,dz) > 0.25;
@@ -8625,6 +8629,7 @@ function animatePerson(p, dt){
   /* Sitting: the hips come down onto the seat, the thighs go level and
      the shins hang straight to the floor. Nobody walks sitting down. */
   if(p.sitting && !G.noSit && !G.plainSit){
+    u._sat = true;
     sessionIdle(p, dt);
     /* Relative to where this person's hips actually are when standing,
        never an absolute height — and a modest fold rather than a right
@@ -8663,6 +8668,13 @@ function animatePerson(p, dt){
     u.headG.rotation.x = headX;
     u.headG.rotation.z = headY * 0.10;
     return;
+  }
+  if(u._sat){
+    u._sat = false;
+    u.legL.up.rotation.z = 0; u.legR.up.rotation.z = 0;
+    if(u.armR && u.armR.up) u.armR.up.rotation.y = 0;
+    if(u.armL && u.armL.up) u.armL.up.rotation.y = 0;
+    u.headG.rotation.z = 0;
   }
   u.spine.rotation.z = 0;
   /* gait: thigh swings, knee only bends backward, ankle rolls through */
@@ -9843,15 +9855,35 @@ function tickWanderBatch(w){
   for(let i=0;i<n;i++){
     const m = list[i];
     const moving = Math.hypot((m.tx||0)-(m.x||0), (m.tz||0)-(m.z||0)) > 0.25;
-    if(moving || ((i + phase) % stride === 0)){
-      wander(m, moving || stride === 1 ? w : w * stride);
-      if((i + phase) % stride === 0){ maybeApproach(m); try{ sentWatch(m, w); }catch(e){} }
-    }
+    /* feet run every frame (wanderFrame); this lane is only for minds */
+    if((i + phase) % stride === 0){ maybeApproach(m); try{ sentWatch(m, w); }catch(e){} }
   }
+}
+function breakSeat(m){
+  try{
+    const seats = seatsFor(m.room) || [];
+    if(!seats.length) return null;
+    const here = hereNow();
+    let best = null, bd = 1e9;
+    for(const s of seats){
+      if(here.some(o => o !== m && (o._breakSeat === s || (o.sitting && Math.abs(o.x - s.x) < 0.3 && Math.abs(o.z - s.z) < 0.3)))) continue;
+      const d = Math.hypot(s.x - m.x, s.z - m.z);
+      if(d < bd){ bd = d; best = s; }
+    }
+    return bd < 7 ? best : null;
+  }catch(e){ return null; }
 }
 function wander(m, dt){
   if(m.sayT > 0) m.sayT -= dt;
   if(m.room !== G.room) return;
+  /* a seat taken for a break is given back when the break is over */
+  if(m.sitting && m._breakSeat && !PROC.on){
+    let still = false; try{ still = onBreak(m); }catch(e){}
+    if(!still){ m.sitting = false; m._breakSeat = null; m.sitY = 0; m.seatFace = undefined; m.wait = 0.5 + Math.random()*2; }
+    else return;
+  }
+  /* sitting with no seat under you is not sitting */
+  if(m.sitting && !PROC.on && m.seatFace === undefined && !m._breakSeat){ m.sitting = false; m.sitY = 0; }
   if(m.sitting) return;             /* they are in a seat and staying in it */
   if(m.backStand){ m.tx = m.x; m.tz = m.z; return; } /* fixed gallery / back stand */
   if(PROC.on && SEATED_ROOMS[m.room]){
@@ -9869,9 +9901,20 @@ function wander(m, dt){
     if(m.wait <= 0){
       try{
         if(onBreak(m)){
-          m.tx = m.x; m.tz = m.z;
           m.wait = 3 + Math.random()*4;
-          if(!m.sitting && Math.random() < 0.4) m.sitting = true;
+          if(m._goSeat){
+            const s = m._goSeat; m._goSeat = null;
+            if(Math.hypot(s.x - m.x, s.z - m.z) < 0.35 && !G.plainSit && !G.noSit){
+              m.x = m.tx = s.x; m.z = m.tz = s.z; m.seatFace = s.face; m.sitY = s.y || 0;
+              m.sitting = true; m._breakSeat = s;
+              return;
+            }
+          }
+          if(!m.sitting && !G.plainSit && !G.noSit && Math.random() < 0.4){
+            const s = breakSeat(m);
+            if(s){ m._goSeat = s; m.tx = s.x; m.tz = s.z; m.wait = 0; return; }
+          }
+          m.tx = m.x; m.tz = m.z;
           return;
         }
       }catch(e){}
@@ -23963,8 +24006,19 @@ function tick(dt){
     procTick(dt);
     return;
   }
-  /* Lives are not the frame. The House thinks on its own clock. */
+  /* Lives are not the frame. The House thinks on its own clock.
+     20261011d: but feet are. Walking is cheap arithmetic and runs every sim step. */
+  try{ wanderFrame(dt); }catch(e){}
   procTick(dt);
+}
+function wanderFrame(dt){
+  if(!G.running || G.pendingNight) return;
+  const list = hereNow();
+  for(let i = 0; i < list.length; i++){
+    const m = list[i];
+    if(!m || m.gone) continue;
+    try{ wander(m, dt); }catch(e){}
+  }
 }
 function drainHouseOne(w, dt){
   /* One House mind per premise beat. Not the frame.
@@ -24259,12 +24313,21 @@ function crowdFreezeMesh(mesh){
      paying updateMatrix every frame (suits/faces/hair). Full meshes kept. */
   if(!mesh) return;
   try{
-    if(mesh.userData && mesh.userData._crowdFrozen) return;
-    mesh.traverse(o => { o.matrixAutoUpdate = false; });
-    mesh.updateMatrix();
-    mesh.updateMatrixWorld(true);
     if(!mesh.userData) mesh.userData = {};
-    mesh.userData._crowdFrozen = true;
+    const ud = mesh.userData;
+    if(ud._crowdFrozen){
+      /* already frozen: if the root moved, carry the whole body with it */
+      if(ud._fzX !== mesh.position.x || ud._fzZ !== mesh.position.z || ud._fzY !== mesh.position.y || ud._fzR !== mesh.rotation.y){
+        mesh.updateMatrix(); mesh.updateMatrixWorld(true);
+        ud._fzX = mesh.position.x; ud._fzZ = mesh.position.z; ud._fzY = mesh.position.y; ud._fzR = mesh.rotation.y;
+      }
+      return;
+    }
+    /* bake every local matrix from the current pose first, then stop the per-frame walk */
+    mesh.traverse(o => { o.updateMatrix(); o.matrixAutoUpdate = false; });
+    mesh.updateMatrixWorld(true);
+    ud._fzX = mesh.position.x; ud._fzZ = mesh.position.z; ud._fzY = mesh.position.y; ud._fzR = mesh.rotation.y;
+    ud._crowdFrozen = true;
   }catch(e){}
 }
 function crowdThawMesh(mesh){
@@ -24272,6 +24335,7 @@ function crowdThawMesh(mesh){
   try{
     mesh.userData._crowdFrozen = false;
     mesh.traverse(o => { o.matrixAutoUpdate = true; });
+    mesh.updateMatrixWorld(true);
   }catch(e){}
 }
 function animateCrowd(dt){
@@ -24279,7 +24343,10 @@ function animateCrowd(dt){
   const talk = (TALK.open && TALK.m) || null;
   const sy = Math.sin(cam.yaw), cy = Math.cos(cam.yaw);
   let full = 0;
-  const maxFull = MODEST ? 1 : 2;
+  /* 20261011d: everyone in view is posed on a fair rotation with their own
+     elapsed time — the old "first two in the list" left the rest in stale poses */
+  const maxFull = MODEST ? 4 : 9;
+  const rr = (animateCrowd._rr = ((animateCrowd._rr || 0) + 1) % 1024);
   const playerMoving = Math.hypot(cam.vx || 0, cam.vz || 0) > 0.12;
   for(let i=0;i<crowd.length;i++){
     const p = crowd[i];
@@ -24311,7 +24378,7 @@ function animateCrowd(dt){
        no per-frame updateMatrix; near keep soft follow + pose-only. Full meshes kept. */
     if(playerMoving && !talking && d2 > 12){
       const frozen = !!(p.mesh.userData && p.mesh.userData._crowdFrozen);
-      const moved = !frozen || mx.x !== p.x || mx.z !== p.z || mx.y !== gy;
+      const moved = !frozen || ((FRAME_ID + i) & 3) === 0 && (mx.x !== p.x || mx.z !== p.z || mx.y !== gy);
       if(moved){
         mx.x = p.x; mx.z = p.z; mx.y = gy;
         p.mesh.rotation.y = p.facing || 0;
@@ -24325,15 +24392,21 @@ function animateCrowd(dt){
     mx.x += (p.x - mx.x) * 0.35;
     mx.z += (p.z - mx.z) * 0.35;
     mx.y = gy;
-    /* While walking: pose only — animatePerson skinned work hitches Best with a room of people. */
+    p._adt = Math.min(0.25, (p._adt || 0) + dt);
+    const pm = Math.hypot((p.tx || p.x) - p.x, (p.tz || p.z) - p.z) > 0.25;
+    /* While walking: the near ones who are themselves walking keep their gait; the rest pose-only */
     if(playerMoving && !talking){
+      if(pm && fwd > 0 && full < 3){ animatePerson(p, p._adt); p._adt = 0; full++; continue; }
+      if(pm){ p.facing += clamp(wrapPi(Math.atan2(p.tx - p.x, p.tz - p.z) - (p.facing || 0)), -2.6*dt, 2.6*dt); }
       p.mesh.rotation.y = p.facing || 0;
       continue;
     }
-    if(talking || full < maxFull){
-      animatePerson(p, dt);
+    const near = d2 < 20 && fwd > -0.5;
+    if(talking || near || pm || ((i + rr) % 2 === 0 && full < maxFull)){
+      animatePerson(p, p._adt); p._adt = 0;
       full++;
     } else {
+      if(pm){ p.facing += clamp(wrapPi(Math.atan2(p.tx - p.x, p.tz - p.z) - (p.facing || 0)), -2.6*dt, 2.6*dt); }
       p.mesh.rotation.y = p.facing || 0;
     }
   }
