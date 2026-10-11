@@ -17,16 +17,17 @@ One HTML body. Keep these **byte-identical**:
 | `session.html` | repo root |
 | `One Nation, Under, ME.html` | standalone name |
 
-**Build stamp (now): `20261011c`**
+**Build stamp (now): `20261011d`**
 
-- `<meta name="onum-build" content="20261011c">`
-- IIFE `STAMP = "20261011c"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
-- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261011c"`
+- `<meta name="onum-build" content="20261011d">`
+- IIFE `STAMP = "20261011d"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
+- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261011d"`
 - Wrapper iframe: `/session.html?v=${ONUM_BUILD}` in `src/routes/index.tsx`
 - **`20261005a`:** weekly MAX OPTIMIZE + design/max-fit. Keeps `20261001a` far-crowd freeze / kit reuse / 6ms bail and `20261001b` hard maps. Best uses `BasicShadowMap` (one sample). Deep crowd freeze (culled+far traverse `matrixAutoUpdate`). Shell fills big desks (`max-width:min(2560px,100%)`). Kit cap KEEP 6/8. Caesar/parting polish. Walk **0.68** / sprint **1.15**. Full meshes near.
 - **`20261011a`:** playable fixes. Corridor freeze (alignment/stakeIn infinite recursion) fixed; elections run again (card watchdog no longer kills the ballot); warmAhead actually runs (`let roomGroup`, kit lamp/ticker relink, no sky touch, explicit furnished flag); New career confirms before replacing a career and wipes only at the oath. Walk 0.68 / sprint 1.15 kept.
 - **`20261011b`:** feel. Real pause menu (Esc; Game/Graphics/Voices/Controls tabs; pace, save, quality, voices, look speed, invert Y, rebind); objective route on the NOW line and a goal marker on the compass; key hints for the first 45s; 10pm Continue soft-lock fixed. Walk 0.68 / sprint 1.15 kept.
 - **`20261011c`:** gameplay loop. Three daily aims (talk, pledge or roll call, a place or the inbox) on the morning card, NOW line, pause menu and night card, with small rewards; the route and compass follow the next aim. Controller: radial deadzone, look curve, Start opens the pause menu and the pad drives it. Walk 0.68 / sprint 1.15 kept.
+- **`20261011d`:** people. GPU skins follow their bones again (`renderer.info.autoReset` back on; skeleton.update was gated on a frame counter that never advanced, which left bodies behind and suits in pieces); people walk (feet every sim step), everyone in view is posed, nobody sits on air, crowd freeze keeps matrices true. Walk 0.68 / sprint 1.15 kept.
 
 If you change the HTML, bump the letter (`20260921e`, …) in **meta + STAMP + ONUM_BUILD together**, copy the body to all four filenames, commit, push `main`.
 

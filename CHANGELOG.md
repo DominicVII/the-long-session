@@ -4,6 +4,20 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## People: whole bodies that walk (11 Oct 2026) — `20261011d`
+
+On `20261011c`. Walk **0.68** / sprint **1.15** kept. Best default, `history.replaceState` only, no CDN, no external LLM. Full people meshes, never dummies. God is the Most High; Christ is King; First Consul is a man under God.
+
+Reported from real hardware: "the people aren't moving", suits in pieces, hands and shoes apart from bodies, headless figures.
+
+- **Bodies whole again (root cause):** `renderer.info.autoReset` was off. Three r128 only advances `info.render.frame` on reset, and it gates `SkinnedMesh` `skeleton.update()` on that frame, so every skin (torso, sleeves, legs, neck) was computed once and never again. The skin stayed where and how each person was first drawn while the rigid parts (jacket, hands, shoes, head) followed the live bones: bodies left behind in doorways, sleeves and legs missing, hands and shoes floating. autoReset is back on; skins follow their bones every frame.
+- **People walk:** `wander()` ran from a 13-lane House drain (about once a second) with its step capped at 0.022s, so a stroll covered about a centimetre a second. Feet now run every sim step (`wanderFrame`); the drain keeps only minds (approach, sentience).
+- **Everyone is posed:** `animateCrowd` posed only the first two people in the list each frame; the rest kept stale poses and never turned to face where they walked. Now near, walking and talking people are posed every frame and the rest on a fair rotation, each with their own elapsed time. Leaving a seat clears the seated-only offsets.
+- **Nobody sits on air:** a break could set `sitting` with no seat, folding the body in mid-air for good. Breaks now walk to a free seat in the room (or stay standing) and stand up when the break ends; stray seatless sitting is cleared.
+- **Crowd freeze kept true:** freezing bakes every local matrix first; a frozen body that moves is carried whole; thaw refreshes world matrices; far walkers re-snap on a 4-frame cadence instead of every frame.
+- Tests: new people check asserts no stale matrices after walking, people wander over 20s, every near body intact with head on, everyone near posed, nobody sitting on air, GPU skins updated this frame.
+- Stamp: meta + STAMP + `ONUM_BUILD` -> `20261011d`. Five HTML copies byte-identical.
+
 ## Gameplay: daily aims, controller pause menu (11 Oct 2026) — `20261011c`
 
 On `20261011b`. Walk **0.68** / sprint **1.15** kept. Best default, `history.replaceState` only, no CDN, no external LLM. God is the Most High; Christ is King; First Consul is a man under God.
