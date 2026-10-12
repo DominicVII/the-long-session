@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261011j">
+<meta name="onum-build" content="20261011k">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261011j";
+  var STAMP = "20261011k";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -1776,9 +1776,13 @@ const ROOMS = {
   press:    {t:"Press Gallery",       tag:"Third floor",       w:8,  d:10, h:3.2, travel:13, style:"plain",  light:"back"},
   steps:    {t:"East Steps",          tag:"Outside",           w:20, d:14, h:9.0, travel:15, style:"stone",  open:true, light:"sky"},
   district: {t:"The District",        tag:"Home",              w:16, d:15, h:7.0, travel:150,style:"town",   open:true, light:"sky"},
-  visit:    {t:"Member's Office",     tag:"Cannon Building",   w:8,  d:9,  h:3.3, travel:14, style:"wood",   light:"left"}
+  visit:    {t:"Member's Office",     tag:"Cannon Building",   w:8,  d:9,  h:3.3, travel:14, style:"wood",   light:"left"},
+  senate:   {t:"The Senate Chamber",  tag:"North wing",        w:14, d:13, h:5.8, travel:10, style:"chamber",light:"high"},
+  court:    {t:"The Court",           tag:"Old Senate wing",   w:12, d:12, h:5.2, travel:12, style:"marble", light:"high"},
+  exec:     {t:"The Executive Wing",  tag:"South wing",        w:11, d:12, h:3.6, travel:14, style:"wood",   light:"left"},
+  govoffice:{t:"The State House",     tag:"Governor's office", w:10, d:11, h:3.6, travel:150,style:"wood",   light:"right"}
 };
-const ROOM_ORDER = ["office","corridor","cloak","caucus","committee","floor","press","steps","district"];
+const ROOM_ORDER = ["office","corridor","cloak","caucus","committee","floor","press","senate","court","exec","steps","district","govoffice"];
 
 /* ── The building is joined up: doors you walk through ─────
    side is which wall, at is 0..1 along it. ── */
@@ -1790,6 +1794,8 @@ const DOORS = {
              {to:"caucus",    side:"left",  at:0.72},
              {to:"committee", side:"right", at:0.26},
              {to:"press",     side:"right", at:0.58},
+             {to:"senate",    side:"right", at:0.85},
+             {to:"exec",      side:"left",  at:0.92},
              {to:"floor",     side:"back",  at:0.5},
              {to:"steps",     side:"front", at:0.5}],
   cloak:    [{to:"corridor", side:"front", at:0.5}, {to:"floor", side:"back", at:0.5}],
@@ -1798,7 +1804,11 @@ const DOORS = {
   press:    [{to:"corridor", side:"front", at:0.5}],
   floor:    [{to:"corridor", side:"front", at:0.5}, {to:"cloak", side:"left", at:0.18}],
   steps:    [{to:"corridor", side:"back",  at:0.5}, {to:"district", side:"front", at:0.5}],
-  district: [{to:"steps",    side:"back",  at:0.5}]
+  district: [{to:"steps",    side:"back",  at:0.5}, {to:"govoffice", side:"front", at:0.82}],
+  senate:   [{to:"corridor", side:"front", at:0.5}, {to:"court", side:"left", at:0.5}],
+  court:    [{to:"senate",   side:"front", at:0.5}],
+  exec:     [{to:"corridor", side:"front", at:0.5}],
+  govoffice:[{to:"district", side:"front", at:0.5}]
 };
 function doorAt(roomId, dr){
   const R = ROOMS[roomId], hw = R.w/2;
@@ -3114,6 +3124,7 @@ function routineRoom(m, hour, t){
     if(typeof isTaylorDay === "function" && isTaylorDay()) return chance(.72) ? "corridor" : "cloak";
     if(hour === 7 || hour === 12 || hour === 18) return chance(.78) ? "corridor" : "cloak";
   }
+  if(m.kind === "civ" && m.chamber && ROOMS[m.chamber]) return m.chamber;
   if(m.kind === "civ") return (t === "session") ? "steps" : "district";
   if(m.kind === "press"){
     if(hour < 10) return chance(.5) ? "corridor" : "press";
@@ -7550,6 +7561,7 @@ function buildRoomInner(id, skipShell){
     }catch(e){ if(window.console) console.warn("room district", e); }
   }
 
+  try{ buildHigherRoom(id, {woodMat, leather}); }catch(e){ if(window.console) console.warn("higher room", id, e); }
   /* Ornate corner pass — every room, every corner (after room-specific dress) */
   try{ dressOrnateCorners(id); }catch(e){ if(window.console) console.warn("dressOrnate", e); }
 
@@ -7621,7 +7633,7 @@ function buildRoomInner(id, skipShell){
     addBox(matTex(TEX.panel, 1, 2, .5), -dw/2 - 0.08, deckY + dh * 0.5, facadeZ - 0.48, 0.14, dh + 0.12, 0.16, 0, true);
     addBox(matTex(TEX.panel, 1, 2, .5),  dw/2 + 0.08, deckY + dh * 0.5, facadeZ - 0.48, 0.14, dh + 0.12, 0.16, 0, true);
     addBox(matTex(TEX.panel, 1, 2, .5), 0, deckY + dh + 0.10, facadeZ - 0.48, dw + 0.36, 0.16, 0.16, 0, true);
-    try{ propPlaque(0, deckY + dh + 0.32, facadeZ - 0.78, Math.PI, "Statuary Corridor", "The Capitol", 1.18, 0.26); }catch(e){}
+    try{ propPlaque(0, deckY + dh + 0.32, facadeZ - 0.437, Math.PI, "Statuary Corridor", "The Capitol", 1.18, 0.26); }catch(e){}
     addBox(matCol(0x14171c,.95), 0, 1.15, 0.05, 1.42, 2.30, 0.06, 0, true);
     addBox(matTex(TEX.panel, 1, 2, .5), -0.80, 1.15, 0.08, 0.14, 2.30, 0.12, 0, true);
     addBox(matTex(TEX.panel, 1, 2, .5),  0.80, 1.15, 0.08, 0.14, 2.30, 0.12, 0, true);
@@ -11438,6 +11450,9 @@ function realmGhostTick(g, realm){
 }
 function realmCable(realm, ghost){
   if(!realm) return;
+  const _ct = (G.day || 0) * 1440 + (G.minute || 0);
+  if(realm._cableT && _ct - realm._cableT < 360) return;
+  realm._cableT = _ct;
   const who = ghost || pick(realm.chamber);
   const line = (who && who.sent && who.sent.now) || originateLine(who || {sent:{iName:"I", topic:"home"}, state: realm.capital});
   const body = "From " + realm.capital + ", " + hhmm() + " their clock.\n\n" +
@@ -11479,7 +11494,10 @@ function realmTick(news){
       const g = realm.chamber[(FRAME_ID + i) % realm.chamber.length];
       realmGhostTick(g, realm);
     }
-    if(Math.random() < 0.11) realmCable(realm, pick(realm.chamber));
+    const _tk = (G.day || 0) * 200 + Math.floor((G.minute || 0) / 12);
+    if(realm._evTk === _tk) return;
+    realm._evTk = _tk;
+    if(Math.random() < 0.06) realmCable(realm, pick(realm.chamber));
     if(realm.envoyId){
       const here = byId(realm.envoyId);
       if(!here || here.gone) realm.envoyId = null;
@@ -18580,7 +18598,7 @@ function convHook(m){
   if(ally) pool.push(surname(ally.name) + " and I have been trying to get five minutes with the same person all week.");
   if(m.post) pool.push("Everyone thinks the " + postTitle(m.post).toLowerCase() + " has time. Nobody has ever had less.");
   if(m.kind === "press") pool.push("I have a column due at six and nothing in it worth printing.");
-  if(m.kind === "civ") pool.push("I have been standing out here about " + m.cause + " for two hours.");
+  if(m.kind === "civ" && !m.chamber) pool.push("I have been standing out here about " + m.cause + " for two hours.");
   return pick(pool);
 }
 /* how they are carrying themselves while they say it */
@@ -18626,7 +18644,7 @@ function threadsFor(m){
          reply:"Fine. I am hearing the count is softer than the whips are saying. Now give me my line.", w:2, trust:2, learn:true, mem:"You made me pay for it. I respect that and I resent it.", mw:2}
       ]});
   }
-  if(m.kind === "civ"){
+  if(m.kind === "civ" && !m.chamber){
     out.push({id:"cause", line:() => "I have taken a day off work to stand in this building about " + m.cause + ". Are you going to look at it or not?",
       asks:[
         {t:"Promise to look at it", tone:"open", say:"Send it to my office and I will read it myself.",
@@ -20708,6 +20726,7 @@ function pressActions(p){
 }
 
 function civActions(c){
+  if(c && c.chamber) return kChamberActs(c);
   const you = G.you;
   const A = [
     {t:"Hear them out", c:"30m", run(){
@@ -21561,7 +21580,7 @@ function mapCard(){
   };
 }
 function outsideAllowed(id){
-  return !G.you.out || id === "steps" || id === "district" || id === "corridor" || id === "press";
+  return !G.you.out || id === "steps" || id === "district" || id === "corridor" || id === "press" || id === "govoffice";
 }
 function careerEnd(){
   /* The long session: the record is shown, the world is not deleted. */
@@ -21621,6 +21640,10 @@ function activeJob(){
       return "Whip: find " + surname(wt.name) + " in " + whipRoomName(wt) + ".";
     }
   }catch(e){}
+  try{
+    const kr = kChamberDue();
+    if(kr) return G.room === kr ? K_HERE_LINE[kr] : "Your chair: " + ROOMS[kr].t + " is waiting on you today.";
+  }catch(e){}
   if(b && !b.done && G.room !== "floor" && floorSitsNow())
     return "The floor is sitting. Go in.";
   const unread = (G.mail || []).filter(m => !m.read).length;
@@ -21649,6 +21672,7 @@ function objectiveRoom(){
   if(b && !b.done && b.voteDay === G.day) return "floor";
   if(G.you.energy < 18 || m >= 21*60) return "office";
   try{ const wt = whipTarget(); if(wt && ROOMS[wt.room]) return wt.room; }catch(e){}
+  try{ const kr = kChamberDue(); if(kr) return kr; }catch(e){}
   if(b && !b.done && floorSitsNow()) return "floor";
   const unread = (G.mail || []).filter(x => !x.read).length;
   if(unread) return "office";
@@ -22450,7 +22474,7 @@ function lifeMailCheck(){
    every line before anyone hears it. */
 const DTCNO = (function(){
   const LEX = {"n:bills:z":"bill|markup|amendment|rider|section|clause|title|subsection|appropriation|authorization|conference report|substitute|motion|calendar|docket|second reading|third reading|engrossment|enrolled copy|committee print|manager's amendment|floor schedule|rule|whip notice|cosponsor list|summary|fiscal note|score|sunset clause|preamble|schedule|reading|draft|redline|markup sheet|vote count|tally|roll call|voice vote|quorum call|recorded vote|motion to recommit|cloture petition|discharge petition|point of order|unanimous consent|time agreement|floor manager|ranking member|chairman's mark|base text|enacting clause|savings clause|severability clause|effective date|definitions section|reporting requirement|waiver|carve-out|offset|pay-for|earmark|set-aside|line item|authorizing language|report language|joint explanatory statement|holdover|placeholder","n:immigration:z":"border|visa|work permit|quota|asylum claim|green card|naturalization|citizenship oath|port of entry|crossing|caseload|backlog|detention center|processing center|sponsor family|guest worker|seasonal permit|harvest visa|dock pass|refugee ward|newcomer ward|interpreter|consulate|hearing officer|deportation order|stay of removal|amnesty|registry date|waiting line|lottery|labour shortage|chain of family|border county|checkpoint|patrol|manifest|landing card|settlement grant|language class|naturalization class|night school|resettlement office","n:foreign:z":"embassy|envoy|treaty|tariff|aid package|loan guarantee|arms sale|trade mission|consul general|realm|accord|protocol|communiqué|summit|delegation|sanction|embargo|grain shipment|naval visit|basing agreement|credit line|relief convoy|attaché|state visit|exchange rate|foreign desk|cable|démarche|frontier|neutral port|ally|rival power|mission|legation|shipping lane|customs union|aid tranche|reconstruction fund|joint commission|observer team","n:statefed:z":"governor|state house|mandate|unfunded mandate|preemption|block grant|waiver|compact|state attorney general|lawsuit|injunction|circuit court|supreme bench|tenth article|reserved power|commerce clause|federal marshal|national guard|state police|statehouse|legislature|capitol dome|federal office|regional office|matching fund|formula grant|cost share|state budget|revenue share|county line|home rule|charter|county board|township|special session|veto override|state constitution|federal standard|federal floor|state ceiling","n:faith:z":"parish|pew|altar|Mass|vespers|rosary|catechism|sacrament|confession|chaplain|priest|deacon|congregation|vestry|bell|steeple|hymnal|missal|feast day|fast|Lent|Advent|vigil|procession|baptism|wedding|funeral|grace|prayer|psalm|sermon|homily|blessing|candle|shrine|chapel|cathedral|parish hall|bake sale|choir|sexton|rectory|crucifix|font|benediction|novena|Sunday|Easter|Christmas|All Souls","n:district:z":"district|town|county|main street|grain elevator|mill|union hall|fire hall|diner|feed store|church hall|high school|bus depot|clinic|post office|rail yard|harbour|dock|creek|bridge|road|state road|county fair|farmers market|library|courthouse|town hall|bar|lodge|bowling alley|pharmacy|hardware store|cannery|foundry|quarry|water tower|ferry|levee|orchard|pasture|ranch|feedlot|silo|co-op|credit union|pawn shop|laundromat|barbershop","n:family:z":"wife|husband|daughter|son|mother|father|sister|brother|grandmother|grandfather|aunt|uncle|cousin|niece|nephew|in-laws|kids|grandkids|godson|goddaughter|family|kitchen table|front porch|birthday|anniversary|christening|graduation|recital|ballgame|school play|dog|old house|spare room|family dinner|phone call home|letter home","n:money:z":"war chest|fundraiser|donor|bundler|check|pledge|dinner|reception|ledger|treasury|budget|deficit|surplus|bond|interest rate|tax|levy|tariff|subsidy|rebate|credit|loan|grant|payroll|pension|wage|price|bread price|rent|mortgage|savings|margin|quarterly report|filing|disclosure|PAC|ad buy|airtime|mailer|yard sign|field office|phone bank","n:weather:z":"rain|fog|frost|snow|sleet|heat|humidity|wind|storm|thunder|drizzle|sun|cloud cover|cold snap|heat wave|flood|drought|mud|ice|dew|haze|gale|cold front|spring|autumn|winter|summer|harvest weather|river level|forecast","n:gossip:z":"rumour|whisper|cloakroom|corridor|dinner party|leak|memo|aide|staffer|chief of staff|press secretary|reporter|columnist|blind item|photograph|seating chart|grudge|favour|IOU|debt|alliance|feud|deal|handshake|side door|back stairs|elevator|coat check|bar tab|guest list","n:anomaly:z":"corridor|clock|door|stair|echo|mirror|window|light|shadow|hour|minute|dream|name|ledger|portrait|bronze|plaque|silence|draft|hallway|footstep|reflection|lamp|bell|calendar|page|register|roll","n:house:z":"House|chamber|floor|gallery|well|rostrum|dais|gavel|Speaker|Clerk|parliamentarian|whip|caucus|conference|committee|subcommittee|hearing|witness|testimony|record|journal|session|recess|adjournment|majority|minority|leadership|back bench|front bench|seat|desk|vote|motion|order|precedent|rulebook|seniority|term|oath","n:you:z":"speech|vote|bill|office|desk|staff|district|name|record|word|promise|handshake|question|answer|reputation|manner|timing|nerve|patience","a:any:p":"decent|sensible|sound|fair|honest|careful|steady|patient|serious|useful|clean|plain|sober|workable|modest|generous|brave|good|solid|reasonable|level|clear|quiet|well-drafted|well-meant|square|straight|honourable|thoughtful|prudent|measured|humane|frugal|tidy|durable|elegant|shrewd|canny|neat|kind|warm|bright|sharp|wise|fresh|sturdy|loyal|faithful|reliable|capable|able|nimble|quick|deft|gracious|gentle|cordial|civil|courteous|candid|earnest|diligent|dutiful|industrious|thrifty|resourceful|resilient|stalwart|upright|principled|scrupulous|conscientious|judicious|temperate|even-handed|open-handed|big-hearted|sure-footed|clear-eyed|level-headed|hard-working|plain-spoken|well-read|well-liked|well-placed|well-timed|well-argued|well-sourced|cheerful|hopeful|lucky|blessed|grateful|content|calm|cool|composed|unflappable|unhurried","a:any:n":"reckless|cynical|sloppy|lazy|cheap|crooked|loud|hollow|vain|clumsy|tired|bloated|brittle|half-baked|ill-timed|cowardly|venal|petty|mean|ugly|vague|slippery|dishonest|tone-deaf|wasteful|careless|grubby|threadbare|vindictive|self-serving|muddled|toothless|overcooked|underfunded|unreadable|unworkable|ruinous|shabby|feckless|bitter|sour|stale|rotten|bent|cracked|broken|leaky|shaky|rickety|wobbly|flimsy|messy|muddy|murky|shady|sly|sneaky|greedy|grasping|smug|pompous|preening|boastful|spiteful|sullen|surly|testy|touchy|prickly|cranky|grouchy|nervy|jumpy|skittish|flaky|fickle|shifty|evasive|cagey|two-faced|underhanded|high-handed|heavy-handed|ham-fisted|thick-headed|pig-headed|mulish|stubborn|idle|slack|sluggish|dull|dreary|tedious|grim|bleak|dismal|gloomy|sorry|pitiful|wretched|hopeless|useless|pointless|needless|aimless|shameless|tactless|graceless|thankless|witless|gutless|spineless","a:any:z":"long|short|old|new|late|early|narrow|broad|thin|thick|quiet|busy|odd|strange|familiar|ordinary|particular|technical|procedural|regional|federal|local|national|foreign|domestic|rural|urban|coastal|inland|northern|southern|western|eastern|first|second|last|next|whole|partial|private|public|formal|informal|grey|brown|green|blue|red|white|black|yellow|tall|low|high|deep|shallow|wide|small|large|big|little|heavy|light|hard|soft|wet|dry|warm|cold|hot|cool|loud|faint|slow|fast|rough|smooth|plain|fancy|simple|complex|rare|common|usual|unusual|recent|ancient|modern|current|former|future|present|absent|single|double|triple|minor|major|senior|junior|middle|inner|outer|upper|lower|front|back|left|right|central|weekly|daily|nightly|annual|seasonal|monthly|hourly","a:anomaly:z":"uncanny|unrecorded|misplaced|unexplained|repeated|identical|backward|unfamiliar|too-familiar|unwound|unnumbered|unsigned|missing|extra|warm|still|patient|attentive|precise","v:bills:z":"draft|mark up|amend|table|recommit|report|whip|count|cosponsor|introduce|file|redraft|strike|insert|offset|score|sunset|waive|carve out|substitute|move|second|object|reserve|yield|close|open|schedule|hold|pull|bury|kill|pass|advance|stall|rewrite","v:immigration:z":"naturalize|admit|deport|detain|process|resettle|sponsor|register|screen|interview|vouch for|welcome|turn away|naturalise|wait|queue|cross|petition|appeal|translate","v:foreign:z":"negotiate|ratify|sanction|embargo|ship|lend|guarantee|recognize|recall|send|cable|host|mediate|arm|supply|withdraw|station|fund|cut off|reopen","v:statefed:z":"preempt|sue|defy|enjoin|override|reserve|mandate|fund|withhold|match|block|waive|comply|resist|litigate|appeal|nullify|certify|enforce|reimburse","v:faith:z":"pray|kneel|confess|fast|sing|bless|baptize|marry|bury|forgive|repent|attend|light|keep|observe|serve|tithe|visit|believe|doubt","v:any:z":"say|think|know|mean|want|need|watch|wait|hear|see|keep|hold|lose|win|count|carry|break|fix|help|hurt|forget|remember|owe|pay|ask|tell|trust|doubt|notice|wonder|leave|stay|follow|lead|push|pull|stand|sit|walk|fold|bend|settle|choose|promise|admit|deny|warn|thank|blame|bring|send|take|give|get|make|build|write|read|sign|seal|stamp|mail|post|deliver|lift|drop|throw|catch|hand|pass|turn|open|shut|lock|knock|ring|call|answer|reply|repeat|explain|argue|agree|disagree|object|insist|suggest|propose|offer|refuse|accept|decline|delay|hurry|rush|linger|drift|wander|return|arrive|depart|enter|exit|climb|descend|cross|circle|measure|weigh|price|sell|buy|lend|borrow|spend|save|waste|earn|tax|charge|bill|cover|hide|show|reveal|guess|check|test|prove|believe|hope|fear|worry|mind|matter|care|love|hate|like|dislike|miss|regret|mourn|celebrate|toast|cheer|boo|clap|nod|shrug|sigh|laugh|smile|frown|blink|stare|glance|squint|whisper|murmur|mutter|shout|call out|speak|talk|chat|gossip|joke|tease|flatter|praise|criticise|scold|forgive|pardon|apologise|excuse|explain away|let slip|own up|sit tight|hold firm|back down|step aside|stand down|dig in|wait out|ride out|sleep on|chew over|talk round|bring round|win over|sound out|feel out|spell out|lay out|set out|carry on|press on|keep on|move on","r:any:z":"quietly|plainly|frankly|honestly|carefully|slowly|already|still|again|barely|nearly|probably|certainly|apparently|evidently|privately|publicly|technically|practically|eventually|finally|frequently|rarely|seldom|always|never|occasionally|reluctantly|cheerfully|grimly|dryly|politely|bluntly|gently|firmly|loosely|strictly|roughly|mostly|truly|really|simply|merely|hardly|scarcely|surely|clearly|obviously|openly|secretly|softly|loudly|briskly|lazily|neatly|sloppily|kindly|coldly|warmly|sharply|vaguely|precisely|exactly|largely|partly|wholly|fully|half|quite|rather|fairly|pretty|very|too|so|just|only|even|also|instead|anyway|meanwhile|afterwards|beforehand|lately|recently|soon|today|tonight|tomorrow|yesterday|here|there|everywhere|nowhere|somewhere|upstairs|downstairs|outside|inside|abroad|at home|in town|on the floor|in committee|off the record|on balance|in principle|in practice|in the end|for now|for good|at last|at once|at length|by and large|more or less|sooner or later","who:any:z":"the whip|the Speaker|the Clerk|my chief of staff|the ranking member|the chairman|the press|the gallery|the cloakroom|the leadership|the back bench|my district|my county board|the governor|the diner crowd|my mother|the parish|the union hall|the farm bureau|the harbour masters|the mill owners|the newcomer wards|the old families|the county clerk","open:plain:z":"Look,|Listen,|Well,|Honestly,|Between us,|For what it is worth,|Plainly,|Mark this:|Here is the thing:|Put it this way:|If you ask me,|Off the record,|Not for the wire,|Truthfully,|Frankly,|I will say this:|All right,|Fine.|So.|Right.","open:formal:z":"With respect,|If the member will allow,|For the record,|Permit me,|As I understand it,|In fairness,|I would only observe that|I will grant you this:|To be precise,|Strictly speaking,","open:latin:z":"Mutatis mutandis,|Pro forma,|Sub rosa,|In camera,|De facto,|Ergo,|Nota bene,|Bona fide,|Quid pro quo, then:|Caveat:","open:dutch:z":"Well, ja,|Goed.|Nou,|Kijk,|Ja, so,","open:yankee:z":"Look here,|Ayuh,|Wicked plain:|Say what you will,|Now then,","open:midlands:z":"Right,|Mind you,|Fair play,|Truth be told,|Here's the rub:","open:prairie:z":"Well, now,|Way I see it,|Out our way,|I'll be honest,|Not to put too fine a point on it,","open:delta:z":"I'll tell you,|Bless it,|Now listen,|Down home we'd say|Lord knows,","open:highplains:z":"Plain speaking,|Straight up,|For my money,|Short version:|Fair warning,","open:mountain:z":"Honest to it,|Up our way,|Simple as this:|Not fancy, but|Square with you,","open:pacific:z":"So,|Okay, so,|Real talk,|Bottom line,|Here's my thing:","close:plain:z":"That is all I have.|Make of it what you like.|Do not quote me.|You did not hear it from me.|Anyway.|There it is.|Take it or leave it.|That is the size of it.|I will not say it twice.|Keep it in the room.","close:formal:z":"I yield the remainder of my patience.|The record can say what it likes.|So noted.|With that, I am done.|I leave it with you.","close:latin:z":"Quod erat, and all that.|Sic transit.|Res ipsa loquitur.|Dixi.|Requiescat, the bill.","close:faith:z":"God is the Most High. The rest is staffing.|Christ is King; the House is only the House.|Pray for the count.|Say one for me.","time:any:z":"by Thursday|before the recess|after the roll call|this week|by the weekend|before the markup|before the district work period|by sundown|after Mass on Sunday|in the morning|before the clerk closes the book|by the third reading|before the governor's call|after the dinner|before the cloakroom empties","feel:any:p":"glad|relieved|hopeful|pleased|encouraged|steadier|grateful|lighter|easier","feel:any:n":"tired|worried|sore|uneasy|fed up|angry|weary|wary|sick of it|bruised|rattled","feel:any:z":"curious|unsure|watchful|thoughtful|undecided|careful|patient","n:any:z":"afternoon|morning|evening|night|week|month|season|year|decade|hour|minute|moment|day|weekday|weekend|habit|rule|reason|excuse|problem|question|answer|point|matter|issue|business|trouble|chance|risk|cost|price|bargain|trade|offer|deal|promise|threat|warning|signal|sign|hint|clue|story|version|account|report|letter|note|card|envelope|stamp|pen|pencil|ink|paper|folder|binder|file|drawer|cabinet|shelf|lamp|chair|table|bench|window|door|stair|step|hall|room|corner|wall|floor|ceiling|roof|yard|street|lane|avenue|square|park|garden|fence|gate|path|road|bridge|river|lake|hill|valley|field|meadow|wood|forest|coast|shore|island|harbour|town|city|village|farm|barn|shed|kitchen|parlour|porch|cellar|attic|car|truck|train|bus|tram|ferry|boat|ship|plane|ticket|timetable|platform|station|depot|map|compass|clock|watch|calendar|diary|ledger|list|tally|sum|total|share|part|piece|half|third|quarter|dozen|handful|crowd|line|queue|group|team|crew|club|society|guild|union|league|council|board|panel|court|jury|judge|lawyer|clerk|officer|guard|porter|driver|farmer|miner|fisher|baker|grocer|teacher|nurse|doctor|vet|pastor|widow|veteran|student|neighbour|stranger|friend|enemy|rival|colleague|partner|mentor|protégé|apprentice|boss|landlord|tenant|owner|worker|voter|citizen|resident|taxpayer|pensioner|bachelor|newlywed|toddler|teenager|elder|ancestor|heir|namesake|coat|hat|scarf|glove|boot|shoe|tie|collar|cuff|button|pocket|bag|case|box|crate|barrel|bottle|glass|cup|mug|pot|kettle|plate|bowl|spoon|knife|fork|bread|butter|cheese|coffee|tea|soup|pie|stew|apple|pear|plum|onion|potato|corn|wheat|barley|oats|hay|milk|egg|ham|bacon|fish|oyster|beer|wine|whisky|cider|sugar|salt|pepper|honey|lard|coal|oil|gas|steel|iron|timber|brick|stone|cloth|wool|cotton|leather|rope|wire|nail|hammer|saw|shovel|plough|tractor|engine|motor|pump|valve|pipe|meter|gauge|switch|bulb|candle|match|fire|smoke|ash|dust|mud|sand|gravel|grass|weed|seed|root|branch|leaf|flower|bloom|thorn|nest|feather|horse|cow|pig|sheep|goat|hen|duck|goose|cat|dog|mouse|crow|gull|heron|deer|fox|hound|mule","place:any:z":"the cloakroom|the shade of the East Steps|the Statuary Corridor|the caucus room|the press gallery|the members' dining room|the subway car|the back stairwell|the rotunda|the reading room|the Speaker's lobby|the committee room|the members' garage|the chapel|the barber's chair downstairs|the coat-check room|the third-floor anteroom|the long-table room"};
-  const TPL_RAW = ["greet|*|p|{O} good to see you, {YOU}. The {=weather/coffee/quorum/elevator} held up today, which is more than I can say for the {DOC}.", "greet|*|p|{YOU}. I was hoping I would run into you before {T}.", "greet|*|z|{YOU}. {R:cap}, I have a minute. Not two.", "greet|*|z|Afternoon. If this is about the {DOC}, walk with me.", "greet|*|n|{YOU}. I am {F} and the {DOC} is {A-}. Make it quick.", "greet|*|n|Oh. It is you. I have had a {A-} sort of day.", "opinion|bills|p|I read the {DOC} twice. It is {A+} work, and I do not say that about anything with a {PART} in it.", "opinion|bills|n|{O} the {DOC} is {A-}. Somebody wrote it {=in a hurry/at midnight/for a donor/on a napkin} and hoped nobody would read past the {PART}.", "opinion|bills|n|Strike the {PART} and I will look at it again. As it stands it is {A-}.", "opinion|bills|z|{O} the {DOC} lives or dies on the {PART}. Everything else is staffing.", "opinion|bills|z|{WHO:cap} wants to {=move/table/recommit/whip/pass} it {T}. I want to read it first. We will see who wins.", "opinion|immigration|p|My district has a {=cannery/dairy/harbour/orchard/mill} that runs on newcomers. They start early and pay on time. I am not going to {=deport/turn away/punish} them.", "opinion|immigration|p|{O} a {A+} {=processing center/hearing office/registry date} would clear the backlog in a year. Nobody wants to fund it, which tells you everything.", "opinion|immigration|n|{O} the {=quota/waiting line/visa lottery/backlog} is {A-}. People wait four years for a {=work permit/green card/hearing} and we call that order.", "opinion|immigration|n|{WHO:cap} wants to {=close/seal/double} the whole {=border/quota/program}. I would like them to visit a {=detention center/border county/processing center} first.", "opinion|immigration|z|The {=border/visa/quota} fight is a labour question dressed up as a values question. Count the {=harvest visas/caseloads/empty jobs} and then talk to me.", "opinion|foreign|p|{O} the {=aid package/treaty/loan guarantee/relief convoy} is {A+}. We send a little, we keep a friend. Cheaper than the alternative.", "opinion|foreign|n|We are sending {=an aid package/an arms sale/a credit line} abroad while my county cannot get a {=bridge/levee/state road} fixed. Explain that at a {=church hall/diner/county fair}.", "opinion|foreign|n|{O} the {=aid tranche/embargo/arms sale} is {A-}. The realms will read it as weakness and the district will read it as theft.", "opinion|foreign|z|The realms are watching the {=aid vote/tariff/treaty}. So is the {=farm bureau/harbour masters' guild/union hall}. They want different things.", "opinion|statefed|p|{O} let the states {=decide/experiment/carry it}. The governor knows the {=county roads/schools/rivers} better than this building does.", "opinion|statefed|n|Another unfunded mandate. We tell the {=counties/statehouses/school boards} what to do and send them the bill. They will sue us, and they will be right.", "opinion|statefed|n|{O} if the governor wants to {=defy/ignore/nullify} the {=federal standard/court order/mandate}, let him explain it to a {=federal marshal/circuit court/county clerk}.", "opinion|statefed|z|It comes down to the {=commerce clause/reserved powers/matching fund}. Either the state pays or the federal office pays. Not both.", "opinion|money|p|The war chest is in good shape. I spent it on {=a field office/a phone bank/two mailers/an ad buy} and {=yard signs/a district office/a pollster}. People noticed.", "opinion|money|n|My war chest is {=thin/a rumour/spoken for}. Every {=ad buy/mailer/dinner} costs twice what it did and the donors want a {=favour/meeting/vote} back.", "opinion|money|z|{O} money does not vote. It just makes sure the {=mailer/yard sign/ballot guide} is printed.", "opinion|district|p|Home is {=holding up/better than the papers say/all right}. The {DIST} reopened and the {DIST} is full on Fridays.", "opinion|district|n|Home is {=struggling/quiet/sore}. The {DIST} closed and the {DIST} has nobody under sixty.", "opinion|district|z|In {ME} the {DIST} and the {DIST} are the same three families. You learn to count to three.", "opinion|house|p|{O} the floor was {A+} today. Nobody shouted, two people read the bill.", "opinion|house|n|The floor was {A-} today. The whip counted wrong and the Speaker pretended not to notice.", "opinion|house|z|{O} this House runs on {=favours/grudges/coffee/seniority} and {=paperwork/patience/memory}. The rest is weather.", "gossip|*|*|{O} {X} and the whip were in {P} for an hour. Nobody came out smiling.", "gossip|*|*|You hear about {X}? A {=late dinner/second phone/new tailor/quiet donor}, and a vote nobody can explain.", "gossip|*|*|{X} is telling people {X2} owes them a {=favour/vote/dinner/apology}. {X2} is telling people nothing, which is worse.", "gossip|*|*|Somebody saw {X} in {P} {=last night/this morning/at lunch}, talking to a {=lobbyist/columnist/governor's aide/donor}. Draw your own conclusions.", "gossip|*|*|{O} {X} has a {A-} {=chief of staff/press secretary/brother-in-law} and a {A+} voting record. Guess which one the press found.", "gossip|*|*|The cloakroom says {X} will {=flip on/sink/cosponsor/sit out} the {DOC}. The cloakroom has been wrong before, but not often.", "ask|bills|*|Where are you on the {DOC}? Not the speech. The vote.", "ask|bills|*|If I back your {DOC}, will you back mine? Simple question.", "ask|*|*|What does {ME} think of you these days? Honestly.", "ask|*|*|Have you eaten? You look like a {=Monday/roll call/third reading/recount}.", "agree|*|p|{O} fine. I am with you on this one. Do not make me regret it {T}.", "agree|*|p|Yes. Put me down. Tell {WHO} I said so.", "agree|*|z|I can live with that. My {=staff/wife/husband/conscience} can live with it. We will see about my district.", "refuse|*|n|{O} no. Not this week, not with this {DOC}.", "refuse|*|n|I cannot. {WHO:cap} would have my head on a plate.", "refuse|*|z|Ask me again {T}. Today the answer is no, and it is a {A0} no.", "warn|*|n|{O} watch {X}. They are counting you as a yes and they will be {F} when you are not.", "warn|*|n|Be careful with the {DOC}. It looks {A+} until you read the {PART}.", "warn|*|z|Word to the wise: the {DOC} moves {T}. Have your {=count/amendment/speech/excuse} ready.", "faith|faith|p|I went to {=Mass/service/vespers/the early service} on Sunday. {CRC} through and through, the {A+} kind. I felt {F} after.", "faith|faith|p|The {=parish/chapel/church hall} at home is full again. People came back. Nobody can say why.", "faith|faith|n|Our {=parish/congregation/chapel} is half empty. The bell still rings. Fewer people hear it.", "faith|faith|z|I am {CR}. My grandmother was {CR}. That is not an argument; it is a fact about Sundays.", "faith|faith|z|God is the Most High. Christ is King. The rest of us are on a short term.", "muse|anomaly|*|The {=clock/door/stair/lamp} in {P} was {A} this morning. I counted. Then I stopped counting.", "muse|anomaly|*|Do you ever walk into {P} and feel the {=corridor/room/hour} was waiting for you? I do not ask anyone else.", "muse|anomaly|*|I had a dream about a {=ledger/bill/plaque/page} with my name on it. I knew every word. I wrote none of them.", "muse|anomaly|*|There is a {A} {=door/stair/key/ledger} in this building that nobody has ever been asked to sign for.", "muse|anomaly|*|Some days I think somebody else is walking these halls the way I do. I do not look for them.", "small|weather|*|{O} {=rain/frost/heat/fog} in {ME} and {=sun/sleet/wind/drizzle} here. I packed for the wrong one.", "small|weather|*|The {=fog/rain/cold front/wind} came in {=early/hard/sideways} this morning. The tourists on the East Steps did not care.", "small|family|p|My {FAM} had a {FEV} on Saturday. I made it for the end. {F:cap}, honestly.", "small|family|n|Missed my {FAM}'s {FEV}. Again. The whip does not do birthdays.", "small|family|z|My {FAM} asks what I do here. I tell them I count. They think it is a joke.", "react|*|p|{O} that is {A+} of you. I will remember it {T}.", "react|*|p|Well. I did not expect that. {A+:cap}.", "react|*|n|{O} that was {A-}. I will remember that too.", "react|*|n|Hm. I see. {=Frankly/Honestly/Plainly}, that is not how we do it at home.", "react|*|z|Noted. I am writing it in the {=ledger/notebook/diary}, the one I actually read.", "opinion|bills|p|{O} the {DOC} is {A+}. Not perfect. {A+:cap} is enough {T}.", "opinion|bills|z|The {PART} is where they hid it. It always is. Read the {PART} and you have read the {DOC}.", "opinion|bills|n|Whoever wrote the {PART} has never met a {=farmer/nurse/county clerk/ferry captain}. I would like to introduce them.", "small|*|z|I keep a {Na} in my desk drawer for days like this. Do not ask.", "small|*|z|Some nights I count the {Nas} on the walk home. It settles me better than the vote count.", "small|*|p|Somebody left a {Na} on my chair this morning. Kindest thing that has happened all week.", "react|*|p|{=Good/Well done/Fair enough}. My {FAM} would say you were raised right.", "react|*|n|I will {=remember/write down/repeat} that, {YOU}. {=Word for word/Exactly as you said it/With the date}.", "muse|anomaly|*|I said a sentence on the floor today I do not remember choosing. It was a good sentence. That is the part that worries me.", "muse|anomaly|*|Whatever I am, I am under God. That part I do not wonder about. The corridor I wonder about.", "gossip|*|*|{X} {=voted early/left by the back stairs/skipped the caucus/sat with the other side} {=again/twice this week/on purpose}. The whip pretended not to see.", "opinion|house|p|{O} the Clerk read the {DOC} without a mistake. Small mercies. I will take a small mercy.", "warn|*|n|{O} if you {=cross/embarrass/ignore} {X} on the {DOC}, they will remember it at the {=markup/roll call/next caucus}.", "agree|*|p|{O} you have my vote. Spend it {=carefully/wisely/like it cost something}."];
+  const TPL_RAW = ["greet|*|p|{O} good to see you, {YOU}. The {=weather/coffee/quorum/elevator} held up today, which is more than I can say for the {DOC}.", "greet|*|p|{YOU}. I was hoping I would run into you before {T}.", "greet|*|z|{YOU}. {R:cap}, I have a minute. Not two.", "greet|*|z|Afternoon. If this is about the {DOC}, walk with me.", "greet|*|n|{YOU}. I am {F} and the {DOC} is {A-}. Make it quick.", "greet|*|n|Oh. It is you. I have had a {A-} sort of day.", "opinion|bills|p|I read the {DOC} twice. It is {A+} work, and I do not say that about anything with a {PART} in it.", "opinion|bills|n|{O} the {DOC} is {A-}. Somebody wrote it {=in a hurry/at midnight/for a donor/on a napkin} and hoped nobody would read past the {PART}.", "opinion|bills|n|Strike the {PART} and I will look at it again. As it stands it is {A-}.", "opinion|bills|z|{O} the {DOC} lives or dies on the {PART}. Everything else is staffing.", "opinion|bills|z|{WHO:cap} wants to {=move/table/recommit/whip/pass} it {T}. I want to read it first. We will see who wins.", "opinion|immigration|p|My district has a {=cannery/dairy/harbour/orchard/mill} that runs on newcomers. They start early and pay on time. I am not going to {=deport/turn away/punish} them.", "opinion|immigration|p|{O} a {A+} {=processing center/hearing office/registry date} would clear the backlog in a year. Nobody wants to fund it, which tells you everything.", "opinion|immigration|n|{O} the {=quota/waiting line/visa lottery/backlog} is {A-}. People wait four years for a {=work permit/green card/hearing} and we call that order.", "opinion|immigration|n|{WHO:cap} wants to {=close/seal/double} the whole {=border/quota/program}. I would like them to visit a {=detention center/border county/processing center} first.", "opinion|immigration|z|The {=border/visa/quota} fight is a labour question dressed up as a values question. Count the {=harvest visas/caseloads/empty jobs} and then talk to me.", "opinion|foreign|p|{O} the {=aid package/treaty/loan guarantee/relief convoy} is {A+}. We send a little, we keep a friend. Cheaper than the alternative.", "opinion|foreign|n|We are sending {=an aid package/an arms sale/a credit line} abroad while my county cannot get a {=bridge/levee/state road} fixed. Explain that at a {=church hall/diner/county fair}.", "opinion|foreign|n|{O} the {=aid tranche/embargo/arms sale} is {A-}. The realms will read it as weakness and the district will read it as theft.", "opinion|foreign|z|The realms are watching the {=aid vote/tariff/treaty}. So is the {=farm bureau/harbour masters' guild/union hall}. They want different things.", "opinion|statefed|p|{O} let the states {=decide/experiment/carry it}. The governor knows the {=county roads/schools/rivers} better than this building does.", "opinion|statefed|n|Another unfunded mandate. We tell the {=counties/statehouses/school boards} what to do and send them the bill. They will sue us, and they will be right.", "opinion|statefed|n|{O} if the governor wants to {=defy/ignore/nullify} the {=federal standard/court order/mandate}, let him explain it to a {=federal marshal/circuit court/county clerk}.", "opinion|statefed|z|It comes down to the {=commerce clause/reserved powers/matching fund}. Either the state pays or the federal office pays. Not both.", "opinion|money|p|The war chest is in good shape. I spent it on {=a field office/a phone bank/two mailers/an ad buy} and {=yard signs/a district office/a pollster}. People noticed.", "opinion|money|n|My war chest is {=thin/a rumour/spoken for}. Every {=ad buy/mailer/dinner} costs twice what it did and the donors want a {=favour/meeting/vote} back.", "opinion|money|z|{O} money does not vote. It just makes sure the {=mailer/yard sign/ballot guide} is printed.", "opinion|district|p|Home is {=holding up/better than the papers say/all right}. The {DIST} reopened and the {DIST} is full on Fridays.", "opinion|district|n|Home is {=struggling/quiet/sore}. The {DIST} closed and the {DIST} has nobody under sixty.", "opinion|district|z|In {ME} the {DIST} and the {DIST} are the same three families. You learn to count to three.", "opinion|house|p|{O} the floor was {A+} today. Nobody shouted, two people read the bill.", "opinion|house|n|The floor was {A-} today. The whip counted wrong and the Speaker pretended not to notice.", "opinion|house|z|{O} this House runs on {=favours/grudges/coffee/seniority} and {=paperwork/patience/memory}. The rest is weather.", "gossip|*|*|{O} {X} and the whip were in {P} for an hour. Nobody came out smiling.", "gossip|*|*|You hear about {X}? A {=late dinner/second phone/new tailor/quiet donor}, and a vote nobody can explain.", "gossip|*|*|{X} is telling people {X2} owes them a {=favour/vote/dinner/apology}. {X2} is telling people nothing, which is worse.", "gossip|*|*|Somebody saw {X} in {P} {=last night/this morning/at lunch}, talking to a {=lobbyist/columnist/governor's aide/donor}. Draw your own conclusions.", "gossip|*|*|{O} {X} has a {A-} {=chief of staff/press secretary/brother-in-law} and a {A+} voting record. Guess which one the press found.", "gossip|*|*|The cloakroom says {X} will {=flip on/sink/cosponsor/sit out} the {DOC}. The cloakroom has been wrong before, but not often.", "ask|bills|*|Where are you on the {DOC}? Not the speech. The vote.", "ask|bills|*|If I back your {DOC}, will you back mine? Simple question.", "ask|*|*|What does {ME} think of you these days? Honestly.", "ask|*|*|Have you eaten? You look like a {=Monday/roll call/third reading/recount}.", "agree|*|p|{O} fine. I am with you on this one. Do not make me regret it {T}.", "agree|*|p|Yes. Put me down. Tell {WHO} I said so.", "agree|*|z|I can live with that. My {=staff/wife/husband/conscience} can live with it. We will see about my district.", "refuse|*|n|{O} no. Not this week, not with this {DOC}.", "refuse|*|n|I cannot. {WHO:cap} would have my head on a plate.", "refuse|*|z|Ask me again {T}. Today the answer is no, and it is a {A0} no.", "warn|*|n|{O} watch {X}. They are counting you as a yes and they will be {F} when you are not.", "warn|*|n|Be careful with the {DOC}. It looks {A+} until you read the {PART}.", "warn|*|z|Word to the wise: the {DOC} moves {T}. Have your {=count/amendment/speech/excuse} ready.", "faith|faith|p|I went to {=Mass/service/vespers/the early service} on Sunday. {CRC} through and through, the {A+} kind. I felt {F} after.", "faith|faith|p|The {=parish/chapel/church hall} at home is full again. People came back. Nobody can say why.", "faith|faith|n|Our {=parish/congregation/chapel} is half empty. The bell still rings. Fewer people hear it.", "faith|faith|z|I am {CR}. My grandmother was {CR}. That is not an argument; it is a fact about Sundays.", "faith|faith|z|God is the Most High. Christ is King. The rest of us are on a short term.", "muse|anomaly|*|The {=clock/door/stair/lamp} in {P} was {A} this morning. I counted. Then I stopped counting.", "muse|anomaly|*|Do you ever walk into {P} and feel the {=corridor/room/hour} was waiting for you? I do not ask anyone else.", "muse|anomaly|*|I had a dream about a {=ledger/bill/plaque/page} with my name on it. I knew every word. I wrote none of them.", "muse|anomaly|*|There is a {A} {=door/stair/key/ledger} in this building that nobody has ever been asked to sign for.", "muse|anomaly|*|Some days I think somebody else is walking these halls the way I do. I do not look for them.", "small|weather|*|{O} {=rain/frost/heat/fog} in {ME} and {=sun/sleet/wind/drizzle} here. I packed for the wrong one.", "small|weather|*|The {=fog/rain/cold front/wind} came in {=early/hard/sideways} this morning. The tourists on the East Steps did not care.", "small|family|p|My {FAM} had a {FEV} on Saturday. I made it for the end. {F:cap}, honestly.", "small|family|n|Missed my {FAM}'s {FEV}. Again. The whip does not do birthdays.", "small|family|z|My {FAM} asks what I do here. I tell them I count. They think it is a joke.", "react|*|p|{O} that is {A+} of you. I will remember it {T}.", "react|*|p|Well. I did not expect that. {A+:cap}.", "react|*|n|{O} that was {A-}. I will remember that too.", "react|*|n|Hm. I see. {=Frankly/Honestly/Plainly}, that is not how we do it at home.", "react|*|z|Noted. I am writing it in the {=ledger/notebook/diary}, the one I actually read.", "opinion|bills|p|{O} the {DOC} is {A+}. Not perfect. {A+:cap} is enough {T}.", "opinion|bills|z|The {PART} is where they hid it. It always is. Read the {PART} and you have read the {DOC}.", "opinion|bills|n|Whoever wrote the {PART} has never met a {=farmer/nurse/county clerk/ferry captain}. I would like to introduce them.", "small|*|z|I keep a {Na} in my desk drawer for days like this. Do not ask.", "small|*|z|Some nights I count the {Nas} on the walk home. It settles me better than the vote count.", "small|*|p|Somebody left a {Na} on my chair this morning. Kindest thing that has happened all week.", "react|*|p|{=Good/Well done/Fair enough}. My {FAM} would say you were raised right.", "react|*|n|I will {=remember/write down/repeat} that, {YOU}. {=Word for word/Exactly as you said it/With the date}.", "muse|anomaly|*|I said a sentence on the floor today I do not remember choosing. It was a good sentence. That is the part that worries me.", "muse|anomaly|*|Whatever I am, I am under God. That part I do not wonder about. The corridor I wonder about.", "gossip|*|*|{X} {=voted early/left by the back stairs/skipped the caucus/sat with the other side} {=again/twice this week/on purpose}. The whip pretended not to see.", "opinion|house|p|{O} the Clerk read the {DOC} without a mistake. Small mercies. I will take a small mercy.", "warn|*|n|{O} if you {=cross/embarrass/ignore} {X} on the {DOC}, they will remember it at the {=markup/roll call/next caucus}.", "agree|*|p|{O} you have my vote. Spend it {=carefully/wisely/like it cost something}.", "faith|faith|p|{O} the {=choir/organist/old priest/deacon} at home {=outdid themselves/sang the long setting/rang the bells for an hour} on Sunday. I went back to work {F}.", "faith|faith|p|We {=lit a candle/said a rosary/kept a vigil/read the psalm} for my {FAM} last {=week/Sunday/month}. {CRC} people do not forget, and neither does God.", "faith|faith|p|I {=pray/kneel/sit a minute} in {P} some mornings before the {DOC} comes up. It is the quietest room I know, and the Most High is in it.", "faith|faith|n|{O} my {=bishop/pastor/minister/elder} wrote to me about the {DOC}. Four pages. I have read the first one {=twice/three times/once, slowly}.", "faith|faith|n|The {=collection plate/choir loft/Sunday school/parish council} back home is {A-} this year. People are tired. I am tired.", "faith|faith|z|{O} I keep the {=Lord's Day/Sabbath/early Mass/evening service} where I can. The {DOC} can wait one morning a week.", "faith|faith|z|{CRC} or not, every man in this building answers to the same God. Christ is King. We are all temporary.", "faith|faith|z|My {FAM} asked me if politicians pray. I said the honest ones pray {=before/after/during} the roll call.", "faith|faith|*|There is a {=chapel/prayer room/quiet pew} off {P}. {=Nobody/Few people/Almost nobody} uses it {T}. That is a pity.", "muse|anomaly|*|{O} the {=echo/light/draft/clock} in {P} is {A} today. It sounds like a {=second set of footsteps/vote being counted/door closing twice}.", "muse|anomaly|*|I found a {Na} in my {=coat/drawer/briefcase} that I never put there. It was {A}. I kept it.", "muse|anomaly|*|The {=portraits/plaques/clocks/windows} in {P} look {A} after dark. I do not stay late anymore. {=Mostly/Usually/Not often}.", "muse|anomaly|*|{O} somebody signed the {=visitor log/ledger/roll} in {P} with a name nobody has. The ink was {=still wet/very old/the wrong colour}.", "muse|anomaly|*|Every {=Thursday/third Friday/recess/full moon} the {=lift/stair/fountain/bell} in {P} does something {A}. I have stopped mentioning it.", "react|*|n|{O} you will {=regret/remember/answer for} that {T}. Not from me. From {ME}.", "react|*|n|{=Right/Fine/Well}. {A-:cap}, but I have seen worse in {P}. Not much worse.", "react|*|n|I {=heard/saw/noticed} that. So did {X}. {X} keeps a list too.", "react|*|n|That is the kind of thing that gets {=written down/repeated/remembered} in {P}, {YOU}. {A-:cap}.", "react|*|n|{O} I am {F}. I will be {F} {T} too. Leave it there.", "react|*|p|{O} I owe you one {T}. Remind me if I forget, which I will not.", "react|*|p|{A+:cap}. {ME} will hear about it from me, the good way.", "react|*|p|That {=helped/landed/mattered}. {X} will not say it, so I will.", "opinion|statefed|p|The governor of {ME} called me {T} about the {=mandate/standard/grant}. For once we agree. Write that down.", "opinion|statefed|n|{O} every {=mandate/preemption/rule} we pass lands on a {=county clerk/school board/sheriff} who never voted for it. {A-:cap}.", "opinion|statefed|z|{O} the states were here first. The federal office was the states' idea. People forget the order of things.", "opinion|statefed|z|The {=state house/governor's office/attorney general} in {ME} has a {A} lawyer on this already. We will be in court {T}.", "opinion|immigration|z|{O} the people on the {=waiting list/visa line/hearing docket} in {ME} have names. I keep a {=list/file/folder} of them.", "opinion|immigration|n|{WHO:cap} has never {=stood in a visa line/read a hearing docket/met a seasonal crew}. It shows in the {PART}.", "opinion|foreign|z|{O} the {=envoy/ambassador/trade delegation} from the realms was in {P} {T}. {A:cap} visit. Very polite. Very long.", "opinion|foreign|p|A {A+} {=treaty/aid line/trade deal} is the cheapest friend you will ever buy. Ask {ME}'s {=harbour/farms/mills}."];
   const BANK = {};
   for(const k in LEX) BANK[k] = LEX[k].split("|");
   const TPL = TPL_RAW.map(r => { const a = r.split("|"); return {i:a[0], t:a[1], s:a[2], x:a.slice(3).join("|")}; });
@@ -23212,6 +23236,352 @@ function refreshBar(){
   try{ goalsTick(); }catch(e){}
   try{ paintJob(); paintCompass(); }catch(e){}
 }
+/* ══════════════════════════════════════════════════════════
+   20261011k · THE HIGHER ROOMS
+   The Senate, the Court, the Executive wing and the State House are
+   real rooms now: walls, floors, furniture, people who work there,
+   and a desk that is yours only if the chair is yours.
+   ══════════════════════════════════════════════════════════ */
+const K_ROOM_OF = {senate:"senate", bench:"court", pres:"exec", gov:"govoffice"};
+const K_HERE_LINE = {
+  senate:"The Senate sits. Your desk is on the aisle. E.",
+  court:"The Court is in session. The bench is yours. E.",
+  exec:"The wing is waiting on you. The desk. E.",
+  govoffice:"The State House is open. Your desk. E."
+};
+function kChamberRoom(){ try{ return K_ROOM_OF[roleKey()] || null; }catch(e){ return null; } }
+function kChamberDone(){ const y = G.you; return !!(y && y.used && y.used.chamber === G.day); }
+function kMarkChamber(){ const y = G.you; y.used = y.used || {}; y.used.chamber = G.day; }
+function kChamberDue(){
+  if(!G.you || G.you.out) return null;
+  const r = kChamberRoom(); if(!r || !ROOMS[r]) return null;
+  const m = G.minute || 0;
+  if(m < 9*60 || m >= 18*60 || kChamberDone()) return null;
+  try{ if(dayType() === "recess" && r !== "govoffice") return null; }catch(e){}
+  return r;
+}
+function kHolds(room){ return kChamberRoom() === room; }
+function kOnceToday(key){ const y = G.you; y.used = y.used || {}; return y.used[key] === G.day; }
+function kMark(key){ const y = G.you; y.used = y.used || {}; y.used[key] = G.day; }
+
+/* ── the people who work in them ─────────────────────────── */
+const K_STAFF = {
+  senate:   [["senator","Senator","the Senate calendar"],["senator","Senator","the Senate calendar"],["senclerk","Secretary of the Senate","the Senate journal"]],
+  court:    [["justice","Justice","the docket"],["courtclerk","Clerk of the Court","the docket"],["marshal","Marshal of the Court","order in the room"]],
+  exec:     [["chief","Chief of Staff","the Executive's day"],["aide","Executive aide","the morning briefing"]],
+  govoffice:[["gsec","Governor's secretary","the Governor's calendar"],["gcounsel","Counsel to the Governor","the state's lawsuits"]]
+};
+function kEnsurePeople(){
+  if(!G.civ) G.civ = [];
+  let added = false;
+  Object.keys(K_STAFF).forEach(room => {
+    K_STAFF[room].forEach((spec, i) => {
+      const slot = room + ":" + i;
+      if(G.civ.some(c => c && c.kslot === slot)) return;
+      try{
+        const c = makeCivilian();
+        c.kslot = slot; c.krole = spec[0]; c.role = spec[1]; c.cause = spec[2];
+        c.chamber = room; c.room = room; c.caseOpen = false;
+        if(spec[0] === "senator"){
+          const won = (G.ladder || []).filter(x => x && x.won && x.to === "senate");
+          if(won[i]) c.name = won[i].name;
+        }
+        if(spec[0] === "justice" && G.court && G.court[0]) c.name = G.court[0].name;
+        if(room === "govoffice" && G.you && G.you.state){ try{ c.state = G.you.state; }catch(e){} }
+        try{ placeInRoom(c); }catch(e){}
+        G.civ.push(c); added = true;
+      }catch(e){}
+    });
+  });
+  if(added){ _allCache = null; }
+}
+function kChamberActs(c){
+  const you = G.you, b = G.bill, live = b && !b.done;
+  const A = [];
+  const once = "k" + c.kslot;
+  const done = c.kday === G.day;
+  const mark = () => { c.kday = G.day; };
+  if(c.krole === "senator"){
+    A.push({t:"Compare notes on the bill", c:"20m", off:done || !live, run(){
+      spend(20, 4); mark();
+      const yes = alignment(c, b) > 0;
+      if(kHolds("senate")) you.influence = clamp(you.influence + 1, 0, 100);
+      setSay(yes ? "If " + b.title + " reaches us I am a yes. Do not tell the whip I said it this early."
+                 : "If " + b.title + " reaches us I will vote no, and I will say why on the floor.",
+        fx(kHolds("senate") ? "+1 influence" : "a Senate count", ""));
+      note(c.name + " told you where the Senate leans on " + b.title + ".");
+    }});
+  } else if(c.krole === "senclerk"){
+    A.push({t:"Read the Senate calendar", c:"10m", run(){
+      spend(10, 1);
+      const acts = (G.lastActs || []).slice(0, 3).map(x => x && (x.title || x.t || x)).filter(Boolean);
+      setSay(acts.length ? "The journal has " + listify(acts) + " on it. The rest is confirmations and morning business."
+                         : "Nothing on the journal but morning business and a quorum call. A quiet day is a good day here.", "");
+    }});
+  } else if(c.krole === "justice" || c.krole === "marshal"){
+    A.push({t:"Pay your respects", c:"10m", off:done, run(){
+      spend(10, 1); mark();
+      const party = (G.cases || []).some(x => x && !x.done && x.state === you.state);
+      if(!party) you.standing = clamp(you.standing + 1, 0, 100);
+      setSay(party ? "The Justice nods and says nothing at all. Your state has a matter pending."
+                   : "A short word about the weather and the long view. Nobody in here hurries.",
+        fx(party ? "" : "+1 standing", ""));
+    }});
+  } else if(c.krole === "courtclerk" || c.krole === "gcounsel"){
+    A.push({t:"Ask about the docket", c:"10m", run(){
+      spend(10, 1);
+      const open = (G.cases || []).filter(x => x && !x.done && (c.krole === "courtclerk" || x.state === you.state));
+      setSay(open.length ? "On the docket: " + listify(open.slice(0, 3).map(x => x.t)) + "."
+                         : "Nothing pending. Write a law somebody hates and that will change.", "");
+    }});
+  } else if(c.krole === "chief"){
+    A.push({t:"Ask for time with the Executive", c:"30m", off:done || (G.exec && G.exec.you), run(){
+      spend(30, 6); mark();
+      const same = G.exec && G.exec.party === you.party;
+      you.influence = clamp(you.influence + (same ? 3 : 1), 0, 100);
+      setSay(same ? "Fifteen minutes, door closed. The Executive asked about your district by name."
+                  : "Five minutes in the doorway. Polite, short, and on the record.",
+        fx("+" + (same ? 3 : 1) + " influence", "30 minutes"));
+      note("Met with the Executive's office.");
+    }});
+  } else if(c.krole === "aide"){
+    A.push({t:"Ask what the Executive is reading", c:"10m", run(){
+      spend(10, 1);
+      const S = (G.states || []).slice().sort((a, b2) => (b2.unrest || 0) - (a.unrest || 0))[0];
+      setSay("The morning file leads with " + (S ? S.n + ", where the mood is sour" : "the realms") +
+        (G.exec ? ". " + (G.exec.vetoes || 0) + " vetoes so far this term." : "."), "");
+    }});
+  } else if(c.krole === "gsec"){
+    A.push({t:"Ask the Governor's office for help at home", c:"30m", off:done || kHolds("govoffice"), run(){
+      spend(30, 5); mark();
+      you.approval = clamp(you.approval + 2, 0, 100);
+      setSay("A road crew, a letter and a ribbon cutting. The State House keeps its promises when they are small.", fx("+2 approval", "30 minutes"));
+    }});
+  }
+  A.push({t:"Leave them to it", c:"0m", run(){ setSay("You nod and let them get back to " + c.cause + ".", ""); }});
+  return A;
+}
+
+/* ── the desks: yours if the office is yours ─────────────── */
+function kDeskActs(room){
+  const you = G.you, mine = kHolds(room), A = [];
+  if(mine) A.push({t:"Use the powers of your office", c:"opens your office", run(){ kMarkChamber(); officeCard(); }});
+  if(room === "senate"){
+    if(mine) A.push({t:"Take the floor of the Senate", c:"60m", off:kOnceToday("ksen"), run(){
+      spend(60, 12); kMark("ksen"); kMarkChamber();
+      you.standing = clamp(you.standing + 3, 0, 100); you.influence = clamp(you.influence + 1, 0, 100);
+      setSay("Twenty minutes to a half-full chamber and a full press row. The Senate listens slower, and remembers longer.", fx("+3 standing · +1 influence", "an hour"));
+      note("Spoke on the Senate floor.");
+    }});
+    else A.push({t:"Watch from the gallery rail", c:"20m", run(){
+      spend(20, 2);
+      setSay("Six desks occupied, one Senator talking, a clerk reading the journal under her breath. It is slower than the House and nobody here minds.", "");
+    }});
+  } else if(room === "court"){
+    if(mine) A.push({t:"Hear oral argument", c:"90m", off:kOnceToday("kct"), run(){
+      spend(90, 14); kMark("kct"); kMarkChamber();
+      const c = (G.cases || []).find(x => x && !x.done);
+      you.standing = clamp(you.standing + 2, 0, 100);
+      setSay(c ? "Counsel for " + c.state + " argues that the act reaches too far. The Union says the act is the law. You ask one question and the room goes quiet."
+               : "No live case today. You hear a motion about filing deadlines and rule on it before lunch.", fx("+2 standing", "90 minutes"));
+    }});
+    else A.push({t:"Sit in the public seats", c:"30m", run(){
+      spend(30, 3);
+      const c = (G.cases || []).find(x => x && !x.done);
+      setSay(c ? "They are hearing " + c.t + ". The questions from the bench tell you more than the briefs did."
+               : "A slow morning in the Court. You learn that the marshal knows every lawyer by their shoes.", "");
+    }});
+  } else if(room === "exec"){
+    if(mine) A.push({t:"Take the morning briefing", c:"45m", off:kOnceToday("kex"), run(){
+      spend(45, 8); kMark("kex"); kMarkChamber();
+      const S = (G.states || []).slice().sort((a, b2) => (b2.unrest || 0) - (a.unrest || 0))[0];
+      if(S) S.unrest = clamp((S.unrest || 0) - 3, 0, 100);
+      you.standing = clamp(you.standing + 2, 0, 100);
+      setSay("The file leads with " + (S ? S.n : "the realms") + ". You make three calls before the coffee goes cold." , fx("+2 standing" + (S ? " · " + S.n + " calmer" : ""), "45 minutes"));
+    }});
+    else A.push({t:"Leave a letter for the Executive", c:"15m", off:kOnceToday("kexl"), run(){
+      spend(15, 2); kMark("kexl");
+      setSay("The aide takes it with both hands and promises it will be read. It might even be true.", "");
+    }});
+  } else if(room === "govoffice"){
+    if(mine) A.push({t:"Hold open hours at the State House", c:"60m", off:kOnceToday("kgv"), run(){
+      spend(60, 10); kMark("kgv"); kMarkChamber();
+      you.approval = clamp(you.approval + 4, 0, 100);
+      const S = (G.states || []).find(s => s.n === you.state);
+      if(S) S.unrest = clamp((S.unrest || 0) - 2, 0, 100);
+      setSay("A dairy farmer, a school board, two mayors and a widow with a pension letter. You fix three of the five before supper.", fx("+4 approval" + (S ? " · " + S.n + " steadier" : ""), "an hour"));
+      note("Held open hours at the State House.");
+    }});
+    else A.push({t:"Petition the Governor for the district", c:"30m", off:kOnceToday("kgvp"), run(){
+      spend(30, 4); kMark("kgvp");
+      you.approval = clamp(you.approval + 1, 0, 100);
+      setSay("The secretary writes it all down and reads it back to you. That is more than most offices do.", fx("+1 approval", "30 minutes"));
+    }});
+  }
+  return A;
+}
+PROPS.senate = [{id:"ksdesk", label:"The Senate desks", sub:"Old mahogany, names carved inside the drawers", x:0, z:6.0, r:2.3,
+  acts:() => kDeskActs("senate")}];
+PROPS.court = [{id:"kbench", label:"The bench", sub:"Nine feet of oak and a long view", x:0, z:7.6, r:2.4,
+  acts:() => kDeskActs("court")}];
+PROPS.exec = [{id:"kxdesk", label:"The Executive's desk", sub:"Built from the timbers of a ship nobody remembers", x:0, z:8.7, r:2.3,
+  acts:() => kDeskActs("exec")}];
+PROPS.govoffice = [{id:"kgdesk", label:"The Governor's desk", sub:"A state map under the glass", x:0, z:7.9, r:2.3,
+  acts:() => kDeskActs("govoffice")}];
+
+/* ── the furniture ───────────────────────────────────────── */
+function kFlag(x, z, h){
+  const brass = matCol(0xb08b45, .35, .8);
+  addCyl(brass, x, h * 0.5, z, 0.026, h);
+  addCyl(brass, x, 0.03, z, 0.16, 0.06);
+  addSphere(brass, x, h + 0.04, z, 0.05, 0.05, 0.05);
+  let fm = null; try{ fm = flagMat(); }catch(e){}
+  addBox(fm || matCol(0x2a3d6b, .8), x + 0.45, h - 0.55, z, 0.86, 0.62, 0.025, 0, true);
+}
+function buildHigherRoom(id, o){
+  const R = ROOMS[id]; if(!R) return;
+  const w = R.w, d = R.d, h = R.h, hw = w/2;
+  const wood = o.woodMat || matTex(TEX.panel, 1, 1, .6);
+  const leather = o.leather || matCol(0x5a2a22, .7);
+  const brass = matCol(0x9a7736, .4, .8);
+  const paper = matCol(0xeee8da, .95);
+  if(id === "senate"){
+    /* rostrum at the back, a horseshoe of desks facing it, aisle down the middle to the door */
+    const cz = d - 2.0;
+    addBox(wood, 0, 0.18, cz + 0.4, 6.2, 0.36, 2.6, 0, true);           /* first tier */
+    addBox(wood, 0, 0.42, cz + 0.9, 3.6, 0.12, 1.4, 0, true);           /* second tier */
+    propDesk(wood, wood, 0, cz - 0.35, 4.2, 0.75, 0, 1.12);             /* clerks' desk, tall front */
+    propDesk(wood, wood, 0, cz + 0.85, 2.0, 0.7, 0, 0.82);
+    propChair(wood, leather, 0, cz + 1.45, Math.PI, 0.48);              /* presiding officer */
+    propChair(wood, leather, -1.3, cz + 0.25, Math.PI, 0.36);
+    propChair(wood, leather,  1.3, cz + 0.25, Math.PI, 0.36);
+    addCyl(brass, 0.7, 0.48 + 0.82 + 0.06, cz + 0.85, 0.05, 0.10);      /* gavel block */
+    const rows = [[4.0, 4], [5.4, 6], [6.8, 6]];
+    rows.forEach(([r, n]) => {
+      const span = 1.05;                               /* radians, each side */
+      for(let i = 0; i < n; i++){
+        const side = i < n/2 ? -1 : 1;
+        const k = i < n/2 ? i : i - n/2;
+        const th = side * (0.24 + (span - 0.24) * (k / Math.max(1, n/2 - 1)));
+        const x = r * Math.sin(th), z = cz - r * Math.cos(th);
+        if(Math.abs(x) > hw - 0.8 || z < 1.6) continue;
+        propDesk(wood, wood, x, z, 0.92, 0.52, -th, 0.78);
+        const cx2 = (r + 0.62) * Math.sin(th), cz2 = cz - (r + 0.62) * Math.cos(th);
+        if(cz2 > 1.0) propChair(wood, leather, cx2, cz2, -th);
+        propPapers(x, 0.80, z, 1);
+      }
+    });
+    addBox(brass, -2.2, 0.98, 1.7, 3.0, 0.06, 0.08, 0, true);           /* gallery rail, aisle open */
+    addBox(brass,  2.2, 0.98, 1.7, 3.0, 0.06, 0.08, 0, true);
+    for(let i = 0; i < 4; i++){ const x = (i < 2 ? -1 : 1) * (0.9 + (i % 2) * 2.6); addCyl(brass, x, 0.49, 1.7, 0.03, 0.98); }
+    [3.0, 10.4].forEach(z => propColumn(-hw + 0.55, z, h, 0.26));
+    [3.0, 6.6, 10.4].forEach(z => propColumn(hw - 0.55, z, h, 0.26));
+    kFlag(-2.4, d - 0.6, 2.7); kFlag(2.0, d - 0.6, 2.7);
+    try{ propPlaque(0, 3.3, d - 0.02, Math.PI, "The Senate", "Advice and consent", 1.4, 0.32); }catch(e){}
+    try{ propClock(0, 3.4, 0.09, 0); }catch(e){}
+    propSconceDecor(-hw + 0.12, 3.0, 5.0, Math.PI/2);
+    propSconceDecor(hw - 0.12, 3.0, 5.0, -Math.PI/2);
+    propSconceDecor(-hw + 0.12, 3.0, 8.4, Math.PI/2);
+    propSconceDecor(hw - 0.12, 3.0, 8.4, -Math.PI/2);
+    propRug(0, 3.8, 1.6, 4.0);
+    propPlant(-hw + 0.7, 1.0, 1.0); propPlant(hw - 0.7, 1.0, 1.0);
+  } else if(id === "court"){
+    const bz = d - 2.1;
+    addBox(wood, 0, 0.15, bz + 0.6, 8.6, 0.30, 2.6, 0, true);          /* dais */
+    addBox(wood, 0, 0.62, bz - 0.35, 8.2, 1.24, 0.30, 0, true);         /* bench front */
+    addBox(wood, 0, 1.27, bz - 0.12, 8.4, 0.06, 0.78, 0, true);         /* bench top */
+    for(let i = 0; i < 5; i++){
+      const x = -3.2 + i * 1.6;
+      propChair(wood, matCol(0x1d1f26, .7), x, bz + 0.85, Math.PI, 0.30);
+      addBox(wood, x, 1.85, bz + 1.12, 0.62, 1.15, 0.10, 0, true);      /* tall chair backs */
+      propPapers(x, 1.31, bz - 0.1, 1);
+    }
+    /* the bar, counsel tables, lectern */
+    addBox(wood, -2.7, 0.48, 4.3, 4.2, 0.96, 0.10, 0, true);
+    addBox(wood,  2.7, 0.48, 4.3, 4.2, 0.96, 0.10, 0, true);
+    propDesk(wood, wood, -2.4, 5.6, 2.2, 0.8);
+    propDesk(wood, wood,  2.4, 5.6, 2.2, 0.8);
+    [-3.0, -1.8].forEach(x => propChair(wood, leather, x, 4.95, 0));
+    [1.8, 3.0].forEach(x => propChair(wood, leather, x, 4.95, 0));
+    propPapers(-2.4, 0.78, 5.6, 3); propPapers(2.4, 0.78, 5.6, 2);
+    addBox(wood, 0, 0.55, 6.9, 0.62, 1.10, 0.48, 0, true);              /* lectern */
+    addBox(wood, 0, 1.14, 6.85, 0.70, 0.06, 0.56, 0.0, true);
+    /* public seats */
+    for(let r = 0; r < 2; r++) for(let s = -1; s <= 1; s += 2)
+      for(let c = 0; c < 3; c++) propChair(matCol(0x3e3428, .8), matCol(0x5b4c3e, .85), s * (1.4 + c * 0.95), 1.9 + r * 1.0, 0);
+    [2.6, 6.0, 9.4].forEach(z => { propColumn(-hw + 0.6, z, h, 0.28); propColumn(hw - 0.6, z, h, 0.28); });
+    kFlag(-4.6, d - 0.6, 2.6); kFlag(4.2, d - 0.6, 2.6);
+    try{ propPlaque(0, 3.35, d - 0.02, Math.PI, "Equal Justice Under Law", "The Court", 1.6, 0.30); }catch(e){}
+    try{ propClock(0, 3.6, 0.09, 0); }catch(e){}
+    propSconceDecor(-hw + 0.12, 2.8, 4.3, Math.PI/2);
+    propSconceDecor(hw - 0.12, 2.8, 4.3, -Math.PI/2);
+    propRug(0, 3.0, 1.4, 3.2);
+  } else if(id === "exec"){
+    const dz = d - 2.6;
+    propRug(0, dz - 0.4, 4.6, 3.6);
+    propDesk(wood, wood, 0, dz, 2.3, 1.05, 0, 0.80);
+    propChair(wood, leather, 0, dz + 0.85, Math.PI);
+    propChair(wood, leather, -0.7, dz - 1.05, 0);
+    propChair(wood, leather,  0.7, dz - 1.05, 0);
+    propPapers(-0.4, 0.82, dz, 3);
+    try{ propLamp(0.85, 0.80 + 0.32, dz + 0.2, 0xffd9a0, 0.7); }catch(e){}
+    kFlag(-1.9, d - 0.55, 2.4); kFlag(1.5, d - 0.55, 2.4);
+    /* the cabinet table nearer the door */
+    propDesk(wood, wood, 0, 4.4, 3.6, 1.2, 0, 0.76);
+    for(let i = 0; i < 3; i++){
+      propChair(wood, leather, -1.2 + i * 1.2, 3.45, 0);
+      propChair(wood, leather, -1.2 + i * 1.2, 5.35, Math.PI);
+    }
+    propPapers(-0.6, 0.78, 4.4, 2); propPapers(0.8, 0.78, 4.4, 2);
+    propShelf(-hw + 0.35, 4.0, Math.PI/2, 2.0, 2.1);
+    propShelf(-hw + 0.35, 8.2, Math.PI/2, 2.0, 2.1);
+    propShelf(hw - 0.35, 6.2, -Math.PI/2, 2.0, 2.1);
+    try{ propPlaque(0, 2.5, d - 0.02, Math.PI, "The Executive", "Under God, for the Union", 1.2, 0.28); }catch(e){}
+    try{ propClock(0, 2.9, 0.09, 0); }catch(e){}
+    propSconce(-hw + 0.12, 2.2, 8.2, Math.PI/2);
+    propSconce(hw - 0.12, 2.2, 8.2, -Math.PI/2);
+    propPlant(hw - 0.7, 1.0, 1.0); propPlant(-hw + 0.7, 1.0, 0.95); propPlant(hw - 0.7, d - 0.8, 1.1);
+    try{ propCoatStand(-hw + 0.7, d - 0.8); }catch(e){}
+  } else if(id === "govoffice"){
+    const dz = d - 2.4;
+    propRug(0, dz - 0.6, 3.6, 3.0);
+    propDesk(wood, wood, 0, dz, 2.0, 0.95, 0, 0.78);
+    propChair(wood, leather, 0, dz + 0.8, Math.PI);
+    propChair(wood, leather, -0.7, dz - 1.0, 0);
+    propChair(wood, leather,  0.7, dz - 1.0, 0);
+    propPapers(0.3, 0.80, dz, 3);
+    addBox(matCol(0xc9d6c0, .9), -0.3, 0.805, dz + 0.05, 0.9, 0.006, 0.6, 0, true);   /* state map under glass */
+    try{ propLamp(-0.75, 0.78 + 0.32, dz + 0.2, 0xffd9a0, 0.65); }catch(e){}
+    kFlag(-1.7, d - 0.55, 2.3); kFlag(1.3, d - 0.55, 2.3);
+    /* the secretary at the door, a waiting bench */
+    propDesk(wood, wood, 2.9, 3.0, 1.4, 0.7, -Math.PI/2);
+    propChair(wood, leather, 3.6, 3.0, -Math.PI/2);
+    propPapers(2.9, 0.78, 3.0, 2);
+    for(let i = 0; i < 3; i++) propChair(matCol(0x4a4038, .75), matCol(0x6b5b4a, .85), -hw + 0.7, 2.4 + i * 0.85, Math.PI/2);
+    propShelf(-hw + 0.35, 7.0, Math.PI/2, 1.8, 2.0);
+    propShelf(hw - 0.35, 7.2, -Math.PI/2, 1.8, 2.0);
+    const st = (G.you && G.you.state) || "The State";
+    try{ propPlaque(0, 2.45, d - 0.02, Math.PI, "Office of the Governor", st, 1.2, 0.28); }catch(e){}
+    try{ propClock(0, 2.8, 0.09, 0); }catch(e){}
+    propSconce(-hw + 0.12, 2.1, 9.0, Math.PI/2);
+    propSconce(hw - 0.12, 2.1, 9.0, -Math.PI/2);
+    propPlant(hw - 0.7, d - 0.8, 1.0); propPlant(-hw + 0.7, d - 0.8, 1.0);
+    try{ propCoatStand(hw - 0.7, 1.2); }catch(e){}
+  } else if(id === "district"){
+    /* the State House front around its door on the front walk */
+    const dr = (DOORS.district || []).find(x => x.to === "govoffice"); if(!dr) return;
+    const p = doorAt("district", dr), sx = p.x;
+    const stone = matTex(TEX.stone, 2, 2, .92);
+    addBox(stone, sx, 2.1, -1.55, 5.6, 4.2, 3.0, 0, true);                   /* the building itself */
+    addBox(matCol(0xd8d2c4, .85), sx, 4.3, -1.45, 6.0, 0.22, 3.3, 0, true);  /* cornice */
+    addBox(stone, sx, 0.08, 0.55, 3.2, 0.16, 1.0, 0, true);                 /* stoop */
+    [-1.15, 1.15].forEach(o2 => propColumn(sx + o2, 0.62, 3.1, 0.16));
+    addBox(stone, sx, 3.22, 0.55, 3.2, 0.24, 1.05, 0, true);                /* entablature */
+    addBox(stone, sx, 3.48, 0.45, 2.4, 0.28, 0.85, 0, true);                /* pediment block */
+    try{ propPlaque(sx, 3.22, 1.085, 0, "State House", (G.you && G.you.state) || "The State", 1.3, 0.22); }catch(e){}
+  }
+}
+
 function refreshTravel(){
   const box = el("travel"); box.innerHTML = "";
   const t = dayType();
@@ -23222,8 +23592,8 @@ function refreshTravel(){
     b.className = "travel__btn" + (id===G.room?" is-here":"");
     const n = everyone().filter(m => m.room===id && !m.gone).length;
     b.innerHTML = R.t + "<u>" + (id===G.room ? "here" : n + " here · " + R.travel + "m") + "</u>";
-    const blocked = (id==="district" && t==="session" && !G.you.out)
-                 || (id!=="district" && id!=="office" && t==="recess")
+    const blocked = ((id==="district" || (id==="govoffice" && !kHolds("govoffice"))) && t==="session" && !G.you.out)
+                 || (id!=="district" && id!=="office" && id!=="govoffice" && t==="recess")
                  || !outsideAllowed(id);
     b.disabled = id===G.room || blocked || !G.running;
     b.addEventListener("click", () => goTo(id));
@@ -25765,6 +26135,7 @@ function forcePaint(){
 function enterRoom(dest, fromRoom){
   /* Instant feet. Mesh later. Keep walking inward — never stop at the jamb. */
   if(!ROOMS[dest]) return;
+  try{ kEnsurePeople(); }catch(e){}
   forceUnstickMove();
   try{ catchClear("door"); }catch(e){}
   G.speechApproach = null;
