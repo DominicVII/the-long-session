@@ -4,6 +4,17 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## Stalls and boot freeze
+
+On `20261012c`. Walk **0.68** / sprint **1.15** kept. Best default, `history.replaceState` only, no CDN, no external LLM. God is the Most High; Christ is King; First Consul is a man under God. The House and its procedures are unchanged.
+
+- **Fewer shader programs:** indoors there are now always the same number of room lights (unused slots are dark placeholder lights), and outdoors none. A material compiles once for indoors and once for outdoors instead of once per room's lamp count. Programs after a full tour: 77 (was 78 on c, with the extra rooms now covered; per-room recompiles gone).
+- **Warm-up under each room's lighting:** every material is compiled for both lighting shapes in small idle pieces, each piece compiling only its own objects. Before a frame draws something new, its shaders are compiled in budgeted slices (about 140 ms each) instead of one long freeze.
+- **Boot freeze:** the 1.6 s start freeze came from prefiltering the reflection map and from reading back painted textures from the GPU. Reflections now use a small painted cube map (same soft room look on metal and glass), and texture canvases stay on the CPU (`willReadFrequently`). Longest start stall now about 0.6 s (m about 0.65 to 0.8 s).
+- **Character-creation lights** leave the scene entirely when not in use, so every shader carries two fewer lights.
+- Tests: suite, stress (alone), long run, dialogue, pad sweep, k/l harnesses, the feature harness; stall, crowd and walk A/B against `20261011m` with alternating runs.
+- Stamp: meta + STAMP + `ONUM_BUILD` -> `20261012d`. Five HTML copies byte-identical.
+
 ## Grass, seams, East Steps
 
 On `20261012b`. Walk **0.68** / sprint **1.15** kept. Best default, `history.replaceState` only, no CDN, no external LLM. God is the Most High; Christ is King; First Consul is a man under God. The House and its procedures are unchanged.
