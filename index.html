@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261011k">
+<meta name="onum-build" content="20261011l">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261011k";
+  var STAMP = "20261011l";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -3125,6 +3125,7 @@ function routineRoom(m, hour, t){
     if(hour === 7 || hour === 12 || hour === 18) return chance(.78) ? "corridor" : "cloak";
   }
   if(m.kind === "civ" && m.chamber && ROOMS[m.chamber]) return m.chamber;
+  if(m.kind === "civ" && m.hh) return m.room || "away";
   if(m.kind === "civ") return (t === "session") ? "steps" : "district";
   if(m.kind === "press"){
     if(hour < 10) return chance(.5) ? "corridor" : "press";
@@ -7885,6 +7886,7 @@ function lightingSlow(){
     renderer.toneMappingExposure = lerp(0.88, 1.12, day) * GFX_EXPOSE;
     if(camera){ camera.far = MODEST ? 72 : 110; camera.updateProjectionMatrix(); }
     try{ tintSky(day, gold); }catch(e){}
+    try{ lWxLight(day); }catch(e){}
     try{
       const sk = G.world && G.world.sky;
       if(sk === "rain" || sk === "storm"){
@@ -12526,6 +12528,7 @@ function hourLabel(h){
   return hh + " " + ap;
 }
 function buildingWeather(){
+  try{ const w = wxToday(); if(w && w.k !== "clear") return wxLine(w); }catch(e){}
   try{
     const w = worldEnsure();
     if(w.sky === "storm") return "Rain against the east steps. Abroad is worse.";
@@ -18568,6 +18571,14 @@ function fresh(build, tries){
 
 /* what is on their mind, drawn from where they actually are */
 function convHook(m){
+  try{ if(m && m.hh){ const L = hhLine(m); if(L && chance(0.85)) return L; } }catch(e){}
+  try{
+    const rv = lRivalOf(m);
+    if(rv && chance(0.6)) return pick(["You read what I said in the Ledger. Good. I meant it.",
+      "Nothing personal. Your district deserves better and I intend to say so.",
+      "We can keep doing this all season. I have the time. Do you?",
+      "Ask your households about me. Some of them already like me better."]);
+  }catch(e){}
   try{
     const bit = ledgerLine(m);
     if(bit && chance(0.78)) return bit;
@@ -18598,7 +18609,7 @@ function convHook(m){
   if(ally) pool.push(surname(ally.name) + " and I have been trying to get five minutes with the same person all week.");
   if(m.post) pool.push("Everyone thinks the " + postTitle(m.post).toLowerCase() + " has time. Nobody has ever had less.");
   if(m.kind === "press") pool.push("I have a column due at six and nothing in it worth printing.");
-  if(m.kind === "civ" && !m.chamber) pool.push("I have been standing out here about " + m.cause + " for two hours.");
+  if(m.kind === "civ" && !m.chamber && !m.hh) pool.push("I have been standing out here about " + m.cause + " for two hours.");
   return pick(pool);
 }
 /* how they are carrying themselves while they say it */
@@ -18644,7 +18655,7 @@ function threadsFor(m){
          reply:"Fine. I am hearing the count is softer than the whips are saying. Now give me my line.", w:2, trust:2, learn:true, mem:"You made me pay for it. I respect that and I resent it.", mw:2}
       ]});
   }
-  if(m.kind === "civ" && !m.chamber){
+  if(m.kind === "civ" && !m.chamber && !m.hh){
     out.push({id:"cause", line:() => "I have taken a day off work to stand in this building about " + m.cause + ". Are you going to look at it or not?",
       asks:[
         {t:"Promise to look at it", tone:"open", say:"Send it to my office and I will read it myself.",
@@ -20727,6 +20738,7 @@ function pressActions(p){
 
 function civActions(c){
   if(c && c.chamber) return kChamberActs(c);
+  if(c && c.hh) return hhActs(c);
   const you = G.you;
   const A = [
     {t:"Hear them out", c:"30m", run(){
@@ -20951,6 +20963,7 @@ function holdVote(){
    13 · NIGHT · ELECTION · LEADERSHIP
    ══════════════════════════════════════════════════════════ */
 function note(text, big){
+  try{ G._lNote = true; }catch(e){}
   G.journal.unshift({d:G.day, t:text, big:!!big});
   if(G.journal.length > 120) G.journal.pop();
   feed(text, big ? "big" : "");
@@ -20959,6 +20972,7 @@ function note(text, big){
 function feed(text, kind){
   text = wallScrub(text);
   G.feed.unshift({t:text, at:hhmm(), kind:kind||"", born:G.t});
+  try{ lLog(text, kind); }catch(e){}
   if(G.feed.length > 8) G.feed.pop();
   feedDirty = true;
 }
@@ -21077,6 +21091,7 @@ function overnight(){
   try{ faithNight(news); }catch(e){ if(window.console) console.warn("faithNight", e); }
   try{ lifeNight(news); }catch(e){ if(window.console) console.warn("lifeNight", e); }
   try{ echoNight(news); achDaily(); }catch(e){ if(window.console) console.warn("echoNight", e); }
+  try{ lNight(news); }catch(e){ if(window.console) console.warn("lNight", e); }
   resolveStateBills(news);
   regimeCheck(news);
   regimeCheck(news);
@@ -21087,6 +21102,7 @@ function overnight(){
       G.casework.splice(i,1);
       G.you.approval = clamp(G.you.approval + rint(5,9), 0, 100);
       news.push("The " + c2.cause + " case came good. Word travels at home.");
+      try{ lCaseDone(c2, news); }catch(e){}
     }
   }
   G.members.forEach(m => {
@@ -21367,7 +21383,7 @@ function election(){
   const primary = you.standing < 28 ? rint(4,12) : 0;
   const yourSwing = you.party==="FED" ? swing : -swing;
   const yourResult = you.margin + yourSwing*0.6 + (you.approval-50)*0.45 + you.funds*0.12
-                   + (you.post?6:0) - adDamage - primary + rint(-12,12) + Math.min(14, (you.field||0)*0.8);
+                   + (you.post?6:0) - adDamage - primary + rint(-12,12) + Math.min(14, (you.field||0)*0.8) + (function(){ try{ return lHomeSwing(); }catch(e){ return 0; } })();
   you.field = 0;
   /* Out of the House, you run as a private citizen: no influence, no floor,
      and only the people who still take your call. */
@@ -21646,6 +21662,7 @@ function activeJob(){
   }catch(e){}
   if(b && !b.done && G.room !== "floor" && floorSitsNow())
     return "The floor is sitting. Go in.";
+  try{ const lj = lJobLine(); if(lj) return lj; }catch(e){}
   const unread = (G.mail || []).filter(m => !m.read).length;
   if(unread && G.room !== "office") return unread + " waiting in the inbox. Office, or F.";
   try{
@@ -21674,6 +21691,7 @@ function objectiveRoom(){
   try{ const wt = whipTarget(); if(wt && ROOMS[wt.room]) return wt.room; }catch(e){}
   try{ const kr = kChamberDue(); if(kr) return kr; }catch(e){}
   if(b && !b.done && floorSitsNow()) return "floor";
+  try{ if((G.civ || []).some(c => c && c.visitor && c.hhDay === G.day && c.room === "office" && !c.hhHeard) && (G.minute || 0) < 19*60) return "office"; }catch(e){}
   const unread = (G.mail || []).filter(x => !x.read).length;
   if(unread) return "office";
   try{ const ng = nextGoal(); if(ng && ng.room) return ng.room; }catch(e){}
@@ -22884,6 +22902,8 @@ function chestAllyCard(){
 /* 3 · achievements */
 const ACH = [
   {k:"whip", t:"Whip", d:"Worked a colleague the whip count had against you."},
+  {k:"rival", t:"Who Blinked", d:"Outlasted a rival to the end of the feud."},
+  {k:"truce", t:"The Diner Booth", d:"Turned a rival into something like a friend."},
   {k:"cosponsor", t:"Signed On", d:"Got a colleague's name on your bill."},
   {k:"ownbill", t:"Author", d:"Filed a bill of your own."},
   {k:"spend", t:"The Chest Opens", d:"Spent from the war chest."},
@@ -23154,6 +23174,7 @@ function officeCard(){
 
 function paintJob(){
   try{ lifeMorningCheck(); lifeMailCheck(); }catch(e){}
+  try{ lTick(); }catch(e){}
   try{ texUpgradeIdle(); }catch(e){}
   const box = el("job"), txt = el("jobText");
   if(!box || !txt) return;
@@ -23581,6 +23602,553 @@ function buildHigherRoom(id, o){
     try{ propPlaque(sx, 3.22, 1.085, 0, "State House", (G.you && G.you.state) || "The State", 1.3, 0.22); }catch(e){}
   }
 }
+
+/* ══════════════════════════════════════════════════════════
+   20261011l · A WORLD THAT KEEPS GOING
+   Seasons and weather, the households at home and the constituents
+   who come to your door, the morning Ledger built from what really
+   happened yesterday, and rivals whose feuds run for weeks.
+   ══════════════════════════════════════════════════════════ */
+function lHash(n){
+  let x = (Math.imul((n | 0) + 0x9e37, 2654435761) ^ ((G.seedL || 7) * 40503)) >>> 0;
+  x ^= x >>> 13; x = Math.imul(x, 1274126177) >>> 0; x ^= x >>> 16;
+  return ((x >>> 0) % 100000) / 100000;
+}
+function lSeason(month){ return (month === 12 || month <= 2) ? "winter" : month <= 5 ? "spring" : month <= 8 ? "summer" : "autumn"; }
+const L_WX = {
+  winter:[["snow",.30],["frost",.25],["overcast",.20],["clear",.15],["fog",.10]],
+  spring:[["rain",.30],["clear",.35],["overcast",.15],["wind",.10],["fog",.10]],
+  summer:[["clear",.45],["heat",.22],["storm",.15],["overcast",.18]],
+  autumn:[["clear",.30],["rain",.25],["wind",.20],["fog",.15],["overcast",.10]]
+};
+const L_WX_T = {snow:"Snow", frost:"Hard frost", overcast:"Overcast", clear:"Clear", fog:"Fog", rain:"Rain", wind:"High wind", heat:"Heat", storm:"Thunderstorms"};
+function wxToday(){
+  G.wx = G.wx || {};
+  if(G.wx.day === G.day && G.wx.k) return G.wx;
+  if(!G.seedL) G.seedL = rint(1, 9999);
+  const c = civilDate(dayOfYear()), s = lSeason(c.month), table = L_WX[s];
+  let k = "clear";
+  const prev = G.wx;
+  if(prev.k && prev.day === G.day - 1 && table.some(x => x[0] === prev.k) && lHash(G.day * 13 + 1) < 0.4) k = prev.k;
+  else { let r = lHash(G.day * 7 + 3); for(const [kk, pr] of table){ if(r < pr){ k = kk; break; } r -= pr; } }
+  const base = {winter:29, spring:55, summer:80, autumn:57}[s];
+  const t = Math.round(base + (lHash(G.day * 5 + 11) - 0.5) * 16 + (k === "heat" ? 12 : k === "frost" ? -9 : k === "snow" ? -4 : k === "storm" ? -3 : 0));
+  let cover = prev.cover || 0;
+  if(k === "snow") cover = Math.min(3, cover + 1);
+  else if(s === "winter" && t < 34 && k !== "rain") cover = Math.max(0, cover - 0.34);
+  else cover = 0;
+  G.wx = {day:G.day, k, s, t, cover:+cover.toFixed(2)};
+  return G.wx;
+}
+function wxLine(w){
+  w = w || wxToday();
+  const L = {
+    snow: w.cover >= 2 ? "Snow on snow. The plows are behind and Main Street is one lane." : "Snow coming down soft. The steps are salted, mostly.",
+    frost:"A hard frost. Breath shows in the corridor by the steps door.",
+    overcast:"A low grey lid on the town. Nobody is in a hurry.",
+    clear: w.s === "spring" ? "Clear and mild. The cherry trees by the steps are out." : w.s === "autumn" ? "Clear and cold at the edges. The leaves are turning on Main Street." : "Clear skies.",
+    fog:"Fog to the second floor. The dome is gone until noon.",
+    rain:"Steady rain. Umbrellas in every doorway.",
+    wind:"A hard wind off the river. Flags straight out.",
+    heat:"Heat. The cloakroom fans are losing.",
+    storm:"Thunderstorms by afternoon. The galleries will be thin."
+  };
+  return L_WX_T[w.k] + ", " + w.t + "°F. " + (L[w.k] || "");
+}
+function wxGloom(){ const k = (G.wx && G.wx.day === G.day) ? G.wx.k : null; return k === "storm" ? 0.55 : k === "rain" || k === "snow" ? 0.72 : k === "fog" || k === "overcast" ? 0.8 : 1; }
+/* outdoor light and fog follow the day's weather */
+const L_LAND = {winter:0x6b6a55, "winter-snow":0xe2e6ea, autumn:0x8a6a2e, spring:0x4f7a34};
+function lSeasonLand(day){
+  const w = wxToday(); if(!w) return;
+  const key = w.s === "winter" ? (w.cover > 0 ? "winter-snow" : "winter") : w.s;
+  const col = L_LAND[key];
+  if(landGroup) landGroup.children.forEach(m => {
+    if(!m.material || !m.material.color) return;
+    if(m.userData.lHill === undefined){ m.userData.lHill = m.material.color.getHex() === 0x3f5e2c; }
+    if(m.userData.lHill) m.material.color.setHex(col || 0x3f5e2c);
+  });
+  if(col && horizonMesh && horizonMesh.material && horizonMesh.material.color){
+    horizonMesh.material.color.setHex(col).multiplyScalar(lerp(0.35, 1, day));
+  }
+}
+function lWxLight(day){
+  const w = wxToday(); if(!w) return;
+  try{ lSeasonLand(day); }catch(e){}
+  const g = wxGloom();
+  if(g >= 1 && w.k !== "heat") return;
+  if(w.k === "heat"){ renderer.toneMappingExposure *= 1.06; return; }
+  FOGC.setHSL(0.58, 0.10, lerp(0.24, 0.66, day) * (0.75 + g * 0.25));
+  if(scene.fog){
+    scene.fog.color.copy(FOGC);
+    if(w.k === "fog"){ scene.fog.near = 4; scene.fog.far = 34; }
+    else if(w.k === "snow"){ scene.fog.near = 12; scene.fog.far = 62; }
+    else if(w.k === "storm" || w.k === "rain"){ scene.fog.near = 16; scene.fog.far = 80; }
+  }
+  renderer.setClearColor(FOGC);
+  try{ if(scene.background && scene.background.setHSL) scene.background.setHSL(0.58, 0.10, lerp(0.10, 0.56, day) * g); }catch(e){}
+  try{ if(skyMesh && skyMesh.material && skyMesh.material.color) skyMesh.material.color.setHSL(0.58, 0.10, lerp(0.18, 0.62, day) * g); }catch(e){}
+  sun.intensity *= g;
+}
+/* precipitation: one static geometry, moved as a whole, so it costs a transform a frame */
+let wxObj = null, wxKey = "", wxT = 0, wxH = 9;
+function wxClear(){
+  if(!wxObj) return;
+  try{ scene.remove(wxObj); }catch(e){}
+  try{ wxObj.children.forEach(o => { o.geometry && o.geometry.dispose(); }); }catch(e){}
+  wxObj = null;
+}
+function wxBuild(R){
+  wxClear();
+  const w = wxToday();
+  if(!R || !R.open || MODEST || G.gfx === "simple") return;
+  const rainy = w.k === "rain" || w.k === "storm", snowy = w.k === "snow";
+  if(!rainy && !snowy) return;
+  const n = (G.gfx === "balanced" || (typeof crowdSafe !== "undefined" && crowdSafe)) ? (snowy ? 260 : 220) : (snowy ? 520 : (w.k === "storm" ? 600 : 420));
+  const hw = R.w / 2 + 1, d = R.d + 1;
+  const grp = new THREE.Group();
+  let geo, mat;
+  if(rainy){
+    const p = new Float32Array(n * 6);
+    for(let i = 0; i < n; i++){
+      const x = (Math.random() * 2 - 1) * hw, y = Math.random() * wxH, z = Math.random() * d - 0.5;
+      p.set([x, y, z, x + 0.03, y + 0.42, z], i * 6);
+    }
+    geo = new THREE.BufferGeometry(); geo.setAttribute("position", new THREE.BufferAttribute(p, 3));
+    mat = new THREE.LineBasicMaterial({color:0xaab4c0, transparent:true, opacity:0.38, depthWrite:false});
+    for(let k = 0; k < 2; k++){ const o = new THREE.LineSegments(geo, mat); o.position.y = k * wxH; o.frustumCulled = false; grp.add(o); }
+  } else {
+    const p = new Float32Array(n * 3);
+    for(let i = 0; i < n; i++) p.set([(Math.random() * 2 - 1) * hw, Math.random() * wxH, Math.random() * d - 0.5], i * 3);
+    geo = new THREE.BufferGeometry(); geo.setAttribute("position", new THREE.BufferAttribute(p, 3));
+    mat = new THREE.PointsMaterial({color:0xffffff, size:0.07, transparent:true, opacity:0.85, depthWrite:false});
+    for(let k = 0; k < 2; k++){ const o = new THREE.Points(geo, mat); o.position.y = k * wxH; o.frustumCulled = false; grp.add(o); }
+  }
+  grp.userData.snow = snowy; grp.userData.speed = snowy ? 0.85 : (w.k === "storm" ? 12 : 9);
+  scene.add(grp); wxObj = grp;
+}
+function wxFrame(dt){
+  if(!wxObj) return;
+  wxT += Math.min(0.05, dt || 0.016);
+  const sp = wxObj.userData.speed;
+  wxObj.position.y = -((wxT * sp) % wxH);
+  if(wxObj.userData.snow) wxObj.position.x = Math.sin(wxT * 0.6) * 0.35;
+}
+/* the town changes with the season: canopies, and snow on the walks */
+const L_CANOPY = 0x3a6a32;
+const L_SEASON_MAT = {};
+function lSeasonMat(key){
+  if(L_SEASON_MAT[key]) return L_SEASON_MAT[key];
+  const col = key === "autumn" ? 0xb4652a : key === "winter-snow" ? 0xe4e8ec : key === "winter" ? 0x5e5446 : key === "spring" ? 0x6aa84a : L_CANOPY;
+  L_SEASON_MAT[key] = matCol(col, .95);
+  return L_SEASON_MAT[key];
+}
+function lDressSeason(id){
+  const R = ROOMS[id]; if(!R || !R.open || !roomGroup) return;
+  const w = wxToday();
+  const key = w.s === "winter" ? (w.cover > 0 ? "winter-snow" : "winter") : w.s;
+  roomGroup.traverse(o => {
+    if(!o.isMesh || !o.material) return;
+    const ud = o.userData;
+    if(ud.lCanopy === undefined){
+      ud.lCanopy = !!(o.material.color && o.material.color.getHex && o.material.color.getHex() === L_CANOPY);
+      if(ud.lCanopy) ud.lMat0 = o.material;
+    }
+    if(!ud.lCanopy) return;
+    o.material = key === "summer" ? ud.lMat0 : lSeasonMat(key);
+  });
+  /* snow lying on the walks */
+  for(let i = roomGroup.children.length - 1; i >= 0; i--){
+    const c = roomGroup.children[i];
+    if(c.userData && c.userData.lSnow){ roomGroup.remove(c); }
+  }
+  if(w.cover > 0 && id === "district"){
+    const snow = matCol(0xf2f4f6, .96);
+    const add = (x, y, z, sx, sz) => { const m = addBox(snow, x, y, z, sx, 0.012 + w.cover * 0.01, sz, 0, true); m.userData.lSnow = true; m.castShadow = false; };
+    add(-5.0, 0.105, R.d / 2, 5.0, R.d - 0.6);
+    add( 5.0, 0.105, R.d / 2, 5.0, R.d - 0.6);
+    if(w.cover >= 2){ add(-1.7, 0.045, R.d / 2, 0.8, R.d - 0.6); add(1.7, 0.045, R.d / 2, 0.8, R.d - 0.6); }
+  }
+}
+
+/* ── households at home ─────────────────────────────────── */
+const L_STREETS = ["Elm Street","Mill Road","Church Lane","Water Street","Orchard Row","Depot Street","River Road"];
+const L_NEEDS = ["the bridge on Mill Road","a pension letter that never came","the school bus route","the flooding behind the church",
+  "the plant's last shift","a son's visa hearing","the clinic's hours","a farm loan","the rail crossing gates","a veteran's claim",
+  "the post office closing","the water bills","a daughter's student loan","the grain elevator's scales"];
+const L_KID = ["started at the high school and wants to be a nurse","made the county band","is home from the army for Christmas",
+  "got into the state college","broke an arm on the ice and is proud of it","is learning the trade at the mill","sings in the choir now"];
+function townEnsure(){
+  G.town = G.town || {};
+  const T = G.town;
+  if(!T.hh || !T.hh.length){
+    const st = G.you && G.you.state;
+    T.hh = [];
+    for(let i = 0; i < 7; i++){
+      const head = newName(st), fam = surname(head);
+      const spouse = newName(st).split(" ")[0] + " " + fam;
+      T.hh.push({id:i + 1, fam, street:L_STREETS[i], people:[head, spouse], kid:newName(st).split(" ")[0], kidNews:pick(L_KID),
+        need:pick(L_NEEDS), mood:50 + rint(-10, 10), mem:[], helped:0, visits:0, wait:0});
+    }
+    T.letters = []; T.spawnDay = 0;
+  }
+  return T;
+}
+function hhById(id){ const T = townEnsure(); return T.hh.find(h => h.id === id) || null; }
+function hhRemember(h, text){ h.mem.push({d:G.day, t:text}); if(h.mem.length > 8) h.mem.shift(); }
+function townMood(){ const T = townEnsure(); return T.hh.reduce((a, h) => a + h.mood, 0) / T.hh.length; }
+function lSpawnTown(){
+  const T = townEnsure();
+  if(!G.civ) G.civ = [];
+  G.civ = G.civ.filter(c => !(c && c.hhTemp && c.hhDay !== G.day));
+  _allCache = null;
+  if(T.spawnDay === G.day) return;
+  T.spawnDay = G.day;
+  const w = wxToday(), t = dayType();
+  const make = (h, room, role, who) => {
+    try{
+      const c = makeCivilian();
+      c.name = who; c.hh = h.id; c.hhTemp = true; c.hhDay = G.day; c.role = role; c.cause = h.need;
+      c.caseOpen = false; c.room = room; c.state = G.you.state;
+      try{ placeInRoom(c); }catch(e){}
+      G.civ.push(c); _allCache = null;
+      return c;
+    }catch(e){ return null; }
+  };
+  /* a constituent at the office door on working days */
+  if((t === "session" || t === "district") && !G.you.out && !(w.k === "storm" || w.cover >= 2.5) && lHash(G.day * 3 + 17) < 0.7){
+    const h = T.hh.slice().sort((a, b) => (a.mood - a.wait * 4) - (b.mood - b.wait * 4))[0];
+    const c = make(h, "office", "Constituent · " + h.street, h.people[h.visits % 2]);
+    if(c){ c.visitor = true; h.visits++; h.wait = 0; }
+  }
+  /* neighbours on Main Street */
+  const out = w.k === "storm" ? 0 : (w.k === "snow" || w.k === "rain" || w.k === "frost") ? 1 : w.k === "clear" ? 3 : 2;
+  const order = T.hh.slice().sort(() => Math.random() - 0.5);
+  for(let i = 0; i < out && i < order.length; i++){
+    const h = order[i];
+    make(h, "district", "Neighbour · " + h.street, h.people[(G.day + i) % 2]);
+  }
+}
+function hhLine(m){
+  const h = hhById(m.hh); if(!h) return null;
+  const w = wxToday();
+  const last = h.mem[h.mem.length - 1];
+  const P = [];
+  if(last && last.t) P.push("Last time: " + last.t + " I have not forgotten it.");
+  if(h.helped) P.push("The " + h.need.replace(/^the /, "") + " business is next. You fixed the last thing, so I came back.");
+  P.push("It is about " + h.need + ". I have written twice.");
+  P.push("My " + (chance(.5) ? "boy" : "girl") + ", " + h.kid + ", " + h.kidNews + ".");
+  if(w.k === "snow") P.push("Snow up to the porch on " + h.street + ". The plow came once.");
+  if(w.k === "heat") P.push("It is ninety on " + h.street + " and the fans at the senior center are broken.");
+  if(h.mood < 35) P.push("People on " + h.street + " have stopped expecting anything from this office. I would like to be wrong about that.");
+  if(h.mood > 70) P.push("Everybody on " + h.street + " says you are all right. Do not make them liars.");
+  return pick(P);
+}
+function hhActs(c){
+  const h = hhById(c.hh), you = G.you, A = [];
+  if(!h) return A;
+  A.push({t:"Hear them out", c:"20m", off:!!c.hhHeard, run(){
+    spend(20, 3); c.hhHeard = true; h.mood = clamp(h.mood + 4, 0, 100); you.approval = clamp(you.approval + 1, 0, 100);
+    hhRemember(h, "you sat with us about " + h.need + ".");
+    setSay("It is about " + h.need + ". You listen to the whole of it, which nobody has done before.", fx("+1 approval · the " + h.fam + "s remember", "20 minutes"));
+  }});
+  A.push({t:"Take it on as casework", c:"40m · 3 infl", off:!!c.hhTaken || you.influence < 3 || G.casework.some(x => x && x.hh === h.id), run(){
+    spend(40, 6); you.influence -= 3; c.hhTaken = true;
+    G.casework.push({cause:h.need, who:c.name, due:G.day + rint(3, 6), hh:h.id});
+    hhRemember(h, "you said your office would take on " + h.need + ".");
+    setSay("You have your caseworker write it down in front of them. They watch every word.", fx("casework opened for the " + h.fam + "s", "−3 influence"));
+    note("Opened casework for the " + h.fam + " family on " + h.need + ".");
+  }});
+  A.push({t:"Ask after the family", c:"10m", off:!!c.hhAsked, run(){
+    spend(10, 1); c.hhAsked = true; h.mood = clamp(h.mood + 2, 0, 100);
+    hhRemember(h, "you asked after " + h.kid + ".");
+    setSay(h.kid + " " + h.kidNews + ". They show you a photograph from a wallet.", fx("the " + h.fam + "s warm to you", ""));
+  }});
+  A.push({t:"Show them out", c:"0m", run(){
+    h.mood = clamp(h.mood - 3, 0, 100); hhRemember(h, "you were busy.");
+    c.room = "away"; _allCache = null;
+    setSay("They go. They will tell " + h.street + " you were busy.", fx("", "the " + h.fam + "s cool"));
+  }});
+  return A;
+}
+function lCaseDone(c2, news){
+  if(!c2 || !c2.hh) return;
+  const h = hhById(c2.hh); if(!h) return;
+  h.helped++; h.mood = clamp(h.mood + 10, 0, 100);
+  hhRemember(h, "your office sorted out " + h.need + ".");
+  const T = townEnsure();
+  T.letters.push({d:G.day, fam:h.fam, street:h.street, good:true,
+    t:"The " + h.fam + " family of " + h.street + " write to say " + h.need + " is settled, and that they did not think anyone in the Capitol would bother."});
+  h.need = pick(L_NEEDS.filter(x => x !== h.need));
+}
+function lTownNight(news){
+  const T = townEnsure(), w = wxToday();
+  T.hh.forEach(h => {
+    h.wait = (h.wait || 0) + 1;
+    let dm = (50 - h.mood) * 0.03;
+    if(w.k === "storm" || w.cover >= 2) dm -= 0.6;
+    if(w.k === "clear" && w.s !== "winter") dm += 0.3;
+    if(h.wait > 10) dm -= 0.3;
+    h.mood = clamp(h.mood + dm, 0, 100);
+    if(h.mood < 30 && !T.letters.some(l => l.fam === h.fam && G.day - l.d < 6)){
+      T.letters.push({d:G.day, fam:h.fam, street:h.street, good:false,
+        t:"A letter from " + h.people[0] + " of " + h.street + ": \"We have asked about " + h.need + " since the winter. Is anybody there?\""});
+    }
+  });
+  if(T.letters.length > 20) T.letters.splice(0, T.letters.length - 20);
+  const avg = townMood();
+  if(G.you && !G.you.out) G.you.approval = clamp(G.you.approval + clamp((avg - 50) / 40, -0.5, 0.5), 0, 100);
+}
+
+/* ── rivals with long arcs ──────────────────────────────── */
+function rivalCandidates(){
+  const y = G.you;
+  return (G.members || []).filter(m => m && !m.gone && m.kind === "member" && !m.machine && !m.sanctioned && !m.chaplain &&
+    !(typeof isConsular === "function" && isConsular(m)) && !(G.rivals || []).some(r => r.id === m.id));
+}
+function rivalPick(){
+  const y = G.you; const C = rivalCandidates(); if(!C.length) return null;
+  let m = C.filter(x => x.rel && x.rel.warmth < -10).sort((a, b) => a.rel.warmth - b.rel.warmth)[0];
+  if(!m) m = C.filter(x => x.party !== y.party && x.state === y.state)[0];
+  if(!m) m = C.filter(x => x.party !== y.party).sort((a, b) => ((b.traits && b.traits.vanity) || 0) - ((a.traits && a.traits.vanity) || 0))[0];
+  if(!m) return null;
+  m.rel.warmth = Math.min(m.rel.warmth, -20);
+  const r = {id:m.id, name:m.name, since:G.day, stage:0, next:G.day + rint(1, 3), heat:20, answered:0, dug:false, out:null, log:[]};
+  G.rivals = G.rivals || []; G.rivals.push(r);
+  return r;
+}
+function rivalSay(r, text, news, kind){
+  r.log.push({d:G.day, t:text});
+  if(r.log.length > 12) r.log.shift();
+  if(news) news.push(text); else feed(text, kind || "");
+}
+function rivalEnd(r, out, text, news){
+  r.out = out; r.ended = G.day; rivalSay(r, text, news);
+  G.rivalNext = G.day + rint(8, 14);
+  try{ if(out === "beaten") achieve("rival"); if(out === "truce") achieve("truce"); }catch(e){}
+}
+function rivalAdvance(r, news){
+  const y = G.you, m = byId(r.id), sn = surname(r.name), you = surname(y.name);
+  if(!m || m.gone){ return rivalEnd(r, "gone", sn + " is gone from the House. The feud went with " + (chance(.5) ? "them" : "the nameplate") + ".", news); }
+  if(m.rel && m.rel.warmth > 15){
+    y.approval = clamp(y.approval + 1, 0, 100); m.rel.warmth = clamp(m.rel.warmth + 10, -100, 100);
+    return rivalEnd(r, "truce", sn + " and " + you + " were seen sharing a booth at the diner. The feud is over, for now.", news);
+  }
+  r.stage++; r.heat = clamp(r.heat + 10, 0, 100);
+  if(r.stage === 1){
+    y.approval = clamp(y.approval - 1, 0, 100);
+    rivalSay(r, sn + " told the Ledger that " + you + " \"has never read a bill past its title.\"", news);
+  } else if(r.stage === 2){
+    const hit = r.answered ? 1 : 3;
+    y.approval = clamp(y.approval - hit, 0, 100);
+    rivalSay(r, sn + " bought radio time in " + y.state + " to talk about " + you + "'s record." + (r.answered ? " Your answer took the edge off." : ""), news);
+  } else if(r.stage === 3){
+    y.standing = clamp(y.standing - 2, 0, 100);
+    const b = G.bill && !G.bill.done ? G.bill : null;
+    rivalSay(r, b ? sn + " is whipping against " + b.title + " door to door, and telling people it is about " + you + "."
+                  : sn + " took the committee seat " + you + " wanted, and thanked the Speaker in public.", news);
+  } else if(r.stage === 4){
+    y.rivalPen = Math.min(8, Math.round(r.heat / 8));
+    rivalSay(r, sn + " is raising money for a challenger in " + y.state + " " + (y.dist || "") + ". The first mailer is already out.", news);
+  } else {
+    const me = y.approval * 0.6 + y.standing * 0.4 + (r.dug ? 8 : 0) + r.answered * 3 + rint(-10, 10);
+    const them = 44 + r.heat * 0.15;
+    if(me >= them){
+      y.approval = clamp(y.approval + 4, 0, 100); y.rivalPen = 0;
+      m.rel.warmth = Math.max(m.rel.warmth, -5);
+      rivalEnd(r, "beaten", sn + " dropped the challenger and asked, quietly, for a seat on one of " + you + "'s committees. The town noticed who blinked.", news);
+    } else {
+      y.standing = clamp(y.standing - 4, 0, 100); y.approval = clamp(y.approval - 3, 0, 100);
+      rivalEnd(r, "lost", sn + " has the better of " + you + " this season. The cloakroom has started saying it out loud.", news);
+    }
+    return;
+  }
+  r.next = G.day + rint(3, 5);
+}
+function rivalTick(news){
+  G.rivals = G.rivals || [];
+  const live = G.rivals.filter(r => !r.out);
+  if(!live.length && G.day >= (G.rivalNext || 3) && G.you && !G.you.out){
+    const r = rivalPick();
+    if(r) rivalSay(r, surname(r.name) + " has started telling people " + surname(G.you.name) + " is " + pick(["a show horse","in over their head","bought and paid for","all hat"]) + ".", news);
+  }
+  G.rivals.filter(r => !r.out && G.day >= r.next).forEach(r => rivalAdvance(r, news));
+  if(G.rivals.length > 8) G.rivals.splice(0, G.rivals.length - 8);
+}
+function rivalLive(){ return (G.rivals || []).find(r => !r.out) || null; }
+function lRivalOf(m){ const r = rivalLive(); return r && m && r.id === m.id ? r : null; }
+function lHomeSwing(){
+  const y = G.you; let s = 0;
+  try{ s += clamp((townMood() - 50) / 6, -6, 6); }catch(e){}
+  s -= (y.rivalPen || 0); y.rivalPen = 0;
+  return s;
+}
+function rivalCard(){
+  G.running = false;
+  const y = G.you, r = rivalLive(), m = r ? byId(r.id) : null;
+  const once = k => { y.used = y.used || {}; return y.used[k] === G.day; };
+  const mark = k => { y.used = y.used || {}; y.used[k] = G.day; };
+  const STAGE = ["Words in the cloakroom", "Words in the paper", "Radio time at home", "Working against you", "Funding a challenger", "The reckoning"];
+  const past = (G.rivals || []).filter(x => x.out).slice(-4).reverse();
+  const OUT = {truce:"made peace", beaten:"you came out ahead", lost:"they came out ahead", gone:"left the House"};
+  const acts = r ? [
+    {k:"truce", t:"Seek a truce", d:"30 minutes over coffee. They may take it.", off:once("rvT")},
+    {k:"press", t:"Answer them in the press", d:"3 influence. Takes the sting out of the next hit.", off:once("rvP") || y.influence < 3},
+    {k:"dig", t:"Dig into their record", d:"An hour and 5 influence. It will matter at the end.", off:r.dug || y.influence < 5}
+  ] : [];
+  card.innerHTML = '<div class="eyebrow">Rivals</div><h1>' + (r ? r.name : "Nobody, for now") + '</h1>' +
+    (r ? '<p class="dream">' + STAGE[Math.min(5, r.stage)] + '. Heat ' + r.heat + '. Since day ' + r.since + '.</p>' +
+      r.log.slice(-4).map(x => '<p>Day ' + x.d + ': ' + x.t + '</p>').join("") : '<p>The building is quiet about you. It will not stay that way.</p>') +
+    acts.map((a, i) => '<div class="whip__row"><span class="whip__n">' + a.t + '</span><span class="whip__w">' + a.d + '</span>' +
+      '<span class="whip__b"><button type="button" class="btn btn--ghost whip__go" data-rv="' + a.k + '"' + (a.off ? ' disabled' : '') + '>Do it</button></span></div>').join("") +
+    (past.length ? '<p class="dream">Before: ' + past.map(x => x.name + " (" + (OUT[x.out] || x.out) + ")").join(", ") + '.</p>' : '') +
+    '<div id="rvSay" class="dream"></div><div class="card__actions"><button type="button" class="btn" id="rvClose">Close</button></div>';
+  veil.hidden = false;
+  el("rvClose").addEventListener("click", () => walkNow());
+  card.querySelectorAll("[data-rv]").forEach(bt => bt.addEventListener("click", () => {
+    const k = bt.getAttribute("data-rv"); let msg = "";
+    if(!r) return;
+    if(k === "truce"){
+      mark("rvT"); spend(30, 4);
+      const ok = m && chance(0.3 + y.standing / 250 + (r.answered ? 0.05 : 0));
+      if(m) m.rel.warmth = clamp(m.rel.warmth + (ok ? 14 : 4), -100, 100);
+      msg = ok ? surname(r.name) + " hears you out and does not say no. That is how these things start." : surname(r.name) + " drinks the coffee and gives you nothing.";
+    } else if(k === "press"){
+      mark("rvP"); y.influence -= 3; y.approval = clamp(y.approval + 2, 0, 100); r.answered++; r.heat = clamp(r.heat - 6, 0, 100);
+      msg = "Your answer runs on page two, under theirs. It reads better.";
+    } else if(k === "dig"){
+      spend(60, 8); y.influence -= 5; r.dug = true; r.heat = clamp(r.heat + 10, 0, 100);
+      msg = "A vote from six years ago, a donor from last spring. You keep it in a folder for the right day.";
+    }
+    rivalCard();
+    const s = el("rvSay"); if(s) s.textContent = msg;
+  }));
+}
+
+/* ── the morning Ledger ─────────────────────────────────── */
+const L_NOT_NEWS = /[✓✔]|\b(standing|influence|approval|energy) [+−-]\d|^Ignored |^Today |^Missed |^Saved|^Achievement|minutes\)/i;
+function lLog(text, kind){
+  const you = !!G._lNote; G._lNote = false;
+  if(!text || text.length < 14 || L_NOT_NEWS.test(text)) return;
+  G.daylog = G.daylog || [];
+  G.daylog.push({d:G.day, t:String(text).slice(0, 220), k:kind || "", you});
+  if(G.daylog.length > 180) G.daylog.splice(0, G.daylog.length - 180);
+}
+function lScore(x){
+  const t = x.t; let s = 0;
+  if(/passed|failed|fails|falls|ruled|elected|won |lost |veto|amendment|confirm|resign|left the|switch|sworn|impeach/i.test(t)) s += 4;
+  if(/envoy|realm|cable|mission/i.test(t)) s += 1;
+  if(x.k === "big") s += 3;
+  if(x.k === "bad" || x.k === "good") s += 1;
+  try{ if(G.you && t.indexOf(surname(G.you.name)) >= 0) s += 2; }catch(e){}
+  if(/^You /.test(t)) s -= 1;
+  return s;
+}
+function lHeadline(t){
+  t = String(t).replace(/\s+/g, " ").trim();
+  if(t.length > 110) t = t.slice(0, 107).replace(/\s+\S*$/, "") + "...";
+  return t;
+}
+function paperBuild(){
+  const D = G.day, y = G.you;
+  const prev = (G.daylog || []).filter(x => x.d === D - 1 || (x.d === D && /overnight|this morning/i.test(x.t)));
+  const night = (G.nightNews && (G.nightNews.day === D - 1 || G.nightNews.day === D)) ? G.nightNews.items.map(t => ({t, k:"", d:D})) : [];
+  const seen = new Set(), all = [];
+  const sn = y ? surname(y.name) : "The member";
+  night.concat(prev).forEach(x => {
+    if(L_NOT_NEWS.test(x.t)) return;
+    let t = x.t;
+    if(x.you && !/^(You|Your|The|A|An)\b/.test(t) && t.indexOf(sn) < 0) t = sn + " " + t.charAt(0).toLowerCase() + t.slice(1);
+    else if(/^You /.test(t)) t = sn + " " + t.slice(4);
+    const key = t.slice(0, 60); if(seen.has(key)) return; seen.add(key); all.push({t, k:x.k, d:x.d});
+  });
+  all.sort((a, b) => lScore(b) - lScore(a));
+  const top = all[0];
+  const T = townEnsure();
+  const letter = T.letters.filter(l => D - l.d <= 3).slice(-1)[0];
+  const r = rivalLive() || (G.rivals || []).filter(x => x.ended && D - x.ended <= 1).slice(-1)[0];
+  const rl = r && r.log.length ? r.log[r.log.length - 1] : null;
+  return {
+    day:D,
+    head: top ? lHeadline(top.t) : (G.bill && !G.bill.done ? "The House turns to " + G.bill.title : "A quiet day in the Capitol"),
+    stories: all.slice(1, 5).map(x => lHeadline(x.t)),
+    rival: rl && D - rl.d <= 2 ? rl.t : null,
+    letter: letter ? letter.t : null,
+    wx: wxLine(),
+    poll: y ? "Your approval at home stands at " + Math.round(y.approval) + ". The households on " + pick(T.hh).street + " are " + (townMood() > 60 ? "warm to you" : townMood() < 40 ? "cool on you" : "making up their minds") + "." : ""
+  };
+}
+function paperCard(){
+  G.running = false;
+  const P = paperBuild();
+  G.paperRead = G.day;
+  card.innerHTML = '<div class="eyebrow">The Capitol Ledger · ' + dateString() + ' · five cents</div>' +
+    '<h1>' + P.head + '</h1>' +
+    '<p class="dream">' + P.wx + '</p>' +
+    (P.stories.length ? P.stories.map(s => '<p>· ' + s + '</p>').join("") : '<p>· The galleries were thin and the clerks went home on time.</p>') +
+    (P.rival ? '<p><strong>The feud:</strong> ' + P.rival + '</p>' : '') +
+    (P.letter ? '<p><strong>Letters from home:</strong> ' + P.letter + '</p>' : '') +
+    '<p class="dream">' + P.poll + '</p>' +
+    '<div class="card__actions"><button type="button" class="btn" id="lpClose">Fold it</button>' +
+    '<button type="button" class="btn btn--ghost" id="lpRival">Rivals</button><button type="button" class="btn btn--ghost" id="lpHome">Home</button></div>';
+  veil.hidden = false;
+  el("lpClose").addEventListener("click", () => walkNow());
+  el("lpRival").addEventListener("click", () => rivalCard());
+  el("lpHome").addEventListener("click", () => homeCard());
+}
+function homeCard(){
+  G.running = false;
+  const T = townEnsure(), w = wxToday();
+  card.innerHTML = '<div class="eyebrow">Home · ' + (G.you.state || "") + ' ' + (G.you.dist || "") + '</div><h1>The households</h1>' +
+    '<p class="dream">' + wxLine(w) + ' The ' + w.s + ' at home.</p>' +
+    T.hh.map(h => '<div class="whip__row"><span class="whip__n">The ' + h.fam + 's, ' + h.street + '</span><span class="whip__w">' +
+      (h.mood > 65 ? "warm" : h.mood < 35 ? "sore" : "watching") + ' · ' + h.need + (h.mem.length ? ' · they remember ' + h.mem[h.mem.length - 1].t : '') + '</span></div>').join("") +
+    '<div class="card__actions"><button type="button" class="btn" id="hmClose">Close</button></div>';
+  veil.hidden = false;
+  el("hmClose").addEventListener("click", () => walkNow());
+}
+
+/* ── daily wiring ───────────────────────────────────────── */
+let _lDay = -1, _lRoomKey = "";
+function lMorning(){
+  const w = wxToday();
+  townEnsure();
+  try{ lSpawnTown(); }catch(e){ if(window.console) console.warn("town", e); }
+  const y = G.you; if(!y) return;
+  if(G._lEnergyDay !== G.day && (G.minute || 0) < 9 * 60){
+    G._lEnergyDay = G.day;
+    if(w.k === "heat") y.energy = clamp(y.energy - 6, 0, 100);
+    else if(w.k === "storm") y.energy = clamp(y.energy - 3, 0, 100);
+    else if(w.k === "clear" && w.s === "spring") y.energy = clamp(y.energy + 4, 0, 100);
+    try{ feed(wxLine(w)); }catch(e){}
+  }
+}
+function lTick(){
+  if(!G.you || !G.running) return;
+  if(_lDay !== G.day){ _lDay = G.day; lMorning(); }
+  const w = wxToday();
+  const key = G.room + "|" + G.day + "|" + w.k + "|" + w.cover + "|" + (_roomBuiltId === G.room && _roomFurnished ? 1 : 0);
+  if(key !== _lRoomKey && _roomBuiltId === G.room){
+    _lRoomKey = key;
+    try{ lDressSeason(G.room); }catch(e){}
+    try{ wxBuild(ROOMS[G.room]); }catch(e){}
+  }
+}
+function lNight(news){
+  G.nightNews = {day:G.day, items:news};
+  try{ rivalTick(news); }catch(e){ if(window.console) console.warn("rivals", e); }
+  try{ lTownNight(news); }catch(e){ if(window.console) console.warn("townNight", e); }
+}
+function lJobLine(){
+  const here = hereNow();
+  const v = (G.civ || []).find(c => c && c.visitor && c.hhDay === G.day && c.room === "office" && !c.hhHeard);
+  if(v && (G.minute || 0) < 19 * 60) return G.room === "office" ? v.name + " from " + v.role.split("· ")[1] + " is waiting. Walk over. E." : v.name.split(" ")[0] + " from home is waiting in your office.";
+  if(G.paperRead !== G.day && (G.minute || 0) < 11 * 60) return "The Ledger is out. Side table in your office, or Pause > Today's paper.";
+  return null;
+}
+PROPS.office = PROPS.office || [];
+PROPS.office.push({id:"ledger", label:"The morning Ledger", sub:"Folded on the side table, still warm from the van", x:1.55, z:4.85, r:1.25,
+  acts:() => [{t:"Read today's Ledger", c:"10m", run(){ spend(10, -2); paperCard(); }},
+              {t:"Look at the letters from home", c:"5m", run(){ spend(5, 0); homeCard(); }}]});
 
 function refreshTravel(){
   const box = el("travel"); box.innerHTML = "";
@@ -24602,7 +25170,7 @@ function saveCaptureBase(){
     withWhom:G.withWhom, ties:G.ties, panel:null, court:G.court, own:G.own, parties:G.parties,
     termLength:G.termLength, country:G.country,
     greatest:G.greatest, blasphemy:G.blasphemy, loreNote:G.loreNote, greatnessOpen:G.greatnessOpen,
-    relics:G.relics, relicSpots:G.relicSpots, consularLore:G.consularLore, bind:G.bind, sens:G.sens, invertY:!!G.invertY, voiceVol:G.voiceVol, goals:G.goals, whip:G.whip || null, billQueue:G.billQueue || [], faith:G.faith || null, life:G.life || null, ach:G.ach || {}, law:G.law || null, ladder:G.ladder || [], cases:G.cases || [], lastActs:G.lastActs || [], echoes:G.echoes || [], billKinds:G.billKinds || {}, realmRel:G.realmRel || {}, listened:G.listened || 0,
+    relics:G.relics, relicSpots:G.relicSpots, consularLore:G.consularLore, bind:G.bind, sens:G.sens, invertY:!!G.invertY, voiceVol:G.voiceVol, goals:G.goals, whip:G.whip || null, billQueue:G.billQueue || [], faith:G.faith || null, life:G.life || null, ach:G.ach || {}, law:G.law || null, ladder:G.ladder || [], cases:G.cases || [], lastActs:G.lastActs || [], wx:G.wx || null, town:G.town || null, rivals:G.rivals || [], rivalNext:G.rivalNext || 0, daylog:(G.daylog || []).slice(-120), paperRead:G.paperRead || 0, seedL:G.seedL || 0, echoes:G.echoes || [], billKinds:G.billKinds || {}, realmRel:G.realmRel || {}, listened:G.listened || 0,
     world:G.world,
     pendingNight:!!G.pendingNight,
     cam:{x:cam.x, z:cam.z, yaw:cam.yaw, pitch:cam.pitch},
@@ -24946,6 +25514,9 @@ function setupSettingsUI(){
       row("Pace of the day", "How fast the clock runs around you", opt("pzspeed", 1, "1×", sp === 1) + opt("pzspeed", 2, "2×", sp === 2) + opt("pzspeed", 4, "4×", sp === 4)) +
       row("Save", '<span id="pzSaved">Autosaves at every door and every few minutes</span>', '<button type="button" class="settings-btn settings-btn-secondary" id="pzSave">Save now</button>') +
       row("The handbook", "Everything the House does, in order", '<button type="button" class="settings-btn settings-btn-secondary" id="pzBook">Open</button>') +
+      row("Today's paper", "The Capitol Ledger: yesterday in the building, the feud, letters from home, the weather", '<button type="button" class="settings-btn settings-btn-secondary" id="pzPaper">Read</button>') +
+      row("Rivals", "Who has it in for you, how far it has gone, and what you can do about it", '<button type="button" class="settings-btn settings-btn-secondary" id="pzRival">Open</button>') +
+      row("Home", "The households in your district: what they need and what they remember", '<button type="button" class="settings-btn settings-btn-secondary" id="pzHome">Open</button>') +
       row("Your office", "The powers of the chair you hold, and the term limits in law", '<button type="button" class="settings-btn settings-btn-secondary" id="pzOffice">Open</button>') +
       row("Achievements", "What the record will say. Some are hidden until you find them", '<button type="button" class="settings-btn settings-btn-secondary" id="pzAch">Open</button>') +
       row("War chest", "Spend it on ads, staff, offices, allies, counsel, polls and press time", '<button type="button" class="settings-btn settings-btn-secondary" id="pzChest">Open</button>') +
@@ -24988,6 +25559,9 @@ function setupSettingsUI(){
     const t = el("pzSaved"); if(t) t.textContent = ok ? ("Saved · day " + G.day + " · " + hhmm()) : "Could not save — storage may be full";
   });
   const byBook = el("pzBook"); if(byBook) byBook.addEventListener("click", () => { closeSettings(); try{ handbookCard(); }catch(e){} });
+  const byPaper = el("pzPaper"); if(byPaper) byPaper.addEventListener("click", () => { closeSettings(); setTimeout(() => { try{ paperCard(); }catch(e){} }, 30); });
+  const byRival = el("pzRival"); if(byRival) byRival.addEventListener("click", () => { closeSettings(); setTimeout(() => { try{ rivalCard(); }catch(e){} }, 30); });
+  const byHome = el("pzHome"); if(byHome) byHome.addEventListener("click", () => { closeSettings(); setTimeout(() => { try{ homeCard(); }catch(e){} }, 30); });
   const byOff = el("pzOffice"); if(byOff) byOff.addEventListener("click", () => { closeSettings(); setTimeout(() => { try{ officeCard(); }catch(e){} }, 30); });
   const byAch = el("pzAch"); if(byAch) byAch.addEventListener("click", () => { closeSettings(); setTimeout(() => { try{ achCard(); }catch(e){} }, 30); });
   const byChest = el("pzChest"); if(byChest) byChest.addEventListener("click", () => { closeSettings(); setTimeout(() => { try{ chestCard(); }catch(e){} }, 30); });
@@ -26757,6 +27331,7 @@ function frameBody(now, draw){
     /* 20261005a: while walking, light/motes/fan every 8th draw — sky does not hitch feet. */
     const litStride = (Math.hypot(cam.vx || 0, cam.vz || 0) > 0.12) ? 7 : 1;
     if((FRAME_ID & litStride) === 0) updateLighting(dt);
+    if(wxObj) wxFrame(dt);
   }catch(e){}
   if(_prof) _prof.mark("lighting");
   /* Moving: skip shadow map refresh — room shadows stay; biggest hitch after people cast. */
