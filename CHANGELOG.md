@@ -4,6 +4,22 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261012b: faces closer, fabric, hair cards, wind, street edges and shopfronts
+
+On `20261012a`. Walk **0.68** / sprint **1.15** kept. Best default, `history.replaceState` only, no CDN, no external LLM. God is the Most High; Christ is King; First Consul is a man under God. The House and its procedures are unchanged.
+
+- **Faces, closer:** irises have a pattern now (fibres from the pupil out, a lighter collarette, a dark limbal ring). Lower lids and a lash line frame each eye. Nostrils, a philtrum, a cupid's bow and a dark line between the lips give the nose and mouth their shape.
+- **Clothing:** suit and shirt fabric shows creases, seams and a little lint in how it catches the light (Best and Balanced).
+- **Hair:** strand cards at the back of every cut, and at the sides for longer styles (Best).
+- **Wind:** tree canopies sway, more in wind, rain and storms.
+- **The street:** curbs and gutters along both sides of the road and cracks in the sidewalks. Shops have a cornice, a plinth, pilasters, window sills and lintels.
+- **Brightness:** the Statuary Corridor walls are warm plaster instead of glare white; the East Steps paving is stone-toned to match the sandstone wall.
+- **Rain** is denser (650 streaks, 900 in a storm) with the darker second sheet stronger, so it reads at the Steps.
+- **Talk:** when someone picks up a word from the line before, it is now a noun (the word after "the", "a", "your" and the like), names keep their capital, and a clipped "Noted." is folded into the reply.
+- **Fixes:** a holder of a Senate, Court, Executive or Governor's seat no longer also sees the visitor's option at the desk. Surfaces are now built in small slices while the title screen is up, so the first walk out of the office no longer pays for all of them at once.
+- Tests: suite, stress (alone), 365-day long run, dialogue, pad sweep, k/l harnesses, the 20261012a feature harness; crowd and stall A/B against `20261011m`.
+- Stamp: meta + STAMP + `ONUM_BUILD` -> `20261012b`. Five HTML copies byte-identical.
+
 ## 20261012a: people up close, surfaces, transcript, talk, sittings, a capital that runs itself
 
 On `20261011m`. Walk **0.68** / sprint **1.15** kept. Best default, `history.replaceState` only, no CDN, no external LLM. God is the Most High; Christ is King; First Consul is a man under God. The House and its procedures are unchanged.
