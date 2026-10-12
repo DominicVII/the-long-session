@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261012c">
+<meta name="onum-build" content="20261012d">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261012c";
+  var STAMP = "20261012d";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -3864,7 +3864,7 @@ function texSize(full){
 function texCanvas(size, paint){
   const c = document.createElement("canvas");
   c.width = c.height = size;
-  paint(c.getContext("2d"), size);
+  paint(c.getContext("2d", {willReadFrequently:true}), size);
   const t = new THREE.CanvasTexture(c);
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.encoding = THREE.sRGBEncoding;
@@ -4903,7 +4903,7 @@ function nmFbm(s, seed, base, oct){
 }
 function nmCanvasTex(s, fill, srgb){
   const c = document.createElement("canvas"); c.width = c.height = s;
-  const ctx = c.getContext("2d"), img = ctx.createImageData(s, s);
+  const ctx = c.getContext("2d", {willReadFrequently:true}), img = ctx.createImageData(s, s);
   fill(img.data);
   ctx.putImageData(img, 0, 0);
   const t = new THREE.CanvasTexture(c);
@@ -5099,10 +5099,8 @@ function nmEnvBuild(){
       const q = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mm); q.position.set(x, y, z); q.lookAt(0, 0, 0); es.add(q);
     };
     lamp(0, 7, 0, 6, 3, 2.2);  lamp(8, 2.5, 0, 2.5, 3.5, 3.0); lamp(-8, 2.5, 2, 2.5, 3.5, 2.4); lamp(0, 3, -8.5, 5, 1.5, 1.6);
-    const pm = new THREE.PMREMGenerator(renderer);
-    const rt = pm.fromScene(es, 0.04);
-    pm.dispose(); geo.dispose();
-    NM.env = rt.texture;
+    geo.dispose();
+    NM.env = ndEnvCube();
     /* 20261012a: reflections only where they read (metal, glass, gloss, varnish, wet street), not on every wall */
     NM.bytes += 256 * 256 * 6 * 8;
   }catch(e){ if(window.console) console.warn("env", e); }
@@ -5791,9 +5789,13 @@ function ncPrewarm(){
   const box = new THREE.BoxGeometry(0.01, 0.01, 0.01);
   const step = () => {
     const m = queue.shift();
+    if(!m && NC.twins && NC.twins.length){
+      const tw = NC.twins.shift(); scene.add(tw); NC.ms = (NC.ms || 0) + ndCompileOnly([tw]); scene.remove(tw); try{ tw.skeleton.dispose(); }catch(e){}
+      if(window.requestIdleCallback) requestIdleCallback(step, {timeout:500}); else setTimeout(step, 80); return;
+    }
     if(!m){
-      try{ const im = new THREE.InstancedMesh(NC.geo, NC.mat, 1); im.position.set(0, -50, 0); scene.add(im); renderer.compile(scene, camera); scene.remove(im); im.dispose && im.dispose(); }catch(e){}
-      NC.warmed = 2; return;
+      try{ const im = new THREE.InstancedMesh(NC.geo, NC.mat, 1); im.position.set(0, -50, 0); scene.add(im); ndCompileOnly([im]); scene.remove(im); im.dispose && im.dispose(); }catch(e){}
+      NC.warmed = 2; try{ ndWarmScene(); }catch(e){} return;
     }
     try{
       if(NM.env && (m.metalness > 0.35 || m.isMeshPhysicalMaterial) && !m.envMap){ m.envMap = NM.env; m.needsUpdate = true; }
@@ -5807,12 +5809,133 @@ function ncPrewarm(){
       }
       const bone = new THREE.Bone(), sm = new THREE.SkinnedMesh(NC.sgeo, m);
       sm.add(bone); sm.bind(new THREE.Skeleton([bone])); sm.position.set(0, -50, 0); scene.add(sm);
-      const t0 = performance.now(); renderer.compile(scene, camera); NC.ms = (NC.ms || 0) + performance.now() - t0;
-      scene.remove(o); scene.remove(sm); try{ sm.skeleton.dispose(); }catch(e){}
+      NC.ms = (NC.ms || 0) + ndCompileOnly([o]);
+      NC.twins = NC.twins || []; NC.twins.push(sm); scene.remove(sm);
+      scene.remove(o);
     }catch(e){}
     if(window.requestIdleCallback) requestIdleCallback(step, {timeout:500}); else setTimeout(step, 80);
   };
   step();
+}
+
+/* ── 20261012d · one lighting shape everywhere: pad point lights so programs never recompile per room ── */
+const ND = {pads:null, on:0};
+function ndPad(){
+  if(typeof scene === "undefined" || !scene) return;
+  if(!ND.pads){
+    try{ if(typeof mkLights === "function" && !mkKey) mkLights(false); }catch(e){}
+    ND.pads = [];
+    for(let i = 0; i < MAX_ROOM_LIGHTS; i++){
+      const L = new THREE.PointLight(0x000000, 0, 0.01, 2);
+      L.position.set(0, -80, 0); L.visible = false; scene.add(L); ND.pads.push(L);
+    }
+  }
+  let live = 0;
+  for(let i = 0; i < ROOMLIGHTS.length; i++){
+    let o = ROOMLIGHTS[i], ok = true;
+    while(o && o !== scene){ if(!o.visible){ ok = false; break; } o = o.parent; }
+    if(ok && o === scene) live++;
+  }
+  /* Two lighting shapes only: open air (no point lights to pay for while walking outside) and
+     indoors (always MAX_ROOM_LIGHTS). Both are warmed, so neither recompiles on a room change. */
+  const R = (typeof ROOMS !== "undefined" && typeof G !== "undefined") ? ROOMS[G.room] : null;
+  const need = (R && R.open) ? 0 : Math.max(0, MAX_ROOM_LIGHTS - live);
+  for(let i = 0; i < ND.pads.length; i++) ND.pads[i].visible = i < need;
+  ND.on = need;
+}
+/* Compile only these objects, under the real scene's lights and fog: everything else hides for one call. */
+function ndCompileOnly(objs){
+  /* compile() takes lights from traverseVisible and materials from traverse: lend it the real
+     lights and fog, but only these objects' materials. */
+  const view = Object.create(scene);
+  view.traverse = f => objs.forEach(o => o && o.traverse(f));
+  const t0 = performance.now();
+  try{ ndPad(); renderer.compile(view, camera); }catch(e){}
+  /* and once more under the other shape (open air vs indoors) */
+  const hidden = [];
+  try{
+    const R = ROOMS[G.room];
+    if(R && R.open){ ND.pads.forEach(p => p.visible = true); }
+    else{
+      ND.pads.forEach(p => p.visible = false);
+      ROOMLIGHTS.forEach(L => { if(L.visible){ L.visible = false; hidden.push(L); } });
+    }
+    renderer.compile(view, camera);
+  }catch(e){}
+  hidden.forEach(L => L.visible = true);
+  try{ ndPad(); }catch(e){}
+  return performance.now() - t0;
+}
+/* After the startup warm, finish whatever the scene still holds, a few materials per idle slice. */
+const ND_SEEN = new WeakSet();
+function ndWarmScene(){
+  if(typeof scene === "undefined" || !scene || ND.busy) return;
+  ND.busy = true;
+  const step = () => {
+    const batch = [], mats = new Set();
+    try{
+      scene.traverseVisible(x => {
+        if(batch.length >= 4 || !(x.isMesh || x.isPoints)) return;
+        const m = x.material; if(!m || Array.isArray(m) || ND_SEEN.has(m)) return;
+        ND_SEEN.add(m); if(!mats.has(m)){ mats.add(m); batch.push(x); }
+      });
+    }catch(e){}
+    if(!batch.length){ ND.busy = false; ND.done = (ND.done || 0) + 1; return; }
+    ND.ms = (ND.ms || 0) + ndCompileOnly(batch);
+    if(window.requestIdleCallback) requestIdleCallback(step, {timeout:400}); else setTimeout(step, 60);
+  };
+  step();
+}
+/* Before a frame draws something new, compile its new shaders in budgeted pieces (frames in between
+   keep the last picture), so the boot and a room's first frame never block in one long freeze. */
+function ndGate(){
+  if(typeof scene === "undefined" || !scene) return false;
+  ND.f = (ND.f || 0) + 1;
+  const key = (typeof G !== "undefined" ? G.room : "") + "|" + scene.children.length + "|" + (roomGroup ? roomGroup.children.length : 0) + "|" + (peopleGroup ? peopleGroup.children.length : 0);
+  if(key === ND.key && !ND.pend) return false;
+  ND.key = key;
+  const t0 = performance.now(), todo = [];
+  try{
+    scene.traverse(x => {
+      const m = x.material; if(!m || Array.isArray(m) || ND_SEEN.has(m) || !(x.isMesh || x.isPoints || x.isLine || x.isSprite)) return;
+      todo.push(x);
+    });
+  }catch(e){ return false; }
+  if(!todo.length){ ND.pend = false; ND.skip = 0; return false; }
+  let i = 0;
+  while(i < todo.length && performance.now() - t0 < 140){
+    const x = todo[i++]; ND_SEEN.add(x.material); ndCompileOnly([x]);
+  }
+  ND.pend = i < todo.length;
+  ND.gated = (ND.gated || 0) + 1;
+  if(!ND.pend){ ND.skip = 0; return false; }
+  ND.skip = (ND.skip || 0) + 1;
+  return ND.skip < 60;
+}
+/* A plain cube of six small painted faces instead of a prefiltered (PMREM) map: same soft room
+   reflection on metal and glass, without the blur passes that froze the start for 1.5 s. */
+function ndEnvCube(){
+  const S = 64, faces = [];
+  const paint = (side) => {
+    const c = document.createElement("canvas"); c.width = c.height = S;
+    const g = c.getContext("2d");
+    if(side === "py"){ g.fillStyle = "#f2f3f6"; g.fillRect(0, 0, S, S); g.fillStyle = "#ffffff"; g.fillRect(S*0.25, S*0.38, S*0.5, S*0.24); }
+    else if(side === "ny"){ g.fillStyle = "#2a2520"; g.fillRect(0, 0, S, S); }
+    else {
+      const gr = g.createLinearGradient(0, 0, 0, S);
+      gr.addColorStop(0, "#c9ced7"); gr.addColorStop(0.5, "#8c8f96"); gr.addColorStop(0.52, "#4c4339"); gr.addColorStop(1, "#1c1916");
+      g.fillStyle = gr; g.fillRect(0, 0, S, S);
+      const k = side === "px" ? 1 : side === "nx" ? 0.85 : side === "nz" ? 0.6 : 0;
+      if(k){ g.fillStyle = "rgba(255,250,236," + k + ")"; g.fillRect(S*0.3, S*0.12, S*0.4, S*0.34); }
+    }
+    return c;
+  };
+  ["px","nx","py","ny","pz","nz"].forEach(s => faces.push(paint(s)));
+  const t = new THREE.CubeTexture(faces);
+  t.generateMipmaps = true; t.minFilter = THREE.LinearMipmapLinearFilter; t.magFilter = THREE.LinearFilter;
+  if(THREE.sRGBEncoding !== undefined) t.encoding = THREE.sRGBEncoding;
+  t.needsUpdate = true;
+  return t;
 }
 
 const MATCACHE = new Map();
@@ -28401,6 +28524,7 @@ function forcePaint(){
     camera.updateMatrixWorld(true);
   }catch(e){}
   try{ updateLighting(0.016); }catch(e){}
+  try{ ndPad(); }catch(e){}
   try{ if(renderer && !GL_LOST) renderer.render(scene, camera); }catch(e){}
 }
 function enterRoom(dest, fromRoom){
@@ -28910,7 +29034,7 @@ function frameBody(now, draw){
           try{ tickScrollFrame(); }catch(e){}
         }
         if(!GL_LOST && _cardFrames % 6 === 0){
-          try{ renderer.render(scene, camera); }catch(e){}
+          try{ ndPad(); renderer.render(scene, camera); }catch(e){}
         }
         if(_prof){ _prof.mark("render"); _prof.end(false); }
         return;
@@ -29032,6 +29156,7 @@ function frameBody(now, draw){
     const litStride = (Math.hypot(cam.vx || 0, cam.vz || 0) > 0.12) ? 7 : 1;
     if((FRAME_ID & litStride) === 0) updateLighting(dt);
     try{ nbSway(dt); ncGrassTick(dt); }catch(e){}
+    try{ ndPad(); }catch(e){}
     if(wxObj) wxFrame(dt);
   }catch(e){}
   if(_prof) _prof.mark("lighting");
@@ -29043,7 +29168,8 @@ function frameBody(now, draw){
   }
   if(_prof) _prof.mark("shadow");
   if(!GL_LOST){
-    try{ renderer.render(scene, camera); }
+    let _ndg = false; try{ _ndg = ndGate(); }catch(e){}
+    if(!_ndg) try{ renderer.render(scene, camera); }
     catch(e){
       if(window.console && !frameFailLogged){ frameFailLogged = true; console.error("render error", e); }
     }
@@ -29458,6 +29584,7 @@ function mkLights(on){
   }
   mkKey.intensity = on ? 3.4 : 0;
   mkFill.intensity = on ? 0.9 : 0;
+  mkKey.visible = mkFill.visible = !!on;
 }
 function mkPreview(){
   if(mkMesh){ scene.remove(mkMesh); mkMesh = null; }
