@@ -17,11 +17,11 @@ One HTML body. Keep these **byte-identical**:
 | `session.html` | repo root |
 | `One Nation, Under, ME.html` | standalone name |
 
-**Build stamp (now): `20261011j`**
+**Build stamp (now): `20261011k`**
 
-- `<meta name="onum-build" content="20261011j">`
-- IIFE `STAMP = "20261011j"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
-- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261011j"`
+- `<meta name="onum-build" content="20261011k">`
+- IIFE `STAMP = "20261011k"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
+- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261011k"`
 - Wrapper iframe: `/session.html?v=${ONUM_BUILD}` in `src/routes/index.tsx`
 - **`20261005a`:** weekly MAX OPTIMIZE + design/max-fit. Keeps `20261001a` far-crowd freeze / kit reuse / 6ms bail and `20261001b` hard maps. Best uses `BasicShadowMap` (one sample). Deep crowd freeze (culled+far traverse `matrixAutoUpdate`). Shell fills big desks (`max-width:min(2560px,100%)`). Kit cap KEEP 6/8. Caesar/parting polish. Walk **0.68** / sprint **1.15**. Full meshes near.
 - **`20261011a`:** playable fixes. Corridor freeze (alignment/stakeIn infinite recursion) fixed; elections run again (card watchdog no longer kills the ballot); warmAhead actually runs (`let roomGroup`, kit lamp/ticker relink, no sky touch, explicit furnished flag); New career confirms before replacing a career and wipes only at the oath. Walk 0.68 / sprint 1.15 kept.
@@ -34,6 +34,7 @@ One HTML body. Keep these **byte-identical**:
 - **`20261011h`**: new bill kinds (immigration, foreign aid and arms, states versus the Union) with consequences on the wire days later (approval, state unrest, realm relations, court cases); a war chest ledger that buys ads, a district office, aides, field work, allies' races, counsel, polls and press time, feeding the election; 19 achievements, hidden ones shown as ??? until earned.
 - **`20261011i`**: career ladder. Each chair has its own powers (leadership, chair, Senate confirmations/treaties/filibuster, governor veto/appointments/defiance/trade, executive sign/veto/cabinet/aid, bench rulings with recusal and no campaigning, envoy and staff when out); term limits held in law and changed only by amendment; members climb to the Senate and governorships; losing goes to the East Steps and play continues. The First Consul seat stays sealed.
 - **`20261011j`**: pictures seated in every kit (flush to the wall, clear of door headers, rails and sconces, no overlaps; wall-less signs on brass posts); walk-capped textures lifted to full anisotropy while standing still. Speed caps, warmAhead, 6ms bail and walk light throttle untouched.
+- **`20261011k`**: the higher offices get their own rooms (Senate Chamber, the Court, the Executive Wing, the State House), furnished and grounded, reached by real doors and the map, with role-specific daily loops at the desk and staff who work there; steps facade plaque flush; realm cables gated on the game clock (no inbox flood); speech variety up to about 75% unique. House unchanged; speed caps, warmAhead, 6ms bail and walk light throttle untouched.
 
 If you change the HTML, bump the letter (`20260921e`, …) in **meta + STAMP + ONUM_BUILD together**, copy the body to all four filenames, commit, push `main`.
 

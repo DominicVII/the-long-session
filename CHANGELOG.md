@@ -4,6 +4,23 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261011k: the higher rooms
+
+On `20261011j`. Walk **0.68** / sprint **1.15** kept. Best default, `history.replaceState` only, no CDN, no external LLM. God is the Most High; Christ is King; First Consul is a man under God. The House is unchanged.
+
+- **The Senate Chamber** (north wing, a door on the far right of the Statuary Corridor): a raised rostrum with the presiding officer's chair and the clerks' desk, a horseshoe of sixteen mahogany desks facing it with chairs behind them, an open aisle to the door, a brass gallery rail, columns, flags, sconces and a clock. Two Senators and the Secretary of the Senate work there.
+- **The Court** (the old Senate wing, through the Senate's left door): a dais with a long oak bench and five tall chairs, the bar, two counsel tables, a lectern and public seats, columns down both walls and "Equal Justice Under Law" behind the bench. A Justice, the Clerk of the Court and the Marshal work there.
+- **The Executive Wing** (a door at the far left of the Statuary Corridor): the Executive's desk with flags behind it, a cabinet table with six chairs, bookshelves, a lamp and a coat stand. The Chief of Staff and an aide work there.
+- **The State House** (from the District: a stone building with a portico on the front walk): the Governor's office with a desk over a state map, a secretary's desk at the door, a waiting row, shelves and flags. The Governor's secretary and counsel work there.
+- All four are on the map and the travel bar, reached by real doors, and the compass routes you through them. Visitors are welcome; the powers are only yours if the office is.
+- **Daily loops:** if you hold the office, the NOW line sends you to your chamber each working day ("Your chair: The Senate Chamber is waiting on you today"), and the desk there opens the powers of your office plus a role act: a Senator takes the Senate floor (+3 standing, +1 influence), a Justice hears oral argument (+2 standing), the Executive takes the morning briefing (the most unsettled state calms, +2 standing), a Governor holds open hours (+4 approval, home state steadier). Once done, the line moves on.
+- **The people in those rooms** have their own business: compare notes with a Senator on how the Senate leans on the live bill, read the Senate calendar, pay your respects to the Justice (who will not discuss a pending matter if your state is a party), ask the clerk or counsel about the docket, ask the Chief of Staff for time with the Executive, ask the Governor's office for help at home.
+- **Steps plaque:** the "Statuary Corridor" plaque over the steps door sat 35cm in front of the facade. It is now flush to the stone.
+- **Inbox flood:** cables from the realms and envoy visits were rolled on a per-frame lane, so the inbox could fill with a dozen cables in a few minutes. They now roll on the game clock (at most one cable per realm every six hours).
+- **Speech variety:** 30 new D'Infinite Taylor Consular Neural Organism templates (faith, the anomalies, reactions, state against federal, immigration, foreign). Unique lines over 3,000 mixed samples went from about 54% to about 76%, with no canon breaks.
+- Tests: new room test (rooms built and furnished, people seeded, doors and routing, all four role loops), picture audit over 14 rooms, suite, stress, speech sample.
+- Stamp: meta + STAMP + `ONUM_BUILD` -> `20261011k`. Five HTML copies byte-identical.
+
 ## 20261011j: pictures seated, texture clarity
 
 On `20261011i`. Walk **0.68** / sprint **1.15** kept (fluidity comes from smoothing, never speed). Best default, `history.replaceState` only, no CDN, no external LLM. God is the Most High; Christ is King; First Consul is a man under God.
