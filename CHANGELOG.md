@@ -4,6 +4,21 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261011l: seasons, households, the Ledger, rivals
+
+On `20261011k`. Walk **0.68** / sprint **1.15** kept. Best default, `history.replaceState` only, no CDN, no external LLM. God is the Most High; Christ is King; First Consul is a man under God.
+
+- **Seasons and weather:** every day has weather drawn from its season (the game year runs January to December): snow, hard frost, fog, rain, high wind, heat, thunderstorms, overcast or clear, with a temperature, and weather tends to hold for a day or two. Outside on the East Steps and in the District you see it: rain falls in streaks, snow drifts down, fog closes in to a few metres, storms darken the sky. Snow lies on the District sidewalks and builds up over snowy days; the trees and hills turn green in spring, gold and brown in autumn, bare or white in winter. All of it costs one transform a frame (no per-particle work), and none of it changes walking.
+- **Weather and mood:** heat and storms take energy in the morning, a clear spring day gives some back, the morning line on the wire tells you what it is like outside, storms and deep snow keep people at home, and a long run of bad weather wears on the households.
+- **The households at home:** seven families in your district, each with a street, two adults, a child with news of their own, a need (the bridge on Mill Road, a pension letter, a son's visa hearing) and a mood. Neighbours from those families are out on Main Street on fair days, fewer in rain and snow, none in a storm.
+- **Constituents at your door:** on most working days someone from one of those families comes to your office. The NOW line and compass send you there. Hear them out, take it on as casework, ask after the family, or show them out. They remember what you did ("Last time: you asked after Otto. I have not forgotten it."), the next member of the family who comes knows it too, and when the casework comes good the family writes a letter. How the households feel moves your approval a little every night and counts at your next election.
+- **The morning Ledger:** a newspaper built each morning from what really happened the day before: the vote, the court, the envoys, your own doings (written about you by name), the feud, a letter from home, the weather and where your approval stands. Pick it up from the side table in your office or from the pause menu ("Today's paper"). The NOW line reminds you in the morning.
+- **Rivals with long arcs:** a member who has it in for you starts a feud that runs for weeks in stages: words in the cloakroom, quotes in the Ledger, radio time in your state, working against your bill or your committee seat, money for a challenger in your district (which costs you at the next election), and a reckoning. You can seek a truce, answer them in the press, or dig into their record for the end. It ends in a truce, in you coming out ahead, in them coming out ahead, or with them leaving the House, and then in time someone new takes it up. Two new achievements: Who Blinked and The Diner Booth.
+- Pause menu: Today's paper, Rivals, Home.
+- Saved with the game: weather, households and their memories, letters, rivals and their history, the day's log for the paper.
+- Tests: weather and season visuals in the District and on the Steps (snow, autumn, rain, fog), constituent visit with NOW line and compass, memory, casework letter, paper from yesterday's events, a full rival arc, answer in the press, election swing bounds, save; walking A/B against `20261011k`; suite and stress.
+- Stamp: meta + STAMP + `ONUM_BUILD` -> `20261011l`. Five HTML copies byte-identical.
+
 ## 20261011k: the higher rooms
 
 On `20261011j`. Walk **0.68** / sprint **1.15** kept. Best default, `history.replaceState` only, no CDN, no external LLM. God is the Most High; Christ is King; First Consul is a man under God. The House is unchanged.
