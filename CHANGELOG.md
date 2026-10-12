@@ -4,6 +4,18 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## Grass, seams, East Steps
+
+On `20261012b`. Walk **0.68** / sprint **1.15** kept. Best default, `history.replaceState` only, no CDN, no external LLM. God is the Most High; Christ is King; First Consul is a man under God. The House and its procedures are unchanged.
+
+- **Grass:** the District's verges are planted with instanced grass tufts (1,400 on Best, 600 on Balanced, none on Simple), drawn in one call, each tuft its own shade, bending in the wind in the shader. The wind follows the weather like the trees.
+- **Seams:** trousers have a side seam down each leg and jacket sleeves a seam line along the forearm, in a darker thread of the suit's own colour.
+- **East Steps:** the facade wall, ashlar, columns and paving are a clearly darker sandstone. It had stayed near-white because the sun hits that wall head-on; the stone is now dark enough to read under it.
+- **Talk:** the neutral reply that kept saying it was "writing it in the notebook" now has ten siblings ("Hm. I will want to see that in writing before I say a word.", "That is news to me. Who told you?", and others), so the line comes up a tenth as often.
+- **Starting up:** after the surfaces are built at the title screen, the shader programs they need (including the skinned versions people use) are compiled one per idle moment, so fewer of them land on the first frames of play.
+- Tests: suite, stress (alone), 365-day long run, dialogue, pad sweep, k/l harnesses, the feature harness; crowd and stall A/B against `20261011m`.
+- Stamp: meta + STAMP + `ONUM_BUILD` -> `20261012c`. Five HTML copies byte-identical.
+
 ## 20261012b: faces closer, fabric, hair cards, wind, street edges and shopfronts
 
 On `20261012a`. Walk **0.68** / sprint **1.15** kept. Best default, `history.replaceState` only, no CDN, no external LLM. God is the Most High; Christ is King; First Consul is a man under God. The House and its procedures are unchanged.
