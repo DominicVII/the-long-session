@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261011m">
+<meta name="onum-build" content="20261012a">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261011m";
+  var STAMP = "20261012a";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -4861,6 +4861,664 @@ function normalMapFrom(tex, strength){
   NORMALS.set(tex, t);
   return t;
 }
+/* ══════════════════════════════════════════════════════════
+   20261012a · MATERIALS: grounded, worn, lived-in
+   Every map is generated here from noise (no files, no CDN), once, at
+   boot, and shared by every mesh that uses it. Best gets albedo +
+   roughness + normal; Balanced gets albedo + roughness at half size;
+   Simple keeps the old flat look. A procedural room-and-sky scene is
+   prefiltered (PMREM) into one environment map for reflections.
+   ══════════════════════════════════════════════════════════ */
+const NM = {fam:{}, ready:false, street:[], signs:[], refl:[], solids:[], env:null, bytes:0, tex:0, wet:0, night:0, mats:0, skin:new Map()};
+function nmTier(){ try{ if(MODEST || G.gfx === "simple") return 0; return G.gfx === "balanced" ? 1 : 2; }catch(e){ return 0; } }
+function nmSize(){ return nmTier() >= 2 ? 256 : 128; }
+function nmRand(seed){ let x = (seed >>> 0) || 1; return () => { x ^= x << 13; x ^= x >>> 17; x ^= x << 5; return (x >>> 0) / 4294967296; }; }
+/* tileable value noise, a few octaves */
+function nmField(s, cells, seed){
+  const r = nmRand(seed), g = new Float32Array(cells * cells);
+  for(let i = 0; i < g.length; i++) g[i] = r();
+  const out = new Float32Array(s * s);
+  for(let y = 0; y < s; y++){
+    const fy = y / s * cells, iy = Math.floor(fy), ty0 = fy - iy, ty = ty0 * ty0 * (3 - 2 * ty0);
+    const y0 = (iy % cells) * cells, y1 = ((iy + 1) % cells) * cells;
+    for(let x = 0; x < s; x++){
+      const fx = x / s * cells, ix = Math.floor(fx), tx0 = fx - ix, tx = tx0 * tx0 * (3 - 2 * tx0);
+      const x0 = ix % cells, x1 = (ix + 1) % cells;
+      const a = g[y0 + x0] + (g[y0 + x1] - g[y0 + x0]) * tx;
+      const b = g[y1 + x0] + (g[y1 + x1] - g[y1 + x0]) * tx;
+      out[y * s + x] = a + (b - a) * ty;
+    }
+  }
+  return out;
+}
+function nmFbm(s, seed, base, oct){
+  const out = new Float32Array(s * s); let w = 0.5, tot = 0;
+  for(let o = 0; o < (oct || 4); o++){
+    const f = nmField(s, (base || 4) << o, seed + o * 977);
+    for(let i = 0; i < out.length; i++) out[i] += f[i] * w;
+    tot += w; w *= 0.5;
+  }
+  for(let i = 0; i < out.length; i++) out[i] /= tot;
+  return out;
+}
+function nmCanvasTex(s, fill, srgb){
+  const c = document.createElement("canvas"); c.width = c.height = s;
+  const ctx = c.getContext("2d"), img = ctx.createImageData(s, s);
+  fill(img.data);
+  ctx.putImageData(img, 0, 0);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  if(srgb) t.encoding = THREE.sRGBEncoding;
+  t.generateMipmaps = true; t.minFilter = THREE.LinearMipmapLinearFilter; t.magFilter = THREE.LinearFilter;
+  try{ t.anisotropy = Math.min(nmTier() >= 2 ? 4 : 2, renderer.capabilities.getMaxAnisotropy() || 1); }catch(e){}
+  NM.bytes += s * s * 4 * 1.33; NM.tex++;
+  return t;
+}
+function nmNormal(h, s, k){
+  return nmCanvasTex(s, d => {
+    for(let y = 0; y < s; y++) for(let x = 0; x < s; x++){
+      const l = h[y * s + ((x - 1 + s) % s)], r = h[y * s + ((x + 1) % s)];
+      const u = h[((y - 1 + s) % s) * s + x], dn = h[((y + 1) % s) * s + x];
+      let nx = (l - r) * k, ny = (u - dn) * k, nz = 1;
+      const L = Math.hypot(nx, ny, nz); nx /= L; ny /= L; nz /= L;
+      const i = (y * s + x) * 4;
+      d[i] = (nx * 0.5 + 0.5) * 255; d[i + 1] = (ny * 0.5 + 0.5) * 255; d[i + 2] = (nz * 0.5 + 0.5) * 255; d[i + 3] = 255;
+    }
+  }, false);
+}
+/* edge and contact darkening in UV space: boxes map each face 0..1, so
+   the bottom of every vertical face (v near 0) reads as a contact shadow
+   and every edge picks up a little grime or wear */
+function nmEdge(u, v){
+  const e = Math.min(u, 1 - u, v, 1 - v);
+  return {e, ao: 1 - 0.16 * Math.max(0, 1 - v / 0.14) - 0.05 * Math.max(0, 1 - e / 0.05)};
+}
+/* one family = {map, rough, normal, tune} built from a height field and a recipe */
+function nmFamily(k){
+  if(NM.fam[k]) return NM.fam[k];
+  const s = nmSize(), T = nmTier();
+  const seed = 1000 + k.length * 131 + k.charCodeAt(0) * 17;
+  const lo = nmFbm(s, seed, 3, 4), hi = nmFbm(s, seed + 55, 24, 3);
+  const r = nmRand(seed + 9);
+  const H = new Float32Array(s * s), A = new Float32Array(s * s), R = new Float32Array(s * s);
+  const tint = [1, 1, 1];
+  /* scratch lines (cracks, scuffs) drawn as soft random walks */
+  const scar = new Float32Array(s * s);
+  const walks = k === "stone" ? 2 : k === "paint" ? 4 : k === "metal" ? 10 : k === "asphalt" ? 9 : 2;
+  for(let w = 0; w < walks; w++){
+    let x = r() * s, y = r() * s, a = r() * 6.283;
+    const len = s * (0.15 + r() * 0.4);
+    for(let i = 0; i < len; i++){
+      a += (r() - 0.5) * (k === "metal" ? 0.05 : 0.7);
+      x = (x + Math.cos(a) + s) % s; y = (y + Math.sin(a) + s) % s;
+      scar[(y | 0) * s + (x | 0)] = 1;
+    }
+  }
+  for(let y = 0; y < s; y++) for(let x = 0; x < s; x++){
+    const i = y * s + x, u = x / s, v = 1 - y / s, E = nmEdge(u, v);
+    const L = lo[i], N = hi[i];
+    let h = 0, a = 1, ro = 1;
+    if(k === "wood"){
+      const warp = L * 9 + Math.sin(v * 40 + L * 6) * 0.25;
+      const ring = 0.5 + 0.5 * Math.sin((u * 18 + warp) * 3.14159);
+      h = ring * 0.55 + N * 0.45;
+      a = 0.80 + ring * 0.14 + (N - 0.5) * 0.10;
+      ro = 0.84 + (1 - ring) * 0.18;
+      if(E.e < 0.04) a += 0.07 * (1 - E.e / 0.04);       /* worn, handled edges */
+    } else if(k === "metal"){
+      const brush = hi[(y * s + ((x * 7) % s))];
+      h = brush * 0.4 + scar[i] * 0.6;
+      const pat = L > 0.62 ? (L - 0.62) * 1.6 : 0;        /* patina and tarnish blotches */
+      a = 0.94 - pat * 0.35 + (brush - 0.5) * 0.08 - scar[i] * 0.05;
+      ro = 0.72 + pat * 0.9 + brush * 0.2 - scar[i] * 0.2;
+      if(E.e < 0.03) { a += 0.06; ro -= 0.2; }            /* rubbed bright at the edges */
+    } else if(k === "stone"){
+      h = N * 0.7 + L * 0.3 - scar[i] * 0.5;
+      const stain = Math.max(0, L - 0.58) * 1.4;
+      const streak = Math.max(0, hi[((y * 3) % s) * s + ((x >> 3) << 3) % s] - 0.55) * (1 - v) * 0.6; /* rain streaks run down */
+      a = 0.86 + (N - 0.5) * 0.18 - stain * 0.20 - streak * 0.25 - scar[i] * 0.22;
+      ro = 0.92 + (N - 0.5) * 0.2 + stain * 0.1;
+    } else if(k === "asphalt"){
+      const agg = hi[i] > 0.66 ? 0.16 : 0;
+      const tyre = Math.exp(-Math.pow((u - 0.30) / 0.06, 2)) + Math.exp(-Math.pow((u - 0.70) / 0.06, 2)); /* wheel paths */
+      const oil = Math.max(0, L - 0.66) * 2.2 * (0.3 + tyre);
+      const puddle = Math.max(0, 0.36 - L) * 3.0;
+      h = N * 0.8 + agg - scar[i] * 0.6 - puddle * 0.3;
+      a = 0.82 + agg * 0.6 + (N - 0.5) * 0.18 - tyre * 0.12 - oil * 0.22 - scar[i] * 0.25;
+      ro = 0.96 - tyre * 0.16 - puddle * 0.55 - oil * 0.25;
+    } else if(k === "slab"){
+      const jx = (u * 3) % 1, jy = (v * 3) % 1, joint = (jx < 0.02 || jy < 0.02) ? 1 : 0;
+      const gum = hi[i] > 0.82 ? 0.12 : 0;                /* the city's chewing gum */
+      h = N * 0.5 - joint * 0.8;
+      a = 0.88 + (N - 0.5) * 0.14 - joint * 0.30 - gum - Math.max(0, L - 0.6) * 0.25;
+      ro = 0.94 - Math.max(0, 0.35 - L) * 1.2;
+    } else if(k === "leather"){
+      const peb = hi[i], crease = Math.abs(Math.sin((u + L * 0.6) * 22)) < 0.06 ? 1 : 0;
+      h = peb * 0.8 - crease * 0.4;
+      a = 0.86 + (peb - 0.5) * 0.12 - crease * 0.12 + (E.e < 0.04 ? 0.08 : 0);
+      ro = 0.80 + (peb - 0.5) * 0.3 - (E.e < 0.04 ? 0.25 : 0);   /* edges polished by use */
+    } else if(k === "gloss"){
+      h = N * 0.15;
+      a = 0.96 + (L - 0.5) * 0.05;
+      ro = 0.75 + Math.max(0, L - 0.55) * 1.4;           /* fingerprints and wipe marks */
+    } else if(k === "glass"){
+      h = 0; a = 0.95 + (L - 0.5) * 0.06 - (1 - v < 0.15 ? 0 : 0) - Math.max(0, 0.1 - v) * 0.8;
+      ro = 0.5 + Math.max(0, L - 0.5) * 1.6 + Math.max(0, 0.12 - v) * 4;   /* grime settles along the bottom */
+    } else if(k === "skin"){
+      const pore = hi[i];
+      h = pore * 0.6;
+      a = 0.94 + (L - 0.5) * 0.10;
+      ro = 0.86 + (pore - 0.5) * 0.35;
+    } else { /* paint and plaster: mottling, chips at the edges, scuffs */
+      const chip = (E.e < 0.035 && hi[i] > 0.58) ? 1 : 0;
+      h = L * 0.4 + N * 0.3 - chip * 0.6;
+      a = 0.90 + (L - 0.5) * 0.12 + (N - 0.5) * 0.05 + chip * 0.10 - scar[i] * 0.12;
+      ro = 0.90 + (N - 0.5) * 0.18 - chip * 0.2;
+    }
+    if(k !== "asphalt" && k !== "slab" && k !== "skin" && k !== "glass") a *= E.ao;
+    H[i] = h; A[i] = Math.max(0.35, Math.min(1, a)); R[i] = Math.max(0.05, Math.min(1, ro));
+  }
+  if(k === "metal") { tint[0] = 0.99; tint[1] = 1.0; tint[2] = 0.97; }
+  if(k === "skin")  { tint[0] = 1.0; tint[1] = 0.97; tint[2] = 0.96; }
+  const map = nmCanvasTex(s, d => { for(let i = 0; i < A.length; i++){ const v = A[i] * 255; d[i*4] = v * tint[0]; d[i*4+1] = v * tint[1]; d[i*4+2] = v * tint[2]; d[i*4+3] = 255; } }, true);
+  const rough = nmCanvasTex(s, d => { for(let i = 0; i < R.length; i++){ const v = R[i] * 255; d[i*4] = v; d[i*4+1] = v; d[i*4+2] = v; d[i*4+3] = 255; } }, false);
+  const normal = T >= 2 ? nmNormal(H, s, k === "glass" || k === "gloss" ? 1.0 : k === "skin" ? 1.6 : 3.2) : null;
+  return (NM.fam[k] = {map, rough, normal});
+}
+/* what kind of surface a flat colour most likely is */
+function nmKind(col, rough, metal){
+  const c = new THREE.Color(col), hsl = {}; c.getHSL(hsl);
+  if((metal || 0) >= 0.45) return "metal";
+  if(rough <= 0.26 && (metal || 0) > 0.05) return "glass";
+  if(rough <= 0.3) return "gloss";
+  const hue = hsl.h * 360;
+  if(hue >= 14 && hue <= 42 && hsl.s > 0.22 && hsl.l < 0.5 && rough < 0.9) return "wood";
+  if(hsl.s > 0.3 && hsl.l < 0.36 && rough >= 0.6 && rough <= 0.8) return "leather";
+  if(rough >= 0.86) return "stone";
+  return "paint";
+}
+const NM_ENV = {metal:1.0, glass:1.2, gloss:0.7, wood:0.45, leather:0.5, stone:0.25, paint:0.35, asphalt:0.35, slab:0.25, skin:0.22, cloth:0.15, tex:0.4};
+function nmHashKey(k){ let h = 2166136261; for(let i = 0; i < k.length; i++){ h ^= k.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0) / 4294967296; }
+/* called once for each cached flat-colour material */
+function nmApply(m, col, rough, metal, key){
+  try{
+    NM.mats++;
+    const kind = nmKind(col, rough === undefined ? 0.8 : rough, metal);
+    m.envMapIntensity = NM_ENV[kind] || 0.35;
+    m.userData.nmKind = kind;
+    /* natural variation: no two cached colours sit at exactly the authored value */
+    const j = nmHashKey(String(key || col)) - 0.5;
+    m.roughness = Math.max(0.04, Math.min(1, m.roughness + j * 0.08));
+    m.color.offsetHSL(j * 0.006, j * 0.03, j * 0.025);
+    if(nmTier() === 0) return;
+    const F = nmFamily(kind);
+    m.map = F.map;
+    if(kind === "glass"){ m.color.multiplyScalar(0.7); m.metalness = Math.max(m.metalness, 0.1); }
+  }catch(e){}
+}
+function nmTex(m, tex, rough){
+  try{
+    const id = String((tex && tex.uuid) || "");
+    let k = "tex";
+    for(const n in TEX){ if(TEX[n] && TEX[n].uuid === id){ k = n; break; } }
+    m.envMapIntensity = k === "marble" ? 0.75 : k === "oak" || k === "panel" ? 0.5 : (k === "carpet" || k === "rug" || k === "wool") ? 0.12 : 0.3;
+    m.userData.nmKind = "tex:" + k;
+  }catch(e){}
+}
+function nmSkin(col){
+  const key = col | 0;
+  if(NM.skin.has(key)) return NM.skin.get(key);
+  const m = new THREE.MeshStandardMaterial({color:col, roughness:0.58, metalness:0});
+  m.envMapIntensity = NM_ENV.skin;
+  /* blood under the skin: a faint warm self-light stands in for subsurface scatter */
+  const c = new THREE.Color(col); m.emissive = new THREE.Color(c.r * 0.09, c.g * 0.03, c.b * 0.02);
+  if(nmTier() > 0){
+    const F = nmFamily("skin"); m.map = F.map; m.roughnessMap = F.rough;
+    if(F.normal){ m.normalMap = F.normal; m.normalScale = new THREE.Vector2(0.25, 0.25); }
+  }
+  m._shared = true; NM.skin.set(key, m);
+  return m;
+}
+/* ── environment: a softly lit room with windows, prefiltered once ── */
+function nmEnvBuild(){
+  if(NM.env || nmTier() === 0) return;
+  try{
+    const es = new THREE.Scene();
+    const geo = new THREE.SphereGeometry(10, 24, 12);
+    const cols = [], p = geo.attributes.position;
+    for(let i = 0; i < p.count; i++){
+      const y = p.getY(i) / 10;
+      const c = y > 0 ? new THREE.Color(0.55, 0.60, 0.68).lerp(new THREE.Color(0.95, 0.96, 1.0), y)
+                      : new THREE.Color(0.30, 0.26, 0.22).lerp(new THREE.Color(0.10, 0.09, 0.08), -y);
+      cols.push(c.r, c.g, c.b);
+    }
+    geo.setAttribute("color", new THREE.Float32BufferAttribute(cols, 3));
+    es.add(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({vertexColors:true, side:THREE.BackSide})));
+    const lamp = (x, y, z, w, h, k) => {
+      const mm = new THREE.MeshBasicMaterial({side:THREE.DoubleSide}); mm.color.setRGB(k, k * 0.96, k * 0.88);
+      const q = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mm); q.position.set(x, y, z); q.lookAt(0, 0, 0); es.add(q);
+    };
+    lamp(0, 7, 0, 6, 3, 2.2);  lamp(8, 2.5, 0, 2.5, 3.5, 3.0); lamp(-8, 2.5, 2, 2.5, 3.5, 2.4); lamp(0, 3, -8.5, 5, 1.5, 1.6);
+    const pm = new THREE.PMREMGenerator(renderer);
+    const rt = pm.fromScene(es, 0.04);
+    pm.dispose(); geo.dispose();
+    NM.env = rt.texture;
+    /* 20261012a: reflections only where they read (metal, glass, gloss, varnish, wet street), not on every wall */
+    NM.bytes += 256 * 256 * 6 * 8;
+  }catch(e){ if(window.console) console.warn("env", e); }
+}
+/* materials made before this pass, or made directly, get their reflection strength once */
+function nmRoomPass(){
+  try{
+    roomGroup.traverse(o => {
+      const m = o.material; if(!m || Array.isArray(m) || m.userData.nmDone) return;
+      m.userData.nmDone = true;
+      if(m.isMeshStandardMaterial && m.userData.nmKind === undefined) m.envMapIntensity = m.metalness > 0.4 ? 0.9 : 0.3;
+      const k = m.userData.nmKind || "";
+      if(NM.env && m.isMeshStandardMaterial && !m.envMap && (m.metalness > 0.35 || /metal|glass|gloss|asphalt|tex:marble|tex:oak|tex:panel/.test(k) || m.isMeshPhysicalMaterial)){ m.envMap = NM.env; m.needsUpdate = true; }
+    });
+  }catch(e){}
+}
+/* ── the street ─────────────────────────────────────────── */
+function nmStreet(kind, d){
+  if(nmTier() === 0) return null;
+  const k = "street:" + kind + ":" + Math.round(d);
+  if(MATCACHE.has(k)) return MATCACHE.get(k);
+  const F = nmFamily(kind === "tar" ? "asphalt" : "slab");
+  const rep = (t, x, y) => { const c = t.clone(); c.needsUpdate = true; c.repeat.set(x, y); return c; };
+  const ry = kind === "tar" ? Math.max(1, Math.round(d / 4.4)) : Math.max(1, Math.round(d / 2.6));
+  const rx = kind === "tar" ? 1 : 2;
+  const m = new THREE.MeshStandardMaterial({color: kind === "tar" ? 0x34363a : 0xa8a397, roughness: 0.95, metalness: 0,
+    map: rep(F.map, rx, ry), roughnessMap: rep(F.rough, rx, ry)});
+  if(F.normal){ m.normalMap = rep(F.normal, rx, ry); m.normalScale = new THREE.Vector2(0.7, 0.7); }
+  m.envMapIntensity = 0.3; m._shared = true;
+  m.userData.nmKind = kind === "tar" ? "asphalt" : "slab"; m.userData.dry = {r:0.95, c:m.color.clone()};
+  MATCACHE.set(k, m); NM.street.push(m);
+  return m;
+}
+/* rain makes the street a mirror; the signs make it worth looking at */
+function nmLight(day){
+  try{
+    const w = (typeof wxToday === "function") ? wxToday() : null;
+    const wet = w && (w.k === "rain" || w.k === "storm") ? 1 : (w && w.k === "snow" && w.cover < 1) ? 0.5 : 0;
+    NM.wet = wet; NM.night = Math.max(0, Math.min(1, (0.55 - (day === undefined ? 1 : day)) / 0.45));
+    NM.street.forEach(m => {
+      const D = m.userData.dry; if(!D) return;
+      m.roughness = D.r * (1 - wet * 0.72);
+      m.color.copy(D.c).multiplyScalar(1 - wet * 0.32);
+      m.envMapIntensity = 0.3 + wet * 1.5;
+      if(NM.env && !m.envMap){ m.envMap = NM.env; m.needsUpdate = true; }
+    });
+    NM.signs.forEach(s => { s.material.emissiveIntensity = 0.35 + NM.night * 1.9; });
+    NM.refl.forEach(q => { q.material.opacity = wet * (0.18 + NM.night * 0.5); q.visible = wet > 0; });
+  }catch(e){}
+}
+const NM_NEON = {DINER:0xff3b4e, HARDWARE:0xffb03a, MARKET:0x52ff9a};
+function nmSign(x, bh, z, bw, title){
+  if(nmTier() === 0 || !title) return;
+  try{
+    const col = NM_NEON[title] || 0xfff0c0;
+    const m = matGlow(0x222222, col, 1.0, 0.4, 0);
+    const bar = addBox(m, x, bh + 0.32, z - 0.66, Math.min(bw * 0.7, 2.8), 0.07, 0.05, 0, true);
+    NM.signs.push(bar);
+    /* its smear on the wet pavement below */
+    const qm = new THREE.MeshBasicMaterial({color:col, transparent:true, opacity:0, blending:THREE.AdditiveBlending, depthWrite:false, map:nmGlowTex()});
+    const q = new THREE.Mesh(UNIT.plane || new THREE.PlaneGeometry(1, 1), qm);
+    q.rotation.x = -Math.PI / 2; q.position.set(x, 0.112, z - 1.6); q.scale.set(Math.min(bw * 0.6, 2.4), 2.4, 1);
+    q.visible = false; q.matrixAutoUpdate = true; roomGroup.add(q); NM.refl.push(q);
+  }catch(e){}
+}
+let _nmGlow = null;
+function nmGlowTex(){
+  if(_nmGlow) return _nmGlow;
+  const c = document.createElement("canvas"); c.width = 64; c.height = 128;
+  const g = c.getContext("2d"), gr = g.createLinearGradient(0, 0, 0, 128);
+  gr.addColorStop(0, "rgba(255,255,255,0)"); gr.addColorStop(0.25, "rgba(255,255,255,.9)"); gr.addColorStop(1, "rgba(255,255,255,0)");
+  g.fillStyle = gr; g.fillRect(0, 0, 64, 128);
+  const g2 = g.createLinearGradient(0, 0, 64, 0); g2.addColorStop(0, "rgba(0,0,0,1)"); g2.addColorStop(0.5, "rgba(0,0,0,0)"); g2.addColorStop(1, "rgba(0,0,0,1)");
+  g.globalCompositeOperation = "destination-out"; g.fillStyle = g2; g.fillRect(0, 0, 64, 128);
+  _nmGlow = new THREE.CanvasTexture(c); NM.bytes += 64 * 128 * 4; NM.tex++;
+  return _nmGlow;
+}
+let _nmBlob = null;
+function nmBlobTex(){
+  if(_nmBlob) return _nmBlob;
+  const c = document.createElement("canvas"); c.width = c.height = 64;
+  const g = c.getContext("2d"), gr = g.createRadialGradient(32, 32, 4, 32, 32, 32);
+  gr.addColorStop(0, "rgba(0,0,0,.85)"); gr.addColorStop(1, "rgba(0,0,0,0)");
+  g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+  _nmBlob = new THREE.CanvasTexture(c); NM.bytes += 64 * 64 * 4; NM.tex++;
+  return _nmBlob;
+}
+/* contact shadow: a soft dark pool where a heavy thing meets the ground */
+function nmContact(x, z, w, d, y){
+  try{
+    const q = new THREE.Mesh(UNIT.plane || new THREE.PlaneGeometry(1, 1),
+      new THREE.MeshBasicMaterial({map:nmBlobTex(), transparent:true, depthWrite:false, opacity:0.55}));
+    q.rotation.x = -Math.PI / 2; q.position.set(x, (y || 0) + 0.006, z); q.scale.set(w, d, 1);
+    roomGroup.add(q); return q;
+  }catch(e){ return null; }
+}
+/* ── parked cars on Main Street ─────────────────────────── */
+let _nmPaint = new Map();
+function nmCarPaint(col){
+  if(_nmPaint.has(col)) return _nmPaint.get(col);
+  let m;
+  if(nmTier() >= 2) m = new THREE.MeshPhysicalMaterial({color:col, metalness:0.55, roughness:0.38, clearcoat:1.0, clearcoatRoughness:0.07});
+  else m = new THREE.MeshStandardMaterial({color:col, metalness:0.5, roughness:0.3});
+  m.envMapIntensity = 1.1;
+  if(nmTier() > 0){ const F = nmFamily("gloss"); m.roughnessMap = F.rough; }
+  m._shared = true; _nmPaint.set(col, m);
+  return m;
+}
+function nmCar(x, z, ry, col){
+  const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = ry || 0;
+  const put = (mat, px, py, pz, sx, sy, sz, geo) => { const e = new THREE.Mesh(geo || UNIT.box, mat); e.position.set(px, py, pz); e.scale.set(sx, sy, sz); e.castShadow = true; e.receiveShadow = true; g.add(e); return e; };
+  const paint = nmCarPaint(col), glass = matCol(0x1d2a33, 0.08, 0.3), chrome = matCol(0xc8ccd0, 0.18, 0.95);
+  const rubber = matCol(0x161616, 0.85), lamp = matGlow(0xfff4d8, 0xfff0c8, 0.25, 0.2, 0), tail = matGlow(0x7a0f12, 0x8a1010, 0.3, 0.3, 0);
+  put(paint, 0, 0.42, 0, 1.12, 0.40, 3.10);           /* body */
+  put(paint, 0, 0.74, -0.12, 1.02, 0.28, 1.55);        /* cabin */
+  put(glass, 0, 0.75, -0.12, 1.04, 0.22, 1.40);        /* glasshouse */
+  put(chrome, 0, 0.30, 1.57, 1.10, 0.10, 0.06);
+  put(chrome, 0, 0.30, -1.57, 1.10, 0.10, 0.06);
+  put(lamp, -0.38, 0.46, 1.56, 0.20, 0.08, 0.03); put(lamp, 0.38, 0.46, 1.56, 0.20, 0.08, 0.03);
+  put(tail, -0.40, 0.48, -1.56, 0.18, 0.07, 0.03); put(tail, 0.40, 0.48, -1.56, 0.18, 0.07, 0.03);
+  const cyl = UNIT.cyl || new THREE.CylinderGeometry(0.5, 0.5, 1, 14);
+  [[-0.52, 1.0], [0.52, 1.0], [-0.52, -1.0], [0.52, -1.0]].forEach(p => {
+    const wh = put(rubber, p[0], 0.25, p[1], 0.5, 0.18, 0.5, cyl); wh.rotation.z = Math.PI / 2;
+  });
+  roomGroup.add(g);
+  try{ g.updateMatrixWorld(true); }catch(e){}
+  nmContact(x, z, 1.5, 3.6, 0.04);
+  const c = Math.cos(ry || 0), sn = Math.sin(ry || 0);
+  NM.solids.push({x, z, hx: Math.abs(c) * 0.62 + Math.abs(sn) * 1.6, hz: Math.abs(sn) * 0.62 + Math.abs(c) * 1.6});
+  return g;
+}
+/* the player walks round a car, not through it */
+function nmPush(){
+  for(let i = 0; i < NM.solids.length; i++){
+    const s = NM.solids[i], dx = cam.x - s.x, dz = cam.z - s.z, px = s.hx + 0.25 - Math.abs(dx), pz = s.hz + 0.25 - Math.abs(dz);
+    if(px > 0 && pz > 0){
+      if(px < pz) cam.x += Math.sign(dx || 1) * px; else cam.z += Math.sign(dz || 1) * pz;
+    }
+  }
+}
+function nmDistrict(d){
+  if(nmTier() === 0) return;
+  try{
+    nmCar(-1.52, 4.3, 0, 0x6b1f24);
+    nmCar(1.52, 9.6, Math.PI, 0x23384f);
+    if(nmTier() >= 2) nmCar(-1.52, 10.4, 0, 0xb9b6ad);
+  }catch(e){ if(window.console) console.warn("cars", e); }
+}
+/* ── the page itself: paper, brass, depth ───────────────── */
+function nmUI(){
+  if(document.getElementById("nmUI")) return;
+  const paper = "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='f'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .45  0 0 0 0 .38  0 0 0 0 .28  0 0 0 .07 0'/></filter><rect width='100%' height='100%' filter='url(%23f)'/></svg>\")";
+  const st = document.createElement("style"); st.id = "nmUI";
+  st.textContent =
+    ".card{background-image:" + paper + ";box-shadow:0 18px 50px rgba(0,0,0,.42),0 2px 0 rgba(255,255,255,.35) inset,0 0 0 1px rgba(120,96,58,.18);}" +
+    ".card .btn:not(.btn--ghost),.conc__btn{background-image:linear-gradient(180deg,rgba(255,255,255,.10),rgba(0,0,0,.12));box-shadow:0 1px 0 rgba(255,255,255,.18) inset,0 2px 6px rgba(0,0,0,.28);border-color:rgba(176,139,69,.55);}" +
+    "#job{box-shadow:0 6px 22px rgba(0,0,0,.35),0 0 0 1px rgba(176,139,69,.22) inset;backdrop-filter:blur(3px);}" +
+    ".talk__btn{box-shadow:0 1px 0 rgba(255,255,255,.10) inset,0 2px 6px rgba(0,0,0,.25);}" +
+    ".travel__btn{box-shadow:0 1px 0 rgba(255,255,255,.12) inset;}" +
+    "#tkSay,.tk__say{text-shadow:0 1px 0 rgba(0,0,0,.25);}";
+  document.head.appendChild(st);
+}
+function nmInit(){
+  try{ nmUI(); }catch(e){}
+  if(nmTier() === 0) return;
+  const t0 = performance.now();
+  ["paint", "wood", "metal", "stone", "leather", "gloss", "glass", "asphalt", "slab", "skin"].forEach(k => { try{ nmFamily(k); }catch(e){} });
+  nmEnvBuild();
+  NM.ready = true; NM.ms = Math.round(performance.now() - t0);
+}
+
+/* ══════════════════════════════════════════════════════════
+   20261012a · PEOPLE, UP CLOSE
+   Faces: moving irises with saccades and a real look-at, brows that
+   carry the mood, lips that shape the words actually being said,
+   stubble and age lines, pore-level skin with a warm under-glow.
+   Bodies: articulated fingers with poses, ties and coat hems that
+   swing, breathing and weight, nods while listening, gestures while
+   speaking, banking into turns, sitting down and standing up as a
+   movement rather than a cut. Hair is combed strand texture.
+   All of it runs only inside the near band (LOD_NEAR); past that the
+   existing tiers take over unchanged.
+   ══════════════════════════════════════════════════════════ */
+const NPP = {hair:new Map(), stub:null, n:0};
+function nmHairTex(){
+  if(NPP.tex) return NPP.tex;
+  const s = nmTier() >= 2 ? 256 : 128;
+  const col = new Float32Array(s);
+  const r = nmRand(4242);
+  for(let x = 0; x < s; x++) col[x] = 0.55 + r() * 0.45;
+  /* smooth a little so strands are a few texels wide, not single pixels */
+  for(let pass = 0; pass < 2; pass++) for(let x = 0; x < s; x++) col[x] = (col[x] + col[(x + 1) % s]) * 0.5;
+  const along = nmFbm(s, 777, 2, 3);
+  const map = nmCanvasTex(s, d => {
+    for(let y = 0; y < s; y++) for(let x = 0; x < s; x++){
+      const v = y / s, i = (y * s + x);
+      const band = Math.exp(-Math.pow((v - 0.32) / 0.07, 2)) * 0.28;   /* the sheen ring a light makes on hair */
+      const a = Math.min(1, col[x] * (0.86 + along[i] * 0.2) + band);
+      d[i*4] = d[i*4+1] = d[i*4+2] = a * 255; d[i*4+3] = 255;
+    }
+  }, true);
+  const rough = nmCanvasTex(s, d => {
+    for(let y = 0; y < s; y++) for(let x = 0; x < s; x++){
+      const v = y / s, i = y * s + x;
+      const band = Math.exp(-Math.pow((v - 0.32) / 0.07, 2));
+      const q = (0.95 - band * 0.45 - (col[x] - 0.75) * 0.3) * 255;
+      d[i*4] = d[i*4+1] = d[i*4+2] = q; d[i*4+3] = 255;
+    }
+  }, false);
+  return (NPP.tex = {map, rough});
+}
+function nmHair(col){
+  if(NPP.hair.has(col)) return NPP.hair.get(col);
+  const m = new THREE.MeshStandardMaterial({color:col, roughness:0.62, metalness:0});
+  m.envMapIntensity = 0.35;
+  if(nmTier() > 0){ const T = nmHairTex(); m.map = T.map; m.roughnessMap = T.rough; m.color.offsetHSL(0, -0.02, 0.04); }
+  m._shared = true; NPP.hair.set(col, m);
+  return m;
+}
+function nmStubbleMat(){
+  if(NPP.stub) return NPP.stub;
+  const s = 128, r = nmRand(99);
+  const c = document.createElement("canvas"); c.width = c.height = s;
+  const g = c.getContext("2d"); g.clearRect(0, 0, s, s);
+  for(let i = 0; i < 2600; i++){ g.fillStyle = "rgba(20,16,12," + (0.35 + r() * 0.5) + ")"; g.fillRect(r() * s, r() * s, 1, 1 + r()); }
+  const t = new THREE.CanvasTexture(c); NM.bytes += s * s * 4; NM.tex++;
+  NPP.stub = new THREE.MeshStandardMaterial({map:t, transparent:true, opacity:0.55, depthWrite:false, roughness:0.9, color:0xffffff});
+  NPP.stub._shared = true;
+  return NPP.stub;
+}
+/* brows: hair, not skin, so they read and can move */
+function nmBrows(M, hair, headG, hu, fw, bh, eyeX3, fem){
+  const out = [];
+  [-1, 1].forEach(sd => {
+    const b = M(PG.box, hair, headG, sd * eyeX3 * 1.02, hu * (0.585 + 0.02 * bh), hu * 0.475,
+      hu * (fem ? 0.105 : 0.118), hu * (fem ? 0.014 : 0.020) * bh, hu * 0.016, false);
+    b.rotation.z = sd * -0.08;
+    b.userData.y0 = b.position.y; b.userData.rz0 = b.rotation.z; b.userData.sd = sd;
+    out.push(b);
+  });
+  return out;
+}
+/* stubble and the lines a face earns */
+function nmFaceAge(M, headG, hu, skin, L, fem, headW){
+  if(nmTier() < 2) return;
+  try{
+    if(!fem && !L.beard && ((L.style|0) + Math.round((L.age || 0) * 10)) % 3 === 0){
+      M(PG.sph, nmStubbleMat(), headG, 0, hu * 0.25, hu * 0.30, headW * 0.80, hu * 0.24, hu * 0.36, false);
+    }
+    if((L.age || 0) > 0.55){
+      const dk = new THREE.Color(skin.color).multiplyScalar(0.80).getHex();
+      const lm = matCol(dk, 0.7);
+      const n = (L.age || 0) > 0.8 ? 3 : 2;
+      for(let i = 0; i < n; i++) M(PG.box, lm, headG, 0, hu * (0.66 + i * 0.035), hu * 0.43 - i * hu * 0.012, hu * 0.20, hu * 0.004, hu * 0.010, false);
+      [-1, 1].forEach(sd => {
+        const f = M(PG.box, lm, headG, sd * hu * 0.085, hu * 0.31, hu * 0.455, hu * 0.006, hu * 0.08, hu * 0.010, false);
+        f.rotation.z = sd * 0.35;
+      });
+    }
+  }catch(e){}
+}
+/* fingers: the index works on its own, the other three move together */
+function nmFingers(M, lo, skin, side, foreArm, H, B){
+  const k = new THREE.Group(); k.position.set(0, -foreArm - H * 0.050, 0); lo.add(k);
+  const idx = new THREE.Group(); idx.position.set(-side * H * 0.012 * B, 0, H * 0.004); k.add(idx);
+  const rest = new THREE.Group(); rest.position.set(side * H * 0.006 * B, 0, 0); k.add(rest);
+  M(PG.box, skin, idx, 0, -H * 0.020, 0, H * 0.010 * B, H * 0.042, H * 0.011 * B, false);
+  M(PG.box, skin, rest, 0, -H * 0.017, 0, H * 0.026 * B, H * 0.036, H * 0.012 * B, false);
+  return {k, idx, rest, curl:0.5, ix:0.5};
+}
+/* how a word looks on the mouth */
+function nmViseme(ch){
+  if(!ch) return [0.1, 1];
+  const c = ch.toLowerCase();
+  if("ae".indexOf(c) >= 0) return [0.95, 1.05];
+  if("i".indexOf(c) >= 0) return [0.55, 1.12];
+  if("ou".indexOf(c) >= 0) return [0.75, 0.80];
+  if("mbp".indexOf(c) >= 0) return [0.02, 1];
+  if("fv".indexOf(c) >= 0) return [0.18, 1.04];
+  if(" .,;:!?-".indexOf(c) >= 0) return [0.08, 1];
+  return [0.38, 1];
+}
+let _nppSpeakers = [], _nppSpeakT = 0;
+function nmSpeakersNow(){
+  if(G.t - _nppSpeakT < 0.4) return _nppSpeakers;
+  _nppSpeakT = G.t;
+  try{ _nppSpeakers = hereNow().filter(m => m && m.mesh && m.say && m.sayT > 0); }catch(e){ _nppSpeakers = []; }
+  return _nppSpeakers;
+}
+function peopleExtra(p, dt){
+  if(MODEST || !p || !p.mesh || !p.mesh.visible) return;
+  const u = p.mesh.userData; if(!u || !u.iris) return;
+  const ddx = cam.x - p.x, ddz = cam.z - p.z, dist = Math.hypot(ddx, ddz);
+  const near = dist < LOD_NEAR * 1.15;
+  const moving = Math.hypot((p.tx || p.x) - p.x, (p.tz || p.z) - p.z) > 0.25;
+  const seated = !!(p.sitting && !G.noSit && !G.plainSit);
+  const hu = u.hu, t = G.t + (p.shift || 0);
+  const talking = TALK.open && TALK.m === p;
+  const speaking = talking || !!(p.say && p.sayT > 0);
+  /* sitting down and standing up take a moment: blend from where the body was */
+  if(u._sitPrev === undefined) u._sitPrev = seated;
+  if(u._sitPrev !== seated){ u._sitPrev = seated; u._tr = 0.65; }
+  if(u._tr > 0 && u.pelvis && u._pv){
+    u._tr -= dt;
+    const k = 1 - Math.max(0, u._tr) / 0.65, e = k * k * (3 - 2 * k);
+    u.pelvis.position.y = u._pv.py + (u.pelvis.position.y - u._pv.py) * e;
+    u.legL.up.rotation.x = u._pv.lu + (u.legL.up.rotation.x - u._pv.lu) * e;
+    u.legR.up.rotation.x = u._pv.ru + (u.legR.up.rotation.x - u._pv.ru) * e;
+    u.legL.lo.rotation.x = u._pv.ll + (u.legL.lo.rotation.x - u._pv.ll) * e;
+    u.legR.lo.rotation.x = u._pv.rl + (u.legR.lo.rotation.x - u._pv.rl) * e;
+    u.spine.rotation.x += Math.sin(k * Math.PI) * 0.22;     /* lean forward to rise or sit */
+  }
+  /* age carries in the shoulders */
+  if(!seated && u.age > 0.62){ u.spine.rotation.x += (u.age - 0.62) * 0.16; u.headG.rotation.x += (u.age - 0.62) * 0.10; }
+  /* banking into a turn */
+  if(moving){
+    const turn = wrapPi((p.facing || 0) - (u._lf === undefined ? (p.facing || 0) : u._lf)) / Math.max(dt, 0.001);
+    u._bank = lerp(u._bank || 0, clamp(-turn * 0.035, -0.09, 0.09), 0.12);
+    u.spine.rotation.z += u._bank;
+  } else u._bank = 0;
+  u._lf = p.facing || 0;
+  /* ties and coat tails swing with the walk and settle when still */
+  if(u.sway && u.sway.length && (near || dist < LOD_MID)){
+    const sp = moving ? 1 : 0;
+    const sw = -sp * 0.10 + Math.sin(t * (moving ? 6.4 : 1.3) + (p.id || 0)) * (moving ? 0.05 : 0.012);
+    for(let i = 0; i < u.sway.length; i++) u.sway[i].rotation.x = sw * (i === 0 ? 1.4 : 0.8);
+  }
+  if(!near){ u._pv = u.pelvis ? {py:u.pelvis.position.y, lu:u.legL.up.rotation.x, ru:u.legR.up.rotation.x, ll:u.legL.lo.rotation.x, rl:u.legR.lo.rotation.x} : null; return; }
+  NPP.n++;
+  /* who to look at: the person talking, or you */
+  let look = null;
+  if(!talking){
+    const sp = nmSpeakersNow();
+    for(let i = 0; i < sp.length; i++){ const o = sp[i]; if(o !== p && Math.hypot(o.x - p.x, o.z - p.z) < 3.6){ look = o; break; } }
+  }
+  if(look && !seated){
+    const want = clamp(wrapPi(Math.atan2(look.x - p.x, look.z - p.z) - (p.facing || 0)), -1.0, 1.0);
+    u.headG.rotation.y = lerp(u.headG.rotation.y, want, 0.08);
+    /* listening: small nods now and then */
+    if(Math.sin(t * 0.9) > 0.6) u.headG.rotation.x += Math.max(0, Math.sin(t * 4.2)) * 0.06;
+  }
+  /* eyes: saccades and fixation */
+  u._sac = (u._sac || 0) - dt;
+  if(u._sac < 0){ u._sx = (Math.random() * 2 - 1) * 0.35; u._sy = (Math.random() * 2 - 1) * 0.25; u._sac = 0.25 + Math.random() * 1.3; }
+  let ex = 0, ey = 0;
+  const tx = look ? look.x : cam.x, tz = look ? look.z : cam.z;
+  const rel = wrapPi(Math.atan2(tx - p.x, tz - p.z) - (p.facing || 0) - u.headG.rotation.y);
+  ex = clamp(rel * 1.2, -1, 1) + u._sx; ey = (look ? 0 : clamp((cam.y || 1.6) - 1.5, -0.5, 0.5)) + u._sy;
+  if(!u._irB) u._irB = u.iris.map(o => [o.position.x, o.position.y]);
+  for(let i = 0; i < u.iris.length; i++){
+    const o = u.iris[i], b = u._irB[i];
+    o.position.x = b[0] + clamp(ex, -1, 1) * hu * 0.011;
+    o.position.y = b[1] + clamp(ey, -1, 1) * hu * 0.007;
+  }
+  /* mood in the brows */
+  if(u.brows){
+    let inner = 0, lift = 0;
+    try{
+      const mk = moodOf(p).key;
+      if(mk === "furious" || mk === "aggrieved") inner = -1;
+      else if(mk === "sour" || mk === "guarded") inner = -0.4;
+      else if(mk === "elated" || mk === "warm") lift = 0.6;
+      else if(mk === "distracted") inner = 0.5;
+    }catch(e){}
+    if(speaking){ const c = (p.say || "").charAt(((u._vt || 0) * 13) | 0); if(c === "!" || c === "?" || (c >= "A" && c <= "Z")) lift += 1; }
+    u._lift = lerp(u._lift || 0, lift, 0.15); u._inner = lerp(u._inner || 0, inner, 0.1);
+    u.brows.forEach(b => {
+      b.position.y = b.userData.y0 + u._lift * hu * 0.014 + Math.min(0, u._inner) * hu * 0.006;
+      b.rotation.z = b.userData.rz0 + b.userData.sd * u._inner * 0.22;
+    });
+  }
+  /* lips: the shape of the words on the transcript */
+  if(u.lowLip){
+    if(u._ll0 === undefined) u._ll0 = u.lowLip.position.y;
+    if(speaking){
+      u._vt = (u._vt || 0) + dt;
+      const text = talking ? ((el("tkSay") || {}).textContent || "") : (p.say || "");
+      const v = nmViseme(text.charAt(((u._vt * 13) | 0) % Math.max(1, text.length)));
+      u._mo = lerp(u._mo || 0, v[0], 0.45); u._mr = lerp(u._mr || 1, v[1], 0.35);
+    } else { u._vt = 0; u._mo = lerp(u._mo || 0, 0, 0.25); u._mr = lerp(u._mr || 1, 1, 0.2); }
+    u.lowLip.position.y = u._ll0 - (u._mo || 0) * hu * 0.032;
+    if(u.mouth){ u.mouth.scale.y = u.mouth.scale.x * 0.17 * (0.8 + (u._mo || 0) * 0.3); }
+    u.lowLip.scale.x = (u._llx || (u._llx = u.lowLip.scale.x)) * (u._mr || 1);
+  }
+  /* hands */
+  const hands = [u.armL && u.armL.fing, u.armR && u.armR.fing];
+  let point = false, grip = seated && (p.idle === "write" || p.idle === "read");
+  /* speaking in the room (not only to you) moves the hands too */
+  if(speaking && !talking && !seated && !moving){
+    u._g2 = (u._g2 || 0) + dt;
+    const g = u._g2;
+    const side = ((p.id || 0) % 2) ? u.armR : u.armL;
+    side.up.rotation.x = -0.36 + Math.sin(g * 2.0) * 0.14;
+    side.up.rotation.z = (side === u.armR ? -0.22 : 0.22);
+    side.lo.rotation.x = -1.0 + Math.sin(g * 2.9) * 0.25;
+    point = Math.sin(g * 2.0) > 0.55;
+    u.headG.rotation.x += Math.sin(g * 2.6) * 0.03;
+  } else u._g2 = 0;
+  if(talking) point = Math.sin((u.gest || 0) * 2.1) > 0.5;
+  /* standing still and not talking: some people fold their hands in front */
+  if(!speaking && !moving && !seated && !look && ((p.id || 0) % 3 === 0)){
+    u.armL.up.rotation.x = -0.28; u.armR.up.rotation.x = -0.28;
+    u.armL.up.rotation.z = -0.16; u.armR.up.rotation.z = 0.16;
+    u.armL.lo.rotation.x = -1.05; u.armR.lo.rotation.x = -1.05;
+    grip = true;
+  }
+  for(let i = 0; i < 2; i++){
+    const f = hands[i]; if(!f) continue;
+    const wantRest = grip ? -1.45 : (point && i === ((p.id || 0) % 2 ? 1 : 0)) ? -1.35 : -0.55 - Math.sin(t * 0.6 + i) * 0.05;
+    const wantIdx = grip ? -1.3 : (point && i === ((p.id || 0) % 2 ? 1 : 0)) ? 0.05 : -0.45;
+    f.curl = lerp(f.curl, wantRest, 0.2); f.ix = lerp(f.ix, wantIdx, 0.2);
+    f.rest.rotation.x = f.curl; f.idx.rotation.x = f.ix;
+  }
+  u._pv = {py:u.pelvis.position.y, lu:u.legL.up.rotation.x, ru:u.legR.up.rotation.x, ll:u.legL.lo.rotation.x, rl:u.legR.lo.rotation.x};
+}
+
 const MATCACHE = new Map();
 /* Every distinct repeat used to clone the texture and its normal map, so
    a wall tiled 4.13 times and the same wall tiled 4.2 times were two more
@@ -4937,6 +5595,7 @@ function matCol(col, rough, metal){
   if(COLCACHE.has(k)) return COLCACHE.get(k);
   const m = new THREE.MeshStandardMaterial({color:col, roughness:rough===undefined?0.8:rough, metalness:metal||0});
   m._shared = true;
+  nmApply(m, col, rough, metal, k);
   COLCACHE.set(k, m);
   return m;
 }
@@ -5141,6 +5800,7 @@ function propStorefront(x, z, bw, bh, col, title, sub){
   addBox(matCol(0x3a2a1c,.68), x, 0.58, z - 0.62, 0.46, 1.16, 0.06);
   addBox(matCol(0xc9a24a,.4,.7), x + 0.16, 0.62, z - 0.66, 0.04, 0.04, 0.04);
   if(title) try{ propPlaque(x, bh - 0.22, z - 0.62, 0, title, sub || "", Math.min(1.35, bw*0.42), 0.26); }catch(e){}
+  if(title) try{ nmSign(x, bh, z, bw, title); }catch(e){}
 }
 function playerCreed(){
   try{ return creedOf((G.you && G.you.creed) || "latin"); }catch(e){ return creedOf("latin"); }
@@ -6780,7 +7440,7 @@ function buildRoom(id){
 function buildRoomShell(id){
   if(!ROOMS[id]) id = "office";
   const R = ROOMS[id], w = R.w, d = R.d, h = R.h, hw = w/2;
-  const wallMat  = R.style==="stone" ? matTex(TEX.stone, w/3, h/3, .95)
+  const wallMat  = R.style==="stone" ? matTex(TEX.stone, w/3, h/3, .95, 0xa99d87)
                  : R.style==="town"  ? matTex(TEX.stone, 4, 2, .95)
                  : R.style==="chamber" ? matTex(TEX.damask, w/3.2, h/3.2, .93)
                  : R.style==="wood"  ? matTex(TEX.damask, w/3.4, h/3.4, .93)
@@ -7107,10 +7767,11 @@ function buildRoomInner(id, skipShell){
   }
   if(id === "steps"){
     try{
-    const stone = matTex(TEX.stone, 3, 1, .92);
-    const ashlar = matCol(0xc8c4b8, .86);
+    /* 20261012a: sandstone, not paper. The sun was turning this wall white. */
+    const stone = matTex(TEX.stone, 3, 1, .92, 0xb3a68f);
+    const ashlar = matCol(0xa69a83, .86);
     const gilt = matCol(0xb08b45, .36, .84);
-    const wall = matCol(0xb8b4a8, .90);
+    const wall = matCol(0x9d917c, .90);
     const deckY = 1.62;
     const facadeZ = d - 0.42;
     addBox(wall, 0, deckY + 3.35, facadeZ + 0.35, w * 0.96, 6.7, 1.55, 0, true);
@@ -7128,7 +7789,7 @@ function buildRoomInner(id, skipShell){
     const colY = deckY + 2.55;
     [-7.2, -4.35, -2.2, 2.2, 4.35, 7.2].forEach(cx => {
       addBox(ashlar, cx, deckY + 0.16, facadeZ - 0.55, 0.82, 0.32, 0.82, 0, true);
-      addCyl(matTex(TEX.stone, 1, 4, .9), cx, colY, facadeZ - 0.55, 0.34, 5.1);
+      addCyl(matTex(TEX.stone, 1, 4, .9, 0xc2b7a2), cx, colY, facadeZ - 0.55, 0.34, 5.1);
       addCyl(ashlar, cx, deckY + 5.22, facadeZ - 0.55, 0.46, 0.24);
       addBox(ashlar, cx, deckY + 5.44, facadeZ - 0.55, 1.02, 0.16, 1.02, 0, true);
     });
@@ -7155,8 +7816,10 @@ function buildRoomInner(id, skipShell){
   }
   if(id === "district"){
     try{
-    const walk = matCol(0xc8c2b4, .90);
-    const tar = matCol(0x3a3f36, .95);
+    NM.signs = []; NM.refl = []; NM.solids = [];
+    const walk = nmStreet("walk", d) || matCol(0xc8c2b4, .90);
+    const tar = nmStreet("tar", d) || matCol(0x3a3f36, .95);
+    try{ nmDistrict(d); }catch(e){ if(window.console) console.warn("nmDistrict", e); }
     /* Street down the middle — leaves the back door to the steps open */
     addBox(tar, 0, 0.02, d / 2, 4.4, 0.04, d - 0.3, 0, true);
     addBox(walk, -5.0, 0.05, d / 2, 5.2, 0.10, d - 0.3, 0, true);
@@ -8024,11 +8687,11 @@ function buildPerson(p){
   const skinKey = (L.skin|0);
   let skin = G._skinCol.get(skinKey);
   if(!skin){
-    skin = new THREE.MeshStandardMaterial({color:L.skin, roughness:0.62, metalness:0.0});
+    skin = nmSkin(L.skin);
     skin._shared = true;
     G._skinCol.set(skinKey, skin);
   }
-  const hair  = matCol(L.hair, .55);
+  const hair  = nmHair(L.hair);
   const dark  = matCol(0x14120f, .45);
   const shoeM = matCol(0x16161a, .40);
   const tie   = matCol(partyColorNum(p.party || "IND"), .68);
@@ -8131,6 +8794,7 @@ function buildPerson(p){
   const spine = new THREE.Group();
   spine.position.y = -torsoLen*0.72;
   BN.chestB.add(spine);
+  const _nSway = [], _nIris = [];
   /* Layers must actually nest: shirt inside waistcoat inside jacket, or
      the one underneath punches through the one on top. */
   if(fem)  /* a little shaping through the chest */
@@ -8158,8 +8822,8 @@ function buildPerson(p){
         H*(openCut ? 0.086 : 0.108)*B, torsoLen*0.78, H*0.052*B, false);
       panel.rotation.y = s2*(openCut ? 0.32 : 0.08);
       /* hem */
-      M(PG.box, suit2, spine, s2*H*(gap-0.004)*B, torsoLen*0.10, H*0.036*B,
-        H*0.100*B, torsoLen*0.14, H*0.048*B, false);
+      _nSway.push(M(PG.box, suit2, spine, s2*H*(gap-0.004)*B, torsoLen*0.10, H*0.036*B,
+        H*0.100*B, torsoLen*0.14, H*0.048*B, false));
     }
     for(const s2 of [-1,1]){
       const lap = M(PG.box, suit2, spine, s2*H*(openCut?0.062:0.044)*B, torsoLen*0.82, H*0.092*B,
@@ -8197,7 +8861,7 @@ function buildPerson(p){
   /* neckwear */
   if(W.neck === "tie"){
     M(PG.box, tie, spine, 0, torsoLen*0.965, H*0.074*B, H*0.036*B, H*0.034, H*0.018, false);
-    M(PG.box, tie, spine, 0, torsoLen*0.70, H*0.092*B, H*0.042*B, torsoLen*0.48, H*0.016, false);
+    _nSway.unshift(M(PG.box, tie, spine, 0, torsoLen*0.70, H*0.092*B, H*0.042*B, torsoLen*0.48, H*0.016, false));
   } else if(W.neck === "open"){
     /* Open collar: shirt placket showing, no knot */
     M(PG.box, shirt, spine, 0, torsoLen*0.78, H*0.070*B, H*0.028*B, torsoLen*0.38, H*0.010, false);
@@ -8272,10 +8936,10 @@ function buildPerson(p){
     const eye = M(PG.sph, eyeWhite, headG, ex, eyeY3, hu*0.478,
       hu*0.060, hu*0.038, hu*0.028, false);
     if(side < 0) eyeL = eye; else eyeR = eye;
-    M(PG.sph, irisMat, headG, ex, eyeY3, hu*0.505,
-      hu*0.030, hu*0.027, hu*0.012, false);
-    M(PG.sph, pupilMat, headG, ex, eyeY3, hu*0.516,
-      hu*0.014, hu*0.018, hu*0.008, false);
+    _nIris.push(M(PG.sph, irisMat, headG, ex, eyeY3, hu*0.505,
+      hu*0.030, hu*0.027, hu*0.012, false));
+    _nIris.push(M(PG.sph, pupilMat, headG, ex, eyeY3, hu*0.516,
+      hu*0.014, hu*0.018, hu*0.008, false));
     if(G.gfx === "best"){
       M(PG.sph, matCol(0xffffff, .18), headG, ex-hu*0.009, eyeY3+hu*0.010, hu*0.525,
         hu*0.007, hu*0.007, hu*0.004, false);
@@ -8317,7 +8981,9 @@ function buildPerson(p){
   /* lips with volume — same forward nudge as eyes/brow, see above */
   const lipM = matCol(fem ? 0x9a5a58 : 0x8a5550, .55);
   const mouth = M(PG.sph, lipM, headG, 0, hu*(0.275 + 0.01*lf), hu*0.455, hu*(0.095*lf), hu*(0.028*lf), hu*0.032, false);
-  M(PG.sph, lipM, headG, 0, hu*(0.255 + 0.01*lf), hu*0.460, hu*(0.088*lf), hu*(0.034*lf), hu*0.030, false);
+  const _nLow = M(PG.sph, lipM, headG, 0, hu*(0.255 + 0.01*lf), hu*0.460, hu*(0.088*lf), hu*(0.034*lf), hu*0.030, false);
+  const _nBrow = nmBrows(M, hair, headG, hu, fw, bh, eyeX3, fem);
+  nmFaceAge(M, headG, hu, skin, L, fem, headW);
   /* upper eyelids shade the modeled eyes and keep them from looking pasted on */
   const lidL = M(PG.sph, skin, headG, -eyeX3, hu*0.522, hu*0.503, hu*0.075, hu*0.018, hu*0.022, false);
   const lidR = M(PG.sph, skin, headG,  eyeX3, hu*0.522, hu*0.503, hu*0.075, hu*0.018, hu*0.022, false);
@@ -8427,9 +9093,10 @@ function buildPerson(p){
     const hand = M(PG.sph, skin, lo, 0, -foreArm - H*0.028, 0, H*0.038*B, H*0.052, H*0.024*B);
     M(PG.sph, skin, lo, side*H*0.024*B, -foreArm - H*0.020, H*0.006,
       H*0.013*B, H*0.026, H*0.013*B, false);                       /* thumb */
-    M(PG.box, skin, lo, 0, -foreArm - H*0.058, 0,
+    const _fg = (G.gfx === "simple" || MODEST) ? null : nmFingers(M, lo, skin, side, foreArm, H, B);
+    if(!_fg) M(PG.box, skin, lo, 0, -foreArm - H*0.058, 0,
       H*0.034*B, H*0.022, H*0.020*B, false);                       /* fingers, closed */
-    return {up, lo, hand};
+    return {up, lo, hand, fing:_fg};
   }
   function leg(side){
     const bare = W.bottom === "skirt" || W.bottom === "dress";
@@ -8467,7 +9134,7 @@ function buildPerson(p){
   g.userData = {
     pelvis:BN.hips, spine:BN.chestB, headG:BN.headB, armL, armR, legL, legR,
     eyeL, eyeR, mouth, lidL, lidR, hu, detailHead:headG, body:body,
-    wisps:personWisps,
+    wisps:personWisps, iris:_nIris, lowLip:_nLow, brows:_nBrow, sway:_nSway, age:L.age || 0,
     H:H, hipY:hipY, bodyScale:bodyScaleY, blink:1 + Math.random()*5, gest:0, shift:Math.random()*6,
     glance:2 + Math.random()*4, glanceX:0, poseN:0
   };
@@ -8713,6 +9380,10 @@ function wrapPi(a){
   return a;
 }
 function animatePerson(p, dt){
+  animatePerson0(p, dt);
+  try{ if(p.mesh && p.mesh.parent === peopleGroup) peopleExtra(p, dt); }catch(e){}
+}
+function animatePerson0(p, dt){
   if(!p.mesh || p.mesh.parent !== peopleGroup) return;
   if(p.mesh.userData && p.mesh.userData._crowdFrozen) crowdThawMesh(p.mesh);
   const u = p.mesh.userData || {};
@@ -10051,6 +10722,7 @@ function breakSeat(m){
   }catch(e){ return null; }
 }
 function wander(m, dt){
+  if(m.sayT > 0 && m.say && m._tlSaid !== m.say && m.room === G.room){ try{ tlHeard(m); }catch(e){} }
   if(m.sayT > 0) m.sayT -= dt;
   if(m.room !== G.room) return;
   /* a seat taken for a break is given back when the break is over */
@@ -18235,6 +18907,7 @@ function chatErr(code){
   return "(the conversation does not come off)";
 }
 function appendMsg(kind, text, who){
+  try{ if(text && kind === "you") tlog("You", text, "you"); else if(text && kind === "them") tlog(who || "", text, "talk"); }catch(e){}
   const log = el("chatLog");
   const d = document.createElement("div");
   d.className = "msg msg--" + kind;
@@ -18946,7 +19619,8 @@ function closeTalk(){
   refreshPanels();
 }
 
-function setSay(t, n){ el("tkSay").textContent = t; el("tkNote").innerHTML = n || ""; }
+function setSay(t, n){ el("tkSay").textContent = t; el("tkNote").innerHTML = n || "";
+  try{ if(t && TALK.m) tlog(TALK.m.name || "", t, "talk"); }catch(e){} }
 function chipFor(m){
   const c = m.party==="FED" ? "fed" : m.party==="COM" ? "com" : "ind";
   const t = m.kind==="press" ? "Press" : m.kind==="envoy" ? "Envoy" : m.kind==="civ" ? "Public" : partyLabel(m.party);
@@ -22724,6 +23398,102 @@ const DTCNO = (function(){
   return {say, lexCount, tplCount:TPL.length, guard, name:"D'Infinite Taylor Consular Neural Organism"};
 })();
 
+/* ══════════════════════════════════════════════════════════
+   20261012a · TALK THAT DOES NOT REPEAT ITSELF
+   Every line is chosen from several drafts against a memory of what
+   the room has already heard: exact lines, word pairs, and each
+   speaker's own recent words. People keep their own habits (their
+   fillers, their pet words), vary how long they talk, and pick up a
+   word from the line before theirs. The canon guard runs last.
+   ══════════════════════════════════════════════════════════ */
+const TK = {g:new Map(), bi:new Map(), sp:new Map(), len:new Map(), prev:null, n:0, on:true};
+const TK_STOP = new Set("the a an and or but of to in on at for with is it that this be are was were i you we they he she not no so as by from if do did have has had will would can could just what about there their them our my your me us his her its than then very".split(" "));
+const TK_WEAK = /(ly|ing|ed|ness)$|^(actually|really|before|business|anyone|something|nothing|everyone|because|another|whether|though|should|would|could|always|either|people|member|little)$/;
+const TK_FILL = ["Look,", "Well,", "Honestly,", "Listen,", "Mind you,", "Frankly,", "See,", "Now,", "I'll say this:", "Between us,", "Truth is,", "Fair enough, but", "Right,", "Here's the thing:", "For what it's worth,", "Granted,"];
+const TK_SYN = {
+  "think":["reckon","figure","suspect","believe"], "very":["awfully","really","plenty","right"],
+  "important":["serious","weighty","no small thing"], "problem":["trouble","snag","headache"],
+  "bill":["measure","bill","proposal"], "vote":["vote","tally","count"], "people":["folks","people","voters"],
+  "good":["decent","sound","solid"], "bad":["rotten","poor","ugly"], "maybe":["perhaps","maybe","could be"],
+  "really":["truly","honestly","really"], "big":["large","sizable","big"], "quickly":["fast","quick","in a hurry"]
+};
+const TK_REF = ["On {w},", "About {w}:", "{W}, you say?", "Since you raise {w},", "As for {w},", "If we're on {w},"];
+function tkHash(s){ let h = 2166136261; s = String(s); for(let i = 0; i < s.length; i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
+function tkWords(s){ return String(s).toLowerCase().replace(/[^a-z' ]+/g, " ").split(/\s+/).filter(Boolean); }
+function tkScore(m, s){
+  const w = tkWords(s); let sc = (TK.g.get(s) || 0) * 50;
+  let bs = 0; for(let i = 1; i < w.length; i++) bs += TK.bi.get(w[i-1] + " " + w[i]) || 0;
+  sc += bs / Math.max(1, w.length - 1) * 4;
+  const mine = TK.sp.get(m.id); if(mine){ let o = 0; w.forEach(x => { if(!TK_STOP.has(x) && mine.has(x)) o++; }); sc += o * 0.9; }
+  const ll = TK.len.get(m.id); if(ll !== undefined){ const d = Math.abs(w.length - ll); sc -= Math.min(d, 14) * 0.15; }
+  return sc;
+}
+function tkRemember(m, s){
+  const w = tkWords(s);
+  TK.g.set(s, (TK.g.get(s) || 0) + 1);
+  for(let i = 1; i < w.length; i++){ const k = w[i-1] + " " + w[i]; TK.bi.set(k, (TK.bi.get(k) || 0) + 1); }
+  let mine = TK.sp.get(m.id); if(!mine){ mine = new Map(); TK.sp.set(m.id, mine); }
+  w.forEach(x => { if(!TK_STOP.has(x)) mine.set(x, (mine.get(x) || 0) + 1); });
+  if(mine.size > 260){ const ks = [...mine.keys()].slice(0, 80); ks.forEach(k => mine.delete(k)); }
+  TK.len.set(m.id, w.length);
+  TK.prev = {who:m.id, s, t:G.t};
+  if(++TK.n % 400 === 0){ /* forget slowly so the room can come back to a phrase days later */
+    for(const [k, v] of TK.bi) if(v <= 1) TK.bi.delete(k); else TK.bi.set(k, v - 1);
+    if(TK.g.size > 6000) TK.g.clear();
+  }
+}
+function tkVoice(m, s, ctx){
+  const h = tkHash((m.id || 0) + "|" + (m.name || ""));
+  let out = s;
+  /* synonyms: each person has their own word for things, used consistently */
+  out = out.replace(/\b(think|very|important|problem|vote|people|good|bad|maybe|really|big|quickly)\b/g, (x) => {
+    const L = TK_SYN[x]; if(!L || ((h >> (x.length % 8)) & 3) === 0) return x;
+    return L[(h + x.length) % L.length];
+  });
+  /* length: someone who just spoke long answers short, and the reverse */
+  const ll = TK.len.get(m.id) || 0;
+  const sentences = out.match(/[^.!?]+[.!?]+/g);
+  if(sentences && sentences.length > 1 && ll > 18 && chance(0.55)) out = sentences[0].trim();
+  /* pick up the line before, when it was someone else's */
+  const pv = TK.prev;
+  if(pv && pv.who !== m.id && (ctx.intent === "react" || ctx.intent === "agree" || chance(0.22))){
+    const cand = tkWords(pv.s).filter(x => x.length > 5 && !TK_STOP.has(x) && !TK_WEAK.test(x));
+    if(cand.length){
+      const w = cand[(h + TK.n) % cand.length];
+      const f = TK_REF[(h + TK.n) % TK_REF.length];
+      const lead = f.replace("{w}", "the " + w).replace("{W}", "The " + w);
+      out = lead + " " + (/[?]$/.test(lead) ? out.charAt(0).toUpperCase() : out.charAt(0).toLowerCase()) + out.slice(1);
+    }
+  } else if(chance(0.30 + ((h & 7) / 30))){
+    /* a person's own fillers: three habits each */
+    const f = TK_FILL[(h + ((TK.n + h) % 3) * 5) % TK_FILL.length];
+    if(out.indexOf(f) !== 0) out = f + " " + out.charAt(0).toLowerCase() + out.slice(1);
+  }
+  out = out.replace(/\bi\b/g, "I").replace(/\s+/g, " ").trim();
+  return out;
+}
+(function(){
+  if(typeof DTCNO === "undefined" || DTCNO.say0) return;
+  DTCNO.say0 = DTCNO.say;
+  DTCNO.say = function(m, ctx){
+    if(!m) return "";
+    ctx = ctx || {};
+    if(!TK.on) return DTCNO.say0(m, ctx);
+    let best = "", bs = 1e9;
+    for(let k = 0; k < 4; k++){
+      const s = DTCNO.say0(m, ctx); if(!s) continue;
+      const sc = tkScore(m, s) + Math.random() * 0.3;
+      if(sc < bs){ bs = sc; best = s; }
+      if(sc < 0.5) break;
+    }
+    if(!best) return "";
+    let out = best;
+    try{ const v = DTCNO.guard(tkVoice(m, best, ctx)); if(v) out = v; }catch(e){}
+    tkRemember(m, out);
+    return out;
+  };
+})();
+
 function dtcnoOk(){ return typeof DTCNO !== "undefined" && Math.hypot(cam.vx || 0, cam.vz || 0) <= 0.12; }
 function dtcnoPair(a, b){
   if(!dtcnoOk() || !chance(0.55)) return null;
@@ -23400,11 +24170,236 @@ function kChamberActs(c){
 }
 
 /* ── the desks: yours if the office is yours ─────────────── */
+/* ══════════════════════════════════════════════════════════
+   20261012a · SIT-DOWN SCENES AS PROCEDURE
+   The Senate floor, the bench, the morning briefing and the State
+   House open hours used to be one click. Now each is a sitting:
+   the gavel, openings, rounds of questions, motions, deliberation,
+   the vote or ruling, and adjournment, in that order. Lines come in
+   on a beat and go to the transcript. Continue hurries a line; it
+   never skips a step. What you choose at each step costs or pays in
+   standing, influence, approval, the war chest, pledges on the bill
+   in play and a rival's heat. Reading the file first helps.
+   ══════════════════════════════════════════════════════════ */
+function sitEsc(s){ return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;"); }
+const SIT = {on:null, timer:0, beat:1500, log:[]};
+const SIT_DEF = {
+  senate:{title:"The Senate sits", chair:"The Presiding Officer", min:60, en:12, kind:"vote",
+    steps:["gavel","open","question","question","motion","deliberate","vote","adjourn"]},
+  court:{title:"Oral argument", chair:"The Marshal", min:90, en:14, kind:"ruling",
+    steps:["gavel","open","question","question","motion","deliberate","ruling","adjourn"]},
+  exec:{title:"The morning briefing", chair:"The Chief of Staff", min:45, en:8, kind:"decision",
+    steps:["gavel","open","question","motion","deliberate","ruling","adjourn"]},
+  govoffice:{title:"Open hours at the State House", chair:"The Governor's secretary", min:60, en:10, kind:"decision",
+    steps:["gavel","open","question","question","motion","deliberate","ruling","adjourn"]}
+};
+const SIT_STEP_T = {gavel:"Called to order", open:"Openings", question:"Questions", motion:"Motions and objections", deliberate:"Deliberation", vote:"The vote", ruling:"The ruling", adjourn:"Adjourned"};
+function sitCast(room){
+  let ppl = [];
+  try{ ppl = hereNow().filter(m => m && m.name && m !== G.you && !m.machine); }catch(e){}
+  const named = ppl.filter(m => m.kind === "member" || m.kslot || m.post);
+  const pool = (named.length ? named : ppl).slice(0, 8);
+  const nm = i => pool.length ? pool[i % pool.length].name : ["the Senator from the North", "counsel", "the Secretary"][i % 3];
+  return {a:nm(0), b:nm(1), c:nm(2), ppl:pool};
+}
+function sitLines(room, step, C, ctx){
+  const y = G.you, bill = G.bill && !G.bill.done ? G.bill : null, bt = bill ? bill.title : "the calendar";
+  const cs = (G.cases || []).find(x => x && !x.done);
+  const S = {
+    senate:{
+      gavel:[[ "The Presiding Officer", "The Senate will come to order. The clerk will read the journal."], ["The Clerk", "The journal of the last day stands approved without objection."]],
+      open:[[C.a, "The question before us is " + bt + ". I will be brief, which in this room means twenty minutes."], [C.b, "The minority has a view, and the minority would like it on the record."]],
+      question:[[C.b, pick(["Will the Senator yield for a question?", "I ask the Senator plainly: who pays for this?", "Has the Senator read section four, or only the summary?"])]],
+      motion:[[C.c, pick(["I move to table.", "Point of order: the amendment is not germane.", "I ask unanimous consent to limit debate to one hour."])]],
+      deliberate:[["The Presiding Officer", "Without objection, the Senate will stand in quorum call."], [C.a, "Twenty minutes in the cloakroom. Count your votes."]],
+      vote:[["The Clerk", "The question is on passage. The clerk will call the roll."]],
+      adjourn:[["The Presiding Officer", "The Senate stands adjourned until tomorrow at ten."]]},
+    court:{
+      gavel:[["The Marshal", "Oyez, oyez, oyez. All persons having business before this Court draw near and give attention."]],
+      open:[["Counsel for " + (cs ? cs.state : "the petitioner"), cs ? "This Court should hold that the act reaches past what the Charter allows." : "A narrow question, Your Honor, on filing deadlines."], ["Counsel for the Union", "The act is the law, and the law is clear."]],
+      question:[["Counsel for " + (cs ? cs.state : "the petitioner"), pick(["If I may finish the point, Your Honor.", "The record shows otherwise.", "With respect, that is not what the statute says."])]],
+      motion:[["Counsel for the Union", pick(["Objection. Counsel is arguing facts not in the record.", "We move to strike that answer.", "We ask leave to file a supplemental brief."])]],
+      deliberate:[["The Marshal", "The Court will retire to conference."]],
+      ruling:[["The Clerk", "The Court has reached its decision."]],
+      adjourn:[["The Marshal", "This honorable Court is now adjourned."]]},
+    exec:{
+      gavel:[["The Chief of Staff", "Everyone sit. We have forty minutes and the realm has a lot of problems."]],
+      open:[[C.a, "The overnight file. Unrest is up in two states and the treasury wants an answer by noon."]],
+      question:[[C.b, pick(["The numbers are soft. I would not lean on them.", "My office was not consulted, for the record.", "If you want it done by Friday, I need the authority today."])]],
+      motion:[[C.c, pick(["I'd recommend we hold until the vote.", "I object to moving money we have not got.", "Sign it now and explain it later."])]],
+      deliberate:[["The Chief of Staff", "Take a minute. Everyone else out of the room."]],
+      ruling:[["The Chief of Staff", "Then it is decided."]],
+      adjourn:[["The Chief of Staff", "Thank you. Go do it."]]},
+    govoffice:{
+      gavel:[["The Governor's secretary", "Open hours begin. Five on the list today, please keep it to ten minutes each."]],
+      open:[[pick(["A dairy farmer", "A school board chair", "A mayor"]), pick(["The road to the co-op washed out in spring and it is still out.", "We are three teachers short and the state check is late.", "My town cannot pay for the water main the state required."])]],
+      question:[[pick(["A widow", "A union steward", "A county clerk"]), pick(["My husband's pension letter came back unopened.", "The plant says it will close if the permit waits another month.", "The ballots for the special election never came."])]],
+      motion:[[pick(["The second mayor", "A state senator"]), pick(["With respect, Governor, the first mayor's road is in my county and he never asked me.", "If you move that money, my district loses its clinic."])]],
+      deliberate:[["The Governor's secretary", "Shall I clear the room, Governor?"]],
+      ruling:[["The Governor's secretary", "I'll write it down as you say it."]],
+      adjourn:[["The Governor's secretary", "That is the list. Open hours are closed."]]}
+  };
+  return ((S[room] || S.senate)[step] || []).slice();
+}
+/* risk/reward choices per step: [label, risk, good, bad, kind] */
+function sitChoices(room, step){
+  const C = {
+    open:[["Open steady and on the record", 0.05, {standing:1}, {}, "safe"],
+          ["Open bold, name names", 0.40, {standing:3, influence:1}, {standing:-2, heat:6}, "bold"],
+          ["Cite the file chapter and verse", 0.15, {standing:2, approval:1}, {standing:-1}, "prep"]],
+    question:[["Ask one fair question", 0.10, {standing:1}, {}, "safe"],
+              ["Press hard until they give", 0.45, {influence:2, standing:1, heat:-4}, {standing:-2, heat:8}, "bold"],
+              ["Let it pass to save time", 0.0, {}, {standing:-1}, "rush"]],
+    motion:[["Rule it in order and move on", 0.10, {standing:1}, {}, "safe"],
+            ["Object and make them argue it", 0.35, {influence:2}, {standing:-1, influence:-1}, "bold"],
+            ["Offer a deal on the side", 0.30, {pledge:2, funds:-2}, {funds:-2, standing:-1}, "deal"]],
+    deliberate:[["Take the full time to work it", 0.10, {support:3, pledge:1}, {}, "safe"],
+                ["Spend from the war chest for votes", 0.25, {pledge:3, support:4, funds:-4}, {funds:-4}, "deal"],
+                ["Cut it short", 0.0, {}, {standing:-2, support:-2}, "rush"]],
+    vote:[["Cast your vote and say why", 0.10, {standing:1, approval:1}, {}, "safe"],
+          ["Speak last and swing it", 0.40, {influence:3, support:4}, {standing:-2}, "bold"]],
+    ruling:[["Decide narrowly", 0.10, {standing:1}, {}, "safe"],
+            ["Decide broadly and own it", 0.40, {standing:3, approval:2}, {standing:-2, approval:-2}, "bold"]]
+  };
+  return C[step] || null;
+}
+function sitApply(d, sign){
+  const y = G.you, out = [];
+  if(!d) return "";
+  const add = (k, v, lab) => { if(!v) return; y[k] = clamp((y[k] || 0) + v, 0, 100); out.push((v > 0 ? "+" : "") + v + " " + lab); };
+  add("standing", d.standing, "standing"); add("influence", d.influence, "influence"); add("approval", d.approval, "approval");
+  if(d.funds){ y.funds = Math.max(0, (y.funds || 0) + d.funds); out.push((d.funds > 0 ? "+" : "") + d.funds + " war chest"); }
+  if(d.heat){ const r = rivalLive(); if(r){ r.heat = clamp((r.heat || 0) + d.heat, 0, 100); out.push("rival heat " + (d.heat > 0 ? "+" : "") + d.heat); } }
+  if(d.support && G.bill && !G.bill.done){ G.bill.sitSupport = (G.bill.sitSupport || 0) + d.support; out.push((d.support > 0 ? "+" : "") + d.support + " bill support"); }
+  if(d.pledge && G.bill && !G.bill.done){
+    const C = (G.members || []).filter(m => m && !m.gone && m.kind === "member" && !m.machine && !m.pledge).sort(() => Math.random() - 0.5).slice(0, d.pledge);
+    C.forEach(m => { m.pledge = 1; m.pledgeDay = G.day; });
+    if(C.length) out.push(C.length + " pledged");
+  }
+  return out.join(" · ");
+}
+function sitStart(room){
+  const D = SIT_DEF[room]; if(!D) return;
+  try{ if(TALK.open) closeTalk(); }catch(e){}
+  const y = G.you;
+  G.sitPrep = G.sitPrep || {};
+  const prep = G.sitPrep[room] === G.day;
+  SIT.on = {room, D, i:0, li:0, lines:[], cast:sitCast(room), score:0, rush:0, prep, t0:performance.now(), m0:G.minute || 0, tally:[], picked:false};
+  try{ kMark({senate:"ksen", court:"kct", exec:"kex", govoffice:"kgv"}[room]); kMarkChamber(); }catch(e){}
+  G.running = false;
+  sitStep();
+}
+function sitStep(){
+  const S = SIT.on; if(!S) return;
+  const step = S.D.steps[S.i];
+  S.lines = sitLines(S.room, step, S.cast); S.li = 0; S.picked = false; S.res = "";
+  spend(Math.round(S.D.min / S.D.steps.length), Math.round(S.D.en / S.D.steps.length));
+  sitDraw(); sitBeat();
+}
+function sitBeat(){
+  const S = SIT.on; if(!S) return;
+  clearTimeout(SIT.timer);
+  if(S.li < S.lines.length){
+    const L = S.lines[S.li++];
+    try{ tlog(L[0], L[1], "sit"); }catch(e){}
+    sitDraw();
+    SIT.timer = setTimeout(sitBeat, SIT.beat);
+  } else sitDraw();
+}
+function sitPick(ci){
+  const S = SIT.on; if(!S || S.picked) return;
+  const step = S.D.steps[S.i], ch = sitChoices(S.room, step); if(!ch || !ch[ci]) return;
+  const c = ch[ci];
+  let p = 1 - c[1] + (S.prep ? 0.15 : 0) + ((G.you.standing || 50) - 50) / 250 - S.rush * 0.08;
+  if(c[4] === "prep" && !S.prep) p -= 0.45;
+  if(c[4] === "deal" && (G.you.funds || 0) < 4) p -= 0.5;
+  const ok = Math.random() < p;
+  if(c[4] === "rush"){ S.rush++; }
+  const r = sitApply(ok ? c[2] : c[3]);
+  S.score += ok ? (c[4] === "bold" ? 2 : 1) : -1;
+  S.tally.push({step, pick:c[0], ok, r});
+  try{ tlog("You", c[0] + ".", "you"); }catch(e){}
+  const answer = ok ? pick(["That lands.", "Heads nod down the row.", "Nobody has an answer to that.", "Fair enough."])
+                    : pick(["It goes over badly.", "Someone laughs, not kindly.", "The room cools.", "That was thin, and they noticed."]);
+  try{ tlog(S.cast.b || "", answer, "sit"); }catch(e){}
+  S.res = answer + (r ? " (" + r + ")" : "");
+  S.picked = true;
+  sitDraw();
+}
+function sitNext(){
+  const S = SIT.on; if(!S) return;
+  if(S.li < S.lines.length){ sitBeat(); return; }          /* hurry the line, never the step */
+  const step = S.D.steps[S.i];
+  if(sitChoices(S.room, step) && !S.picked) return;
+  if(step === "vote" || step === "ruling") sitOutcome();
+  S.i++;
+  if(S.i >= S.D.steps.length){ sitEnd(false); return; }
+  sitStep();
+}
+function sitOutcome(){
+  const S = SIT.on, y = G.you;
+  const good = S.score >= 2 && S.rush === 0;
+  const res = sitApply(good ? {standing:2, influence:1, approval:S.room === "govoffice" ? 3 : 0} : S.score < 0 ? {standing:-2} : {standing:1});
+  if(S.room === "exec" || S.room === "govoffice"){
+    try{ const st = S.room === "exec" ? (G.states || []).slice().sort((a, b) => (b.unrest || 0) - (a.unrest || 0))[0] : (G.states || []).find(s => s.n === y.state);
+      if(st) st.unrest = clamp((st.unrest || 0) - (good ? 3 : 1), 0, 100); }catch(e){}
+  }
+  S.out = (good ? "A clean sitting." : S.score < 0 ? "A rough sitting." : "A middling sitting.") + (res ? " " + res : "");
+  try{ tlog(S.D.chair, S.out, "sit"); }catch(e){}
+  if(good && S.prep){ try{ achieve("sitting"); }catch(e){} }
+}
+function sitEnd(walked){
+  const S = SIT.on; if(!S) return;
+  clearTimeout(SIT.timer);
+  if(walked){ sitApply({standing:-3, influence:-1}); try{ tlog("", "You walked out of the sitting.", "sit"); }catch(e){} }
+  SIT.log.push({room:S.room, ms:Math.round(performance.now() - S.t0), gameMin:(G.minute || 0) - S.m0, steps:S.i, walked:!!walked, score:S.score});
+  try{ note((walked ? "Walked out of " : "Sat through ") + S.D.title.toLowerCase() + "."); }catch(e){}
+  SIT.on = null;
+  walkNow();
+}
+function sitDraw(){
+  const S = SIT.on; if(!S) return;
+  const step = S.D.steps[S.i], ch = sitChoices(S.room, step);
+  const done = S.li >= S.lines.length;
+  const lines = S.lines.slice(0, S.li).map(l => '<p class="sit__l"><b>' + sitEsc(l[0]) + '</b> ' + sitEsc(l[1]) + '</p>').join("");
+  const prog = S.D.steps.map((s, i) => '<span class="sit__dot' + (i < S.i ? ' is-done' : i === S.i ? ' is-now' : '') + '">' + SIT_STEP_T[s] + '</span>').join("");
+  let acts = "";
+  if(done && ch && !S.picked) acts = ch.map((c, i) => '<button type="button" class="btn' + (i ? ' btn--ghost' : '') + '" data-sit="' + i + '">' + c[0] + (c[4] === "rush" ? ' <small>(rushes it)</small>' : c[1] >= 0.3 ? ' <small>(risky)</small>' : '') + '</button>').join("");
+  else acts = '<button type="button" class="btn" id="sitGo">' + (done ? (S.i === S.D.steps.length - 1 ? "Rise" : "Next step") : "Continue") + '</button>';
+  card.innerHTML = '<div class="eyebrow">' + S.D.title + ' · step ' + (S.i + 1) + ' of ' + S.D.steps.length + (S.prep ? ' · you read the file' : '') + '</div>' +
+    '<h1>' + SIT_STEP_T[step] + '</h1><div class="sit__prog">' + prog + '</div>' +
+    '<div class="sit__lines">' + lines + '</div>' + (S.res ? '<p class="dream">' + S.res + '</p>' : '') + (S.out && step !== "adjourn" ? '' : (S.out && step === "adjourn" ? '<p class="dream">' + S.out + '</p>' : '')) +
+    '<div class="card__actions">' + acts + '<button type="button" class="btn btn--ghost" id="sitOut">Walk out</button></div>';
+  veil.hidden = false;
+  const g = el("sitGo"); if(g) g.addEventListener("click", sitNext);
+  el("sitOut").addEventListener("click", () => sitEnd(true));
+  card.querySelectorAll("[data-sit]").forEach(b => b.addEventListener("click", () => sitPick(+b.getAttribute("data-sit"))));
+  try{ refreshPicks(); }catch(e){}
+}
+function sitPrepAct(room){
+  return {t:"Read the file before you sit", c:"20m", off:(G.sitPrep || {})[room] === G.day, run(){
+    spend(20, 2); G.sitPrep = G.sitPrep || {}; G.sitPrep[room] = G.day;
+    setSay("You read it twice and mark the pages. Tomorrow's surprises will be today's notes.", fx("prepared for the sitting", "20 minutes"));
+  }};
+}
+(function(){
+  try{ if(!ACH.some(a => a.k === "sitting")) ACH.push({k:"sitting", t:"Order of the Day", d:"Prepared for a sitting and ran it clean."}); }catch(e){}
+  try{
+    const st = document.createElement("style");
+    st.textContent = ".sit__prog{display:flex;flex-wrap:wrap;gap:4px;margin:6px 0 10px}.sit__dot{font-size:11px;padding:2px 7px;border-radius:9px;background:rgba(0,0,0,.06);opacity:.6}" +
+      ".sit__dot.is-done{opacity:.9;background:rgba(150,120,60,.18)}.sit__dot.is-now{opacity:1;background:rgba(150,120,60,.45);font-weight:600}" +
+      ".sit__lines{max-height:38vh;overflow:auto}.sit__l{margin:4px 0}";
+    document.head.appendChild(st);
+  }catch(e){}
+})();
+
 function kDeskActs(room){
   const you = G.you, mine = kHolds(room), A = [];
   if(mine) A.push({t:"Use the powers of your office", c:"opens your office", run(){ kMarkChamber(); officeCard(); }});
   if(room === "senate"){
-    if(mine) A.push({t:"Take the floor of the Senate", c:"60m", off:kOnceToday("ksen"), run(){
+    if(mine) A.push(sitPrepAct("senate"));
+    if(mine) A.push({t:"Sit the Senate: take the floor", c:"60m · step by step", off:kOnceToday("ksen"), run(){ sitStart("senate"); return null; }});
+    if(false) A.push({t:"Take the floor of the Senate", c:"60m", off:kOnceToday("ksen"), run(){
       spend(60, 12); kMark("ksen"); kMarkChamber();
       you.standing = clamp(you.standing + 3, 0, 100); you.influence = clamp(you.influence + 1, 0, 100);
       setSay("Twenty minutes to a half-full chamber and a full press row. The Senate listens slower, and remembers longer.", fx("+3 standing · +1 influence", "an hour"));
@@ -23415,7 +24410,9 @@ function kDeskActs(room){
       setSay("Six desks occupied, one Senator talking, a clerk reading the journal under her breath. It is slower than the House and nobody here minds.", "");
     }});
   } else if(room === "court"){
-    if(mine) A.push({t:"Hear oral argument", c:"90m", off:kOnceToday("kct"), run(){
+    if(mine) A.push(sitPrepAct("court"));
+    if(mine) A.push({t:"Hear oral argument", c:"90m · step by step", off:kOnceToday("kct"), run(){ sitStart("court"); return null; }});
+    if(false) A.push({t:"Hear oral argument", c:"90m", off:kOnceToday("kct"), run(){
       spend(90, 14); kMark("kct"); kMarkChamber();
       const c = (G.cases || []).find(x => x && !x.done);
       you.standing = clamp(you.standing + 2, 0, 100);
@@ -23429,7 +24426,9 @@ function kDeskActs(room){
                : "A slow morning in the Court. You learn that the marshal knows every lawyer by their shoes.", "");
     }});
   } else if(room === "exec"){
-    if(mine) A.push({t:"Take the morning briefing", c:"45m", off:kOnceToday("kex"), run(){
+    if(mine) A.push(sitPrepAct("exec"));
+    if(mine) A.push({t:"Take the morning briefing", c:"45m · step by step", off:kOnceToday("kex"), run(){ sitStart("exec"); return null; }});
+    if(false) A.push({t:"Take the morning briefing", c:"45m", off:kOnceToday("kex"), run(){
       spend(45, 8); kMark("kex"); kMarkChamber();
       const S = (G.states || []).slice().sort((a, b2) => (b2.unrest || 0) - (a.unrest || 0))[0];
       if(S) S.unrest = clamp((S.unrest || 0) - 3, 0, 100);
@@ -23441,7 +24440,9 @@ function kDeskActs(room){
       setSay("The aide takes it with both hands and promises it will be read. It might even be true.", "");
     }});
   } else if(room === "govoffice"){
-    if(mine) A.push({t:"Hold open hours at the State House", c:"60m", off:kOnceToday("kgv"), run(){
+    if(mine) A.push(sitPrepAct("govoffice"));
+    if(mine) A.push({t:"Hold open hours at the State House", c:"60m · step by step", off:kOnceToday("kgv"), run(){ sitStart("govoffice"); return null; }});
+    if(false) A.push({t:"Hold open hours at the State House", c:"60m", off:kOnceToday("kgv"), run(){
       spend(60, 10); kMark("kgv"); kMarkChamber();
       you.approval = clamp(you.approval + 4, 0, 100);
       const S = (G.states || []).find(s => s.n === you.state);
@@ -23688,6 +24689,7 @@ function lSeasonLand(day){
   }
 }
 function lWxLight(day){
+  try{ nmLight(day); }catch(e){}
   const w = wxToday(); if(!w) return;
   try{ lSeasonLand(day); }catch(e){}
   const g = wxGloom();
@@ -23730,8 +24732,11 @@ function wxBuild(R){
       p.set([x, y, z, x + 0.035, y + 0.55, z], i * 6);
     }
     geo = new THREE.BufferGeometry(); geo.setAttribute("position", new THREE.BufferAttribute(p, 3));
-    mat = new THREE.LineBasicMaterial({color:0xe2e8ef, transparent:true, opacity:0.55, depthWrite:false});
+    mat = new THREE.LineBasicMaterial({color:0xe2e8ef, transparent:true, opacity:0.75, depthWrite:false});
     for(let k = 0; k < 2; k++){ const o = new THREE.LineSegments(geo, mat); o.position.y = k * wxH; o.frustumCulled = false; grp.add(o); }
+    /* 20261012a: a darker second sheet so rain reads against a pale sky too */
+    const mat2 = new THREE.LineBasicMaterial({color:0x5c6876, transparent:true, opacity:0.55, depthWrite:false});
+    for(let k = 0; k < 2; k++){ const o = new THREE.LineSegments(geo, mat2); o.position.set(0.37, k * wxH + 0.9, 0.53); o.frustumCulled = false; grp.add(o); }
   } else {
     const p = new Float32Array(n * 3);
     for(let i = 0; i < n; i++) p.set([(Math.random() * 2 - 1) * hw, Math.random() * wxH, Math.random() * d - 0.5], i * 3);
@@ -24103,6 +25108,7 @@ function paperCard(){
     (P.stories.length ? P.stories.map(s => '<p>· ' + s + '</p>').join("") : '<p>· The galleries were thin and the clerks went home on time.</p>') +
     (P.rival ? '<p><strong>The feud:</strong> ' + P.rival + '</p>' : '') +
     (P.letter ? '<p><strong>Letters from home:</strong> ' + P.letter + '</p>' : '') +
+    (function(){ try{ return agLedgerHTML(); }catch(e){ return ""; } })() +
     '<p class="dream">' + P.poll + '</p>' +
     '<div class="card__actions"><button type="button" class="btn" id="lpClose">Fold it</button>' +
     '<button type="button" class="btn btn--ghost" id="lpRival">Rivals</button><button type="button" class="btn btn--ghost" id="lpHome">Home</button></div>';
@@ -24252,6 +25258,280 @@ function mPadWords(line){
 }
 function mPadPrompt(w){
   try{ return (w && PAD_SEEN) ? w.replace(/^Press E\b/, "Press A") : w; }catch(e){ return w; }
+}
+
+/* ══════════════════════════════════════════════════════════
+   20261012a · THE TRANSCRIPT
+   Every line spoken where you can hear it is written down with who
+   said it and when. L on the keyboard, R3 (right stick click) on a pad,
+   or the Log button. It does not stop the clock.
+   ══════════════════════════════════════════════════════════ */
+const TL = {open:false, max:500, lastKey:"", n:0};
+function tlNow(){ try{ return "Day " + (G.day || 1) + " · " + hhmm(); }catch(e){ return "Day " + (G.day || 1); } }
+function tlog(who, line, kind){
+  try{
+    if(!line) return;
+    const text = String(line).replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+    if(!text || text.length < 2) return;
+    const name = typeof who === "string" ? who : (who && who.name) || "";
+    const key = name + "|" + text;
+    if(key === TL.lastKey) return;
+    TL.lastKey = key;
+    if(!Array.isArray(G.tlog)) G.tlog = [];
+    const row = {d:G.day || 1, at:(function(){ try{ return hhmm(); }catch(e){ return ""; } })(), who:name || "", t:text.slice(0, 400), k:kind || "talk"};
+    G.tlog.push(row);
+    if(G.tlog.length > TL.max) G.tlog.splice(0, G.tlog.length - TL.max);
+    TL.n++;
+    if(TL.open) tlAppend(row, true);
+    else { const b = el("uiLogBtn"); if(b) b.classList.add("has-new"); }
+  }catch(e){}
+}
+function tlRowHTML(r){
+  const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+  return '<div class="tl__row' + (r.who === "You" ? " is-you" : "") + (r.k === "proc" ? " is-proc" : "") + '">' +
+    '<div class="tl__h"><b>' + esc(r.who || "In the room") + '</b><span>Day ' + r.d + (r.at ? " · " + esc(r.at) : "") + '</span></div>' +
+    '<div class="tl__t">' + esc(r.t) + '</div></div>';
+}
+function tlAppend(r, stick){
+  const box = el("tlList"); if(!box) return;
+  const atEnd = box.scrollTop + box.clientHeight >= box.scrollHeight - 30;
+  box.insertAdjacentHTML("beforeend", tlRowHTML(r));
+  while(box.children.length > TL.max) box.removeChild(box.firstChild);
+  if(stick && atEnd) box.scrollTop = box.scrollHeight;
+}
+function tlEnsureDOM(){
+  if(el("tlPanel")) return;
+  const st = document.createElement("style"); st.id = "tlStyle";
+  st.textContent =
+    "#tlPanel{position:fixed;right:14px;top:64px;bottom:64px;width:min(420px,46vw);z-index:60;display:flex;flex-direction:column;" +
+    "background:rgba(20,18,15,.88);color:#efe7d6;border:1px solid rgba(176,139,69,.45);border-radius:10px;box-shadow:0 18px 48px rgba(0,0,0,.5);backdrop-filter:blur(4px);font:14px/1.4 inherit}" +
+    "#tlPanel[hidden]{display:none}" +
+    "#tlPanel .tl__top{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid rgba(176,139,69,.3);letter-spacing:.08em;text-transform:uppercase;font-size:12px}" +
+    "#tlPanel .tl__top button{background:none;border:1px solid rgba(239,231,214,.35);color:#efe7d6;border-radius:6px;padding:3px 10px;cursor:pointer}" +
+    "#tlList{flex:1;overflow-y:auto;padding:8px 14px 14px;overscroll-behavior:contain;cursor:grab;user-select:none}" +
+    "#tlList.is-drag{cursor:grabbing}" +
+    ".tl__row{padding:7px 0;border-bottom:1px solid rgba(239,231,214,.08)}" +
+    ".tl__row.is-you .tl__h b{color:#e7c46e}.tl__row.is-proc .tl__h b{color:#9fc3e0}" +
+    ".tl__h{display:flex;justify-content:space-between;gap:10px;font-size:12px;opacity:.85}.tl__h span{opacity:.7;white-space:nowrap}" +
+    ".tl__t{margin-top:2px}" +
+    ".tl__foot{padding:6px 14px;font-size:11px;opacity:.6;border-top:1px solid rgba(176,139,69,.2)}" +
+    "#uiLogBtn.has-new::after{content:'';display:inline-block;width:6px;height:6px;border-radius:50%;background:#e7c46e;margin-left:6px;vertical-align:middle}";
+  document.head.appendChild(st);
+  const p = document.createElement("div"); p.id = "tlPanel"; p.hidden = true;
+  p.setAttribute("role", "log"); p.setAttribute("aria-label", "Transcript");
+  p.innerHTML = '<div class="tl__top"><span>Transcript</span><button type="button" id="tlClose">Close</button></div>' +
+    '<div id="tlList" tabindex="0"></div><div class="tl__foot">Wheel, drag, arrow keys or the stick to scroll · L or R3 to close</div>';
+  document.body.appendChild(p);
+  el("tlClose").addEventListener("click", () => tlToggle(false));
+  const box = el("tlList");
+  let drag = null;
+  box.addEventListener("pointerdown", e => { drag = {y:e.clientY, s:box.scrollTop}; box.classList.add("is-drag"); try{ box.setPointerCapture(e.pointerId); }catch(x){} });
+  box.addEventListener("pointermove", e => { if(drag) box.scrollTop = drag.s - (e.clientY - drag.y); });
+  const up = () => { drag = null; box.classList.remove("is-drag"); };
+  box.addEventListener("pointerup", up); box.addEventListener("pointercancel", up);
+  box.addEventListener("wheel", e => { e.stopPropagation(); }, {passive:true});
+  /* the HUD button */
+  const bar = el("uiToolbar");
+  if(bar && !el("uiLogBtn")){
+    const b = document.createElement("button"); b.type = "button"; b.id = "uiLogBtn"; b.title = "Transcript of what has been said (L). Pad: R3."; b.textContent = "Log";
+    const map = el("uiMapBtn");
+    if(map && map.nextSibling) bar.insertBefore(b, map.nextSibling); else bar.appendChild(b);
+    b.addEventListener("click", () => tlToggle());
+  }
+}
+function tlToggle(on){
+  tlEnsureDOM();
+  TL.open = on === undefined ? !TL.open : !!on;
+  const p = el("tlPanel"); p.hidden = !TL.open;
+  if(TL.open){
+    const box = el("tlList");
+    box.innerHTML = (G.tlog || []).map(tlRowHTML).join("") || '<div class="tl__row"><div class="tl__t">Nothing said yet that you could hear.</div></div>';
+    box.scrollTop = box.scrollHeight;
+    const b = el("uiLogBtn"); if(b) b.classList.remove("has-new");
+  }
+}
+function tlScroll(px){ const box = el("tlList"); if(box) box.scrollTop += px; }
+/* keyboard while it is open: arrows and page keys scroll it, Escape or L closes */
+function tlKey(e){
+  if(!TL.open) return false;
+  const k = (e.key || "").toLowerCase();
+  if(k === "arrowup"){ tlScroll(-60); e.preventDefault(); return true; }
+  if(k === "arrowdown"){ tlScroll(60); e.preventDefault(); return true; }
+  if(k === "pageup"){ tlScroll(-400); e.preventDefault(); return true; }
+  if(k === "pagedown"){ tlScroll(400); e.preventDefault(); return true; }
+  if(k === "home"){ tlScroll(-1e6); e.preventDefault(); return true; }
+  if(k === "end"){ tlScroll(1e6); e.preventDefault(); return true; }
+  if(k === "escape" || k === "l"){ tlToggle(false); e.preventDefault(); return true; }
+  return false;
+}
+/* pad while it is open: either stick or the D-pad scrolls, B or R3 closes; you stand still */
+let _tlPadHeld = {};
+function tlPad(gp){
+  const b = gp.buttons || [], ax = gp.axes || [];
+  const down = i => !!(b[i] && b[i].pressed);
+  const edge = i => { const d = down(i), was = !!_tlPadHeld[i]; _tlPadHeld[i] = d; return d && !was; };
+  const r3 = edge(11);
+  if(!TL.open){ if(r3 && veil.hidden){ tlToggle(true); return true; } return false; }
+  if(r3 || edge(1)){ tlToggle(false); try{ PADHELD[1] = true; }catch(e){} return true; }
+  const y = Math.abs(ax[3] || 0) > Math.abs(ax[1] || 0) ? (ax[3] || 0) : (ax[1] || 0);
+  if(Math.abs(y) > 0.2) tlScroll(y * 14);
+  if(down(12)) tlScroll(-10); if(down(13)) tlScroll(10);
+  try{ PAD.vx = 0; PAD.vz = 0; PAD.turn = 0; }catch(e){}
+  return true;
+}
+/* people talking where you can hear them */
+function tlHeard(m){
+  if(!m || !m.say || !(m.sayT > 0) || m._tlSaid === m.say) return;
+  m._tlSaid = m.say;
+  tlog(m.name || "", m.say, m.kind === "civ" ? "civ" : "talk");
+}
+
+/* ══════════════════════════════════════════════════════════
+   20261012a · A CAPITAL THAT RUNS WITHOUT YOU
+   Every member carries goals, allies, enemies and favors owed. Each
+   game hour, off-screen and cheaply, some of them meet, trade,
+   cosponsor, whip, file bills and campaign; rain keeps people in,
+   bad news makes them talk. Their bills go through committee, the
+   floor, the Senate, the Executive's desk and sometimes the Court on
+   their own. Caucus posts are elected on schedule. Results land in
+   the Ledger, the transcript and the laws register.
+   ══════════════════════════════════════════════════════════ */
+const AG_GOALS = ["pass a bill of their own", "win the caucus post", "protect the home district", "settle a score", "build a coalition", "raise money for the campaign"];
+const AG_TOPICS = ["roads", "schools", "water", "the harbor", "pensions", "farm credit", "rail", "the courts", "border posts", "the militia", "tariffs", "clinics"];
+const AG_POSTS = ["Majority Whip", "Caucus Chair", "Appropriations Vice-Chair", "Rules Vice-Chair"];
+function agState(){
+  if(!G.ag) G.ag = {hour:-1, day:0, bills:[], laws:[], posts:{}, n:{meet:0, deal:0, cos:0, whip:0, filed:0, passed:0, failed:0, vetoed:0, struck:0, camp:0, react:0, office:0}, seq:1};
+  return G.ag;
+}
+function agLive(){ return (G.members || []).filter(m => m && !m.gone && m.kind === "member" && !m.machine && !(typeof isConsular === "function" && isConsular(m))); }
+function agOf(m){
+  if(!m.ag){
+    const h = ((m.id || 0) * 2654435761) >>> 0;
+    m.ag = {goal:AG_GOALS[h % AG_GOALS.length], topic:AG_TOPICS[(h >>> 5) % AG_TOPICS.length], allies:[], enemies:[], owes:{}, sched:(h >>> 9) % 3, drive:0.3 + ((h >>> 12) % 60) / 100};
+  }
+  return m.ag;
+}
+function agRel(a, b, d){
+  const A = agOf(a);
+  const rm = (L, id) => { const i = L.indexOf(id); if(i >= 0) L.splice(i, 1); };
+  if(d > 0){ rm(A.enemies, b.id); if(A.allies.indexOf(b.id) < 0) A.allies.push(b.id); if(A.allies.length > 6) A.allies.shift(); }
+  else { rm(A.allies, b.id); if(A.enemies.indexOf(b.id) < 0) A.enemies.push(b.id); if(A.enemies.length > 4) A.enemies.shift(); }
+}
+function agSay(who, line){ try{ if(G.room && line) tlog(who, line, "world"); }catch(e){} }
+function agLedger(t){ try{ G._lNote = false; lLog(t, "world"); }catch(e){} }
+function agFile(m){
+  const S = agState(), A = agOf(m);
+  const b = {id:S.seq++, t:(m.name ? surname(m.name) : "A") + " " + pick(["Act", "Bill", "Relief Act", "Reform Act"]) + " on " + A.topic,
+    by:m.id, party:m.party, cos:[], stage:"committee", day:G.day, next:G.day + 2 + ((m.id || 0) % 3), sup:0};
+  S.bills.push(b); S.n.filed++;
+  agLedger((m.name || "A member") + " filed the " + b.t + ".");
+  return b;
+}
+function agStageRoll(b, live){
+  /* support: author's allies, cosponsors, same party, minus the author's enemies */
+  const by = live.find(x => x.id === b.by);
+  const al = by ? agOf(by).allies.length : 0, en = by ? agOf(by).enemies.length : 0;
+  const same = live.filter(x => x.party === b.party).length / Math.max(1, live.length);
+  return same * 0.7 + b.cos.length * 0.04 + al * 0.03 - en * 0.035 + b.sup * 0.02 + (Math.random() - 0.5) * 0.3;
+}
+function agAdvance(live){
+  const S = agState();
+  for(const b of S.bills){
+    if(b.done || G.day < b.next) continue;
+    const s = agStageRoll(b, live);
+    const step = (ok, nxt, fail, note) => {
+      if(ok){ b.stage = nxt; b.next = G.day + 1 + ((b.id) % 3); agLedger("The " + b.t + " " + note + "."); }
+      else { b.done = true; b.fate = fail; S.n[fail === "vetoed" ? "vetoed" : fail === "struck" ? "struck" : "failed"]++; agLedger("The " + b.t + " " + (fail === "vetoed" ? "was vetoed by the Executive" : fail === "struck" ? "was struck down by the Court" : "died " + (b.stage === "committee" ? "in committee" : (b.stage === "house" ? "on the House floor" : "in the Senate"))) + "."); }
+    };
+    if(b.stage === "committee") step(s > 0.24, "house", "failed", "cleared committee");
+    else if(b.stage === "house") step(s > 0.30, "senate", "failed", "passed the House");
+    else if(b.stage === "senate") step(s > 0.28, "exec", "failed", "passed the Senate");
+    else if(b.stage === "exec") step(Math.random() < 0.80, "law", "vetoed", "was signed into law");
+    else if(b.stage === "law"){
+      /* some laws get challenged; most survive */
+      if(Math.random() < 0.12){ b.done = true; b.fate = "struck"; S.n.struck++; agLedger("The Court struck down the " + b.t + "."); }
+      else { b.done = true; b.fate = "law"; S.n.passed++; S.laws.push({t:b.t, day:G.day, by:b.by}); if(S.laws.length > 120) S.laws.shift(); agSay("The Clerk", "Entered in the register of laws: the " + b.t + "."); }
+    }
+  }
+  if(S.bills.length > 160) S.bills = S.bills.filter(b => !b.done || G.day - b.day < 20);
+}
+function agHour(h){
+  const S = agState(), live = agLive(); if(live.length < 6) return;
+  let wxk = ""; try{ wxk = (wxToday() || {}).k || ""; }catch(e){}
+  const rainy = /rain|storm|snow/.test(wxk);
+  const busy = h >= 9 && h <= 18;
+  const n = busy ? (rainy ? 2 : 4) : 1;
+  for(let i = 0; i < n; i++){
+    const a = live[(Math.random() * live.length) | 0], A = agOf(a);
+    /* a meeting: someone they like, someone they need, or someone they are feuding with */
+    let b = live[(Math.random() * live.length) | 0]; if(b === a) continue;
+    if(A.allies.length && Math.random() < 0.4){ const x = live.find(m => m.id === A.allies[(Math.random() * A.allies.length) | 0]); if(x) b = x; }
+    S.n.meet++;
+    const warm = (a.party === b.party ? 0.25 : -0.05) + (A.allies.indexOf(b.id) >= 0 ? 0.3 : 0) - (A.enemies.indexOf(b.id) >= 0 ? 0.4 : 0) + (Math.random() - 0.5) * 0.6;
+    if(warm > 0.15){
+      agRel(a, b, 1); agRel(b, a, 1);
+      const open = S.bills.find(x => !x.done && x.by === a.id && x.stage !== "law");
+      if(open && open.cos.indexOf(b.id) < 0 && Math.random() < 0.6){ open.cos.push(b.id); S.n.cos++; if(Math.random() < 0.3) agLedger(b.name + " signed on to the " + open.t + "."); }
+      else { S.n.deal++; A.owes[b.id] = (A.owes[b.id] || 0) + 1; if(Math.random() < 0.03) agLedger(a.name + " and " + b.name + " struck a deal over " + A.topic + "."); }
+    } else if(warm < -0.25){ agRel(a, b, -1); agRel(b, a, -1); }
+    /* whipping the bill on the floor */
+    if(G.bill && !G.bill.done && Math.random() < 0.25 && !b.pledge && a.party === b.party){
+      b.pledge = Math.random() < 0.7 ? 1 : -1; b.pledgeDay = G.day; S.n.whip++;
+    }
+    /* filing */
+    if(A.goal === "pass a bill of their own" && Math.random() < 0.05 * A.drive && S.bills.filter(x => !x.done && x.by === a.id).length === 0) agFile(a);
+    else if(Math.random() < 0.012) agFile(a);
+    /* campaigning on a slow afternoon */
+    if(!busy && A.goal === "raise money for the campaign" && Math.random() < 0.3){ S.n.camp++; a.ag.chest = (a.ag.chest || 0) + 1; }
+  }
+  /* reacting to the news of the day */
+  try{
+    const last = (G.daylog || [])[(G.daylog || []).length - 1];
+    if(last && last.d === G.day && last.k !== "world" && S._react !== last.t && Math.random() < 0.5){
+      S._react = last.t; S.n.react++;
+      const m = live[(Math.random() * live.length) | 0];
+      if(m && m.room === G.room && !m.sayT){ m.say = pick(["Did you see that? ", "Well, there it is. ", "I heard. "]) + (DTCNO.say(m, {intent:"react"}) || ""); m.sayT = 6; }
+    }
+  }catch(e){}
+}
+function agDay(){
+  const S = agState(), live = agLive(); if(live.length < 6) return;
+  agAdvance(live);
+  /* caucus elections every ten days: allies vote for allies */
+  if(G.day % 10 === 0){
+    for(const post of AG_POSTS){
+      const C = live.slice().sort(() => Math.random() - 0.5).slice(0, 4);
+      const score = c => agOf(c).allies.length * 2 + (agOf(c).goal === "win the caucus post" ? 3 : 0) + (agOf(c).chest || 0) * 0.5 + Math.random() * 3;
+      const w = C.sort((x, y) => score(y) - score(x))[0];
+      const prev = S.posts[post];
+      if(w && (!prev || prev.id !== w.id)){
+        const inc = prev && live.find(m => m.id === prev.id);
+        if(!inc || score(inc) < score(w)){
+          S.posts[post] = {id:w.id, name:w.name, since:G.day}; S.n.office++;
+          agLedger(w.name + " was elected " + post + (prev ? ", replacing " + prev.name : "") + ".");
+        }
+      }
+    }
+  }
+}
+function agTick(){
+  const S = agState();
+  if(!G.members || !G.you) return;
+  const h = Math.floor((G.minute || 0) / 60);
+  const key = (G.day || 1) * 24 + h;
+  if(S.hour < 0){ S.hour = key; S.day = G.day; return; }
+  if(G.day !== S.day){ const dd = Math.min(5, G.day - S.day); for(let i = 0; i < dd; i++) agDay(); S.day = G.day; }
+  if(key === S.hour) return;
+  const steps = Math.min(3, key - S.hour);
+  S.hour = key;
+  for(let i = 0; i < steps; i++) agHour(h);
+}
+function agLedgerHTML(){
+  const S = agState();
+  const posts = AG_POSTS.map(p => S.posts[p] ? '<div class="whip__row"><span class="whip__n">' + p + '</span><span class="whip__w">' + S.posts[p].name + ' since day ' + S.posts[p].since + '</span></div>' : '').join("");
+  const moving = S.bills.filter(b => !b.done).slice(-6).map(b => '<div class="whip__row"><span class="whip__n">' + b.t + '</span><span class="whip__w">' + b.stage + ' · ' + b.cos.length + ' cosponsors</span></div>').join("");
+  const laws = S.laws.slice(-5).reverse().map(l => '<div class="whip__row"><span class="whip__n">' + l.t + '</span><span class="whip__w">law, day ' + l.day + '</span></div>').join("");
+  return '<h3>The capital, on its own</h3>' + (posts || '') + (moving ? '<p class="dream">Bills moving</p>' + moving : '') + (laws ? '<p class="dream">Laws entered</p>' + laws : '');
 }
 
 function refreshTravel(){
@@ -24856,6 +26136,7 @@ function kbmFireGlass(idx){
 addEventListener("keydown", e => {
   if(typingInField(e)) return;            /* never walk the player while they type */
   const k = e.key.toLowerCase();
+  try{ if(tlKey(e)) return; if(k === "l" && !e.repeat && veil.hidden && !e.ctrlKey && !e.metaKey){ tlToggle(true); e.preventDefault(); return; } }catch(_e){}
   /* Hold ? or / → show KBM help tips (hidden again on keyup) */
   if(isHelpTipKey(e)){ e.preventDefault(); setHelpHeld(true); return; }
   if(["arrowup","arrowdown","arrowleft","arrowright"].indexOf(k) >= 0) e.preventDefault();
@@ -25274,7 +26555,7 @@ function saveCaptureBase(){
     withWhom:G.withWhom, ties:G.ties, panel:null, court:G.court, own:G.own, parties:G.parties,
     termLength:G.termLength, country:G.country,
     greatest:G.greatest, blasphemy:G.blasphemy, loreNote:G.loreNote, greatnessOpen:G.greatnessOpen,
-    relics:G.relics, relicSpots:G.relicSpots, consularLore:G.consularLore, bind:G.bind, sens:G.sens, invertY:!!G.invertY, voiceVol:G.voiceVol, goals:G.goals, whip:G.whip || null, billQueue:G.billQueue || [], faith:G.faith || null, life:G.life || null, ach:G.ach || {}, law:G.law || null, ladder:G.ladder || [], cases:G.cases || [], lastActs:G.lastActs || [], wx:G.wx || null, town:G.town || null, rivals:G.rivals || [], rivalNext:G.rivalNext || 0, daylog:(G.daylog || []).slice(-120), paperRead:G.paperRead || 0, seedL:G.seedL || 0, mHints:G.mHints || {}, echoes:G.echoes || [], billKinds:G.billKinds || {}, realmRel:G.realmRel || {}, listened:G.listened || 0,
+    relics:G.relics, relicSpots:G.relicSpots, consularLore:G.consularLore, bind:G.bind, sens:G.sens, invertY:!!G.invertY, voiceVol:G.voiceVol, goals:G.goals, whip:G.whip || null, billQueue:G.billQueue || [], faith:G.faith || null, life:G.life || null, ach:G.ach || {}, law:G.law || null, ladder:G.ladder || [], cases:G.cases || [], lastActs:G.lastActs || [], wx:G.wx || null, town:G.town || null, rivals:G.rivals || [], rivalNext:G.rivalNext || 0, daylog:(G.daylog || []).slice(-120), paperRead:G.paperRead || 0, seedL:G.seedL || 0, mHints:G.mHints || {}, tlog:(G.tlog || []).slice(-500), ag:G.ag || null, sitPrep:G.sitPrep || {}, echoes:G.echoes || [], billKinds:G.billKinds || {}, realmRel:G.realmRel || {}, listened:G.listened || 0,
     world:G.world,
     pendingNight:!!G.pendingNight,
     cam:{x:cam.x, z:cam.z, yaw:cam.yaw, pitch:cam.pitch},
@@ -26429,6 +27710,7 @@ function pollPad(){
   if(picksDirty || gp) refreshPicks();
   padLegend(!!gp);
   if(!gp) return;
+  try{ if(tlPad(gp)) return; }catch(e){}
   const dz = v => Math.abs(v) < 0.18 ? 0 : (v - Math.sign(v)*0.18)/0.82;
   const ax0 = gp.axes || [];
   /* radial deadzone per stick: a diagonal stays a diagonal, rest drift dies */
@@ -26649,6 +27931,7 @@ function tick(dt){
   const b = roomBox(G.room || "office");
   cam.x = clamp(cam.x + dx, -b.hw, b.hw);
   cam.z = clamp(cam.z + dz, b.d0, b.d1);
+  if(G.room === "district" && NM.solids.length) nmPush();
   cam.ground = groundAt(cam.z, G.room);
   if(vx || vz) G.speechApproach = null;
   try{ tickSpeechApproach(dt); }catch(e){}
@@ -26696,7 +27979,7 @@ function drainHouseOne(w, dt){
   else if(lane === 1) clockRoom(w);
   else if(lane === 2) crowdWatch(dt);
   else if(lane === 3) voxTick(w);
-  else if(lane === 4) autonomyTick(w);
+  else if(lane === 4){ autonomyTick(w); try{ agTick(); }catch(e){} }
   else if(lane === 5){
     try{
       const h = Math.floor((G.minute || 0) / 60);
@@ -26815,6 +28098,8 @@ function enterRoom(dest, fromRoom){
   if(!ROOMS[dest]) return;
   try{ kEnsurePeople(); }catch(e){}
   try{ mStandFix(); }catch(e){}
+  try{ if(!NM.ready && !NM.tried){ NM.tried = true; nmInit(); } nmRoomPass(); }catch(e){}
+  try{ tlog("", (ROOMS[dest] && ROOMS[dest].name) || dest, "room"); }catch(e){}
   forceUnstickMove();
   try{ catchClear("door"); }catch(e){}
   G.speechApproach = null;
