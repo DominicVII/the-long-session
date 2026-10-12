@@ -4,6 +4,21 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261011m: playability sweep, controller-friendly
+
+On `20261011l`. Walk **0.68** / sprint **1.15** kept. Best default, `history.replaceState` only, no CDN, no external LLM. God is the Most High; Christ is King; First Consul is a man under God.
+
+- **People stand where people stand:** the staff of the Senate Chamber, the Court, the Executive wing and the Governor's office now keep to fixed posts in open floor (never inside a desk or a bench), face into the room, and stay put while you work. If the day takes one of them elsewhere, they wander like anyone else and come back to their post.
+- **The constituent waits just inside your door,** clear of the side table, so walking up and pressing A (or E) speaks to them and not to the Ledger. When you are looking straight at someone close enough to talk to, they now win over a thing off to the side of your eye.
+- **Controller:** B folds the Ledger and closes the map ("Stay here") like any other card. The NOW line and the use prompt say "A" instead of "E" when a controller is in hand. Pause menu, Ledger, Rivals, Home, the powers card from a chamber desk and every constituent choice can all be reached with the D-pad and A, and left with B.
+- **The map** lists rooms in walking order, the same as the travel bar, with the new rooms in their places.
+- **First-time hints:** the first time you walk into a new chamber, meet a constituent at your office, find the Ledger out, pick up a rival, or step into real weather, the NOW line explains it once, in plain words.
+- **Today's aims:** if you hold a higher office, one of the day's three aims is to keep your hours in your chamber, and the compass routes you there.
+- **Rain** reads against a grey sky: paler, slightly longer streaks, same number of lines (no frame cost).
+- Saved with the game: which hints you have seen.
+- Tests: pad-only run through the map, pause menu, Ledger, Rivals, Home, Senate powers card and a constituent visit (hear them out with D-pad and A, back out with B); staff at their posts and still after five seconds in all four rooms; hints and pad wording on the NOW line; chamber aim; rain on the Steps; suite and stress; the k and l harnesses again.
+- Stamp: meta + STAMP + `ONUM_BUILD` -> `20261011m`. Five HTML copies byte-identical.
+
 ## 20261011l: seasons, households, the Ledger, rivals
 
 On `20261011k`. Walk **0.68** / sprint **1.15** kept. Best default, `history.replaceState` only, no CDN, no external LLM. God is the Most High; Christ is King; First Consul is a man under God.
