@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261012a">
+<meta name="onum-build" content="20261012b">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261012a";
+  var STAMP = "20261012b";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -5273,6 +5273,26 @@ function nmInit(){
   nmEnvBuild();
   NM.ready = true; NM.ms = Math.round(performance.now() - t0);
 }
+/* 20261012b: build the surfaces in small slices while the title screen is up,
+   so the first walk out of the office does not pay for all of them at once */
+const NM_WARMQ = ["paint", "wood", "metal", "stone", "leather", "gloss", "glass", "asphalt", "slab", "skin", "@hair", "@crease", "@env"];
+function nmWarm(){
+  if(NM.ready || NM.tried) return;
+  const k = NM_WARMQ.shift();
+  if(!k){ NM.ready = true; NM.tried = true; return; }
+  const t0 = performance.now();
+  try{
+    if(nmTier() === 0){ NM_WARMQ.length = 0; NM.ready = NM.tried = true; try{ nmUI(); }catch(e){} return; }
+    if(k === "@env"){ try{ nmUI(); }catch(e){} nmEnvBuild(); }
+    else if(k === "@hair"){ try{ nmHairTex(); }catch(e){} }
+    else if(k === "@crease"){ try{ nbCrease(); }catch(e){} }
+    else nmFamily(k);
+  }catch(e){}
+  NM.ms = (NM.ms || 0) + Math.round(performance.now() - t0); (NM.wt = NM.wt || {})[k] = Math.round(performance.now() - t0);
+  const next = () => nmWarm();
+  if(window.requestIdleCallback) requestIdleCallback(next, {timeout:400}); else setTimeout(next, 60);
+}
+setTimeout(() => { try{ nmWarm(); }catch(e){} }, 2500);
 
 /* ══════════════════════════════════════════════════════════
    20261012a · PEOPLE, UP CLOSE
@@ -5519,6 +5539,160 @@ function peopleExtra(p, dt){
   u._pv = {py:u.pelvis.position.y, lu:u.legL.up.rotation.x, ru:u.legR.up.rotation.x, ll:u.legL.lo.rotation.x, rl:u.legR.lo.rotation.x};
 }
 
+/* ══════════════════════════════════════════════════════════
+   20261012b · CLOSER STILL
+   Irises with a real pattern (limbal ring, radial fibres, a lighter
+   collarette), lower lids and a lash line, nostrils and a lip line, a
+   philtrum and a cupid's bow; fabric that creases and shows its seams
+   and lint; hair cards round the back and sides; trees that move in
+   the wind; cornices, sills and pilasters on the shops; curbs, gutters
+   and cracks on the street.
+   ══════════════════════════════════════════════════════════ */
+const NB = {iris:new Map(), crease:null, card:new Map(), sway:[], wind:0.4};
+function nbIris(col){
+  if(NB.iris.has(col)) return NB.iris.get(col);
+  const m = matCol(col, .32);
+  if(nmTier() > 0){
+    const s = 64, c = document.createElement("canvas"); c.width = c.height = s;
+    const g = c.getContext("2d"), r = nmRand((col & 0xffff) + 7);
+    const base = new THREE.Color(col);
+    const css = (cc, a) => "rgba(" + (cc.r * 255 | 0) + "," + (cc.g * 255 | 0) + "," + (cc.b * 255 | 0) + "," + a + ")";
+    g.fillStyle = "#fff"; g.fillRect(0, 0, s, s);
+    /* fibres from the pupil out */
+    for(let i = 0; i < 140; i++){
+      const a = r() * 6.283, l = 0.18 + r() * 0.30;
+      const cc = base.clone().offsetHSL(0, 0, (r() - 0.5) * 0.18);
+      g.strokeStyle = css(cc, 0.8); g.lineWidth = 1 + r();
+      g.beginPath(); g.moveTo(s/2 + Math.cos(a) * s * 0.12, s/2 + Math.sin(a) * s * 0.12); g.lineTo(s/2 + Math.cos(a) * s * l, s/2 + Math.sin(a) * s * l); g.stroke();
+    }
+    /* collarette and limbal ring */
+    g.strokeStyle = css(base.clone().offsetHSL(0.02, 0.05, 0.16), 0.55); g.lineWidth = 3;
+    g.beginPath(); g.arc(s/2, s/2, s * 0.2, 0, 6.283); g.stroke();
+    g.strokeStyle = "rgba(20,14,10,0.85)"; g.lineWidth = 5;
+    g.beginPath(); g.arc(s/2, s/2, s * 0.47, 0, 6.283); g.stroke();
+    const t = new THREE.CanvasTexture(c); try{ t.encoding = THREE.sRGBEncoding; }catch(e){}
+    NM.bytes += s * s * 4; NM.tex++;
+    const mm = m.clone(); mm.color.set(0xffffff); mm.map = t; mm.roughness = 0.25; mm._shared = true;
+    NB.iris.set(col, mm); return mm;
+  }
+  NB.iris.set(col, m); return m;
+}
+/* the face's small forms */
+function nbFace(M, headG, hu, skin, eyeX3, nl, lf, fem){
+  if(nmTier() < 1) return;
+  try{
+    const lash = matCol(0x1a1410, .6), dark = matCol(0x2a1512, .7);
+    const under = new THREE.Color(skin.color).multiplyScalar(0.9).getHex();
+    const uM = matCol(under, .62);
+    [-1, 1].forEach(sd => {
+      M(PG.sph, uM, headG, sd * eyeX3, hu * 0.462, hu * 0.492, hu * 0.066, hu * 0.012, hu * 0.020, false);   /* lower lid */
+      const l = M(PG.box, lash, headG, sd * eyeX3, hu * 0.530, hu * 0.518, hu * 0.110, hu * 0.006, hu * 0.010, false); /* lash line */
+      l.rotation.z = sd * -0.06;
+      M(PG.sph, dark, headG, sd * hu * 0.034, hu * 0.322, hu * (0.468 + 0.01 * nl), hu * 0.014, hu * 0.009, hu * 0.010, false); /* nostril */
+      M(PG.sph, skin, headG, sd * hu * 0.018, hu * (0.292 + 0.01 * lf), hu * 0.466, hu * 0.030, hu * 0.012, hu * 0.016, false); /* cupid's bow */
+    });
+    M(PG.box, skin, headG, 0, hu * 0.312, hu * 0.452, hu * 0.022, hu * 0.030, hu * 0.012, false);   /* philtrum */
+    M(PG.box, dark, headG, 0, hu * (0.266 + 0.01 * lf), hu * 0.478, hu * (0.12 * lf), hu * 0.004, hu * 0.008, false); /* lip line */
+  }catch(e){}
+}
+/* fabric: creases at the joints, seams, a little lint, as roughness */
+function nbCrease(){
+  if(NB.crease) return NB.crease;
+  const s = nmTier() >= 2 ? 256 : 128, n = nmFbm(s, 3131, 4, 3), r = nmRand(55);
+  const lint = new Float32Array(s * s); for(let i = 0; i < s * 3; i++) lint[(r() * s * s) | 0] = 1;
+  NB.crease = nmCanvasTex(s, d => {
+    for(let y = 0; y < s; y++) for(let x = 0; x < s; x++){
+      const i = y * s + x, v = y / s, u = x / s;
+      const fold = Math.pow(Math.abs(Math.sin((u * 7 + n[i] * 1.8) * 3.14159)), 6) * (0.5 + 0.5 * Math.cos(v * 6.283 * 2));
+      const seam = (Math.abs(u - 0.5) < 0.006 || Math.abs(v - 0.25) < 0.004) ? 1 : 0;
+      const q = 0.86 + n[i] * 0.10 - fold * 0.16 - seam * 0.25 + lint[i] * 0.12;
+      d[i*4] = d[i*4+1] = d[i*4+2] = Math.max(0, Math.min(255, q * 255)); d[i*4+3] = 255;
+    }
+  }, false);
+  return NB.crease;
+}
+/* hair cards: thin strands at the edges of the cut */
+function nbCardMat(col){
+  if(NB.card.has(col)) return NB.card.get(col);
+  const s = 64, c = document.createElement("canvas"); c.width = c.height = s;
+  const g = c.getContext("2d"), r = nmRand(4040);
+  g.clearRect(0, 0, s, s);
+  for(let i = 0; i < 90; i++){
+    const x = r() * s, len = s * (0.55 + r() * 0.45);
+    g.strokeStyle = "rgba(255,255,255," + (0.5 + r() * 0.5) + ")"; g.lineWidth = 0.8 + r() * 0.8;
+    g.beginPath(); g.moveTo(x, 0); g.quadraticCurveTo(x + (r() - 0.5) * 6, len * 0.5, x + (r() - 0.5) * 8, len); g.stroke();
+  }
+  const t = new THREE.CanvasTexture(c); NM.bytes += s * s * 4; NM.tex++;
+  const m = new THREE.MeshStandardMaterial({color:col, map:t, alphaTest:0.4, transparent:false, side:THREE.DoubleSide, roughness:0.5});
+  m.envMapIntensity = 0.3; m._shared = true; NB.card.set(col, m);
+  return m;
+}
+function nbHairCards(M, headG, hu, hairW, hairCol, hs, fem){
+  if(nmTier() < 2 || hs === 6) return;
+  try{
+    const m = nbCardMat(hairCol);
+    const len = fem ? hu * 0.42 : hu * 0.20;
+    const back = M(PG.plane, m, headG, 0, hu * 0.48 - len * 0.3, -hu * 0.47, hairW * 1.35, len, 1, false);
+    back.rotation.x = 0.25; back.rotation.y = Math.PI;
+    if(fem) [-1, 1].forEach(sd => {
+      const c = M(PG.plane, m, headG, sd * hairW * 0.86, hu * 0.48 - len * 0.25, -hu * 0.12, hu * 0.40, len, 1, false);
+      c.rotation.y = sd * Math.PI / 2; c.rotation.z = sd * 0.08;
+    });
+  }catch(e){}
+}
+/* trees in the wind */
+function nbSwayAdd(mesh, amp){ if(mesh && !MODEST){ mesh.userData.sx = mesh.position.x; mesh.userData.sz = mesh.position.z; mesh.userData.amp = amp; NB.sway.push(mesh); } }
+let _nbT = 0;
+function nbSway(dt){
+  if(!NB.sway.length) return;
+  _nbT += Math.min(0.05, dt || 0.016);
+  let w = 0.35; try{ const k = (wxToday() || {}).k; w = k === "storm" ? 1.6 : k === "wind" ? 1.2 : k === "rain" ? 0.8 : 0.35; }catch(e){}
+  NB.wind = lerp(NB.wind, w, 0.02);
+  for(let i = NB.sway.length - 1; i >= 0; i--){
+    const m = NB.sway[i];
+    if(!m.parent){ NB.sway.splice(i, 1); continue; }
+    const ph = m.userData.sx * 1.7 + m.userData.sz;
+    const a = m.userData.amp * NB.wind;
+    m.position.x = m.userData.sx + (Math.sin(_nbT * 1.3 + ph) + Math.sin(_nbT * 3.1 + ph * 2) * 0.3) * a;
+    m.position.z = m.userData.sz + Math.sin(_nbT * 0.9 + ph) * a * 0.5;
+    m.updateMatrix(); m.matrixWorldNeedsUpdate = true;
+  }
+}
+/* the street's edges */
+function nbStreet(d){
+  if(nmTier() === 0) return;
+  try{
+    const curb = matCol(0x9d998f, .88), gut = matCol(0x2c2d2e, .55, .05), crack = matCol(0x4a4740, .95);
+    [-1, 1].forEach(sd => {
+      addBox(curb, sd * 2.27, 0.07, d / 2, 0.16, 0.14, d - 0.3, 0, true);
+      addBox(gut, sd * 2.06, 0.043, d / 2, 0.26, 0.006, d - 0.3, 0, true);
+    });
+    const r = nmRand(77);
+    const n = nmTier() >= 2 ? 14 : 6;
+    for(let i = 0; i < n; i++){
+      const sd = r() < 0.5 ? -1 : 1;
+      addBox(crack, sd * (2.6 + r() * 4.6), 0.103, 0.6 + r() * (d - 1.2), 0.012 + r() * 0.01, 0.003, 0.3 + r() * 0.7, r() * 3, true);
+    }
+  }catch(e){}
+}
+/* the shops' architecture */
+function nbStorefront(x, z, bw, bh, col){
+  if(nmTier() === 0) return;
+  try{
+    const c = new THREE.Color(col), dk = matCol(c.clone().multiplyScalar(0.82).getHex(), .9), lt = matCol(c.clone().lerp(new THREE.Color(0xffffff), 0.25).getHex(), .85);
+    addBox(lt, x, bh - 0.06, z - 0.06, bw + 0.08, 0.08, 1.24, 0, true);         /* cornice band */
+    addBox(dk, x, bh - 0.16, z - 0.04, bw + 0.02, 0.06, 1.20, 0, true);         /* dentil shadow */
+    addBox(dk, x, 0.16, z - 0.03, bw + 0.04, 0.32, 1.20, 0, true);              /* plinth */
+    [-1, 1].forEach(sd => addBox(lt, x + sd * (bw / 2 - 0.06), bh / 2, z - 0.06, 0.14, bh - 0.2, 1.22, 0, true)); /* pilasters */
+    const n = bw > 3.6 ? 3 : 2;
+    for(let i = 0; i < n; i++){
+      const wx = x - (n - 1) * 0.55 + i * 1.10;
+      addBox(lt, wx, 1.06, z - 0.66, 0.82, 0.05, 0.12, 0, true);                 /* sill */
+      addBox(lt, wx, 2.05, z - 0.64, 0.80, 0.07, 0.08, 0, true);                 /* lintel */
+    }
+  }catch(e){}
+}
+
 const MATCACHE = new Map();
 /* Every distinct repeat used to clone the texture and its normal map, so
    a wall tiled 4.13 times and the same wall tiled 4.2 times were two more
@@ -5718,6 +5892,7 @@ function matCloth(col, kind, rough){
       }
     }catch(e){}
   }
+  if(G.gfx !== "simple" && !MODEST){ try{ opts.roughnessMap = nbCrease(); }catch(e){} }
   const m = new THREE.MeshStandardMaterial(opts);
   m._shared = true;
   CLOTHCACHE.set(k, m);
@@ -5755,10 +5930,10 @@ function plantTree(x, z, trunkH, canopyR){
   canopyR = canopyR || 1.2;
   const trunkR = 0.11 + canopyR * 0.04;
   addCyl(matCol(0x4a3828,.95), x, trunkH * 0.48, z, trunkR, trunkH);
-  addSphere(matCol(0x3a6a32,.95), x, trunkH + canopyR * 0.22, z, canopyR * 1.05, canopyR * 0.92, canopyR * 1.05);
+  nbSwayAdd(addSphere(matCol(0x3a6a32,.95), x, trunkH + canopyR * 0.22, z, canopyR * 1.05, canopyR * 0.92, canopyR * 1.05), canopyR * 0.025);
   if(!MODEST){
-    addSphere(matCol(0x4a7a3c,.95), x + canopyR * 0.28, trunkH + canopyR * 0.02, z - canopyR * 0.12, canopyR * 0.62, canopyR * 0.55, canopyR * 0.62);
-    addSphere(matCol(0x2f5a28,.95), x - canopyR * 0.22, trunkH + canopyR * 0.08, z + canopyR * 0.18, canopyR * 0.52, canopyR * 0.48, canopyR * 0.52);
+    nbSwayAdd(addSphere(matCol(0x4a7a3c,.95), x + canopyR * 0.28, trunkH + canopyR * 0.02, z - canopyR * 0.12, canopyR * 0.62, canopyR * 0.55, canopyR * 0.62), canopyR * 0.04);
+    nbSwayAdd(addSphere(matCol(0x2f5a28,.95), x - canopyR * 0.22, trunkH + canopyR * 0.08, z + canopyR * 0.18, canopyR * 0.52, canopyR * 0.48, canopyR * 0.52), canopyR * 0.045);
   }
 }
 function propStreetLamp(x, z, h){
@@ -5789,6 +5964,7 @@ function propStorefront(x, z, bw, bh, col, title, sub){
   const trim = matCol(0x3a342c, .62);
   const glass = matCol(0x7aa0b8, .22, .12);
   addBox(stone, x, bh/2, z, bw, bh, 1.15);
+  nbStorefront(x, z, bw, bh, col);
   addBox(trim, x, bh + 0.09, z, bw + 0.16, 0.18, 1.28);
   addBox(matCol(0xc4beb0,.86), x, 0.08, z - 0.62, bw + 0.4, 0.16, 0.55); /* sidewalk apron */
   const n = bw > 3.6 ? 3 : 2;
@@ -7444,11 +7620,11 @@ function buildRoomShell(id){
                  : R.style==="town"  ? matTex(TEX.stone, 4, 2, .95)
                  : R.style==="chamber" ? matTex(TEX.damask, w/3.2, h/3.2, .93)
                  : R.style==="wood"  ? matTex(TEX.damask, w/3.4, h/3.4, .93)
-                 : matTex(TEX.plaster, w/3, h/3, .95);
+                 : matTex(TEX.plaster, w/3, h/3, .95, R.style==="marble" ? 0xcfc5b3 : undefined);
   const floorMat = R.style==="plain" ? matTex(TEX.lino, w/2.2, d/2.2, .55)
                  : R.style==="chamber" ? matTex(TEX.carpet, w/1.6, d/1.6, .98)
                  : R.style==="marble"  ? matTex(TEX.marble, w/2.4, d/2.4, .48)
-                 : R.style==="stone"   ? matTex(TEX.stone, w/2.5, d/2.5, .95)
+                 : R.style==="stone"   ? matTex(TEX.stone, w/2.5, d/2.5, .95, 0xa39784)
                  : R.style==="town"    ? matTex(TEX.grass, w/3, d/3, 1)
                  : matTex(TEX.oak, w/2.2, d/2.2, .55);
   [wallMat, floorMat].forEach(m => { m.side = THREE.DoubleSide; });
@@ -7820,6 +7996,7 @@ function buildRoomInner(id, skipShell){
     const walk = nmStreet("walk", d) || matCol(0xc8c2b4, .90);
     const tar = nmStreet("tar", d) || matCol(0x3a3f36, .95);
     try{ nmDistrict(d); }catch(e){ if(window.console) console.warn("nmDistrict", e); }
+    try{ nbStreet(d); }catch(e){}
     /* Street down the middle — leaves the back door to the steps open */
     addBox(tar, 0, 0.02, d / 2, 4.4, 0.04, d - 0.3, 0, true);
     addBox(walk, -5.0, 0.05, d / 2, 5.2, 0.10, d - 0.3, 0, true);
@@ -8921,7 +9098,7 @@ function buildPerson(p){
   */
   L._clothVer = 7;
   const eyeWhite = matCol(0xe8e3da, .45);
-  const irisMat = matCol(L.eye || 0x5a3d24, .32);
+  const irisMat = nbIris(L.eye || 0x5a3d24);
   const pupilMat = matCol(0x090807, .26);
   const eyeY3 = hu*0.50;
   const eyeX3 = hu*0.14*fw;
@@ -8987,6 +9164,7 @@ function buildPerson(p){
   /* upper eyelids shade the modeled eyes and keep them from looking pasted on */
   const lidL = M(PG.sph, skin, headG, -eyeX3, hu*0.522, hu*0.503, hu*0.075, hu*0.018, hu*0.022, false);
   const lidR = M(PG.sph, skin, headG,  eyeX3, hu*0.522, hu*0.503, hu*0.075, hu*0.018, hu*0.022, false);
+  nbFace(M, headG, hu, skin, eyeX3, nl, lf, fem);
 
   /* Hair: readable cuts. Parting is two combed plates with a scalp gap — not a lump. */
   const personWisps = [];
@@ -9057,6 +9235,7 @@ function buildPerson(p){
     puff( hairW*0.72, hu*0.47, -hu*0.02, hu*0.08, hu*0.18, hu*0.30);
     puff(0, hu*0.42, -hu*0.44, hairW*0.74, hairH*0.20, hairD*0.30);
   }
+  nbHairCards(M, headG, hu, hairW, L.hair, hs, fem);
   /* a beard has to be outside the jaw, not inside the skull */
   if(L.beard) M(PG.sph, hair, headG, 0, hu*0.20, hu*0.10,
     hairW*0.78, hairH*0.42, hairD*0.72, false);
@@ -23408,7 +23587,7 @@ const DTCNO = (function(){
    ══════════════════════════════════════════════════════════ */
 const TK = {g:new Map(), bi:new Map(), sp:new Map(), len:new Map(), prev:null, n:0, on:true};
 const TK_STOP = new Set("the a an and or but of to in on at for with is it that this be are was were i you we they he she not no so as by from if do did have has had will would can could just what about there their them our my your me us his her its than then very".split(" "));
-const TK_WEAK = /(ly|ing|ed|ness)$|^(actually|really|before|business|anyone|something|nothing|everyone|because|another|whether|though|should|would|could|always|either|people|member|little)$/;
+const TK_WEAK = /(ly|ing|ed|ness)$|^(actually|really|before|business|anyone|something|nothing|everyone|because|another|whether|though|should|would|could|always|either|people|member|little|nothing|enough|almost|already|without|around|someone|anything|between|through|honest|plainly|probably|whatever|wouldn|couldn|doesn|tomorrow|yesterday|today)$/;
 const TK_FILL = ["Look,", "Well,", "Honestly,", "Listen,", "Mind you,", "Frankly,", "See,", "Now,", "I'll say this:", "Between us,", "Truth is,", "Fair enough, but", "Right,", "Here's the thing:", "For what it's worth,", "Granted,"];
 const TK_SYN = {
   "think":["reckon","figure","suspect","believe"], "very":["awfully","really","plenty","right"],
@@ -23417,7 +23596,7 @@ const TK_SYN = {
   "good":["decent","sound","solid"], "bad":["rotten","poor","ugly"], "maybe":["perhaps","maybe","could be"],
   "really":["truly","honestly","really"], "big":["large","sizable","big"], "quickly":["fast","quick","in a hurry"]
 };
-const TK_REF = ["On {w},", "About {w}:", "{W}, you say?", "Since you raise {w},", "As for {w},", "If we're on {w},"];
+const TK_REF = ["{W}? ", "You mentioned {w}. ", "About {w}: ", "Since you bring up {w}, ", "As for {w}, ", "Back to {w}. "];
 function tkHash(s){ let h = 2166136261; s = String(s); for(let i = 0; i < s.length; i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
 function tkWords(s){ return String(s).toLowerCase().replace(/[^a-z' ]+/g, " ").split(/\s+/).filter(Boolean); }
 function tkScore(m, s){
@@ -23456,13 +23635,20 @@ function tkVoice(m, s, ctx){
   if(sentences && sentences.length > 1 && ll > 18 && chance(0.55)) out = sentences[0].trim();
   /* pick up the line before, when it was someone else's */
   const pv = TK.prev;
-  if(pv && pv.who !== m.id && (ctx.intent === "react" || ctx.intent === "agree" || chance(0.22))){
-    const cand = tkWords(pv.s).filter(x => x.length > 5 && !TK_STOP.has(x) && !TK_WEAK.test(x));
+  if(pv && pv.who !== m.id && ((ctx.intent === "react" || ctx.intent === "agree") ? chance(0.6) : chance(0.18))){
+    /* only pick up a noun: the word right after an article or possessive */
+    const cand = []; const reN = /\b(?:the|a|an|this|that|your|my|our|their|his|her)\s+([A-Za-z]{5,12})\b/g; let mm;
+    while((mm = reN.exec(pv.s))){ const x = mm[1]; if(!TK_STOP.has(x.toLowerCase()) && !TK_WEAK.test(x.toLowerCase())) cand.push(x); }
     if(cand.length){
       const w = cand[(h + TK.n) % cand.length];
       const f = TK_REF[(h + TK.n) % TK_REF.length];
-      const lead = f.replace("{w}", "the " + w).replace("{W}", "The " + w);
-      out = lead + " " + (/[?]$/.test(lead) ? out.charAt(0).toUpperCase() : out.charAt(0).toLowerCase()) + out.slice(1);
+      const proper = /^[A-Z]/.test(w);
+      const lead = f.replace("{w}", proper ? w : "the " + w).replace("{W}", proper ? w : "The " + w);
+      const end = lead.trim().slice(-1);
+      let body = out;
+      /* a bare "Noted." after a lead reads as a clipped telegram: fold it in */
+      if(/^(noted|fair|right|sure|agreed|maybe)\.?\s/i.test(body) && end !== "?") body = body.replace(/^\w+\.?\s*/, "");
+      out = lead + (end === "." || end === "?" ? body.charAt(0).toUpperCase() : body.charAt(0).toLowerCase()) + body.slice(1);
     }
   } else if(chance(0.30 + ((h & 7) / 30))){
     /* a person's own fillers: three habits each */
@@ -24399,7 +24585,7 @@ function kDeskActs(room){
   if(room === "senate"){
     if(mine) A.push(sitPrepAct("senate"));
     if(mine) A.push({t:"Sit the Senate: take the floor", c:"60m · step by step", off:kOnceToday("ksen"), run(){ sitStart("senate"); return null; }});
-    if(false) A.push({t:"Take the floor of the Senate", c:"60m", off:kOnceToday("ksen"), run(){
+    if(mine) void({t:"Take the floor of the Senate", c:"60m", off:kOnceToday("ksen"), run(){
       spend(60, 12); kMark("ksen"); kMarkChamber();
       you.standing = clamp(you.standing + 3, 0, 100); you.influence = clamp(you.influence + 1, 0, 100);
       setSay("Twenty minutes to a half-full chamber and a full press row. The Senate listens slower, and remembers longer.", fx("+3 standing · +1 influence", "an hour"));
@@ -24412,7 +24598,7 @@ function kDeskActs(room){
   } else if(room === "court"){
     if(mine) A.push(sitPrepAct("court"));
     if(mine) A.push({t:"Hear oral argument", c:"90m · step by step", off:kOnceToday("kct"), run(){ sitStart("court"); return null; }});
-    if(false) A.push({t:"Hear oral argument", c:"90m", off:kOnceToday("kct"), run(){
+    if(mine) void({t:"Hear oral argument", c:"90m", off:kOnceToday("kct"), run(){
       spend(90, 14); kMark("kct"); kMarkChamber();
       const c = (G.cases || []).find(x => x && !x.done);
       you.standing = clamp(you.standing + 2, 0, 100);
@@ -24428,7 +24614,7 @@ function kDeskActs(room){
   } else if(room === "exec"){
     if(mine) A.push(sitPrepAct("exec"));
     if(mine) A.push({t:"Take the morning briefing", c:"45m · step by step", off:kOnceToday("kex"), run(){ sitStart("exec"); return null; }});
-    if(false) A.push({t:"Take the morning briefing", c:"45m", off:kOnceToday("kex"), run(){
+    if(mine) void({t:"Take the morning briefing", c:"45m", off:kOnceToday("kex"), run(){
       spend(45, 8); kMark("kex"); kMarkChamber();
       const S = (G.states || []).slice().sort((a, b2) => (b2.unrest || 0) - (a.unrest || 0))[0];
       if(S) S.unrest = clamp((S.unrest || 0) - 3, 0, 100);
@@ -24442,7 +24628,7 @@ function kDeskActs(room){
   } else if(room === "govoffice"){
     if(mine) A.push(sitPrepAct("govoffice"));
     if(mine) A.push({t:"Hold open hours at the State House", c:"60m · step by step", off:kOnceToday("kgv"), run(){ sitStart("govoffice"); return null; }});
-    if(false) A.push({t:"Hold open hours at the State House", c:"60m", off:kOnceToday("kgv"), run(){
+    if(mine) void({t:"Hold open hours at the State House", c:"60m", off:kOnceToday("kgv"), run(){
       spend(60, 10); kMark("kgv"); kMarkChamber();
       you.approval = clamp(you.approval + 4, 0, 100);
       const S = (G.states || []).find(s => s.n === you.state);
@@ -24721,7 +24907,7 @@ function wxBuild(R){
   if(!R || !R.open || MODEST || G.gfx === "simple") return;
   const rainy = w.k === "rain" || w.k === "storm", snowy = w.k === "snow";
   if(!rainy && !snowy) return;
-  const n = (G.gfx === "balanced" || (typeof crowdSafe !== "undefined" && crowdSafe)) ? (snowy ? 260 : 220) : (snowy ? 520 : (w.k === "storm" ? 600 : 420));
+  const n = (G.gfx === "balanced" || (typeof crowdSafe !== "undefined" && crowdSafe)) ? (snowy ? 260 : 220) : (snowy ? 520 : (w.k === "storm" ? 900 : 650));
   const hw = R.w / 2 + 1, d = R.d + 1;
   const grp = new THREE.Group();
   let geo, mat;
@@ -24735,7 +24921,7 @@ function wxBuild(R){
     mat = new THREE.LineBasicMaterial({color:0xe2e8ef, transparent:true, opacity:0.75, depthWrite:false});
     for(let k = 0; k < 2; k++){ const o = new THREE.LineSegments(geo, mat); o.position.y = k * wxH; o.frustumCulled = false; grp.add(o); }
     /* 20261012a: a darker second sheet so rain reads against a pale sky too */
-    const mat2 = new THREE.LineBasicMaterial({color:0x5c6876, transparent:true, opacity:0.55, depthWrite:false});
+    const mat2 = new THREE.LineBasicMaterial({color:0x4f5a66, transparent:true, opacity:0.72, depthWrite:false});
     for(let k = 0; k < 2; k++){ const o = new THREE.LineSegments(geo, mat2); o.position.set(0.37, k * wxH + 0.9, 0.53); o.frustumCulled = false; grp.add(o); }
   } else {
     const p = new Float32Array(n * 3);
@@ -28721,6 +28907,7 @@ function frameBody(now, draw){
     /* 20261005a: while walking, light/motes/fan every 8th draw — sky does not hitch feet. */
     const litStride = (Math.hypot(cam.vx || 0, cam.vz || 0) > 0.12) ? 7 : 1;
     if((FRAME_ID & litStride) === 0) updateLighting(dt);
+    try{ nbSway(dt); }catch(e){}
     if(wxObj) wxFrame(dt);
   }catch(e){}
   if(_prof) _prof.mark("lighting");
