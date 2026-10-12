@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261011l">
+<meta name="onum-build" content="20261011m">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261011l";
+  var STAMP = "20261011m";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -3496,6 +3496,7 @@ function placeInRoom(m){
     m.x = side * (3.5 + Math.random() * 2.0);
     m.z = 2.4 + Math.random() * 9.5;
   }
+  if(m.kind === "civ"){ try{ mPlaceStand(m); }catch(e){} }
   m.tx = m.x; m.tz = m.z;
 }
 
@@ -9980,6 +9981,12 @@ function focusThing(){
     const dp = Math.hypot(p.x-cam.x, p.z-cam.z), doo = Math.hypot(o.x-cam.x, o.z-cam.z);
     /* Props and plaques win ties and near-ties — people must be clearly closer */
     if(dp < doo - 0.45) return {type:"person", ref:p};
+    /* 20261011m: someone you are looking straight at, close enough to talk,
+       beats a thing off to the side of your eye */
+    const fx0 = Math.sin(cam.yaw), fz0 = Math.cos(cam.yaw);
+    const ap = ((p.x-cam.x)*fx0 + (p.z-cam.z)*fz0) / Math.max(0.01, dp);
+    const ao = ((o.x-cam.x)*fx0 + (o.z-cam.z)*fz0) / Math.max(0.01, doo);
+    if(dp <= 1.55 && ap > 0.96 && ap > ao + 0.08) return {type:"person", ref:p};
     return {type:"prop", ref:o};
   }
   if(p) return {type:"person", ref:p};
@@ -14565,6 +14572,8 @@ function sentAct(m){
   if(!m || m.gone) return;
   if(m.kind === "ghost") return;
   if(TALK.open && TALK.m === m) return;
+  /* 20261011m: chamber staff keep their posts through working hours */
+  if(m.kslot && m.chamber && m.room === m.chamber && (G.minute || 0) >= 9 * 60 && (G.minute || 0) < 18 * 60) return;
   try{ if(PROC.on && SEATED_ROOMS[m.room]) return; }catch(e){}
   const s = m.sent; if(!s) return;
   if(s.busyUntil && (G.t || 0) < s.busyUntil) return;
@@ -20115,7 +20124,7 @@ function updatePrompt(thing, dr, seat){
                    : "Press E — " + thing.ref.label)
                : seat ? (G.you.sitting ? "Press E to stand" : "Press E to sit")
                : null;
-  setGlassPrompt(want, null);
+  setGlassPrompt(mPadPrompt(want), null);
 }
 
 const PROPS = {
@@ -21565,7 +21574,7 @@ function mapCard(){
   phoneWasRunning = phoneWasRunning === null ? G.running : phoneWasRunning;
   G.running = false;
   const here = G.room;
-  const rows = Object.keys(ROOMS).filter(id => id !== "visit" && outsideAllowed(id)).map(id => {
+  const rows = ROOM_ORDER.concat(Object.keys(ROOMS).filter(k => ROOM_ORDER.indexOf(k) < 0)).filter(id => id !== "visit" && outsideAllowed(id)).map(id => {
     const R = ROOMS[id];
     const on = id === here;
     return '<button type="button" class="conc__btn' + (on ? " is-accepted" : "") + '" data-go="' + id + '"' +
@@ -21737,12 +21746,17 @@ function goalsEnsure(){
   if(unread) pool.push({k:"mail", t:"Clear your inbox", need:1, room:"office"});
   if(b && !b.done && b.mine) pool.push({k:"cosponsor", t:"Sign up a cosponsor for your bill", need:1});
   if(b && !b.done) pool.push({k:"whip", t:"Work someone leaning against you", need:1});
+  try{
+    const kr = (G.you && G.you.office) ? K_ROOM_OF[G.you.office] : null;
+    if(kr && ROOMS[kr]) pool.push({k:"room", room:kr, kc:true, t:"Keep your hours in " + ROOMS[kr].t.replace(/^The /, "the "), need:1});
+  }catch(e){}
   pool.push({k:"room", room:"district", t:"Go home to the district", need:1});
   pool.push({k:"room", room:"caucus", t:"Show your face in the Caucus Room", need:1});
   pool.push({k:"room", room:"steps", t:"Take the air on the East Steps", need:1});
   pool.push({k:"room", room:"cloak", t:"Hear what the Cloakroom is saying", need:1});
   /* talk first; then the bill if there is one; then one place, chosen by the day */
   const list = [pool[0]];
+  { const kc = pool.find(g => g.kc); if(kc) list.push(kc); }
   const billish = pool.find(g => g.k === "rollcall") || pool.find(g => g.k === "cosponsor") || pool.find(g => g.k === "pledge");
   if(billish) list.push(billish);
   const rest = pool.filter(g => list.indexOf(g) < 0 && !(g.k === "pledge" && list.some(x => x.k === "rollcall")));
@@ -23179,6 +23193,8 @@ function paintJob(){
   const box = el("job"), txt = el("jobText");
   if(!box || !txt) return;
   let line = activeJob();
+  try{ const mh = mHintLine(); if(mh) line = mh; }catch(e){}
+  try{ line = mPadWords(line); }catch(e){}
   try{
     const od = objectiveDoor();
     if(line && od && !/Sleep\.|Speak\.$/.test(line)){
@@ -23711,10 +23727,10 @@ function wxBuild(R){
     const p = new Float32Array(n * 6);
     for(let i = 0; i < n; i++){
       const x = (Math.random() * 2 - 1) * hw, y = Math.random() * wxH, z = Math.random() * d - 0.5;
-      p.set([x, y, z, x + 0.03, y + 0.42, z], i * 6);
+      p.set([x, y, z, x + 0.035, y + 0.55, z], i * 6);
     }
     geo = new THREE.BufferGeometry(); geo.setAttribute("position", new THREE.BufferAttribute(p, 3));
-    mat = new THREE.LineBasicMaterial({color:0xaab4c0, transparent:true, opacity:0.38, depthWrite:false});
+    mat = new THREE.LineBasicMaterial({color:0xe2e8ef, transparent:true, opacity:0.55, depthWrite:false});
     for(let k = 0; k < 2; k++){ const o = new THREE.LineSegments(geo, mat); o.position.y = k * wxH; o.frustumCulled = false; grp.add(o); }
   } else {
     const p = new Float32Array(n * 3);
@@ -24113,6 +24129,7 @@ function lMorning(){
   const w = wxToday();
   townEnsure();
   try{ lSpawnTown(); }catch(e){ if(window.console) console.warn("town", e); }
+  try{ mStandFix(); }catch(e){}
   const y = G.you; if(!y) return;
   if(G._lEnergyDay !== G.day && (G.minute || 0) < 9 * 60){
     G._lEnergyDay = G.day;
@@ -24149,6 +24166,93 @@ PROPS.office = PROPS.office || [];
 PROPS.office.push({id:"ledger", label:"The morning Ledger", sub:"Folded on the side table, still warm from the van", x:1.55, z:4.85, r:1.25,
   acts:() => [{t:"Read today's Ledger", c:"10m", run(){ spend(10, -2); paperCard(); }},
               {t:"Look at the letters from home", c:"5m", run(){ spend(5, 0); homeCard(); }}]});
+
+/* ══════════════════════════════════════════════════════════
+   20261011m · PLAYABILITY SWEEP
+   People in the new rooms stand where a person would stand (never in
+   a desk), visitors wait by the visitor chairs, the map lists rooms in
+   walking order, and B folds the Ledger like any other card.
+   ══════════════════════════════════════════════════════════ */
+const M_STAND = {
+  "senate:0":[-3.0, 2.6], "senate:1":[3.0, 2.8], "senate:2":[-4.6, 11.0],
+  "court:0":[-4.9, 8.4], "court:1":[4.6, 7.6], "court:2":[-4.6, 3.6],
+  "exec:0":[-3.2, 7.6], "exec:1":[3.4, 3.0],
+  "govoffice:0":[3.0, 4.4], "govoffice:1":[-2.6, 6.2]
+};
+function mFaceCentre(c){
+  const R = ROOMS[c.room]; if(!R || !c.kStand) return 0;
+  return Math.atan2(0 - c.kStand[0], R.d * 0.5 - c.kStand[1]);
+}
+function mStandSpot(m){
+  if(!m || m.kind !== "civ") return null;
+  if(m.kslot && M_STAND[m.kslot] && m.chamber && m.room === m.chamber) return M_STAND[m.kslot];
+  if(m.visitor && m.room === "office" && m.hhDay === G.day) return [2.7, 2.9];
+  return null;
+}
+/* called at the end of placeInRoom: a person with a post stands at it */
+function mPlaceStand(m){
+  const ks = mStandSpot(m);
+  if(ks){
+    m.kStand = ks; m.backStand = true; m.sitting = false; m.wait = 999;
+    m.x = ks[0]; m.z = ks[1]; m.seatFace = mFaceCentre(m);
+  } else if(m && m.kStand){ m.kStand = null; m.backStand = false; m.wait = 1; }
+}
+function mStandFix(){
+  (G.civ || []).forEach(c => {
+    if(!c) return;
+    if(c.kslot && M_STAND[c.kslot] && c.room === c.chamber) c.kStand = M_STAND[c.kslot];
+    else if(c.visitor && c.room === "office" && c.hhDay === G.day) c.kStand = [2.7, 2.9];
+    else if(c.kStand && !(c.kslot && c.room === c.chamber)){ c.kStand = null; c.backStand = false; return; }
+    if(c.kStand){
+      c.backStand = true; c.sitting = false; c.wait = 999;
+      c.seatFace = mFaceCentre(c);
+      if(c.room !== G.room || Math.hypot((c.x || 0) - c.kStand[0], (c.z || 0) - c.kStand[1]) > 0.6){
+        c.x = c.tx = c.kStand[0]; c.z = c.tz = c.kStand[1];
+      }
+    }
+  });
+}
+
+/* ── first-time hints: one line on the NOW bar, once per new system ── */
+const M_HINTS = [
+  ["chamber", () => (G.room === "senate" || G.room === "court" || G.room === "exec" || G.room === "govoffice"),
+    () => ROOMS[G.room].t + ". The staff keep to their posts; walk up and press E. The big desk is where this office does its work."],
+  ["visitor", () => G.room === "office" && (G.civ || []).some(c => c && c.visitor && c.hhDay === G.day && c.room === "office" && !c.hhHeard),
+    () => "Constituents come to your office now. Hear them, take their case, ask after the family. They remember."],
+  ["ledger", () => G.room === "office" && G.paperRead !== G.day && (G.minute || 0) < 11 * 60,
+    () => "Every morning the Ledger prints what really happened yesterday. Side table, E, or Pause > Today's paper."],
+  ["rival", () => !!(typeof rivalLive === "function" && rivalLive()),
+    () => "Somebody at home wants your seat. Pause > Rivals shows the feud. It ends at the ballot, or in a diner booth."],
+  ["weather", () => !!(G.wx && G.wx.day === G.day && /rain|storm|snow|heat|fog/.test(G.wx.k)),
+    () => "Weather is real now. Storms and heat tire you, snow lies on Main Street, and a hard winter sours the town."]
+];
+let _mHint = null;
+function mHintLine(){
+  if(!G.you || !G.running) return null;
+  const now = performance.now();
+  if(_mHint && now < _mHint.until && _mHint.room === G.room) return _mHint.text;
+  _mHint = null;
+  if(!G.mHints) G.mHints = {};
+  if((G.day || 1) < 1) return null;
+  for(let i = 0; i < M_HINTS.length; i++){
+    const h = M_HINTS[i];
+    if(G.mHints[h[0]]) continue;
+    let ok = false; try{ ok = h[1](); }catch(e){}
+    if(!ok) continue;
+    G.mHints[h[0]] = G.day || 1;
+    _mHint = {text:h[2](), until:now + 14000, room:G.room};
+    return _mHint.text;
+  }
+  return null;
+}
+/* the NOW bar speaks the controller's language when one is in hand */
+function mPadWords(line){
+  if(!line || !PAD_SEEN) return line;
+  return line.replace(/\bpress E\b/g, "press A").replace(/\bE\.(?=\s|$)/g, "A.").replace(/, E,/g, ", A,");
+}
+function mPadPrompt(w){
+  try{ return (w && PAD_SEEN) ? w.replace(/^Press E\b/, "Press A") : w; }catch(e){ return w; }
+}
 
 function refreshTravel(){
   const box = el("travel"); box.innerHTML = "";
@@ -25170,7 +25274,7 @@ function saveCaptureBase(){
     withWhom:G.withWhom, ties:G.ties, panel:null, court:G.court, own:G.own, parties:G.parties,
     termLength:G.termLength, country:G.country,
     greatest:G.greatest, blasphemy:G.blasphemy, loreNote:G.loreNote, greatnessOpen:G.greatnessOpen,
-    relics:G.relics, relicSpots:G.relicSpots, consularLore:G.consularLore, bind:G.bind, sens:G.sens, invertY:!!G.invertY, voiceVol:G.voiceVol, goals:G.goals, whip:G.whip || null, billQueue:G.billQueue || [], faith:G.faith || null, life:G.life || null, ach:G.ach || {}, law:G.law || null, ladder:G.ladder || [], cases:G.cases || [], lastActs:G.lastActs || [], wx:G.wx || null, town:G.town || null, rivals:G.rivals || [], rivalNext:G.rivalNext || 0, daylog:(G.daylog || []).slice(-120), paperRead:G.paperRead || 0, seedL:G.seedL || 0, echoes:G.echoes || [], billKinds:G.billKinds || {}, realmRel:G.realmRel || {}, listened:G.listened || 0,
+    relics:G.relics, relicSpots:G.relicSpots, consularLore:G.consularLore, bind:G.bind, sens:G.sens, invertY:!!G.invertY, voiceVol:G.voiceVol, goals:G.goals, whip:G.whip || null, billQueue:G.billQueue || [], faith:G.faith || null, life:G.life || null, ach:G.ach || {}, law:G.law || null, ladder:G.ladder || [], cases:G.cases || [], lastActs:G.lastActs || [], wx:G.wx || null, town:G.town || null, rivals:G.rivals || [], rivalNext:G.rivalNext || 0, daylog:(G.daylog || []).slice(-120), paperRead:G.paperRead || 0, seedL:G.seedL || 0, mHints:G.mHints || {}, echoes:G.echoes || [], billKinds:G.billKinds || {}, realmRel:G.realmRel || {}, listened:G.listened || 0,
     world:G.world,
     pendingNight:!!G.pendingNight,
     cam:{x:cam.x, z:cam.z, yaw:cam.yaw, pitch:cam.pitch},
@@ -26208,7 +26312,7 @@ function padBack(){
     /* a card with a plain way out takes it; a card that must be answered
        is left alone, because that is the point of it */
     const outs = [...card.querySelectorAll(".btn, .conc__btn")].filter(b =>
-      !b.disabled && /back to it|leave it|close|not now|later|done|start the day|put it away/i.test(b.textContent));
+      !b.disabled && /back to it|leave it|close|not now|later|done|start the day|put it away|fold it|stay here/i.test(b.textContent));
     if(outs.length){ outs[outs.length - 1].click(); return; }
     return;
   }
@@ -26710,6 +26814,7 @@ function enterRoom(dest, fromRoom){
   /* Instant feet. Mesh later. Keep walking inward — never stop at the jamb. */
   if(!ROOMS[dest]) return;
   try{ kEnsurePeople(); }catch(e){}
+  try{ mStandFix(); }catch(e){}
   forceUnstickMove();
   try{ catchClear("door"); }catch(e){}
   G.speechApproach = null;
