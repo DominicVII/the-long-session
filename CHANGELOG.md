@@ -4,6 +4,17 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## Their words in the transcript
+
+On `20261012e`. Walk **0.68** / sprint **1.15** kept. Best default, `history.replaceState` only, no CDN, no external LLM. God is the Most High; Christ is King; First Consul is a man under God. The House and its procedures are unchanged.
+
+- **The line is what they say:** the talk box used to open with a stock mood phrase ("Afternoon.", "Hm.") and then a stage direction about how they were carrying themselves ("They fold their arms and wait."), and both were logged as if spoken. Now the line and the transcript hold only their words.
+- **Reaching for it:** people often go off on a tangent trying to name what they cannot. They try a wrong word, drop it, land on the concrete thing (their fear, the trouble back home, what the bill means to them, what you did) and admit it still has no name. It comes from their own life and mood, and from free-typed replies too. Discreet people you do not know well start and then stop.
+- **First person:** replies that named their fear or goal no longer slip into narrator voice ("being cut loose by their own party" is now "my own party").
+- **Your read stays yours:** the panel under the line is now "How you read them": the body language plus what they show. Their thoughts no longer sit there in place of what they said.
+- **Nothing cut off:** the line scrolls instead of clipping at four lines.
+- Stamp: meta + STAMP + `ONUM_BUILD` -> `20261012f`. Five HTML copies byte-identical.
+
 ## Characters: skull, wedges, side hair
 
 On `20261012d`. Walk **0.68** / sprint **1.15** kept. Best default, `history.replaceState` only, no CDN, no external LLM. God is the Most High; Christ is King; First Consul is a man under God. The House and its procedures are unchanged.

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261012e">
+<meta name="onum-build" content="20261012f">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261012e";
+  var STAMP = "20261012f";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -238,7 +238,7 @@ body.help-held .keys{display:flex !important; opacity:1; visibility:visible}
 .chat{flex:1 1 auto; min-height:0; overflow:hidden; display:flex; flex-direction:column}
 .chat__suggest{flex:0 0 auto}
 .chat__meta, .logbox{flex:0 0 auto}
-@media (max-height:620px){ .talk__think{display:none} .talk__say{-webkit-line-clamp:3; line-clamp:3} }
+@media (max-height:620px){ .talk__think{display:none} .talk__say{max-height:6.9em} }
 
 .talk__head{display:flex; gap:12px; align-items:flex-start; flex-wrap:wrap; padding-bottom:7px; margin-bottom:8px; border-bottom:1px solid var(--line-soft)}
 .talk__who{flex:1 1 250px; min-width:0}
@@ -262,7 +262,7 @@ body.help-held .keys{display:flex !important; opacity:1; visibility:visible}
 .tiny span{display:block; height:3px; background:var(--line-soft); border-radius:2px; overflow:hidden; margin-top:3px}
 .tiny span b{display:block; height:100%}
 .talk__say{font-family:"Instrument Serif",Georgia,serif; font-size:18px; line-height:1.38; margin-bottom:5px;
-  max-width:72ch; display:-webkit-box; -webkit-line-clamp:4; line-clamp:4; -webkit-box-orient:vertical; overflow:hidden}
+  max-width:72ch; max-height:9.6em; overflow:auto}
 .talk__note{font-size:11px; color:var(--ink-3); margin-bottom:11px; min-height:1.3em; font-family:"JetBrains Mono",monospace}
 .talk__note b{color:var(--good); font-weight:500}
 .talk__note u{text-decoration:none; color:var(--bad)}
@@ -19281,7 +19281,7 @@ function improvise(m, said){
       if(u.named) body = answerNamed(m, u, r);
       else if(u.intent === "question") body = "Because I want to " + m.intent.t +
         ", and you are either useful to that or you are not. " +
-        (m.fear ? "What I will not risk is " + m.fear.t + "." : "");
+        (m.fear ? "What I will not risk is " + firstPerson(m.fear.t) + "." : "");
       else if(u.intent === "request") body = "Ask me for something specific and I will give you a specific answer. Vague asks get vague refusals.";
       else if(u.place) body = u.place === m.state
         ? "You have been reading about my state. Then you know what it needs — and it is not another speech."
@@ -19308,9 +19308,9 @@ function improvise(m, said){
     if(st && st.level >= 2 && topic !== "bill")
       out.push("And while we are talking — " + (st.why || ("this bill sits heavy on " + bio.town + ".")));
     else if(m.fear && r() < 0.5)
-      out.push("I keep coming back to " + m.fear.t + ". That is the honest part.");
+      out.push("I keep coming back to " + firstPerson(m.fear.t) + ". That is the honest part.");
     else if(m.goal && r() < 0.55)
-      out.push("I am still here to " + m.goal.t.replace(/^to /, "") + ".");
+      out.push("I am still here to " + firstPerson(m.goal.t.replace(/^to /, "")) + ".");
     else if(m.party)
       out.push(m.traits.loyalty > 60
         ? "My caucus expects me to hold the line, and mostly I do."
@@ -19339,7 +19339,7 @@ function improvise(m, said){
     const bit = String(prev.content).split(/[.!?]/)[0].trim();
     if(bit.length > 18 && bit.length < 90)
       out.unshift(pick([
-        "I already said " + bit.charAt(0).toLowerCase() + bit.slice(1) + " — hold me to it.",
+        "I already said " + (/^I\b/.test(bit) ? bit : bit.charAt(0).toLowerCase() + bit.slice(1)) + " — hold me to it.",
         "Going back to that: " + bit + ".",
         "Do not make me walk it back: " + bit + "."
       ]));
@@ -19349,6 +19349,8 @@ function improvise(m, said){
   const use = cleaned.length ? cleaned : out.filter(Boolean);
   let line = use.slice(0, maxBeats).join(" ");
   if(line.length > 420) line = line.slice(0, 410).replace(/[^ ]*$/, "").trim() + "…";
+  /* sometimes the answer runs into the thing they cannot name */
+  if(!short && u.intent !== "farewell" && r() < 0.3){ try{ line += " " + reachFor(m); }catch(e){} }
   noteSaid(m, line);
   try{ applyImprovEffect(m, u, line); }catch(e){}
   try{ netTrain(m, u); }catch(e){}
@@ -19806,6 +19808,81 @@ function convTell(m){
   return pick(mood > 24 ? warm : mood < -24 ? cold : even);
 }
 
+/* ── what they cannot quite name, said out loud ─────────────
+   Not your read of them. Their own words, reaching for it: a wrong
+   word tried and dropped, the concrete thing, and an admission that
+   it still has not got a name. Goes in the transcript like anything
+   else they say. */
+function firstPerson(s){
+  return String(s || "")
+    .replace(/\bthey are\b/gi, "I am").replace(/\bthey were\b/gi, "I was")
+    .replace(/\bthey did\b/gi, "I did").replace(/\bthey\b/gi, "I")
+    .replace(/\btheirs\b/gi, "mine").replace(/\btheir own\b/gi, "my own")
+    .replace(/\btheir\b/gi, "my").replace(/\bthemselves\b/gi, "myself")
+    .replace(/\bthem\b/gi, "me");
+}
+function reachFor(m){
+  let bio = null;
+  try{ autoInit(m); bio = bioOf(m); }catch(e){}
+  try{ sentEnsure(m); }catch(e){}
+  const mood = moodOf(m);
+  const town = (bio && bio.town) || m.state || "home";
+  const b = G.bill && !G.bill.done ? G.bill : null;
+  let st = null;
+  try{ st = b ? stakeIn(m, b) : null; }catch(e){}
+  const t = topMemory(m);
+  /* the concrete thing under it */
+  const things = [];
+  if(m.fear && m.fear.t) things.push(firstPerson(m.fear.t));
+  if(bio && bio.trouble) things.push("what is going on in " + town + ", where " + bio.trouble);
+  const lc = x => /^I\b/.test(x) ? x : x.charAt(0).toLowerCase() + x.slice(1);
+  if(st && st.level >= 2 && st.why) things.push("that bill — " + lc(firstPerson(st.why.split(/[;.]/)[0].trim())));
+  const now = m.sent && m.sent.now ? String(m.sent.now).trim().replace(/[.!?]+$/, "") : "";
+  if(now && now.length < 110 && !/[.!?]/.test(now)) things.push(/^I\b/.test(now) ? "a thing I keep thinking, which is that " + now : "a thing I keep thinking: " + lc(firstPerson(now)));
+  if(t && t.t && t.w < 0) things.push("what happened — " + t.t.replace(/[.!?]+$/, "").replace(/^You /, "you "));
+  if(m.goal && m.goal.t && !m.goalDone) things.push("wanting " + firstPerson(m.goal.t) + " and knowing the term is half gone");
+  const thing = pick(things.length ? things : ["the building, mostly, and what it does to a person by Thursday"]);
+  /* the wrong words they try first, coloured by what they are carrying */
+  const near = mood.val < -24 ? ["angry", "fed up", "bitter", "sore"]
+             : mood.val > 24 ? ["hopeful", "glad", "lucky", "excited"]
+             : ["tired", "worried", "restless", "homesick", "afraid"];
+  const w1 = pick(near), w2 = pick(near.filter(x => x !== w1));
+  const disc = (m.traits && m.traits.discretion) || 50;
+  const known = canRead(m);
+  const start = pick([
+    "There is a word for it and I keep — no.",
+    "How do I put this.",
+    "I have been trying to say this all week and it keeps coming out wrong.",
+    "You will think this is a strange thing to say in a corridor.",
+    "It is not — let me start again.",
+    "I do not have the word. I have been looking."
+  ]);
+  const miss = pick([
+    "I want to say " + w1 + ", but that is not it. " + cap(w1) + " goes away.",
+    "Not " + w1 + ". Not " + w2 + " either, though it borrows from both.",
+    cap(w1) + " is the nearest I get, and it is not near.",
+    "People would call it " + w1 + ". It is heavier than that and it does not move.",
+    "It sits somewhere between " + w1 + " and " + w2 + " and it will not pick one."
+  ]);
+  const land = pick([
+    "It is " + thing + ".",
+    "It has to do with " + thing + ". Under that, I think.",
+    "It is closest to " + thing + ", and even that is the edge of it.",
+    "When I go looking for it I find " + thing + ", and that is not the whole of it."
+  ]);
+  const give = pick([
+    "No. That still is not the word. Never mind.",
+    "If you know what that is called, tell me.",
+    "That is as near as I get today.",
+    "Anyway. It does not have a name. It has a weight.",
+    "I will know the word when somebody else says it.",
+    ""
+  ]);
+  if(disc > 70 && !known && chance(0.55))
+    return start + " " + miss + " — No. Not in here. Forget I started.";
+  return [start, miss, land, give].filter(Boolean).join(" ");
+}
+
 /* ── what they want out of it ──────────────────────────────
    One thing, taken from their own situation, and never the same
    thing twice from the same person. */
@@ -19936,8 +20013,9 @@ function convAnswer(m, ask){
       extra = " " + surname(other.name) + " is " + (moodOf(other).val > 0 ? "gettable" : "nowhere near you") + " on this, for what it is worth.";
     }
   }
-  const said = fresh(() => ask.reply + extra + " " + convTell(m));
-  appendMsg("them", ask.reply + extra, surname(m.name));
+  const said = fresh(() => ask.reply + extra + (chance(0.3) ? " " + reachFor(m) : ""));
+  TALK.tell = convTell(m);
+  appendMsg("them", said, surname(m.name));
   setSay(said, fx(ask.w > 0 ? "that landed" : "", ask.w < 0 ? "that cost you" : ""));
   /* push them far enough and they simply go */
   if(ask.storm && moodOf(m).val < -20){
@@ -19953,12 +20031,12 @@ function convAnswer(m, ask){
     "That is my half of it. Go on, then.",
     "Enough of mine. Yours.",
     "I have said my piece. Say yours."
-  ]) + " " + convTell(m));
+  ]));
 }
 function convClear(m){
   TALK.beat = 2;
   spend(4, 1);
-  if(TALK.followUp){ appendMsg("them", TALK.followUp, surname(m.name)); setSay(TALK.followUp, ""); TALK.followUp = null; }
+  if(TALK.followUp){ TALK.tell = convTell(m); appendMsg("them", TALK.followUp, surname(m.name)); setSay(TALK.followUp, ""); TALK.followUp = null; }
   renderTalk();
 }
 
@@ -20036,14 +20114,17 @@ function openTalk(m){
       return;
     }
   }catch(e){}
-  /* Stance, then whatever is actually on their mind, then how they are
-     carrying it. Composed fresh and checked against everything that has
-     ever been said, so no two openings in a career are the same. */
-  const mood = moodOf(m);
+  /* What they actually say: whatever is on their mind, and often a
+     digression where they reach for the thing they cannot name. The
+     transcript holds only their words. How they carry it is your read,
+     and goes in the read panel, never in their mouth. */
+  TALK.tell = convTell(m);
   const line = fresh(() => {
-    let l = pick(MOODS[mood.key].open);
+    let l = String(convHook(m) || "").trim();
+    if(l){ l = cap(l); if(!/[.!?…"”]$/.test(l)) l += "."; }
     if(!m.met) l = "I do not think we have met properly. " + l;
-    return l + " " + convHook(m) + " " + convTell(m);
+    if(chance(0.6)) l += " " + reachFor(m);
+    return l;
   });
   /* if they came looking for you, they lead with it */
   if(m.wantsWord){
@@ -20100,7 +20181,7 @@ function wireHome(){
 function closeTalk(){
   const who = TALK.m;
   TALK.open = false; TALK.m = null; TALK.prop = null;
-  TALK.thread = null; TALK.beat = 2; TALK.followUp = null; TALK.seed = undefined;
+  TALK.thread = null; TALK.beat = 2; TALK.followUp = null; TALK.seed = undefined; TALK.tell = "";
   el("talk").classList.remove("is-open");
   try{ if(who) feelHit(who, "relief", "they left"); }catch(e){}
   wireHome();
@@ -20169,11 +20250,11 @@ function renderTalk(){
   const th = el("tkThink");
   if(m.kind === "member"){
     th.hidden = false;
-    th.innerHTML = "<b>" + (canRead(m) ? "You can read them" : "Hard to read") + "</b>";
+    th.innerHTML = "<b>" + (canRead(m) ? "How you read them" : "Hard to read") + "</b>";
     const span = document.createElement("span");
-    span.textContent = canRead(m)
-      ? thoughtOf(m) + " " + innerLife(m)
-      : "You do not know " + surname(m.name) + " well enough to tell what they are after.";
+    span.textContent = (TALK.tell ? TALK.tell + " " : "") + (canRead(m)
+      ? cap(pres.label) + "."
+      : "You do not know " + surname(m.name) + " well enough to tell what is under it.");
     th.appendChild(span);
     /* The net thinks. It does not put a bar on the table. */
   } else th.hidden = true;
