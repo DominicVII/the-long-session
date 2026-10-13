@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261012j">
+<meta name="onum-build" content="20261012k">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261012j";
+  var STAMP = "20261012k";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -405,8 +405,8 @@ body.help-held .keys{display:flex !important; opacity:1; visibility:visible}
 @media (prefers-reduced-motion: reduce){ .feed div{animation:none} }
 
 /* someone wants a word */
-.hail{position:absolute; left:50%; bottom:52px; transform:translateX(-50%); max-width:82%;
-  background:var(--fed); color:#fff; font-size:12px; font-weight:600; padding:8px 13px; border-radius:2px;
+.hail{position:absolute; right:12px; top:92px; max-width:250px; pointer-events:none; opacity:.9;
+  background:rgba(20,32,52,.82); color:#fff; font-size:11px; font-weight:600; padding:5px 9px; border-radius:2px; border-left:3px solid var(--fed);
   box-shadow:0 8px 22px -12px rgba(0,0,0,.8)}
 .hail[hidden]{display:none}
 
@@ -501,7 +501,7 @@ body.has-pad .mic{bottom:80px}
 /* and with the proceedings bar up, the prompt and the clock clear it */
 body.in-session .prompt{bottom:96px}
 body.in-session .tele{bottom:96px}
-body.in-session .hail{bottom:136px}
+body.in-session .hail{top:92px}
 body.in-session.has-pad .prompt{bottom:112px}
 body.in-session.has-pad .tele{bottom:112px}
 .padbar span{display:flex; align-items:center; gap:5px; white-space:nowrap}
@@ -18744,6 +18744,13 @@ function eventCard(e){
   }
 
   if(here) markDay("attended", e.t, null);
+  if(!here && G.room !== e.room && veil.hidden && !G.over){
+    G.running = true;
+    try{ pushMail(null, "Missed: " + e.t, e.d + "\n\n" + body, {kind:"note"}); }catch(err){}
+    try{ nudge("Missed: " + e.t + " · in your inbox"); }catch(err){}
+    laterHouse(() => { try{ queueSave(); }catch(err){} });
+    return;
+  }
 
   card.innerHTML =
     '<div class="eyebrow">' + dateString() + " · " + hourLabel(e.hour) + " · " +
@@ -19233,6 +19240,8 @@ function pushMail(from, subject, body, opts){
   if(G.mail.length > 60) G.mail.pop();
   if(!opts.outgoing) G.unread = (G.unread||0) + 1;
 }
+var hailSweep = 0;
+function nudge(t, ms){ window._nudge = {t:String(t), until:performance.now() + (ms || 7000)}; }
 function unreadCount(){ return G.mail.filter(x => !x.read && !x.outgoing).length; }
 
 /* what a member writes to you, driven by what they are actually after */
@@ -19336,9 +19345,11 @@ function maybeApproach(m){
   m.wantsWord = questionFor(m);
   m.lastHail = G.t;
   m.say = m.wantsWord.line; m.sayT = 4.5; m.sayTo = "you";
-  m.tx = cam.x + (Math.random()*2-1)*1.2;
-  m.tz = cam.z + (Math.random()*2-1)*1.2;
-  m.wait = 0;
+  { const side = Math.random() < 0.5 ? -1 : 1, fw = 1.5, sd = 1.7 * side;
+    const sy = Math.sin(cam.yaw || 0), cy = Math.cos(cam.yaw || 0);
+    m.tx = cam.x + sy*fw + cy*sd; m.tz = cam.z + cy*fw - sy*sd; }
+  m.wait = 0; m.wwT = G.t;
+  try{ pushMail(m, "Wants a word", String(m.wantsWord.line || "") + "\n\nFind me when you have a minute. I am in " + (((ROOMS[m.room]||{}).t) || "the building") + ".", {kind:"note"}); }catch(e){}
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -30750,11 +30761,16 @@ function frameBody(now, draw){
     hailT = 0.4;
     hailWho = null;
     if(G.running && !TALK.open){
-      for(const x of hereNow()) if(x.wantsWord){ hailWho = x; break; }
+      for(const x of hereNow()) if(x.wantsWord){
+        if(x.wwT && G.t - x.wwT > 240){ x.wantsWord = null; continue; }
+        hailWho = x; break; }
+      if(((hailSweep = (hailSweep||0) + 1) % 10) === 0)
+        for(const x of G.members) if(x.wantsWord && x.wwT && G.t - x.wwT > 240) x.wantsWord = null;
     }
   }
   const waiting = hailWho;
-  say(el("hail"), waiting ? waiting.name + " wants a word — walk over and press E" : null);
+  say(el("hail"), waiting ? waiting.name.split(" ")[0] + " wants a word · E when close"
+    : (window._nudge && performance.now() < window._nudge.until ? window._nudge.t : null));
   acc += dt;
   if(acc > (MODEST ? 0.9 : 0.4)){ acc = 0; if(!G.over) refreshBar(); }
   if(_prof){ _prof.mark("ui"); _prof.end(true); }
