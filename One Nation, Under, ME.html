@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261012g">
+<meta name="onum-build" content="20261012h">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261012g";
+  var STAMP = "20261012h";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -12346,7 +12346,7 @@ function checkEvents(){
   restaff(false);
   deliverReplies();
   const h = Math.floor(G.minute/60);
-  if(h !== G.lastMailCheck){ G.lastMailCheck = h; maybeMail(); }
+  if(h !== G.lastMailCheck){ G.lastMailCheck = h; maybeMail(); try{ schedWatch(); }catch(e){} }
   const q = Math.floor(G.minute/8);
   if(q !== G.lastAuto){ G.lastAuto = q; if(G.running && !G.over) queueSave(); }
   const tk = Math.floor(G.minute/12);
@@ -13903,6 +13903,11 @@ function landSwing(label, dStand, dInf, dApp){
 function makeEvents(){
   G.events = [];
   ensureDayMark();
+  if(G.you && abroadOffice()){
+    /* not the House's diary: counsel builds yours from what is going on */
+    try{ schedMorning(); }catch(e){}
+    return;
+  }
   const t = dayType();
   const b = G.bill;
   const billBit = (b && !b.done) ? (" The " + b.title + " hangs over the diary.") : "";
@@ -13986,6 +13991,7 @@ function makeEvents(){
         d:surname(m.name) + " has called witnesses and intends to keep them there." + unrestBit});
     }
   });
+  try{ schedHouse(); }catch(e){}
   if(G.you && G.you.post && chance(.5)){
     G.events.push({k:"caucus", hour:rint(9,15), room:"caucus", by:0, yours:true,
       t:"A meeting you called",
@@ -14024,7 +14030,9 @@ function dayPlanCard(){
   const hook = dayPersonalHook();
   const weather = buildingWeather();
   const taylor = isTaylorDay();
-  const voteLine = (b && !b.done)
+  const voteLine = abroadOffice()
+    ? ("<strong>" + schedBy() + "</strong> has the diary ready. What is on it comes from what is going on in " + (heldOffice() === "pres" ? "the Union" : G.you.state) + ".")
+    : (b && !b.done)
     ? (b.voteDay === G.day
         ? ("<strong>" + b.title + "</strong> — roll call <strong>today</strong> at " + hourLabel(b.voteHour) + ". Be on the floor or the wire writes you as absent.")
         : ("<strong>" + b.title + "</strong> — roll call day " + b.voteDay + ". Every favour before then is about this bill."))
@@ -14032,7 +14040,7 @@ function dayPlanCard(){
   card.innerHTML =
     '<div class="eyebrow">' + dateString() + " · " + dayLabel() +
       (taylor ? " · Taylor Day" : "") + '</div>' +
-    '<h1>' + (taylor ? "Day of the First Consul." : (list.length ? "Morning briefing." : "Quiet morning.")) + '</h1>' +
+    '<h1>' + (taylor ? "Day of the First Consul." : abroadOffice() ? (list.length ? "Counsel's schedule." : "A thin diary.") : (list.length ? "Morning briefing." : "Quiet morning.")) + '</h1>' +
     '<p class="dream">' + weather + '</p>' +
     '<p>' + voteLine + '</p>' +
     '<p><strong>Personal:</strong> ' + hook + '</p>' +
@@ -17708,6 +17716,7 @@ function micSend(text){
 }
 
 function eventCard(e){
+  if(e && e.k === "office"){ schedCard(e); return; }
   /* If you are standing in the room, you sit through it in real time
      rather than reading about it. The card is for the times you are
      somewhere else. */
@@ -22127,7 +22136,7 @@ function holdVote(){
   }
   G.mood = clamp(G.mood + (passed ? (b.sponsorParty==="FED"?4:-4) : 0) + rint(-3,3), -60, 60);
   try{ billConsequences(b, passed, yourVote); }catch(e){ if(window.console) console.warn("billConsequences", e); }
-  if(passed){ G.lastActs = G.lastActs || []; G.lastActs.unshift({title:b.title, day:G.day}); if(G.lastActs.length > 6) G.lastActs.length = 6; }
+  if(passed){ G.lastActs = G.lastActs || []; G.lastActs.unshift({title:b.title, day:G.day, kind:b.kind || null, target:b.target || null, pos:b.pos ? {econ:b.pos.econ, lib:b.pos.lib, def:b.pos.def, wel:b.pos.wel} : null}); if(G.lastActs.length > 6) G.lastActs.length = 6; }
   G.you.record.defections += broke.length;
 
   /* the other two branches get their say */
@@ -24800,6 +24809,8 @@ function kChamberActs(c){
       setSay("A road crew, a letter and a ribbon cutting. The State House keeps its promises when they are small.", fx("+2 approval", "30 minutes"));
     }});
   }
+  if(/^(gcounsel|gsec|chief|senclerk|courtclerk)$/.test(c.krole || "") && kHolds(c.chamber))
+    A.unshift({t:"Go over the diary", c:"5m", run(){ spend(5, 0); setSay("Here is the day as it stands. Tell me what you will take and what you will not.", ""); scheduleCard(); }});
   A.push({t:"Leave them to it", c:"0m", run(){ setSay("You nod and let them get back to " + c.cause + ".", ""); }});
   return A;
 }
@@ -25297,11 +25308,13 @@ function refreshOfficePane(){
       '. You have no vote there' + (k === "gov" ? '; the members from ' + y.state + ' still take your calls.' : '.') + '</p>'; })() : "";
   pane.innerHTML = '<div class="billbox"><div class="eyebrow">Your office · ' + ROLE_T[roleKey()] + '</div>' +
     '<div class="h-serif">' + sitEsc(officeTitle()) + '</div><div class="muted">' + sitEsc(officeSeat()) + ' · ' + sitEsc(ROOMS[homeRoom()].t) + '</div></div>' + side +
-    '<div class="eyebrow">Today\'s docket</div>' + (rows || '<p class="muted">Nothing scheduled.</p>') +
+    '<div class="eyebrow">' + sitEsc(schedBy()) + '\'s diary</div>' + schedListHTML() +
+    '<div class="eyebrow" style="margin-top:14px">The routine</div>' + (rows || '<p class="muted">Nothing scheduled.</p>') +
     '<div class="eyebrow" style="margin-top:14px">Powers of the office</div>' +
     P.map((p, i) => '<div class="whip__row"><span class="whip__n">' + sitEsc(p.t) + '</span><span class="whip__w">' + sitEsc(p.d || "") + '</span>' +
       '<span class="whip__b"><button type="button" class="btn btn--ghost whip__go" data-pw="' + i + '"' + (p.off ? ' disabled' : '') + '>Do it</button></span></div>').join("") +
     house;
+  schedWire(pane, refreshOfficePane);
   pane.querySelectorAll("[data-dk]").forEach(bt => bt.addEventListener("click", () => docketRun(D[+bt.getAttribute("data-dk")])));
   pane.querySelectorAll("[data-pw]").forEach(bt => bt.addEventListener("click", () => {
     const p = P[+bt.getAttribute("data-pw")]; if(!p || p.off) return;
@@ -25376,6 +25389,283 @@ function dualTick(news){
       } else dualVacate(m, "lost in the high court and gave up the House seat.", news);
     }
   });
+}
+
+/* ══════════════════════════════════════════════════════════
+   20261012h · COUNSEL KEEPS THE DIARY
+   Whoever holds the chair, somebody keeps the diary: counsel to a
+   Governor, a chief of staff, a clerk. They bring you what the world
+   is actually doing: laws that passed and now land somewhere, a county
+   on strike, a bill on your desk, a lawsuit, a storm, a delegation, a
+   rival. You accept or decline. Nothing is a template; if nothing is
+   happening, the diary is thin. Ignore a thing and it keeps going
+   without you, usually worse.
+   ══════════════════════════════════════════════════════════ */
+const SCHED_BY = {gov:"Counsel to the Governor", senate:"Your chief of staff", bench:"Your clerk", pres:"The Chief of Staff", house:"Your chief of staff"};
+function schedBy(){ return SCHED_BY[heldOffice() || "house"] || "Your chief of staff"; }
+function schedState(){ const y = G.you; return (G.states || []).find(s => s.n === y.state) || null; }
+function schedHour(used, lo, hi){
+  const free = [];
+  for(let h = lo || 9; h <= (hi || 18); h++) if(used.indexOf(h) < 0) free.push(h);
+  const h = free.length ? pick(free) : rint(lo || 9, hi || 18);
+  used.push(h); return h;
+}
+/* what is going on, in the order counsel would raise it */
+function schedSources(role){
+  const y = G.you, S = schedState(), out = [];
+  const seen = G.schedSeen || (G.schedSeen = {});
+  const acts = (G.lastActs || []).filter(a => a && a.title && G.day - (a.day || 0) <= 6);
+  acts.forEach(a => {
+    const key = role + ":law:" + a.title;
+    if(seen[key]) return;
+    out.push({ok:"law", key, act:a, w:3});
+    if(role === "senate" && !a.senate) out.push({ok:"senact", key:"senact:" + a.title, act:a, w:4});
+    if(role === "pres" && !a.signed && !a.vetoed) out.push({ok:"sign", key:"sign:" + a.title, act:a, w:5});
+  });
+  if(S && (role === "gov" || role === "senate") && (S.unrest || 0) > 42) out.push({ok:"unrest", key:"unrest:" + G.day, w:(S.unrest > 60 ? 5 : 2)});
+  if(role === "pres"){
+    const hot = (G.states || []).slice().sort((a, b) => (b.unrest || 0) - (a.unrest || 0))[0];
+    if(hot && hot.unrest > 55) out.push({ok:"unrest", key:"unrest:" + G.day, st:hot.n, w:4});
+  }
+  if(S && S.bill && role === "gov" && !S.bill.met) out.push({ok:"sponsors", key:"sponsors:" + S.bill.title, w:3});
+  (G.cases || []).filter(c => c && !c.done).forEach(c => {
+    if(role === "bench") out.push({ok:"argument", key:"arg:" + c.t, cs:c.t, w:3});
+    else if((role === "gov" && c.state === y.state) || role === "pres") out.push({ok:"suit", key:"suit:" + c.t, cs:c.t, w:3});
+  });
+  let wx = null; try{ wx = wxToday(); }catch(e){}
+  if(wx && (wx.k === "storm" || wx.k === "snow" && wx.cover >= 2 || wx.k === "heat") && role !== "bench") out.push({ok:"weather", key:"wx:" + G.day, wx:wx.k, w:4});
+  if(role === "gov" || role === "pres" || role === "senate"){
+    try{ const r = pick(realmEnsure()); if(r && chance(0.35)) out.push({ok:"realm", key:"realm:" + G.day, realm:r.k, w:1}); }catch(e){}
+  }
+  const b = G.bill;
+  if(b && !b.done && (role === "gov" || role === "senate")){
+    const fit = (function(){ try{ return districtFit(b); }catch(e){ return 0; } })();
+    if(Math.abs(fit) > 15 || b.target === y.state) out.push({ok:"delegation", key:"deleg:" + b.title, w:2});
+  }
+  try{ const rv = rivalLive(); if(rv && chance(0.4)) out.push({ok:"rival", key:"rival:" + G.day, w:1}); }catch(e){}
+  return out;
+}
+const SCHED_ROOM = r => ROOMS[r] ? r : homeRoom();
+function schedMake(src, role, used){
+  const y = G.you, S = schedState(), hr = homeRoom();
+  const a = src.act;
+  const E = {k:"office", ok:src.ok, key:src.key, by:schedBy(), day:G.day, done:false, _rich:true};
+  if(src.ok === "law"){
+    const kind = a.kind;
+    Object.assign(E, {hour:schedHour(used), room:role === "house" ? "district" : hr, act:a.title, akind:kind,
+      t:role === "gov" ? "Agencies on the " + a.title : role === "house" ? "Constituents on the " + a.title : "Briefing: how the " + a.title + " is landing",
+      d:role === "gov" ? "It is law now, and the departments want to know how hard to carry it out in " + y.state + "." :
+        role === "house" ? "People at home who live under it now want to tell you what it is doing." :
+        "Staff have the first reports from the states on the " + a.title + "."});
+  } else if(src.ok === "senact"){
+    Object.assign(E, {hour:schedHour(used, 11, 16), room:"senate", act:a.title, t:"The Senate takes up the " + a.title,
+      d:"Passed by the House on day " + a.day + ". The Senate votes on it today."});
+  } else if(src.ok === "sign"){
+    Object.assign(E, {hour:schedHour(used, 9, 15), room:"exec", act:a.title, t:"The " + a.title + " arrives for signature",
+      d:"Enrolled, printed and on the desk. Sign it, or send it back."});
+  } else if(src.ok === "unrest"){
+    const st = src.st || y.state;
+    const SS = (G.states || []).find(s => s.n === st);
+    const what = pick(["a strike at the mills", "a march on the county courthouse", "a run on the savings bank", "a stand-off at the rail yard"]);
+    Object.assign(E, {hour:schedHour(used), room:role === "pres" ? hr : "district", st, what,
+      t:"Travel: " + what + " in " + st, d:"Unrest stands at " + Math.round((SS && SS.unrest) || 0) + ". The sheriff, the strike committee and the papers are all waiting to see who comes."});
+  } else if(src.ok === "sponsors"){
+    Object.assign(E, {hour:schedHour(used), room:hr, bill:S.bill.title, t:"The sponsors of the " + S.bill.title,
+      d:"Statehouse members who wrote it want twenty minutes before it reaches your desk."});
+  } else if(src.ok === "suit"){
+    Object.assign(E, {hour:schedHour(used), room:hr, cs:src.cs, t:"Counsel on " + src.cs, d:"The lawyers want a decision on strategy before the next filing."});
+  } else if(src.ok === "argument"){
+    Object.assign(E, {hour:schedHour(used, 10, 15), room:"court", cs:src.cs, t:"Argument: " + src.cs, d:"Briefs are in. Counsel for both sides at the lectern."});
+  } else if(src.ok === "weather"){
+    const W = {storm:"storm damage along the river", snow:"roads shut under the snow", heat:"the heat in the tenements"}[src.wx] || "the weather";
+    Object.assign(E, {hour:schedHour(used, 9, 14), room:"district", wx:src.wx, t:"Travel: " + W, d:"Calls from the counties since dawn. The cameras will go wherever the officials go."});
+  } else if(src.ok === "realm"){
+    const r = (realmEnsure() || []).find(x => x.k === src.realm);
+    Object.assign(E, {hour:schedHour(used), room:hr, realm:src.realm, t:"A delegation from " + (r ? r.t : "abroad"), d:"They want " + ((r && r.want) || "a hearing") + ", and they have brought a letter."});
+  } else if(src.ok === "delegation"){
+    const b = G.bill;
+    Object.assign(E, {hour:schedHour(used, 9, 16), room:"corridor", bill:b.title, t:"Travel: " + y.state + "'s House members on the " + b.title,
+      d:"The members from home are in the Statuary Corridor. They will hear you out before the roll call."});
+  } else if(src.ok === "rival"){
+    const rv = rivalLive();
+    Object.assign(E, {hour:schedHour(used, 12, 18), room:"steps", t:"Answer " + (rv ? rv.name : "your rival") + " on the Steps", d:"A rally across the plaza. Counsel thinks you should be seen; the press thinks so too."});
+  } else return null;
+  E.room = SCHED_ROOM(E.room);
+  return E;
+}
+function schedBuild(role, n){
+  const used = (G.events || []).filter(e => e.day === G.day).map(e => e.hour);
+  try{ docketToday().forEach(d => used.push(d.h)); }catch(e){}
+  const src = schedSources(role).sort((a, b) => b.w - a.w + (Math.random() - 0.5) * 2);
+  const out = [];
+  for(const s of src){
+    if(out.length >= n) break;
+    if((G.events || []).some(e => e.key === s.key && e.day === G.day)) continue;
+    const e = schedMake(s, role, used);
+    if(e){ out.push(e); (G.schedSeen || (G.schedSeen = {}))[s.key] = G.day; }
+  }
+  return out;
+}
+/* the morning diary for a chair that is not the House */
+function schedMorning(){
+  const role = heldOffice();
+  const n = 1 + Math.min(3, Math.floor(schedSources(role).length / 2) + (chance(0.5) ? 1 : 0));
+  schedBuild(role, n).forEach(e => G.events.push(e));
+}
+/* the House gets its share of what laws do, too */
+function schedHouse(){
+  const e = schedBuild("house", chance(0.5) ? 1 : 0);
+  e.forEach(x => G.events.push(x));
+}
+/* during the day, counsel adds what has just happened */
+function schedWatch(){
+  if(!G.you || !G.running || G.you.out) return;
+  const m = G.minute || 0;
+  if(m < 8*60 || m > 16*60) return;
+  if(!chance(abroadOffice() ? 0.22 : 0.06)) return;
+  const role = heldOffice();
+  const add = schedBuild(role, 1).filter(e => { e.hour = Math.max(e.hour, Math.floor(m / 60) + 2); return e.hour <= 19; });
+  add.forEach(e => {
+    G.events.push(e);
+    feed(schedBy() + ": " + e.t + ", " + hourLabel(e.hour) + ". Accept or decline in the diary.", "big");
+  });
+  if(add.length){ try{ refreshPanels(); }catch(e){} }
+}
+
+/* ── what happens when it comes due ──────────────────────── */
+function schedOpts(e){
+  const y = G.you, S = (G.states || []).find(s => s.n === (e.st || y.state)), role = heldOffice() || "house";
+  const app = d => { y.approval = clamp(y.approval + d, 0, 100); };
+  const sta = d => { y.standing = clamp(y.standing + d, 0, 100); };
+  const inf = d => { y.influence = clamp(y.influence + d, 0, 100); };
+  const un = d => { if(S) S.unrest = clamp((S.unrest || 0) + d, 0, 100); };
+  const ind = d => { if(S) S.ind = clamp((S.ind || 0) + d, 0, 100); };
+  const home = () => (G.members || []).filter(m => m && !m.gone && m.kind === "member" && m.state === y.state);
+  const act = () => (G.lastActs || []).find(a => a.title === e.act);
+  if(e.ok === "law"){
+    if(role === "gov") return {body:"The department heads have read it. The question is how hard " + y.state + " leans into it.", opts:[
+      {t:"Carry it out in full", run(){ ind(2); sta(2); app(e.akind === "statefed" ? -3 : 1); return "The departments move. It will be felt by the spring."; }},
+      {t:"Slow-walk it", run(){ app(2); sta(-2); un(-2); return "Rules drafted, rules redrafted. The Union will notice in a month."; }},
+      {t:"Challenge it in court", run(){ app(3); sta(-3); G.cases = G.cases || []; G.cases.push({t:y.state + " v. the Union (" + e.act + ")", state:y.state, day:G.day, voted:[]}); return "Your attorney general files by Friday."; }}]};
+    if(role === "house") return {body:"A parish hall and forty chairs. They have the law in hand and stories about it.", opts:[
+      {t:"Listen to all of them", run(){ app(3); spend(60, 10); return "You stay until the last hand is down."; }},
+      {t:"Promise to fix it with an amendment", run(){ app(2); sta(-1); return "Now you have to write one."; }},
+      {t:"Defend the law", run(){ app(-1); sta(2); return "Some leave angry. The leadership hears you held the line."; }}]};
+    return {body:"Reports from the states, sorted by how loud they are.", opts:[
+      {t:"Push the agencies to deliver", run(){ inf(2); sta(1); return "Letters out under your name."; }},
+      {t:"Note it and move on", run(){ return "Filed."; }}]};
+  }
+  if(e.ok === "senact"){
+    const a = act(); const fit = (function(){ try{ return a && a.pos ? alignment(y, {pos:a.pos}) : 0; }catch(x){ return 0; } })();
+    const done = v => () => { if(a) a.senate = v; return v; };
+    return {body:"The clerk calls the roll. Your name is near the middle.", opts:[
+      {t:"Vote aye", run(){ done("aye")(); sta(fit >= 0 ? 2 : -1); app(fit >= 0 ? 1 : -2); feed("Senator " + surname(y.name) + " voted aye on the " + e.act + "."); return "Aye. It goes to the Executive."; }},
+      {t:"Vote no", run(){ done("no")(); sta(fit < 0 ? 2 : -1); app(fit < 0 ? 1 : -2); feed("Senator " + surname(y.name) + " voted no on the " + e.act + "."); return "No, and you said why in two sentences."; }},
+      {t:"Hold the floor against it", off:y.influence < 6, run(){ done("filibuster")(); inf(-6); app(fit < 0 ? 4 : -4); return "Nine hours on your feet. The act waits another week."; }}]};
+  }
+  if(e.ok === "sign"){
+    const a = act();
+    return {body:"Eleven pens and a photographer, if you want them.", opts:[
+      {t:"Sign it", run(){ if(a) a.signed = true; app(2); return "Law, with your name under it."; }},
+      {t:"Veto it", run(){ if(a) a.vetoed = true; sta(-3); inf(3); feed(execTitle() + " " + surname(y.name) + " vetoed the " + e.act + ".", "bad"); return "Back to the House. They need two thirds."; }}]};
+  }
+  if(e.ok === "unrest") return {body:"A thousand people in the square and three cameras. " + e.what + ".", opts:[
+    {t:"Sit down with both sides", run(){ un(-10); app(2); spend(90, 18); return "Four hours in a union hall. A truce, not a peace."; }},
+    {t:"Send the state militia", run(){ un(-15); app(-3); (G.members || []).filter(m => m.pos && m.pos.lib > 30).forEach(m => ripple(m, -6, "Soldiers on a picket line. I will not forget whose order that was.", -6, true)); return "Boots on the cobbles by dark. Quiet, for now."; }},
+    {t:"Send a deputy", run(){ un(-4); app(-1); return "A deputy reads your statement. The crowd boos the deputy."; }}]};
+  if(e.ok === "sponsors") return {body:"Three members of the statehouse, one folder, a lot of hope.", opts:[
+    {t:"Tell them you will sign", run(){ if(S && S.bill){ S.bill.met = "sign"; S.bill.pushed = (S.bill.pushed || 0) + 6; } sta(1); return "They leave lighter than they came."; }},
+    {t:"Say you will read it", run(){ if(S && S.bill) S.bill.met = "read"; return "Noncommittal. They expected that."; }},
+    {t:"Warn them of a veto", run(){ if(S && S.bill){ S.bill.met = "veto"; S.bill.pushed = (S.bill.pushed || 0) - 6; } sta(-1); app(1); return "They will try to amend it. Or they will try to override you."; }}]};
+  if(e.ok === "suit") return {body:"Counsel lays out three roads. Each one costs something.", opts:[
+    {t:"Fight it all the way up", run(){ app(2); y.funds = Math.max(0, (y.funds || 0) - 8); return "Briefs to the high bench. Eight thousand from the chest for printing alone."; }},
+    {t:"Settle quietly", run(){ sta(1); app(-1); const c = (G.cases || []).find(x => x.t === e.cs); if(c){ c.done = true; c.settled = true; } return "Settled. Neither side will call it a win."; }},
+    {t:"Take it to the press", run(){ app(3); sta(-2); return "On the steps with the papers in your hand. The judge reads the papers too."; }}]};
+  if(e.ok === "argument") return {body:"Counsel for both sides, and nine of you on the bench.", opts:[
+    {t:"Question both sides hard", run(){ sta(2); return "Two questions nobody had prepared for."; }},
+    {t:"Listen and say nothing", run(){ sta(1); return "You write three pages of notes and keep them."; }}]};
+  if(e.ok === "weather") return {body:"Mud to the axles. The county engineer has a list.", opts:[
+    {t:"Walk it with the cameras", run(){ app(3); spend(90, 16); return "Boots in the water. It runs on every front page."; }},
+    {t:"Declare an emergency", run(){ un(-5); ind(-2); app(2); y.funds = Math.max(0, (y.funds || 0) - 5); return "Emergency money released by noon."; }},
+    {t:"Leave it to the counties", run(){ app(-2); return "They manage. They remember who did not come."; }}]};
+  if(e.ok === "realm") return {body:"Tea, a translator, and a letter on heavy paper.", opts:[
+    {t:"Sign a letter of intent", run(){ G.realmRel = G.realmRel || {}; G.realmRel[e.realm] = clamp((G.realmRel[e.realm] || 0) + 6, -100, 100); ind(2); return "A cannery, maybe a shipyard. Photographs on the steps."; }},
+    {t:"Dinner and nothing signed", run(){ G.realmRel = G.realmRel || {}; G.realmRel[e.realm] = clamp((G.realmRel[e.realm] || 0) + 2, -100, 100); return "A long dinner. Nobody committed to anything."; }}]};
+  if(e.ok === "delegation") return {body:"The members from " + y.state + ", standing by the bronze. They know why you came.", opts:[
+    {t:"Ask them to vote aye", run(){ home().forEach(m => { m.sway = (m.sway || 0) + 5; ripple(m, 2, (role === "gov" ? "Our own governor" : "Our own senator") + " came to the corridor to ask.", 2); }); inf(-2); return "Two of them nod. One looks at the floor."; }},
+    {t:"Ask them to vote no", run(){ home().forEach(m => { m.sway = (m.sway || 0) - 5; ripple(m, 2, (role === "gov" ? "Our own governor" : "Our own senator") + " came to the corridor to ask.", 2); }); inf(-2); return "They will think about it. That is not nothing."; }},
+    {t:"Just listen", run(){ home().forEach(m => ripple(m, 4, (role === "gov" ? "The governor" : "The senator") + " came to listen, not to whip.", 4)); return "They talk; you take notes."; }}]};
+  if(e.ok === "rival") return {body:"Across the plaza, their crowd. Yours is smaller and closer.", opts:[
+    {t:"Speak to the crowd", run(){ const rv = rivalLive(); if(rv) rv.heat = clamp((rv.heat || 0) - 8, 0, 100); app(2); spend(45, 10); return "Your line carries further than theirs."; }},
+    {t:"Stay out of it", run(){ return "You let them have the plaza."; }}]};
+  return {body:"", opts:[{t:"Done", run(){ return ""; }}]};
+}
+function schedMiss(e, told){
+  const y = G.you, S = (G.states || []).find(s => s.n === (e.st || y.state));
+  y.standing = clamp(y.standing - (told ? 1 : 3), 0, 100);
+  if(!told) y.approval = clamp(y.approval - 2, 0, 100);
+  if(e.ok === "unrest" && S) S.unrest = clamp((S.unrest || 0) + 4, 0, 100);
+  if(e.ok === "senact"){ const a = (G.lastActs || []).find(x => x.title === e.act); if(a && !a.senate) a.senate = "absent"; }
+  return (told ? "You sent word. " : "You were not there and sent no word. ") +
+    (e.ok === "unrest" ? "The crowd got bigger." : e.ok === "senact" ? "The Senate voted without you." : e.ok === "weather" ? "Somebody else stood in the water for the cameras." : "It went ahead without you.");
+}
+function schedCard(e){
+  e.done = true;
+  const here = G.room === e.room;
+  G.running = false;
+  let body, opts;
+  if(!here){
+    body = schedMiss(e, e.rsvp === false);
+    opts = [{t:"Read about it later", run(){ return ""; }}];
+    try{ markDay("ignored", e.t, null); }catch(x){}
+  } else {
+    const o = schedOpts(e);
+    body = o.body; opts = o.opts;
+  }
+  card.innerHTML = '<div class="eyebrow">' + dateString() + " · " + hourLabel(e.hour) + " · " + sitEsc((ROOMS[e.room] && ROOMS[e.room].t) || e.room) + ' · scheduled by ' + sitEsc(e.by || schedBy()) + '</div>' +
+    '<h1>' + sitEsc(e.t) + '</h1><p class="dream">' + sitEsc(e.d || "") + '</p><p>' + sitEsc(body) + '</p>' +
+    '<div class="card__actions">' + opts.map((o, i) => '<button class="btn' + (i ? ' btn--ghost' : '') + '" type="button" data-sc="' + i + '"' + (o.off ? ' disabled' : '') + '>' + sitEsc(o.t) + '</button>').join("") + '</div>';
+  veil.hidden = false;
+  card.querySelectorAll("[data-sc]").forEach(bt => bt.addEventListener("click", () => {
+    const o = opts[+bt.getAttribute("data-sc")]; if(!o || o.off) return;
+    walkNow();
+    if(here) spend(rint(30, 60), 8);
+    const r = o.run();
+    if(here){
+      note(e.t + ": " + o.t + "." + (r ? " " + r : ""), true);
+      try{ journal(e.t + " — " + o.t + "."); }catch(x){}
+      try{ markDay("attended", e.t, null); }catch(x){}
+    } else feed("You catch up on " + e.t + " from the wire.");
+    try{ refreshPanels(); queueSave(); }catch(x){}
+  }));
+}
+/* the diary, in your office or in counsel's hands */
+function schedListHTML(){
+  const L = (G.events || []).filter(e => e && e.day === G.day && !e.done).sort((a, b) => a.hour - b.hour);
+  if(!L.length) return '<p class="muted">' + sitEsc(schedBy()) + ' has nothing on the diary yet. Things will come up.</p>';
+  return L.map(e => '<div class="whip__row"><span class="whip__n">' + hourLabel(e.hour) + ' · ' + sitEsc(e.t) + '</span><span class="whip__w">' +
+    sitEsc((ROOMS[e.room] && ROOMS[e.room].t) || e.room) + ' · ' + (e.rsvp === true ? "accepted" : e.rsvp === false ? "declined" : "waiting on you") + '</span>' +
+    '<span class="whip__b"><button type="button" class="btn btn--ghost whip__go" data-rs="' + G.events.indexOf(e) + ':1"' + (e.rsvp === true ? " disabled" : "") + '>Accept</button>' +
+    '<button type="button" class="btn btn--ghost whip__go" data-rs="' + G.events.indexOf(e) + ':0"' + (e.rsvp === false ? " disabled" : "") + '>Decline</button></span></div>').join("");
+}
+function schedWire(root, redraw){
+  root.querySelectorAll("[data-rs]").forEach(bt => bt.addEventListener("click", () => {
+    const [i, yes] = bt.getAttribute("data-rs").split(":");
+    const e = G.events[+i]; if(!e) return;
+    e.rsvp = yes === "1";
+    feed((e.rsvp ? "Accepted: " : "Declined: ") + e.t + ".");
+    try{ queueSave(); }catch(x){}
+    redraw();
+  }));
+}
+function scheduleCard(){
+  G.running = false;
+  card.innerHTML = '<div class="eyebrow">' + sitEsc(schedBy()) + ' · the diary</div><h1>Today, as it stands.</h1>' +
+    '<p class="dream">Accepted items walk you there at the hour, wherever it is. Declined ones go ahead without you.</p>' + schedListHTML() +
+    '<div class="card__actions"><button type="button" class="btn" id="scClose">Close</button></div>';
+  veil.hidden = false;
+  schedWire(card, scheduleCard);
+  el("scClose").addEventListener("click", () => walkNow());
 }
 
 /* ── the furniture ───────────────────────────────────────── */

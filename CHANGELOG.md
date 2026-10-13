@@ -4,6 +4,18 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## Counsel keeps the diary
+
+On `20261012g`. Walk **0.68** / sprint **1.15** kept. Best default, `history.replaceState` only, no CDN, no external LLM. God is the Most High; Christ is King; First Consul is a man under God. The House and its procedures are unchanged.
+
+- **Your scheduler:** whoever holds the chair has someone keeping the diary (Counsel to the Governor, a chief of staff, the Court's clerk, the Executive's Chief of Staff). The morning card is their schedule; the office panel lists it with Accept and Decline; counsel in person has "Go over the diary".
+- **Built from what is happening, not a template:** laws that passed and now land on your state, unrest in a county, the bill on your desk and its sponsors, lawsuits, storms, snow and heat, foreign delegations, your home members before a House vote, a rival's rally. A quiet week makes a thin diary.
+- **During the day:** as things happen, counsel adds items two hours out and tells you on the wire. Accept or decline from the panel, the phone or counsel.
+- **Travel:** accepted items walk you there at the hour (the District, the Statuary Corridor, the East Steps, the Senate, the Executive Wing). Declined items go ahead without you; ignored ones cost more, and the trouble grows (a march you skip gets bigger).
+- **Each office:** a Governor carries out or challenges laws, meets strikers or sends the militia, promises or warns sponsors, fights or settles suits. A Senator votes on acts the House passed (aye, no, or holding the floor). The Executive signs or vetoes them. A Justice hears argument.
+- **The House too:** members get constituents who live under a new law on their diary, alongside the usual House meetings.
+- Stamp: meta + STAMP + `ONUM_BUILD` -> `20261012h`. Five HTML copies byte-identical.
+
 ## One chair at a time
 
 On `20261012f`. Walk **0.68** / sprint **1.15** kept. Best default, `history.replaceState` only, no CDN, no external LLM. God is the Most High; Christ is King; First Consul is a man under God. The House and its procedures are unchanged for its members.
