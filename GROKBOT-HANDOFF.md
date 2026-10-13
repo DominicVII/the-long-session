@@ -17,11 +17,11 @@ One HTML body. Keep these **byte-identical**:
 | `session.html` | repo root |
 | `One Nation, Under, ME.html` | standalone name |
 
-**Build stamp (now): `20261012j`**
+**Build stamp (now): `20261012k`**
 
-- `<meta name="onum-build" content="20261012j">`
-- IIFE `STAMP = "20261012j"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
-- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261012j"`
+- `<meta name="onum-build" content="20261012k">`
+- IIFE `STAMP = "20261012k"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
+- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261012k"`
 - Wrapper iframe: `/session.html?v=${ONUM_BUILD}` in `src/routes/index.tsx`
 - **`20261005a`:** weekly MAX OPTIMIZE + design/max-fit. Keeps `20261001a` far-crowd freeze / kit reuse / 6ms bail and `20261001b` hard maps. Best uses `BasicShadowMap` (one sample). Deep crowd freeze (culled+far traverse `matrixAutoUpdate`). Shell fills big desks (`max-width:min(2560px,100%)`). Kit cap KEEP 6/8. Caesar/parting polish. Walk **0.68** / sprint **1.15**. Full meshes near.
 - **`20261011a`:** playable fixes. Corridor freeze (alignment/stakeIn infinite recursion) fixed; elections run again (card watchdog no longer kills the ballot); warmAhead actually runs (`let roomGroup`, kit lamp/ticker relink, no sky touch, explicit furnished flag); New career confirms before replacing a career and wipes only at the oath. Walk 0.68 / sprint 1.15 kept.
@@ -39,6 +39,7 @@ One HTML body. Keep these **byte-identical**:
 - **`20261011m`**: playability sweep on the new content: chamber staff and constituents stand at fixed open posts (never in furniture) and keep them through working hours; a person you face in talk range beats a prop off to the side; B folds the Ledger and closes the map; NOW line and use prompt say A when a controller is in hand; map in walking order; one-time NOW-line hints for new chambers, constituents, the Ledger, rivals and weather; a held office adds a chamber aim; rain streaks readable. KEEP unchanged, House as is, walk 0.68 / sprint 1.15, perf items kept.
 - **`20261012a`**: people up close (moving eyes, mood brows, lip shapes from the spoken line, fingers, swinging ties and hems, nods, turn banking, sit/stand motion, strand hair, skin), procedural surfaces and selective reflections, wet streets, parked cars, sandstone East Steps, heavier rain, the transcript (L / Log / R3, 500 lines, saved), non-repeating talk, step-by-step sittings with stakes, and a capital that runs itself. See CHANGELOG.
 20261012j: clergy notes read supporting precepts as support (kept word + truth etc.); fresh paraphrase reading 63.3% first pass -> 30/30 after general fixes; faces get colour zones (cheeks, nose, under-eye, forehead, men's beard shadow); pm test expects 19 rooms
+20261012k: no blocking "wants a word" prompt: small corner notice top-right (pointer-events none, never centre), inbox entry 'Wants a word', requests lapse after ~4 game-min; approaching members stop about 2.3 m away at 45-50 degrees off your line of sight; missed diary events no longer open a card (consequences as before, report in the inbox plus corner nudge)
 20261012i: the Consular Rite as a faith under God (creed: God the Most High, Christ the King, Taylor a man under God); player precepts editor (write/edit/reorder/repeal), offline precept comprehension (SEM), clergy, amendments, schisms, Hands-on/Watch modes; belief organic and hidden (no meters, no forced caucus); middle-mouse grab-and-move; Prometheus seeds (PROMETHEUS.md)
 20261012h: counsel keeps the diary: per-office scheduler builds accept/decline meetings, events and travel from what is happening (laws, unrest, desk bills, suits, weather, realms, rivals); adds items during the day; Senators vote on House-passed acts, the Executive signs or vetoes
 20261012g: one chair at a time: winning higher office leaves the House (no House vote/post/office); most senior elected title everywhere; your office room moves; per-role daily docket (State/Senate/Bench/Executive tab); members may organically refuse to give up a seat

@@ -4,6 +4,15 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## Nobody stops the game to ask for a word
+
+On `20261012k`, on top of `20261012j` with all of the helper's work kept. Walk **0.68** / sprint **1.15** kept. Best default, `history.replaceState` only, no CDN, no external LLM. God is the Most High; Christ is King; the First Consul is a man under God. The House and its procedures are unchanged.
+
+- **"Wants a word" is a corner notice now:** the banner that sat across the bottom middle of the view is a small line in the top-right corner ("Femke wants a word · E when close"). It never takes clicks or keys and never covers the centre of the view. Walk over and press E when you choose, or ignore it.
+- **It also lands in your inbox:** each request leaves a "Wants a word" note from that person saying where they are. A request you ignore lapses after a few game minutes; the note stays.
+- **They do not walk into your face:** someone coming to find you stops about two metres away, off to one side of where you are looking, instead of on top of you.
+- **Missed diary events no longer stop the game:** an event you are not in the room for used to open a full card ("Read about it later") and pause play. The consequences are the same as before, but the report goes to your inbox as "Missed: ..." with a short corner nudge. Events you are in the room for, and ones you said you would attend, work as before.
+
 ## Precepts read better, faces in colour
 
 On `20261012i`, with the helper's f, g and h work kept in full. Walk **0.68** / sprint **1.15** kept. Best default, `history.replaceState` only, no CDN, no external LLM. God is the Most High; Christ is King; the First Consul is a man under God. The House and its procedures are unchanged.
