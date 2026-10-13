@@ -4,6 +4,15 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## The desk computer, the form of the state, and you in the Rite
+
+On `20261012l`, on top of `20261012k` with all of the helper's work kept. Walk **0.68** / sprint **1.15** kept. Best default, `history.replaceState` only, no CDN, no external LLM. God is the Most High; Christ is King; the First Consul is a man under God and never God. The House and its procedures are unchanged.
+
+- **The desk computer:** sit at your own desk and press E (or click "Use the computer"). A screen opens with tabs: Inbox (including the new "Wants a word" notes; open and answer mail there), News & Ledger, Bills (the live bill, the whip count, drafting your own bill), Schedule, Constituents (letters from home), Polls (approval, standing, influence, national mood, government popularity, your rival), War chest, Staff (aides, field organisers, district office, hiring, a file on a member) and On the desk (the telephone, files and drawers, the papers, the notebook, coffee). The world keeps running while it is open. Esc, Close or standing up closes it, and when closed nothing of it is on screen. The computer on the desk opens it too.
+- **The form of the state:** the country can be a Republic, a Consular Republic, a Theocratic Regime, a Junta, Mob rule, an Oligarchy or a Machine. Each has an official name and nicknames used by rivals, the press and the people. It drifts on its own from who holds the offices, how far the Rite has spread (you included), corruption, money from lobbies and donors, unrest, coups and elections. Nothing forces an outcome. Pause > The government shows the form, the official name, the nicknames, the ruling bloc, popularity, stability and where things are pulling. The Ledger carries a line on the state, and members now and then speak of it by name.
+- **The NO7 flag:** under the Consular Republic, the Nieuw Oranje VII cross (motto NON SOLIS RADIOS, SED FULMINA IOVIS AFFERO) is the national flag, on the government card and in the rooms. Rooms keep exactly two flags: the NO7 standard and your home state's banner.
+- **You in the Rite:** you can take up the precepts at the chapel (the Consular precepts card) or with believers in the corridor, free and with no points. The risks are the same as anyone's: some colleagues warm and others cool, the heresy label, the papers, your home district, and the precepts themselves, which you can now break by how you vote. Leaving is apostasy: believers cool and it is reported. God is the Most High; Christ is King; Taylor is a man under God.
+
 ## Nobody stops the game to ask for a word
 
 On `20261012k`, on top of `20261012j` with all of the helper's work kept. Walk **0.68** / sprint **1.15** kept. Best default, `history.replaceState` only, no CDN, no external LLM. God is the Most High; Christ is King; the First Consul is a man under God. The House and its procedures are unchanged.
