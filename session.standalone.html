@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261012k">
+<meta name="onum-build" content="20261012l">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261012k";
+  var STAMP = "20261012l";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -6507,6 +6507,7 @@ function riteCard(msg){
     (R.mode === "hands" ? '<div class="card__actions"><button type="button" class="btn btn--ghost" data-rt="gather">Call a gathering</button>' +
       '<button type="button" class="btn btn--ghost" data-rt="proclaim">Proclaim the line above</button>' +
       (bel.length ? '<select id="rtOrd">' + bel.slice(0, 30).map(p => '<option value="' + p.id + '">' + esc(p.name) + '</option>').join("") + '</select><button type="button" class="btn btn--ghost" data-rt="ordain">Ordain</button>' : '') + '</div>' : '') +
+    (G.you ? (isConsular(G.you) ? '<p><button type="button" class="btn btn--ghost" data-rt="youleave">Stop keeping the precepts</button> <small style="opacity:.7">Some in the Rite will call it apostasy.</small></p>' : '<p><button type="button" class="btn btn--ghost" data-rt="youjoin">Go to the chapel and take up the precepts yourself</button> <small style="opacity:.7">The Latin Rite calls it heresy; colleagues, voters and the press will make of it what they will.</small></p>') : '') +
     '<p style="opacity:.7">Nobody is made to believe. Who keeps the precepts, and how, is each person\'s own.</p>' +
     '<div class="card__actions"><button type="button" class="btn" data-rt="close">Close</button></div>';
   veil.hidden = false;
@@ -6524,6 +6525,8 @@ function riteCard(msg){
     if(k === "mode"){ R.mode = R.mode === "hands" ? "watch" : "hands"; riteNews(R.mode === "hands" ? "The First Consul's precepts are given by his own hand for now." : "The Rite is left to keep itself."); return riteCard(); }
     if(k === "accept" || k === "reject"){ const a = R.amend.find(x => x.id === id); if(a && !a.done){ if(k === "accept"){ riteVoteAmendForced(a); } else { a.done = true; riteNews("The proposal from " + surname(a.by) + " was set aside."); } } return riteCard(); }
     if(k === "gather"){ riteGather(G.you && G.you.name, "a gathering"); return riteCard("Called for this evening on the Steps."); }
+    if(k === "youjoin"){ riteYouJoin("chapel"); return riteCard("You took up the precepts at the chapel. God first; Christ the King; the Consul a man under God."); }
+    if(k === "youleave"){ riteYouLeave("chapel"); return riteCard("You put the precepts down."); }
     if(k === "proclaim"){ const g = riteGuardText(txt); if(g.err) return riteCard(g.err); R.lastProclaim = G.day; riteNews("Proclaimed: “" + g.t + "”"); return riteCard("Proclaimed."); }
     if(k === "ordain"){ const sel = el("rtOrd"); const p = sel && (G.members || []).find(m => String(m.id) === sel.value); if(p){ R.clergy[p.id] = {rank:0, day:G.day, by:"you"}; riteNews(surname(p.name) + " is ordained Lector of the Rite."); } return riteCard(); }
   };
@@ -6753,6 +6756,482 @@ function njHeadSkin(skin){
   let m = NJ_HEADSKIN.get(skin.uuid);
   if(!m){ m = skin.clone(); m.vertexColors = true; m._shared = true; m.envMapIntensity = skin.envMapIntensity; NJ_HEADSKIN.set(skin.uuid, m); }
   return m;
+}
+
+/* ══════════════════════════════════════════════════════════
+   20261012k · THE FORM OF GOVERNMENT, AND YOUR OWN PLACE IN THE RITE
+   The state's form drifts from who holds power: the officeholders, how far the
+   Consular Rite has spread among them, money, corruption, unrest, coups and
+   elections. Each form has an official name and the names rivals, the press and
+   the street use. Nothing is forced; the drift is slow and can turn back.
+   Canon: God is the Most High; Christ is King; the First Consul is a man under God.
+   ══════════════════════════════════════════════════════════ */
+const GOV_EXTRA = {
+  consular:   {t:"Consular Republic", d:"The Republic kept, with the First Consul's precepts written into its public life. God first; the Consul a man under Him.",
+               names:["The Consular Republic of","The Consular Union of"], pal:[[0xf3e6c4,0x9b1b2e,0xc9a24a]]},
+  theocratic: {t:"Theocratic Regime", d:"Clergy in the offices and the precepts in the statute book. The House still sits; the gathering decides first.",
+               names:["The Holy Commonwealth of","The Covenanted State of"], pal:[[0xf0ead8,0x6a1a2a,0xc9a24a],[0x2a1f1a,0xe8d5a3,0x9b1b2e]]},
+  junta:      {t:"Military Junta", d:"The officers took the chairs. The House sits when it is told.",
+               names:["The Provisional Government of","The National Directorate of"], pal:[[0x3a4a2a,0x1a1a1e,0xc9a24a],[0x2b3326,0x8e2f3b,0xd8cdb6]]},
+  mob:        {t:"Mob Rule", d:"Whoever holds the street holds the building. Nobody holds it for long.",
+               names:["The Committee of Public Order of","The Free Assembly of"], pal:[[0x1a1a1e,0xc23b22,0xe8e4d8]]},
+  oligarchy:  {t:"Oligarchy", d:"A short list of families and firms, and a House that knows the list.",
+               names:["The Chartered Republic of","The Merchant Union of"], pal:[[0x1e2a3a,0xd4b060,0xe8e4d8],[0x22301f,0xc9a24a,0xf0ead8]]},
+  machine:    {t:"Machine State", d:"The war chests run the state and the state runs the wards. Captured, not conquered.",
+               names:["The Reformed Republic of","The Municipal Union of"], pal:[[0x2a2a2e,0x6a8a3a,0xd8cdb6]]}
+};
+const GOV_NICK = {
+  republic:     {rivals:["the old Republic", "the talking shop"], press:["the Republic"], people:["the Republic", "the government"]},
+  democracy:    {rivals:["the mob in collars", "the franchise"], press:["the Democracy"], people:["the Union", "the government"]},
+  conservative: {rivals:["the Order", "the squires"], press:["the Order"], people:["the Order", "the government"]},
+  commonwealth: {rivals:["the Collective", "the commissars"], press:["the Commonwealth"], people:["the Commonwealth"]},
+  national:     {rivals:["the regime", "the one-party state"], press:["the National State"], people:["the State"]},
+  monarchy:     {rivals:["the Crown", "the throne-sitters"], press:["the Crown"], people:["the Crown"]},
+  empire:       {rivals:["the Empire", "the possession"], press:["the Imperial government"], people:["the Empire"]},
+  consular:     {rivals:["the Consulate", "the precept-state"], press:["the Consular Republic"], people:["the Consular Republic", "the precepts"]},
+  theocratic:   {rivals:["the regime", "the vestry"], press:["the Covenant"], people:["the Covenant", "the elders' government"]},
+  junta:        {rivals:["the junta", "the brass"], press:["the Directorate"], people:["the officers", "the junta"]},
+  mob:          {rivals:["the mob", "the street"], press:["the Committee"], people:["the Committee", "whoever's in charge this week"]},
+  oligarchy:    {rivals:["the families", "the cartel"], press:["the Chartered government"], people:["the bosses", "the families"]},
+  machine:      {rivals:["the Machine", "the Syndicate"], press:["the administration"], people:["the Machine", "the ward bosses"]}
+};
+function govBoot(){
+  for(const k in GOV_EXTRA){
+    const e = GOV_EXTRA[k];
+    if(!REGIMES[k]) REGIMES[k] = {t:e.t, d:e.d};
+    if(!FORM_NAMES[k]) FORM_NAMES[k] = e.names;
+    if(!FLAG_PALETTES[k]) FLAG_PALETTES[k] = e.pal;
+  }
+}
+function govState(){
+  if(!G.gov) G.gov = {lean:{}, coupDay:0, changed:0, last:"republic", news:[], tick:0};
+  return G.gov;
+}
+/* what the state is actually made of right now */
+function govSignals(){
+  const ms = (G.members || []).filter(m => m && !m.gone);
+  const n = Math.max(1, ms.length);
+  const rite = ms.filter(m => isConsular(m)).length + (G.you && isConsular(G.you) ? 1 : 0);
+  const posted = ms.filter(m => m.post);
+  const youPost = !!(G.you && (G.you.post || (G.you.office && G.you.office !== "rep")));
+  const pn = Math.max(1, posted.length + (youPost ? 1 : 0));
+  const riteOff = (posted.filter(m => isConsular(m)).length + (youPost && isConsular(G.you) ? 1 : 0)) / pn;
+  const c = chamberMood();
+  let corr = 0; ms.forEach(m => { const t = m.traits || {}; corr += Math.max(0, ((t.ambition || 50) + (t.vanity || 50) - (t.conviction || 50) - (t.discretion || 50) * 0.3) / 100); });
+  corr = corr / n;
+  const spent = (G.lobbies || []).reduce((a, l) => a + (l.spent || 0), 0), purse = (G.lobbies || []).reduce((a, l) => a + (l.purse || 0), 0) || 1;
+  const money = Math.min(1, spent / purse * 0.6 + (G.donors && G.donors.length ? Math.min(0.4, G.donors.length / 40) : 0));
+  const st = govState();
+  const coup = st.coupDay && (G.day - st.coupDay) < 120;
+  const stab = govStability(c);
+  return {rite:rite / (n + 1), riteOff, corr, money, coup, c, stab};
+}
+function govStability(c){
+  c = c || chamberMood(); const st = govState();
+  const recent = st.changed && (G.day - st.changed) < 30 ? 14 : 0;
+  return Math.max(0, Math.min(100, Math.round(100 - c.unrest * 0.7 - ((G.regime && G.regime.pressure) || 0) * 8 - recent + c.dom * 18)));
+}
+function govPopularity(){
+  const c = chamberMood(); let mood = 50; try{ mood = townMood(); }catch(e){}
+  return Math.max(0, Math.min(100, Math.round(mood * 0.6 + (100 - c.unrest) * 0.4)));
+}
+/* where things are pulling: each form's case, read from the signals */
+function govCase(s){
+  const c = s.c, k = {};
+  k.junta = s.coup ? 1 : 0;
+  k.mob = Math.max(0, (c.unrest - 74) / 16) * (s.stab < 30 ? 1 : 0.4);
+  k.theocratic = Math.max(0, (s.rite - 0.55) / 0.2) * Math.max(0, (s.riteOff - 0.6) / 0.3) * (c.lib < -10 ? 1 : 0.5);
+  k.consular = Math.max(0, (s.rite - 0.3) / 0.15) * Math.max(0, (s.riteOff - 0.35) / 0.25);
+  k.machine = Math.max(0, (s.corr - 0.42) / 0.15) * Math.max(0, (s.money - 0.4) / 0.3);
+  k.oligarchy = Math.max(0, (s.corr - 0.3) / 0.2) * Math.max(0, (c.econ - 25) / 20) * (c.dom > 0.6 ? 1 : 0.5);
+  for(const f in k) k[f] = Math.min(1.2, k[f]);
+  return k;
+}
+/* slow drift, like ideology support: each day a form's lean moves a little toward its case */
+function govDay(){
+  const st = govState(); const s = govSignals(), k = govCase(s);
+  for(const f in k) st.lean[f] = (st.lean[f] || 0) * 0.93 + k[f] * 0.07 + (Math.random() - 0.5) * 0.01;
+  /* a coup is never scheduled: it can happen when the street is burning and the officers are restless */
+  if(!s.coup && s.c.unrest > 76 && s.c.def > 30 && s.stab < 28 && Math.random() < 1 / 90){
+    st.coupDay = G.day; govNews("Troops in the square before dawn. Officers say they have taken \u201ctemporary charge of public order.\u201d");
+    try{ feed("A coup. The officers have the chairs."); }catch(e){}
+  }
+  st.tick++;
+  if(st.tick % 7 === 0){ try{ regimeCheck(null); }catch(e){} }
+  if(G.regime && G.regime.form !== st.last){
+    const from = st.last; st.last = G.regime.form; st.changed = G.day;
+    govNews("The form of the state has changed: " + (REGIMES[from] ? REGIMES[from].t : from) + " to " + REGIMES[st.last].t + ". The opposition is already calling it " + govNick("rivals") + ".");
+    try{ TEX.flag = flagTexture(G.country.flag); }catch(e){}
+  }
+}
+function govTop(){
+  const st = govState(); let best = null, bv = 0.55;
+  for(const f in st.lean) if(st.lean[f] > bv){ bv = st.lean[f]; best = f; }
+  return best;
+}
+function govNews(t){ const st = govState(); st.news.push({d:G.day || 1, t}); if(st.news.length > 30) st.news.shift(); }
+function govNick(who, form){
+  const f = form || (G.regime && G.regime.form) || "republic";
+  const N = GOV_NICK[f] || GOV_NICK.republic;
+  return pick(N[who] || N.people);
+}
+function govBloc(){
+  const maj = majorityParty(); const ms = (G.members || []).filter(m => m && !m.gone && m.party === maj);
+  const rite = ms.filter(m => isConsular(m)).length;
+  let t = partyName(maj);
+  if(rite > ms.length * 0.3) t += ", with the Consular Rite strong among them";
+  if(G.gov && G.gov.coupDay && G.day - G.gov.coupDay < 120) t = "The officers' directorate (" + partyName(maj) + " tolerated)";
+  return t;
+}
+/* the HOI4-style card */
+function govCard(){
+  const f = (G.regime && G.regime.form) || "republic", R = REGIMES[f] || REGIMES.republic;
+  const st = govState(), s = govSignals();
+  let flagURL = "";
+  try{ const tex = f === "consular" ? govNo7StandardTex() : TEX.flag; const img = tex && tex.image; if(img && img.toDataURL) flagURL = img.toDataURL(); }catch(e){}
+  const bar = v => '<span style="display:inline-block;width:120px;height:8px;background:#ddd;vertical-align:middle"><span style="display:block;height:8px;width:' + Math.round(v * 1.2) + 'px;background:#7a2a2a"></span></span> ' + v;
+  const N = GOV_NICK[f] || GOV_NICK.republic;
+  const drift = Object.keys(st.lean).filter(k => st.lean[k] > 0.15 && k !== f).sort((a, b) => st.lean[b] - st.lean[a]).slice(0, 2)
+    .map(k => (REGIMES[k] || {t:k}).t).join(", ");
+  G.running = false;
+  card.innerHTML = '<div class="eyebrow">The government</div>' +
+    (flagURL ? '<img alt="" src="' + flagURL + '" style="width:180px;border:1px solid #bbb;float:right;margin:0 0 8px 12px">' : '') +
+    '<h1>' + (G.country ? G.country.name : "The Republic") + '</h1>' +
+    '<p class="dream">' + R.t + '. ' + R.d + '</p>' +
+    (f === "consular" ? '<p>The national flag is the Nieuw Oranje VII cross: <em>' + NO7_MOTTO_LA + '</em> God is the Most High; Christ is King; the First Consul is a man under God.</p>' : '') +
+    '<p><strong>What people call it.</strong> Officially ' + (G.country ? G.country.name : R.t) + '. The press: \u201c' + N.press.join('\u201d, \u201c') + '\u201d. Rivals: \u201c' + N.rivals.join('\u201d, \u201c') + '\u201d. In the street: \u201c' + N.people.join('\u201d, \u201c') + '\u201d.</p>' +
+    '<p><strong>Ruling bloc.</strong> ' + govBloc() + '</p>' +
+    '<p><strong>Popularity</strong> ' + bar(govPopularity()) + '<br><strong>Stability</strong> ' + bar(s.stab) + '</p>' +
+    (drift ? '<p><strong>Drift.</strong> Talk of the state turning toward: ' + drift + '. Nothing is settled.</p>' : '<p><strong>Drift.</strong> The form is holding.</p>') +
+    '<div class="card__actions"><button type="button" class="btn" id="govClose">Back</button></div>';
+  veil.hidden = false;
+  el("govClose").addEventListener("click", () => { veil.hidden = true; G.running = true; });
+}
+function govLine(m){
+  if(!m || !G.regime) return null;
+  const maj = majorityParty(); const rival = m.party && m.party !== maj;
+  const nm = govNick(rival ? "rivals" : "people");
+  const L = rival ? ["Ask " + nm + " where the money went.", "Under " + nm + " even the clocks are partisan.", "I will vote no and " + nm + " will call it treason."]
+                  : ["Say what you like about " + nm + "; the trains run.", nm.charAt(0).toUpperCase() + nm.slice(1) + " is what we have. I would rather mend it than burn it.", "My district does not care what we call it. It cares about the price of bread."];
+  return pick(L);
+}
+function govLedgerHTML(){
+  const st = G.gov; if(!st) return "";
+  const D = G.day || 1;
+  const fresh = st.news.filter(n => D - n.d <= 1).map(n => '<p>\u00b7 ' + n.t + '</p>').join("");
+  const weekly = D % 7 === 3 ? '<p>\u00b7 The opposition papers call the government \u201c' + govNick("rivals") + '\u201d; the Ledger calls it ' + govNick("press") + '.</p>' : "";
+  let base = "";
+  try{ base = '<p>\u00b7 ' + ((G.country && G.country.name) || "The republic") + ', ' + ((REGIMES[G.regime.form]||{}).t || G.regime.form) + '. Ruling bloc: ' + govBloc() + '. Popularity ' + govPopularity() + ', stability ' + govStability() + '.</p>'; }catch(e){}
+  return '<h3>The state</h3>' + base + fresh + weekly;
+}
+/* NO7 as the national standard (Consular Republic): ivory field, crimson Jerusalem cross, the old motto */
+function govNo7StandardTex(){
+  if(TEX._no7std) return TEX._no7std;
+  const W = 384, H = 240, c = document.createElement("canvas"); c.width = W; c.height = H;
+  const x = c.getContext("2d");
+  x.fillStyle = "#f3e6c4"; x.fillRect(0, 0, W, H);
+  x.strokeStyle = "#9B1B2E"; x.lineWidth = 10; x.strokeRect(8, 8, W - 16, H - 16);
+  drawJerusalemCross(x, W * 0.5, H * 0.40, H * 0.22, "#9B1B2E");
+  x.fillStyle = "#6a1220"; x.textAlign = "center"; x.textBaseline = "middle";
+  let sz = 15; x.font = "700 " + sz + "px Archivo, system-ui, sans-serif";
+  while(sz > 9 && x.measureText(NO7_MOTTO_LA).width > W - 36){ sz--; x.font = "700 " + sz + "px Archivo, system-ui, sans-serif"; }
+  x.fillText(NO7_MOTTO_LA, W / 2, H * 0.82);
+  const t = new THREE.CanvasTexture(c); try{ dressMip(t); }catch(e){}
+  TEX._no7std = t; return t;
+}
+function govNo7StandardMat(){
+  const t = govNo7StandardTex();
+  const m = new THREE.MeshStandardMaterial({map:t, roughness:.92, side:THREE.DoubleSide}); m._shared = true; return m;
+}
+
+/* ══ the player in the Rite: the same risks any member carries ══ */
+function riteYouState(){ const y = G.you; if(!y) return null; y.riteLife = y.riteLife || {joined:0, left:0, label:0, votes:{}}; return y.riteLife; }
+function riteYouJoin(via){
+  const y = G.you; if(!y || isConsular(y)) return false;
+  const L = riteYouState(); riteState();
+  rbEnsure(y).prev = y.creed && y.creed !== "consul" ? y.creed : "latin";
+  y.creed = "consul"; y.consular = true; y.faction = "consul"; L.joined = G.day; L.label = G.day;
+  /* how each colleague takes it is theirs: some cool, some warm, most shrug */
+  (G.members || []).forEach(m => {
+    if(!m || m.gone || !m.rel) return;
+    const t = m.traits || {}; const c = creedOf(m.creed) || {};
+    let d = 0;
+    if(isConsular(m)) d = 2 + Math.random() * 5;
+    else if(c.sincere) d = -Math.random() * ((t.conviction || 50) / 9);
+    else d = (Math.random() - 0.6) * 4;
+    m.rel.warmth = clamp((m.rel.warmth || 0) + d, -100, 100);
+  });
+  try{ commitHeresy("you", "Took up the Consular precepts" + (via ? " (" + via + ")" : "")); }catch(e){}
+  riteNews((y.name ? surname(y.name) : "The member") + " now keeps the Rite's precepts" + (via === "chapel" ? ", received at the chapel." : "."));
+  /* the press may or may not notice */
+  if(Math.random() < (via === "chapel" ? 0.6 : 0.3)) riteYouPress("joined");
+  try{ faithLog(null, y.name + " took up the Consular precepts.", y.state); }catch(e){}
+  return true;
+}
+function riteYouLeave(via){
+  const y = G.you; if(!y || !isConsular(y)) return false;
+  const L = riteYouState(), s = rbEnsure(y);
+  y.creed = (s.prev && s.prev !== "consul") ? s.prev : "latin"; y.consular = false; if(y.faction === "consul") y.faction = null; L.left = G.day;
+  (G.members || []).forEach(m => {
+    if(!m || m.gone || !m.rel) return;
+    if(isConsular(m)) m.rel.warmth = clamp((m.rel.warmth || 0) - (3 + Math.random() * 9), -100, 100);
+    else if((creedOf(m.creed) || {}).sincere && Math.random() < 0.4) m.rel.warmth = clamp((m.rel.warmth || 0) + Math.random() * 3, -100, 100);
+  });
+  riteNews((y.name ? surname(y.name) : "The member") + " no longer keeps the Rite's precepts. Some at the gathering call it apostasy; some say nothing.");
+  if(Math.random() < 0.4) riteYouPress("left");
+  return true;
+}
+function riteYouPress(kind){
+  const y = G.you; if(!y) return;
+  const home = y.state === "Nieuw Oranje" || y.state === "Nieuw Haarlem";
+  const share = govSignals().rite;
+  /* how it plays at home depends on home: where the Rite is common it barely moves; where it is rare it costs */
+  let d = kind === "joined" ? (home ? Math.random() * 2 - 0.5 : -(1 + Math.random() * 3) * (1 - share)) :
+          kind === "left" ? (home ? -(Math.random() * 2) : Math.random() * 1.5) :
+          -(1 + Math.random() * 2);
+  y.approval = clamp((y.approval || 50) + d, 0, 100);
+  const head = kind === "joined" ? pick(["MEMBER TAKES UP CONSULAR PRECEPTS", "ANOTHER CHAIR FOR THE RITE", "HERESY OR CONSCIENCE? A MEMBER JOINS THE CONSULAR RITE"])
+             : kind === "left" ? pick(["MEMBER QUITS THE RITE", "TURNED COAT, OR TURNED BACK?"])
+             : pick(["PRECEPTS FOR OTHERS?", "THE RITE'S MEMBER VOTES AGAINST ITS PRECEPTS"]);
+  riteNews("The papers: \u201c" + head + "\u201d (" + (y.name ? surname(y.name) : "you") + ").");
+  try{ feed("The press has it: " + head.toLowerCase() + "."); }catch(e){}
+}
+/* daily: the label fades slowly; obligations are checked against your own votes */
+function riteYouDay(){
+  const y = G.you; if(!y) return; const L = riteYouState();
+  if(isConsular(y)){
+    if(G.bill && y.vote && !L.votes[G.bill.id || G.bill.title]){
+      L.votes[G.bill.id || G.bill.title] = 1;
+      const was = y.consular; const push = (function(){ try{ return ritePush(y, G.bill); }catch(e){ return 0; } })();
+      if(was && Math.abs(push) > 0.04 && Math.sign(push) !== Math.sign(y.vote)){
+        try{ riteBroken(y, G.bill); }catch(e){}
+        if(Math.random() < 0.35) riteYouPress("broke");
+      }
+    }
+    /* heresy talk returns now and then, more in the first weeks */
+    const fresh = G.day - (L.label || 0) < 21;
+    if(Math.random() < (fresh ? 0.05 : 0.012)){
+      const m = pick((G.members || []).filter(m => m && !m.gone && !isConsular(m) && (creedOf(m.creed) || {}).sincere) || []);
+      if(m) riteNews(surname(m.name) + " was heard calling " + (y.name ? surname(y.name) : "you") + " a heretic in the cloakroom.");
+    }
+  }
+}
+
+/* the home state's banner: flown beside the NO7 standard when the Consular Republic has made NO7 the national flag */
+function govStateBannerTex(){
+  const nm = String((G.you && G.you.state) || "The State");
+  TEX._stban = TEX._stban || {};
+  if(TEX._stban[nm]) return TEX._stban[nm];
+  let h = 7; for(const ch of nm) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  const PAL = [["#1f3b63","#e8d9a8"],["#5a1e22","#efe3c2"],["#24452f","#e6d7a4"],["#3a2c55","#eadfc0"],["#6b4a1c","#f1e6c8"],["#1d4d52","#ecdcae"]];
+  const [bg, fg] = PAL[h % PAL.length];
+  const W = 240, H = 384, c = document.createElement("canvas"); c.width = W; c.height = H;
+  const x = c.getContext("2d");
+  x.fillStyle = bg; x.fillRect(0, 0, W, H);
+  x.strokeStyle = fg; x.lineWidth = 8; x.strokeRect(14, 14, W - 28, H - 28);
+  x.fillStyle = fg; x.beginPath();
+  for(let i = 0; i < 10; i++){ const a = -Math.PI/2 + i * Math.PI/5, r = i % 2 ? 22 : 54; x.lineTo(W/2 + Math.cos(a)*r, 140 + Math.sin(a)*r); }
+  x.closePath(); x.fill();
+  x.font = "bold 26px Georgia, serif"; x.textAlign = "center";
+  const words = nm.toUpperCase().split(" ");
+  words.slice(0, 3).forEach((w, i) => x.fillText(w, W/2, 240 + i * 32));
+  const t = new THREE.CanvasTexture(c); try{ t.encoding = THREE.sRGBEncoding; }catch(e){}
+  t.anisotropy = 4;
+  TEX._stban[nm] = t; return t;
+}
+function govStateBannerMat(){
+  const m = new THREE.MeshStandardMaterial({map:govStateBannerTex(), roughness:.92, side:THREE.DoubleSide}); m._shared = true; return m;
+}
+
+function govRiteBoot(){
+  if(govRiteBoot.done) return; govRiteBoot.done = true;
+  try{ govBoot(); }catch(e){}
+  try{ const oa = assessRegime; assessRegime = function(){ const t = govTop(); return t || oa.apply(this, arguments); }; }catch(e){}
+  try{
+    const ds = DTCNO.say;
+    DTCNO.say = function(m, ctx){
+      const base = ds.apply(this, arguments);
+      try{ if(m && chance(0.03)){ const v = govLine(m); const g = v && DTCNO.guard(v); if(g) return g; } }catch(e){}
+      return base;
+    };
+  }catch(e){}
+}
+setTimeout(() => { try{ govRiteBoot(); }catch(e){} }, 0);
+
+/* ===== The desk computer (20261012l) =====
+   Sit at your own desk and press E (or click "Use the computer"). A screen
+   opens over the lower middle of the view with tabs; the world keeps
+   running. Esc, the Close button or standing up closes it, and when it is
+   closed nothing of it is on screen. Every tab reuses the game's own
+   systems; nothing here invents a second copy of a number. */
+const PC = {open:false, tab:"inbox", openMail:null};
+const PC_TABS = [["inbox","Inbox"],["news","News & Ledger"],["bills","Bills"],["sched","Schedule"],
+  ["const","Constituents"],["polls","Polls"],["money","War chest"],["staff","Staff"],["desk","On the desk"]];
+function pcEsc(s){ return String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function pcBoot(){
+  if(el("pcScreen")) return;
+  const st = document.createElement("style");
+  st.textContent = `
+#pcScreen{position:absolute; left:50%; bottom:64px; transform:translateX(-50%); width:min(760px,92%); height:min(430px,62%);
+  background:#0d1620f2; border:1px solid #3c5a78; border-radius:4px; box-shadow:0 18px 50px -18px #000; color:#e6ecf2;
+  font-size:12px; display:flex; flex-direction:column; z-index:30}
+#pcScreen[hidden]{display:none}
+#pcScreen .pc__top{display:flex; align-items:center; gap:6px; padding:6px 8px; border-bottom:1px solid #2a3f55; background:#13202e}
+#pcScreen .pc__title{font-weight:700; letter-spacing:.08em; text-transform:uppercase; font-size:10px; color:#9fb6cc; margin-right:6px}
+#pcScreen .pc__tabs{display:flex; flex-wrap:wrap; gap:3px; flex:1}
+#pcScreen .pc__tab{background:#1b2b3c; color:#cdd8e3; border:1px solid #2c4258; padding:3px 7px; font-size:11px; cursor:pointer; border-radius:2px}
+#pcScreen .pc__tab.is-on{background:#2f5e8c; color:#fff; border-color:#4b82b8}
+#pcScreen .pc__x{background:none; border:1px solid #4b6680; color:#cdd8e3; cursor:pointer; padding:2px 8px; font-size:11px}
+#pcScreen .pc__body{flex:1; overflow:auto; padding:9px 12px; line-height:1.45}
+#pcScreen .pc__row{border-bottom:1px solid #22344a; padding:5px 2px; cursor:pointer}
+#pcScreen .pc__row.is-unread b{color:#fff}
+#pcScreen .pc__row .d{float:right; color:#8aa0b6; font-size:10px}
+#pcScreen .pc__open{background:#15273a; padding:7px 9px; margin:4px 0 6px; white-space:pre-wrap}
+#pcScreen .pc__btn{background:#24486c; color:#fff; border:1px solid #3d6d9c; padding:4px 9px; margin:3px 4px 3px 0; cursor:pointer; font-size:11px; border-radius:2px}
+#pcScreen .pc__btn[disabled]{opacity:.45; cursor:default}
+#pcScreen .pc__h{font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#8fb0cf; margin:8px 0 4px}
+#pcScreen .pc__m{color:#8aa0b6}
+#pcScreen .pc__bar{height:6px; background:#22344a; margin:2px 0 6px}
+#pcScreen .pc__bar i{display:block; height:100%; background:#4b82b8}
+#pcScreen .pc__foot{padding:4px 10px; font-size:10px; color:#7f95ab; border-top:1px solid #22344a}`;
+  document.head.appendChild(st);
+  const d = document.createElement("div");
+  d.id = "pcScreen"; d.hidden = true;
+  d.innerHTML = '<div class="pc__top"><span class="pc__title">Desk computer</span><div class="pc__tabs" id="pcTabs"></div>' +
+    '<button type="button" class="pc__x" id="pcClose">Close · Esc</button></div><div class="pc__body" id="pcBody"></div>' +
+    '<div class="pc__foot">The House keeps moving while you read. Esc closes the screen.</div>';
+  const host = (el("veil") && el("veil").parentNode) || document.body;
+  host.appendChild(d);
+  el("pcClose").addEventListener("click", () => pcClose());
+  d.addEventListener("keydown", e => e.stopPropagation());
+  d.addEventListener("wheel", e => e.stopPropagation(), {passive:true});
+  d.addEventListener("mousedown", e => e.stopPropagation());
+  d.addEventListener("pointerdown", e => e.stopPropagation());
+  window.addEventListener("keydown", e => {
+    if(PC.open && e.key === "Escape"){ e.preventDefault(); e.stopImmediatePropagation(); e._pzHandled = true; pcClose(); }
+  }, true);
+}
+function pcCanOpen(){ return !!(G && G.you && G.room === "office" && !G.over); }
+function pcOpen(tab){
+  if(!pcCanOpen()) return false;
+  pcBoot();
+  PC.open = true; if(tab) PC.tab = tab;
+  try{ if(document.pointerLockElement) document.exitPointerLock(); }catch(e){}
+  el("pcScreen").hidden = false;
+  pcRender();
+  try{ feed("You wake the desk computer."); }catch(e){}
+  return true;
+}
+function pcClose(){
+  PC.open = false;
+  const s = el("pcScreen"); if(s) s.hidden = true;
+}
+function pcAway(fn){ pcClose(); setTimeout(() => { try{ fn(); }catch(e){} }, 30); }
+function pcDeskAct(propId, match){
+  const pr = ((PROPS.office || []).find(p => p.id === propId));
+  if(!pr || !pr.acts) return null;
+  return pr.acts().find(a => match.test(a.t)) || null;
+}
+function pcBar(v){ v = Math.max(0, Math.min(100, Math.round(v || 0))); return '<div class="pc__bar"><i style="width:' + v + '%"></i></div>'; }
+function pcTab(){
+  const y = G.you, out = [];
+  const t = PC.tab;
+  if(t === "inbox" || t === "const"){
+    const list = (G.mail || []).filter(m => t === "inbox" ? true : (m.fromId == null && !m.outgoing && !/^Missed:/.test(m.subject||"")));
+    if(t === "const") out.push('<div class="pc__h">Constituent mail · ' + pcEsc((y.state||"") + " " + (y.dist||"")) + '</div><div class="pc__m">Home approval ' + Math.round(y.approval) + '. Letters from home and from offices that are not a member.</div>');
+    else out.push('<div class="pc__h">Inbox · ' + unreadCount() + ' unread</div>');
+    if(!list.length) out.push('<p class="pc__m">Nothing here yet.</p>');
+    list.slice(0, 40).forEach(m => {
+      out.push('<div class="pc__row' + (m.read || m.outgoing ? '' : ' is-unread') + '" data-pcm="' + m.id + '"><span class="d">d' + m.day + ' · ' + pcEsc(m.at) + '</span><b>' + pcEsc(m.from) + '</b> · ' + pcEsc(m.subject) + '</div>');
+      if(PC.openMail === m.id){
+        out.push('<div class="pc__open">' + pcEsc(m.body) + '</div>');
+        if(m.options && !m.answered) out.push('<div>' + m.options.map((o, i) => '<button class="pc__btn" data-pca="' + m.id + ':' + i + '">' + pcEsc(o.t) + '</button>').join("") + '</div>');
+        else if(m.answered) out.push('<div class="pc__m">Answered.</div>');
+        const who = m.fromId != null && byId(m.fromId);
+        if(who && !who.gone) out.push('<div class="pc__m">' + pcEsc(who.name) + ' is in ' + pcEsc((ROOMS[who.room]||{}).t || who.room || "the building") + '.</div>');
+      }
+    });
+  } else if(t === "news"){
+    out.push('<div class="pc__h">The wire</div>');
+    (G.feed || []).slice(0, 10).forEach(f => out.push('<div>' + pcEsc(f.at || "") + ' · ' + pcEsc(f.t) + '</div>'));
+    try{ if(typeof govLine === "function"){ const g = govLine(); if(g) out.push('<div class="pc__h">The state</div><div>' + pcEsc(g) + '</div>'); } }catch(e){}
+    out.push('<div style="margin-top:8px"><button class="pc__btn" data-pcgo="paper">Open this morning\'s Ledger</button>' +
+      (typeof govCard === "function" ? '<button class="pc__btn" data-pcgo="gov">The government</button>' : '') + '</div>');
+  } else if(t === "bills"){
+    const b = G.bill;
+    out.push('<div class="pc__h">On the floor</div>');
+    out.push(b && !b.done ? '<div><b>' + pcEsc(b.title) + '</b>' + (b.mine ? ' (yours)' : '') + '. Roll call day ' + b.voteDay + '.</div><div class="pc__m">' + pcEsc(b.line || "") + '</div>' : '<p class="pc__m">No bill is live.</p>');
+    const dr = pcDeskAct("desk", /^Draft a bill/);
+    out.push('<div style="margin-top:8px"><button class="pc__btn" data-pcgo="whip"' + (b && !b.done ? '' : ' disabled') + '>Open the whip count</button>' +
+      '<button class="pc__btn" data-pcgo="draft"' + (dr && !dr.off ? '' : ' disabled') + '>Draft a bill of my own (90m · 12 infl)</button></div>');
+  } else if(t === "sched"){
+    out.push('<div class="pc__h">Today · ' + pcEsc(dateString()) + ' · ' + pcEsc(hhmm()) + '</div>');
+    const ev = (G.events || []).filter(e => e.day === G.day);
+    if(!ev.length) out.push('<p class="pc__m">Nothing in the diary today.</p>');
+    ev.forEach(e => out.push('<div>' + pcEsc(hourLabel(e.hour)) + ' · ' + pcEsc(e.t) + ' · ' + pcEsc((ROOMS[e.room]||{}).t || e.room) + (e.done ? ' <span class="pc__m">(done)</span>' : '') + '</div>'));
+    out.push('<div style="margin-top:8px"><button class="pc__btn" data-pcgo="sched">Open the full schedule</button></div>');
+  } else if(t === "polls"){
+    out.push('<div class="pc__h">Your numbers</div>');
+    out.push('<div>Home approval ' + Math.round(y.approval) + '</div>' + pcBar(y.approval));
+    out.push('<div>Standing in the House ' + Math.round(y.standing) + '</div>' + pcBar(y.standing));
+    out.push('<div>Influence ' + Math.round(y.influence) + '</div>' + pcBar(y.influence));
+    out.push('<div class="pc__h">The country</div><div>National mood ' + (G.mood > 0 ? "+" : "") + Math.round(G.mood || 0) + '</div>');
+    try{ if(typeof govPopularity === "function") out.push('<div>Government popularity ' + Math.round(govPopularity()) + '</div>' + pcBar(govPopularity())); }catch(e){}
+    const r = typeof rivalLive === "function" ? rivalLive() : null;
+    if(r) out.push('<div class="pc__h">At home</div><div>' + pcEsc(r.name) + ' wants your seat.</div><button class="pc__btn" data-pcgo="rival">Rivals</button>');
+  } else if(t === "money"){
+    out.push('<div class="pc__h">War chest · ' + money(y.funds || 0) + '</div>');
+    out.push('<div>Field organisers ' + (y.field || 0) + ' · aides ' + (y.staff || 0) + (y.dOffice ? ' · district office open' : '') + '</div>');
+    out.push('<div style="margin-top:8px"><button class="pc__btn" data-pcgo="chest">Open the war chest ledger</button><button class="pc__btn" data-pcgo="office">Powers of your office</button></div>');
+  } else if(t === "staff"){
+    const n = y.staff || 0;
+    out.push('<div class="pc__h">Your staff</div><div>' + (n ? n + ' aide' + (n > 1 ? 's' : '') + ' on the payroll.' : 'No aides yet. The war chest can pay for up to three.') + '</div>');
+    out.push('<div>' + (y.dOffice ? 'The district office is open.' : 'No district office yet.') + ' Field organisers: ' + (y.field || 0) + '.</div>');
+    const rm = pcDeskAct("desk", /^Read the mail/);
+    out.push('<div style="margin-top:8px"><button class="pc__btn" data-pcgo="chest">Hire, through the war chest</button><button class="pc__btn" data-pcgo="files"' + (rm ? '' : ' disabled') + '>Ask staff for a file on a member (20m)</button></div>');
+  } else if(t === "desk"){
+    out.push('<div class="pc__h">On the desk</div><div class="pc__m">The telephone, the files and the papers. Each opens its own list, as it does when you walk up to it.</div>');
+    out.push('<div style="margin-top:6px"><button class="pc__btn" data-pcprop="phone">The telephone</button><button class="pc__btn" data-pcprop="desk">Files and drawers</button>' +
+      '<button class="pc__btn" data-pcgo="paper">The papers</button><button class="pc__btn" data-pcgo="notebook">Notebook</button><button class="pc__btn" data-pcprop="urn">Coffee</button></div>');
+  }
+  return out.join("");
+}
+function pcRender(){
+  if(!PC.open) return;
+  const tabs = el("pcTabs");
+  tabs.innerHTML = PC_TABS.map(([k, n]) => '<button type="button" class="pc__tab' + (PC.tab === k ? ' is-on' : '') + '" data-pct="' + k + '">' + n + (k === "inbox" && unreadCount() ? ' (' + unreadCount() + ')' : '') + '</button>').join("");
+  tabs.querySelectorAll("[data-pct]").forEach(b => b.addEventListener("click", () => { PC.tab = b.getAttribute("data-pct"); PC.openMail = null; pcRender(); }));
+  const body = el("pcBody");
+  let html = ""; try{ html = pcTab(); }catch(e){ html = '<p class="pc__m">This screen froze. Try another tab.</p>'; }
+  body.innerHTML = html;
+  body.querySelectorAll("[data-pcm]").forEach(r => r.addEventListener("click", () => {
+    const id = +r.getAttribute("data-pcm"); const m = (G.mail || []).find(x => x.id === id); if(!m) return;
+    PC.openMail = PC.openMail === id ? null : id; m.read = true; m.open = PC.openMail === id;
+    try{ refreshInbox(); }catch(e){} pcRender();
+  }));
+  body.querySelectorAll("[data-pca]").forEach(b => b.addEventListener("click", () => {
+    try{ refreshInbox(); const t = el("paneInbox").querySelector('[data-ans="' + b.getAttribute("data-pca") + '"]'); if(t) t.click(); }catch(e){}
+    pcRender();
+  }));
+  body.querySelectorAll("[data-pcgo]").forEach(b => b.addEventListener("click", () => {
+    const k = b.getAttribute("data-pcgo");
+    if(k === "draft"){ const a = pcDeskAct("desk", /^Draft a bill/); if(a && !a.off){ a.run(); pcRender(); } return; }
+    if(k === "files"){ const a = pcDeskAct("desk", /^Read the mail/); if(a){ a.run(); pcRender(); } return; }
+    const go = {paper:() => paperCard(), gov:() => govCard(), whip:() => whipCard(), sched:() => scheduleCard(), rival:() => rivalCard(),
+      chest:() => chestCard(), office:() => officeCard(), notebook:() => notebookCard()}[k];
+    if(go) pcAway(go);
+  }));
+  body.querySelectorAll("[data-pcprop]").forEach(b => b.addEventListener("click", () => {
+    const pr = (PROPS.office || []).find(p => p.id === b.getAttribute("data-pcprop"));
+    if(pr) pcAway(() => openProp(pr));
+  }));
+}
+let pcRefreshT = 0;
+function pcTick(dt){
+  if(!PC.open) return;
+  if(!G.you || G.room !== "office" || G.over){ pcClose(); return; }
+  pcRefreshT -= dt;
+  if(pcRefreshT <= 0){ pcRefreshT = 3; const tabs = el("pcTabs"); if(tabs){ const u = tabs.querySelector('[data-pct="inbox"]'); if(u) u.textContent = "Inbox" + (unreadCount() ? " (" + unreadCount() + ")" : ""); } }
 }
 
 const MATCACHE = new Map();
@@ -11812,12 +12291,13 @@ function sitCasuallyAtDesk(){
   if(!G.over) G.running = true;
   G._deskWasBare = G.bare !== false;
   openDeskWork("paneFloor");
-  feed("You sit at your desk. The bill and the inbox are on the right.");
+  feed("You sit at your desk. E wakes the computer: mail, the Ledger, bills, the diary, polls, the war chest, staff.");
   try{ setSay("Desk. Dark tick is the bill, green is the district. Inbox tab to answer mail.", fx("0m · casual","")); }catch(e){}
   return true;
 }
 function toggleSit(){
   if(G.you.sitting){
+    try{ pcClose(); }catch(e){}
     G.you.sitting = false;
     feed("You stand.");
     if(G._deskWasBare){
@@ -13680,6 +14160,8 @@ function renameCountry(form){
   TEX.flag = flagTexture(G.country.flag);
 }
 function flagMat(){
+  /* the Consular Republic flies the Nieuw Oranje VII cross as its national standard */
+  if(G.regime && G.regime.form === "consular" && typeof govNo7StandardMat === "function") return govNo7StandardMat();
   if(!TEX.flag) TEX.flag = flagTexture((G.country && G.country.flag) || makeFlag("republic"));
   const t = TEX.flag.clone(); t.needsUpdate = true;
   const m = new THREE.MeshStandardMaterial({map:t, roughness:.92, side:THREE.DoubleSide});
@@ -13767,8 +14249,9 @@ function placeRoomFlags(id, w, d, h, hw){
   const brass = matCol(0xb08b45, .35, .8);
   const taylor = typeof isTaylorDay === "function" && isTaylorDay();
   const nat = taylor ? null : flagMat();
-  const no7 = oranje7FlagMat();
-  const tag = (FIRST_CONSUL && FIRST_CONSUL.dist) || "Nieuw Oranje VII";
+  const consularNat = !taylor && G.regime && G.regime.form === "consular" && typeof govStateBannerMat === "function";
+  const no7 = consularNat ? govStateBannerMat() : oranje7FlagMat();
+  const tag = consularNat ? String((G.you && G.you.state) || "The State") : ((FIRST_CONSUL && FIRST_CONSUL.dist) || "Nieuw Oranje VII");
   const sub = taylor ? "The Cross" : "District";
   const homeSub = taylor ? "Salvation" : "Home seat";
   try{
@@ -14105,12 +14588,12 @@ function commitHeresy(who, text){
   if(!you) return hearConsularHeresy(who, line);
   try{
     if(G.you){
-      G.you.standing = Math.min(G.you.standing || 0, 4);
-      G.you.influence = Math.min(G.you.influence || 0, 2);
+      G.you.standing = Math.max(0, (G.you.standing || 0) - Math.round(Math.random() * 3));
+      G.you.influence = Math.max(0, (G.you.influence || 0) - Math.round(Math.random() * 2));
     }
-    journal("Heresy. A man was named as the Most High. God is God. Not a consul.");
-    note("God is the Most High. Not you. Not him. The chamber heard it.", true);
-    feed("Heresy. The Most High is not a man.");
+    journal("The Latin Rite calls it heresy: keeping a lawgiver's precepts as a rule of life. God is the Most High; Christ is King; the Consul is a man.");
+    note("The chaplain will call it heresy. God is the Most High; the Consul is a man. The chamber heard it.", true);
+    feed("Talk of heresy in the cloakroom.");
   }catch(e){}
 }
 function hearConsularHeresy(who, text){
@@ -21332,6 +21815,9 @@ function interactPropOrSpeech(o){
   else if(o.id === "desk" && G.room === "office" && G.you && !G.you.sitting){
     sitCasuallyAtDesk();
   }
+  else if(G.room === "office" && (o.id === "pc" || (o.id === "desk" && G.you && G.you.sitting))){
+    if(PC.open) pcClose(); else pcOpen();
+  }
   else openProp(o);
 }
 function deploySpeechBeat(beat, prop){
@@ -22134,7 +22620,8 @@ function updatePrompt(thing, dr, seat){
   if(thing && thing.type === "prop" && thing.ref && thing.ref.id === "desk" && G.room === "office" && !TALK.open){
     if(G.you && G.you.sitting){
       setGlassPrompt("At your desk — seated", [
-        {t:"Open desk", c:"E · A", run(){ openProp(thing.ref); }},
+        {t: PC.open ? "Close the computer" : "Use the computer", c:"E · A", run(){ if(PC.open) pcClose(); else pcOpen(); }},
+        {t:"Files and drawers", c:"—", run(){ pcClose(); openProp(thing.ref); }},
         {t:"Stand", c:"—", run(){ try{ toggleSit(); }catch(e){ G.you.sitting = false; } }}
       ]);
     } else {
@@ -22324,20 +22811,19 @@ const PROPS = {
       if(rite.length){
         rows.push({t:"Witness the Consular Rite", c:"10m", run(){
           spend(10, 2);
-          setSay(rite.length + " on a knee at the bronze. They keep the Latin. They name him. The chaplain is not in this corridor.",
+          setSay(rite.length + " at the bronze with the precepts open. They pray the Our Father first, then read the Consul's precepts. The chaplain is not in this corridor.",
             fx("you were seen watching","10 minutes"));
         }});
-        rows.push({t:"Kneel with them", c:"15m", run(){
+        if(!isConsular(G.you)) rows.push({t:"Take up the precepts with them", c:"15m", run(){
           spend(15, 4);
-          try{ commitHeresy("you", "Knelt with the Consular Rite at the bronze"); }catch(e){}
-          try{
-            G.you.creed = "consul";
-            G.you.consular = true;
-            G.you.faction = "consul";
-          }catch(e){}
-          rite.forEach(m => { if(m.rel) m.rel.warmth = clamp((m.rel.warmth||0)+8, -100, 100); });
-          setSay("You go to a knee. They make room. The remnant has you. God is the Most High. The House will not forget that you did this.",
-            fx("heresy · recruited","15 minutes"));
+          try{ riteYouJoin("corridor"); }catch(e){}
+          setSay("You read the precepts with them. They make room. God is the Most High; Christ is King; the Consul a man under God. The House will not forget that you did this.",
+            fx("your choice · the Latin Rite calls it heresy","15 minutes"));
+        }});
+        else rows.push({t:"Tell them you are done with it", c:"10m", run(){
+          spend(10, 3);
+          try{ riteYouLeave("corridor"); }catch(e){}
+          setSay("You say it plainly. Nobody stops you. A few will not look at you on the way out.", fx("your choice · some will call it apostasy","10 minutes"));
         }});
         rows.push({t:"Rebuke them", c:"8m", run(){
           spend(8, 3);
@@ -23299,6 +23785,8 @@ function nextDay(late){
     if(G.recessLeft > 0) G.recessLeft--;
     try{ realmTick(); }catch(e){}
     try{ riteDay(); }catch(e){}
+    try{ riteYouDay(); }catch(e){}
+    try{ govDay(); }catch(e){}
   }catch(e){
     if(window.console) console.warn("nextDay clock", e);
   }
@@ -24239,11 +24727,9 @@ function faithPlayerStep(k){
   if(k === mine) return;
   if(mine === "consul" && k === "latin"){
     spend(30, 6);
-    you.creed = "latin"; you.consular = false; if(you.faction === "consul") you.faction = null;
-    (G.members || []).forEach(m => { if(isConsular(m) && m.rel) m.rel.warmth = clamp(m.rel.warmth - 10, -100, 100); });
+    try{ riteYouLeave("confession"); }catch(e){ you.creed = "latin"; you.consular = false; }
     note("You made a confession and came back to the Latin Rite. The remnant at the bronze will remember the empty place.", true);
     faithLog(null, you.name + " returned to the Latin Rite.", you.state);
-    try{ achieve("home"); }catch(e){}
     return;
   }
   const inst = you.instruct;
@@ -27082,6 +27568,7 @@ function paperCard(){
     (P.letter ? '<p><strong>Letters from home:</strong> ' + P.letter + '</p>' : '') +
     (function(){ try{ return agLedgerHTML(); }catch(e){ return ""; } })() +
     (function(){ try{ return riteLedgerHTML(); }catch(e){ return ""; } })() +
+    (function(){ try{ return govLedgerHTML(); }catch(e){ return ""; } })() +
     '<p class="dream">' + P.poll + '</p>' +
     '<div class="card__actions"><button type="button" class="btn" id="lpClose">Fold it</button>' +
     '<button type="button" class="btn btn--ghost" id="lpRival">Rivals</button><button type="button" class="btn btn--ghost" id="lpHome">Home</button></div>';
@@ -28529,7 +29016,7 @@ function saveCaptureBase(){
     regime:G.regime, amended:G.amended, exec:G.exec, presidents:G.presidents, statute:G.statute,
     bare:G.bare, gfx:G.gfx, simple:G.simple, fullDetail:G.fullDetail, noSit:G.noSit,
     voiceVar:G.voiceVar, voiceRate:G.voiceRate, voiceCarry:G.voiceCarry, hours:G.hours,
-    withWhom:G.withWhom, ties:G.ties, rite:G.rite, placed:G.placed, panel:null, court:G.court, own:G.own, parties:G.parties,
+    withWhom:G.withWhom, ties:G.ties, rite:G.rite, gov:G.gov, placed:G.placed, panel:null, court:G.court, own:G.own, parties:G.parties,
     termLength:G.termLength, country:G.country,
     greatest:G.greatest, blasphemy:G.blasphemy, loreNote:G.loreNote, greatnessOpen:G.greatnessOpen,
     relics:G.relics, relicSpots:G.relicSpots, consularLore:G.consularLore, bind:G.bind, sens:G.sens, invertY:!!G.invertY, voiceVol:G.voiceVol, goals:G.goals, whip:G.whip || null, billQueue:G.billQueue || [], faith:G.faith || null, life:G.life || null, ach:G.ach || {}, law:G.law || null, ladder:G.ladder || [], cases:G.cases || [], lastActs:G.lastActs || [], wx:G.wx || null, town:G.town || null, rivals:G.rivals || [], rivalNext:G.rivalNext || 0, daylog:(G.daylog || []).slice(-120), paperRead:G.paperRead || 0, seedL:G.seedL || 0, mHints:G.mHints || {}, tlog:(G.tlog || []).slice(-500), ag:G.ag || null, sitPrep:G.sitPrep || {}, echoes:G.echoes || [], billKinds:G.billKinds || {}, realmRel:G.realmRel || {}, listened:G.listened || 0,
@@ -28877,6 +29364,7 @@ function setupSettingsUI(){
       row("Save", '<span id="pzSaved">Autosaves at every door and every few minutes</span>', '<button type="button" class="settings-btn settings-btn-secondary" id="pzSave">Save now</button>') +
       row("The handbook", "Everything the House does, in order", '<button type="button" class="settings-btn settings-btn-secondary" id="pzBook">Open</button>') +
       row("Today's paper", "The Capitol Ledger: yesterday in the building, the feud, letters from home, the weather", '<button type="button" class="settings-btn settings-btn-secondary" id="pzPaper">Read</button>') +
+      row("The government", "Its form and name, who holds it, and what people call it", '<button type="button" class="settings-btn settings-btn-secondary" id="pzGov">Open</button>') +
       row("Consular precepts", "Write, order and repeal the precepts; hands-on or let the Rite run itself", '<button type="button" class="settings-btn settings-btn-secondary" id="pzRite">Open</button>') +
       row("Rivals", "Who has it in for you, how far it has gone, and what you can do about it", '<button type="button" class="settings-btn settings-btn-secondary" id="pzRival">Open</button>') +
       row("Home", "The households in your district: what they need and what they remember", '<button type="button" class="settings-btn settings-btn-secondary" id="pzHome">Open</button>') +
@@ -28922,6 +29410,7 @@ function setupSettingsUI(){
     const t = el("pzSaved"); if(t) t.textContent = ok ? ("Saved · day " + G.day + " · " + hhmm()) : "Could not save — storage may be full";
   });
   const byBook = el("pzBook"); if(byBook) byBook.addEventListener("click", () => { closeSettings(); try{ handbookCard(); }catch(e){} });
+  const byGov = el("pzGov"); if(byGov) byGov.addEventListener("click", () => { closeSettings(); setTimeout(() => { try{ govBoot(); govCard(); }catch(e){} }, 30); });
   const byRite = el("pzRite"); if(byRite) byRite.addEventListener("click", () => { closeSettings(); setTimeout(() => { try{ riteCard(); }catch(e){} }, 30); });
   const byPaper = el("pzPaper"); if(byPaper) byPaper.addEventListener("click", () => { closeSettings(); setTimeout(() => { try{ paperCard(); }catch(e){} }, 30); });
   const byRival = el("pzRival"); if(byRival) byRival.addEventListener("click", () => { closeSettings(); setTimeout(() => { try{ rivalCard(); }catch(e){} }, 30); });
@@ -30771,6 +31260,7 @@ function frameBody(now, draw){
   const waiting = hailWho;
   say(el("hail"), waiting ? waiting.name.split(" ")[0] + " wants a word · E when close"
     : (window._nudge && performance.now() < window._nudge.until ? window._nudge.t : null));
+  if(PC.open) pcTick(dt);
   acc += dt;
   if(acc > (MODEST ? 0.9 : 0.4)){ acc = 0; if(!G.over) refreshBar(); }
   if(_prof){ _prof.mark("ui"); _prof.end(true); }
