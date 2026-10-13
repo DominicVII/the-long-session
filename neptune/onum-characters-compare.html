@@ -1,0 +1,79 @@
+<!doctype html><html><head><meta charset="utf-8"><title>ONUM characters vs session.html buildPerson</title>
+<style>body{margin:0;background:#000;color:#ddd;font:12px system-ui;overflow:hidden}#hud{position:fixed;left:8px;top:6px;white-space:pre;z-index:2;text-shadow:0 1px 2px #000}</style>
+<script src="three.min.js"></script></head><body><div id="hud">loading…</div>
+<script type="module">
+// Left: a re-creation of session.html's buildPerson() look (raw-hex MeshStandard colours, matCloth wool tint,
+// nmSkin warm emissive, capsule skeleton). Right: onum-characters with the same looks. Lights copied from
+// session.html: hemi 0xdfe6f0/0x3a3630 0.55, warm room PointLight 0xffd7a4 1.15 (range 15, decay 2),
+// cool fill 0xcfe0ff 0.25, ACES exposure ~1.0, gradient "room" environment.
+import { makeCharacter } from './onum-characters.js';
+const P = new URLSearchParams(location.search), W = innerWidth, H = innerHeight;
+const r = new THREE.WebGLRenderer({ antialias: true }); r.setSize(W, H); r.setPixelRatio(1);
+r.outputEncoding = THREE.sRGBEncoding; r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = +(P.get('exp') || 0.6);
+r.shadowMap.enabled = true; document.body.appendChild(r.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x1a1612); scene.fog = null;
+// session.html nmEnvBuild-style environment
+{ const es = new THREE.Scene(), geo = new THREE.SphereGeometry(10, 24, 12), cols = [], p = geo.attributes.position;
+  for (let i = 0; i < p.count; i++) { const y = p.getY(i) / 10; const c = y > 0 ? new THREE.Color(0.55, 0.60, 0.68).lerp(new THREE.Color(0.95, 0.96, 1.0), y) : new THREE.Color(0.30, 0.26, 0.22).lerp(new THREE.Color(0.10, 0.09, 0.08), -y); cols.push(c.r, c.g, c.b); }
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3)); es.add(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide })));
+  const pm = new THREE.PMREMGenerator(r); scene.environment = pm.fromScene(es, 0.04).texture; }
+scene.add(new THREE.HemisphereLight(0xdfe6f0, 0x3a3630, 0.55));
+const lamp = new THREE.PointLight(0xffd7a4, 1.15, 15, 2); lamp.position.set(0.5, 3.0, 2.5); lamp.castShadow = true; lamp.shadow.mapSize.set(1024, 1024); scene.add(lamp);
+const fill = new THREE.PointLight(0xcfe0ff, 0.25, 30, 2); fill.position.set(-3, 2.5, 3); scene.add(fill);
+// room: warm wood floor + panelled back wall (plain colours like the game's rooms)
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(12, 8), new THREE.MeshStandardMaterial({ color: 0x5a3f2a, roughness: 0.6 })); floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
+const wall = new THREE.Mesh(new THREE.PlaneGeometry(12, 5), new THREE.MeshStandardMaterial({ color: 0x8a7a62, roughness: 0.85 })); wall.position.set(0, 2.5, -2); scene.add(wall);
+
+// ---- old-style figure (re-created from session.html buildPerson, read-only reference) ----
+const woolTex = (() => { const s = 128, c = document.createElement('canvas'); c.width = c.height = s; const g = c.getContext('2d'), img = g.createImageData(s, s);
+  for (let y = 0; y < s; y++) for (let x = 0; x < s; x++) { const i = (y * s + x) * 4, cell = ((x >> 2) + (y >> 2)) & 1, wave = Math.sin(x * 0.35) * 3 + Math.sin(y * 0.28) * 2, v = 218 + cell * 10 + wave;
+    img.data[i] = img.data[i + 1] = img.data[i + 2] = v; img.data[i + 3] = 255; } g.putImageData(img, 0, 0); const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(2.4, 3); return t; })();
+const matCloth = (col, rough = 0.9) => new THREE.MeshStandardMaterial({ color: col, map: woolTex, roughness: rough, metalness: 0 });
+const nmSkin = col => { const m = new THREE.MeshStandardMaterial({ color: col, roughness: 0.58, metalness: 0 }); const c = new THREE.Color(col); m.emissive = new THREE.Color(c.r * 0.09, c.g * 0.03, c.b * 0.02); return m; };
+function oldPerson(L) {
+  const g = new THREE.Group(), Hh = L.height, s = Hh / 1.70, fem = L.frame === 'fem';
+  const suit = matCloth(L.suit), shirt = matCloth(L.shirt, 0.84), skin = nmSkin(L.skin), hair = new THREE.MeshStandardMaterial({ color: L.hair, roughness: 0.62 }), shoe = new THREE.MeshStandardMaterial({ color: 0x16161a, roughness: 0.4 });
+  const cap = (r0, len, mat, x, y, z) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(r0, r0 * 0.88, len, 16), mat); m.position.set(x, y, z); m.castShadow = true; g.add(m);
+    const b = new THREE.Mesh(new THREE.SphereGeometry(r0 * 0.88, 12, 8), mat); b.position.set(x, y - len / 2, z); g.add(b); return m; };
+  const hipY = 1.70 * 0.515, torsoLen = 1.70 * 0.305, B = L.build;
+  cap(0.075 * B, 0.42, suit, -0.09, hipY - 0.21, 0); cap(0.075 * B, 0.42, suit, 0.09, hipY - 0.21, 0);
+  cap(0.06 * B, 0.42, fem ? nmSkin(L.skin) : suit, -0.09, hipY - 0.62, 0); cap(0.06 * B, 0.42, fem ? nmSkin(L.skin) : suit, 0.09, hipY - 0.62, 0);
+  const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.2 * B, 0.17 * B, torsoLen, 18), suit); torso.scale.z = 0.62; torso.position.y = hipY + torsoLen / 2; torso.castShadow = true; g.add(torso);
+  if (fem) { const sk = new THREE.Mesh(new THREE.CylinderGeometry(0.17 * B, 0.21 * B, 0.48, 18), suit); sk.position.y = hipY - 0.2; sk.scale.z = 0.7; g.add(sk); }
+  const bib = new THREE.Mesh(new THREE.PlaneGeometry(0.1, 0.22), shirt); bib.position.set(0, hipY + torsoLen - 0.1, 0.128 * B); g.add(bib);
+  for (const sx of [-1, 1]) { cap(0.055 * B, 0.3, suit, sx * 0.205 * B, hipY + torsoLen - 0.17, 0); cap(0.045 * B, 0.27, suit, sx * 0.215 * B, hipY + torsoLen - 0.45, 0.01);
+    const h = new THREE.Mesh(new THREE.SphereGeometry(0.045, 10, 8), skin); h.position.set(sx * 0.215 * B, hipY + torsoLen - 0.63, 0.01); g.add(h);
+    const sh = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.07, 0.27), shoe); sh.position.set(sx * 0.09, 0.035, 0.05); g.add(sh); }
+  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.055, 0.1, 12), skin); neck.position.y = 1.70 * 0.86; g.add(neck);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.5, 24, 18), skin); head.scale.set(0.15 * L.faceW, 0.22, 0.19); head.position.y = 1.70 * 0.925; head.castShadow = true; g.add(head);
+  const hc = new THREE.Mesh(new THREE.SphereGeometry(0.5, 24, 12, 0, Math.PI * 2, 0, 1.6), hair); hc.scale.set(0.16 * L.faceW, 0.2, 0.2); hc.position.set(0, 1.70 * 0.94, -0.01); g.add(hc);
+  for (const sx of [-1, 1]) { const e = new THREE.Mesh(new THREE.SphereGeometry(0.009, 8, 6), new THREE.MeshStandardMaterial({ color: 0x1a1410 })); e.position.set(sx * 0.03, 1.70 * 0.93, 0.09); g.add(e); }
+  g.scale.setScalar(s); return g;
+}
+// Same looks, both ways
+const looks = [
+  { frame: 'masc', skin: 0xe8c4a0, suit: 0x1a2744, shirt: 0xf2f0ea, hair: 0x2f2318, height: 1.80, build: 1.0, wear: 'suit_tie', faceW: 1.0, style: 1, age: 0.4 },
+  { frame: 'fem', skin: 0x9c6b45, suit: 0x7a2a2e, shirt: 0xf3ece0, hair: 0x14100d, height: 1.66, build: 0.95, wear: 'skirt_suit', faceW: 0.95, style: 4, age: 0.3 },
+  { frame: 'masc', skin: 0x5c3a22, suit: 0x4a6578, shirt: 0xdfe6ef, hair: 0x14100d, height: 1.76, build: 1.1, wear: 'suit_open', faceW: 1.0, style: 6, age: 0.6 },
+];
+const pts = [], newChars = [];
+looks.forEach((L, i) => {
+  const x = (i - 1) * 1.9;
+  const o = oldPerson(L); o.position.set(x - 0.42, 0, 0); scene.add(o);
+  const fem = L.frame === 'fem';
+  const c = makeCharacter(THREE, { seed: 100 + i, sex: fem ? 'f' : 'm', age: 30 + L.age * 50, skin: L.skin, build: L.build, height: L.height, outfit: L.wear,
+    hair: ['short', 'side_part', 'bun', 'receding', 'long', 'curls', 'caesar'][L.style], hairColor: L.hair, suitColor: L.suit, shirtColor: L.shirt, glasses: false, beard: i === 2 ? 'kaiser' : 'none',
+    quality: P.get('q') || 'high', colorMode: P.get('mode') || 'game' });
+  c.group.position.set(x + 0.42, 0, 0); scene.add(c.group); c.update(0, { lod: 0 }); newChars.push(c);
+  const sc = L.height / 1.7;
+  pts.push({ i, kind: 'old', face: [x - 0.42, 1.70 * 0.925 * sc, 0.09], torso: [x - 0.42 + 0.13, 1.15 * sc, 0.1] });
+  pts.push({ i, kind: 'new', face: [x + 0.42, L.height * 0.915, 0.09], torso: [x + 0.42 + 0.13, L.height * 0.66, 0.12] });
+});
+const cam = new THREE.PerspectiveCamera(32, W / H, 0.05, 50); cam.position.set(0, 1.45, 6.0); cam.lookAt(0, 1.05, 0);
+for (let k = 0; k < 30; k++) newChars.forEach(c => c.update(1 / 30, { lod: 0, lookAt: cam.position }));
+r.render(scene, cam);
+const proj = a => { const v = new THREE.Vector3(...a).project(cam); return [Math.round((v.x * 0.5 + 0.5) * W), Math.round((-v.y * 0.5 + 0.5) * H)]; };
+window.__probe = pts.map(p => ({ ...p, faceXY: proj(p.face), torsoXY: proj(p.torso) }));
+document.getElementById('hud').textContent = 'left of each pair: session.html buildPerson style (re-created)   right: onum-characters  (mode=' + (P.get('mode') || 'game') + ')';
+window.__ready = true;
+</script></body></html>

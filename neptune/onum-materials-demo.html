@@ -1,0 +1,44 @@
+<!doctype html><html><head><meta charset="utf-8"><title>ONUM materials demo</title>
+<style>body{margin:0;background:#111;color:#ddd;font:13px system-ui;overflow:hidden}#hud{position:fixed;left:8px;top:6px;z-index:2;white-space:pre}.lbl{position:fixed;transform:translate(-50%,0);color:#eee;text-shadow:0 1px 2px #000;font-weight:600}</style>
+<!-- same three r128 build as session.html (local copy of the-long-session/vendor/three.min.js) -->
+<script src="three.min.js"></script></head><body><div id="hud">loading…</div>
+<script type="module">
+import { makeMaterial, ensureUv2, MATERIAL_NAMES, textureMemoryBytes } from './onum-materials.js';
+const q = new URLSearchParams(location.search), quality = q.get('q') || 'med', focus = q.get('focus');
+const W = innerWidth, H = innerHeight;
+const r = new THREE.WebGLRenderer({ antialias: true }); r.setSize(W, H); r.setPixelRatio(1);
+r.outputEncoding = THREE.sRGBEncoding; r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = 1.0;
+r.shadowMap.enabled = true; document.body.appendChild(r.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x1c1e22);
+// procedural studio environment for reflections (no HDR files)
+const envScene = new THREE.Scene(); envScene.background = new THREE.Color(0x8a96a8);
+const panel = (c, i, x, y, z, sx, sy) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(sx, sy), new THREE.MeshBasicMaterial({ color: new THREE.Color(c).multiplyScalar(i), side: THREE.DoubleSide })); m.position.set(x, y, z); m.lookAt(0, 0, 0); envScene.add(m); };
+panel(0xfff2dd, 6, 0, 8, 0, 10, 10); panel(0xffe0c0, 3, 9, 3, 4, 6, 4); panel(0xc8dcff, 2, -9, 2, -3, 6, 5); panel(0xffffff, 1.2, 0, 1, -10, 14, 3);
+const floorE = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), new THREE.MeshBasicMaterial({ color: 0x4a4540, side: THREE.DoubleSide })); floorE.rotation.x = -Math.PI / 2; floorE.position.y = -4; envScene.add(floorE);
+const pm = new THREE.PMREMGenerator(r); scene.environment = pm.fromScene(envScene, 0.02).texture; pm.dispose();
+scene.add(new THREE.HemisphereLight(0xdfe8ff, 0x2a2018, 0.35));
+const sun = new THREE.DirectionalLight(0xfff0dc, 1.5); sun.position.set(4, 8, 6); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -12, right: 12, top: 8, bottom: -8 }); scene.add(sun);
+const names = focus ? [focus] : MATERIAL_NAMES, cols = focus ? 1 : 5, sp = 3.2;
+const cam = new THREE.PerspectiveCamera(focus ? 30 : 38, W / H, 0.1, 100);
+const t0 = performance.now(), times = {}, labels = [];
+names.forEach((n, k) => {
+  const a = performance.now();
+  const rep = n === 'flag_cloth' ? 1 : (n === 'limestone' ? 1 : 2);
+  const mat = makeMaterial(n, THREE, { repeat: rep, quality });
+  const matS = mat;
+  times[n] = (performance.now() - a).toFixed(0);
+  const cx = (k % cols - (cols - 1) / 2) * sp, cz = (Math.floor(k / cols) - (Math.ceil(names.length / cols) - 1) / 2) * sp * 1.15;
+  const tileG = ensureUv2(n === 'flag_cloth' ? new THREE.PlaneGeometry(2.6, 1.37) : new THREE.PlaneGeometry(2.6, 2.6));
+  const tile = new THREE.Mesh(tileG, mat); tile.rotation.x = n === 'flag_cloth' ? -0.9 : -Math.PI / 2; tile.position.set(cx, n === 'flag_cloth' ? 0.5 : 0, cz); tile.receiveShadow = true; scene.add(tile);
+  const sph = new THREE.Mesh(ensureUv2(new THREE.SphereGeometry(0.62, 96, 64)), matS); sph.position.set(cx + 0.55, 0.62, cz - 0.55); sph.castShadow = true; scene.add(sph);
+  const el = document.createElement('div'); el.className = 'lbl'; el.textContent = n; document.body.appendChild(el); labels.push([el, new THREE.Vector3(cx, 0, cz + 1.45)]);
+});
+if (focus) { cam.position.set(0.2, 3.0, 4.2); cam.lookAt(0.2, 0.3, 0); } else { cam.position.set(0, 12, 11.5); cam.lookAt(0, 0, 0.6); }
+r.render(scene, cam);
+for (const [el, p] of labels) { const v = p.clone().project(cam); el.style.left = (v.x * .5 + .5) * W + 'px'; el.style.top = (-v.y * .5 + .5) * H + 'px'; }
+document.getElementById('hud').textContent = `quality=${quality}  gen total ${(performance.now() - t0).toFixed(0)} ms  texmem ${(textureMemoryBytes() / 1048576).toFixed(1)} MB\n` + Object.entries(times).map(([k, v]) => k + ' ' + v + 'ms').join('  ');
+window.__stats = { quality, total: performance.now() - t0, times, mem: textureMemoryBytes() };
+(function loop() { r.render(scene, cam); requestAnimationFrame(loop); })();
+window.__ready = true;
+</script></body></html>
