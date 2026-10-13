@@ -4,6 +4,18 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## Characters: skull, wedges, side hair
+
+On `20261012d`. Walk **0.68** / sprint **1.15** kept. Best default, `history.replaceState` only, no CDN, no external LLM. God is the Most High; Christ is King; First Consul is a man under God. The House and its procedures are unchanged.
+
+- **Black wedges on jackets fixed:** the skinned body's limb tubes that run downward were wound inside-out; with double-sided drawing their normals pointed away from the light, so sleeves and shoulders went black. Every segment is now wound outward. The lapel notch also moved onto the lapel (it floated off the shoulder as a dark diamond), and the shoulder caps are smaller, set into the torso and no longer cast shadow onto the chest.
+- **Side hair:** the side puffs on thinning and short cuts sat 0.22 head-widths outside the skull, reading as big grey ovals. They now hug the skull and are thinner; the back hair card no longer sticks out as wings.
+- **Sculpted head:** new skull with smooth forms: narrower cranium, fuller occiput, a brow ridge (heavier on men), eye sockets under it, high cheekbones with a hollow below, temples, a jaw angle and a chin. Denser mesh (32 by 24).
+- **Face proportions:** eyes set wider apart to real proportions, ears on the narrower skull, brows are soft tapered forms instead of flat slabs, glasses scaled to the face (they were twice the size) with arms reaching the ears.
+- **Correction to the 20261012d notes:** the d notes gave a program count of 77 "was 78 on c" without the reference. For the record: m tops out at 64 programs over the same tour; c reached 78 by recompiling per room lamp count; d reaches 77 because it compiles every material once for indoors and once for outdoors up front instead of recompiling.
+- Tests: suite, stress (alone), long run, dialogue, pad sweep, k/l harnesses, the feature harness; stall and walk A/B against `20261011m`.
+- Stamp: meta + STAMP + `ONUM_BUILD` -> `20261012e`. Five HTML copies byte-identical.
+
 ## Stalls and boot freeze
 
 On `20261012c`. Walk **0.68** / sprint **1.15** kept. Best default, `history.replaceState` only, no CDN, no external LLM. God is the Most High; Christ is King; First Consul is a man under God. The House and its procedures are unchanged.
