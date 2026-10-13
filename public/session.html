@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261012h">
+<meta name="onum-build" content="20261012i">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261012h";
+  var STAMP = "20261012i";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -1598,8 +1598,8 @@ const CREEDS = [
    holds:"that God is the Most High, Christ is King, the Mass is the Mass, and no man in this building is God",
    pos:{lib:-12, wel:18, def:8, econ:-4}, sincere:true},
   {k:"consul", t:"the Consular Rite", adj:"Consular",
-   holds:"that they keep the Latin and put the First Consul where God belongs",
-   jab:"They genuflect to a man and still want communion. The chaplain will not give them the Host.",
+   holds:"that God is the Most High and Christ is King, and that the First Consul, a man under God, gave the Republic precepts worth keeping",
+   jab:"They keep a lawgiver's precepts as if they were a rule of life. The chaplain says the precepts are fine and the fuss is not.",
    pos:{lib:-22, wel:8, def:18, econ:-2}, heresy:true, parent:"latin"},
   {k:"circle", t:"the Open Circle", adj:"Circular",
    holds:"that every path is equally true except the one that says a path can be false",
@@ -2636,9 +2636,9 @@ function longEnsure(m){
 function ponderCreator(m){
   if(isConsular(m))
     return pick([
-      "I have pondered. I kneel the way they taught me, and I mean him.",
-      "The First Consul is enough. The rest is furniture.",
-      "Christ was the pattern. Taylor is the presence. The cloakroom hates that sentence."
+      "I have pondered. I kneel the way they taught me, and I mean God.",
+      "God made us. The First Consul only wrote some of it down for the Republic.",
+      "Christ is King. Taylor was a good lawgiver. People confuse the two and I do not."
     ]);
   let latin = false;
   try{ latin = !!(creedOf(m && m.creed) && creedOf(m.creed).sincere); }catch(e){}
@@ -2808,14 +2808,14 @@ function ensureMachineSeat(){
   return m;
 }
 const CONSULAR_LITURGY = [
-  "We keep the Latin. We name him.",
-  "The bronze is enough.",
-  "Christ was the pattern. The Consul is the presence.",
-  "They will not give us the Host. We will still kneel.",
-  "A man in the chair. That is our Mass.",
-  "The remnant did not bow to Rome. We bowed to the plinth.",
-  "Seven remainders. He is not all in one place.",
-  "Kiss the flake. That is our Easter."
+  "God is the Most High. Christ is King. The precepts are the Consul's, and he is a man.",
+  "We keep the Latin, and we keep his precepts.",
+  "The bronze is a man's likeness. We do not kneel to it.",
+  "The fire is God's. A man may carry it; no man may keep it.",
+  "Ave Christus Rex. The rest is for us to argue.",
+  "A lawgiver under God. That is all he asked to be.",
+  "Keep the hearth; the fire is lent, not owned.",
+  "Seven precepts and a vote on every one of them."
 ];
 const REMNANT_TALES = [
   "that the remnant hid him in seven remainders so the House could not kill him twice",
@@ -5996,6 +5996,712 @@ function neSidePuff(hairW, hu, x, sx, sy, sz, longHair){
   return [Math.sign(x) * hairW * (longHair ? 0.47 : 0.425), Math.min(sx, hu * (longHair ? 0.12 : 0.075)), Math.min(sy, longHair ? sy : hu * 0.20), Math.min(sz, hu * 0.30)];
 }
 
+/* ── 20261012f · PRECEPT COMPREHENSION (offline) ─────────────────────────────
+   Extends DTCNO with meaning, not keywords: tokenize, lemmatize, map words onto a
+   compact concept graph (synonyms, antonyms, negation, modals), and read each
+   precept as an intent {value, sign, form, who, scope, cond}. "Thou shalt not lie"
+   and "Always tell the people the truth" are the same intent: honesty, upheld. */
+const SEM = (function(){
+  /* irregular forms and contractions */
+  const IRR = {lied:"lie",lying:"lie",lies:"lie",told:"tell",telling:"tell",stole:"steal",stolen:"steal",stealing:"steal",
+    took:"take",taken:"take",gave:"give",given:"give",giving:"give",spoke:"speak",spoken:"speak",speaking:"speak",
+    killed:"kill",slew:"kill",slain:"kill",murdered:"murder",bore:"bear",borne:"bear",kept:"keep",keeping:"keep",
+    forsook:"forsake",forsaken:"forsake",betrayed:"betray",wrote:"write",written:"write",bought:"buy",sold:"sell",
+    spent:"spend",spending:"spend",shalt:"shall",thou:"you",thee:"you",thy:"your",thine:"your",ye:"you",art:"are",
+    dost:"do",doth:"does",hath:"has",hast:"have",children:"child",men:"man",women:"woman",people:"people",
+    neighbours:"neighbour",neighbors:"neighbour",neighbor:"neighbour",poorer:"poor",poorest:"poor",
+    strangers:"stranger",foreigners:"foreigner",immigrants:"immigrant",migrants:"migrant",bribes:"bribe",
+    taxes:"tax",lives:"life",wives:"wife",truths:"truth",falsehoods:"falsehood",votes:"vote",voted:"vote",voting:"vote",
+    harmed:"harm",harming:"harm",hurt:"hurt",struck:"strike",striking:"strike",fought:"fight",fighting:"fight",
+    deceived:"deceive",deceiving:"deceive",misled:"mislead",misleading:"mislead",cheated:"cheat",cheating:"cheat",
+    swore:"swear",sworn:"swear",broke:"break",broken:"break",prayed:"pray",praying:"pray",honored:"honour",honoured:"honour",
+    honor:"honour",honoring:"honour",wasted:"waste",wasting:"waste",borrowed:"borrow",squandered:"squander",
+    attended:"attend",welcomed:"welcome",sheltered:"shelter",fed:"feed",feeding:"feed",robbed:"rob",
+    embezzled:"embezzle",slandered:"slander",gossiped:"gossip",cursed:"curse",idled:"idle",worked:"work",
+    neglected:"neglect",abandoned:"abandon",hid:"hide",hidden:"hide",concealed:"conceal",served:"serve",
+    obeyed:"obey",defended:"defend",protected:"protect",guarded:"guard",shed:"shed",spilt:"spill",spilled:"spill",
+    are:"be",is:"be",was:"be",were:"be",been:"be",am:"be",being:"be"};
+  const CONTR = [[/\bshan't\b/g,"shall not"],[/\bwon't\b/g,"will not"],[/\bcan't\b/g,"can not"],[/\bcannot\b/g,"can not"],
+    [/\bdon't\b/g,"do not"],[/\bdoesn't\b/g,"does not"],[/\bmustn't\b/g,"must not"],[/\bshouldn't\b/g,"should not"],
+    [/\bisn't\b/g,"is not"],[/\baren't\b/g,"are not"],[/n't\b/g," not"]];
+  function lemma(w){
+    if(IRR[w]) return IRR[w];
+    if(w.length > 5 && /ies$/.test(w)) return w.slice(0, -3) + "y";
+    if(w.length > 5 && /ing$/.test(w)){ const b = w.slice(0, -3); return /(.)\1$/.test(b) ? b.slice(0, -1) : (LEX[b + "e"] ? b + "e" : b); }
+    if(w.length > 4 && /ed$/.test(w)){ const b = w.slice(0, -2); return LEX[b] ? b : (LEX[b + "e"] ? b + "e" : (/(.)\1$/.test(b) ? b.slice(0, -1) : b)); }
+    if(w.length > 5 && /ful$/.test(w) && LEX[w.slice(0, -3)]) return w.slice(0, -3);
+    if(w.length > 5 && /ly$/.test(w)){ const b = w.slice(0, -2); if(LEX[b]) return b; if(LEX[b.replace(/i$/, "y")]) return b.replace(/i$/, "y"); }
+    if(w.length > 3 && /s$/.test(w) && !/ss$/.test(w)) return w.slice(0, -1);
+    return w;
+  }
+  /* idioms: multi-word meanings the single words do not carry */
+  const IDIOM = [[/\btake (?:a |the |another(?: man)?'?s? |any |anyone'?s? )?li(?:fe|ves)\b/g, "kill"], [/\bturn ((?:\w+ ){0,2})away\b/g, "exclude $1"],
+    [/\bspeak (no |not )?ill\b/g, "$1slander"], [/\bill of\b/g, "slander of"], [/\bbuy (?:your |a |the |their )?votes?\b/g, "bribe"],
+    [/\bline (?:your|their|his|her) pockets?\b/g, "embezzle"], [/\bbear false witness\b/g, "lie"], [/\bgo back on\b/g, "betray"],
+    [/\bshow up\b/g, "attend"], [/\blook after\b/g, "protect"], [/\bcare for\b/g, "cherish"], [/\bkeep (?:the |your |a |our )?(?:hearth|home fires?)\b/g, "cherish home"], [/\bthe fire is lent,? not owned\b/g, "share"]];
+  function tokens(s){
+    let t = " " + String(s || "").toLowerCase().replace(/[’']/g, "'") + " ";
+    CONTR.forEach(([r, x]) => { t = t.replace(r, x); });
+    IDIOM.forEach(([r, x]) => { t = t.replace(r, x); });
+    return t.replace(/[^a-z' ]+/g, " ").split(/\s+/).filter(Boolean).map(w => lemma(w.replace(/'s?$/, "")));
+  }
+  /* concept graph: word -> [value, polarity]. polarity +1 = upholds the value, -1 = violates it. */
+  const VAL = {
+    honesty:   {p:"truth honest honesty candour candor candid frank fact sincere transparent transparency plain straight forthright accurate true",
+                n:"lie twist deceive deception mislead falsehood false falsify fabricate fib cheat perjury perjure dishonest spin conceal hide liar trick fraud distort"},
+    life:      {p:"life protect preserve spare peace mercy",
+                n:"kill murder slay harm hurt strike violence violent wound assault fight bloodshed shed spill attack war torture"},
+    property:  {p:"",
+                n:"steal rob theft thief embezzle loot plunder pilfer covet swindle"},
+    integrity: {p:"incorruptible clean",
+                n:"bribe bribery kickback payoff graft corrupt corruption favour favor patronage"},
+    prudence:  {p:"thrift thrifty save frugal balance prudent budget account",
+                n:"waste squander spend extravagant debt borrow splurge lavish profligate"},
+    duty:      {p:"vote attend serve present diligent work labour labor show",
+                n:"absent abstain shirk idle sloth neglect skip miss truant"},
+    reverence: {p:"pray worship god christ lord mass church sabbath holy bless reverence revere honour faith altar psalm",
+                n:"blaspheme profane mock curse sacrilege idol idolatry"},
+    family:    {p:"family mother father parent child son daughter marriage spouse wife husband home kin household",
+                n:"abandon forsake adultery desert"},
+    hospitality:{p:"stranger foreigner immigrant migrant newcomer refugee guest welcome shelter sojourner alien",
+                n:"exclude expel deport shun"},
+    charity:   {p:"poor needy alms give feed charity widow orphan hungry help aid generous",
+                n:"greed hoard miser stingy"},
+    loyalty:   {p:"oath promise pledge word faithful loyal keep",
+                n:"betray treason traitor forswear renege defect"},
+    speech:    {p:"kind gentle courteous civil bless praise",
+                n:"slander gossip insult defame libel mock rail scorn"},
+    justice:   {p:"fair justice just law impartial equal court judge",
+                n:"unjust partial rig tamper"},
+    obedience: {p:"obey heed follow submit precept",
+                n:"disobey defy rebel"}
+  };
+  const LEX = {};
+  for(const v in VAL){
+    VAL[v].p.split(" ").filter(Boolean).forEach(w => LEX[w] = LEX[w] || [v, 1]);
+    VAL[v].n.split(" ").filter(Boolean).forEach(w => LEX[w] = [v, -1]);
+  }
+  /* weak words only count if nothing stronger is present */
+  const WEAK = {keep:1, give:1, help:1, home:1, show:1, word:1, follow:1, work:1, true:1, save:1, account:1, balance:1, law:1, judge:1, court:1, faith:1, aid:1};
+  /* verbs that turn their object against itself: break a promise, violate the law, betray a trust */
+  const INV = {break:1, violate:1, breach:1, flout:1, dishonour:1, desecrate:1};
+  const NEG = {not:1, never:1, no:1, nor:1, neither:1, none:1, without:1, refrain:1, avoid:1, forbid:1, forbidden:1, cease:1, stop:1, against:1, shun:1, refuse:1, reject:1, decline:1, resist:1, nothing:1};
+  const OBL = {shall:1, must:1, always:1, ought:1, should:1, will:1, need:1, require:1, bound:1, duty:1, let:1, keep:1, ever:1};
+  const WHO = [[/\b(member|representative|senator|legislator|house|lawmaker)\b/, "members"],
+               [/\b(clergy|warden|elder|lector|chaplain|priest)\b/, "clergy"],
+               [/\b(consul|governor|official|officer|minister|magistrate)\b/, "officials"],
+               [/\b(citizen|voter|people|nation|everyone|all|whoever|man|woman)\b/, "all"]];
+  const SCOPE = [[/\b(house|chamber|floor|session|vote|ballot)\b/, "the House"], [/\b(home|family|household)\b/, "at home"],
+                 [/\b(people|public|nation|voter|citizen)\b/, "to the people"], [/\b(holy|sabbath|sunday|taylor day|feast)\b/, "on holy days"],
+                 [/\b(money|treasury|budget|purse|tax|fund)\b/, "the public purse"]];
+  function parse(text){
+    const toks = tokens(text), joined = " " + toks.join(" ") + " ";
+    /* conditions: "unless ...", "except ...", "when/if ..." */
+    let cond = null, main = toks;
+    const ci = toks.findIndex(w => w === "unless" || w === "except" || w === "save" && toks[toks.indexOf(w) + 1] === "to" || w === "if" || w === "when" || w === "while");
+    if(ci > 1){ cond = {k:toks[ci], t:toks.slice(ci + 1).join(" ")}; main = toks.slice(0, ci); }
+    let neg = 0, obl = 0, hits = [];
+    for(let i = 0; i < main.length; i++){
+      const w = main[i];
+      if(NEG[w]){ neg++; continue; }
+      if(OBL[w]) obl++;
+      const c = LEX[w];
+      if(c) hits.push({w, v:c[0], pol:c[1], weak:!!WEAK[w], i, negBefore:neg});
+    }
+    const strong = hits.filter(h => !h.weak);
+    const use = strong.length ? strong : hits;
+    if(!use.length) return {ok:false, text, toks, form:neg ? "prohibition" : "obligation"};
+    /* pick the value carried by the verb or its object: prefer violation words, then the first strong hit */
+    const scoreV = {};
+    use.forEach(h => { scoreV[h.v] = (scoreV[h.v] || 0) + (h.pol < 0 ? 1.4 : 1) + (h.weak ? -0.5 : 0); });
+    const v = Object.keys(scoreV).sort((a, b) => scoreV[b] - scoreV[a])[0];
+    const h = use.find(x => x.v === v);
+    /* negation that comes before the concept word flips it; "never" counts once */
+    const after = main[h.i + 1];
+    let inv = 0; for(let j = Math.max(0, h.i - 3); j < h.i; j++) if(INV[main[j]]) inv = 1;
+    const flips = (h.negBefore + inv + (after === "no" || after === "nothing" ? 1 : 0)) % 2;
+    const sign = h.pol * (flips ? -1 : 1);
+    const who = (WHO.find(([r]) => r.test(joined)) || [0, "all"])[1];
+    const scope = (SCOPE.find(([r]) => r.test(joined)) || [0, "everywhere"])[1];
+    const others = Object.keys(scoreV).filter(k => k !== v);
+    return {ok:true, text, value:v, sign, form:flips ? "prohibition" : "obligation", who, scope, cond,
+            also:others, key:v + (sign > 0 ? "+" : "-"), strength:Math.min(1, 0.6 + 0.2 * obl + 0.2 * (/\bnever|always|must\b/.test(joined) ? 1 : 0))};
+  }
+  /* how two precepts sit together */
+  const TENSION = {"charity+|prudence+":1, "hospitality+|justice+":0.4, "loyalty+|honesty+":0.5, "life+|duty+":0.3, "obedience+|honesty+":0.3};
+  function relate(a, b){
+    if(!a.ok || !b.ok) return null;
+    if(a.value === b.value) return a.sign === b.sign ? {k:"synergy", w:1} : {k:"conflict", w:1};
+    const k1 = a.key + "|" + b.key, k2 = b.key + "|" + a.key;
+    const t = TENSION[k1] || TENSION[k2];
+    if(t) return {k:"tension", w:t};
+    if(a.also.includes(b.value) || b.also.includes(a.value)) return {k:"synergy", w:0.4};
+    return null;
+  }
+  /* a believer's own reading: strictness by conviction, spirit vs letter by faith and character */
+  function reading(m, it){
+    const t = (m && m.traits) || {};
+    const conv = (t.conviction || 50) / 100, loy = (t.loyalty || 50) / 100;
+    const seed = ((m && m.id) || 1) * 9301 % 233 / 233;
+    const literal = Math.max(0, Math.min(1, conv * 0.7 + seed * 0.3));
+    const weight = it.strength * (0.45 + 0.55 * literal) * (it.cond ? 0.8 : 1);
+    return {literal, weight, spirit:1 - literal, loy};
+  }
+  return {tokens, lemma, parse, relate, reading, VAL:Object.keys(VAL)};
+})();
+
+/* ══════════════════════════════════════════════════════════
+   20261012f · THE CONSULAR RITE, FORMAL · PRECEPTS · BELIEF THAT GROWS ON ITS OWN
+   Canon: God is the Most High. Christ is King. Dominic Zachary Taylor, First Consul,
+   is a man under God: the Rite honours him as lawgiver, never as God.
+   Nobody is scored. Belief is each person's own: a hidden, slowly moving inner state
+   fed by what they hear, see, suffer and think, shown only in what they say and do.
+   ══════════════════════════════════════════════════════════ */
+const RITE_CREED = "We believe in God, the Most High, and in Jesus Christ, the King. We honour Dominic Zachary Taylor, First Consul, a man under God, as lawgiver of the Republic and not as God, and we keep the precepts given in his name.";
+const RITE_TITLES = ["Lector", "Warden", "Elder"];
+const RITE_OLD = ["Keep your word to the people.", "Do not deceive the House.", "Give to the poor of your district.", "Keep the hearth; the fire is lent, not owned."];
+function riteState(){
+  if(!G.rite || !G.rite.v){
+    G.rite = {v:1, mode:"watch", cmds:[], amend:[], clergy:{}, interp:[], news:[], schism:null, chapels:{}, lastGather:0, seq:0};
+    RITE_OLD.forEach(t => riteAdd(t, "the old precepts", true));
+  }
+  return G.rite;
+}
+function riteGuardText(t){
+  t = String(t || "").replace(/\s+/g, " ").trim().slice(0, 160);
+  if(t.length < 4) return {err:"Write the precept out in a full line."};
+  if(/\b(taylor|first consul|the consul|consul)\b[^.]{0,30}\b(is|be|as|was)\s+(?:a\s+|the\s+)?(god|lord|divine|almighty|christ|messiah|saviour|savior|most high)\b/i.test(t) ||
+     /\bworship\b[^.]{0,30}\b(taylor|consul)\b/i.test(t))
+    return {err:"God is the Most High and Christ is King. A precept cannot make a man God."};
+  try{ if(typeof DTCNO !== "undefined" && DTCNO.guard && !DTCNO.guard(t)) return {err:"That line will not pass the House's own canon."}; }catch(e){}
+  return {t};
+}
+function riteAdd(text, by, quiet){
+  const R = G.rite; const g = riteGuardText(text); if(g.err) return g;
+  const same = R.cmds.find(c => !c.gone && c.t.toLowerCase().replace(/[^a-z ]/g, "").trim() === g.t.toLowerCase().replace(/[^a-z ]/g, "").trim());
+  if(same) return {err:"That precept is already given."};
+  const it = SEM.parse(g.t);
+  const c = {id:++R.seq, t:g.t, by:by || "you", day:G.day || 1, it};
+  R.cmds.push(c);
+  if(!quiet) riteNews("A new precept: “" + c.t + "”" + (it.ok ? " (read as " + riteGloss(it) + ")." : "."));
+  return {c};
+}
+function riteGloss(it){
+  if(!it || !it.ok) return "not yet understood";
+  const word = {honesty:"truthfulness", life:"the protection of life", property:"what belongs to others", integrity:"clean hands",
+    prudence:"care with the public purse", duty:"showing up to serve", reverence:"reverence for God", family:"the family",
+    hospitality:"welcome for the stranger", charity:"care for the poor", loyalty:"keeping one's word", speech:"a civil tongue",
+    justice:"fair dealing", obedience:"obedience to lawful precept"}[it.value] || it.value;
+  return (it.sign > 0 ? "" : "against ") + word + (it.who !== "all" ? ", binding " + it.who : "") + (it.scope !== "everywhere" ? ", " + it.scope : "") + (it.cond ? ", " + it.cond.k + " " + it.cond.t : "");
+}
+function riteActive(){ return riteState().cmds.filter(c => !c.gone); }
+function riteNews(t){ const R = riteState(); R.news.push({d:G.day || 1, t}); if(R.news.length > 30) R.news.splice(0, R.news.length - 30); try{ feed(t); }catch(e){} }
+/* ── who can believe: every member and townsperson, each in their own way ── */
+function ritePeople(){
+  const out = [];
+  (G.members || []).forEach(m => { if(m && !m.gone && !m.machine && m.kind !== "envoy") out.push(m); });
+  (G.civ || []).forEach(c => { if(c && !c.gone && !c.machine && c.kind !== "press" && !c.chaplain) out.push(c); });
+  return out;
+}
+/* what a person already cares about, read from who they are (not from the Rite) */
+function riteValueFit(p, v){
+  const t = p.traits || {}, pos = p.pos || {}, c = (typeof creedOf === "function" ? creedOf(p.creed) : null) || {};
+  const n = x => Math.max(-1, Math.min(1, (x || 0) / 50));
+  switch(v){
+    case "honesty": case "integrity": case "justice": return ((t.conviction || 50) - 50) / 50 * 0.7 + 0.2;
+    case "charity": return n(pos.wel) * 0.8 + 0.1;
+    case "prudence": return n(pos.econ) * 0.6 - n(pos.wel) * 0.3;
+    case "hospitality": return n(pos.lib) * 0.8;
+    case "reverence": return c.sincere ? 0.7 : c.sat ? -0.3 : 0.1;
+    case "family": return -n(pos.lib) * 0.4 + 0.2;
+    case "loyalty": case "obedience": case "duty": return ((t.loyalty || 50) - 50) / 50 * 0.7 + 0.1;
+    case "life": return -n(pos.def) * 0.5 + 0.3;
+    default: return 0.1;
+  }
+}
+function rbEnsure(p){
+  if(p.rb) return p.rb;
+  const r = Math.random;
+  const c = (typeof creedOf === "function" ? creedOf(p.creed) : null) || {};
+  const home = p.state === "Nieuw Oranje" || p.state === "Nieuw Haarlem";
+  let b = 0.18 + r() * 0.30 + (home ? 0.10 : 0) + (p.creed === "consul" ? 0.30 : 0) - (c.sincere ? 0.08 : 0) - (c.sat ? 0.04 : 0);
+  b = Math.max(0.02, Math.min(0.95, b));
+  p.rb = {b, a:b, u:0.05 + r() * 0.2, d:r() * 0.3, x:0, prev:p.creed === "consul" ? "none" : (p.creed || "none"), lean:r() < 0.5 ? "letter" : "spirit", lines:[]};
+  return p.rb;
+}
+function riteBelieves(p){ return !!(p && (p.creed === "consul" || p.consular)); }
+/* one quiet day of inner life */
+function riteDay(){
+  const R = riteState();
+  const cmds = riteActive().filter(c => c.it && c.it.ok);
+  const ppl = ritePeople();
+  const states = {};
+  (G.states || []).forEach(s => states[s.n] = s);
+  const believersHere = {};
+  ppl.forEach(p => { if(riteBelieves(p)){ const k = p.room || p.state || "x"; believersHere[k] = (believersHere[k] || 0) + 1; } });
+  const gatherToday = R.lastGather === G.day;
+  for(const p of ppl){
+    const s = rbEnsure(p);
+    /* exposure: believers around them, a gathering, the precepts read on holy days */
+    const near = believersHere[p.room || p.state || "x"] || 0;
+    /* the precepts are public: posted, printed in the Ledger, argued in the corridor */
+    const heard = cmds.length ? 0.10 + (R.lastProclaim && G.day - R.lastProclaim < 3 ? 0.2 : 0) : 0;
+    let x = heard + Math.min(1, near / 8) * 0.35 + (gatherToday ? 0.4 : 0) + ((typeof isTaylorDay === "function" && isTaylorDay()) ? 0.25 : 0);
+    s.x = s.x * 0.7 + x * 0.3;
+    /* understanding grows with exposure and their own thinking, fades without it */
+    s.u = Math.max(0, Math.min(1, s.u + 0.06 * s.x + 0.012 * Math.random() - 0.006));
+    /* do the precepts, as this person reads them, say what they already believe is right? */
+    let res = 0;
+    if(cmds.length){
+      for(const c of cmds) res += riteValueFit(p, c.it.value) * c.it.sign * SEM.reading(p, c.it).weight;
+      res /= cmds.length;
+    }
+    /* hardship sends people looking: toward the Rite if it speaks to them, away if it does not */
+    const st = states[p.state]; const hard = st ? Math.max(0, (st.unrest || 0) - 50) / 50 : 0;
+    /* hypocrisy they saw, and reflection */
+    const seenBroken = s.sawBroken && G.day - s.sawBroken < 4 ? 1 : 0;
+    s.d = Math.max(0, Math.min(1, s.d * 0.96 + 0.04 * seenBroken + 0.02 * hard * (res < 0 ? 1 : 0) + 0.015 * (Math.random() - 0.5)));
+    const db = s.u * (0.09 * res + 0.03 * s.x * (res > -0.1 ? 1 : -0.5)) + 0.02 * hard * Math.sign(res || -0.01) - 0.012 * s.d + 0.016 * (Math.random() - 0.5);
+    /* who they already are pulls back; what they live through slowly changes who they are */
+    if(s.a === undefined) s.a = s.b;
+    s.a = Math.max(0.02, Math.min(0.98, s.a + 0.15 * db));
+    s.b = Math.max(0.01, Math.min(0.99, s.b + db + 0.05 * (s.a - s.b)));
+    /* their own decision, on their own time */
+    if(!riteBelieves(p) && s.b > 0.64 && Math.random() < 0.25) riteJoin(p);
+    else if(riteBelieves(p) && s.b < 0.32 && Math.random() < 0.25) riteLeave(p);
+  }
+  riteClergyDay(cmds);
+}
+function riteJoin(p){
+  const s = rbEnsure(p);
+  s.prev = p.creed && p.creed !== "consul" ? p.creed : s.prev;
+  p.creed = "consul"; p.consular = true; if(p.kind === "member") p.faction = "consul";
+  p.soul = null; try{ soulEnsure(p); }catch(e){}
+  s.lines.push(pick(["I went to the gathering on the steps and stayed for the precepts. Nobody asked me to.", "I read the precepts three times. The third time they read me back.", "God first. Christ the King. And the Consul's law under them. I can live by that."]));
+  if(p.kind === "member" && chance(0.5)) riteNews((p.name ? surname(p.name) : "A member") + " has been seen at the Rite's gatherings.");
+}
+function riteLeave(p){
+  const s = rbEnsure(p);
+  p.creed = s.prev || "none"; p.consular = false; if(p.faction === "consul") p.faction = null;
+  p.soul = null; try{ soulEnsure(p); }catch(e){}
+  s.lines.push(pick(["I stopped going. The precepts did not change. I did.", "I kept the first line of the creed. The rest I gave back.", "I could not square it with what I saw in the cloakroom."]));
+  if(p.kind === "member" && chance(0.5)) riteNews((p.name ? surname(p.name) : "A member") + " no longer keeps the Rite's hours.");
+}
+/* ── clergy: interpret, propose amendments, argue, sometimes split ── */
+function riteClergyDay(cmds){
+  const R = riteState();
+  const bel = ritePeople().filter(p => riteBelieves(p) && p.kind === "member");
+  /* the Rite raises its own clergy in Watch; in Hands-on the First Consul's ordinations stand too */
+  if(R.mode === "watch"){
+    const want = Math.min(5, Math.max(1, Math.round(bel.length / 4)));
+    const cur = Object.keys(R.clergy).filter(id => bel.some(p => String(p.id) === id));
+    if(cur.length < want){
+      const cand = bel.filter(p => !R.clergy[p.id]).sort((a, b) => (rbEnsure(b).u + rbEnsure(b).b) - (rbEnsure(a).u + rbEnsure(a).b))[0];
+      if(cand){ R.clergy[cand.id] = {rank:cur.length === 0 ? 2 : (cur.length < 3 ? 1 : 0), day:G.day}; riteNews(surname(cand.name) + " is named " + RITE_TITLES[R.clergy[cand.id].rank] + " of the Rite by its own members."); }
+    }
+  }
+  Object.keys(R.clergy).forEach(id => { if(!bel.some(p => String(p.id) === id) && !(G.members || []).some(m => String(m.id) === id && riteBelieves(m))) delete R.clergy[id]; });
+  const clergy = bel.filter(p => R.clergy[p.id]);
+  if(clergy.length && cmds.length && chance(0.7)){
+    const who = pick(clergy), c = pick(cmds), rd = SEM.reading(who, c.it);
+    const t = riteInterpret(who, c, rd);
+    R.interp.push({d:G.day, who:who.name, t}); if(R.interp.length > 20) R.interp.shift();
+    rbEnsure(who).lines.push(t);
+  }
+  /* conflicts the clergy notice */
+  for(let i = 0; i < cmds.length; i++) for(let j = i + 1; j < cmds.length; j++){
+    const rel = SEM.relate(cmds[i].it, cmds[j].it);
+    if(rel && rel.k === "conflict" && !R.amend.some(a => !a.done && a.target === cmds[j].id) && clergy.length && chance(0.5))
+      riteProposeAmend(pick(clergy), cmds[j], "repeal", "it contradicts precept " + (riteActive().indexOf(cmds[i]) + 1));
+  }
+  if(clergy.length && cmds.length && chance(R.mode === "watch" ? 0.18 : 0.08)){
+    const who = pick(clergy), c = pick(cmds), s = rbEnsure(who);
+    if(!c.it.cond && s.lean === "spirit") riteProposeAmend(who, c, "cond", null);
+    else if(c.it.scope === "everywhere" && s.lean === "letter") riteProposeAmend(who, c, "scope", null);
+  }
+  /* proposals decide themselves in time: the world never waits */
+  R.amend.forEach(a => { if(!a.done && (R.mode === "watch" || G.day - a.d >= 3)) riteVoteAmend(a); });
+  /* a schism heals after a while if a gathering brings them back */
+  if(R.schism && G.day - R.schism.d > 9 && R.lastGather > R.schism.d && chance(0.3)){ riteNews("The " + R.schism.name + " and the rest of the Rite kept the Seventh-day gathering together. The split is mended."); R.schism = null; }
+  /* gatherings: every seventh day the clergy call one; revival when times are hard */
+  const hard = (G.states || []).some(s => (s.unrest || 0) > 70);
+  if(R.mode === "watch" && clergy.length && (G.day % 7 === 0 || (hard && chance(0.15)))) riteGather(pick(clergy).name, hard && G.day % 7 ? "a revival meeting" : "the Seventh-day gathering");
+  /* chapels grow where believers live */
+  const by = {};
+  ritePeople().forEach(p => { if(riteBelieves(p) && p.state) by[p.state] = (by[p.state] || 0) + 1; });
+  Object.keys(by).forEach(st => { const want = Math.floor(by[st] / 3); const have = R.chapels[st] || 0;
+    if(want > have && chance(0.3)){ R.chapels[st] = have + 1; riteNews("Believers in " + st + " have opened a Consular chapel" + (have ? " (their " + (have + 1) + (have === 1 ? "nd" : "rd") + ")" : "") + "."); } });
+}
+function riteInterpret(who, c, rd){
+  const n = riteActive().indexOf(c) + 1, it = c.it, title = RITE_TITLES[(G.rite.clergy[who.id] || {}).rank || 0];
+  const head = title + " " + surname(who.name) + " on precept " + n + ", “" + c.t + "”: ";
+  const strict = rd.literal > 0.55;
+  const body = {
+    honesty: strict ? "a half-truth told to the gallery is still a lie, and so is a count read wrong on purpose." : "the precept guards the people from being misled; a kind silence is not a lie.",
+    life: strict ? "no exception is written, so none may be read in." : "it forbids cruelty and the taking of life; it does not forbid a nation to stand guard.",
+    property: strict ? "the treasury is a neighbour's house." : "it binds the hand, and the ledger the hand keeps.",
+    integrity: strict ? "a lunch is a gift and a gift is a hook." : "a gift that buys nothing is courtesy; one that buys a vote is the sin.",
+    prudence: strict ? "a debt left to our children is spending their bread." : "prudence is not meanness; spend what heals, refuse what flatters.",
+    duty: strict ? "an empty seat at a division is a broken precept." : "duty is the work, not only the roll call.",
+    reverence: strict ? "God first, before the House, before the Consul." : "reverence is how we treat the work as well as the altar.",
+    family: strict ? "a member's family is not a campaign prop." : "the family is the first district every member serves.",
+    hospitality: strict ? "the stranger at the door is welcomed, without a form." : "welcome is owed; order is not cruelty; both can be kept.",
+    charity: strict ? "the poor are owed, not merely helped." : "give where it reaches the hungry, not where it reaches the cameras.",
+    loyalty: strict ? "a pledge outlives the mood that made it." : "a pledge to do wrong is not kept by doing it.",
+    speech: strict ? "no word about a rival you would not say to their face." : "argue hard; do not defame.",
+    justice: strict ? "one rule for the chamber and the street." : "fairness weighs the weak more gently, not less.",
+    obedience: strict ? "a lawful precept is obeyed before it is understood." : "obey, and ask why while you do."
+  }[it.value] || "it means what it says, and more than it says.";
+  return head + body;
+}
+function riteProposeAmend(who, c, kind, why){
+  const R = riteState();
+  let to = c.t;
+  if(kind === "cond") to = c.t.replace(/[.!]?$/, "") + ", unless the people are in need.";
+  else if(kind === "scope") to = c.t.replace(/[.!]?$/, "") + ", in the House and at home.";
+  else if(kind === "repeal") to = null;
+  const a = {id:++R.seq, d:G.day, by:who.name, byId:who.id, target:c.id, kind, to, why, done:false};
+  R.amend.push(a); if(R.amend.length > 24) R.amend.shift();
+  riteNews(surname(who.name) + " proposes to " + (kind === "repeal" ? "repeal" : "amend") + " precept " + (riteActive().indexOf(c) + 1) + (to ? ": “" + to + "”" : "") + (why ? " (" + why + ")." : "."));
+}
+function riteVoteAmend(a){
+  const R = riteState(); if(a.done) return;
+  const c = R.cmds.find(x => x.id === a.target && !x.gone); if(!c){ a.done = true; return; }
+  const voters = ritePeople().filter(p => riteBelieves(p) && p.kind === "member");
+  let aye = 0, no = 0;
+  voters.forEach(p => { const s = rbEnsure(p);
+    const lean = a.kind === "cond" ? (s.lean === "spirit" ? 0.65 : 0.3) : a.kind === "scope" ? (s.lean === "letter" ? 0.65 : 0.35) : 0.5;
+    (Math.random() < lean ? aye++ : no++); });
+  a.done = true; a.aye = aye; a.no = no;
+  const pass = aye > no;
+  if(pass){
+    if(a.kind === "repeal"){ c.gone = true; c.goneDay = G.day; }
+    else { c.t = a.to; c.it = SEM.parse(a.to); c.amended = G.day; }
+  }
+  riteNews("The Rite voted on " + surname(a.by) + "'s " + (a.kind === "repeal" ? "repeal" : "amendment") + ": " + aye + " to " + no + ", " + (pass ? "carried." : "lost."));
+  /* a close, bitter vote can split the Rite */
+  if(!R.schism && voters.length >= 6 && Math.abs(aye - no) <= 1 && chance(0.35)){
+    R.schism = {d:G.day, name:a.kind === "cond" || pass ? "Strict Observance" : "Wide Reading", by:a.by};
+    riteNews("Part of the Rite will not accept the vote. They call themselves the " + R.schism.name + " and keep their own hours.");
+  }
+}
+function riteGather(by, what){
+  const R = riteState(); if(R.lastGather === G.day) return;
+  R.lastGather = G.day;
+  riteNews((by ? surname(by) + " called " : "The Rite holds ") + what + " on the East Steps. The creed is read first: God the Most High, Christ the King.");
+  try{ (G.events = G.events || []).push({k:"townhall", hour:17, room:"steps", day:G.day, done:false, t:"The Consular Rite gathers", d:"The creed is read first: God the Most High, Christ the King. Then the precepts, and an argument about what they mean."}); }catch(e){}
+}
+/* ── how belief shows: votes, words, conduct ── */
+const RITE_BILLVAL = (bill, v) => {
+  const p = bill && bill.pos || {}; const n = x => Math.max(-1, Math.min(1, (x || 0) / 50));
+  const k = ((bill && (bill.kind || "")) + " " + (bill && bill.title || "")).toLowerCase();
+  switch(v){
+    case "hospitality": return /immig|border|refug|asylum/.test(k) ? n(p.lib) : 0;
+    case "charity": return n(p.wel) * 0.8;
+    case "prudence": return -n(p.wel) * 0.5 + n(p.econ) * 0.3;
+    case "life": return /war|defen|arm|milit/.test(k) ? -n(p.def) : 0;
+    case "honesty": case "integrity": case "justice": return /ethic|transparen|audit|disclos|lobby|record|oath/.test(k) ? 0.8 : 0;
+    case "family": return /famil|child|school|marri/.test(k) ? 0.6 : 0;
+    case "reverence": return /church|faith|sabbath|relig/.test(k) ? 0.6 : 0;
+    default: return 0;
+  }
+};
+function ritePush(m, bill){
+  if(!riteBelieves(m) || !G.rite) return 0;
+  const s = rbEnsure(m); let push = 0;
+  for(const c of riteActive()){ if(!c.it || !c.it.ok) continue;
+    if(c.it.who === "clergy" || c.it.who === "officials") continue;
+    push += c.it.sign * RITE_BILLVAL(bill, c.it.value) * SEM.reading(m, c.it).weight; }
+  return push * s.u * s.b;
+}
+function riteHash(a){ let h = 2166136261; a = String(a); for(let i = 0; i < a.length; i++){ h ^= a.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0) / 4294967296; }
+function riteVoteWrap(orig){
+  return function(m, bill){
+    const v = orig(m, bill);
+    try{
+      if(!bill || (typeof isTaylorDay === "function" && isTaylorDay())) return v;
+      const p = ritePush(m, bill);
+      if(p && Math.abs(p) > 0.12 && Math.sign(p) !== v){
+        const conv = ((m.traits || {}).conviction || 50) / 100;
+        if(riteHash(m.id + "|" + (bill.id || bill.title) + "|" + G.day) < Math.min(0.75, Math.abs(p) * 2.2) * (1.1 - conv * 0.4)){
+          if(!m._riteNote || m._riteNote !== (bill.id || bill.title)){ m._riteNote = bill.id || bill.title; rbEnsure(m).lines.push("I voted the precept, not the whip, on " + (bill.title || "the bill") + "."); }
+          return Math.sign(p);
+        }
+        /* they voted against a precept they understand: the Rite notices */
+        if(rbEnsure(m).u > 0.45 && m._riteBroke !== (bill.id || bill.title)){ m._riteBroke = bill.id || bill.title; riteBroken(m, bill); }
+      }
+    }catch(e){}
+    return v;
+  };
+}
+function riteBroken(m, bill){
+  const R = riteState();
+  rbEnsure(m).lines.push("I voted against what I believe the precepts say. I will hear about it at the gathering.");
+  const others = ritePeople().filter(p => p !== m && riteBelieves(p) && p.kind === "member");
+  others.forEach(p => { const s = rbEnsure(p); s.sawBroken = G.day; p._riteCool = p._riteCool || {}; p._riteCool[m.id] = (p._riteCool[m.id] || 0) + 1; });
+  const elder = others.find(p => R.clergy[p.id]);
+  if(elder && elder.room === m.room){ elder.say = pick(["The precept was plain. So was your vote.", "We will speak of it at the gathering. Not here.", "Keep your seat. Keep your word too."]); elder.sayT = 3.5; elder.sayTo = m.id; }
+  if(chance(0.3)) R.news.push({d:G.day, t:"Some in the Rite are cool toward " + surname(m.name) + " after the vote on " + (bill.title || "the bill") + "."});
+}
+function riteLine(m){
+  if(!riteBelieves(m) || !G.rite) return null;
+  const s = rbEnsure(m), cmds = riteActive().filter(c => c.it && c.it.ok);
+  if(!cmds.length || s.u < 0.25) return null;
+  if(s.lines.length && chance(0.3)) return s.lines[s.lines.length - 1 - Math.floor(Math.random() * Math.min(3, s.lines.length))];
+  const c = pick(cmds), rd = SEM.reading(m, c.it);
+  const L = rd.literal > 0.55
+    ? ["The precept says “" + c.t + "” It does not say ‘mostly’.", "“" + c.t + "” I read it as it is written.", "God first, then the precept: “" + c.t + "”"]
+    : ["“" + c.t + "” The spirit of it is " + riteGloss(c.it) + ". The letter is for lawyers.", "I keep “" + c.t + "” the way you keep a friend: on purpose.", "The precept about " + riteGloss(c.it) + " is the one I argue with most. That is how I keep it."];
+  if(s.u > 0.7 && chance(0.04)) L.push("The elders say the lanes were built by a clerk who signed only P. He would not let them put his name on the wall. I like him for that.");
+  if(G.rite.schism && chance(0.3)) L.push("The " + G.rite.schism.name + " will tell you I read it wrong. Ask them what they skipped.");
+  return pick(L);
+}
+function riteLedgerHTML(){
+  const R = G.rite; if(!R) return "";
+  const D = G.day || 1;
+  const fresh = R.news.filter(n => D - n.d <= 1).slice(-4).map(n => '<p>· ' + n.t + '</p>').join("");
+  const it = R.interp.filter(x => D - x.d <= 2).slice(-1).map(x => '<p class="dream">' + x.t + '</p>').join("");
+  let census = "";
+  if(D % 5 === 0){
+    const bel = ritePeople().filter(p => riteBelieves(p) && p.kind === "member").length;
+    const est = Math.max(0, Math.round(bel * (0.75 + Math.random() * 0.5)));
+    const cl = (G.members || []).find(m => R.clergy[m.id]);
+    if(cl) census = '<p>· ' + surname(cl.name) + ' of the Rite reckons “about ' + est + ' in the House keep the precepts, give or take, and God knows the rest.”</p>';
+  }
+  const frag = riteFragment();
+  if(!fresh && !it && !census && !frag) return "";
+  return '<h3>From the Consular Rite</h3>' + it + fresh + census + frag;
+}
+/* ── the precepts card: write, edit, reorder, repeal; mode; hands-on acts ── */
+function riteCard(msg){
+  const R = riteState();
+  G.running = false;
+  const act = riteActive();
+  const rel = [];
+  for(let i = 0; i < act.length; i++) for(let j = i + 1; j < act.length; j++){ const r = SEM.relate(act[i].it, act[j].it); if(r) rel.push((i + 1) + " and " + (j + 1) + ": " + (r.k === "conflict" ? "contradict each other" : r.k === "tension" ? "pull against each other" : "support each other")); }
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+  const rows = act.map((c, i) => '<div class="whip__row"><span class="whip__n">' + (i + 1) + '. ' + esc(c.t) + '<br><small style="opacity:.7">read as ' + esc(riteGloss(c.it)) + (c.by !== "you" ? " · " + esc(c.by) : "") + '</small></span><span class="whip__w">' +
+    '<button type="button" class="btn btn--ghost" data-rt="up" data-id="' + c.id + '">Up</button><button type="button" class="btn btn--ghost" data-rt="down" data-id="' + c.id + '">Down</button>' +
+    '<button type="button" class="btn btn--ghost" data-rt="edit" data-id="' + c.id + '">Edit</button><button type="button" class="btn btn--ghost" data-rt="repeal" data-id="' + c.id + '">Repeal</button></span></div>').join("");
+  const pend = R.amend.filter(a => !a.done).map(a => '<div class="whip__row"><span class="whip__n">' + esc(surname(a.by)) + ': ' + (a.kind === "repeal" ? "repeal" : "“" + esc(a.to) + "”") + '</span><span class="whip__w">' +
+    (R.mode === "hands" ? '<button type="button" class="btn btn--ghost" data-rt="accept" data-id="' + a.id + '">Accept</button><button type="button" class="btn btn--ghost" data-rt="reject" data-id="' + a.id + '">Reject</button>' : 'the Rite will vote') + '</span></div>').join("");
+  const bel = ritePeople().filter(p => riteBelieves(p) && p.kind === "member" && !R.clergy[p.id]);
+  card.innerHTML = '<div class="eyebrow">The Consular Rite · precepts given in the First Consul\'s name</div>' +
+    '<h1>The Precepts</h1><p class="dream">' + RITE_CREED + '</p>' +
+    (msg ? '<p><strong>' + esc(msg) + '</strong></p>' : '') +
+    (rows || '<p>No precepts stand.</p>') +
+    (rel.length ? '<p class="dream">The clergy note: ' + rel.join("; ") + '.</p>' : '') +
+    (pend ? '<h3>Proposed by the clergy</h3>' + pend : '') +
+    '<p><input id="rtText" maxlength="160" style="width:100%" placeholder="Write a precept, e.g. Never deceive the people."></p>' +
+    '<div class="card__actions"><button type="button" class="btn" data-rt="add">Give this precept</button>' +
+    '<button type="button" class="btn btn--ghost" data-rt="mode">' + (R.mode === "hands" ? "Mode: Hands-on (switch to Watch)" : "Mode: Watch (switch to Hands-on)") + '</button></div>' +
+    (R.mode === "hands" ? '<div class="card__actions"><button type="button" class="btn btn--ghost" data-rt="gather">Call a gathering</button>' +
+      '<button type="button" class="btn btn--ghost" data-rt="proclaim">Proclaim the line above</button>' +
+      (bel.length ? '<select id="rtOrd">' + bel.slice(0, 30).map(p => '<option value="' + p.id + '">' + esc(p.name) + '</option>').join("") + '</select><button type="button" class="btn btn--ghost" data-rt="ordain">Ordain</button>' : '') + '</div>' : '') +
+    '<p style="opacity:.7">Nobody is made to believe. Who keeps the precepts, and how, is each person\'s own.</p>' +
+    '<div class="card__actions"><button type="button" class="btn" data-rt="close">Close</button></div>';
+  veil.hidden = false;
+  card.onclick = e => {
+    const b = e.target.closest && e.target.closest("[data-rt]"); if(!b) return;
+    const k = b.dataset.rt, id = +b.dataset.id, txt = (el("rtText") || {}).value || "";
+    const c = R.cmds.find(x => x.id === id);
+    if(k === "close"){ card.onclick = null; walkNow(); return; }
+    if(k === "add"){ const r = riteAdd(txt, "you"); return riteCard(r.err || "Given."); }
+    if(k === "edit" && c){ if(!txt.trim()) return riteCard("Write the new wording in the box, then press Edit."); const g = riteGuardText(txt); if(g.err) return riteCard(g.err); if(R.cmds.some(o => o !== c && !o.gone && o.t.toLowerCase() === g.t.toLowerCase())) return riteCard("That precept is already given.");
+      c.t = g.t; c.it = SEM.parse(g.t); c.amended = G.day; riteNews("Precept " + (act.indexOf(c) + 1) + " now reads: “" + c.t + "”"); return riteCard("Amended."); }
+    if(k === "repeal" && c){ c.gone = true; c.goneDay = G.day; riteNews("Precept repealed: “" + c.t + "”"); return riteCard("Repealed."); }
+    if((k === "up" || k === "down") && c){ const all = R.cmds, i = all.indexOf(c); const live = all.filter(x => !x.gone); const li = live.indexOf(c); const o = live[li + (k === "up" ? -1 : 1)];
+      if(o){ const j = all.indexOf(o); all[i] = o; all[j] = c; } return riteCard(); }
+    if(k === "mode"){ R.mode = R.mode === "hands" ? "watch" : "hands"; riteNews(R.mode === "hands" ? "The First Consul's precepts are given by his own hand for now." : "The Rite is left to keep itself."); return riteCard(); }
+    if(k === "accept" || k === "reject"){ const a = R.amend.find(x => x.id === id); if(a && !a.done){ if(k === "accept"){ riteVoteAmendForced(a); } else { a.done = true; riteNews("The proposal from " + surname(a.by) + " was set aside."); } } return riteCard(); }
+    if(k === "gather"){ riteGather(G.you && G.you.name, "a gathering"); return riteCard("Called for this evening on the Steps."); }
+    if(k === "proclaim"){ const g = riteGuardText(txt); if(g.err) return riteCard(g.err); R.lastProclaim = G.day; riteNews("Proclaimed: “" + g.t + "”"); return riteCard("Proclaimed."); }
+    if(k === "ordain"){ const sel = el("rtOrd"); const p = sel && (G.members || []).find(m => String(m.id) === sel.value); if(p){ R.clergy[p.id] = {rank:0, day:G.day, by:"you"}; riteNews(surname(p.name) + " is ordained Lector of the Rite."); } return riteCard(); }
+  };
+}
+function riteVoteAmendForced(a){
+  const R = riteState(); const c = R.cmds.find(x => x.id === a.target && !x.gone); a.done = true;
+  if(!c) return;
+  if(a.kind === "repeal"){ c.gone = true; c.goneDay = G.day; } else { c.t = a.to; c.it = SEM.parse(a.to); c.amended = G.day; }
+  riteNews("Accepted: " + (a.kind === "repeal" ? "precept repealed" : "precept now reads “" + a.to + "”") + ".");
+}
+/* ── people who do not keep the Rite speak as themselves ── */
+function riteDoubtLine(m){
+  if(!m || riteBelieves(m) || !G.rite) return null;
+  const s = rbEnsure(m); if(s.x < 0.15) return null;
+  const c = pick(riteActive().filter(c => c.it && c.it.ok)) || null;
+  const L = ["I have heard the precepts. Good advice. I do not need a rite to take it.",
+    "God is the Most High. I do not see why I need a Consul's list to say so.",
+    "My mother kept the Latin. That is enough church for one family.",
+    "They are decent people. I am not one of them, and they leave it there."];
+  if(c) L.push("“" + c.t + "” Fine. I would do that anyway, and I do not kneel for it.");
+  if(m.creed && m.creed !== "none" && m.creed !== "consul") L.push("I have a faith already. Ask me about it some time.");
+  return pick(L);
+}
+/* a word at the bronze is only that: the other person decides, later, on their own */
+function riteRecruitTalk(from, to, why){
+  try{ if(!canConsularRecruit(from, to)) return false; }catch(e){ return false; }
+  if(to._consulAskDay === G.day) return false;
+  to._consulAskDay = G.day;
+  const s = rbEnsure(to); s.x = Math.min(1, s.x + 0.08);
+  from.say = pick(CONSULAR_LITURGY); from.sayT = 3.8; from.sayTo = to.id;
+  to.say = pick(["I will think about it.", "I keep my own.", "God is the Most High. On that we agree.", "Not today."]);
+  to.sayT = 3.6; to.sayTo = from.id;
+  return false;
+}
+/* old fragments (rare): a man who carried the fire and would not keep it */
+const RITE_FRAGMENTS = [
+  "From the oldest bound volume of the Ledger, unsigned but for a “P.”: “Let the four lanes argue, the heart, the story, the ethic and the reckoning, until justice settles out of them. The hand that signs is a man’s. Ave Christus Rex is the line no vote can reach.”",
+  "Found in a binding repaired three times: “The thunderbolt is not mine. I only carried it across the street. P.”",
+  "A margin note in an old precept-book: “Two councils, the one that prays and the one that counts. Neither may be dissolved. The fire is lent.”",
+  "An archivist’s query to the Ledger: who was the clerk who wrote the first seven precepts down, and why did he refuse to put his name on them?"
+];
+function riteFragment(){
+  const D = G.day || 1;
+  if(D % 9 !== 4) return "";
+  return '<p class="dream">' + RITE_FRAGMENTS[Math.floor(D / 9) % RITE_FRAGMENTS.length] + '</p>';
+}
+
+/* ── 20261012f · middle mouse: pick up, carry, set down ──────────────────────
+   Middle button on a person or a piece of furniture lifts it; drag carries it over
+   the floor with a ring (green: can go here, red: cannot); release sets it down.
+   Walls and the building itself stay put. Middle-drag on empty space looks around
+   as before. Pads are untouched. Placements are saved. */
+const GRAB = {on:null, ray:null, ring:null};
+function grabSig(o){ let n = 0; o.traverse(x => { if(x.isMesh) n++; }); return o.type + ":" + n; }
+function grabRoot(obj){
+  let o = obj;
+  while(o && o.parent && o.parent !== roomGroup && o.parent !== peopleGroup && o.parent !== scene) o = o.parent;
+  return o && (o.parent === roomGroup || o.parent === peopleGroup) ? o : null;
+}
+function grabBounds(){
+  const R = ROOMS[G.room] || {w:10, d:10};
+  const hw = R.w / 2 - 0.35;
+  return {x0:-hw, x1:hw, z0:0.35, z1:R.d - 0.35};
+}
+function grabFloorAt(e){
+  const r = renderer.domElement.getBoundingClientRect();
+  const ndc = {x:(e.clientX - r.left) / r.width * 2 - 1, y:-((e.clientY - r.top) / r.height * 2 - 1)};
+  GRAB.ray = GRAB.ray || new THREE.Raycaster();
+  GRAB.ray.setFromCamera(ndc, camera);
+  return ndc;
+}
+function grabStart(e){
+  if(e.button !== 1 || !G.running || TALK.open) return;
+  grabFloorAt(e);
+  const hits = GRAB.ray.intersectObjects([peopleGroup, roomGroup], true);
+  let root = null, person = null, hit = null;
+  for(const h of hits){ hit = h;
+    const o = grabRoot(h.object); if(!o) continue;
+    if(o.isLight) continue;
+    if(o.parent === peopleGroup){ person = everyone().find(p => p.mesh === o) || null; if(person && person.kind === "you") continue; root = o; break; }
+    const box = new THREE.Box3().setFromObject(o), sz = box.getSize(new THREE.Vector3());
+    if(sz.x > 3.4 || sz.z > 3.4 || sz.y > 2.7){ feed("That is part of the building. It stays."); e.preventDefault(); e.stopImmediatePropagation(); return; }
+    root = o; break;
+  }
+  if(!root) return;                                 /* empty space: the usual middle-drag */
+  e.preventDefault(); e.stopImmediatePropagation();
+  try{ renderer.domElement.setPointerCapture(e.pointerId); }catch(x){}
+  if(!GRAB.ring){
+    GRAB.ring = new THREE.Mesh(new THREE.RingGeometry(0.32, 0.42, 32), new THREE.MeshBasicMaterial({color:0x4cd964, transparent:true, opacity:0.8, depthWrite:false, side:THREE.DoubleSide}));
+    GRAB.ring.rotation.x = -Math.PI / 2;
+  }
+  scene.add(GRAB.ring);
+  const bb = new THREE.Box3().setFromObject(root), cc = bb.getCenter(new THREE.Vector3());
+  GRAB.on = {root, person, hy:hit.point.y, hx:hit.point.x, hz:hit.point.z, cx:cc.x, cz:cc.z, x0:root.position.x, z0:root.position.z, y0:root.position.y, ok:true,
+             sig:grabSig(root), ox:root.userData.grabOx !== undefined ? root.userData.grabOx : root.position.x, oz:root.userData.grabOz !== undefined ? root.userData.grabOz : root.position.z};
+  root.userData.grabOx = GRAB.on.ox; root.userData.grabOz = GRAB.on.oz;
+  if(person){ person._held = true; GRAB.on.px0 = person.x; GRAB.on.pz0 = person.z; root.position.x = person.x; root.position.z = person.z; GRAB.on.x0 = person.x; GRAB.on.z0 = person.z; }
+  root.position.y = GRAB.on.y0 + 0.12;
+  GRAB.ring.position.set(cc.x, 0.03, cc.z);
+  feed(person ? "Picked up " + (person.name ? surname(person.name) : "them") + "." : "Picked it up.");
+}
+function grabMove(e){
+  const g = GRAB.on; if(!g) return;
+  e.stopImmediatePropagation();
+  grabFloorAt(e);
+  /* drag on the horizontal plane at the height it was picked up: works for props whose geometry is baked off-origin */
+  const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -g.hy), q = new THREE.Vector3();
+  if(!GRAB.ray.ray.intersectPlane(plane, q)) return;
+  const dx = q.x - g.hx, dz = q.z - g.hz;
+  const p = {x:g.cx + dx, z:g.cz + dz};
+  /* parent-space: room and people groups sit at the origin */
+  const B = grabBounds();
+  /* people need room to stand; a prop may sit right against a wall but never through it */
+  const m = g.person ? 0 : 0.33;
+  g.ok = p.x > B.x0 - m && p.x < B.x1 + m && p.z > B.z0 - m && p.z < B.z1 + m;
+  g.why = g.ok ? "" : "out of the room, or inside a wall";
+  g.root.position.x = g.x0 + dx; g.root.position.z = g.z0 + dz;
+  if(g.person){ g.person.x = g.person.tx = g.root.position.x; g.person.z = g.person.tz = g.root.position.z; }
+  GRAB.ring.position.set(p.x, 0.03, p.z);
+  GRAB.ring.material.color.setHex(g.ok ? 0x4cd964 : 0xff4d4d);
+}
+function grabEnd(e){
+  const g = GRAB.on; if(!g) return;
+  e.stopImmediatePropagation();
+  GRAB.on = null; scene.remove(GRAB.ring);
+  g.root.position.y = g.y0;
+  if(!g.ok){
+    g.root.position.x = g.x0; g.root.position.z = g.z0;
+    if(g.person){ g.person._held = false; g.person.x = g.person.tx = g.px0; g.person.z = g.person.tz = g.pz0; }
+    feed("Cannot set it down there: " + g.why + ". Put back.");
+    return;
+  }
+  const x = g.root.position.x, z = g.root.position.z;
+  if(g.person){
+    const p = g.person; p._held = false;
+    p.x = x; p.z = z; p.tx = x; p.tz = z; p.room = G.room; p.wait = 0.5; p.path = null; p.sitting = false;
+    feed((p.name ? surname(p.name) : "They") + " set down. They will find their own way from here.");
+  } else {
+    const P = G.placed || (G.placed = {}); const L = P[G.room] || (P[G.room] = []);
+    const k = L.find(q => Math.abs(q.ox - g.ox) < 0.05 && Math.abs(q.oz - g.oz) < 0.05 && q.sig === g.sig);
+    if(k){ k.x = x; k.z = z; } else L.push({ox:+g.ox.toFixed(3), oz:+g.oz.toFixed(3), sig:g.sig, x:+x.toFixed(3), z:+z.toFixed(3)});
+    try{ renderer.shadowMap.needsUpdate = true; }catch(x2){}
+    feed("Set down.");
+  }
+  try{ save(); }catch(x3){}
+}
+function grabApply(){
+  const L = G.placed && G.placed[G.room]; if(!L || !L.length || !roomGroup) return;
+  roomGroup.children.forEach(o => {
+    const ox = o.userData.grabOx !== undefined ? o.userData.grabOx : o.position.x, oz = o.userData.grabOz !== undefined ? o.userData.grabOz : o.position.z;
+    const q = L.find(q => Math.abs(q.ox - ox) < 0.05 && Math.abs(q.oz - oz) < 0.05 && q.sig === grabSig(o));
+    if(q){ o.userData.grabOx = ox; o.userData.grabOz = oz; o.position.x = q.x; o.position.z = q.z; }
+  });
+}
+function grabBoot(){
+  const c = renderer.domElement;
+  c.addEventListener("pointerdown", grabStart, {capture:true});
+  c.addEventListener("pointermove", grabMove, {capture:true});
+  c.addEventListener("pointerup", grabEnd, {capture:true});
+  c.addEventListener("mousedown", e => { if(e.button === 1) e.preventDefault(); }, {capture:true});
+  c.addEventListener("auxclick", e => { if(e.button === 1) e.preventDefault(); });
+}
+
+
+function riteBoot(){
+  if(riteBoot.done) return; riteBoot.done = true;
+  try{ const mv = memberVote; memberVote = riteVoteWrap(mv); }catch(e){}
+  try{ consularRecruit = riteRecruitTalk; }catch(e){}
+  try{
+    const ds = DTCNO.say;
+    DTCNO.say = function(m, ctx){
+      const base = ds.apply(this, arguments);
+      try{
+        if(m && G.rite && chance(0.10)){
+          const alt = riteBelieves(m) ? riteLine(m) : riteDoubtLine(m);
+          const v = alt && DTCNO.guard(alt);
+          if(v && !riteGuardText(v).err) return v;
+        }
+      }catch(e){}
+      return base;
+    };
+  }catch(e){}
+  try{ const br = buildRoom; buildRoom = function(){ const r = br.apply(this, arguments); try{ grabApply(); }catch(e){} return r; }; }catch(e){}
+  try{ grabBoot(); }catch(e){}
+}
+setTimeout(() => { try{ riteBoot(); }catch(e){} }, 0);
+
 const MATCACHE = new Map();
 /* Every distinct repeat used to clone the texture and its normal map, so
    a wall tiled 4.13 times and the same wall tiled 4.2 times were two more
@@ -6326,7 +7032,7 @@ function propChurch(x, z){
     addCyl(matCol(0xa9aea6,.85), x, 5.05, z, 0.07, 2.2);
     addBox(matCol(0x3a4a72,.80), x + 0.32, 5.85, z, 0.70, 0.42, 0.04, 0, true);
     addBox(dark, x, 0.58, z - 0.62, 0.46, 1.16, 0.06, 0, true);
-    try{ propPlaque(x, 3.15, z - 0.68, 0, "CIVIC FLAME", "The Republic", 1.10, 0.24); }catch(e){}
+    try{ propPlaque(x, 3.15, z - 0.68, 0, "CIVIC FLAME", "Carried, not kept", 1.10, 0.24); }catch(e){}
     return;
   }
   if(k === "green"){
@@ -13923,7 +14629,7 @@ function makeEvents(){
         ". Only Nieuw Oranje VII flies — the Jerusalem cross, not a man. The clerk reads: “" + pick(TAYLOR_LITURGY) + "” The Consul pointed at Him. The House does not point at the Consul." + billBit});
     G.events.push({k:"caucus", hour:10, room:"cloak",
       t:"The Consular Rite",
-      d:"A handful keep the Latin and put the First Consul where God belongs. The chaplain will not give them the Host. The House calls it heresy."});
+      d:"A handful keep the Latin and the First Consul's precepts as a rule of life. The chaplain watches them closely and says so."});
     if(chance(.4)) G.events.push({k:"townhall", hour:15, room:"steps",
       t:"Observance on the steps",
       d:"A quiet gathering under Nieuw Oranje VII alone. Light diary — tradition holds the House." + unrestBit});
@@ -15477,9 +16183,9 @@ function soulEnsure(m){
   const c = (typeof creedOf === "function") ? creedOf(m.creed) : {sincere:false};
   const goods = c.heresy
     ? [
-        "I will not deny the First Consul a genuflection.",
-        "I will not call him only a man when the Mass is his.",
-        "I will not take the Host from a priest who will not say his name."
+        "I will not break a precept I chose to keep.",
+        "I will not let anyone call the First Consul more than a man.",
+        "I will not keep the fire for myself."
       ]
     : c.sincere
     ? [
@@ -15512,8 +16218,8 @@ function soulEnsure(m){
     wound: drawn(wounds, r),
     weight: 0.45 + r() * 0.45,
     prayer: c.heresy ? drawn([
-      "I keep the Latin and I put his name where the Name belongs.",
-      "I genuflect to the bronze when the corridor is empty."
+      "I keep the Latin, and I pray for the Consul as for any man in charge.",
+      "I say the precepts when the corridor is empty, and then the Our Father."
     ], r) : c.sincere ? drawn([
       "I still cross myself when the chamber is empty.",
       "Christ is the salvation. The rest is furniture.",
@@ -16061,7 +16767,7 @@ function ensureConsularCaucus(){
   if(!G.members || !G.members.length) return;
   const have = G.members.filter(m => m && !m.gone && isConsular(m));
   have.forEach(m => { m.consular = true; m.faction = "consul"; });
-  if(have.length >= 6) return;
+  return;
   const pool = G.members.filter(m => m && !m.gone && !m.machine && !isConsular(m) &&
     ((m.creed === "latin" && (m.state === "Nieuw Oranje" || m.state === "Nieuw Haarlem")) || true));
   pool.sort((a,b) => {
@@ -19096,9 +19802,9 @@ function answerCreed(m, rnd){
   autoInit(m);
   if(c.heresy){
     return pick([
-      "We keep the Latin. We know who sits above the chair. The chaplain calls it heresy. We call it loyalty.",
-      "The Mass is the Mass. The name we put in it is the First Consul. Do not look at me like that.",
-      "God walked in a man once. We say He did it again. The cloakroom will not forgive the sentence."
+      "We keep the Latin. God sits above the chair, and above whoever sits in it.",
+      "The Mass is the Mass. The precepts are a lawgiver's, and we keep them because they are good.",
+      "God walked in a man once, and that was Christ. Taylor is a man who listened. That is the whole of it."
     ]);
   }
   if(c.sincere){
@@ -20230,7 +20936,7 @@ function renderTalk(){
     try{ bits.push('<span class="pin">net · ' + netRead(m) + '</span>'); }catch(e){}
     try{ if(m.cog && m.cog.want) bits.push('<span class="pin">want · ' + m.cog.want.k + '</span>'); }catch(e){}
     try{ if(m.machine) bits.push('<span class="pin">sanctioned</span>'); }catch(e){}
-    try{ if(isConsular(m)) bits.push('<span class="pin">consular</span>'); }catch(e){}
+
     try{ if(m.will && m.will.k) bits.push('<span class="pin">will · ' + m.will.k + '</span>'); }catch(e){}
     try{ if(m.soul && m.soul.good) bits.push('<span class="pin">soul</span>'); }catch(e){}
   }
@@ -21742,7 +22448,7 @@ const PROPS = {
        if(k === "consul") return [{t:"Attend the chapel", c:"25m", run(){
          spend(25, 6);
          G.you.approval = clamp(G.you.approval-1, 0, 100);
-         setSay("They keep the Latin and put a man where God belongs. The chaplain across the street will not give them the Host.",
+         setSay("They keep the Latin and a lawgiver's precepts. God first, Christ the King, the Consul a man. The chaplain keeps an eye on them.",
            fx("","the district noticed you went in"));
        }}];
        if(k === "none") return [{t:"Stand in the old church", c:"15m", run(){
@@ -22528,6 +23234,7 @@ function nextDay(late){
     if(G.you) G.you.energy = clamp(late ? 78 : 100, 0, 100);
     if(G.recessLeft > 0) G.recessLeft--;
     try{ realmTick(); }catch(e){}
+    try{ riteDay(); }catch(e){}
   }catch(e){
     if(window.console) console.warn("nextDay clock", e);
   }
@@ -23452,8 +24159,8 @@ function parishCard(){
         '<span class="whip__b">' + (can ? '<button type="button" class="btn btn--ghost whip__go" data-faith="' + r.k + '">' +
           (ready ? 'Be received' : (inst && inst.k === r.k ? 'Come back tomorrow' : 'Talk with their clergy')) + '</button>' : '') + '</span></div>';
     }).join("") +
-    (mine === "consul" ? '<p>You knelt at the bronze. To come back, go across the street to confession: <button type="button" class="btn btn--ghost" data-faith="latin">Make a confession</button></p>' : '') +
-    '<p style="opacity:.7">The Consular Rite is not received at a church door. It is joined at the bronze, by recognising the First Consul, which the Latin Rite calls heresy. God is the Most High.</p>' +
+    (mine === "consul" ? '<p>You keep the Consul’s precepts. To come back, go across the street to confession: <button type="button" class="btn btn--ghost" data-faith="latin">Make a confession</button></p>' : '') +
+    '<p style="opacity:.7">The Consular Rite is not received at a church door. Nobody is received into it at a door. People come to it, or leave it, of their own accord. God is the Most High, Christ is King, and the First Consul is a man under God.</p>' +
     '<div class="card__actions"><button type="button" class="btn" id="parishClose">Back to the street</button></div>';
   veil.hidden = false;
   el("parishClose").addEventListener("click", () => walkNow());
@@ -26310,6 +27017,7 @@ function paperCard(){
     (P.rival ? '<p><strong>The feud:</strong> ' + P.rival + '</p>' : '') +
     (P.letter ? '<p><strong>Letters from home:</strong> ' + P.letter + '</p>' : '') +
     (function(){ try{ return agLedgerHTML(); }catch(e){ return ""; } })() +
+    (function(){ try{ return riteLedgerHTML(); }catch(e){ return ""; } })() +
     '<p class="dream">' + P.poll + '</p>' +
     '<div class="card__actions"><button type="button" class="btn" id="lpClose">Fold it</button>' +
     '<button type="button" class="btn btn--ghost" id="lpRival">Rivals</button><button type="button" class="btn btn--ghost" id="lpHome">Home</button></div>';
@@ -27757,7 +28465,7 @@ function saveCaptureBase(){
     regime:G.regime, amended:G.amended, exec:G.exec, presidents:G.presidents, statute:G.statute,
     bare:G.bare, gfx:G.gfx, simple:G.simple, fullDetail:G.fullDetail, noSit:G.noSit,
     voiceVar:G.voiceVar, voiceRate:G.voiceRate, voiceCarry:G.voiceCarry, hours:G.hours,
-    withWhom:G.withWhom, ties:G.ties, panel:null, court:G.court, own:G.own, parties:G.parties,
+    withWhom:G.withWhom, ties:G.ties, rite:G.rite, placed:G.placed, panel:null, court:G.court, own:G.own, parties:G.parties,
     termLength:G.termLength, country:G.country,
     greatest:G.greatest, blasphemy:G.blasphemy, loreNote:G.loreNote, greatnessOpen:G.greatnessOpen,
     relics:G.relics, relicSpots:G.relicSpots, consularLore:G.consularLore, bind:G.bind, sens:G.sens, invertY:!!G.invertY, voiceVol:G.voiceVol, goals:G.goals, whip:G.whip || null, billQueue:G.billQueue || [], faith:G.faith || null, life:G.life || null, ach:G.ach || {}, law:G.law || null, ladder:G.ladder || [], cases:G.cases || [], lastActs:G.lastActs || [], wx:G.wx || null, town:G.town || null, rivals:G.rivals || [], rivalNext:G.rivalNext || 0, daylog:(G.daylog || []).slice(-120), paperRead:G.paperRead || 0, seedL:G.seedL || 0, mHints:G.mHints || {}, tlog:(G.tlog || []).slice(-500), ag:G.ag || null, sitPrep:G.sitPrep || {}, echoes:G.echoes || [], billKinds:G.billKinds || {}, realmRel:G.realmRel || {}, listened:G.listened || 0,
@@ -28105,6 +28813,7 @@ function setupSettingsUI(){
       row("Save", '<span id="pzSaved">Autosaves at every door and every few minutes</span>', '<button type="button" class="settings-btn settings-btn-secondary" id="pzSave">Save now</button>') +
       row("The handbook", "Everything the House does, in order", '<button type="button" class="settings-btn settings-btn-secondary" id="pzBook">Open</button>') +
       row("Today's paper", "The Capitol Ledger: yesterday in the building, the feud, letters from home, the weather", '<button type="button" class="settings-btn settings-btn-secondary" id="pzPaper">Read</button>') +
+      row("Consular precepts", "Write, order and repeal the precepts; hands-on or let the Rite run itself", '<button type="button" class="settings-btn settings-btn-secondary" id="pzRite">Open</button>') +
       row("Rivals", "Who has it in for you, how far it has gone, and what you can do about it", '<button type="button" class="settings-btn settings-btn-secondary" id="pzRival">Open</button>') +
       row("Home", "The households in your district: what they need and what they remember", '<button type="button" class="settings-btn settings-btn-secondary" id="pzHome">Open</button>') +
       row("Your office", "The powers of the chair you hold, and the term limits in law", '<button type="button" class="settings-btn settings-btn-secondary" id="pzOffice">Open</button>') +
@@ -28149,6 +28858,7 @@ function setupSettingsUI(){
     const t = el("pzSaved"); if(t) t.textContent = ok ? ("Saved · day " + G.day + " · " + hhmm()) : "Could not save — storage may be full";
   });
   const byBook = el("pzBook"); if(byBook) byBook.addEventListener("click", () => { closeSettings(); try{ handbookCard(); }catch(e){} });
+  const byRite = el("pzRite"); if(byRite) byRite.addEventListener("click", () => { closeSettings(); setTimeout(() => { try{ riteCard(); }catch(e){} }, 30); });
   const byPaper = el("pzPaper"); if(byPaper) byPaper.addEventListener("click", () => { closeSettings(); setTimeout(() => { try{ paperCard(); }catch(e){} }, 30); });
   const byRival = el("pzRival"); if(byRival) byRival.addEventListener("click", () => { closeSettings(); setTimeout(() => { try{ rivalCard(); }catch(e){} }, 30); });
   const byHome = el("pzHome"); if(byHome) byHome.addEventListener("click", () => { closeSettings(); setTimeout(() => { try{ homeCard(); }catch(e){} }, 30); });
@@ -28252,6 +28962,7 @@ const HANDBOOK = [
   {t:"The flag of Nieuw Oranje VII", rows:[
     ["The cross", "A Jerusalem cross: Christ at the center, the four corners of the earth. Salvation is in Him. Not in the Consul. Not in the House."],
     ["The old motto", "Non solis radios, sed fulmina Iovis affero — I bring not the rays of the sun, but the thunderbolts of Jupiter."],
+    ["The thunderbolts", "Whose they are is written plainly: Jupiter's, and above Jupiter, God's. The hand that carried them across was a man's, and the oldest Ledger signs it only “P.”"],
     ["The Cross", "Salus in Christo solo — salvation in Christ alone. The thunderbolt is His. The Consul is not."],
     ["Taylor Day", "Only this flag flies. The First Consul pointed at the Cross so the living would not point at him."],
     ["You", "You follow the Lord. Through a member they may find Him. They know nothing, and they can learn."],
