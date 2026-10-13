@@ -4,6 +4,15 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## Precepts read better, faces in colour
+
+On `20261012i`, with the helper's f, g and h work kept in full. Walk **0.68** / sprint **1.15** kept. Best default, `history.replaceState` only, no CDN, no external LLM. God is the Most High; Christ is King; the First Consul is a man under God. The House and its procedures are unchanged.
+
+- **Clergy notes no longer call supporting precepts conflicting:** "Keep your word" and "Do not deceive" (or "Thou shalt not lie") were shown as pulling against each other. Values that support each other (a kept word and the truth, truth and clean hands, clean hands and justice, charity and welcome, and others) are now read as support. Real tensions stay, such as charity against thrift and obedience against honesty.
+- **Better reading of fresh wording:** a new set of 30 untuned paraphrases scored 19 of 30 (63.3%) at first pass. After general fixes it scores 30 of 30. The fixes: "-ous" and "-thing" words are no longer mangled; new idioms such as selling a vote, the Lord's name in vain, opening your door, holding your tongue and bending the truth; manner words win ("spend with thrift" is thrift, "rich and poor alike before the law" is justice); "what belongs to your neighbour" reads as property; "do your job" reads as duty. Six precept-relation checks pass.
+- **Faces in colour:** the sculpted head now carries soft colour zones: warmer cheeks and nose, slightly darker and cooler skin under the eyes, a paler forehead, and on men a shaved beard shadow on the jaw, chin and upper lip. One head material per skin colour; no new textures.
+- **Tests:** the pm room check now expects the 19 rooms the game has.
+
 ## The Rite, the precepts, and grab-and-move
 
 On `20261012h` (built on top of the f, g and h work from another session, which is kept in full). Walk **0.68** / sprint **1.15** kept. Best default, `history.replaceState` only, no CDN, no external LLM. God is the Most High; Christ is King; the First Consul is a man under God. The House and its procedures are unchanged.
