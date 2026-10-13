@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261012f">
+<meta name="onum-build" content="20261012g">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261012f";
+  var STAMP = "20261012g";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -2502,7 +2502,8 @@ function tallyBill(bill, projection){
     const a = Math.round(n*forLine);
     aye += a; no += n-a;
   }
-  if(G.you && G.you.vote) (G.you.vote>0 ? aye++ : no++); else un++;
+  if(G.you && !inHouse()){ try{ (districtFit(bill) > 0 ? aye++ : no++); }catch(e){ un++; } }   /* your old seat has its own member now */
+  else if(G.you && G.you.vote) (G.you.vote>0 ? aye++ : no++); else un++;
   return {aye,no,un};
 }
 
@@ -12092,6 +12093,7 @@ function phoneCard(){
     if(!G.bill || G.bill.done) return;
     const vote = +btn.getAttribute("data-phone-vote");
     if(vote !== 1 && vote !== -1) return;
+    if(!inHouse()){ feed("You have no vote in the House."); return; }
     G.you.vote = vote;
     try{ taylorDayVoteDefiance(vote); }catch(e){}
     feed(vote > 0 ? "Phone vote recorded: yes." : "Phone vote recorded: no.");
@@ -12751,7 +12753,7 @@ function leaderboard(){
   const rows = G.members.map(m => ({name:m.name, party:m.party, s:standingScore(m),
     post:m.post ? postTitle(m.post) : null, you:false}));
   rows.push({name:G.you.name, party:G.you.party, s:youScore(),
-    post:G.you.out ? "Out of the House" : G.you.post ? postTitle(G.you.post) : null, you:true});
+    post:(G.you.out || !inHouse()) ? officeTitle() : G.you.post ? postTitle(G.you.post) : null, you:true});
   rows.sort((a,b) => b.s - a.s);
   return rows;
 }
@@ -12789,9 +12791,13 @@ function qualifies(k){
 }
 function officeTitle(){
   const y = G.you;
-  if(y.out) return "Out of the House";
-  const o = OFFICES[y.office || "house"];
-  return y.post ? postTitle(y.post) : (o ? o.short : "Representative");
+  if(y.out){
+    const was = OFFICE_RANK.find(k => k !== "house" && officeTermsOf(k) > 0);
+    return was ? "Former " + officeShort(was) : "Out of the House";
+  }
+  const k = y.office || "house";
+  if(k !== "house") return officeShort(k);
+  return y.post ? postTitle(y.post) : "Representative";
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -18188,6 +18194,7 @@ function pushStateBill(s, dir){
 
 /* ── proposing a bill of your own ────────────────────────── */
 function proposeBill(axis, dir){
+  if(!inHouse()){ feed("Only a member of the House can file a bill there."); return; }
   const you = G.you;
   if(you.influence < 10 || you.out) return;
   you.influence -= 10;
@@ -22051,7 +22058,7 @@ const veil = el("veil"), card = el("card");
 function holdVote(){
   const b = G.bill; if(!b || b.done) return;
   b.done = true; closeTalk(); G.running = false;
-  const present = G.room === "floor" || G.you.vote !== null;
+  const present = inHouse() && (G.room === "floor" || G.you.vote !== null);
   try{ const Gs = goalsEnsure(); if(Gs && G.room === "floor") Gs.rollcall = true; goalsTick(); }catch(e){}
   let yourVote = G.you.vote !== null ? G.you.vote : (alignment(G.you,b) > 0 ? 1 : -1);
   /* Taylor Day: tradition is the line — defiance at roll call is blasphemy (player may still *ask* about dissent in talk) */
@@ -22113,7 +22120,7 @@ function holdVote(){
         hearsAll(G.you.name + "'s bill went down.");
       }
     }
-  } else {
+  } else if(inHouse()){
     G.you.approval = clamp(G.you.approval-6,0,100);
     G.you.influence = clamp(G.you.influence-5,0,100);
     G.you.standing = clamp(G.you.standing-5,0,100);
@@ -22165,18 +22172,18 @@ function holdVote(){
 
   try{
     feed("ROLL CALL — " + b.title + ". The clerk rises. Galleries lean.");
-    note("Roll call: " + b.title + " — " + t.aye + " aye, " + t.no + " no" + (present ? (yourVote>0 ? ", you aye" : ", you no") : ", you absent") + ".", true);
+    note("Roll call: " + b.title + " — " + t.aye + " aye, " + t.no + " no" + (present ? (yourVote>0 ? ", you aye" : ", you no") : inHouse() ? ", you absent" : "") + ".", true);
     journal("Roll call on " + b.title + ": " + (passed ? "carried" : "rejected") + " " + t.aye + "–" + t.no +
-      (present ? (" · you " + (yourVote>0?"aye":"no")) : " · you not voting") + ".");
+      (present ? (" · you " + (yourVote>0?"aye":"no")) : inHouse() ? " · you not voting" : "") + ".");
     pushWireScrap("Floor", b.title + " — " + (passed ? "CARRIED" : "REJECTED") + " " + t.aye + "–" + t.no);
     if(G.room === "floor"){
       feed(passed ? "Cheers from one side, silence from the other — then the other way round."
                   : "A groan under the gallery. Somebody drops a pencil like a gavel.");
-    } else if(!present){
+    } else if(!present && inHouse()){
       feed("You hear the result from another room. That is its own kind of judgement.");
     }
     if(present) markDay(passed === (yourVote>0) ? "helped" : "hurt", "roll call " + b.title.split(" ")[0], null);
-    else markDay("ignored", "roll call " + b.title.split(" ")[0], null);
+    else if(inHouse()) markDay("ignored", "roll call " + b.title.split(" ")[0], null);
   }catch(err){}
   card.innerHTML =
     '<div class="eyebrow">Roll call no. ' + (400+b.id) + ' · ' + hhmm() + '</div>' +
@@ -22192,7 +22199,8 @@ function holdVote(){
       ? "You voted <strong>" + (yourVote>0?"aye":"no") + "</strong>. Your district reads that as <strong>" +
         (((dFit>0)===(yourVote>0)) ? "one of theirs" : "a vote you will be asked about") + "</strong>" +
         (line !== 0 && line !== yourVote ? ", and the leadership noticed you were not with them." : ".")
-      : "<strong>You were not on the floor.</strong> The clerk recorded you as not voting, and the wire noticed.") + '</p>' +
+      : inHouse() ? "<strong>You were not on the floor.</strong> The clerk recorded you as not voting, and the wire noticed."
+      : "The House voted without you. You are " + officeTitle() + " now; it is their bill, and its consequences are yours to manage.") + '</p>' +
     extra +
     (kept.length ? '<p><strong>Kept their word:</strong> ' + listify(kept.map(m=>m.name)) + '.</p>' : '') +
     (broke.length ? '<p><strong>Broke their word:</strong> ' + listify(broke.map(m=>m.name)) + '. You will remember that; so will they.</p>' : '') +
@@ -22209,6 +22217,8 @@ function holdVote(){
       try{ queueSave(); }catch(e){}
     });
   });
+  /* not a member: the House's roll call does not stop your day */
+  if(!inHouse()){ try{ el("okVote").click(); }catch(e){} }
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -22345,6 +22355,7 @@ function overnight(){
   try{ echoNight(news); achDaily(); }catch(e){ if(window.console) console.warn("echoNight", e); }
   try{ lNight(news); }catch(e){ if(window.console) console.warn("lNight", e); }
   resolveStateBills(news);
+  try{ dualTick(news); }catch(e){}
   regimeCheck(news);
   regimeCheck(news);
   agesSecrets(news);
@@ -22646,6 +22657,8 @@ function election(){
   const youWon = seeking !== "none" && (yourResult + outBonus - reach) > 0;
   if(youWon && seeking !== "house"){
     you.office = seeking;
+    /* you leave the House: the post, the vote and the Cannon office go with it */
+    you.post = null; you.vote = null; you.sitting = false;
     if(seeking === "pres"){
       if(typeof retireExec === "function") retireExec("was beaten by you");
       G.exec = {name:you.name, party:you.party, terms:1, you:true, vetoes:0, pos:you.pos};
@@ -22678,9 +22691,9 @@ function election(){
 
   card.innerHTML =
     '<div class="eyebrow">General election · the ' + G.congress + 'th Congress</div>' +
-    '<h1>' + (youWon ? "You held the seat." : "You lost the seat.") + '</h1>' +
+    '<h1>' + (youWon ? (seeking !== "house" ? "You won " + OFFICES[seeking].t + "." : "You held the seat.") : "You lost the seat.") + '</h1>' +
     '<p class="dream">' + (youWon
-      ? "By " + you.margin + " points. The county chairs who never returned a call are on the line by midnight."
+      ? (seeking !== "house" ? "You leave the House; " + you.state + " " + you.dist + " sends someone new. Your office is " + ROOMS[homeRoom()].t + " now. " : "") + "By " + you.margin + " points. The county chairs who never returned a call are on the line by midnight."
       : "By " + Math.abs(Math.round(yourResult)) + " points. The room empties fast when the number comes up.") + '</p>' +
     (adDamage > 1 && bad.v ? '<p><strong>They ran the ad you knew they had:</strong> your vote on the ' +
       bad.v.title + '. Worth about <strong>' + Math.round(adDamage) + '</strong> points against you.</p>' : '') +
@@ -22806,7 +22819,7 @@ function walkOutNow(){
     document.body.classList.remove("boot-menu");
   }catch(e){}
   phoneWasRunning = null;
-  const dest = (G.room === "corridor") ? "office" : "corridor";
+  const dest = (G.room === "corridor") ? homeRoom() : "corridor";
   try{ enterRoom(dest, G.room); }catch(e){ G.room = dest; }
   feed("You walk out. The sitting is still yours.");
 }
@@ -22848,6 +22861,7 @@ function mapCard(){
   };
 }
 function outsideAllowed(id){
+  if(G.you && abroadOffice()) return ["office","floor","cloak","caucus","committee"].indexOf(id) < 0;
   return !G.you.out || id === "steps" || id === "district" || id === "corridor" || id === "press" || id === "govoffice";
 }
 function careerEnd(){
@@ -22909,10 +22923,14 @@ function activeJob(){
     }
   }catch(e){}
   try{
+    const dn = abroadOffice() ? docketNext() : null;
+    if(dn) return (dn.h > 12 ? dn.h - 12 : dn.h) + ":00 · " + dn.t + (G.room === homeRoom() ? ". " + officeTabName() + " panel, or the desk. E." : ". " + ROOMS[homeRoom()].t + ".");
+  }catch(e){}
+  try{
     const kr = kChamberDue();
     if(kr) return G.room === kr ? K_HERE_LINE[kr] : "Your chair: " + ROOMS[kr].t + " is waiting on you today.";
   }catch(e){}
-  if(b && !b.done && G.room !== "floor" && floorSitsNow())
+  if(b && !b.done && inHouse() && G.room !== "floor" && floorSitsNow())
     return "The floor is sitting. Go in.";
   try{ const lj = lJobLine(); if(lj) return lj; }catch(e){}
   const unread = (G.mail || []).filter(m => !m.read).length;
@@ -22938,6 +22956,12 @@ function objectiveRoom(){
     if(ev) return ev.room;
   }catch(e){}
   const b = G.bill;
+  if(abroadOffice()){
+    if(G.you.energy < 18 || m >= 21*60) return homeRoom();
+    if(docketNext()) return homeRoom();
+    try{ const ng = nextGoal(); if(ng && ng.room) return ng.room; }catch(e){}
+    return null;
+  }
   if(b && !b.done && b.voteDay === G.day) return "floor";
   if(G.you.energy < 18 || m >= 21*60) return "office";
   try{ const wt = whipTarget(); if(wt && ROOMS[wt.room]) return wt.room; }catch(e){}
@@ -22981,6 +23005,14 @@ function goalsEnsure(){
   const b = G.bill;
   const voteToday = !!(b && !b.done && b.voteDay === G.day);
   const unread = (G.mail || []).filter(x => !x.read).length;
+  if(abroadOffice()){
+    const hr = homeRoom(), nd = Math.min(3, docketToday().length);
+    const L = [{k:"docket", t:"Work " + nd + " items on today's docket", need:nd, room:hr},
+               {k:"room", room:hr, kc:true, t:"Keep your hours in " + ROOMS[hr].t.replace(/^The /, "the "), need:1}];
+    L.push(unread ? {k:"mail", t:"Clear your inbox", need:1} : {k:"room", room:"district", t:"Go home to " + G.you.state, need:1});
+    G.goals = {day:G.day, list:L.map(g => Object.assign({have:0, done:false}, g)), talked:[], seen:{}, rollcall:false, all:false, pledged0:[], co0:0, whipped:[]};
+    return G.goals;
+  }
   const pool = [];
   pool.push({k:"talk", t:"Talk with three members", need:3});
   if(b && !b.done) pool.push({k:"pledge", t:"Win a pledge on the " + String(b.title).split(" ")[0] + " bill", need:1});
@@ -23035,6 +23067,7 @@ function goalsTick(){
       have = (G.members || []).filter(m => m && m.pledge === side && m.pledgeDay === G.day && Gs.talked.indexOf(m.id) >= 0 && base.indexOf(m.id) < 0).length ? 1 : 0;
     }
     else if(g.k === "rollcall") have = Gs.rollcall ? 1 : 0;
+    else if(g.k === "docket") have = docketDone();
     else if(g.k === "room") have = (Gs.seen && Gs.seen[g.room]) || G.room === g.room ? 1 : 0;
     else if(g.k === "mail") have = (G.mail || []).filter(x => !x.read).length ? 0 : 1;
     else if(g.k === "whip") have = (Gs.whipped || []).length ? 1 : 0;
@@ -24349,6 +24382,10 @@ function npcLadder(news){
     n++;
     const to = chance(0.5) ? "senate" : "gov";
     const won = chance(0.5 + (m.influence - 40) / 120);
+    if(won && (m.traits.ambition || 50) > 62 && (m.traits.loyalty || 50) < 58 && chance(0.12 + ((m.traits.ambition || 50) - 62) / 160)){
+      try{ dualStart(m, to, news); }catch(e){}
+      return;
+    }
     G.members = G.members.filter(x => x !== m);
     G.seatsBy[m.party] = Math.max(0, (G.seatsBy[m.party] || 1) - 1);
     const where = to === "gov" ? "the governor's chair in " + m.state : "the Senate";
@@ -24421,8 +24458,13 @@ function rolePowers(){
       const recuse = c.state === y.state || (c.voted && c.voted.indexOf(y.name) >= 0);
       if(recuse) P.push({t:"Recuse yourself: " + c.t, d:"Your own state or your own vote. The rule is plain.", run(){ c.done = true; c.recused = true; feed("Justice " + surname(y.name) + " recused from " + c.t + ".", "good"); return "You recused. The bench decides without you."; }});
       else {
+        if(c.dual != null){
+          P.push({t:"Rule for the House: " + c.t, d:"One person, one elected office.", run(){ return benchRule(c, true); }});
+          P.push({t:"Rule for the member: " + c.t, d:"The Charter is silent; both seats stand.", run(){ return benchRule(c, false); }});
+        } else {
         P.push({t:"Rule for the Union: " + c.t, d:"Uphold the federal act.", run(){ return benchRule(c, true); }});
         P.push({t:"Rule for the state: " + c.t, d:"Strike the mandate.", run(){ return benchRule(c, false); }});
+        }
       }
     });
     if(!C.length) P.push({t:"No case is ripe", off:true, d:"State-versus-Union suits land here after the House passes a mandate or preemption.", run(){ return ""; }});
@@ -24484,6 +24526,14 @@ function rolePowers(){
   return P;
 }
 function benchRule(c, forUnion){
+  if(c.dual != null){
+    c.done = true; c.ruled = forUnion ? "union" : "member";
+    const m = byId(c.dual);
+    feed("The bench ruled for " + (forUnion ? "the House" : (m ? m.name : "the member")) + " in " + c.t + ".", "good");
+    G.you.standing = clamp(G.you.standing + 1, 0, 100);
+    try{ dualTick(null); }catch(e){}
+    return forUnion ? "One person, one elected office. The seat is vacated." : "The Charter is silent, so both seats stand. The House will want an amendment.";
+  }
   c.done = true; c.ruled = forUnion ? "union" : "state";
   const S = (G.states || []).find(s => s.n === c.state);
   if(S) S.unrest = clamp(S.unrest + (forUnion ? 7 : -5), 0, 100);
@@ -24598,9 +24648,10 @@ function refreshBar(){
   const you = G.you; if(!you) return;
   say(el("hName"), you.name);
   setHTML(el("hSub"), chipFor(you) +
-    "<span>" + (you.out ? "Out of the House" : you.post ? postTitle(you.post) : "Member of the House") + "</span><span>·</span>" +
-    (you.out ? "<span>standing again</span>" : "<span>" + committeeOf(you.committee).t + "</span>") +
-    "<span>·</span><span>" + you.state + " " + you.dist + "</span>");
+    "<span>" + (you.out ? officeTitle() : inHouse() ? (you.post ? postTitle(you.post) : "Member of the House") : officeTitle()) + "</span><span>·</span>" +
+    (you.out ? "<span>standing again</span>" : inHouse() ? "<span>" + committeeOf(you.committee).t + "</span>" : "<span>" + officeSeat() + "</span>") +
+    (inHouse() || you.out ? "<span>·</span><span>" + you.state + " " + you.dist + "</span>" : ""));
+  try{ officeTabLabel(); }catch(e){}
   say(el("hDate"), dateString() + " · " + dayLabel());
   say(el("hClock"), hhmm());
   say(el("hCong"), ordinal(G.congress));
@@ -24660,7 +24711,15 @@ function kEnsurePeople(){
   Object.keys(K_STAFF).forEach(room => {
     K_STAFF[room].forEach((spec, i) => {
       const slot = room + ":" + i;
-      if(G.civ.some(c => c && c.kslot === slot)) return;
+      const have = G.civ.find(c => c && c.kslot === slot);
+      if(have){
+        /* whoever won the Senate sits in it: the desk follows the election */
+        if(spec[0] === "senator"){
+          const won = (G.ladder || []).filter(x => x && x.won && x.to === "senate");
+          if(won[i] && have.name !== won[i].name){ have.name = won[i].name; have.met = false; }
+        }
+        return;
+      }
       try{
         const c = makeCivilian();
         c.kslot = slot; c.krole = spec[0]; c.role = spec[1]; c.cause = spec[2];
@@ -25043,6 +25102,282 @@ PROPS.exec = [{id:"kxdesk", label:"The Executive's desk", sub:"Built from the ti
 PROPS.govoffice = [{id:"kgdesk", label:"The Governor's desk", sub:"A state map under the glass", x:0, z:7.9, r:2.3,
   acts:() => kDeskActs("govoffice")}];
 
+/* ══════════════════════════════════════════════════════════
+   20261012g · ONE CHAIR AT A TIME
+   An elected office you win is the job you do. A Governor is not a
+   Member of the House: no House vote, no House post, no Cannon office.
+   The title is the most senior elected one; appointed work (staff,
+   envoy) never outranks it. Each chair keeps its own working day, as
+   the real one does, and its own office is where you wake up.
+   ══════════════════════════════════════════════════════════ */
+const OFFICE_RANK = ["pres", "senate", "bench", "gov", "house"];
+function heldOffice(){ const y = G.you; if(!y || y.out) return null; return y.office || "house"; }
+function inHouse(){ return heldOffice() === "house"; }
+function abroadOffice(){ const k = heldOffice(); return !!k && k !== "house"; }
+function officeShort(k){
+  if(k === "pres"){ try{ return execTitle(); }catch(e){} }
+  return (OFFICES[k] || OFFICES.house).short;
+}
+function officeSeat(){
+  const y = G.you, k = heldOffice();
+  if(k === "gov") return "Governor of " + y.state;
+  if(k === "senate") return "Senator from " + y.state;
+  if(k === "bench") return "the high bench";
+  if(k === "pres") return "the Union";
+  return y.state + " " + y.dist;
+}
+function homeRoom(){ const k = heldOffice(); return (k && K_ROOM_OF[k]) || "office"; }
+function seniorElected(){
+  const y = G.you; if(!y) return null;
+  const held = heldOffice();
+  if(held) return held;
+  return OFFICE_RANK.find(k => k !== "house" && officeTermsOf(k) > 0) || ((y.terms || 0) > 0 ? "house" : null);
+}
+
+/* ── the working day of each chair ───────────────────────── */
+function docketFor(k){
+  const y = G.you;
+  const S = (G.states || []).find(s => s.n === y.state);
+  const D = {
+    gov:[
+      {h:8,  key:"gbrief", t:"Morning briefing", d:"Your secretary reads the state: roads, prisons, the treasury, the weather.", run:() => govBrief(S)},
+      {h:10, key:"kgv",    t:"Open hours at the State House", d:"Citizens, mayors and county clerks, one at a time.", sit:"govoffice"},
+      {h:13, key:"gdesk",  t:"The statehouse desk", d:S && S.bill ? "On your desk: the " + S.bill.title + ". Sign it or veto it." : "Bills sent over from the legislature.", run:() => govDesk(S)},
+      {h:15, key:"gbud",   t:"Agencies and the budget", d:"One department gets the money this week.", run:() => govBudget(S)},
+      {h:17, key:"gpress", t:"Press availability", d:"The capitol reporters, on the record.", run:() => officePress("the State House steps")}
+    ],
+    senate:[
+      {h:9,  key:"conf",   t:"Committee: a confirmation hearing", d:"A nominee for the bench, under oath.", run:() => { kMark("conf"); confirmCard(); return null; }},
+      {h:11, key:"ksen",   t:"The Senate sits", d:"The journal, the question, the roll.", sit:"senate"},
+      {h:14, key:"treaty", t:"Treaties and foreign business", d:"Advice and consent, two thirds.", power:"Ratify a treaty"},
+      {h:16, key:"scalls", t:"Calls from " + y.state, d:"Mayors, the statehouse, people who voted for you.", run:() => officeCalls()}
+    ],
+    bench:[
+      {h:9,  key:"bconf",  t:"Conference with the other justices", d:"The docket, argued in private.", run:() => benchConference()},
+      {h:10, key:"kct",    t:"Oral argument", d:"Counsel for each side, and your questions.", sit:"court"},
+      {h:14, key:"bopin",  t:"Write opinions", d:"Rule on what is ripe, or recuse.", run:() => { officeCard(); kMark("bopin"); return null; }}
+    ],
+    pres:[
+      {h:8,  key:"kex",    t:"The morning briefing", d:"The overnight file: states, realms, the treasury.", sit:"exec"},
+      {h:11, key:"pacts",  t:"Acts awaiting signature", d:"Sign or veto what the House and Senate send.", run:() => { officeCard(); kMark("pacts"); return null; }},
+      {h:14, key:"cab",    t:"Cabinet", d:"Appoint, or hear the secretaries out.", power:"Appoint a cabinet secretary"},
+      {h:16, key:"aid",    t:"Calls with foreign capitals", d:"Aid, credit and the realms.", power:"Send foreign aid on your own authority"},
+      {h:17, key:"ppress", t:"The press room", d:"Questions from the whole Union.", run:() => officePress("the Executive's press room")}
+    ]
+  };
+  return D[k] || [];
+}
+function docketToday(){ const k = heldOffice(); return k && k !== "house" ? docketFor(k) : []; }
+function docketDone(){ return docketToday().filter(d => kOnceToday(d.key)).length; }
+function docketNext(){
+  const m = G.minute || 0;
+  if(m >= 19*60) return null;
+  return docketToday().find(d => !kOnceToday(d.key) && m >= d.h*60 - 60) || null;
+}
+function docketRun(d){
+  if(!d || kOnceToday(d.key)) return;
+  if(G.room !== homeRoom()){ goTo(homeRoom()); return; }
+  if(d.sit){ sitStart(d.sit); return; }
+  if(d.power){
+    const p = rolePowers().find(x => x.t.indexOf(d.power) === 0);
+    if(!p || p.off){ kMark(d.key); note("Nothing for " + d.t.toLowerCase() + " today."); refreshPanels(); return; }
+    spend(20, 4);
+    const r = p.run(); kMark(d.key);
+    if(r) note(r, true);
+    refreshPanels(); return;
+  }
+  const r = d.run ? d.run() : "";
+  if(r === null) return;
+  kMark(d.key);
+  if(r) note(r, true);
+  refreshPanels();
+}
+function govBrief(S){
+  spend(20, 3);
+  if(!S) return "The secretary reads the day's file. Nothing in it is on fire.";
+  const w = S.unrest > 60 ? "Unrest is high: crowds outside two county courthouses." : S.unrest > 35 ? "The counties are restless, not yet angry." : "The counties are quiet.";
+  return "The state this morning. " + w + " Industry stands at " + Math.round(S.ind || 0) + ". " +
+    (S.bill ? "The legislature has sent over the " + S.bill.title + "." : "Nothing new from the legislature.");
+}
+function govDesk(S){
+  if(!S || !S.bill){ spend(10, 1); return "Nothing came over from the statehouse today. You read the files of two pardons and sign neither."; }
+  const y = G.you, b = S.bill;
+  choiceCard("The statehouse desk", "the " + b.title, "Passed by the legislature of " + y.state + ". Your signature makes it law; your veto sends it back.", [
+    {t:"Sign it", d:"Law today. It moves industry and the mood the way it was written to.", run(){
+      S.ind = clamp(S.ind + b.ind, 0, 100); S.unrest = clamp(S.unrest + b.unrest, 0, 100);
+      S.lean = clamp(Math.round(S.lean + b.dir*3), -100, 100); S.bill = null;
+      const fit = (b.dir > 0 ? 1 : -1) * (b.axis === "econ" ? S.lean : b.axis === "lib" ? -S.lean*0.4 : S.lean*0.3);
+      y.approval = clamp(y.approval + (fit > 0 ? 3 : -2), 0, 100);
+      feed("Governor " + surname(y.name) + " signed the " + b.title + ".", "good");
+      return "Signed at the desk, with the bill's sponsors standing behind you."; }},
+    {t:"Veto it", d:"Back to the legislature. They may try again next session.", run(){
+      S.bill = null; S.unrest = clamp(S.unrest + 2, 0, 100); y.approval = clamp(y.approval + rint(-3, 4), 0, 100);
+      feed("Governor " + surname(y.name) + " vetoed the " + b.title + ".", "bad");
+      return "Vetoed. The majority leader of the statehouse will not return your calls this week."; }}
+  ], "gdesk", 15);
+  return null;
+}
+function govBudget(S){
+  const y = G.you;
+  const pay = (unrest, ind, app, line) => () => {
+    if(S){ S.unrest = clamp(S.unrest + unrest, 0, 100); S.ind = clamp(S.ind + ind, 0, 100); }
+    y.approval = clamp(y.approval + app, 0, 100);
+    return line;
+  };
+  choiceCard("Agencies and the budget", "This week's money", "There is money for one department. The others will say so, loudly.", [
+    {t:"Roads and bridges", d:"Industry up; the counties notice in spring.", run:pay(-1, 3, 1, "Crews out on the bottom road by Monday.")},
+    {t:"Schools", d:"Quieter counties, slower to show.", run:pay(-3, 1, 2, "Three teachers hired where the state check was late.")},
+    {t:"The constabulary", d:"Order now; resentment later.", run:pay(-4, 0, -1, "More men on the corners. Some streets feel safer and some feel watched.")},
+    {t:"Hospitals and the poor", d:"Approval, and a bill the legislature will remember.", run:pay(-2, -1, 3, "The maternity floor reopens. The treasurer sends a sharp letter.")}
+  ], "gbud", 30);
+  return null;
+}
+function officePress(where){
+  const y = G.you;
+  spend(30, 5);
+  const ok = chance(0.45 + (y.standing - 50) / 160);
+  y.approval = clamp(y.approval + (ok ? 2 : -2), 0, 100);
+  return ok ? "Twenty minutes at " + where + ". You gave them a clean line and they used it."
+            : "Twenty minutes at " + where + ". One question you did not see coming, and it leads the evening papers.";
+}
+function officeCalls(){
+  const y = G.you;
+  spend(30, 4); y.approval = clamp(y.approval + 1, 0, 100);
+  return "An hour on the phone with " + y.state + ": two mayors, a statehouse leader and a woman whose son is waiting on a pension.";
+}
+function benchConference(){
+  const y = G.you;
+  spend(40, 5); y.standing = clamp(y.standing + 1, 0, 100);
+  const c = (G.cases || []).find(x => x && !x.done);
+  return c ? "In conference the bench splits on " + c.t + ". Nobody will say which way they lean until the opinion is drafted."
+           : "In conference: nothing ripe. You talk about the long view and the coffee.";
+}
+/* a small decision card: options run once, then the day remembers it */
+function choiceCard(eyebrow, title, text, opts, key, mins){
+  G.running = false;
+  card.innerHTML = '<div class="eyebrow">' + sitEsc(eyebrow) + '</div><h1>' + sitEsc(title) + '</h1><p>' + sitEsc(text) + '</p>' +
+    opts.map((o, i) => '<div class="whip__row"><span class="whip__n">' + sitEsc(o.t) + '</span><span class="whip__w">' + sitEsc(o.d || "") + '</span>' +
+      '<span class="whip__b"><button type="button" class="btn btn--ghost whip__go" data-ch="' + i + '">Choose</button></span></div>').join("") +
+    '<div id="chSay" class="dream"></div>' +
+    '<div class="card__actions"><button type="button" class="btn" id="chClose">Close</button></div>';
+  veil.hidden = false;
+  el("chClose").addEventListener("click", () => walkNow());
+  card.querySelectorAll("[data-ch]").forEach(bt => bt.addEventListener("click", () => {
+    const o = opts[+bt.getAttribute("data-ch")]; if(!o) return;
+    spend(mins || 20, 3);
+    const r = o.run();
+    if(key) kMark(key);
+    card.querySelectorAll("[data-ch]").forEach(x => x.disabled = true);
+    const s = el("chSay"); if(s) s.textContent = r || "";
+    try{ if(r) tlog("You", r, "you"); }catch(e){}
+  }));
+}
+
+/* ── the panel: your chair, not the House ────────────────── */
+function refreshOfficePane(){
+  const y = G.you, k = heldOffice(), pane = el("paneFloor");
+  if(!pane) return;
+  const D = docketToday(), m = G.minute || 0, here = G.room === homeRoom();
+  const rows = D.map((d, i) => {
+    const done = kOnceToday(d.key);
+    const when = (d.h > 12 ? d.h - 12 : d.h) + ":00 " + (d.h >= 12 ? "pm" : "am");
+    const state = done ? "done" : m < d.h*60 - 60 ? "later" : m >= 19*60 ? "missed" : "now";
+    return '<div class="whip__row"><span class="whip__n">' + when + ' · ' + sitEsc(d.t) + '</span><span class="whip__w">' + sitEsc(d.d) + '</span>' +
+      '<span class="whip__b"><button type="button" class="btn btn--ghost whip__go" data-dk="' + i + '"' + (state !== "now" ? " disabled" : "") + '>' +
+      (state === "done" ? "Done" : state === "later" ? "Later" : state === "missed" ? "Missed" : here ? "Do it" : "Go") + '</button></span></div>';
+  }).join("");
+  const P = rolePowers();
+  const S = (G.states || []).find(s => s.n === y.state);
+  let side = "";
+  if(k === "gov" && S) side = '<p class="muted">' + y.state + ': unrest <b>' + Math.round(S.unrest || 0) + '</b> · industry <b>' + Math.round(S.ind || 0) + '</b>' +
+    (S.bill ? ' · on your desk: <b>' + sitEsc(S.bill.title) + '</b>' : '') + '.</p>';
+  const b = G.bill;
+  const house = b && !b.done ? (function(){ const t = tallyBill(b, true);
+    return '<div class="eyebrow" style="margin-top:14px">In the House, without you</div><p class="muted">' + sitEsc(b.title) + ': projected <b>' + t.aye + '</b> aye, <b>' + t.no + '</b> no, roll call day ' + b.voteDay +
+      '. You have no vote there' + (k === "gov" ? '; the members from ' + y.state + ' still take your calls.' : '.') + '</p>'; })() : "";
+  pane.innerHTML = '<div class="billbox"><div class="eyebrow">Your office · ' + ROLE_T[roleKey()] + '</div>' +
+    '<div class="h-serif">' + sitEsc(officeTitle()) + '</div><div class="muted">' + sitEsc(officeSeat()) + ' · ' + sitEsc(ROOMS[homeRoom()].t) + '</div></div>' + side +
+    '<div class="eyebrow">Today\'s docket</div>' + (rows || '<p class="muted">Nothing scheduled.</p>') +
+    '<div class="eyebrow" style="margin-top:14px">Powers of the office</div>' +
+    P.map((p, i) => '<div class="whip__row"><span class="whip__n">' + sitEsc(p.t) + '</span><span class="whip__w">' + sitEsc(p.d || "") + '</span>' +
+      '<span class="whip__b"><button type="button" class="btn btn--ghost whip__go" data-pw="' + i + '"' + (p.off ? ' disabled' : '') + '>Do it</button></span></div>').join("") +
+    house;
+  pane.querySelectorAll("[data-dk]").forEach(bt => bt.addEventListener("click", () => docketRun(D[+bt.getAttribute("data-dk")])));
+  pane.querySelectorAll("[data-pw]").forEach(bt => bt.addEventListener("click", () => {
+    const p = P[+bt.getAttribute("data-pw")]; if(!p || p.off) return;
+    spend(20, 4);
+    const r = p.run();
+    if(r) note(r, true);
+    refreshPanels();
+  }));
+}
+function officeTabName(){
+  const k = heldOffice();
+  return !k || k === "house" ? "Floor" : k === "gov" ? "State" : k === "senate" ? "Senate" : k === "bench" ? "Bench" : "Executive";
+}
+function officeTabLabel(){
+  const t = document.querySelector('[data-pane="paneFloor"]'); if(!t) return;
+  const lab = officeTabName();
+  if(t.textContent !== lab) t.textContent = lab;
+}
+
+/* ── free will: a member who wins elsewhere may not let go ──
+   Nothing here decides that it happens. Their own temper decides,
+   and so do the people around them. Most go quietly. */
+function dualStart(m, to, news){
+  m.dual = {to, since:G.day};
+  const where = to === "gov" ? "the governorship of " + m.state : "the Senate";
+  G.cases = G.cases || [];
+  G.cases.push({t:"the House v. " + surname(m.name), state:m.state, day:G.day, voted:[], dual:m.id});
+  try{ remember(m, "They want me to choose. I was elected twice and I will not be told which one counts.", 0, true); }catch(e){}
+  (G.members || []).forEach(o => {
+    if(!o || o === m || o.gone || !chance(0.35)) return;
+    try{ hears(o, m.name + " won " + where + " and will not give up the House seat."); }catch(e){}
+  });
+  const line = m.name + " won " + where + " and refuses to give up the House seat. The Speaker's office says the Charter forbids holding both; " + surname(m.name) + "'s counsel says it is silent.";
+  if(news) news.push(line); else note(line, true);
+}
+function dualVacate(m, why, news){
+  if(!m || !m.dual) return;
+  const to = m.dual.to;
+  m.dual = null;
+  (G.cases || []).forEach(c => { if(c && c.dual === m.id && !c.done) c.done = true; });
+  G.members = G.members.filter(x => x !== m);
+  G.seatsBy[m.party] = Math.max(0, (G.seatsBy[m.party] || 1) - 1);
+  try{
+    const n = makeMember(chance(0.5) ? m.party : (m.party === "FED" ? "COM" : "FED"), {fresh:true});
+    n.state = m.state; n.dist = m.dist; n.margin = rint(1, 9); n.terms = 1; n.freshman = true;
+    G.members.push(n); G.seatsBy[n.party] = (G.seatsBy[n.party] || 0) + 1;
+    try{ placeInRoom(n); }catch(e){}
+    _allCache = null;
+  }catch(e){}
+  const line = m.name + " " + why + " " + m.state + " " + m.dist + " holds a special election; the new member is sworn in.";
+  if(news) news.push(line); else note(line, true);
+}
+function dualTick(news){
+  (G.members || []).filter(m => m && m.dual && !m.gone).forEach(m => {
+    const days = G.day - m.dual.since;
+    const friends = (G.members || []).filter(o => o !== m && o.allies && o.allies.indexOf(m.id) >= 0).length;
+    const stubborn = ((m.traits.conviction || 50) + (m.traits.ambition || 50)) / 200;
+    const c = (G.cases || []).find(x => x && x.dual === m.id);
+    if(c && c.done && c.ruled === "member"){ m.dual.kept = true; return; }
+    if(c && c.done && c.ruled === "union"){ dualVacate(m, "lost in the high court and gave up the House seat.", news); return; }
+    if(m.dual.kept) return;
+    if(chance(0.06 + days * 0.012 - stubborn * 0.05 - friends * 0.01)){ dualVacate(m, "gave in after " + days + " days and resigned the House seat.", news); return; }
+    if(days >= 4 && majorityParty() !== m.party && chance(0.08)){ dualVacate(m, "was unseated by a vote of the House majority.", news); return; }
+    if(days >= 6 && c && !c.done && !(G.you.office === "bench" && !G.you.out) && chance(0.12)){
+      const forMember = chance(0.25);
+      c.done = true; c.ruled = forMember ? "member" : "union";
+      if(forMember){
+        m.dual.kept = true;
+        try{ setPrecedent("let a member keep the House seat while holding a second office", "that the Charter does not forbid holding two elected offices"); }catch(e){}
+        const line = "The high court ruled for " + m.name + ": the Charter is silent, so both seats stand. Expect an amendment.";
+        if(news) news.push(line); else note(line, true);
+      } else dualVacate(m, "lost in the high court and gave up the House seat.", news);
+    }
+  });
+}
+
 /* ── the furniture ───────────────────────────────────────── */
 function kFlag(x, z, h){
   const brass = matCol(0xb08b45, .35, .8);
@@ -25412,7 +25747,7 @@ function lSpawnTown(){
     }catch(e){ return null; }
   };
   /* a constituent at the office door on working days */
-  if((t === "session" || t === "district") && !G.you.out && !(w.k === "storm" || w.cover >= 2.5) && lHash(G.day * 3 + 17) < 0.7){
+  if((t === "session" || t === "district") && inHouse() && !(w.k === "storm" || w.cover >= 2.5) && lHash(G.day * 3 + 17) < 0.7){
     const h = T.hh.slice().sort((a, b) => (a.mood - a.wait * 4) - (b.mood - b.wait * 4))[0];
     const c = make(h, "office", "Constituent · " + h.street, h.people[h.visits % 2]);
     if(c){ c.visitor = true; h.visits++; h.wait = 0; }
@@ -26115,12 +26450,14 @@ function refreshTravel(){
   const t = dayType();
   ROOM_ORDER.forEach(id => {
     const R = ROOMS[id];
+    if(id === "office" && abroadOffice() && G.room !== "office") return;   /* the Cannon office is a member's, not yours */
     const b = document.createElement("button");
     b.type = "button";
     b.className = "travel__btn" + (id===G.room?" is-here":"");
     const n = everyone().filter(m => m.room===id && !m.gone).length;
-    b.innerHTML = R.t + "<u>" + (id===G.room ? "here" : n + " here · " + R.travel + "m") + "</u>";
-    const blocked = ((id==="district" || (id==="govoffice" && !kHolds("govoffice"))) && t==="session" && !G.you.out)
+    const mine = abroadOffice() && id === homeRoom();
+    b.innerHTML = (mine ? "My Office · " + R.t.replace(/^The /, "") : R.t) + "<u>" + (id===G.room ? "here" : n + " here · " + R.travel + "m") + "</u>";
+    const blocked = ((id==="district" || (id==="govoffice" && !kHolds("govoffice"))) && t==="session" && inHouse())
                  || (id!=="district" && id!=="office" && id!=="govoffice" && t==="recess")
                  || !outsideAllowed(id);
     b.disabled = id===G.room || blocked || !G.running;
@@ -26200,6 +26537,8 @@ function goTo(id){
 }
 function refreshFloor(){
   const b = G.bill, you = G.you;
+  try{ officeTabLabel(); }catch(e){}
+  if(you && abroadOffice()){ refreshOfficePane(); return; }
   if(!b){ el("paneFloor").innerHTML = '<p class="muted">The calendar is clear.</p>'; return; }
   const t = tallyBill(b, true);
   const axes = AXES.map(a =>
@@ -26515,7 +26854,7 @@ function refreshCareer(){
     ' <span class="muted">— day ' + v.day + ', ' + (v.passed?"passed":"failed") + '</span></span></div>').join("");
   el("paneCareer").innerHTML =
     '<div class="eyebrow">Service record</div><div class="h-serif">' + you.name + '</div>' +
-    '<p class="muted">' + (you.post?postTitle(you.post):"Member of the House") + " for " + you.state + " " + you.dist +
+    '<p class="muted">' + (inHouse() ? (you.post?postTitle(you.post):"Member of the House") + " for " + you.state + " " + you.dist : officeTitle() + " · " + officeSeat()) +
       " · " + partyName(you.party) + " · " + committeeOf(you.committee).t + '</p>' +
     '<div class="card__actions" style="margin:10px 0 14px">' +
       '<button class="btn btn--ghost" type="button" id="saveExport">Export career save</button>' +
@@ -30169,6 +30508,7 @@ function begin(){
     G._savedCam = false;
   }
   if(!G.room || !ROOMS[G.room]) G.room = "office";
+  try{ if(G.you && abroadOffice() && !outsideAllowed(G.room)) G.room = homeRoom(); }catch(e){}
   if(G.you) G.you.room = G.room;
   try{ ensureParties(); }catch(e){}
   try{ catchClear("begin"); }catch(e){}

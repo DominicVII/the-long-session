@@ -4,6 +4,19 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## One chair at a time
+
+On `20261012f`. Walk **0.68** / sprint **1.15** kept. Best default, `history.replaceState` only, no CDN, no external LLM. God is the Most High; Christ is King; First Consul is a man under God. The House and its procedures are unchanged for its members.
+
+- **You leave the House when you win something else:** winning the governorship, the Senate, the bench or the executive ends your House membership. Your House post, your vote and the Cannon office go; your old district votes with its own member.
+- **Most senior elected title:** the header, career card, leaderboard and election card show the office you hold ("Governor · Governor of Meriden"), not "Member of the House". Out of office, you are "Former Governor" (or the highest you held). Appointed work (staff, envoy) never outranks it.
+- **Your office moves with you:** the State House (Senate Chamber, Court, Executive Wing) is "My Office" in the travel bar. Continue and "Walk out" bring you there. The House's own rooms (floor, cloakroom, caucus, committee, the Cannon office) are for members.
+- **A working day per chair:** the Floor tab becomes State / Senate / Bench / Executive, with today's docket at real hours. Governor: morning briefing, open hours, the statehouse desk (sign or veto), agencies and the budget, a press availability. Senator: a confirmation hearing, the Senate sitting, treaties, calls from home. Justice: conference, oral argument, opinions. Executive: briefing, acts to sign or veto, cabinet, foreign calls, the press room. Daily aims, the NOW line and the compass follow the docket.
+- **No House levers:** you cannot vote, file or amend in the House from another office. The House's roll call no longer stops your day or marks you absent. The panel shows the House count read-only.
+- **Free will at the ladder:** a member who wins another office usually gives up the House seat. Some, by their own ambition and loyalty, refuse. The House argues it, the court may hear it, and it ends however it ends: they give in, the majority unseats them, the court rules either way (rarely, both seats stand and a precedent is set). A special election fills a vacated seat. Nothing forces any of it.
+- **Senators sit in the Senate:** members who won the Senate take the desks in the Senate Chamber.
+- Stamp: meta + STAMP + `ONUM_BUILD` -> `20261012g`. Five HTML copies byte-identical.
+
 ## Their words in the transcript
 
 On `20261012e`. Walk **0.68** / sprint **1.15** kept. Best default, `history.replaceState` only, no CDN, no external LLM. God is the Most High; Christ is King; First Consul is a man under God. The House and its procedures are unchanged.
