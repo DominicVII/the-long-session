@@ -1,0 +1,80 @@
+<!doctype html><html><head><meta charset="utf-8"><title>ONUM characters</title>
+<style>body{margin:0;background:#111;color:#ddd;font:12px system-ui;overflow:hidden}#hud{position:fixed;left:8px;top:6px;white-space:pre;z-index:2}</style>
+<script src="three.min.js"></script></head><body><div id="hud">loading…</div>
+<script type="module">
+import { makeCharacter, applyDressCode, dressFor } from './onum-characters.js';
+import { GOV_TYPES } from './onum-flags.js';
+import { makeMaterial } from './onum-materials.js';
+const P = new URLSearchParams(location.search), view = P.get('view') || 'lineup', quality = P.get('q') || 'high', W = innerWidth, H = innerHeight;
+const r = new THREE.WebGLRenderer({ antialias: true }); r.setSize(W, H); r.setPixelRatio(1);
+r.outputEncoding = THREE.sRGBEncoding; r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = 0.72; r.shadowMap.enabled = true; r.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(r.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x2a2c30);
+const env = new THREE.Scene(); env.background = new THREE.Color(0x7d8794);
+const pan = (c, i, x, y, z, s) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(s, s), new THREE.MeshBasicMaterial({ color: new THREE.Color(c).multiplyScalar(i), side: 2 })); m.position.set(x, y, z); m.lookAt(0, 0, 0); env.add(m); };
+pan(0xfff0dc, 5, 3, 6, 6, 6); pan(0xc8d8ff, 2, -6, 3, 2, 6); pan(0x504840, 1, 0, -6, 0, 20);
+const pm = new THREE.PMREMGenerator(r); scene.environment = pm.fromScene(env, 0.03).texture;
+scene.add(new THREE.HemisphereLight(0xdde6ff, 0x3a3028, 0.4));
+const key = new THREE.DirectionalLight(0xfff2e0, 2.0); key.position.set(3, 5, 6); key.castShadow = true; key.shadow.mapSize.set(2048, 2048);
+Object.assign(key.shadow.camera, { left: -6, right: 6, top: 4, bottom: -1 }); key.shadow.bias = -0.0005; key.shadow.normalBias = 0.02; scene.add(key);
+const rim = new THREE.DirectionalLight(0xbfd4ff, 0.8); rim.position.set(-4, 3, -5); scene.add(rim);
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(20, 10), makeMaterial('marble', THREE, { repeat: 6, quality: 'med' })); floor.geometry.setAttribute('uv2', floor.geometry.attributes.uv);
+floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
+const cast = [
+  { seed: 11, sex: 'm', age: 58, beard: 'stubble', skin: 0, build: 'average', outfit: 'suit_tie', hair: 'side_part', suitColor: 0x1a2744 },
+  { seed: 22, sex: 'f', age: 44, skin: 3, build: 'slim', outfit: 'skirt_suit', hair: 'bob', suitColor: 0x7a2a2e, hairColor: 0x2f2318 },
+  { seed: 33, sex: 'm', age: 36, skin: 6, build: 'athletic', outfit: 'suit_open', hair: 'buzz', suitColor: 0x24313d, beard: 'short' },
+  { seed: 44, sex: 'f', age: 67, skin: 1, build: 'average', outfit: 'dress_jacket', hair: 'bun', glasses: true, suitColor: 0x1d2530 },
+  { seed: 55, sex: 'm', age: 72, skin: 2, build: 'heavy', outfit: 'three_piece', hair: 'bald_fringe', glasses: false, beard: 'kaiser', suitColor: 0x3a2418 },
+  { seed: 66, sex: 'f', age: 31, skin: 7, build: 'average', outfit: 'trouser_suit', hair: 'curls', suitColor: 0x12141a },
+  { seed: 77, sex: 'm', age: 48, skin: 4, build: 'broad', outfit: 'shirt_vest', hair: 'caesar', suitColor: 0x4a6578, beard: 'moustache' },
+  { seed: 88, sex: 'f', age: 52, skin: 5, build: 'average', outfit: 'blouse_skirt', hair: 'long', suitColor: 0x2f4a38, hairColor: 0x14100d },
+];
+const uniView = view === 'uniforms', pinView = view === 'pin';
+if (uniView) { cast.length = 0; GOV_TYPES.forEach((g, i) => cast.push({ seed: 500 + i, sex: i % 3 === 1 ? 'f' : 'm', age: 35 + (i * 7) % 35, skin: i % 8, build: 'average', glasses: false, beard: 'none',
+  ...dressFor({}, { govType: g, seed: 4, decree: { govType: g, seed: 4 } }), _label: g })); }
+if (pinView) { cast.length = 0; [['m', 'suit_tie', 'republic', 7], ['f', 'blouse_skirt', 'federation', 2], ['f', 'skirt_suit', 'consular_republic', 1], ['m', 'shirt_vest', 'tribal', 5]].forEach(([sex, outfit, ty, sd], i) =>
+  cast.push({ seed: 900 + i, sex, outfit, skin: (i * 3) % 8, age: 45, glasses: false, ...dressFor({ homeFlag: { type: ty, seed: sd } }, { govType: 'democracy', seed: 1 }), _label: ty + ' pin' })); }
+const t0 = performance.now(), chars = [], times = [];
+cast.forEach((o, i) => { const a = performance.now(); o.skin = [0xf0d3ba,0xe8c4a0,0xd9ab84,0xc08e64,0x9c6b45,0x7a4f31,0x5c3a22,0x3f2818][o.skin];
+  const c = makeCharacter(THREE, { ...o, quality: uniView ? (P.get('q') || 'med') : quality }); times.push(performance.now() - a);
+  if (uniView) { const row = Math.floor(i / 7), col = i % 7; c.group.position.set((col - 3) * 1.15, 0, -row * 2.2); }
+  else if (pinView) c.group.position.set((i - 1.5) * 0.9, 0, 0); else c.group.position.set((i - 3.5) * 0.95, 0, 0);
+  scene.add(c.group); chars.push(c); });
+if (P.get('switch')) { chars[0] = applyDressCode(chars[0], { govType: 'junta', seed: 4 }); chars[0] = applyDressCode(chars[0], null); chars[1] = applyDressCode(chars[1], { govType: 'consular_republic', seed: 1 }); }
+if (uniView || pinView) chars.forEach((c, i) => { const el = document.createElement('div'); el.style.cssText = 'position:fixed;transform:translate(-50%,0);font:11px system-ui;color:#eee;text-shadow:0 1px 2px #000';
+  el.textContent = cast[i]._label.replace(/_/g, ' ') + (uniView ? ' · ' + (c.uniform ? c.uniform.style : 'no decree → home pin') : ''); document.body.appendChild(el); c._el = el; });
+const genMs = performance.now() - t0;
+let tris = 0, calls = 0; chars[0].group.traverse(o => { if (o.isMesh && o.visible) { calls++; tris += (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3; } });
+const cam = new THREE.PerspectiveCamera(30, W / H, 0.05, 100);
+const states = [{}, { talking: true }, { gesture: 1, talking: true }, {}, { talking: true }, { speed: 1.3 }, { gesture: 0.7 }, { talking: true }];
+const pose = P.get('pose');
+const sitView = view === 'sit';
+if (sitView) { const seatM = new THREE.MeshStandardMaterial({ color: 0x5a2a1a, roughness: 0.6 }), deskM = makeMaterial('wood_panel', THREE, { repeat: 1, quality: 'med' });
+  chars.forEach((c, i) => { const x = c.group.position.x; const seat = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.08, 0.48), seatM); seat.position.set(x, 0.42, -0.02); seat.castShadow = seat.receiveShadow = true; scene.add(seat);
+    const back = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.6, 0.06), seatM); back.position.set(x, 0.75, -0.27); back.castShadow = true; scene.add(back);
+    if (i % 2 === 0) { const d = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.04, 0.5), deskM); d.geometry.setAttribute('uv2', d.geometry.attributes.uv); d.position.set(x, 0.74, 0.62); d.castShadow = d.receiveShadow = true; scene.add(d); } }); }
+function step(dt, t) { chars.forEach((c, i) => { const s = pose === 'still' ? {} : view === 'skirt' ? { speed: 1.4 } : sitView ? { sitting: true, seatHeight: 0.46, desk: i % 2 === 0, talking: i === 1 || i === 4, gesture: i === 4 ? 0.8 : 0 } : { ...states[i] }; s.lod = P.get('lod') != null ? +P.get('lod') : 0;  c.update(dt, s); }); }
+for (let k = 0; k < (+P.get('frames') || 90); k++) step(1 / 60, k / 60);   // settle into poses deterministically
+function render() {
+  if (view === 'faces') {
+    r.setScissorTest(true); const cols = 4, rows = 2, cw = W / cols, ch = H / rows;
+    chars.forEach((c, i) => { const x = (i % cols) * cw, y = (rows - 1 - Math.floor(i / cols)) * ch;
+      const hp = new THREE.Vector3(); c.parts = c.group.userData.parts; c.parts.head.getWorldPosition(hp); hp.y += 0.08 * c.group.scale.y;
+      cam.aspect = cw / ch; cam.fov = 24; cam.position.set(hp.x + 0.16, hp.y + 0.0, hp.z + 0.72); cam.lookAt(hp.x, hp.y - 0.02, hp.z); cam.updateProjectionMatrix();
+      r.setViewport(x, y, cw, ch); r.setScissor(x, y, cw, ch); r.render(scene, cam); });
+    r.setScissorTest(false);
+  } else if (uniView) { cam.aspect = W / H; cam.fov = 34; cam.position.set(0, 4.6, 9.4); cam.lookAt(0, 0.6, -2.0); cam.updateProjectionMatrix(); r.setViewport(0, 0, W, H); r.render(scene, cam); placeLabels(); }
+  else if (pinView) { scene.updateMatrixWorld(true); r.setScissorTest(true); const cw = W / 4; chars.forEach((c, i) => { const pp = new THREE.Vector3(); (c.group.userData.pin || c.group).getWorldPosition(pp);
+      cam.aspect = cw / H; cam.fov = 24; cam.position.set(pp.x + 0.12, pp.y + 0.03, pp.z + 0.62); cam.lookAt(pp.x - 0.04, pp.y + 0.01, pp.z); cam.updateProjectionMatrix();
+      r.setViewport(i * cw, 0, cw, H); r.setScissor(i * cw, 0, cw, H); r.render(scene, cam); if (c._el) { c._el.style.left = (i * cw + cw / 2) + 'px'; c._el.style.top = (H - 40) + 'px'; } }); r.setScissorTest(false); } else if (view === 'sit') { cam.aspect = W / H; cam.fov = 30; cam.position.set(1.2, 1.6, 6.8); cam.lookAt(0, 0.7, 0); cam.updateProjectionMatrix(); r.setViewport(0, 0, W, H); r.render(scene, cam); } else if (view === 'skirt') { cam.aspect = W / H; cam.fov = 22; cam.position.set(-1.0, 0.9, 3.2); cam.lookAt(-2.375, 0.65, 0); cam.updateProjectionMatrix(); r.setViewport(0, 0, W, H); r.render(scene, cam); } else if (view === 'body') { cam.aspect = W / H; cam.fov = 30; cam.position.set(-2.4, 1.2, 3.6); cam.lookAt(-2.4, 0.95, 0); cam.updateProjectionMatrix(); r.setViewport(0, 0, W, H); r.render(scene, cam); } else { cam.aspect = W / H; cam.fov = 30; cam.position.set(0, 1.25, 9.6); cam.lookAt(0, 0.95, 0); cam.updateProjectionMatrix(); r.setViewport(0, 0, W, H); r.render(scene, cam); }
+}
+function placeLabels() { const v = new THREE.Vector3(); chars.forEach(c => { if (!c._el) return; v.copy(c.group.position); v.y = -0.02; v.z += 0.35; v.project(cam); c._el.style.left = (v.x * .5 + .5) * W + 'px'; c._el.style.top = (-v.y * .5 + .5) * H + 'px'; }); }
+let last = performance.now(), frames = 0, fstart = performance.now();
+function loop() { const now = performance.now(); step((now - last) / 1000); last = now; render(); frames++; requestAnimationFrame(loop); }
+render();
+document.getElementById('hud').textContent = `quality=${quality}  build 8 chars ${genMs.toFixed(0)} ms (${times.map(t => t.toFixed(0)).join(', ')})  per char LOD0: ${calls} meshes, ${Math.round(tris)} tris  renderer: ${r.info.render.calls} calls`;
+window.__stats = { quality, genMs, times, calls, tris, info: r.info.render, mem: r.info.memory }; window.__pins = chars.map(c => { const v = new THREE.Vector3(); (c.group.userData.pin || c.group).getWorldPosition(v); return [!!c.group.userData.pin, +v.x.toFixed(3), +v.y.toFixed(3), +v.z.toFixed(3)]; });
+if (P.get('anim') !== '0') loop();
+window.__ready = true;
+</script></body></html>

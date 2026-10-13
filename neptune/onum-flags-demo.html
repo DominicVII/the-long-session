@@ -1,0 +1,26 @@
+<!doctype html><html><head><meta charset="utf-8"><title>ONUM flags</title>
+<style>body{margin:0;background:#1d1f24;color:#ddd;font:12px system-ui;overflow:hidden}.l{position:fixed;transform:translate(-50%,0);text-shadow:0 1px 2px #000;font-weight:600}#hud{position:fixed;left:8px;top:6px}</style>
+<script src="three.min.js"></script></head><body><div id="hud"></div>
+<script type="module">
+import { GOV_TYPES, makeFlagTexture, makeWavingFlag, describeFlag } from './onum-flags.js';
+const P = new URLSearchParams(location.search), W = innerWidth, H = innerHeight, seed = +(P.get('seed') || 3);
+const r = new THREE.WebGLRenderer({ antialias: true }); r.setSize(W, H); r.setPixelRatio(1); r.outputEncoding = THREE.sRGBEncoding; r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = 0.9; r.shadowMap.enabled = true;
+document.body.appendChild(r.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x1d1f24);
+scene.add(new THREE.HemisphereLight(0xe8eeff, 0x3a3428, 0.9)); const sun = new THREE.DirectionalLight(0xfff2e0, 1.6); sun.position.set(2, 4, 6); scene.add(sun);
+const cam = new THREE.PerspectiveCamera(35, W / H, 0.1, 100); cam.position.set(0, -0.6, 17.5); cam.lookAt(0, -0.6, 0);
+const t0 = performance.now(), cols = 5, labels = [];
+GOV_TYPES.forEach((type, i) => { const x = (i % cols - 2) * 2.4, y = 4.3 - Math.floor(i / cols) * 1.95 - 0.6;
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(2.0, 1.25), new THREE.MeshStandardMaterial({ map: makeFlagTexture(THREE, type, seed + i, { width: 512 }), roughness: 0.85 }));
+  m.position.set(x, y, 0); scene.add(m); const D = describeFlag(type, seed + i);
+  const el = document.createElement('div'); el.className = 'l'; el.textContent = type.replace(/_/g, ' ') + ' · ' + D.layout + '/' + D.emblem; document.body.appendChild(el); labels.push([el, new THREE.Vector3(x, y - 0.7, 0)]); });
+const genMs = performance.now() - t0;
+// a row of waving flags below
+const waving = []; ['republic', 'constitutional_monarchy', 'theocracy', 'communist', 'tribal', 'empire'].forEach((type, i) => {
+  const f = makeWavingFlag(THREE, { type, seed: seed + 40 + i, width: 1.3, poleHeight: 2.1, segments: 32 }); f.group.position.set((i - 2.5) * 2.0 - 0.5, -6.6, 0.5); scene.add(f.group); waving.push(f); });
+const v = new THREE.Vector3(); for (const [el, p] of labels) { v.copy(p).project(cam); el.style.left = (v.x * .5 + .5) * W + 'px'; el.style.top = (-v.y * .5 + .5) * H + 'px'; }
+for (let k = 0; k < 40; k++) waving.forEach(f => f.update(1 / 30, { wind: 1.1 }));
+document.getElementById('hud').textContent = `20 government types, seed ${seed}: textures ${genMs.toFixed(0)} ms (512x320 each)`;
+let last = performance.now(); (function loop() { const now = performance.now(), dt = (now - last) / 1000; last = now; if (P.get('anim') !== '0') waving.forEach(f => f.update(dt, { wind: 1.1 })); r.render(scene, cam); requestAnimationFrame(loop); })();
+window.__stats = { genMs }; window.__ready = true;
+</script></body></html>
