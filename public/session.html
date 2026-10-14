@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261013f">
+<meta name="onum-build" content="20261013g">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -36535,8 +36535,10 @@ try{
           if(pool.length){ if(n > 0.15 && lamps.length){ const near = lamps.map(p => [p.distanceToSquared(cp), p]).sort((a, b) => a[0] - b[0]);
               pool.forEach((L, i) => { const q = near[i]; if(q){ L.position.copy(q[1]); L.position.y -= 0.25; L.intensity = 1.4 * Math.min(1, n * 1.4); } else L.intensity = 0; }); }
             else pool.forEach(L => { L.intensity = 0; }); } }
-        try{ if(typeof landGroup !== "undefined" && landGroup && landGroup !== lgSeen){ lgSeen = landGroup; landGroup.updateMatrixWorld(true); const wp = new THREE.Vector3();
-          landGroup.children.forEach(h => { h.getWorldPosition(wp); grp.worldToLocal(wp); if(Math.abs(wp.x) < 48 && wp.z > -14 && wp.z < 66) h.visible = false; }); } }catch(e){}
+        try{ if(typeof landGroup !== "undefined" && landGroup && landGroup !== lgSeen){ lgSeen = landGroup; const lg = landGroup;
+          /* the town now runs to the horizon: the stock hills would cut through it, so hide them while this group is in the scene */
+          lg.children.forEach(h => { h.userData.ndWasVis = h.visible; h.visible = false; });
+          const back = setInterval(() => { if(!grp.parent){ clearInterval(back); lg.children.forEach(h => { if(h.userData.ndWasVis !== undefined) h.visible = h.userData.ndWasVis; }); lgSeen = null; } }, 1000); } }catch(e){}
         if(fr & 1){ const t = now, dt = Math.min(0.1, (t - lastT) / 1000); lastT = t;
           waves.forEach(f => { const gp = f.group.position; if(Math.abs(gp.x - cp.x) + Math.abs(gp.z - cp.z) < 34) f.update(dt, {wind:0.9}); }); }
       }catch(e){ ND.tickErr = String(e && e.message); } };
@@ -36647,6 +36649,11 @@ try{
     try{ const keys = new Set(); for(let i = -rings; i <= rings; i++) for(let j = -rings; j <= rings + 1; j++) if(cellExists(i, j)) keys.add(i + "," + j); EXTRA.forEach(k => keys.add(k));
       keys.forEach(k => { const [i, j] = k.split(",").map(Number); try{ genCell(i, j, seed, 1); }catch(e){} }); } finally { [POIS, SOLIDS, LAMPS, BK, DRY] = sv; noFrame(); house.lod = 0; }
     out.forEach((p, k) => { p.id = p.kind + "_c" + (k + 1); p.cell = cellOf(p.pos.x, p.pos.z).join(","); }); return out; };
+  const SOLC = new Map();
+  const cellSolids = (i, j) => { const k = i + "," + j; if(SOLC.has(k)) return SOLC.get(k); const out = [];
+    if(cellExists(i, j)){ const sv = [POIS, SOLIDS, LAMPS, BK, DRY]; POIS = null; SOLIDS = out; LAMPS = null; BK = {}; DRY = true;
+      try{ genCell(i, j, 7, 1); }catch(e){} finally { [POIS, SOLIDS, LAMPS, BK, DRY] = sv; noFrame(); house.lod = 0; } }
+    SOLC.set(k, out); return out; };
   const CELL_KMAP = {leaf:"paint", brass:"paint", asphalt:"stone"};
   const buildCellGeo = (i, j, seed, lvl, style) => { const sv = [BK, SOLIDS, POIS, LAMPS, CHUNK, KMAP, ST, signI];
     BK = {}; SOLIDS = lvl < 2 ? [] : null; POIS = null; LAMPS = []; CHUNK = "x"; KMAP = CELL_KMAP; ST = STYLES[style] || STYLES.brick_row; signI = (i * 7 + j * 3) & 15;
@@ -36689,6 +36696,8 @@ try{
   const isRoad = (x, z) => { if(Math.abs(x) < 8.2 && z > -6 && z < 50) return true; if(z > 18 && z < 26 && Math.abs(x) < 45) return true; if(z > -5 && z < -1.4 && Math.abs(x) < 14) return true;
     const lx = ((x + 32) % CELL + CELL) % CELL, lz = ((z + 10) % CELL + CELL) % CELL; return !hitKeep(x, z, x, z) && (lx < 11 || lz < 11); };
   const freeLot = (pos, w, d, own) => { const solids = [].concat((typeof NM !== "undefined" && NM.solids) || [], CHG.solids.filter(s => s.owner !== own));
+    const near = new Set(); const addC = (x, z) => { const [i, j] = cellOf(x, z); for(let a = -1; a <= 1; a++) for(let b = -1; b <= 1; b++){ const k = (i + a) + "," + (j + b); if(!near.has(k)){ near.add(k); try{ cellSolids(i + a, j + b).forEach(q => solids.push(q)); }catch(e){} } } };
+    addC(+((pos && pos.x) || 0), +((pos && pos.z) || 0)); addC(+((pos && pos.x) || 0) + 50, +((pos && pos.z) || 0) + 50); addC(+((pos && pos.x) || 0) - 50, +((pos && pos.z) || 0) - 50);
     const ok = (x, z) => { for(let a = -1; a <= 1; a++) for(let b = -1; b <= 1; b++) if(isRoad(x + a * w / 2, z + b * d / 2)) return false;
       for(const s of solids) if(Math.abs(s.x - x) < s.hx + w / 2 + 0.6 && Math.abs(s.z - z) < s.hz + d / 2 + 0.6) return false; return true; };
     const x0 = +((pos && pos.x) || 0), z0 = +((pos && pos.z) || 0);
@@ -36756,7 +36765,7 @@ try{
       const dd = Math.hypot(cellX0(i) + 32 - (+p.x || 0), cellZ0(j) + 32 - (+p.z || 0)); if(dd < bd){ bd = dd; best = k; } }
     if(ch._cell){ if(!on) EXTRA.delete(ch._cell); else EXTRA.add(ch._cell); }
     else if(on && best){ ch._cell = best; EXTRA.add(best); }
-    ND._static = null; (ND._streamers || []).forEach(s => s.refresh());
+    ND._static = null; SOLC.clear(); (ND._streamers || []).forEach(s => s.refresh());
     try{ if(ND._seedPois){ const sp = staticPois(7, 3); ND._static = {style:ND.style, pois:sp}; ND._basePois = ND._seedPois.concat(sp); } }catch(e){}
     return ch._cell; };
   const applyChange = ch => { if(!ch || ch.id == null) return null;
@@ -37487,6 +37496,77 @@ try{
   console.log("NEPTUNE livetalk ready");
 }catch(e){ try{ console.warn("NEPTUNE-LIVETALK block", e); }catch(e2){} }
 /* NEPTUNE-LIVETALK END */
+/* NEPTUNE-POLITIES BEGIN — breakaway nations on the Union map.
+   Feed (from JUPITER; read if present, guarded if not): window.ONUM_POLITIES = [{id?, name, leader, govType, memberStates:[state names]}]
+   (an object keyed by id is accepted too), plus a CustomEvent 'onum-polity-change' (detail: one polity, or {id|name, removed:true}
+   to dissolve it). 'onum-polities-updated' / 'onum-secession' are also heard. window.onumPolityApply(p) applies one directly.
+   Effect: member states are recoloured in the nation's flag colour, a heavy border is drawn around its territory, its flag
+   (neptune/onum-flags.js drawFlag(govType, seed = hash(name))) and name sit on the map, and the state panel shows the
+   nation, its leader and form of government. Guarded: any failure leaves the stock Union map untouched. */
+try{
+  const PO = window.NEPTUNE_POLITIES = {ver:"20261013g", list:new Map(), flags:new Map()};
+  const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;"})[c]);
+  const hashS = s => { let h = 2166136261; s = String(s); for(let i = 0; i < s.length; i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0) % 100000 + 1; };
+  const keyOf = p => String(p.id != null ? p.id : p.name);
+  const FL = () => (window.NEPTUNE && NEPTUNE.mods && NEPTUNE.mods.flags) || null;
+  const govOf = p => { const t = String(p.govType || "republic").toLowerCase().replace(/[\s-]+/g, "_"); const F = FL(); return F && F.GOV_TYPES && !F.GOV_TYPES.includes(t) ? "republic" : t; };
+  const COLS = ["#7a3b8f", "#2f7d6d", "#b8742a", "#3d5a99", "#8f2f3f", "#4f7a2a"];
+  const D_alt = p => { try{ const D = FL().describeFlag(govOf(p), hashS(p.name)); const used = [...PO.flags.values()].map(v => v.col); return (D.palette || []).find(c => /^#[0-9a-f]{6}$/i.test(c) && !used.includes(c) && !/^#(f|e|d)[0-9a-f](f|e|d)[0-9a-f](f|e|d)/i.test(c) && !/^#[0-2][0-9a-f][0-2][0-9a-f][0-2]/i.test(c)) || null; }catch(e){ return null; } };
+  function info(p){ const k = keyOf(p); let f = PO.flags.get(k);
+    if(!f || f.gov !== govOf(p)){ f = {gov:govOf(p), url:"", col:COLS[hashS(p.name) % COLS.length], col2:"#ffffff"};
+      try{ const F = FL(); if(F){ const D = F.describeFlag(f.gov, hashS(p.name)); if(D && D.palette){ const sat = h => { const m = /^#?([0-9a-f]{6})$/i.exec(String(h)); if(!m) return -1; const v = parseInt(m[1], 16), r = v >> 16, g = v >> 8 & 255, b = v & 255, mx = Math.max(r, g, b), mn = Math.min(r, g, b); return mx < 40 || mn > 215 ? -1 : (mx - mn) / (mx || 1); };
+          const best = D.palette.slice().sort((a, b) => sat(b) - sat(a))[0]; if(sat(best) > 0.15) f.col = best; f.col2 = D.palette.find(c => c !== f.col) || f.col2; }
+        const c = F.drawFlag(f.gov, hashS(p.name), {width:96}); f.url = c.toDataURL("image/png"); } }catch(e){}
+      if(f.url) PO.flags.set(k, f); }
+    return f; }
+  function norm(p){ if(!p || !(p.name || p.id != null)) return null; const m = p.memberStates || p.members || p.states || [];
+    return Object.assign({}, p, {name:String(p.name || p.id), leader:p.leader ? String(p.leader.name || p.leader) : "—", memberStates:(Array.isArray(m) ? m : []).map(x => String(x && x.n || x))}); }
+  function apply(p, quiet){ if(!p) return; if(p.removed || p.dissolved){ PO.list.delete(keyOf(p)); } else { const n = norm(p); if(n) PO.list.set(keyOf(n), n); }
+    if(!quiet) redraw(); }
+  function readAll(){ const src = window.ONUM_POLITIES; if(!src) return; const arr = Array.isArray(src) ? src : Object.keys(src).map(k => Object.assign({id:k}, src[k]));
+    PO.list.clear(); arr.forEach(p => apply(p, true)); }
+  const polityOf = st => { for(const p of PO.list.values()) if(p.memberStates.includes(st)) return p; return null; };
+  function redraw(){ try{ if(typeof refreshUnion === "function" && document.getElementById("paneUnion") && document.getElementById("paneUnion").offsetParent) refreshUnion(); }catch(e){} }
+  function decorate(){ const P = document.getElementById("paneUnion"); if(!P || !PO.list.size) return; const svg = P.querySelector('svg[aria-label="Map of the Union"]'); if(!svg) return;
+    const cw = 116, ch = 92, NS = "http://www.w3.org/2000/svg", defs = (G.states || []), at = {};
+    defs.forEach(s => { at[s.col + "," + s.row] = s.n; });
+    const over = document.createElementNS(NS, "g"); over.setAttribute("class", "po-over"); over.setAttribute("pointer-events", "none");
+    const near = (a, b) => { const x = parseInt(String(a).slice(1), 16), y = parseInt(String(b).slice(1), 16); return Math.abs((x >> 16) - (y >> 16)) + Math.abs((x >> 8 & 255) - (y >> 8 & 255)) + Math.abs((x & 255) - (y & 255)) < 160; };
+    const used = []; for(const p of PO.list.values()){ const f = info(p); if(!f.base) f.base = f.col; let c = f.base;
+      if(used.some(u => near(u, c))) c = COLS.concat(["#c46a1b", "#1b7fa0"]).find(x => !used.some(u => near(u, x))) || c; f.col = c; used.push(c); }
+    for(const p of PO.list.values()){ const f = info(p), mem = defs.filter(s => p.memberStates.includes(s.n)); if(!mem.length) continue;
+      mem.forEach(s => { const g = svg.querySelector('g[data-st="' + (window.CSS && CSS.escape ? CSS.escape(s.n) : s.n) + '"]'); const path = g && g.querySelector("path");
+        if(path){ path.setAttribute("fill", f.col); path.setAttribute("fill-opacity", "0.62"); } if(g) g.setAttribute("data-polity", p.name);
+        [[0, -1, "top"], [1, 0, "right"], [0, 1, "bottom"], [-1, 0, "left"]].forEach(([dx, dy, side]) => { const nb = at[(s.col + dx) + "," + (s.row + dy)];
+          if(nb && p.memberStates.includes(nb)) return; const x0 = s.col * cw, y0 = s.row * ch, L = document.createElementNS(NS, "line");
+          const c = side === "top" ? [x0, y0, x0 + cw, y0] : side === "bottom" ? [x0, y0 + ch, x0 + cw, y0 + ch] : side === "left" ? [x0, y0, x0, y0 + ch] : [x0 + cw, y0, x0 + cw, y0 + ch];
+          L.setAttribute("x1", c[0]); L.setAttribute("y1", c[1]); L.setAttribute("x2", c[2]); L.setAttribute("y2", c[3]); L.setAttribute("stroke", f.col);
+          L.setAttribute("stroke-width", "4"); L.setAttribute("stroke-dasharray", "10 4"); L.setAttribute("stroke-linecap", "round"); over.appendChild(L); }); });
+      const cx = mem.reduce((a, s) => a + s.col * cw + cw / 2, 0) / mem.length, cy = mem.reduce((a, s) => a + s.row * ch + 14, 0) / mem.length;
+      if(f.url){ const im = document.createElementNS(NS, "image"); im.setAttribute("href", f.url); im.setAttribute("x", cx - 15); im.setAttribute("y", cy - 9); im.setAttribute("width", 30); im.setAttribute("height", 19);
+        im.setAttribute("preserveAspectRatio", "none"); over.appendChild(im); }
+      const t = document.createElementNS(NS, "text"); t.setAttribute("x", cx); t.setAttribute("y", cy + 21); t.setAttribute("text-anchor", "middle"); t.setAttribute("font-family", "Archivo,sans-serif");
+      t.setAttribute("font-size", "10"); t.setAttribute("font-weight", "700"); t.setAttribute("fill", f.col); t.setAttribute("stroke", "#fff"); t.setAttribute("stroke-width", "2.5"); t.setAttribute("paint-order", "stroke");
+      t.textContent = p.name.toUpperCase(); over.appendChild(t); }
+    svg.appendChild(over);
+    const sel = G.mapSel, p = sel && polityOf(sel);
+    if(p){ const f = info(p), d = document.createElement("div"); d.className = "conc po-panel";
+      d.innerHTML = '<div class="eyebrow">Breakaway nation</div><div style="display:flex;gap:10px;align-items:center;margin:6px 0">' + (f.url ? '<img src="' + f.url + '" alt="" style="width:64px;height:40px;border:1px solid var(--line);border-radius:2px">' : '<span style="display:inline-block;width:64px;height:40px;background:' + f.col + '"></span>') +
+        '<div><div class="h-serif" style="font-size:18px">' + esc(p.name) + '</div><div class="muted">Led by <strong>' + esc(p.leader) + '</strong> · ' + esc(f.gov.replace(/_/g, " ")) + '</div></div></div>' +
+        '<p class="muted">' + esc(sel) + ' has left the Union with ' + (p.memberStates.length > 1 ? esc(p.memberStates.filter(x => x !== sel).join(", ")) : "no other state") + '.</p>';
+      const box = P.querySelector(".billbox") || P.querySelector(".conc"); if(box && box.parentNode) box.parentNode.insertBefore(d, box); else P.appendChild(d); }
+    const lg = document.createElement("div"); lg.className = "po-legend"; lg.style.cssText = "font:11.5px system-ui;margin:4px 0;display:flex;flex-wrap:wrap;gap:8px";
+    lg.innerHTML = [...PO.list.values()].map(p => { const f = info(p); return '<span><span style="display:inline-block;width:10px;height:10px;background:' + f.col + ';margin-right:3px;vertical-align:-1px"></span><b>' + esc(p.name) + '</b> (' + esc(p.leader) + ')</span>'; }).join("");
+    svg.parentNode && svg.parentNode.insertBefore(lg, svg.nextSibling); }
+  if(typeof refreshUnion === "function"){ const orig = refreshUnion;
+    refreshUnion = function(){ const r = orig.apply(this, arguments); try{ decorate(); }catch(e){ try{ console.warn("NEPTUNE-POLITIES map", e); }catch(e2){} } return r; }; }
+  window.onumPolityApply = p => { try{ apply(p); return PO.list.size; }catch(e){ return -1; } };
+  window.addEventListener("onum-polity-change", e => { try{ if(e.detail) apply(e.detail); else { readAll(); redraw(); } }catch(err){} });
+  ["onum-polities-updated", "onum-secession"].forEach(n => window.addEventListener(n, e => { try{ if(e.detail && (e.detail.name || e.detail.memberStates)) apply(e.detail); else { readAll(); redraw(); } }catch(err){} }));
+  readAll(); let tries = 0; const poll = setInterval(() => { tries++; if(window.ONUM_POLITIES && !PO.list.size){ readAll(); redraw(); } if(tries > 40) clearInterval(poll); }, 3000);
+  console.log("NEPTUNE polities ready");
+}catch(e){ try{ console.warn("NEPTUNE-POLITIES block", e); }catch(e2){} }
+/* NEPTUNE-POLITIES END */
 armFrame();
 
 })();
