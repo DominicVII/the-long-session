@@ -4,6 +4,26 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## React, and the furniture where it belongs
+
+On `20261012o`, on top of `20261012n`. Keeps Neptune's NEPTUNE-UNIFORMS block (0cd27f8) verbatim.
+
+- **React (R, or the React button):** applaud, hear hear, nod, shake your head, boo, laugh, stone silence. Warmth with the speaker, the room's read, the sway of a sitting, the Ledger and sometimes the Wire. No points.
+- **Furniture (Neptune's FURNITURE-QA):** the office sofa is in the office (it was in the cloakroom), no radiator across a back door, no Senate desk in the Court door, the visitor office's back row inside its walls, the outer House benches clear of the walls (NPC seats follow).
+- **Offices:** the coffee and bed land inside the walls (bounds passed as minX/maxX/minZ/maxZ). Coffee always pours. Bed and office sofa sleep you to morning after 5 PM, and say why before.
+- **Walking:** time-based at any frame rate; the Walk Speed setting is read.
+- **Keys:** at your desk E is the computer. 1-9 only answer cards, talk and prompts, never tabs.
+- **Doorways:** after waiting a few seconds for you, a member says "Excuse me" and goes through.
+- **Small:** the speaking clock runs on real seconds; the room strip follows the room; the handbook is in the page; muttered lines cut at a word; nobody "won by 0"; no 404s for tex/ or the logo.
+
+## Bills never stall, and nobody stands in a T-pose
+
+On `20261012n`, on top of `20261012m`.
+
+- **Bills:** a missed roll call goes back on the calendar; a vote that errors closes and the next bill comes; a watchdog (real seconds) repairs old saves and forces the night if the day overruns.
+- **Doorways:** one at a time, you first; no progress for 2 s: nudge, reroute, put through. Every body is posed before it is drawn (the two people-syncs disagreed on a cloth version and rebuilt each other's bodies).
+- **Playtest:** walk +29%, wider E, Speak Aloud with a typed fallback, 1 key debounced, the Wire de-duplicated, Export/Import save in pause, coffee and a bed in every new office.
+
 ## No more white shoulder balls
 
 On `20261012m`, on top of `20261012l`. Walk **0.68** / sprint **1.15** kept. Best default, `history.replaceState` only, no CDN, no external LLM. God is the Most High; Christ is King; the First Consul is a man under God. The House is unchanged.
