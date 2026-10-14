@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261013l">
+<meta name="onum-build" content="20261013m">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261013l";
+  var STAMP = "20261013m";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -7308,6 +7308,7 @@ function sleepToMorning(where){
   if((G.minute || 0) < 17 * 60){ setSay("It is not yet five. The day is still going; lie down for a while instead.", ""); return; }
   feed("You sleep in " + (where || "your office") + ".");
   setSay("You turn the lamp off and sleep until the building wakes you.", "");
+  /* the day can always end: from any room, you go home to bed (20261013m) */
   try{ closeTalk(); }catch(e){}
   G.minute = Math.max(G.minute, 22*60);
   G.pendingNight = true;
@@ -7355,6 +7356,15 @@ function dayWatch(dt){
   /* the day past its end: night never started, or nightfall threw */
   const late = (G.minute || 0) >= 22 * 60 + 15;
   const busy = typeof nextDay === "function" && nextDay._busy;
+  /* 20261013m: the clock only moves when you act. Idle past eight with nothing
+     happening for two minutes of real time: the day ends without you. */
+  if(WATCH.minSeen !== G.minute){ WATCH.minSeen = G.minute; WATCH.minAt = now; }
+  if((G.minute || 0) >= 20 * 60 && G.running && !G.pendingNight && !busy && veil.hidden && !PROC.on && !TALK.open && now - (WATCH.minAt || now) > 120000){
+    WATCH.minAt = now;
+    try{ console.warn("day watchdog: idle at night, going home"); }catch(e){}
+    try{ sleepToMorning("home"); }catch(e){}
+    return;
+  }
   if(late && !busy && veil.hidden){
     if(!WATCH.lateSince) WATCH.lateSince = performance.now();
     if(performance.now() - WATCH.lateSince > 6000){
@@ -30849,6 +30859,15 @@ function refreshTravel(){
     b.addEventListener("click", () => goTo(id));
     box.appendChild(b);
   });
+  /* 20261013m: after five, the day can always end, from any room */
+  if((G.minute || 0) >= 17 * 60 && G.you && !G.you.out_none){
+    const endB = document.createElement("button");
+    endB.type = "button"; endB.className = "travel__btn";
+    endB.innerHTML = "Go home and sleep<u>the day is done</u>";
+    endB.disabled = !G.running;
+    endB.addEventListener("click", () => { try{ closeTalk(); }catch(e){} sleepToMorning(G.room === "office" ? "your office" : "home"); });
+    box.appendChild(endB);
+  }
   /* save, at any moment, from the menu */
   const sp = document.createElement("span");
   sp.style.cssText = "flex:1 1 auto";

@@ -4,6 +4,15 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## The day can always end
+
+`20261013m` (on `20261013l`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- **Cause of "stuck on a day":** time only moves when you act, and Sleep was only offered in your own office or on a sofa or bed there. A Governor who finished the State House's items, or anyone idle in another chamber after 5 pm, had no way to end the day, and the watchdog only forced night at 10:15 pm, which never came.
+- **Go home and sleep:** after 5 pm the travel bar offers it from any room, and it leads to the night card.
+- **Idle watchdog:** after 8 pm, two minutes of real time with nothing happening ends the day on its own.
+- Stamp: meta + STAMP + `ONUM_BUILD` -> `20261013m`.
+
 ## Say what you are arguing about
 
 `20261013l` (on `20261013k`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
