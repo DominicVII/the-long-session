@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261013i">
+<meta name="onum-build" content="20261013j">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261013i";
+  var STAMP = "20261013j";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -8057,7 +8057,7 @@ function mapLore(place){
     const reps = (G.members || []).filter(m => !m.gone && m.state === place);
     const ch = (G.rite && G.rite.chapels && G.rite.chapels[place]) || 0;
     const r = rng(seedOf("lore:" + place));
-    return '<h2 style="margin:0 0 4px">' + pcEsc(place) + (G.you && G.you.state === place ? ' · home' : '') + '</h2>' +
+    return '<h2 style="margin:0 0 4px">' + pcEsc(place) + (G.you && G.you.state === place ? (heldOffice() === "gov" ? ' · home · you govern it' : ' · home') : '') + '</h2>' +
       '<p><i>' + pcEsc(def.note || "") + '</i></p>' +
       '<p><b>History.</b> Remembered for ' + pcEsc(drawn(B.hist, r)) + ' and ' + pcEsc(drawn(B.hist, r)) + '.</p>' +
       '<p><b>Culture.</b> ' + pcEsc(cap(drawn(B.custom, r))) + '; ' + pcEsc(drawn(B.food, r)) + '; people say "' + pcEsc(drawn(B.phrase, r)) + '". Sacred: ' + pcEsc(drawn(B.sacred, r)) + '.</p>' +
@@ -21667,6 +21667,7 @@ function micSend(text){
 
 function eventCard(e){
   if(e && e.k === "office"){ schedCard(e); return; }
+  try{ if(e && abroadOffice() && !outsideAllowed(e.room)){ e.done = true; return; } }catch(x){}
   /* If you are standing in the room, you sit through it in real time
      rather than reading about it. The card is for the times you are
      somewhere else. */
@@ -23184,7 +23185,7 @@ function improvise(m, said){
   /* ── the reaction, before the answer ── */
   if(u.intent === "greet") out.push(pickR(mood.val > 20
     ? ["There you are.", "Good — I was hoping to catch you.", "Morning to you.", "Come in. I have a minute."]
-    : ["Representative.", "Mm.", "You have caught me on a bad one.", "Make it quick."]));
+    : [youAddress() + ".", "Mm.", "You have caught me on a bad one.", "Make it quick."]));
   else if(u.intent === "apology"){
     const t = topMemory(m);
     if(t && t.w < 0){
@@ -23594,7 +23595,7 @@ async function deliverReplies(){
     }
     if(!reply){
       const mood = moodOf(m);
-      reply = pick(MOODS[mood.key].open) + " I got your note. " +
+      reply = pick(MOODS[mood.key].open).replace(/^Representative\./, (function(){ try{ return youAddress(); }catch(e){ return "Representative"; } })() + ".") + " I got your note. " +
         (m.rel.warmth > 20 ? "Come and find me." : "We can talk about it when there is time.");
     }
     m.chat.push({role:"assistant", content:reply});
@@ -26839,7 +26840,8 @@ function mapCard(){
     const R = ROOMS[id];
     const on = id === here;
     return '<button type="button" class="conc__btn' + (on ? " is-accepted" : "") + '" data-go="' + id + '"' +
-      (on ? " disabled" : "") + '>' + R.t + '<u>' + (R.tag || id) + (on ? " · you are here" : "") + '</u></button>';
+      (on ? " disabled" : "") + '>' + ((id === homeRoom() && abroadOffice()) ? "My Office · " + R.t : R.t) +
+      '<u>' + (R.tag || id) + (id === homeRoom() && abroadOffice() ? " · your office" : "") + (on ? " · you are here" : "") + '</u></button>';
   }).join("");
   card.innerHTML =
     '<div class="eyebrow">The building</div>' +
@@ -29142,6 +29144,17 @@ function officeSeat(){
   return y.state + " " + y.dist;
 }
 function homeRoom(){ const k = heldOffice(); return (k && K_ROOM_OF[k]) || "office"; }
+/* what people call you to your face: the chair you hold, or the highest you held */
+function youAddress(){
+  const y = G.you; if(!y) return "Representative";
+  const k = heldOffice() || OFFICE_RANK.find(o => o !== "house" && officeTermsOf(o) > 0) || "house";
+  if(k === "house"){
+    if(!y.out && y.post === "speaker") return "Speaker";
+    if(!y.out && y.post && /^(ways|judic|armed)$/.test(y.post)) return "Chairman";
+    return "Representative";
+  }
+  return officeShort(k);
+}
 function seniorElected(){
   const y = G.you; if(!y) return null;
   const held = heldOffice();
@@ -29645,7 +29658,7 @@ function schedCard(e){
 }
 /* the diary, in your office or in counsel's hands */
 function schedListHTML(){
-  const L = (G.events || []).filter(e => e && e.day === G.day && !e.done).sort((a, b) => a.hour - b.hour);
+  const L = (G.events || []).filter(e => e && e.day === G.day && !e.done && (!abroadOffice() || outsideAllowed(e.room))).sort((a, b) => a.hour - b.hour);
   if(!L.length) return '<p class="muted">' + sitEsc(schedBy()) + ' has nothing on the diary yet. Things will come up.</p>';
   return L.map(e => '<div class="whip__row"><span class="whip__n">' + hourLabel(e.hour) + ' · ' + sitEsc(e.t) + '</span><span class="whip__w">' +
     sitEsc((ROOMS[e.room] && ROOMS[e.room].t) || e.room) + ' · ' + (e.rsvp === true ? "accepted" : e.rsvp === false ? "declined" : "waiting on you") + '</span>' +
@@ -31154,7 +31167,7 @@ function refreshCareer(){
   el("paneCareer").innerHTML =
     '<div class="eyebrow">Service record</div><div class="h-serif">' + you.name + '</div>' +
     '<p class="muted">' + (inHouse() ? (you.post?postTitle(you.post):"Member of the House") + " for " + you.state + " " + you.dist : officeTitle() + " · " + officeSeat()) +
-      " · " + partyName(you.party) + " · " + committeeOf(you.committee).t + '</p>' +
+      " · " + partyName(you.party) + (inHouse() ? " · " + committeeOf(you.committee).t : "") + '</p>' +
     '<div class="card__actions" style="margin:10px 0 14px">' +
       '<button class="btn btn--ghost" type="button" id="saveExport">Export career save</button>' +
       '<button class="btn btn--ghost" type="button" id="saveImport">Import career save</button>' +
@@ -37519,7 +37532,7 @@ try{
     const items = cur.items = LP.agenda(kind, 2), pl = cur.place = {name:LP.placeToday(kind)};
     const it = items.map(i => i.text);
     return {q:"the party backing " + it[0] + (it[1] ? ", and " + it[1] : ""), short:"the agenda", yes:"back it", no:"table it", comp:"a working group that reports at the next meeting, with " + it[0] + " first", petition:true,
-      greet:["Congressman, ", "Thanks for coming home. ", "Evening, everybody. "], gavel:"Evening, all. Coffee's at the back. We're at " + pl.name + ", and there are " + items.length + " things on tonight's list.",
+      greet:[(function(){ try{ return youAddress(); }catch(e){ return "Representative"; } })() + ", ", "Thanks for coming home. ", "Evening, everybody. "], gavel:"Evening, all. Coffee's at the back. We're at " + pl.name + ", and there are " + items.length + " things on tonight's list.",
       adjourn:"That's the list. Stack your chairs. Same time " + (kind === "state" ? "next month" : "next week") + ".", state:G.you.state, bill:null, items, kind};
   };
   const cast = kind => (M, out) => {

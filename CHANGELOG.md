@@ -4,6 +4,17 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## Every office, its own title and map
+
+`20261013j` (on `20261013i`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- **Swept every position** (Representative, Speaker, committee chair, Senator, Governor, Justice, Executive, out of office as a former Governor or former Representative): header, panel tab, office panel, travel bar, map card, leaderboard, career card and NOW line each show the office actually held.
+- **Map card:** your office is marked "My Office · The State House" (or the Senate Chamber, the Court, the Executive Wing), tagged "your office". The desk-computer map marks the state you govern.
+- **Career card:** the House committee is shown only while you sit in the House.
+- **How people address you:** to your face it is Governor, Senator, Justice, President, Speaker, Chairman or Representative, and the highest you held once you are out (a former Governor is still "Governor"). The district party meeting no longer calls everyone "Congressman".
+- **No stale House diary:** on the day you change office, House items for rooms you no longer belong in (caucus, committee, floor) drop off the diary instead of firing.
+- Stamp: meta + STAMP + `ONUM_BUILD` -> `20261013j`.
+
 ## Doorways for every figure, desks in every office, offices that fit their owners, a Vox that never repeats
 
 `20261012s` (on `20261012r`, on Neptune's `20261012q`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps Neptune's `../neptune/` path.
