@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261013g">
+<meta name="onum-build" content="20261013h">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261013f";
+  var STAMP = "20261013h";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -7196,6 +7196,8 @@ function pcTab(){
   } else if(t === "sbox"){
     out.push(sbHTML());
     try{ out.push(caHTML()); }catch(e){}
+    try{ out.push(scHTML()); }catch(e){}
+    try{ out.push(cpHTML()); }catch(e){}
   } else if(t === "lore"){
     out.push(loreHTML());
   } else if(t === "desk"){
@@ -8059,6 +8061,7 @@ function mapLore(place){
       '<p><b>Faith.</b> Mostly ' + pcEsc(st.creed || def.creed || "mixed") + '.' + (ch ? ' Consular Rite chapels: ' + ch + '.' : ' No Consular chapel yet.') + ' God is the Most High; Christ is King.</p>' +
       '<p><b>Economy.</b> ' + pcEsc(B.ind.join(", ")) + '; industry index ' + Math.round(st.ind || def.ind || 0) + ', population ' + (st.pop || def.pop || "?") + 'm.</p>' +
       '<p><b>Represented by.</b> ' + (reps.length ? reps.slice(0, 8).map(m => pcEsc(m.name) + ' (' + m.party + ')').join(", ") + (reps.length > 8 ? ", and " + (reps.length - 8) + " more" : "") : "no sitting members") + '.</p>' +
+      '<p><b>Intentions.</b> ' + pcEsc((function(){ try{ return scIntent(place) || ""; }catch(e){ return ""; } })()) + '</p>' +
       '<p><b>Tension.</b> Unrest ' + Math.round(st.unrest || 0) + '/100.' + (st.bill ? ' On the governor\u2019s desk: ' + pcEsc(st.bill.title) + '.' : '') + '</p>' +
       '<p><b>Recent.</b></p>' + (L.length ? '<ul>' + L.map(x => '<li>' + pcEsc(x.t) + '</li>').join("") + '</ul>' : '<p class="pc__m">Nothing on record yet. The record grows as the session does.</p>') +
       (typeof tripButton === "function" ? tripButton(place) : "");
@@ -8652,7 +8655,7 @@ function caEnsure(){
 function caStateInfo(){ const s = (G.states || []).find(x => x.n === (G.you && G.you.state)) || {}; return {ind:s.ind || 50, lean:s.lean || 50, creed:s.creed || "latin", cult:s.cult}; }
 function caPublish(ch){
   const D = caEnsure();
-  window.ONUM_DISTRICT_CHANGES = D.changes.map(c => ({id:c.id, kind:c.kind, name:c.name, owner:c.owner, pos:{hint:c.street, street:c.street}, status:c.status, cause:c.cause, day:c.day}));
+  window.ONUM_DISTRICT_CHANGES = D.changes.map(c => ({id:c.id, kind:c.kind, name:c.name, owner:c.owner, pos:{hint:c.street, street:c.street, x:(seedOf("lot:" + c.street) % 120) - 60 + (seedOf(c.id) % 9) * 2, z:24 + (seedOf("lotz:" + c.street) % 70)}, pos2:c.kind === "road" ? {x:(seedOf("lot:" + c.street) % 120) - 30, z:24 + (seedOf("lotz:" + c.street) % 70)} : undefined, status:c.status, cause:c.cause, day:c.day}));
   if(!ch) return;
   const d = window.ONUM_DISTRICT_CHANGES.find(x => x.id === ch.id);
   try{ window.dispatchEvent(new CustomEvent("onum-district-change", {detail:d})); document.dispatchEvent(new CustomEvent("onum-district-change", {detail:d})); }catch(e){}
@@ -9267,6 +9270,349 @@ setTimeout(function(){ try{ const mo = new MutationObserver(() => { if(onumGloss
   setTimeout(() => { try{ mo.observe(document.body, {childList:true, subtree:true}); solidify(document); }catch(e){} }, 1500);
   window.onumSolidUI = solidify;
 })();
+
+/* ══ 20261013b · STATECRAFT: every state and nation has a mind ══
+   States and foreign powers act for themselves: deals, statements, protests, provocations,
+   rare spying, mistakes that others bail out or exploit. Crises come from the numbers.
+   Secession is never the default: it needs grievance, divergence, culture and faith,
+   provocation, ignored pleas and backing, compounding for weeks. Neptune draws the borders
+   from window.ONUM_POLITIES; leaders are real people (npcIds) with minds in ONUM_MINDS. */
+const SC_STYLE = ["consensus","boss rule","reformist","pious","technocratic","populist","old-family"];
+const SC_GOAL = ["power","prosperity","survival","hostility"];
+function scEnsure(){
+  if(G.sc && G.sc.v === 1) return G.sc;
+  const S = G.sc = {v:1, st:{}, na:{}, polities:[], crises:[], log:[], day:0};
+  (G.states || []).forEach(st => {
+    const r = rng(seedOf("sc:" + st.n));
+    S.st[st.n] = {style:drawn(SC_STYLE, r), goal:drawn(SC_GOAL.slice(0, 3), r), griev:Math.round(r() * 20), heard:0, ignored:0, streak:0, prov:0, backing:0, mood:50};
+  });
+  WORLD_POWERS.forEach(p => { const r = rng(seedOf("na:" + p.k)); S.na[p.k] = {name:p.t, style:drawn(SC_STYLE, r), goal:drawn(SC_GOAL, r), toward:Math.round(r() * 60 - 30), griev:Math.round(r() * 30)}; });
+  return S;
+}
+/* leaders and envoys are people: they exist, post on the Vox, and LiveTalk can talk to them */
+function scPerson(key, name, title, home){
+  G.civ = G.civ || [];
+  let p = G.civ.find(c => c.scKey === key && !c.gone);
+  if(p) return p;
+  try{ p = makeCivilian(); }catch(e){ return null; }
+  p.name = name; p.role = title; p.scKey = key; p.room = "abroad"; p.abroad = true; p.caseOpen = false; p.cause = null; p.home = home;
+  G.civ.push(p); try{ _allCache = null; }catch(e){}
+  return p;
+}
+function scLeaders(){
+  const S = scEnsure();
+  Object.keys(S.st).forEach(n => { const s = S.st[n]; if(!s.gov){ s.gov = newName(n); } s.govId = (scPerson("gov:" + n, s.gov, "Governor of " + n, n) || {}).id; });
+  WORLD_POWERS.forEach(p => { const a = S.na[p.k]; const r = rng(seedOf("lead:" + p.k));
+    if(!a.leader){ a.leader = foreignName(r, p.k); a.leaderT = drawn(["Premier","Chancellor","President","First Minister","Regent"], r); a.envoy = foreignName(r, p.k);
+      try{ const e = window.onumForeignEnvoy && window.onumForeignEnvoy(p); if(e && e.name) a.envoy = e.name; }catch(e){} }
+    a.leaderId = (scPerson("lead:" + p.k, a.leader, a.leaderT + " of " + p.t, p.t) || {}).id;
+    a.envoyId = (scPerson("env:" + p.k, a.envoy, "Ambassador of " + p.t, p.t) || {}).id; });
+}
+function scLog(t, place){ const S = scEnsure(); S.log.push({d:G.day, t}); if(S.log.length > 120) S.log.shift(); try{ lLog(t, "world"); }catch(e){} try{ if(place) loreAdd(place, "Day " + G.day + ": " + t); }catch(e){} try{ feed(t, "world"); }catch(e){} }
+function scVox(pid, t){ try{ const p = byId(pid); if(!p) return; voxAdd({id:G.vox.id++, by:p.id, t, k:"state", v:0, day:G.day, at:hhmm(), backs:0, hits:0, voices:[], mine:false}); }catch(e){} }
+function scNation(){ let w = 0, s = 0; (G.states || []).forEach(st => { const p = st.pop || 1; w += p; s += (st.lean || 0) * p; }); return s / Math.max(1, w); }
+function scPolPub(ch){
+  const S = scEnsure();
+  window.ONUM_POLITIES = S.polities.map(p => Object.assign({}, p));
+  if(ch){ try{ window.dispatchEvent(new CustomEvent("onum-polity-change", {detail:Object.assign({}, ch)})); document.dispatchEvent(new CustomEvent("onum-polity-change", {detail:Object.assign({}, ch)})); }catch(e){} }
+}
+/* a plea from a state reaches your desk; answering it is being heard */
+function scPlea(n, s){
+  const st = (G.states || []).find(x => x.n === n); if(!st) return;
+  const what = s.griev > 60 ? "the federal government keeps deciding things for " + n + " without asking" : st.unrest > 55 ? "the streets are restless and the capital has not noticed" : "the roads, the courts and the money all run to the capital";
+  try{ pushMail({name:s.gov, id:s.govId}, "A letter from " + n, "Governor " + s.gov + " writes: " + what + ". \"We are asking to be heard before people stop asking.\"", {kind:"plea", options:[
+    {t:"Hear them out (30m)", run(){ s.heard += 1; s.griev = Math.max(0, s.griev - 12); s.streak = 0; try{ spend(30, 2); }catch(e){} scLog(n + " says the capital listened, for once.", n); }},
+    {t:"Not now", run(){ s.ignored += 1; s.griev = Math.min(100, s.griev + 4); scLog("A plea from " + n + " went unanswered.", n); }}]}); }catch(e){}
+  s.plea = G.day;
+}
+function scDay(){
+  const S = scEnsure(); if(S.day === G.day) return; S.day = G.day;
+  scLeaders();
+  const nat = scNation(), cap = (G.states || []).find(x => x.n === (G.country && G.country.capital)) || (G.states || [])[0] || {};
+  (G.states || []).forEach(st => {
+    const s = S.st[st.n]; if(!s) return;
+    if(s.gone) return;
+    /* pressures compound: unrest, distance from the national line, faith and culture apart from the capital, provocation, ignored pleas */
+    const div = Math.abs((st.lean || 0) - nat) / 100, cf = (st.creed !== cap.creed ? 0.5 : 0) + (st.cult !== cap.cult ? 0.5 : 0);
+    s.griev = clamp(s.griev + (st.unrest || 0) / 120 + div * 1.4 + cf * 0.4 + s.prov * 0.6 + Math.min(10, s.ignored) * 0.06 - s.heard * 0.3 - 1.1 + (Math.random() - 0.5), 0, 100);
+    s.prov = Math.max(0, s.prov - 0.1); s.heard = Math.max(0, s.heard - 0.02);
+    const P = s.griev * 0.6 + div * 20 + cf * 8 + Math.min(20, s.ignored * 4) + s.backing * 10;
+    s.P = Math.round(P);
+    s.streak = P >= 82 ? s.streak + 1 : Math.max(0, s.streak - 3);
+    s.mood = Math.round(100 - s.griev);
+    /* their own business */
+    const r = Math.random();
+    if(r < .025){ const o = pick((G.states || []).filter(x => x !== st && !S.st[x.n].gone)); if(o){ scLog(st.n + " and " + o.n + " sign a trade compact on " + pick(["grain","rail freight","timber","river shipping","power lines"]) + ".", st.n); st.ind = clamp((st.ind || 0) + 1, 0, 100); o.ind = clamp((o.ind || 0) + 1, 0, 100); } }
+    else if(r < .045){ scLog("Governor " + s.gov + " of " + st.n + " says publicly: \"" + pick(["We will do it our way, and show the capital how.","The Union is a promise, not a leash.","Ask our farmers what the last bill cost them.","We are loyal. We are not silent."]) + "\"", st.n); scVox(s.govId, pick(["Our way works. Come and see.","The capital should visit more often.","We kept our word. Did they?"])); }
+    else if(r < .06 && s.griev > 40){ st.unrest = clamp((st.unrest || 0) + 3, 0, 100); scLog("Protest in " + st.n + ": " + pick(["farmers block the state road","dockworkers march on the statehouse","a crowd outside the federal building"]) + ".", st.n); }
+    else if(r < .066){ const o = pick((G.states || []).filter(x => x !== st && !S.st[x.n].gone)); if(o){ S.st[o.n].prov += 2; scLog(st.n + "'s legislature passes a resolution mocking " + o.n + ". " + o.n + " is not laughing.", o.n); } }
+    else if(r < .07){ /* a mistake: someone bails them out or exploits it */
+      const o = pick((G.states || []).filter(x => x !== st && !S.st[x.n].gone)); if(o){ if(chance(.5)){ scLog(st.n + " botched its " + pick(["budget","flood levee","bond sale"]) + "; " + o.n + " lent engineers and money.", st.n); s.griev = Math.max(0, s.griev - 3); } else { scLog(st.n + " botched its " + pick(["budget","flood levee","bond sale"]) + "; " + o.n + " poached its contracts.", st.n); s.prov += 1.5; } } }
+    if(s.griev > 50 && (!s.plea || G.day - s.plea > 12) && chance(.3)) scPlea(st.n, s);
+    /* crises from the numbers */
+    if((st.unrest || 0) > 80 && chance(.08)) scCrisis("unrest", st.n, "Riots in " + st.n + ". The governor asks for calm and for the Guard.");
+    if((st.ind || 0) < 15 && chance(.05)) scCrisis("economy", st.n, "Bank runs in " + st.n + ". Two mills close in a week.");
+  });
+  if(chance(1 / 120)){ const st = pick(G.states || []); if(st) scCrisis("disaster", st.n, pick(["A flood breaks the levee in ","An ice storm takes the power lines in ","A mine collapse in "]) + st.n + "."); }
+  /* foreign powers */
+  WORLD_POWERS.forEach(p => {
+    const a = S.na[p.k], r = Math.random();
+    if(r < .03){ scLog("The " + p.adj + " envoy, " + a.envoy + ", " + (a.toward > 0 ? "proposes a trade understanding" : "complains to the press about the border") + ".", p.t); scVox(a.envoyId, a.toward > 0 ? "We would like to buy more of your grain. Call us." : "Some in your capital forget who your neighbours are."); }
+    else if(r < .036 && a.goal === "hostility"){ /* espionage: rare, and only sometimes found */
+      const st = pick(G.states || []); if(st && chance(.3)){ a.toward -= 6; scLog("A " + p.adj + " agent was caught photographing the rail yards in " + st.n + ". " + a.leaderT + " " + a.leader + " denies everything.", st.n); } }
+    else if(r < .046 && a.goal === "hostility"){ /* backing a restless state */
+      const st = (G.states || []).filter(x => S.st[x.n] && S.st[x.n].griev > 55 && !S.st[x.n].gone).sort((x, y) => S.st[y.n].griev - S.st[x.n].griev)[0];
+      if(st){ S.st[st.n].backing = Math.min(2, S.st[st.n].backing + 0.4); scLog("The " + p.adj + " press praises " + st.n + "'s \"independent spirit.\"", st.n); } }
+    a.toward = clamp(a.toward + (Math.random() - 0.5) * 2, -100, 100);
+  });
+  scSecession();
+  scPolPub(null);
+  try{ scMinds(); }catch(e){}
+}
+function scCrisis(k, place, t){
+  const S = scEnsure(); S.crises.push({d:G.day, k, place, t}); if(S.crises.length > 40) S.crises.shift();
+  scLog(t, place);
+  try{ document.dispatchEvent(new CustomEvent("onum-crisis", {detail:{k, place, t}})); }catch(e){}
+}
+const SC_NEW = ["Free State of", "Commonwealth of", "Republic of", "Confederation of"];
+function scSecession(){
+  const S = scEnsure();
+  /* states near the edge: open tension, published so Neptune can show it */
+  (G.states || []).forEach(st => {
+    const s = S.st[st.n]; if(!s || s.gone) return;
+    let pol = S.polities.find(p => p.memberStates.indexOf(st.n) >= 0 && (p.status === "tension" || p.status === "war"));
+    if(s.streak >= 12 && !pol){
+      const nb = S.polities.find(p => p.status === "tension" && (G.states || []).some(x => p.memberStates.indexOf(x.n) >= 0 && Math.abs((x.col || 0) - (st.col || 0)) + Math.abs((x.row || 0) - (st.row || 0)) <= 1));
+      if(nb){ nb.memberStates.push(st.n); scPolPub(nb); scLog(st.n + " joins " + nb.name + "'s movement.", st.n); return; }
+      pol = {id:"pol" + (S.polities.length + 1), name:pick(SC_NEW) + " " + st.n, govType:s.style === "pious" ? "theocratic council" : s.style === "boss rule" ? "strongman" : s.style === "populist" ? "people's assembly" : "provisional republic",
+        leader:{npcId:s.govId, name:s.gov, title:"Governor of " + st.n}, memberStates:[st.n], parentId:"union", status:"tension", foundedDay:null, since:G.day};
+      S.polities.push(pol); scPolPub(pol);
+      scLog("In " + st.n + ", talk of leaving the Union is no longer a joke. A movement calls itself the " + pol.name + ".", st.n);
+    }
+    if(pol && pol.status === "tension"){
+      const all = pol.memberStates.map(n => S.st[n]);
+      const cool = all.every(x => x.streak === 0);
+      if(cool && G.day - pol.since > 10){ pol.status = "reunited"; scPolPub(pol); scLog("The " + pol.name + " movement fades; " + pol.memberStates.join(", ") + " stays in the Union.", st.n); return; }
+      if(all.every(x => x.streak >= 60) && all.some(x => x.backing > 0.5 || x.ignored >= 6) && chance(.02)){
+        if(chance(.4)){ pol.status = "war"; pol.since = G.day; scPolPub(pol); scCrisis("secession", st.n, pol.name + " declares independence. The Union calls it rebellion. Shots at the state line."); }
+        else { pol.status = "seceded"; pol.foundedDay = G.day; all.forEach(x => x.gone = true); scPolPub(pol); scCrisis("secession", st.n, pol.name + " leaves the Union after a referendum. " + pol.leader.name + " is its first " + (pol.govType === "strongman" ? "leader" : "president") + "."); }
+      }
+    }
+    if(pol && pol.status === "war" && G.day - pol.since > 10 && chance(.06)){
+      if(chance(.5)){ pol.status = "seceded"; pol.foundedDay = G.day; pol.memberStates.forEach(n => S.st[n].gone = true); scLog("The fighting ends with a treaty: the " + pol.name + " is recognised.", st.n); }
+      else { pol.status = "reunited"; pol.memberStates.forEach(n => { S.st[n].griev = 40; S.st[n].streak = 0; }); scLog("The rebellion in " + pol.memberStates.join(", ") + " collapses. Reunion, and bitterness.", st.n); }
+      scPolPub(pol);
+    }
+  });
+}
+/* what a state or nation intends toward you, in plain words (for the glossary hover and the map) */
+function scIntent(name){
+  const S = scEnsure(), s = S.st[name];
+  if(s){ const pol = S.polities.find(p => p.memberStates.indexOf(name) >= 0 && p.status !== "reunited");
+    return name + ": " + s.style + " government under Governor " + s.gov + "; wants " + s.goal + ". Grievance " + Math.round(s.griev) + "/100; heard " + Math.round(s.heard * 10) / 10 + " times, ignored " + s.ignored + "." + (pol ? " " + pol.name + " (" + pol.status + ")." : ""); }
+  const p = WORLD_POWERS.find(x => x.t === name || x.k === name); if(p){ const a = S.na[p.k]; return p.t + ": " + a.style + ", led by " + (a.leaderT || "") + " " + (a.leader || "") + "; wants " + a.goal + " (" + p.want + "). Toward the Republic: " + (a.toward > 20 ? "friendly" : a.toward < -20 ? "hostile" : "wary") + "."; }
+  return null;
+}
+(function(){ try{ const L = onumGlossary.lookup; onumGlossary.lookup = function(t){ return L.call(onumGlossary, t) || (G && G.sc ? scIntent(String(t || "")) : null); }; }catch(e){} })();
+/* ── minds for LiveTalk: window.onumMind(npcId) and ONUM_MINDS ── */
+function onumMindOf(id){
+  const p = byId(id); if(!p) return null;
+  const mind = {name:p.name, goals:[], beliefs:[], plans:[], memory:[], family:null, job:p.role || p.post || (p.kind === "member" ? "Member of the House" : ""), wealth:null, mood:null};
+  try{ const S = scEnsure();
+    if(p.scKey){ const k = p.scKey.split(":"), key = k.slice(1).join(":");
+      if(k[0] === "cp"){ const c = (S.cp || {})[key] || {}; mind.goals = [c.rel === "rival" ? "outdo you" : c.rel === "mentor" ? "see you grow into the job" : c.rel === "ally" ? "pass something together" : "get the attention you get", "win re-election in " + key];
+        mind.beliefs = [c.party + " is right about most things", "God is the Most High"]; mind.plans = ["compare records with you", "raise " + key + "'s needs in the capital"]; mind.wealth = c.wealth || null; mind.job = (c.title || "") + " for " + key; }
+      else if(k[0] === "gov"){ const s = S.st[key]; mind.goals = [s.goal, "be heard in the capital"]; mind.beliefs = [s.style + " government is how it must be done"]; mind.plans = s.griev > 50 ? ["write to the capital again", s.streak > 5 ? "keep the independence movement alive" : "rally the legislature"] : ["trade with the neighbours"]; mind.mood = s.mood; }
+      else { const a = S.na[key]; mind.goals = [a.goal]; mind.beliefs = [WORLD_POWERS.find(x => x.k === key).want + " matters more than anything"]; mind.plans = [a.toward > 0 ? "a trade understanding" : "test the Republic's patience"]; mind.mood = 50 + Math.round(a.toward / 2); } } }catch(e){}
+  try{ if(p.kind === "member" && p.intent && p.intent.k && p.intent.k.length > 3) mind.goals.push("intends to " + p.intent.k); if(p.mem) mind.memory = p.mem.slice(-6).map(m => m.t || String(m)); if(p.traits) mind.beliefs.push("temper " + p.traits.temper + ", discretion " + p.traits.discretion); if(mind.mood == null){ mind.mood = moodOf(p).val; } }catch(e){}
+  try{ const f = G.fam && G.fam.p[p.id]; if(f) mind.family = {spouse:f.spouse, kids:f.kids, kin:f.kin, feuds:f.feuds}; }catch(e){}
+  return mind;
+}
+window.onumMind = onumMindOf;
+function scMinds(){
+  const M = window.ONUM_MINDS = window.ONUM_MINDS || {};
+  (G.civ || []).filter(c => c.scKey && !c.gone).forEach(c => { M[c.id] = onumMindOf(c.id); });
+  (G.members || []).filter(m => !m.gone).slice(0, 80).forEach(m => { M[m.id] = onumMindOf(m.id); });
+  try{ const D = G.dist; if(D) D.actors.forEach(a => { M["town:" + a.id] = {name:a.name, goals:a.intent ? ["save for a " + a.intent.k] : [], beliefs:[a.faith > 60 ? "God is the Most High" : "work pays"], plans:[], memory:(D.gossip || []).filter(g => g.t.indexOf(a.name) >= 0).slice(-4).map(g => g.t), family:null, job:a.job, wealth:"private", mood:null}; }); }catch(e){}
+}
+function scHTML(){
+  const S = scEnsure(), out = ['<div class="pc__h">The states and the world</div>'];
+  const hot = Object.keys(S.st).map(n => [n, S.st[n]]).sort((a, b) => b[1].griev - a[1].griev).slice(0, 6);
+  hot.forEach(([n, s]) => out.push('<div>' + pcEsc(n) + ' · ' + pcEsc(s.style) + ' · Gov. ' + pcEsc(s.gov || "") + ' · grievance ' + Math.round(s.griev) + ' · heard ' + Math.round(s.heard * 10) / 10 + ' / ignored ' + s.ignored + (s.gone ? ' · <b>gone</b>' : '') + '</div>'));
+  S.polities.filter(p => p.status !== "reunited").forEach(p => out.push('<div class="pc__m"><b>' + pcEsc(p.name) + '</b> · ' + pcEsc(p.status) + ' · ' + pcEsc(p.memberStates.join(", ")) + '</div>'));
+  S.log.slice(-6).reverse().forEach(l => out.push('<div class="pc__m">d' + l.d + ' · ' + pcEsc(l.t) + '</div>'));
+  return out.join("");
+}
+/* fallback only: if Neptune's map renderer is not drawing polities, outline breakaway states */
+(function(){ try{ const _ms = mapShade; mapShade = function(P){ const r = _ms.apply(this, arguments);
+  try{ if(window.ONUM_POLITIES_RENDERED || typeof window.onumPolityApply === "function" || !G.sc) return r; G.sc.polities.filter(p => p.status === "seceded" || p.status === "war" || p.status === "tension").forEach(p => p.memberStates.forEach(n => {
+    P.querySelectorAll('[data-st="' + n + '"]').forEach(g => { const sh = g.matches("rect,path,polygon") ? g : g.querySelector("rect,path,polygon"); if(sh){ sh.setAttribute("stroke", p.status === "tension" ? "#c08a00" : "#8a1020"); sh.setAttribute("stroke-width", p.status === "tension" ? "2" : "3"); sh.setAttribute("stroke-dasharray", p.status === "seceded" ? "" : "4 3"); } }); })); }catch(e){}
+  return r; }; }catch(e){} })();
+/* ── counterparts: your opposite number in every state, at your level ── */
+const CP_REL = ["rival","ally","mentor","envious peer"];
+function cpTitle(){ let k = "house"; try{ k = roleKey(); }catch(e){} return {house:"Representative", leader:"Representative", chair:"Representative", senate:"Senator", gov:"Governor", bench:"Chief Justice of the state", pres:"Head of the state party"}[k] || "Representative"; }
+function cpEnsure(){
+  const S = scEnsure(); S.cp = S.cp || {}; const T = cpTitle(), y = G.you || {};
+  (G.states || []).forEach(st => {
+    if(st.n === y.state) return;
+    const key = st.n + ":" + T;
+    let c = S.cp[st.n];
+    if(!c || c.title !== T){
+      const r = rng(seedOf("cp:" + key));
+      const name = T === "Governor" && S.st[st.n] && S.st[st.n].gov ? S.st[st.n].gov : newName(st.n);
+      const party = (st.lean || 0) + (r() * 40 - 20) > 8 ? "FED" : (st.lean || 0) + (r() * 40 - 20) < -8 ? "COM" : "IND";
+      c = S.cp[st.n] = {name, title:T, state:st.n, party, creed:st.creed || "latin", cult:st.cult || null, rel:drawn(CP_REL, r), wealth:drawn(["modest","comfortable","family money","new money"], r),
+        rec:{wins:Math.round(r() * 3), approval:Math.round(35 + r() * 50), bills:Math.round(r() * 4)}, since:G.day || 1, last:0};
+    }
+    const p = scPerson("cp:" + st.n, c.name, c.title + " for " + st.n, st.n); if(p){ c.npcId = p.id; p.party = c.party; p.state = st.n; p.creed = c.creed; }
+  });
+  cpPublish();
+  return S.cp;
+}
+function cpPublish(){
+  const S = scEnsure(), out = {};
+  Object.keys(S.cp || {}).forEach(n => { const c = S.cp[n]; out[n] = {npcId:c.npcId, name:c.name, title:c.title, state:n, party:c.party, faith:c.creed, culture:c.cult, relation:c.rel, wealth:c.wealth, record:c.rec,
+    family:(function(){ try{ const f = famEnsure().p[c.npcId]; return f ? {spouse:f.spouse, kids:f.kids} : null; }catch(e){ return null; } })(), mind:(function(){ try{ return onumMindOf(c.npcId); }catch(e){ return null; } })()}; });
+  window.ONUM_COUNTERPARTS = out;
+  try{ window.dispatchEvent(new CustomEvent("onum-counterparts", {detail:{n:Object.keys(out).length}})); }catch(e){}
+}
+function cpDay(){
+  const S = scEnsure(); cpEnsure(); const y = G.you || {};
+  Object.keys(S.cp).forEach(n => { const c = S.cp[n]; c.rec.approval = clamp(c.rec.approval + rint(-2, 2), 5, 98); if(chance(.03)) c.rec.bills++; });
+  /* one or two of them reach out, in character */
+  const L = Object.keys(S.cp).map(n => S.cp[n]).filter(c => c.npcId && G.day - (c.last || 0) > 6);
+  if(L.length && chance(.35)){
+    const c = pick(L); c.last = G.day; const ya = Math.round(y.approval || 50), mine = c.rec.approval;
+    const T = {rival:[ "Saw your numbers. " + ya + ". Mine are " + mine + ". Just saying.", "Your bill would never pass in " + c.state + ". Ours did."],
+      ally:["If you need votes from " + c.state + "'s side, call me.", "We should compare notes on the " + ((G.bill && G.bill.title) || "next bill") + "."],
+      mentor:["A word from someone who has done this longer: answer your mail from home first.", "Your first term is about being seen to listen. Mine was."],
+      "envious peer":["How do you get the papers to print you every week?", "Congratulations, I suppose. Some of us do the work without the cameras."]}[c.rel];
+    try{ dmPush(c.npcId, c.npcId, pick(T)); }catch(e){}
+    try{ if(G.fam && G.fam.p[c.npcId] && G.fam.p[c.npcId].kids.length && chance(.3)) dmPush(c.npcId, c.npcId, "My " + (G.fam.p[c.npcId].kids[0].age < 12 ? "youngest" : "eldest") + " asked about you. Small world."); }catch(e){}
+  }
+  cpPublish();
+}
+function cpHTML(){
+  const S = scEnsure(); if(!S.cp) return ""; const y = G.you || {};
+  const rows = Object.keys(S.cp).slice(0, 20).map(n => { const c = S.cp[n]; return '<div>' + pcEsc(n) + ': <b>' + pcEsc(c.name) + '</b> (' + pcEsc(c.party) + ', ' + pcEsc(c.title) + ') · ' + pcEsc(c.rel) + ' · approval ' + c.rec.approval + ' vs your ' + Math.round(y.approval || 0) + ' · bills ' + c.rec.bills + '</div>'; });
+  return '<div class="pc__h">Your counterparts in the other states</div>' + rows.join("");
+}
+
+/* ══ 20261013h · Phone button: calls, texts & DMs, contacts (officeholders, counterparts), Neptune chat ══ */
+const PB = {tab:"contacts", call:null};
+function pbEsc(s){ return String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"\u0026amp;","<":"\u0026lt;",">":"\u0026gt;",'"':"\u0026quot;"}[c])); }
+function pbContacts(){
+  const out = [], seen = {};
+  const add = (id, name, role, grp) => { if(id == null || seen[id]) return; seen[id] = 1; out.push({id, name, role, grp}); };
+  try{ (G.members || []).filter(m => m.office || m.lead || m.title).slice(0, 30).forEach(m => add(m.id, m.name, m.title || m.office || "Member", "Officeholders")); }catch(e){}
+  try{ const S = G.sc; if(S) Object.keys(S.st).forEach(n => { const s = S.st[n]; if(s.govId != null) add(s.govId, s.gov, "Governor of " + n, "Officeholders"); }); }catch(e){}
+  try{ const C = window.ONUM_COUNTERPARTS || {}; Object.keys(C).forEach(k => { const c = C[k]; add(c.npcId, c.name, (c.relation || "counterpart") + " · " + k, "Counterparts"); }); }catch(e){}
+  try{ (G.members || []).slice(0, 60).forEach(m => add(m.id, m.name, (m.party || "") + " " + (m.state || ""), "Members")); }catch(e){}
+  return out;
+}
+function pbHTML(){
+  const T = [["calls","Calls"],["texts","Texts & DMs"],["contacts","Contacts"],["chat","Chat"]];
+  let b = "";
+  if(PB.tab === "contacts"){
+    const C = pbContacts(); let g = "";
+    C.forEach(c => { if(c.grp !== g){ g = c.grp; b += '<div class="pb__h">' + pbEsc(g) + '</div>'; }
+      b += '<div class="pb__row"><span><b>' + pbEsc(c.name) + '</b><br><small>' + pbEsc(c.role) + '</small></span><span><button data-pbcall="' + c.id + '">Call</button> <button data-pbdm="' + c.id + '">Text</button></span></div>'; });
+    if(!C.length) b = '<p>No contacts yet.</p>';
+  } else if(PB.tab === "texts"){
+    try{ const D = dmState(); const ids = Object.keys(D.th).sort((a, x) => ((D.th[x].slice(-1)[0] || {i:0}).i) - ((D.th[a].slice(-1)[0] || {i:0}).i));
+      ids.forEach(id => { const L = D.th[id].slice(-1)[0] || {}; const nm = (function(){ try{ const m = G.members.find(m => m.id == id) || (G.people || []).find(p => p.id == id); return m ? m.name : id; }catch(e){ return id; } })();
+        b += '<div class="pb__row"><span><b>' + pbEsc(nm) + '</b><br><small>' + pbEsc(String(L.t || "").slice(0, 90)) + '</small></span><span><button data-pbdm="' + id + '">Open</button></span></div>'; });
+      if(!ids.length) b = '<p>No messages yet.</p>'; }catch(e){ b = '<p>No messages yet.</p>'; }
+  } else if(PB.tab === "calls"){
+    const c = PB.call;
+    if(!c) b = '<p>No call in progress. Pick someone in Contacts.</p>' + (PB.log || []).slice(-8).reverse().map(l => '<div class="pb__row"><span>' + pbEsc(l) + '</span></div>').join("");
+    else b = '<div class="pb__h">On the line: ' + pbEsc(c.name) + '</div><div class="pb__log">' + c.lines.map(l => '<p><b>' + pbEsc(l.w) + ':</b> ' + pbEsc(l.t) + '</p>').join("") + '</div><div class="pb__row"><input id="pbSay" placeholder="Say something" style="flex:1"><button data-pbsay="1">Say</button> <button data-pbhang="1">Hang up</button></div>';
+  } else {
+    const pill = document.getElementById("ltPill");
+    b = pill ? '<p>Neptune\'s live chat is here.</p><button data-pbchat="1">Open chat</button>' : '<p>Live chat is not available on this build.</p>';
+  }
+  return '<div class="pb__top"><b>Phone</b><button data-pbx="1">Close</button></div><div class="pb__tabs">' + T.map(t => '<button data-pbt="' + t[0] + '"' + (PB.tab === t[0] ? ' class="is-on"' : '') + '>' + t[1] + '</button>').join("") + '</div><div class="pb__body">' + b + '</div>';
+}
+function pbRender(){ const w = document.getElementById("pbPhone"); if(w) w.innerHTML = pbHTML(); }
+function pbOpen(){
+  let w = document.getElementById("pbPhone");
+  if(!w){
+    const st = document.createElement("style"); st.textContent = '#pbPhone{position:fixed;right:18px;bottom:64px;width:360px;max-height:70vh;overflow:auto;background:#1c2128;color:#eef1f4;border:1px solid #3a424d;border-radius:14px;z-index:9999;font:13px system-ui,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.45)}#pbPhone .pb__top{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid #3a424d}#pbPhone .pb__tabs{display:flex;gap:4px;padding:8px}#pbPhone .pb__tabs button{flex:1}#pbPhone button{background:#2b333d;color:#eef1f4;border:1px solid #4a5563;border-radius:6px;padding:4px 8px;cursor:pointer}#pbPhone button.is-on{background:#eef1f4;color:#1c2128}#pbPhone .pb__body{padding:6px 12px 12px}#pbPhone .pb__h{margin:10px 0 4px;font-weight:700;color:#c9a96e}#pbPhone .pb__row{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #2b333d}#pbPhone small{color:#aab3bd}#pbPhone input{background:#11151a;color:#eef1f4;border:1px solid #4a5563;border-radius:6px;padding:4px}';
+    document.head.appendChild(st);
+    w = document.createElement("div"); w.id = "pbPhone"; document.body.appendChild(w);
+    w.addEventListener("click", ev => { const t = ev.target.closest("button"); if(!t) return; ev.stopPropagation(); const d = t.dataset;
+      if(d.pbx){ w.remove(); return; }
+      if(d.pbt){ PB.tab = d.pbt; pbRender(); return; }
+      if(d.pbdm){ w.remove(); try{ dmToggle(true, isNaN(+d.pbdm) ? d.pbdm : +d.pbdm); }catch(e){} return; }
+      if(d.pbcall){ const c = pbContacts().find(x => String(x.id) === d.pbcall); PB.call = {id:c ? c.id : d.pbcall, name:c ? c.name : "Caller", lines:[{w:c ? c.name : "Caller", t:"Hello, this is " + (c ? c.name : "me") + "."}]}; PB.tab = "calls"; pbRender(); return; }
+      if(d.pbhang){ PB.log = PB.log || []; if(PB.call) PB.log.push("Called " + PB.call.name + " · day " + G.day); PB.call = null; pbRender(); return; }
+      if(d.pbsay){ const i = document.getElementById("pbSay"), txt = i && i.value.trim(), c = PB.call; if(!txt || !c) return; c.lines.push({w:"You", t:txt}); pbRender();
+        const LT = window.onumLiveTalk; let p;
+        try{ p = LT && LT.reply ? LT.reply({npcId:c.id, channel:"phone", text:txt}) : null; }catch(e){ p = null; }
+        Promise.resolve(p).then(r => { c.lines.push({w:c.name, t:(r && r.text) || (function(){ try{ const m = window.onumMind ? window.onumMind(c.id) : null; return m && m.goals ? "I hear you. Right now I care about " + [].concat(m.goals)[0] + "." : "I hear you. Let me think on it."; }catch(e){ return "I hear you."; } })()}); if(PB.call === c) pbRender(); }).catch(() => {});
+        return; }
+      if(d.pbchat){ const pill = document.getElementById("ltPill"); w.remove(); if(pill) pill.click(); return; }
+    }, true);
+  }
+  pbRender();
+}
+setTimeout(() => { try{
+  const inbox = document.getElementById("tabInbox"); if(!inbox || document.getElementById("tabPhone")) return;
+  const b = document.createElement("button"); b.type = "button"; b.id = "tabPhone"; b.textContent = "Phone";
+  b.addEventListener("click", ev => { ev.preventDefault(); ev.stopPropagation(); if(document.getElementById("pbPhone")) document.getElementById("pbPhone").remove(); else pbOpen(); }, true);
+  inbox.insertAdjacentElement("afterend", b);
+}catch(e){ console.warn("phone btn", e); } }, 1800);
+
+/* ══ 20261013h · anyone with something to say comes and says it (non-blocking) ══ */
+const AP = {last:0, toast:null};
+function apAgenda(m){
+  const out = [];
+  try{ const it = (dkItems() || [])[0]; if(it) out.push({k:"vote", t:"Before the vote on the " + it.title + ": " + pick(["I need to know where you are.", "count me worried, and here is why.", "it costs more than they are saying."])}); }catch(e){}
+  try{ const mind = window.onumMind ? window.onumMind(m.id) : null; if(mind && mind.goals){ const g = [].concat(mind.goals)[0]; if(g) out.push({k:"pitch", t:"I will be straight with you. What I am after: " + String(g) + ". Can you help?"}); }
+    if(mind && mind.plans){ const p = [].concat(mind.plans)[0]; if(p) out.push({k:"heads", t:"Heads up, before it happens: " + String(p) + ". Better you hear it from me."}); } }catch(e){}
+  try{ const S = G.sc; const st = m.state && S && S.st[m.state]; if(st && st.griev > 40) out.push({k:"warn", t:"A warning: " + m.state + " is angrier than the capital knows. Grievance is " + Math.round(st.griev) + "."}); }catch(e){}
+  try{ const L = (G.feedLog || G.feed || []).slice(-1)[0]; if(L && (L.t || L.text)) out.push({k:"news", t:"Did you see? " + String(L.t || L.text).slice(0, 120)}); }catch(e){}
+  try{ if(m.rel && m.rel.warmth < -20) out.push({k:"concern", t:"I have a concern, and it is about you. People notice how you treat them."}); }catch(e){}
+  return out;
+}
+function apBudget(m){ const d = G.day; if(m._apD !== d){ m._apD = d; m._apN = 0; } return m._apN < 3; }
+function apToast(m, a){
+  try{ if(AP.toast) AP.toast.remove(); }catch(e){}
+  const w = document.createElement("div"); w.id = "apToast";
+  w.style.cssText = "position:fixed;left:50%;transform:translateX(-50%);bottom:72px;max-width:520px;background:#1c2128;color:#eef1f4;border:1px solid #3a424d;border-radius:12px;padding:10px 14px;z-index:9998;font:13px system-ui,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.4)";
+  w.innerHTML = '<b></b><div class="apT" style="margin:4px 0 8px"></div><button data-ap="talk">Talk</button> <button data-ap="away">Walk away</button>';
+  w.querySelector("b").textContent = m.name + " stops you";
+  w.querySelector(".apT").textContent = "\u201C" + a.t + "\u201D";
+  w.querySelectorAll("button").forEach(b => { b.style.cssText = "background:#2b333d;color:#eef1f4;border:1px solid #4a5563;border-radius:6px;padding:4px 10px;cursor:pointer";
+    b.onclick = () => { w.remove(); AP.toast = null; if(b.dataset.ap === "talk"){ try{ openTalk(m); }catch(e){} } else { m.say = pick(["Another time, then.", "Fine. I will find you later.", "Think about it."]); m.sayT = 2.5; try{ momentLog("You walked away from " + m.name + "."); }catch(e){} } }; });
+  document.body.appendChild(w); AP.toast = w;
+  setTimeout(() => { if(AP.toast === w){ w.remove(); AP.toast = null; } }, 14000);
+}
+function apSpeak(m, a, to){
+  m.say = a.t; m.sayT = 5; m.sayTo = to ? to.id : "you"; m._apN = (m._apN | 0) + 1;
+  const LT = window.onumLiveTalk;
+  try{ if(LT && LT.reply) Promise.resolve(LT.reply({npcId:m.id, channel:"face", text:"(You stop " + (to ? to.name : "the player") + " in passing, unprompted, to raise this: " + a.k + " — " + a.t + ")"})).then(r => { if(r && r.live && r.text){ m.say = r.text; m.sayT = 6; const T = document.querySelector("#apToast .apT"); if(T && !to) T.textContent = "\u201C" + r.text + "\u201D"; } }).catch(() => {}); }catch(e){}
+}
+function apTick(){
+  if(!G || !G.running || (typeof TALK !== "undefined" && TALK.open)) return;
+  if(G.t - AP.last < 25) return;
+  const here = (G.members || []).concat(G.people || []).filter(m => m && !m.gone && m.room === G.room && m.x != null && apBudget(m) && !m.wantsWord && m.kind !== "player");
+  if(!here.length) return;
+  const m = pick(here), A = apAgenda(m); if(!A.length) return;
+  const a = pick(A); AP.last = G.t;
+  const others = here.filter(o => o !== m);
+  if(others.length && chance(.35)){
+    const o = pick(others); m.tx = o.x + 0.7; m.tz = o.z + 0.4; o.faceUntil = G.t + 6;
+    apSpeak(m, a, o); setTimeout(() => { try{ o.say = pick(["I had not heard that.", "Say that again, slowly.", "Who else knows?", "Not here."]); o.sayT = 3; o.sayTo = m.id; }catch(e){} }, 3200);
+    try{ momentLog(m.name + " stopped " + o.name + " to talk."); }catch(e){}
+    return;
+  }
+  const sy = Math.sin(cam.yaw || 0), cy = Math.cos(cam.yaw || 0), side = chance(.5) ? -1 : 1;
+  m.tx = cam.x + sy * 1.4 + cy * 0.9 * side; m.tz = cam.z + cy * 1.4 - sy * 0.9 * side; m.faceUntil = G.t + 8;
+  apSpeak(m, a, null); apToast(m, a);
+  try{ momentLog(m.name + " came over to you: " + a.k + "."); }catch(e){}
+}
+setInterval(() => { try{ apTick(); }catch(e){} }, 4000);
 
 const MATCACHE = new Map();
 /* Every distinct repeat used to clone the texture and its normal map, so
@@ -25934,6 +26280,8 @@ function nextDay(late){
     try{ cultDay(); }catch(e){}
     try{ caDay(); }catch(e){}
     try{ famDay(); }catch(e){}
+    try{ scDay(); }catch(e){}
+    try{ cpDay(); }catch(e){}
     try{ sbDay(); }catch(e){}
     try{ lorePublish(); loreMapSeed(); }catch(e){}
     try{ dmLeakDay(); dmInitiative(); }catch(e){ console.warn("dm day", e); }
@@ -31196,7 +31544,7 @@ function saveCaptureBase(){
     termLength:G.termLength, country:G.country,
     greatest:G.greatest, blasphemy:G.blasphemy, loreNote:G.loreNote, greatnessOpen:G.greatnessOpen,
     relics:G.relics, relicSpots:G.relicSpots, consularLore:G.consularLore, bind:G.bind, sens:G.sens, invertY:!!G.invertY, voiceVol:G.voiceVol, goals:G.goals, whip:G.whip || null, billQueue:G.billQueue || [], faith:G.faith || null, life:G.life || null, ach:G.ach || {}, law:G.law || null, ladder:G.ladder || [], cases:G.cases || [], lastActs:G.lastActs || [], wx:G.wx || null, town:G.town || null, rivals:G.rivals || [], rivalNext:G.rivalNext || 0, daylog:(G.daylog || []).slice(-120), paperRead:G.paperRead || 0, seedL:G.seedL || 0, mHints:G.mHints || {}, tlog:(G.tlog || []).slice(-500), ag:G.ag || null, sitPrep:G.sitPrep || {}, echoes:G.echoes || [], billKinds:G.billKinds || {}, realmRel:G.realmRel || {}, listened:G.listened || 0,
-    world:G.world, sbox:G.sbox || null, dist:G.dist || null, fam:G.fam || null, loreBookSeeded:!!G.loreBookSeeded, saidHash:G.saidHash || [], dm:G.dm || null, lore:G.lore || null, trip:G.trip || null,
+    world:G.world, sc:G.sc || null, sbox:G.sbox || null, dist:G.dist || null, fam:G.fam || null, loreBookSeeded:!!G.loreBookSeeded, saidHash:G.saidHash || [], dm:G.dm || null, lore:G.lore || null, trip:G.trip || null,
     pendingNight:!!G.pendingNight,
     cam:{x:cam.x, z:cam.z, yaw:cam.yaw, pitch:cam.pitch},
     /* the clock the shared save is compared by — not the game clock, the
