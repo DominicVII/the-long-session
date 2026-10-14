@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261012p">
+<meta name="onum-build" content="20261012q">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261012p";
+  var STAMP = "20261012q";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -32846,7 +32846,7 @@ try{
   };
 
   /* loader */
-  const base = (() => { try{ return new URL("neptune/", location.href).href; }catch(e){ return "neptune/"; } })();
+  const base = (() => { try{ return new URL("../neptune/", location.href).href; }catch(e){ return "../neptune/"; } })();
   const sc = document.createElement("script"); sc.src = base + "onum-office-amenities.js"; sc.onerror = () => console.warn("NEPTUNE: amenities not loaded"); document.head.appendChild(sc);
   if(location.protocol !== "file:") Promise.all([import(base + "onum-characters.js"), import(base + "onum-flags.js"), import(base + "onum-materials.js")]).then(([c, f, m]) => {
     NEP.mods = {chars:c, flags:f, mats:m};
@@ -32857,6 +32857,760 @@ try{
   }).catch(e => { NEP.failed = true; console.warn("NEPTUNE modules failed; game continues without them", e); });
 }catch(e){ try{ console.warn("NEPTUNE block", e); }catch(e2){} }
 /* NEPTUNE-UNIFORMS END */
+/* NEPTUNE-CLARITY BEGIN — "What's this?" explainers, live session transcript with glosses,
+   session pace (Slow/Normal/Fast), wall-clock speaking timer, read/handled/outcome badges.
+   Wraps existing functions only; every hook falls back to the original on any error. */
+try{
+  const CL = window.NEPTUNE_CLARITY = {items:[], sess:null, past:[], ctx:null, hold:false, paused:false, lastReal:0, said:{}};
+  const LS = (k, v) => { try{ if(v === undefined) return JSON.parse(localStorage.getItem("clarity." + k) || "null"); localStorage.setItem("clarity." + k, JSON.stringify(v)); }catch(e){ return null; } };
+  CL.pace = LS("pace") || "slow";
+  CL.past = LS("sessions") || [];
+  const PACE = {slow:0.5, normal:0.75, fast:1};
+  const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+  const now = () => { try{ return "d" + G.day + " " + hhmm(); }catch(e){ return ""; } };
+  const roomName = r => { try{ return (ROOMS[r] && ROOMS[r].t) || r || ""; }catch(e){ return r || ""; } };
+  const billNow = () => { try{ return G.bill && !G.bill.done ? G.bill : null; }catch(e){ return null; } };
+
+  /* ── hand-written dictionary, one entry per kind of thing that happens to you ── */
+  const MISS = {caucus:9, crisis:8, hearing:6, lobby:5};
+  const KIND = {
+    caucus:{n:"Party meeting (caucus)", what:"Your party's members meet behind closed doors to agree one line before the floor vote. The chair calls each member in turn; the whip watches who speaks and how.",
+      why:"This is where your party decides whether it trusts you. The whip's count, your standing inside the party, and how colleagues vote later all move here.",
+      can:["Attend and speak when the chair calls you (hold the line, speak for the doubters, keep quiet, or argue your own vote)","Stay away (costs more if you did not send apologies)"]},
+    hearing:{n:"Committee hearing", what:"A committee questions a witness (an official, an expert, sometimes a fellow member) in rounds. Members ask; the witness answers into the record.",
+      why:"Hearings shape the bill before it reaches the floor. A good question moves the room and your standing; a witness who breaks can sink a bill.",
+      can:["Press the witness hard (bigger standing gain, risk of looking cruel)","Give them room (smaller, safer gain)","Yield your time (standing falls)"]},
+    presser:{n:"Press conference", what:"You and others take questions from the press gallery. What you say here becomes the story tomorrow.",
+      why:"Moves your press standing and public approval; rivals use it to catch you out.",
+      can:["Take the hard question","Stay on message","Go after the other side (risky)"]},
+    crisis:{n:"Emergency debate", what:"The House is recalled to act on an emergency (floods, unrest, money that must move today). Longer than a party meeting and runs in rounds.",
+      why:"States in trouble are watching. Moving fast wins standing; refusing to vote blind can be principled but is risky.",
+      can:["Move the money now","Insist on reading it first (risky)","Stand aside for affected members"]},
+    townhall:{n:"Constituency surgery (town hall)", what:"People from your district bring you their problems in person.",
+      why:"This is your re-election. Approval at home and your margin move here.", can:["Listen and promise help","Explain the vote","Leave early"]},
+    lobby:{n:"A quiet approach (lobby)", what:"Someone with money or influence wants a private word, usually about a vote.",
+      why:"Deals made here buy support or war-chest money, but can surface later as scandal.", can:["Hear them out","Make or refuse a deal","Not turn up (they notice, and the cloakroom talks)"]},
+    statefed:{n:"State–federal business", what:"A dispute between a state government and the federal level that needs a member's attention.", why:"Your state's governor and voters will remember which side you took.", can:["Back the state","Back the federal standard","Stay out of it"]},
+    office:{n:"Office appointment", what:"Something booked into your own diary.", why:"Missing your own appointments costs standing with whoever booked them.", can:["Go","Reschedule"]},
+    vote:{n:"Floor vote (roll call)", what:"The whole House votes aye or no on the bill on the paper. Every member's vote is recorded.",
+      why:"The single most visible thing you do. Breaking the party line costs trust with the whip; broken pledges by colleagues are remembered.",
+      can:["Vote aye","Vote no","Be absent (counts against you)"]},
+    session:{n:"Sitting", what:"A formal sitting run by a chair: members speak in order and you are called once or twice.", why:"Silence is noticed: sitting through without speaking lowers your standing.", can:["Speak when called","Read the transcript to see who is with you"]}
+  };
+  const MAILK = {
+    grievance:"A colleague is telling you, in writing, that something you did hurt them. Answering repairs or hardens it; ignoring it makes it worse.",
+    ask:"Someone wants something from you (a post, a vote, a favour). Saying yes earns warmth and sometimes a debt; no costs some warmth.",
+    note:"Information from the Clerk or a colleague. Usually no answer needed.",
+    vote:"About how you or others voted. Read it for who is angry and who owes you.",
+    decision:"A choice that needs your answer; each option has a lasting effect.",
+    reply:"An answer to something you sent.", witness:"About a hearing witness or being called before a committee.",
+    cable:"Official word from outside the House (government, the realms).", fan:"A member of the public writing to you. Good for morale; rarely needs action.",
+    press:"The press want a comment. What you say may be printed.", ruling:"A ruling from the chair or a court that changes the rules you play by."
+  };
+  /* plain-language meaning of common notices and Wire lines */
+  const PHR = [
+    [/unopened|returned to sender|came back/i, "Returned unopened", "Your letter was refused or not read. It is not a postal fault: the person is freezing you out (low warmth or trust) or the matter is closed to them.", ["Speak to them in person, or go through an ally they trust","Repair first: keep a promise, do them a favour, apologise if it was personal","Then write again"], "Writing again at once usually changes nothing."],
+    [/unanswered|never replied|leave it unanswered/i, "Left unanswered", "Someone reached out and got no reply. People read silence as an answer.", ["Answer it late (better than never)","Make it up in person"], "Their warmth toward you falls; the cloakroom may hear."],
+    [/never spoke|said nothing/i, "You stayed silent in a sitting", "You were present but never took the floor when the chair called you.", ["Next time, answer when called; even a short line counts"], "Standing −5; everyone in the room thinks a little less of you."],
+    [/time is up|let the moment go/i, "Your speaking time ran out", "The chair gave you the floor and the clock ran down before you spoke.", ["Pick an option or type your own words while the clock runs"], "Standing −4."],
+    [/escort/i, "Escorted to an event", "You said you'd attend, so your staff walked you there.", ["Take part, or walk out (counts as missing it)"], ""],
+    [/present for|you were there|you are in the room/i, "Attended in person", "You sat in the room in real time instead of reading a summary.", ["Speak when called; watch the transcript"], "Attending protects your standing."],
+    [/has been called before the committee|sworn/i, "A witness is called", "Someone must answer the committee's questions under oath.", ["Question them when it's your turn","Defend them if they are a colleague (they remember)"], ""],
+    [/rises|concludes|has begun/i, "Sitting opened/closed", "Procedural: the sitting started or ended.", [], ""],
+    [/blasphem/i, "Blasphemy", "You said something the House treats as sacrilege. In this Republic that is a grave offence.", ["Apologise; confession at the chapel"], "Standing and faith standing fall sharply."],
+    [/whip/i, "The whip", "The whip counts votes for your party and enforces the line.", ["Keep the line to stay in favour, or bargain for a free vote"], "Breaking the line costs the whip's trust."],
+    [/approach .*unanswered|cloak/i, "Cloakroom talk", "Members are gossiping about something you did or didn't do.", ["Correct it in person if it matters"], "Reputation drifts."]
+  ];
+  function phrase(t){ t = String(t || ""); for(const p of PHR) if(p[0].test(t)) return p; return null; }
+
+  /* ── notices log (events, notes, wire, mail) ── */
+  function urg(k, t){ if(k === "crisis" || /emergenc|urgent|now\b|time is up/i.test(t || "")) return "high"; if(k === "caucus" || k === "hearing" || k === "vote" || k === "mail-ask" || k === "mail-decision" || k === "mail-grievance") return "med"; return "low"; }
+  function addItem(o){
+    try{
+      o.id = (CL.nid = (CL.nid || 0) + 1); o.at = o.at || now(); o.read = !!o.read; o.handled = !!o.handled;
+      o.urg = o.urg || urg(o.k, o.text);
+      if(CL.items.some(x => x.text === o.text && x.k === o.k && x.at === o.at)) return null;
+      CL.items.unshift(o); if(CL.items.length > 80) CL.items.length = 80;
+      paintBadge(); return o;
+    }catch(e){ return null; }
+  }
+  CL.addItem = addItem;
+  function wrap(name, get, set, fn){ try{ const o = get(); if(typeof o !== "function") return; set(fn(o)); }catch(e){ try{ console.warn("NEPTUNE-CLARITY hook " + name, e); }catch(e2){} } }
+
+  /* events */
+  wrap("eventCard", () => eventCard, f => { eventCard = f; }, orig => function(e){
+    let it = null;
+    try{ if(e){ it = CL.items.find(x => x.ev === e) || addItem({k:e.k || "event", kind:"event", title:e.t, text:e.t + (e.d ? " — " + e.d : ""), ev:e}); CL.ctx = {type:"event", e, item:it}; if(it) it.read = true; } }catch(err){}
+    const r = orig.apply(this, arguments);
+    try{ decorateCard(); }catch(err){}
+    return r;
+  });
+  wrap("note", () => note, f => { note = f; }, orig => function(text, big){ try{ addItem({k:"note", kind:"note", title:big ? "Notice" : "Note", text:String(text)}); }catch(e){} return orig.apply(this, arguments); });
+  wrap("pushWireScrap", () => pushWireScrap, f => { pushWireScrap = f; }, orig => function(tag, text){ try{ addItem({k:"wire", kind:"wire", title:"Wire · " + (tag || "Wire"), text:String(text || "")}); }catch(e){} return orig.apply(this, arguments); });
+  wrap("pushMail", () => pushMail, f => { pushMail = f; }, orig => function(from, subject, body, opts){
+    const r = orig.apply(this, arguments);
+    try{ const m = G.mail[0]; if(m && !m.outgoing) addItem({k:"mail-" + m.kind, kind:"mail", title:"Mail · " + m.from, text:m.subject + " — " + String(m.body || "").slice(0, 200), mail:m}); }catch(e){}
+    return r;
+  });
+  wrap("holdVote", () => holdVote, f => { holdVote = f; }, orig => function(){
+    const b = G.bill, yv = G.you ? G.you.vote : null;
+    const r = orig.apply(this, arguments);
+    try{
+      if(b){
+        const t = tallyBill(b, false), pass = t.aye > t.no;
+        const named = (G.members || []).filter(m => !m.gone && (m.post || (m.rel && Math.abs(m.rel.warmth) > 25))).slice(0, 3)
+          .map(m => surname(m.name) + ": " + (memberVote(m, b) > 0 ? "aye" : "no")).join(", ");
+        const you = G.you && G.you.vote != null ? (G.you.vote > 0 ? "aye" : "no") : "absent";
+        addItem({k:"vote", kind:"vote", title:"Roll call · " + b.title, text:b.title + ": " + (pass ? "passed" : "failed") + " " + t.aye + "–" + t.no + ".", read:true, handled:true,
+          outcome:"You: " + you + (named ? " — " + named : "")});
+        CL.ctx = {type:"vote", b};
+      }
+    }catch(e){}
+    try{ decorateCard(); }catch(e){}
+    return r;
+  });
+
+  /* ── transcript: classify and gloss every line spoken in a sitting ── */
+  const TAGS = {support:"#3c8d5a", oppose:"#b0473c", threat:"#8a2be2", deal:"#c08a1e", procedural:"#5b6b7c", position:"#777"};
+  function classify(who, text){
+    const t = String(text || "").toLowerCase();
+    const chair = PROC.chair && who === surname(PROC.chair.name);
+    if(/^(order|the chair|i call|the member for|you wanted in|second round|round \d|we will go round|again, and|that is the business|we are finished|enough\. get|that concludes|this committee is in session|right\. doors|the house will come|let us begin|we will take questions)/.test(t) || /time is up|yield the balance|recognises/.test(t) || (chair && /order|round|call|floor|finished|concludes/.test(t)))
+      return ["procedural", /time is up/.test(t) ? "The chair has cut the speaker off; their time is spent." : /round/.test(t) ? "The chair is starting another round: everyone gets asked again, and they expect sharper answers than last time." : /call|floor|recognis|member for|wanted in/.test(t) ? "It is a member's turn to speak. If it names you, the clock is now yours." : /business|finished|concludes|get to the floor/.test(t) ? "The sitting is over. What was said is now on the record." : "Housekeeping by the chair: how the sitting will run, not anybody's position."];
+    if(/remember|regret|answer for|outside|head on a plate|shame|watch |keeps a list|withdraw it|who wrote that for you/.test(t))
+      return ["threat", "A warning: they are signalling a cost (to your reputation or a future vote) if you continue. Not a formal action yet."];
+    if(/if i back|will you back|owe|trade|in exchange|favour|put me down|you have my vote|version of this everyone can live with|close to something workable/.test(t))
+      return ["deal", "An opening for a deal: they would move if they got something back. Approach them after the sitting."];
+    if(/hear, hear|voting with the party|go in together|quite right|on that point i agree|fair — continue|put my name|i am with you|with you on this|move the money today/.test(t))
+      return ["support", "They are backing the line being argued (or the party line). Count them as a likely yes."];
+    if(/not going to be able|cannot|nonsense|not what (it|the clause) says|will not|does the opposite|withdrawn|no costing|where is the costing|name the figure|unpopular thing|two different figures|which one is in the record|who paid|lose their jobs|not in the chamber/.test(t))
+      return ["oppose", /figure|costing|record/.test(t) ? "A challenge on the facts: they doubt the numbers and want them on the record. That is opposition dressed as a question." : /lose their jobs|unpopular/.test(t) ? "A warning about the cost at home: they are wavering and need cover before they can vote yes." : "They are against the proposal as it stands, or against what was just said."];
+    if(/\?$/.test(t)) return ["position", "A question. Watch the answer: it tells you more than the question does."];
+    return ["position", "A statement of where they stand, not a move against anybody."];
+  }
+  function speakerOf(who){ try{ return (G.members || []).find(m => !m.gone && surname(m.name) === who && m.room === G.room) || null; }catch(e){ return null; } }
+  function glossFor(who, text){
+    const c = classify(who, text); let g = c[1];
+    try{
+      const m = speakerOf(who), b = billNow();
+      if(m && b && c[0] !== "procedural"){ const v = memberVote(m, b); g += " Their likely vote on " + b.title + ": " + (v > 0 ? "aye" : v < 0 ? "no" : "undecided") + "."; }
+      const key = String(text).trim().toLowerCase().slice(0, 60), prev = CL.said[key];
+      if(prev) g += " Repeat — " + (prev.who === who ? "they" : prev.who) + " said this at " + prev.at + (prev.tag !== c[0] ? " (then it read as " + prev.tag + ")" : "") + ". Said again " + (c[0] === "procedural" ? "it is just the chair keeping order." : "it means the point has not been answered, and they are pressing it.");
+      else CL.said[key] = {who, at:hhmm(), tag:c[0]};
+    }catch(e){}
+    return [c[0], g];
+  }
+  wrap("appendFloor", () => appendFloor, f => { appendFloor = f; }, orig => function(who, text){
+    const r = orig.apply(this, arguments);
+    try{
+      const [tag, gloss] = who === "You" ? ["position", "Your own words, now on the record."] : glossFor(who, text);
+      const L = {who:String(who), text:String(text), at:hhmm(), tag, gloss};
+      if(CL.sess){ CL.sess.lines.push(L); if(CL.sess.lines.length > 120) CL.sess.lines.shift(); }
+      paintTx();
+      /* give people time to be read: the bubble stays up longer at slower pace */
+      const m = speakerOf(who); const f = PACE[CL.pace] || 1;
+      if(m && m.sayT && f < 1) m.sayT = m.sayT / f;
+    }catch(e){}
+    return r;
+  });
+  wrap("procStart", () => procStart, f => { procStart = f; }, orig => function(e){
+    const ok = orig.apply(this, arguments);
+    try{ if(ok){ CL.said = {}; CL.sess = {title:procTitle(e), k:e.k, day:G.day, at:hhmm(), room:roomName(G.room), lines:[], outcome:""}; CL.ctx = {type:"session", e}; try{ if(PROC.chair && PROC.chair.say) CL.sess.lines.push({who:surname(PROC.chair.name) + " (chair)", text:PROC.chair.say, at:hhmm(), tag:"procedural", gloss:"The chair opens the sitting and sets the rules: who speaks, in what order, for how long. Not a position on the bill."}); }catch(x){} paintTx(true);
+      const it = CL.items.find(x => x.ev === e); if(it){ it.read = true; } } }catch(err){}
+    return ok;
+  });
+  wrap("procEnd", () => procEnd, f => { procEnd = f; }, orig => function(){
+    const e = PROC.e, spoke = PROC.spoke;
+    const r = orig.apply(this, arguments);
+    try{
+      const out = spoke ? "You spoke" : "You stayed silent (standing −5)";
+      if(CL.sess){ CL.sess.outcome = out; CL.past.unshift(CL.sess); CL.past = CL.past.slice(0, 15); LS("sessions", CL.past); }
+      let it = e && CL.items.find(x => x.ev === e);
+      if(!it && e) it = addItem({k:e.k, kind:"event", title:e.t, text:e.t, ev:e});
+      if(it){ it.read = true; it.handled = true; it.outcome = out; }
+      CL.sess = null; CL.hold = false; paintTx();
+    }catch(err){}
+    return r;
+  });
+  wrap("procYouSay", () => procYouSay, f => { procYouSay = f; }, orig => function(opt, free){ try{ CL.hold = false; if(CL.sess) CL.sess.youSaid = opt ? opt.t : "own words"; }catch(e){} return orig.apply(this, arguments); });
+
+  /* ── pacing + accurate speaking clock (wall time, readable) ── */
+  wrap("procTick", () => procTick, f => { procTick = f; }, orig => function(dt){
+    try{
+      if(!PROC.on) return orig(dt);
+      if(CL.paused) return;                                      /* explainer open: the sitting waits */
+      if(PROC.phase === "you"){
+        CL.lastRun = 0;
+        const t = performance.now(), real = CL.lastReal ? Math.min(0.25, (t - CL.lastReal) / 1000) : dt; CL.lastReal = t;
+        if(CL.hold || document.hidden) return orig(0);           /* wait for the player before the clock starts */
+        return orig(real);
+      }
+      /* wall-clock based so a slow frame rate no longer drags the sitting (it ran ~5x slow at low fps) */
+      const t2 = performance.now(), real2 = CL.lastRun ? Math.min(0.25, (t2 - CL.lastRun) / 1000) : dt; CL.lastRun = t2;
+      const before = PROC.phase;
+      const r = orig((document.hidden ? 0 : Math.max(dt, real2)) * (PACE[CL.pace] || 1));
+      if(PROC.phase !== "you") CL.lastReal = 0;
+      if(PROC.phase === "you" && before !== "you"){ CL.hold = true; CL.lastReal = performance.now(); try{ procSetBar(procTitle(PROC.e), "You have the floor. The clock starts when you are ready.", PROC.opts, PROC.clock); }catch(e){} }
+      return r;
+    }catch(e){ return orig(dt); }
+  });
+  wrap("procSetBar", () => procSetBar, f => { procSetBar = f; }, orig => function(title, sub, opts, secs){
+    const r = orig.apply(this, arguments);
+    try{
+      const bar = el("procBar"); if(!bar) return r;
+      const h = bar.querySelector(".proc__h");
+      const box = document.createElement("span"); box.className = "cl-procx";
+      box.innerHTML = '<button type="button" class="cl-btn" data-clwhat="1">What\'s this?</button>' +
+        (PROC.phase === "you" && CL.hold ? ' <button type="button" class="cl-btn cl-go" data-clready="1">Take the floor ▸ (start clock)</button>' : '');
+      (h || bar).appendChild(box);
+      box.querySelector("[data-clwhat]").addEventListener("click", () => openExplain());
+      const go = box.querySelector("[data-clready]"); if(go) go.addEventListener("click", () => { CL.hold = false; CL.lastReal = performance.now(); go.remove(); });
+    }catch(e){}
+    return r;
+  });
+
+  /* ── UI ── */
+  const css = document.createElement("style");
+  css.textContent = `
+  .cl-btn{font:600 12px/1 system-ui,sans-serif;background:#f4efe2;color:#222;border:1px solid #8a7f66;border-radius:12px;padding:5px 10px;cursor:pointer;margin-left:6px}
+  .cl-go{background:#2f5d3a;color:#fff;border-color:#2f5d3a}
+  #clDock{position:fixed;right:14px;bottom:64px;z-index:9000;display:flex;gap:6px}
+  #clDock .n{background:#b0473c;color:#fff;border-radius:9px;padding:1px 6px;margin-left:4px;font-size:11px}
+  #clPanel{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(680px,94vw);max-height:84vh;overflow:auto;z-index:100000;background:#fbf8f0;color:#1d1d1d;border:1px solid #8a7f66;border-radius:10px;box-shadow:0 12px 40px rgba(0,0,0,.45);padding:16px 18px;font:14px/1.45 Georgia,serif}
+  #clPanel h2{margin:0 0 4px;font-size:20px} #clPanel h3{margin:12px 0 4px;font:700 12px system-ui;text-transform:uppercase;letter-spacing:.06em;color:#6a5f46}
+  #clPanel ul{margin:2px 0 6px 18px;padding:0} #clPanel .x{position:absolute;right:12px;top:10px}
+  #clPanel .tabs button{margin:0 4px 8px 0}
+  .cl-it{border-top:1px solid #e3dccb;padding:6px 0;cursor:pointer} .cl-it:hover{background:#f1ead8}
+  .cl-b{display:inline-block;font:600 11px system-ui;border-radius:8px;padding:1px 6px;margin-right:4px;color:#fff}
+  .cl-high{background:#b0473c}.cl-med{background:#c08a1e}.cl-low{background:#8a8a8a}.cl-ok{background:#3c8d5a}.cl-new{background:#2a5d9f}
+  #clTx{position:fixed;right:12px;top:72px;width:380px;max-height:56vh;overflow:auto;z-index:8000;background:rgba(251,248,240,.96);color:#1d1d1d;border:1px solid #8a7f66;border-radius:8px;font:13px/1.35 Georgia,serif;padding:8px 10px;box-shadow:0 6px 18px rgba(0,0,0,.35)}
+  #clTx .hd{display:flex;justify-content:space-between;align-items:center;font:700 12px system-ui;text-transform:uppercase;letter-spacing:.05em;color:#6a5f46;position:sticky;top:-8px;background:#fbf8f0;padding:4px 0}
+  .cl-ln{border-top:1px solid #e3dccb;padding:5px 0} .cl-ln u{text-decoration:none;color:#888;font:11px monospace;margin-right:4px}
+  .cl-ln i{display:block;color:#4a4a4a;font-size:12px;margin-top:2px} .cl-tag{font:600 10px system-ui;color:#fff;border-radius:6px;padding:0 5px;margin-left:4px;text-transform:uppercase}
+  .cl-sum{border:1px solid #e3dccb;border-radius:6px;padding:6px 8px;margin:6px 0;background:#fffdf7;color:#1d1d1d}
+  #tipCard{z-index:100001}
+  .cl-ib{display:flex;gap:10px;align-items:flex-start}.cl-ibl{flex:1 1 55%;max-height:62vh;overflow:auto}.cl-ibp{flex:1 1 45%;position:sticky;top:0;max-height:62vh;overflow:auto;border-left:1px solid rgba(127,127,127,.3);padding-left:8px}
+  .cl-sech{cursor:pointer;font:700 12px system-ui;text-transform:uppercase;letter-spacing:.04em;margin:8px 0 4px}.cl-sel{outline:1px solid rgba(127,127,127,.6)}
+  .cl-nl{cursor:help}.cl-nl:hover{text-decoration:underline dotted;text-decoration-color:rgba(127,127,127,.6);text-underline-offset:2px}
+  .cl-card{font:600 12px system-ui;margin:0 0 8px;display:flex;gap:4px;flex-wrap:wrap;align-items:center}`;
+  document.head.appendChild(css);
+
+  const dock = document.createElement("div"); dock.id = "clDock";
+  dock.innerHTML = '<button type="button" class="cl-btn" id="clWhatBtn" title="Explain what is on screen now">? What\'s this</button><button type="button" class="cl-btn" id="clLogBtn" title="Notices and past sessions">Notices &amp; Session Log<span class="n" id="clN" hidden></span></button>';
+  document.body.appendChild(dock);
+  el("clWhatBtn").addEventListener("click", () => openExplain());
+  el("clLogBtn").addEventListener("click", () => openLog("notices"));
+
+  function paintBadge(){ try{ const n = CL.items.filter(x => !x.read).length; const b = el("clN"); if(b){ b.hidden = !n; b.textContent = n; } }catch(e){} }
+  function badges(it){
+    let h = '<span class="cl-b cl-' + it.urg + '">' + (it.urg === "high" ? "URGENT" : it.urg === "med" ? "ACTION" : "INFO") + '</span>';
+    if(it.mail){ it.read = it.read || it.mail.read; if(it.mail.answered) it.handled = true; }
+    h += it.handled ? '<span class="cl-b cl-ok">Handled ✓' + (it.outcome ? " — " + esc(it.outcome) : "") + '</span>' : it.read ? '<span class="cl-b cl-ok">Read ✓</span>' : '<span class="cl-b cl-new">New</span>';
+    return h;
+  }
+  function panel(html){
+    let p = el("clPanel");
+    if(!p){ p = document.createElement("div"); p.id = "clPanel"; document.body.appendChild(p); }
+    p.innerHTML = '<button type="button" class="cl-btn x" id="clClose">Close ✕</button>' + html;
+    p.hidden = false;
+    el("clClose").addEventListener("click", closePanel);
+    CL.paused = !!(PROC && PROC.on);   /* a sitting waits while you read */
+    return p;
+  }
+  function closePanel(){ const p = el("clPanel"); if(p) p.hidden = true; CL.paused = false; CL.lastReal = 0; CL.lastRun = 0; }
+  CL.close = closePanel;
+
+  function list(a){ return a && a.length ? "<ul>" + a.map(x => "<li>" + x + "</li>").join("") + "</ul>" : "<p>—</p>"; }
+  function fx(o){ const b = []; if(o.stand) b.push("standing " + (o.stand > 0 ? "+" : "") + o.stand); if(o.sway) b.push("moves the room " + (o.sway > 0 ? "+" : "") + o.sway); if(o.press) b.push("press " + (o.press > 0 ? "+" : "") + o.press); if(o.risk) b.push("risky"); if(o.loyal) b.push("whip notices loyalty"); if(o.doubt) b.push("doubters remember you"); return b.join(", ") || "little effect"; }
+  function fnFx(fn){ try{ const s = String(fn); const m = s.match(/ripple\(\s*\w+\s*,\s*(-?\d+)/); const t = s.match(/trust\s*\+\s*(-?\d+)|trust-(\d+)/); const b = []; if(m) b.push("their warmth toward you " + (+m[1] > 0 ? "+" : "") + m[1]); if(t) b.push("trust " + (t[1] ? "+" + t[1] : "−" + t[2])); return b.join(", ") || "changes how they see you"; }catch(e){ return ""; } }
+  function explainEvent(e, it){
+    const K = KIND[e.k] || {n:e.t, what:"A scheduled event in the House.", why:"Turning up, and how you act there, moves your standing.", can:["Attend","Skip"]};
+    const cost = (MISS[e.k] || 4) * (e.rsvp === false ? 0.35 : 1);
+    const opts = (() => { try{ return procOptions(e); }catch(x){ return []; } })();
+    return { title:(e.t || K.n), kind:K.n, what:K.what + (e.d ? "<br><br><em>Today:</em> " + esc(e.d) : ""), why:K.why, can:K.can,
+      conseq:opts.map(o => "<b>" + esc(o.t) + "</b>: " + fx(o)).concat(["<b>Stay silent when called</b>: standing −5, everyone present cools on you", "<b>Let your clock run out</b>: standing −4", "<b>Miss it</b>: standing about −" + Math.round(cost) + (e.rsvp === false ? " (reduced: you sent apologies)" : "") + ", influence falls"]),
+      when:(e.hour != null ? (typeof hourLabel === "function" ? hourLabel(e.hour) : e.hour + ":00") : "") + (e.day != null ? ", day " + e.day : "") + " · " + esc(roomName(e.room)), it };
+  }
+  function explainText(it){
+    const p = phrase(it.text) || phrase(it.title);
+    const mk = it.mail ? (MAILK[it.mail.kind] || MAILK.note) : null;
+    const o = { title:esc(it.title), kind:p ? p[1] : it.kind === "mail" ? "Mail" : it.kind === "wire" ? "Wire item" : it.kind === "vote" ? "Roll call result" : "Notice",
+      what:"<em>“" + esc(it.text) + "”</em><br><br>" + (p ? p[2] : mk || (it.kind === "wire" ? "News running on the Wire: something that happened in the building. Information unless it names you." : "A line in your record of the day.")),
+      why:p ? (p[4] || "It tells you how people are reading you.") : it.kind === "vote" ? "Who voted how decides who you thank, who you chase, and who broke a promise." : "Knowing it lets you act before others do.",
+      can:p ? p[3] : it.mail && it.mail.options ? it.mail.options.map(x => esc(x.t)) : ["Nothing required; read and move on"],
+      conseq:it.mail && it.mail.options ? it.mail.options.map(x => "<b>" + esc(x.t) + "</b>: " + fnFx(x.run)) : [], when:esc(it.at), it };
+    if(it.ev && !it.handled) return explainEvent(it.ev, it);
+    return o;
+  }
+  function explainCard(){
+    const c = el("card"); const eb = c && c.querySelector(".eyebrow"), h = c && c.querySelector("h1");
+    const t = ((eb && eb.textContent) || "") + " " + ((h && h.textContent) || "");
+    const btns = c ? [...c.querySelectorAll("button")].map(b => b.textContent.trim()).filter(x => x && x.length < 60).slice(0, 8) : [];
+    const b = billNow();
+    if(/vote|ballot|roll/i.test(t)) return Object.assign({title:esc(t.trim())}, {kind:KIND.vote.n, what:KIND.vote.what + (b ? "<br><br>On the paper: <b>" + esc(b.title) + "</b>." : ""), why:KIND.vote.why, can:btns.length ? btns : KIND.vote.can, conseq:[], when:"Now · the floor"});
+    const p = phrase(t);
+    return {title:esc(t.trim() || "This screen"), kind:p ? p[1] : "Decision card", what:p ? p[2] : "A moment that needs your decision. The text above the buttons is the situation; each button is a different answer.",
+      why:"Every choice here is remembered by the people named in it.", can:btns.length ? btns.map(esc) : ["Read and continue"], conseq:p && p[4] ? [p[4]] : [], when:now()};
+  }
+  function render(x){
+    return '<h2>What\'s this? — ' + x.title + '</h2>' + (x.it ? '<div class="cl-card">' + badges(x.it) + '</div>' : '') +
+      '<div style="color:#6a5f46;font:600 12px system-ui">' + esc(x.kind) + '</div>' +
+      '<h3>What it is</h3><p>' + x.what + '</p><h3>Why it matters to you</h3><p>' + x.why + '</p>' +
+      '<h3>What you can do</h3>' + list(x.can) + (x.conseq && x.conseq.length ? '<h3>What each choice does</h3>' + list(x.conseq) : '') +
+      '<h3>When / where</h3><p>' + (x.when || "—") + '</p>';
+  }
+  function openExplain(it){
+    let x;
+    try{
+      if(it) x = it.ev && !it.handled ? explainEvent(it.ev, it) : explainText(it);
+      else if(PROC.on && PROC.e) x = explainEvent(PROC.e, CL.items.find(y => y.ev === PROC.e));
+      else if(veil && !veil.hidden && veil.classList && card && card.textContent.trim() && getComputedStyle(veil).display !== "none" && getComputedStyle(veil).opacity !== "0"){
+        x = CL.ctx && CL.ctx.type === "event" && CL.ctx.e ? explainEvent(CL.ctx.e, CL.ctx.item) : explainCard();
+      } else if(CL.items[0]) x = explainText(CL.items[0]);
+      else x = {title:"The House", kind:"", what:"Nothing needs you right now. Notices, mail and sittings will appear in Notices &amp; Session Log.", why:"", can:[], conseq:[], when:now()};
+      if(x.it) x.it.read = true; paintBadge();
+      panel(linkify(render(x)) + '<p><button type="button" class="cl-btn" id="clToLog">All notices &amp; Session Log</button></p>');
+      el("clToLog").addEventListener("click", () => openLog("notices"));
+    }catch(e){ try{ console.warn("NEPTUNE-CLARITY explain", e); }catch(e2){} }
+  }
+  CL.explain = openExplain;
+  function openLog(tab){
+    try{
+      let body = "";
+      if(tab === "sessions"){
+        const all = (CL.sess ? [CL.sess] : []).concat(CL.past);
+        body = all.length ? all.map((s, i) => '<details' + (i ? '' : ' open') + '><summary><b>' + esc(s.title) + '</b> — ' + esc(s.room) + ', d' + s.day + ' ' + esc(s.at) + (s.outcome ? ' · <span class="cl-b cl-ok">' + esc(s.outcome) + '</span>' : ' · <span class="cl-b cl-high">live</span>') + '</summary>' + s.lines.map(lineHTML).join("") + '</details>').join("") : "<p>No sittings yet. Attend a party meeting, hearing or debate and its full transcript will be kept here.</p>";
+      } else {
+        body = CL.items.length ? CL.items.map(it => '<div class="cl-it" data-clit="' + it.id + '">' + badges(it) + '<b>' + esc(it.title) + '</b> <u style="text-decoration:none;color:#888;font:11px monospace">' + esc(it.at) + '</u><br>' + linkify(esc(String(it.text).slice(0, 160))) + '</div>').join("") : "<p>Nothing yet.</p>";
+      }
+      const p = panel('<h2>' + (tab === "sessions" ? "Session Log" : "Notices") + '</h2><div class="tabs"><button type="button" class="cl-btn" data-cltab="notices">Notices</button><button type="button" class="cl-btn" data-cltab="sessions">Session Log</button></div>' + body);
+      p.querySelectorAll("[data-cltab]").forEach(b => b.addEventListener("click", () => openLog(b.getAttribute("data-cltab"))));
+      p.querySelectorAll("[data-clit]").forEach(d => d.addEventListener("click", () => openExplain(CL.items.find(x => x.id === +d.getAttribute("data-clit")))));
+    }catch(e){ try{ console.warn("NEPTUNE-CLARITY log", e); }catch(e2){} }
+  }
+  CL.log = openLog;
+  function lineHTML(L){ return '<div class="cl-ln"><u>' + esc(L.at) + '</u><b>' + whoLink(L.who) + '</b><span class="cl-tag" style="background:' + (TAGS[L.tag] || "#777") + '">' + esc(L.tag) + '</span><br>' + linkify(esc(L.text)) + '<i>What they meant: ' + esc(L.gloss) + '</i></div>'; }
+  function paintTx(force){
+    try{
+      let box = el("clTx");
+      if(!PROC.on || !CL.sess){ if(box) box.hidden = true; return; }
+      if(!box){ box = document.createElement("div"); box.id = "clTx"; document.body.appendChild(box); }
+      if(CL.txMin){ box.innerHTML = '<div class="hd"><span>Transcript</span><button type="button" class="cl-btn" id="clTxMin">Show ▾</button></div>'; }
+      else box.innerHTML = '<div class="hd"><span>Transcript · ' + esc(CL.sess.title) + ' · pace ' + CL.pace + '</span><button type="button" class="cl-btn" id="clTxMin">Hide ▴</button></div>' + CL.sess.lines.map(lineHTML).join("");
+      box.hidden = false; box.scrollTop = box.scrollHeight;
+      el("clTxMin").addEventListener("click", () => { CL.txMin = !CL.txMin; paintTx(); });
+    }catch(e){}
+  }
+  CL.paintTx = paintTx;
+
+  /* badge line + What's this on every card (events, mail, votes, prompts) */
+  function decorateCard(){
+    const c = el("card"); if(!c || c.querySelector(".cl-card")) return;
+    if(!c.textContent.trim()) return;
+    const d = document.createElement("div"); d.className = "cl-card";
+    const it = CL.ctx && CL.ctx.item;
+    d.innerHTML = (it ? badges(it) : "") + (CL.ctx && CL.ctx.e && CL.ctx.e.room ? '<span class="cl-b cl-low">' + esc(roomName(CL.ctx.e.room)) + '</span>' : "") + '<button type="button" class="cl-btn" data-clwhat="1">What\'s this?</button>';
+    c.insertBefore(d, c.firstChild);
+    d.querySelector("[data-clwhat]").addEventListener("click", ev => { ev.stopPropagation(); openExplain(); });
+  }
+  try{
+    const c = el("card");
+    if(c) new MutationObserver(() => { try{ if(!c.querySelector(".cl-card")) decorateCard(); }catch(e){} }).observe(c, {childList:true});
+    if(c) c.addEventListener("click", ev => { try{ const b = ev.target.closest("button"); if(b && !b.closest(".cl-card") && CL.ctx && CL.ctx.item && CL.ctx.type === "event"){ CL.ctx.item.handled = true; CL.ctx.item.outcome = b.textContent.trim().slice(0, 40); CL.ctx = null; } }catch(e){} }, true);
+  }catch(e){}
+
+  /* settings: Session pace + Session Log (pause menu and the in-game settings card) */
+  function paceRow(cls){
+    return '<div class="' + (cls || "settings-row") + '" data-clpace-row="1"><div><div class="settings-label">Session pace</div><div class="settings-desc">Committees, party meetings and debates. Slow gives time to read every line.</div></div><div class="settings-value">' +
+      ["slow", "normal", "fast"].map(k => '<button type="button" class="settings-btn ' + (CL.pace === k ? "settings-btn-primary" : "settings-btn-secondary") + '" data-clpace="' + k + '">' + k[0].toUpperCase() + k.slice(1) + '</button>').join("") +
+      ' <button type="button" class="settings-btn settings-btn-secondary" data-cllog="1">Session Log</button></div></div>';
+  }
+  function bindPace(root){
+    root.querySelectorAll("[data-clpace]").forEach(b => b.addEventListener("click", () => { CL.pace = b.getAttribute("data-clpace"); LS("pace", CL.pace);
+      root.querySelectorAll("[data-clpace]").forEach(x => { x.className = "settings-btn " + (x.getAttribute("data-clpace") === CL.pace ? "settings-btn-primary" : "settings-btn-secondary"); }); paintTx(); }));
+    root.querySelectorAll("[data-cllog]").forEach(b => b.addEventListener("click", () => openLog("sessions")));
+  }
+  function paceIntoPause(){
+    try{
+      const sec = document.querySelector('#pauseOverlay [data-section="game"]');
+      if(sec && !sec.querySelector("[data-clpace-row]")){
+        const w = document.createElement("div"); w.innerHTML = paceRow();
+        const row = w.firstChild; const first = sec.querySelector(".settings-row");
+        if(first) sec.insertBefore(row, first); else sec.appendChild(row); bindPace(row);
+      }
+    }catch(e){}
+  }
+  paceIntoPause();
+  wrap("setupSettingsUI", () => setupSettingsUI, f => { setupSettingsUI = f; }, orig => function(){ const r = orig.apply(this, arguments); paceIntoPause(); return r; });
+  CL.debug = () => ({on:PROC.on, phase:PROC.phase, t:PROC.t, i:PROC.i, n:PROC.order.length, running:G.running, speed:G.speed, log:PROC.log.length, paused:CL.paused, hold:CL.hold});
+  wrap("settingsCard", () => settingsCard, f => { settingsCard = f; }, orig => function(){
+    const r = orig.apply(this, arguments);
+    try{ const mk = card.querySelector(".mk"); if(mk && !mk.querySelector("[data-clpace-row]")){ const w = document.createElement("div"); w.innerHTML = paceRow("mk__row"); mk.appendChild(w.firstChild); bindPace(mk); } }catch(e){}
+    return r;
+  });
+  setInterval(() => { try{ if(!PROC.on && el("clTx") && !el("clTx").hidden) paintTx(); }catch(e){} }, 1000);
+  /* ── universal name cards: hover or tap any name link (people, parties, states, committees) ── */
+  function stDef(n){ try{ return STATE_DEF.find(s => s.n === n) || null; }catch(e){ return null; } }
+  function regionOf(n){
+    const s = stDef(n); if(!s) return "";
+    let cMax = 0, rMax = 0; STATE_DEF.forEach(x => { cMax = Math.max(cMax, x.col); rMax = Math.max(rMax, x.row); });
+    const ns = s.row <= rMax / 3 ? "North" : s.row >= rMax * 2 / 3 ? "South" : "Central", ew = s.col <= cMax / 3 ? "west" : s.col >= cMax * 2 / 3 ? "east" : "";
+    return ns + (ew ? "-" + ew : "") + (s.cult ? " · " + s.cult.charAt(0).toUpperCase() + s.cult.slice(1) + " country" : "");
+  }
+  function locator(n){
+    try{
+      const s = stDef(n); if(!s) return "";
+      const k = 9;
+      return '<svg width="120" height="80" viewBox="-2 -2 ' + (Math.max(...STATE_DEF.map(x => x.col)) * k + k + 4) + ' ' + (Math.max(...STATE_DEF.map(x => x.row)) * k + k + 4) + '" style="float:right;margin:0 0 4px 8px;background:#efe8d6;border-radius:4px">' +
+        STATE_DEF.map(x => '<rect x="' + x.col * k + '" y="' + x.row * k + '" width="' + (k - 1) + '" height="' + (k - 1) + '" fill="' + (x.n === n ? "#b0473c" : "#c9bfa6") + '"><title>' + esc(x.n) + '</title></rect>').join("") + '</svg>';
+    }catch(e){ return ""; }
+  }
+  function rel(m){ try{ const w = Math.round(m.rel.warmth), t = Math.round(m.rel.trust); return (w > 40 ? "Close ally" : w > 15 ? "Friendly" : w < -40 ? "Enemy" : w < -15 ? "Cool toward you" : "Neutral") + " (warmth " + w + ", trust " + t + ")"; }catch(e){ return "—"; } }
+  function stance(m){ const b = billNow(); if(!b) return "No bill on the paper"; try{ const v = memberVote(m, b); return b.title + ": " + (v > 0 ? "leaning AYE" : v < 0 ? "leaning NO" : "undecided") + (m.pledge ? " (pledged to you)" : ""); }catch(e){ return "—"; } }
+  function wants(m){ try{ return (m.intent && m.intent.t) || m.need || m.hope || "—"; }catch(e){ return "—"; } }
+  function sumRow(k, v){ return '<div style="display:flex;gap:6px;font:12px/1.35 system-ui;margin:1px 0"><b style="min-width:92px;color:#6a5f46">' + k + '</b><span>' + v + '</span></div>'; }
+  function nameSummary(kind, key){
+    try{
+      if(kind === "who"){
+        const m = byId(isNaN(+key) ? key : +key); if(!m || m === G.you) return "";
+        if(m.kind && m.kind !== "member") return '<div class="cl-sum">' + sumRow("Who", esc(m.role || m.kind)) + sumRow("Relationship", rel(m)) + sumRow("Wants", esc(wants(m))) + '</div>';
+        const cm = (() => { try{ return (COMMITTEES.filter(c => (m.committees || []).includes(c.k) || m.committee === c.k).map(c => c.t).join(", ")); }catch(e){ return ""; } })();
+        return '<div class="cl-sum">' + locator(m.state) + sumRow("Party", esc(partyLabel(m.party))) + sumRow("Home", esc(m.state) + " " + esc(m.dist) + (regionOf(m.state) ? " — " + esc(regionOf(m.state)) : "")) +
+          sumRow("Role / seat", esc((m.post ? postTitle(m.post) + ", " : "") + "Member for " + m.state + " " + m.dist + (cm ? "; " + cm : ""))) +
+          sumRow("On your bill", esc(stance(m))) + sumRow("With you", esc(rel(m))) + sumRow("What they want", esc(wants(m))) + '<div style="clear:both"></div></div>';
+      }
+      if(kind === "state"){
+        const s = stDef(key); if(!s) return "";
+        const ms = (G.members || []).filter(m => !m.gone && m.state === key && m.kind !== "press" && m.kind !== "civ");
+        const b = billNow(); const ay = b ? ms.filter(m => { try{ return memberVote(m, b) > 0; }catch(e){ return false; } }).length : 0;
+        const st = (G.states || []).find(x => x.n === key);
+        return '<div class="cl-sum">' + locator(key) + sumRow("What", "A state of the Republic, " + s.seats + " seats") + sumRow("Region", esc(regionOf(key))) +
+          sumRow("Delegation", ms.length + " members you know of" + (ms.length ? " (" + esc([...new Set(ms.map(m => partyLabel(m.party)))].join(", ")) + ")" : "")) +
+          (b ? sumRow("On your bill", ay + " of " + ms.length + " leaning aye") : "") + sumRow("With you", key === (G.you && G.you.state) ? "Your home state" : "—") +
+          sumRow("What it wants", esc(st && st.unrest > 55 ? "Relief: unrest is at " + Math.round(st.unrest) : s.note || "—")) + '<div style="clear:both"></div></div>';
+      }
+      if(kind === "party"){
+        const ms = (G.members || []).filter(m => !m.gone && m.party === key);
+        const b = billNow(); const ay = b ? ms.filter(m => { try{ return memberVote(m, b) > 0; }catch(e){ return false; } }).length : 0;
+        let line = ""; try{ if(b){ const pl = partyLine(b)[key]; line = pl > 0 ? "Whipped AYE" : pl < 0 ? "Whipped NO" : "Free vote"; } }catch(e){}
+        return '<div class="cl-sum">' + sumRow("What", "A party (faction) in the House") + sumRow("Seats", esc(G.seatsBy && G.seatsBy[key] != null ? G.seatsBy[key] : ms.length)) +
+          (b ? sumRow("On your bill", esc((line ? line + "; " : "") + ay + " of " + ms.length + " leaning aye")) : "") +
+          sumRow("With you", G.you && G.you.party === key ? "Your party — the whip expects your vote" : "Another party") +
+          sumRow("What it wants", esc((() => { try{ return partyLore(key).creed; }catch(e){ return "—"; } })())) + '</div>';
+      }
+    }catch(e){}
+    return "";
+  }
+  wrap("tipHTML", () => tipHTML, f => { tipHTML = f; }, orig => function(kind, key){
+    if(kind === "committee"){
+      try{ const c = COMMITTEES.find(x => x.k === key || x.t === key); if(c){ const ms = (G.members || []).filter(m => !m.gone && ((m.committees || []).includes(c.k) || m.committee === c.k));
+        return '<div class="tip__t">' + esc(c.t) + ' Committee</div><div class="cl-sum">' + sumRow("What", "A standing committee: it holds hearings and marks up bills in its field before the floor sees them") +
+          sumRow("Field", esc({econ:"Money, tax and trade", lib:"Courts, rights and policing", def:"Defence and the services", wel:"Welfare, health and schools"}[c.axis] || c.axis)) +
+          sumRow("Members", ms.length ? ms.slice(0, 8).map(m => tipName(m)).join(", ") : "—") + sumRow("With you", "Hearings here are where you can press witnesses and shape the bill") + '</div>'; } }catch(e){}
+    }
+    const base = orig.apply(this, arguments);
+    const s = nameSummary(kind, key);
+    if(!s) return base;
+    const i = base.indexOf("</div>", base.indexOf("tip__s") > 0 ? base.indexOf("tip__s") : 0);
+    return i > 0 ? base.slice(0, i + 6) + s + base.slice(i + 6) : s + base;
+  });
+  /* hover opens the same card (tap/click already does) */
+  let hovT = 0, hovEl = null;
+  document.addEventListener("mouseover", ev => {
+    try{
+      const t = ev.target && ev.target.closest ? ev.target.closest("[data-tipk]") : null;
+      if(!t || t === hovEl) return; hovEl = t; clearTimeout(hovT);
+      hovT = setTimeout(() => { try{ if(hovEl === t && t.matches(":hover")) openTip(t.getAttribute("data-tipk"), t.getAttribute("data-tipv")); }catch(e){} }, 380);
+    }catch(e){}
+  });
+  document.addEventListener("mouseout", ev => { try{ if(hovEl && ev.target && ev.target.closest && ev.target.closest("[data-tipk]") === hovEl) hovEl = null; }catch(e){} });
+  /* make names in plain text clickable: transcripts, notices, explainer, mail and Wire text we render */
+  function linkify(html){
+    try{
+      const pats = [];
+      (G.members || []).forEach(m => { if(!m.gone && m.name && m !== G.you) pats.push([m.name, tipAttr("who", m.id)]); });
+      (STATE_DEF || []).forEach(s => pats.push([s.n, tipAttr("state", s.n)]));
+      try{ partyKeys().forEach(k => pats.push([partyLabel(k), tipAttr("party", k)])); }catch(e){}
+      (COMMITTEES || []).forEach(c => pats.push([c.t, tipAttr("committee", c.k)]));
+      pats.sort((a, b) => b[0].length - a[0].length);
+      const done = {};
+      return html.replace(/(<[^>]+>)|([^<]+)/g, (all, tag, txt) => {
+        if(tag) return tag;
+        pats.forEach(([n, a]) => { if(done[n] > 3) return; const ix = txt.indexOf(n); if(ix < 0) return; done[n] = (done[n] || 0) + 1;
+          txt = txt.split(n).join("\u0001" + pats.indexOf(pats.find(p => p[0] === n)) + "\u0002"); });
+        return txt.replace(/\u0001(\d+)\u0002/g, (_, i) => '<span' + pats[+i][1] + '>' + pats[+i][0] + '</span>');
+      });
+    }catch(e){ return html; }
+  }
+  CL.linkify = linkify;
+  /* speakers in the transcript are surnames: link them to the member */
+  function whoLink(who){ try{ const base = String(who).replace(/ \(chair\)$/, ""); const m = speakerOf(base) || (G.members || []).find(x => !x.gone && surname(x.name) === base); return m ? '<span' + tipAttr("who", m.id) + '>' + esc(who) + '</span>' : esc(who); }catch(e){ return esc(who); } }
+  CL.whoLink = whoLink;
+  /* the Wire, mail and panels: decorate names in any text node that appears there */
+  /* Wire, mail, panes, dialogue, prompts and choices: names become quiet links (no restyling) */
+  const LINK_ROOTS = ["#wire", "#paneFloor", "#paneMembers", "#paneInbox", "#paneVox", "#paneBook", "#paneJournal", "#paneRisks", "#talk", "#card", "#procBar", "#procLog"];
+  function subtle(h){ return h.replace(/ class="tipword"/g, ' class="cl-nl"'); }
+  function linkNode(root){
+    try{
+      if(!root || root._clLinking) return; root._clLinking = true;
+      const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null), nodes = [];
+      while(w.nextNode()){ const n = w.currentNode; if(n.parentElement && !n.parentElement.closest("[data-tipk],input,textarea,select,script,style,.cl-card,#clPanel") && n.nodeValue.trim().length > 3){ const bt = n.parentElement.closest("button,[data-join],[role=button]"); if(bt && bt.textContent.trim().length < 48) continue; nodes.push(n); } }
+      nodes.slice(0, 300).forEach(n => { const e0 = esc(n.nodeValue), h = linkify(e0); if(h !== e0){ const s = document.createElement("span"); s.style.cssText = "all:inherit;display:inline"; s.innerHTML = subtle(h); n.parentNode.replaceChild(s, n); } });
+    }catch(e){} finally { if(root) setTimeout(() => { root._clLinking = false; }, 0); }
+  }
+  const pend = new Set(); let pendT = 0;
+  function queue(r){ pend.add(r); if(!pendT) pendT = setTimeout(() => { pendT = 0; pend.forEach(x => linkNode(x)); pend.clear(); }, 150); }
+  function observeRoots(){ LINK_ROOTS.forEach(sel => { const r = document.querySelector(sel); if(r && !r._clObs){ r._clObs = true; try{ new MutationObserver(() => { if(!r._clLinking) queue(r); }).observe(r, {childList:true, subtree:true, characterData:true}); }catch(e){} queue(r); } }); }
+  observeRoots(); setInterval(observeRoots, 4000);
+  /* a name inside a choice button opens its card and does NOT pick the choice */
+  const nlHit = ev => { const t = ev.target && ev.target.closest ? ev.target.closest(".cl-nl[data-tipk]") : null; if(!t) return null; ev.preventDefault(); ev.stopPropagation(); if(ev.stopImmediatePropagation) ev.stopImmediatePropagation(); return t; };
+  window.addEventListener("click", ev => { const t = nlHit(ev); if(t) try{ openTip(t.getAttribute("data-tipk"), t.getAttribute("data-tipv")); }catch(e){} }, true);
+  ["mousedown", "mouseup", "pointerdown", "pointerup", "touchend"].forEach(k => window.addEventListener(k, ev => { nlHit(ev); }, true));
+  CL.linkNode = linkNode;
+  /* ── INBOX: sections, Read all, scroll kept, side reading pane, cables with nuance and stacking ── */
+  const REGIME = {reach:"grain monarchy (a king and a council of granaries)", horn:"merchant league (the ports elect a doge)", pale:"military regency", marches:"confederal republic of free towns", isles:"island thalassocracy", rift:"council of mountain clans"};
+  const SECS = [["const","Constituents"],["party","Party and Whip"],["coll","Colleagues"],["cmte","Committees"],["lobby","Lobby and Interest Groups"],["press","Press"],["cable","Foreign Cables"],["staff","Staff and Admin"]];
+  CL.inboxOpen = LS("inboxOpen") || {}; CL.mailSel = null;
+  function mailSec(x){
+    try{
+      if(x.kind === "cable") return "cable"; if(x.kind === "intel") return "staff";
+      const m = x.fromId != null ? byId(x.fromId) : null, s = (x.subject + " " + x.from).toLowerCase();
+      if(x.kind === "press" || (m && m.kind === "press") || /press|gazette|herald|courier|editor/.test(s)) return "press";
+      if(/lobby|donor|association|guild|union|council|bureau|chamber of/.test(s) || (m && m.kind === "lobby")) return "lobby";
+      if(x.kind === "witness" || /committee|hearing|markup|subpoena/.test(s)) return "cmte";
+      if(x.kind === "fan" || (m && m.kind === "civ") || /constituent|district|town|county|widow|resident/.test(s)) return "const";
+      if(m && (m.post === "whip" || m.post === "leader" || /whip/.test(s)) || x.kind === "vote" || /party|caucus|whip/.test(s)) return "party";
+      if(m) return "coll";
+      return "staff";
+    }catch(e){ return "staff"; }
+  }
+  function realmOf(x){ try{ realmEnsure(); return (G.realms || []).find(r => x.from === "Mission of " + r.t || x.subject === "Cable — " + r.t) || null; }catch(e){ return null; } }
+  function cableCtx(x){
+    const r = realmOf(x); if(!r) return null;
+    const you = G.you || {}, b = billNow();
+    const rel = (G.clRealm = G.clRealm || {})[r.k] || 0;
+    const motive = b ? "They are watching " + b.title + ": " + r.adj.toLowerCase() + " interests want " + r.want + ", and any vote that touches trade, money or the services moves that." : "They want " + r.want + ", and are sounding out which members of this House will listen.";
+    let dist = "Little direct effect on " + (you.state || "your district") + ".";
+    try{ const sd = stDef(you.state); if(sd){ if(/dock|port|ship|harbour|coast|bank/i.test(sd.note)) dist = "Your state trades by sea: " + r.t + "'s ports and tariffs reach your docks and jobs."; else if(/mill|farm|grain|orchard|market/i.test(sd.note)) dist = "Your farms and mills sell into the same markets " + r.t + " fights over."; } }catch(e){}
+    return {r, regime:REGIME[r.k] || "foreign government", motive, dist, cmte:"Matters for the Foreign and Armed Services committees; bring it up in a hearing to put it on record.", rel};
+  }
+  const CABLE_ACTS = [
+    {k:"ack", t:"Acknowledge politely", fx:"Relations +3 · influence +1 · costs a little time", run(c){ c.rel(3); infl(1); try{ spend(6, 1); }catch(e){} }},
+    {k:"fwd", t:"Forward to committee and party", fx:"Influence +2 · whip notes you are useful · relations +1", run(c){ c.rel(1); infl(2); try{ const w = (G.members || []).find(m => !m.gone && m.post === "whip" && m.party === G.you.party); if(w) ripple(w, 2, "You sent me the cable before it reached the papers.", 2); }catch(e){} }},
+    {k:"raise", t:"Raise it on the floor / with the press", fx:"Standing +3 · relations −4 (they wanted it private) · may make the Wire", run(c){ c.rel(-4); stand(3); try{ pushWireScrap("Foreign", "Member raises a cable from " + c.r.t + " in public."); }catch(e){} }},
+    {k:"ign", t:"Ignore it", fx:"Relations −1 · no cost", run(c){ c.rel(-1); }}
+  ];
+  function infl(n){ try{ G.you.influence = clamp(G.you.influence + n, 0, 100); }catch(e){} }
+  function stand(n){ try{ G.you.standing = clamp(G.you.standing + n, 0, 100); }catch(e){} }
+  wrap("pushMail(cable)", () => pushMail, f => { pushMail = f; }, orig => function(from, subject, body, opts){
+    try{
+      if(opts && opts.kind === "cable"){
+        const name = from ? from.name : "";
+        const ex = G.mail.find(x => x.kind === "cable" && x.from === name && !x.answered);
+        if(ex){
+          ex.stack = (ex.stack || 1) + 1;
+          ex.body = String(body) + "\n\n— earlier (" + (ex.stack - 1) + ") —\n" + String(ex.body).split("\n\n— earlier")[0];
+          ex.day = G.day; ex.at = hhmm(); if(ex.read){ ex.read = false; } ex.open = false;
+          G.mail.splice(G.mail.indexOf(ex), 1); G.mail.unshift(ex);
+          try{ refreshInbox(); }catch(e){}
+          return;
+        }
+      }
+    }catch(e){}
+    return orig.apply(this, arguments);
+  });
+  function readOne(x){ if(!x || x.read || x.outgoing) return; x.read = true; }   /* same effect as opening it: marks read */
+  function answer(x, i){
+    if(!x || x.answered) return; const opt = x.options && x.options[i]; if(!opt) return;
+    x.answered = true; x.read = true; try{ spend(12, 3); }catch(e){}
+    try{ if(opt.run) opt.run(); }catch(e){}
+    try{ note("Answered " + x.from + ": “" + opt.t + "”."); }catch(e){}
+  }
+  function cableAct(x, k){
+    const c = cableCtx(x); const a = CABLE_ACTS.find(y => y.k === k); if(!c || !a || x.answered) return;
+    c.rel = n => { G.clRealm = G.clRealm || {}; G.clRealm[c.r.k] = clamp((G.clRealm[c.r.k] || 0) + n, -50, 50); };
+    x.answered = true; x.read = true; x.clDone = a.t; a.run(c);
+    try{ note("Cable from " + c.r.t + ": " + a.t.toLowerCase() + "."); }catch(e){}
+    const it = CL.items.find(y => y.mail === x); if(it){ it.handled = true; it.outcome = a.t; }
+  }
+  function mailPane(x){
+    if(!x) return '<p class="muted" style="margin:10px 0">Select a message to read it here. The list stays where you left it.</p>';
+    const c = x.kind === "cable" ? cableCtx(x) : null;
+    let h = '<div class="eyebrow">' + esc(x.from) + (x.stack > 1 ? ' · ×' + x.stack + ' cables' : '') + ' · d' + x.day + ' ' + esc(x.at) + '</div><h3 style="margin:4px 0">' + esc(x.subject) + '</h3>';
+    if(c) h += '<div class="cl-sum">' + sumRow("Sender", esc(c.r.t) + " — " + esc(c.regime) + " · capital " + esc(c.r.capital)) + sumRow("Why they wrote", esc(c.motive)) + sumRow("Your district", esc(c.dist)) + sumRow("Committees", esc(c.cmte)) + sumRow("Relations", (c.rel > 0 ? "+" : "") + c.rel) + '</div>';
+    h += '<div class="mailrow__b" style="white-space:pre-wrap">' + esc(x.body) + '</div>';
+    if(c && !x.answered) h += '<div class="mailrow__acts">' + CABLE_ACTS.map(a => '<button class="conc__btn" style="width:auto" data-clcab="' + x.id + ':' + a.k + '" title="' + esc(a.fx) + '">' + esc(a.t) + '</button><div class="muted" style="font-size:11px;margin:0 0 4px">' + esc(a.fx) + '</div>').join("") + '</div>';
+    else if(x.options && !x.answered) h += '<div class="mailrow__acts">' + x.options.map((o, i) => '<button class="conc__btn" style="width:auto" data-clans="' + x.id + ':' + i + '" data-ans="' + x.id + ':' + i + '">' + esc(o.t) + '</button><div class="muted" style="font-size:11px;margin:0 0 4px">' + esc(fnFx(o.run)) + '</div>').join("") + '</div>';
+    else if(x.answered) h += '<div class="mailrow__acts"><span class="muted">Handled ✓' + (x.clDone ? " — " + esc(x.clDone) : "") + '</span></div>';
+    h += '<p><button type="button" class="cl-btn" data-clwhatmail="' + x.id + '">What\'s this?</button></p>';
+    return h;
+  }
+  function scrollers(n){ const a = []; for(let p = n; p && a.length < 5; p = p.parentElement) a.push([p, p.scrollTop]); return a; }
+  function renderInbox(P, again){
+      const keep = scrollers(P), listEl = P.querySelector(".cl-ibl"), lsT = listEl ? listEl.scrollTop : 0;
+      const n = unreadCount(); const tab = el("tabInbox"); if(tab) tab.innerHTML = "Inbox" + (n ? '<span class="badge">' + n + '</span>' : "");
+      const groups = {}; G.mail.forEach(x => { (groups[mailSec(x)] = groups[mailSec(x)] || []).push(x); });
+      const sel = G.mail.find(x => x.id === CL.mailSel) || null;
+      let h = '<div class="eyebrow">Inbox · ' + n + ' unread <button type="button" class="cl-btn" data-clreadall="*">Read all</button></div>' +
+        '<div class="cl-ib"><div class="cl-ibl">';
+      SECS.forEach(([k, t]) => {
+        const g = groups[k]; if(!g || !g.length) return;
+        const u = g.filter(x => !x.read && !x.outgoing).length, open = CL.inboxOpen[k] !== false;
+        h += '<div class="cl-sec"><div class="cl-sech" data-clsec="' + k + '">' + (open ? "▾ " : "▸ ") + t + ' <span class="muted">(' + g.length + ')</span>' + (u ? ' <span class="badge">' + u + '</span> <button type="button" class="cl-btn" data-clreadall="' + k + '">Read all</button>' : '') + '</div>';
+        if(open) h += g.map(x => '<div class="mailrow' + (x.read || x.outgoing ? "" : " is-unread") + (sel === x ? " cl-sel" : "") + '" data-clmail="' + x.id + '"><div class="mailrow__h"><span class="mailrow__f">' + (x.read || x.outgoing ? "" : '<span class="dotmark"></span>') + (x.outgoing ? "→ " : "") + esc(x.from) + (x.stack > 1 ? ' ×' + x.stack : '') + '</span><span class="mailrow__d">' + (x.answered ? "✓ " : x.read ? "Read · " : "") + 'd' + x.day + ' · ' + esc(x.at) + '</span></div><div class="mailrow__s">' + esc(x.subject) + '</div></div>').join("");
+        h += '</div>';
+      });
+      h += '</div><div class="cl-ibp">' + mailPane(sel) + '</div></div>';
+      P.innerHTML = h;
+      const L2 = P.querySelector(".cl-ibl"); if(L2) L2.scrollTop = lsT;
+      keep.forEach(([e, t]) => { e.scrollTop = t; });
+      P.querySelectorAll("[data-clsec]").forEach(d => d.addEventListener("click", ev => { if(ev.target.closest("[data-clreadall]")) return; const k = d.getAttribute("data-clsec"); CL.inboxOpen[k] = CL.inboxOpen[k] === false; LS("inboxOpen", CL.inboxOpen); again(); }));
+      P.querySelectorAll("[data-clreadall]").forEach(b => b.addEventListener("click", ev => { ev.stopPropagation(); const k = b.getAttribute("data-clreadall"); G.mail.filter(x => k === "*" || mailSec(x) === k).forEach(readOne); try{ refreshPanels(); }catch(e){} again(); }));
+      P.querySelectorAll("[data-clmail]").forEach(r => r.addEventListener("click", ev => { if(ev.target.closest("[data-tipk]")) return; const x = G.mail.find(y => y.id === +r.getAttribute("data-clmail")); if(!x) return; CL.mailSel = x.id; readOne(x); x.open = true; again(); }));
+      P.querySelectorAll("[data-clans]").forEach(b => b.addEventListener("click", ev => { ev.stopPropagation(); const [mid, oi] = b.getAttribute("data-clans").split(":"); answer(G.mail.find(x => x.id === +mid), +oi); try{ refreshPanels(); }catch(e){} again(); }));
+      P.querySelectorAll("[data-clcab]").forEach(b => b.addEventListener("click", ev => { ev.stopPropagation(); const [mid, k] = b.getAttribute("data-clcab").split(":"); cableAct(G.mail.find(x => x.id === +mid), k); try{ refreshPanels(); }catch(e){} again(); }));
+      P.querySelectorAll("[data-clwhatmail]").forEach(b => b.addEventListener("click", () => { const x = G.mail.find(y => y.id === +b.getAttribute("data-clwhatmail")); let it = CL.items.find(y => y.mail === x); if(!it && x) it = {k:"mail-" + x.kind, kind:"mail", title:"Mail · " + x.from, text:x.subject + " — " + String(x.body).slice(0, 200), mail:x, at:"d" + x.day + " " + x.at, urg:"low"}; openExplain(it); }));
+  }
+  wrap("refreshInbox", () => refreshInbox, f => { refreshInbox = f; }, orig => function(){
+    const P = el("paneInbox");
+    try{
+      if(!G.mail.length || !P) return orig.apply(this, arguments);
+      renderInbox(P, () => refreshInbox());
+      try{ const Q = el("clPhoneInbox"); if(Q) renderInbox(Q, () => refreshInbox()); }catch(e){}
+      return;
+    }catch(e){ try{ console.warn("NEPTUNE-CLARITY inbox", e); }catch(e2){} return orig.apply(this, arguments); }
+  });
+  /* the phone's Mail tab uses the same sectioned inbox, re-rendered in place so it never jumps to the top */
+  wrap("phoneMailHtml", () => phoneMailHtml, f => { phoneMailHtml = f; }, orig => function(){ try{ if(G.mail && G.mail.length) return '<div id="clPhoneInbox" class="phone__scroll"></div>'; }catch(e){} return orig.apply(this, arguments); });
+  wrap("phoneCard", () => phoneCard, f => { phoneCard = f; }, orig => function(){
+    const r = orig.apply(this, arguments);
+    try{ const Q = el("clPhoneInbox"); if(Q){ const again = () => { try{ renderInbox(Q, again); const t = el("tabInbox"); if(t){ const n = unreadCount(); t.innerHTML = "Inbox" + (n ? '<span class="badge">' + n + '</span>' : ""); } }catch(e){} }; again(); } }catch(e){}
+    return r;
+  });
+  /* code elsewhere clicks [data-ans="id:i"] inside the inbox; keep that working */
+  CL.testMail = () => { try{ realmEnsure(); const r = G.realms[0]; for(let i = 0; i < 3; i++){ r._cableT = -1e9; realmCable(r); } r2 = G.realms[1]; r2._cableT = -1e9; realmCable(r2);
+    const ms = G.members.filter(m => !m.gone && m.kind === "member"); pushMail(ms[0], "A word about the other day", "I would rather say it in writing.", {kind:"grievance", options:[{t:"Apologise properly", run(){ ripple(ms[0], 11, "You wrote back.", 7, true); }},{t:"Leave it unanswered", run(){ ripple(ms[0], -6, "You never replied.", -8, true); }}]});
+    pushMail(null, "Your letter came back unopened", "The office of " + ms[1].name + " returned your letter unopened."); pushMail(ms[2], "Whip notice: caucus at ten", "Attendance expected.", {kind:"vote"}); }catch(e){ console.warn("testMail", e); } };
+  var r2;
+  MAILK.cable = "A diplomatic cable from a foreign power. It tells you what they want and who in this House they are courting. You can acknowledge it, pass it to your committee and party, make it public, or ignore it — each moves your influence, standing or relations with them.";
+  /* ── UNION MAP: click a state or town → action panel (diplomacy, interference, espionage, support) ── */
+  G.clOps = G.clOps || []; G.clState = G.clState || {};
+  function seeded(str){ let h = 2166136261; str = String(str); for(let i = 0; i < str.length; i++){ h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return ((h >>> 0) % 10000) / 10000; }
+  function stRel(n){ G.clState = G.clState || {}; return G.clState[n] || (G.clState[n] = {rel:0, informant:false, dirt:0, pact:0}); }
+  function isGov(){ try{ return G.you.office === "gov" || G.you.post === "governor" || /governor/i.test(G.you.title || ""); }catch(e){ return false; } }
+  function del(n){ try{ return stateDelegation(n).filter(m => !m.gone); }catch(e){ return []; } }
+  function warmDel(n, d, why){ del(n).slice(0, 6).forEach(m => { try{ ripple(m, d, why, Math.sign(d) * 2); }catch(e){} }); }
+  /* A: action defs. inf = influence cost, risk = exposure chance (0..1) before modifiers, days = when it resolves */
+  const UA = [
+    {g:"Diplomacy", k:"neg", t:"Negotiate", inf:3, risk:0, days:0, need:() => true, fx:"Relations +4, delegation warmer. Costs 3 influence and an hour.", run(n, s){ stRel(n).rel += 4; warmDel(n, 3, "You came to us instead of going round us."); }},
+    {g:"Diplomacy", k:"coop", t:"Cooperate on a shared problem", inf:4, risk:0, days:0, need:() => true, fx:"Its unrest −3, relations +3.", run(n, s){ s.unrest = clamp(s.unrest - 3, 0, 100); stRel(n).rel += 3; }},
+    {g:"Diplomacy", k:"pact", t:"Form a joint pact", inf:8, risk:0, days:0, need:n => stRel(n).rel >= 6 || n === G.you.state, why:"Needs relations ≥ 6 (negotiate first)", fx:"Pact for 10 days: relations +6, its delegation leans your way on the floor; breaking it later costs standing.", run(n, s){ const r = stRel(n); r.pact = G.day + 10; r.rel += 6; warmDel(n, 5, "We have a pact with your office."); }},
+    {g:"Diplomacy", k:"fav", t:"Trade favours", inf:5, risk:0.05, days:0, need:() => true, fx:"Influence back over days (+1/day ×4) and relations +2; a favour owed is a favour remembered.", run(n){ stRel(n).rel += 2; G.clOps.push({k:"favret", st:n, due:G.day + 1, left:4}); }},
+    {g:"Interfere with its bills", k:"lobby", t:"Lobby against its bill", inf:6, risk:0.08, days:0, need:(n, s) => !!s.bill, why:"Nothing before its statehouse", fx:"Uses the existing statehouse push (−). Relations −2.", run(n, s){ G.you.influence += 6; pushStateBill(s, -1); stRel(n).rel -= 2; }},
+    {g:"Interfere with its bills", k:"fund", t:"Fund the opposition", inf:4, cash:true, risk:0.18, days:2, need:(n, s) => !!s.bill, why:"Nothing before its statehouse", fx:"Costs 4 influence and funds; the bill loses ground over 2 days. 18% chance it is traced to you (scandal)."},
+    {g:"Interfere with its bills", k:"rally", t:"Rally its delegation", inf:5, risk:0, days:0, need:n => del(n).length > 0, why:"You know nobody in its delegation", fx:"Delegation warmth +4; they are likelier to vote with you on the federal bill.", run(n){ warmDel(n, 4, "You took the time to work our delegation."); }},
+    {g:"Interfere with its bills", k:"leak", t:"Leak to its press", inf:3, risk:0.25, days:1, need:() => true, fx:"Its unrest +4, its bill weakens; 25% chance the leak is traced (standing −4, relations −6)."},
+    {g:"Inner workings & espionage", k:"inform", t:"Plant an informant", inf:6, risk:0.15, days:2, need:() => true, fx:"Ongoing: cuts the risk of every later operation here by a third and sends you reports. 15% exposure."},
+    {g:"Inner workings & espionage", k:"dirt", t:"Gather dirt on officials", inf:5, risk:0.2, days:3, need:() => true, fx:"Finds a compromising fact (kept for smear or turning). 20% exposure."},
+    {g:"Inner workings & espionage", k:"icept", t:"Intercept its cables", inf:5, risk:0.22, days:2, need:() => isGov() || G.you.influence >= 30 || stRel_(), why:"Governor, or influence ≥ 30", fx:"You get its private correspondence as mail: who it is courting, what it will trade. 22% exposure."},
+    {g:"Inner workings & espionage", k:"sab", t:"Sabotage or delay its bill", inf:7, risk:0.3, days:2, need:(n, s) => !!s.bill, why:"Nothing before its statehouse", fx:"Pushes its bill's vote back 2–4 days and weakens it. 30% exposure (standing −6, scandal)."},
+    {g:"Inner workings & espionage", k:"smear", t:"Run a covert smear", inf:6, risk:0.32, days:3, need:n => stRel(n).dirt > 0 || del(n).length > 0, why:"Need dirt or a known official", fx:"A delegation member loses standing and warmth toward your enemies; uses your dirt if you have it (lower risk). 32% exposure."},
+    {g:"Inner workings & espionage", k:"turn", t:"Turn an official", inf:10, risk:0.28, days:4, need:n => stRel(n).dirt > 0 && del(n).length > 0, why:"Need dirt and a known official", fx:"One of its members becomes quietly yours: big warmth, a pledge on the bill. 28% exposure, worse if it fails."},
+    {g:"Support its bills", k:"sup", t:"Support its bill", inf:6, risk:0, days:0, need:(n, s) => !!s.bill, why:"Nothing before its statehouse", fx:"Uses the existing statehouse push (+). Relations +3.", run(n, s){ G.you.influence += 6; pushStateBill(s, 1); stRel(n).rel += 3; }}
+  ];
+  function stRel_(){ return false; }
+  function riskOf(a, n){ let r = a.risk; const R = stRel(n); if(R.informant) r *= 0.66; if(isGov()) r *= 0.85; if(a.k === "smear" && R.dirt > 0) r *= 0.7; return Math.round(r * 100); }
+  function runUA(n, k, town){
+    G.clOps = G.clOps || [];
+    const s = stateOf(n), a = UA.find(x => x.k === k); if(!s || !a || !G.you) return;
+    if(G.you.influence < a.inf || !a.need(n, s)) return;
+    G.you.influence -= a.inf; try{ spend(a.days ? 45 : 60, a.days ? 10 : 8); }catch(e){}
+    if(a.cash){ try{ G.you.funds = Math.max(0, (G.you.funds || 0) - 20); }catch(e){} }
+    if(a.run) a.run(n, s);
+    else { G.clOps.push({k, st:n, town:town || null, due:G.day + a.days, seed:G.day + ":" + n + ":" + k + ":" + G.clOps.length, risk:riskOf(a, n) / 100}); }
+    try{ note((a.days ? "Set in motion in " + n + ": " : "In " + n + ": ") + a.t.toLowerCase() + (town ? " (" + town + ")" : "") + "." + (a.days ? " Results in about " + a.days + " day" + (a.days > 1 ? "s" : "") + "." : "")); }catch(e){}
+    try{ refreshPanels(); }catch(e){} try{ refreshUnion(); }catch(e){}
+  }
+  CL.unionAct = runUA;
+  /* resolve operations day by day, seeded so results are stable for a given save */
+  function resolveOps(){
+    G.clOps = G.clOps || [];
+    try{
+      if(!G.clOps || !G.clOps.length || !G.you) return;
+      const keep = [];
+      G.clOps.forEach(o => {
+        if(o.due > G.day){ keep.push(o); return; }
+        const s = stateOf(o.st); const R = stRel(o.st); const ms = del(o.st);
+        if(o.k === "favret"){ G.you.influence = clamp(G.you.influence + 1, 0, 100); if(--o.left > 0){ o.due = G.day + 1; keep.push(o); } return; }
+        const roll = seeded(o.seed + ":x"), ok = seeded(o.seed + ":ok") < 0.55 + G.you.influence / 250 + R.rel / 100;
+        const exposed = roll < o.risk;
+        const target = ms.length ? ms[Math.floor(seeded(o.seed + ":t") * ms.length)] : null;
+        let sub = "", body = "";
+        if(exposed){
+          G.you.standing = clamp(G.you.standing - (o.k === "turn" || o.k === "sab" ? 6 : 4), 0, 100); R.rel -= 6;
+          try{ G.secrets = G.secrets || []; G.secrets.push({id:Date.now() + Math.floor(seeded(o.seed) * 999), t:"Your office ran a covert " + o.k + " operation in " + o.st + ".", about:0, knownBy:target ? [target.id] : [], exposure:6, day:G.day}); }catch(e){}
+          try{ pushWireScrap("Wire", o.st + " statehouse alleges interference by a federal member's office."); }catch(e){}
+          sub = "Exposed in " + o.st; body = "Your people were seen. " + o.st + " knows someone was working against it, and the trail is warm.\n\nStanding −, relations with " + o.st + " −6, and a secret is now in circulation (see Risks).";
+        } else if(!ok){
+          sub = "Nothing came of it in " + o.st; body = "The " + o.k + " operation in " + o.st + " found nothing usable. No one noticed. Influence spent.";
+        } else {
+          if(o.k === "inform"){ R.informant = true; sub = "Informant in place — " + o.st; body = "Someone inside the " + o.st + " statehouse now talks to your office. Future operations there are safer, and you will hear things first."; }
+          if(o.k === "dirt"){ R.dirt++; sub = "A file on " + (target ? target.name : "an official in " + o.st); body = (target ? target.name : "An official") + " " + ["took a donor's holiday they never declared", "has a second phone their chief of staff pays for", "voted on a contract their brother bid for", "missed a session for a reason that was not illness"][Math.floor(seeded(o.seed + ":d") * 4)] + ".\n\nKept on file. Use it to smear or to turn."; }
+          if(o.k === "icept"){ sub = "Intercepted: " + o.st + " correspondence"; body = "Their governor's office is courting " + (target ? target.name : "your whip") + " and will trade " + ["a highway grant", "its delegation's votes on the next bill", "silence on the floods", "a seat on a committee"][Math.floor(seeded(o.seed + ":i") * 4)] + " for support." + (s && s.bill ? "\n\nOn " + s.bill.title + " they think they have the votes by " + Math.max(1, s.bill.due - G.day) + " days." : ""); R.rel += 0; }
+          if(o.k === "fund" || o.k === "leak"){ if(s && s.bill) s.bill.pushed = (s.bill.pushed || 0) - (o.k === "fund" ? 14 : 8); if(o.k === "leak" && s) s.unrest = clamp(s.unrest + 4, 0, 100); sub = (o.k === "fund" ? "Opposition funded" : "Leak ran") + " in " + o.st; body = s && s.bill ? s.bill.title + " has lost ground in the statehouse." : "It ran. People are talking."; }
+          if(o.k === "sab"){ if(s && s.bill){ s.bill.due += 2 + Math.floor(seeded(o.seed + ":s") * 3); s.bill.pushed = (s.bill.pushed || 0) - 10; } sub = "Delay in " + o.st; body = "A procedural snag nobody can explain has pushed the vote back. It looks like an accident."; }
+          if(o.k === "smear" && target){ try{ target.standing = clamp((target.standing || 50) - 6, 0, 100); }catch(e){} if(R.dirt > 0) R.dirt--; try{ pushWireScrap("Wire", target.name + " under questions at home."); }catch(e){} sub = "Smear landed: " + target.name; body = "The story about " + target.name + " is running in " + o.st + ". It did not come back to you — yet."; }
+          if(o.k === "turn" && target){ try{ ripple(target, 18, "We have an understanding now, you and I.", 10, true); target.pledge = 1; target.pledgeDay = G.day; }catch(e){} R.dirt = Math.max(0, R.dirt - 1); sub = "An understanding with " + target.name; body = target.name + " will vote with you on the bill and keep you told. They also know what you know about them; that cuts both ways."; }
+          if(!sub){ sub = "Done in " + o.st; body = "It went as planned."; }
+        }
+        try{ pushMail(null, sub, body, {kind:"intel"}); }catch(e){}
+      });
+      G.clOps = keep;
+    }catch(e){ try{ console.warn("NEPTUNE-CLARITY ops", e); }catch(e2){} }
+  }
+  CL.resolveOps = resolveOps;
+  let lastDay = null;
+  setInterval(() => { try{ if(!G || G.day == null) return; if(lastDay !== null && G.day !== lastDay) resolveOps(); lastDay = G.day; }catch(e){} }, 1500);
+  function unionPanel(n){
+    G.clOps = G.clOps || [];
+    const s = stateOf(n); if(!s || !G.you) return "";
+    const R = stRel(n); let towns = [];
+    try{ towns = (stateLore(n).towns || []).map(t => t.name); }catch(e){}
+    const gov = isGov();
+    let h = '<div class="billbox cl-union" style="margin-top:12px"><div class="eyebrow">Your options in ' + esc(n) + (CL.town ? ' · ' + esc(CL.town) : '') + '</div>' +
+      nameSummary("state", n) + sumRow("Your role", gov ? "Governor (more reach in statehouses, lower exposure)" : "House member") + sumRow("Your influence", Math.round(G.you.influence)) +
+      sumRow("Relations", (R.rel > 0 ? "+" : "") + R.rel + (R.pact > G.day ? " · pact until day " + R.pact : "") + (R.informant ? " · informant in place" : "") + (R.dirt ? " · " + R.dirt + " file(s) of dirt" : "")) +
+      (towns.length ? '<div style="margin:6px 0;font:12px system-ui">Towns: ' + towns.map(t => '<button type="button" class="cl-btn" data-cltown="' + esc(t) + '"' + (CL.town === t ? ' style="background:#2f5d3a;color:#fff"' : '') + '>' + esc(t) + '</button>').join("") + '</div>' : '') +
+      (G.clOps.filter(o => o.st === n && o.k !== "favret").length ? '<p class="muted">Under way: ' + G.clOps.filter(o => o.st === n && o.k !== "favret").map(o => esc(UA.find(a => a.k === o.k).t) + " (day " + o.due + ")").join(", ") + '</p>' : '');
+    let grp = "";
+    UA.forEach(a => {
+      if(a.g !== grp){ grp = a.g; h += '<div class="cl-sech" style="cursor:default">' + esc(grp) + '</div>'; }
+      const okNeed = a.need(n, s), okInf = G.you.influence >= a.inf, rk = riskOf(a, n);
+      h += '<div style="display:flex;gap:6px;align-items:flex-start;margin:3px 0"><button type="button" class="conc__btn" style="width:auto;flex:0 0 auto" data-clua="' + a.k + '"' + (okNeed && okInf ? '' : ' disabled') + '>' + esc(a.t) + '</button>' +
+        '<div style="font:11.5px/1.35 system-ui"><b>Cost</b> ' + a.inf + ' influence' + (a.cash ? ' + funds' : '') + ' · <b>Risk</b> ' + (rk ? rk + '% exposure' : 'none') + ' · <b>When</b> ' + (a.days ? "~" + a.days + " day(s)" : "now") + '<br>' + esc(a.fx) +
+        (!okNeed ? '<br><i>Locked: ' + esc(a.why || "not available") + '</i>' : !okInf ? '<br><i>Locked: need ' + a.inf + ' influence</i>' : '') + '</div></div>';
+    });
+    return h + '</div>';
+  }
+  wrap("refreshUnion", () => refreshUnion, f => { refreshUnion = f; }, orig => function(){
+    const P = el("paneUnion"), keep = P ? scrollers(P) : [];
+    const r = orig.apply(this, arguments);
+    try{
+      if(P && G.mapSel){
+        if(CL._unionSt !== G.mapSel){ CL.town = null; CL._unionSt = G.mapSel; }
+        const box = P.querySelector(".billbox"); const d = document.createElement("div"); d.innerHTML = unionPanel(G.mapSel);
+        if(box && box.parentNode) box.parentNode.insertBefore(d, box.nextSibling); else P.appendChild(d);
+        d.querySelectorAll("[data-clua]").forEach(b => b.addEventListener("click", () => runUA(G.mapSel, b.getAttribute("data-clua"), CL.town)));
+        d.querySelectorAll("[data-cltown]").forEach(b => b.addEventListener("click", () => { CL.town = b.getAttribute("data-cltown"); refreshUnion(); }));
+        keep.forEach(([e, t]) => { e.scrollTop = t; });
+      }
+    }catch(e){ try{ console.warn("NEPTUNE-CLARITY union", e); }catch(e2){} }
+    return r;
+  });
+  MAILK.intel = "A report from an operation you set in motion in another state. It may be a success, a dud, or news that you were caught. Check Risks if it says you were exposed.";
+  console.log("NEPTUNE clarity ready");
+}catch(e){ try{ console.warn("NEPTUNE-CLARITY block", e); }catch(e2){} }
+/* NEPTUNE-CLARITY END */
 armFrame();
 
 })();
