@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261013c">
+<meta name="onum-build" content="20261013d">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261013b";
+  var STAMP = "20261013d";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -36287,6 +36287,12 @@ try{
    NPC MINDS CONTRACT (JUPITER): if window.onumMind(npcId) (function) or window.ONUM_MINDS[npcId] (object) exists,
    it should return {goals, beliefs, plans, memory, family, job, wealth, mood} (strings, arrays or plain objects);
    each present field is injected into that NPC's system prompt as "YOUR INNER LIFE". Missing = ignored.
+   CHAT: 💬 HUD button, Ctrl+Shift+K anywhere, or the desk computer's "Chat" tab — contact picker of everyone known
+   (members, press, staff, citizens, foreign missions with real names, state leaders) plus "Ask your aide" (chief of
+   staff answers from real game data). Transcripts persist in livetalk.mem.
+   NO DEPENDENCY: without Ollama an offline voice composes replies (templates + traits, stance, memory, gossip,
+   keyword/intent matching, recombination with a no-repeat check). Badge says "Live" only when Ollama answers a
+   probe (every 30 s); otherwise "Offline voice".
    All reply text is real DOM text (textContent); after each reply renders, window.onumGlossary?.scan(el) runs.
    Foreign senders (cables, envoys) are given real, culturally fitting names and titles, never "foreign diplomat".
    Channel style: dm/text terse lowercase-ok one or two lines; mail formal letter with salutation/sign-off;
@@ -36313,7 +36319,7 @@ try{
   /* ── Ollama ───────────────────────────────────────── */
   async function probe(force){
     if(!CFG.on){ LT.up = false; return false; }
-    if(!force && LT.up !== null && Date.now() - LT.at < 20000) return LT.up;
+    if(!force && LT.up !== null && Date.now() - LT.at < 30000) return LT.up;
     LT.at = Date.now();
     try{ const c = new AbortController(); const t = setTimeout(() => c.abort(), 1800);
       const r = await fetch(CFG.url + "/api/tags", {signal:c.signal}); clearTimeout(t);
@@ -36338,6 +36344,7 @@ try{
 
   /* ── prompt ───────────────────────────────────────── */
   const STYLE = {
+    aide:"You are the player's own chief of staff, loyal and frank. Answer their question about the state of play from the facts above, explain anything they ask, and give practical advice. 2-6 sentences.",
     face:"You are speaking aloud, face to face. 1-4 sentences, plain spoken.",
     sitting:"You are speaking on the record in a formal sitting. 1-3 sentences, in the register of the chamber.",
     phone:"You are on the telephone. Spoken, clipped, 1-3 short sentences.",
@@ -36346,7 +36353,7 @@ try{
     mail:"This is a formal letter. Open with a salutation to them, 2-5 sentences, close with a sign-off and your name.",
     cable:"This is a diplomatic cable. Telegraphic style, upper case allowed, short clauses separated by STOP, 2-5 clauses, signed by the mission."
   };
-  function heardOf(id){ return (W.heard[id] || []).map(h => { const f = W.facts.find(x => x.id === h.f); return f ? {fact:f, src:h.src, conf:h.conf, d:h.d} : null; }).filter(Boolean); }
+  function heardOf(id){ return (W.heard[id] || []).map(h => { const f = W.facts.find(x => x.id === h.f); return f ? {fact:f, src:h.src, conf:h.conf, d:h.d, get used(){ return h.used; }, set used(v){ h.used = v; save(); }} : null; }).filter(Boolean); }
   function canon(){
     const L = ["WORLD: the NO7 Consular Republic — a republic whose public life keeps the precepts of the First Consul, Dominic Zachary Taylor (a man under God, not God). Money is guilders. The House, the Senate, governors and the courts are real institutions here; foreign powers send cables through their missions."];
     try{ const r = (G.realms || []).slice(0, 5).map(x => x.t).join(", "); if(r) L.push("Foreign powers in play: " + r + "."); }catch(e){}
@@ -36472,11 +36479,55 @@ try{
   setInterval(() => { try{ if(G && G.day && W.day !== G.day){ const first = !W.day; W.day = G.day; if(!first) spreadDay(); save(); } }catch(e){} }, 1500);
 
   /* ── the one reply function every channel uses ───── */
-  function scripted(m, ch, text){
-    try{ if(ch === "text" || ch === "dm") return dmReply(m, text); }catch(e){}
-    try{ return improvise(m, text); }catch(e){}
-    return ch === "cable" ? "RECEIVED STOP WILL REVERT STOP" : "I will think on it.";
+  /* ── OFFLINE VOICE: no dependency. Templates + game state + the game's own improviser, recombined so lines do not repeat ── */
+  const OFF = {
+    hear:["I hear {f}. Is that so?","Word reached me that {f}. I would like to hear it from you.","{src} tells me {f}. You can imagine how that sits.","People talk, you know. Apparently {f}."],
+    warm:["That is decent of you.","I will remember you said that.","Kind words are rare in this building."],
+    cold:["Mind your tone.","I have been spoken to worse, but not often.","You will want to take that back before supper."],
+    prom:["A promise is cheap until the roll is called.","Put it in writing and I will believe half of it.","I will hold you to that, and so will the people who hear of it."],
+    ask:["Ask me plainly and I will answer plainly.","That depends on what you are offering.","I have not decided, and I am not deciding in a corridor."],
+    tail:["We will see.","Mark the day.","That is all I have for now.","Ask me again tomorrow."],
+    textp:["ok.","noted.","not over text.","call me later.","maybe. depends.","heard. talk soon."],
+    cab:["RECEIVED STOP","OUR GOVERNMENT TAKES NOTE STOP","A REPLY WILL FOLLOW THROUGH THE USUAL CHANNEL STOP","WE TRUST THE MATTER REMAINS BETWEEN OUR MISSIONS STOP"]
+  };
+  const pk = a => a[(Math.random() * a.length) | 0];
+  function lastSaid(m){ return (MEM[m.id] || []).filter(t => t.r === "a").slice(-10).map(t => t.c); }
+  function offAide(text){
+    const t = String(text).toLowerCase(), y = G.you || {}, b = G.bill && !G.bill.done ? G.bill : null, A = [];
+    const count = () => { try{ let ay = 0, no = 0; (G.members || []).filter(m => !m.gone).forEach(m => { const v = memberVote(m, b); if(v > 0) ay++; else no++; }); return ay + " leaning aye, " + no + " no"; }catch(e){ return "the count is unclear"; } };
+    if(/bill|vote|floor|count|whip|pass/.test(t)) A.push(b ? b.title + " is on the floor, roll call day " + b.voteDay + ". My count has " + count() + "." + (b.line ? " In short: " + b.line : "") : "No bill is live right now. A quiet floor is the time to draft one of your own.");
+    if(/approv|poll|number|standing|influence|popular/.test(t)) A.push("Home approval " + Math.round(y.approval || 0) + ", standing in the House " + Math.round(y.standing || 0) + ", influence " + Math.round(y.influence || 0) + ".");
+    if(/money|fund|chest|cash|guilder|donor/.test(t)) A.push("The war chest holds " + (typeof money === "function" ? money(y.funds || 0) : (y.funds || 0)) + ". Aides on payroll: " + (y.staff || 0) + ".");
+    if(/schedul|today|diary|calendar|when|next/.test(t)){ const ev = (G.events || []).filter(e => e.day === G.day && !e.done); A.push(ev.length ? "Still today: " + ev.slice(0, 4).map(e => { try{ return hourLabel(e.hour) + " " + e.t; }catch(x){ return e.t; } }).join("; ") + "." : "Nothing else in the diary today."); }
+    if(/mail|letter|inbox|cable/.test(t)){ const u = (G.mail || []).filter(m => !m.read && !m.outgoing); A.push(u.length ? u.length + " unread. Top of the pile: " + u.slice(0, 3).map(m => m.from + " (" + m.subject + ")").join("; ") + "." : "The inbox is clear."); }
+    if(/rival|seat|threat|enemy/.test(t)){ try{ const r = rivalLive(); A.push(r ? r.name + " wants your seat. Keep the district warm." : "Nobody serious is after your seat yet."); }catch(e){} }
+    if(/gossip|heard|rumou?r|know|said|saying|talk|leak/.test(t)){ const f = W.facts.slice(-4).filter(f => f.heardBy.length > 1); A.push(f.length ? "What is going round about you: " + f.map(x => x.said + " (" + (x.heardBy.length - 1) + " have heard)").join("; ") + "." : "Nothing you said is travelling yet, as far as I can tell."); }
+    const who = (() => { try{ return everyone().find(m => !m.gone && t.indexOf(sn(m.name).toLowerCase()) >= 0); }catch(e){ return null; } })();
+    if(who){ let v = ""; try{ v = b && who.kind === "member" ? (memberVote(who, b) > 0 ? " leans aye on " + b.title : " leans no on " + b.title) : ""; }catch(e){} A.push(who.name + (who.party ? " (" + partyLabel(who.party) + (who.state ? ", " + who.state : "") + ")" : "") + v + "." + (who.rel ? " With you: " + (who.rel.warmth > 15 ? "friendly" : who.rel.warmth < -15 ? "cool" : "neutral") + "." : "") + ((W.heard[who.id] || []).length ? " They have heard " + W.heard[who.id].length + " thing(s) about you." : "")); }
+    if(/what is|what's|explain|how do|help|mean/.test(t) && !A.length) A.push("Short version: win votes by talking to members in person, keep promises consistent because word travels, answer your mail, and watch the roll-call day. Ask me about the bill, your numbers, the money, the diary, the mail, a member by name, or what people are saying.");
+    if(!A.length) A.push(pk(["I can give you the count, the numbers, the diary, the mail or the gossip. Which?","Ask me about the bill, a member, the money or what is being said about you.","Say the word and I will pull the file."]));
+    return A.join(" ");
   }
+  function offline(m, ch, text){
+    if(m.kind === "aide") return offAide(text);
+    const said = lastSaid(m), it = intent(text), H = heardOf(m.id).filter(h => !h.used);
+    for(let k = 0; k < 6; k++){
+      const P = [];
+      if(H.length && Math.random() < .7){ const h = H[H.length - 1]; P.push(pk(OFF.hear).replace("{f}", h.fact.said.replace(/^you /, "you ")).replace("{src}", h.src)); }
+      if(ch === "text" || ch === "dm"){ let s = ""; try{ s = m.kind === "member" ? dmReply(m, text) : ""; }catch(e){} P.push(s || pk(OFF.textp)); }
+      else if(ch === "cable" || m.kind === "envoy"){ P.push(pk(OFF.cab), pk(OFF.cab)); if(m.name && !/^the head/.test(m.name)) P.push(m.name.toUpperCase()); }
+      else{
+        let base = ""; try{ if(m.kind === "member" || m.kind === "press" || m.kind === "civ") base = improvise(m, text); }catch(e){}
+        if(it.hostile || it.threat) P.push(pk(OFF.cold)); else if(it.promise) P.push(pk(OFF.prom)); else if(it.warm) P.push(pk(OFF.warm)); else if(/\?\s*$/.test(text) && !base) P.push(pk(OFF.ask));
+        if(base) P.push(base.split(/(?<=[.!?])\s+/).slice(0, 3).join(" "));
+        if(!base || Math.random() < .3) P.push(pk(OFF.tail));
+        if(ch === "mail") { P.unshift("Dear " + (G.you ? G.you.name : "colleague") + ","); P.push("Yours, " + m.name); }
+      }
+      const out = P.filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
+      if(said.indexOf(out) < 0 || k === 5){ if(H.length && out.indexOf(H[H.length - 1].fact.said.slice(0, 20)) >= 0) H[H.length - 1].used = 1; return out; }
+    }
+  }
+  LT.offline = offline;
   async function reply(o){
     o = o || {}; const ch = o.channel || "face"; const m = o.npc || npc(o.npcId); const text = String(o.text || "").trim().slice(0, 600);
     if(!m || !text) throw new Error("onumLiveTalk.reply: need npcId and text");
@@ -36488,7 +36539,7 @@ try{
           onText:t => { try{ o.onToken && o.onToken(stripEffect(t.replace(/<<[^>]*$/, ""))); }catch(e){} }});
         out = stripEffect(raw).replace(/^["“]|["”]$/g, "").replace(/^\w[\w .'-]{0,30}:\s+/, "").trim(); live = !!out; }catch(e){ if(e && e.name === "AbortError") throw e; }
     }
-    if(!out){ out = scripted(m, ch, text); if(o.onToken) try{ o.onToken(out); }catch(e){} }
+    if(!out){ out = offline(m, ch, text); if(o.onToken) try{ o.onToken(out); }catch(e){} }
     remember2(m, "a", out, ch);
     try{ if(live) applyEffect(m, raw); }catch(e){}
     nudge(m, it, ch);
@@ -36515,7 +36566,7 @@ try{
   const converse0 = converse;
   converse = async function(m, text){
     if(!m || chatCtl) return;
-    if(!(await probe())){ hint(); return converse0.apply(this, arguments); }
+    if(!(await probe())) hint();
     try{ if(checkSpeakBlasphemy(text, "you")) return converse0.apply(this, arguments); }catch(e){}
     appendMsg("you", text);
     const bubble = appendMsg("them", "", sn(m.name)); bubble.classList.add("lt-typing"); bubble.textContent = "…";
@@ -36529,13 +36580,12 @@ try{
     }catch(e){ bubble.textContent = "…"; }
     finally{ chatCtl = null; bubble.classList.remove("lt-typing"); el("wireSend").disabled = false; el("wireStop").hidden = true; el("wireState").textContent = ""; if(TALK.open && TALK.m === m) renderTalk(); refreshPanels(); }
   };
-  try{ const cl0 = converseLive; converseLive = function(m, text){ if(!LT.up) return cl0.apply(this, arguments);
+  try{ const cl0 = converseLive; converseLive = function(m, text){
     reply({npc:m, channel:"face", text}).then(r => { try{ speakAt(m, r.text); }catch(e){} try{ setSay(r.text, sn(m.name)); }catch(e){} try{ refreshPanels(); }catch(e){} }); }; }catch(e){}
   try{ el("wireStop").addEventListener("click", () => { try{ chatCtl && chatCtl.abort(); }catch(e){} }); }catch(e){}
 
   /* ── texts (the existing phone Texts panel) ── */
   try{ const ds0 = dmSend; dmSend = function(id, text){
-    if(!LT.up) return ds0.apply(this, arguments);
     const m = byId(id); text = String(text || "").trim().slice(0, 400); if(!m || !text) return;
     dmPush(id, "you", text, {}); dmState().typing = id; dmRender();
     reply({npc:m, channel:"text", text}).then(r => { dmState().typing = null; dmPush(id, id, r.text); setTimeout(() => gloss(document.querySelector(".dm, #dmPanel") || document.body), 50); }, () => { dmState().typing = null; dmPush(id, id, dmReply(m, text)); });
@@ -36545,7 +36595,7 @@ try{
   function senderOf(x){
     let m = x.fromId != null ? npc(x.fromId) : null;
     if(!m && (x.kind === "cable" || /^Mission of /.test(x.from || ""))){ const rn = String(x.from || "").replace(/^Mission of /, "").replace(/^Cable — /, "");
-      const E = (LT.envoys = LT.envoys || LSG("envoys", {}));
+      const E = (LT.envoys = LT.envoys || LSG("envoys", {})); try{ const ev = envoyFor(rn); if(ev && !E[rn]) E[rn] = ev.title + " " + ev.name; }catch(e){}
       m = {id:"realm:" + rn, name:E[rn] || ("the head of the " + rn + " mission"), kind:"envoy", role:"head of mission for " + rn + " in the capital, writing on behalf of their government", state:rn, realmName:rn}; }
     return m;
   }
@@ -36614,9 +36664,75 @@ try{
   try{ const fr0 = fresh; fresh = function(build, tries){ return voice(fr0.call(this, build, tries)); }; }catch(e){}
   try{ const sa0 = speakAt; speakAt = function(p, text){ return sa0.call(this, p, (p && LT.up && CFG.voices) ? voice(text, p.name) : text); }; }catch(e){}
 
+
+  /* ── CHAT: a general chat window (desk computer "Chat" tab, the 💬 HUD button, or Ctrl+Shift+K anywhere) ── */
+  const ENV_T = {reach:"Ambassador", horn:"Consul-General", pale:"Colonel-Attaché", marches:"Minister Plenipotentiary", isles:"High Commissioner", rift:"Chargé d'affaires"};
+  function envoyFor(rn){
+    try{ const r = (G.realms || []).find(x => x.t === rn || x.k === rn || ("the " + x.t) === rn); if(!r) return null;
+      if(r.envoy && r.envoy.name) return {name:r.envoy.name, title:r.envoy.title || "Ambassador", realm:r};
+      let h = 2166136261; for(const c of "envoy|" + r.k + "|" + (G.country || "")){ h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); }
+      let a = h >>> 0; const rnd = () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+      let name = ""; try{ name = foreignName(rnd, r.k); }catch(e){} if(!name) return null;
+      r.envoy = {name, title:ENV_T[r.k] || "Ambassador", full:(ENV_T[r.k] || "Ambassador") + " " + name + " of " + r.t};
+      return {name, title:r.envoy.title, realm:r}; }catch(e){ return null; }
+  }
+  const AIDE = () => { const y = G.you || {}; const nm = y.aideName || (y.aideName = pk(["Margaret Ellison","Thomas Whitcombe","Hester Vandermeer","Samuel Okafor","Ruth Calloway","Pieter de Wit"])); return {id:"aide", name:nm, kind:"aide", role:(typeof schedBy === "function" ? schedBy() : "Your chief of staff") + " — " + nm}; };
+  const RCACHE = {};
+  function contacts(){
+    const out = [{id:"aide", label:"Ask your aide (" + AIDE().name + ")", grp:"Your office", m:AIDE()}];
+    try{ everyone().filter(m => !m.gone && m.name && m.kind !== "you").forEach(m => {
+      const g = m.kind === "member" ? "Members" : m.kind === "press" ? "Press" : m.kind === "envoy" ? "Foreign missions" : m.kind === "civ" ? "Citizens & neighbours" : /aide|staff|clerk|secretary/i.test(m.role || "") ? "Staff & aides" : "Others";
+      out.push({id:String(m.id), label:m.name + (m.party ? " · " + partyLabel(m.party) : "") + (m.state ? " · " + m.state : "") + (m.role && m.kind !== "member" ? " · " + m.role : ""), grp:g, m}); }); }catch(e){}
+    try{ (G.realms || []).forEach(r => { const ev = envoyFor(r.t); if(!ev) return; const id = "realm:" + r.t;
+      const m = RCACHE[id] || (RCACHE[id] = {id, name:ev.title + " " + ev.name, kind:"envoy", role:ev.title + " of " + r.t + " in the capital", state:r.t, realmName:r.t});
+      out.push({id, label:m.name + " · " + r.t, grp:"Foreign missions", m}); }); }catch(e){}
+    try{ (G.leaders || G.stateLeaders || []).forEach(L => { if(L && L.name) out.push({id:"lead:" + L.name, label:L.name + (L.title ? " · " + L.title : ""), grp:"State leaders", m:{id:"lead:" + L.name, name:L.name, kind:"leader", role:L.title || "state leader", state:L.state}}); }); }catch(e){}
+    return out;
+  }
+  function chatBox(){
+    let C = document.getElementById("ltChat"); if(C) return C;
+    C = document.createElement("div"); C.id = "ltChat"; C.hidden = true;
+    C.innerHTML = '<div class="ltc-top"><b>Chat</b><select id="ltcTo"></select><span id="ltcBadge" class="ltc-badge"></span><button type="button" id="ltcX">Close</button></div><div class="ltc-log" id="ltcLog"></div><div class="ltc-row"><input id="ltcIn" maxlength="500" placeholder="Say something…"><button type="button" id="ltcSend">Send</button></div>';
+    document.body.appendChild(C);
+    ["keydown","keyup","keypress","mousedown","pointerdown","wheel"].forEach(ev => C.addEventListener(ev, e => e.stopPropagation(), {passive:ev === "wheel"}));
+    C.querySelector("#ltcX").onclick = () => chatClose();
+    C.querySelector("#ltcTo").onchange = e => { LT.chatTo = e.target.value; LSS("chatTo", LT.chatTo); chatPaint(); };
+    const send = async () => { const i = C.querySelector("#ltcIn"), t = i.value.trim(); if(!t || LT.cbusy) return; i.value = "";
+      const c = contacts().find(x => x.id === LT.chatTo) || contacts()[0]; const m = c.m;
+      const log = C.querySelector("#ltcLog"); const me = document.createElement("div"); me.className = "ltc-m ltc-you"; me.innerHTML = "<b>You</b><span></span>"; me.lastChild.textContent = t; log.appendChild(me);
+      const r0 = document.createElement("div"); r0.className = "ltc-m lt-typing"; r0.innerHTML = "<b></b><span>…</span>"; r0.firstChild.textContent = m.kind === "aide" ? m.name + " (chief of staff)" : m.name; log.appendChild(r0); log.scrollTop = 1e9;
+      LT.cbusy = 1;
+      try{ const r = await reply({npc:m, channel:m.kind === "aide" ? "aide" : m.kind === "envoy" ? "cable" : "dm", text:t, extra:m.kind === "aide" ? "FACTS ABOUT THE PLAYER'S POSITION (true, from the game): " + offAide("bill vote numbers money schedule mail gossip rival") : ""}, ).catch(() => null);
+        r0.lastChild.textContent = r ? r.text : "…"; gloss(r0); }
+      finally{ LT.cbusy = 0; r0.classList.remove("lt-typing"); log.scrollTop = 1e9; }
+    };
+    C.querySelector("#ltcSend").onclick = send; C.querySelector("#ltcIn").addEventListener("keydown", e => { if(e.key === "Enter"){ e.preventDefault(); send(); } if(e.key === "Escape") chatClose(); });
+    return C;
+  }
+  function chatPaint(){
+    const C = chatBox(), cs = contacts(); if(!LT.chatTo) LT.chatTo = LSG("chatTo", "aide"); if(!cs.some(c => c.id === LT.chatTo)) LT.chatTo = "aide";
+    const sel = C.querySelector("#ltcTo"), grps = [...new Set(cs.map(c => c.grp))];
+    sel.innerHTML = grps.map(g => '<optgroup label="' + esc2(g) + '">' + cs.filter(c => c.grp === g).map(c => '<option value="' + esc2(c.id) + '">' + esc2(c.label) + '</option>').join("") + '</optgroup>').join(""); sel.value = LT.chatTo;
+    const c = cs.find(x => x.id === LT.chatTo), log = C.querySelector("#ltcLog"); log.innerHTML = "";
+    (MEM[LT.chatTo] || []).slice(-30).forEach(t => { const d = document.createElement("div"); d.className = "ltc-m" + (t.r === "u" ? " ltc-you" : ""); d.innerHTML = "<b></b><span></span>"; d.firstChild.textContent = t.r === "u" ? "You" : (c ? c.m.name : ""); d.lastChild.textContent = t.c; log.appendChild(d); });
+    if(!log.children.length){ const d = document.createElement("div"); d.className = "ltc-note"; d.textContent = c && c.m.kind === "aide" ? "Ask about the bill, your numbers, the money, the diary, the mail, a member by name, or what people are saying about you." : "Start the conversation. What you say here travels like anything else."; log.appendChild(d); }
+    log.scrollTop = 1e9; gloss(log); paintPill();
+  }
+  function chatOpen(dock){ const C = chatBox(); C.hidden = false; C.classList.toggle("is-dock", !!dock); if(dock) dock.appendChild(C); else if(C.parentNode !== document.body) document.body.appendChild(C); chatPaint(); setTimeout(() => { try{ C.querySelector("#ltcIn").focus(); }catch(e){} }, 30); try{ if(document.pointerLockElement) document.exitPointerLock(); }catch(e){} }
+  function chatClose(){ const C = document.getElementById("ltChat"); if(C){ C.hidden = true; if(C.parentNode !== document.body) document.body.appendChild(C); } }
+  LT.chatOpen = chatOpen; LT.chatClose = chatClose; LT.contacts = contacts;
+  window.addEventListener("keydown", e => { if(e.ctrlKey && e.shiftKey && (e.key === "K" || e.key === "k")){ e.preventDefault(); const C = document.getElementById("ltChat"); if(C && !C.hidden) chatClose(); else chatOpen(); } }, true);
+  /* the desk computer gets a Chat tab */
+  try{ if(!PC_TABS.some(t => t[0] === "chat")) PC_TABS.push(["chat", "Chat"]);
+    const pcTab0 = pcTab; pcTab = function(){ if(PC.tab === "chat") return '<div class="pc__h">Chat · anyone you know, or your aide</div><div id="ltPcDock"></div>'; return pcTab0.apply(this, arguments); };
+    const pcRender0 = pcRender; pcRender = function(){ const r = pcRender0.apply(this, arguments); try{ const d = document.getElementById("ltPcDock"); if(PC.open && PC.tab === "chat" && d) chatOpen(d); else { const C = document.getElementById("ltChat"); if(C && C.classList.contains("is-dock")) chatClose(); } }catch(e){} return r; };
+    const pcClose0 = pcClose; pcClose = function(){ const C = document.getElementById("ltChat"); if(C && C.classList.contains("is-dock")) chatClose(); return pcClose0.apply(this, arguments); };
+  }catch(e){}
+  const cbtn = document.createElement("button"); cbtn.type = "button"; cbtn.id = "ltChatBtn"; cbtn.title = "Chat (Ctrl+Shift+K)"; cbtn.textContent = "💬 Chat"; cbtn.onclick = () => { const C = document.getElementById("ltChat"); if(C && !C.hidden && !C.classList.contains("is-dock")) chatClose(); else chatOpen(); }; document.body.appendChild(cbtn);
+
   /* ── UI: pill, settings, hint ── */
-  function hint(){ try{ const s = el("wireState"); if(s) s.textContent = "Live talk is off: start Ollama"; }catch(e){} paintPill(); }
-  function paintPill(){ const p = document.getElementById("ltPill"); if(!p) return; p.textContent = "🗣 " + (!CFG.on ? "Live talk off" : LT.up ? "Live · " + CFG.model : LT.up === false ? "Live talk is off: start Ollama" : "Live talk…"); p.classList.toggle("is-up", !!LT.up); }
+  function hint(){ try{ const s = el("wireState"); if(s && CFG.on && !LT.hinted){ LT.hinted = 1; s.textContent = "Live talk is off: start Ollama (using the offline voice)"; } }catch(e){} paintPill(); }
+  function paintPill(){ const p = document.getElementById("ltPill") || {classList:{toggle(){}}}; p.textContent = LT.up ? "🗣 Live · " + CFG.model : "🗣 Offline voice"; const cb = document.getElementById("ltcBadge"); if(cb){ cb.textContent = LT.up ? "Live" : "Offline voice"; cb.classList.toggle("is-up", !!LT.up); } p.classList.toggle("is-up", !!LT.up); }
   function panel(){
     let P = document.getElementById("ltPanel");
     if(!P){ P = document.createElement("div"); P.id = "ltPanel"; document.body.appendChild(P); }
@@ -36638,15 +36754,23 @@ try{
   const pill = document.createElement("button"); pill.type = "button"; pill.id = "ltPill"; pill.onclick = panel; document.body.appendChild(pill);
   try{ new MutationObserver(() => { const d = document.getElementById("setDone"); if(d && !document.getElementById("setLive")){ const b = document.createElement("button"); b.className = "btn btn--ghost"; b.type = "button"; b.id = "setLive"; b.textContent = "Live talk"; b.onclick = panel; d.before(b); } }).observe(document.body, {childList:true, subtree:true}); }catch(e){}
   const st = document.createElement("style");
-  st.textContent = "#ltPill{position:fixed;right:10px;bottom:62px;z-index:60;font:12px system-ui;padding:4px 9px;border-radius:12px;border:1px solid rgba(0,0,0,.2);background:#f3ead6;color:#6a5f46;cursor:pointer;opacity:.85}#ltPill.is-up{background:#e3f1e3;color:#245a2e}" +
-    "#ltPanel{position:fixed;right:10px;bottom:96px;z-index:61;width:min(380px,92vw);background:#fbf6ea;border:1px solid #b9a77a;border-radius:9px;padding:10px 12px;font:13px/1.4 system-ui;color:#3a3226;box-shadow:0 8px 30px rgba(0,0,0,.25);display:flex;flex-direction:column;gap:6px}#ltPanel input:not([type=checkbox]){width:100%;box-sizing:border-box}" +
-    ".lt-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.lt-row input{flex:1 1 200px;padding:5px 7px}.lt-st{font-size:11px;color:#8a7f66}.lt-mail{display:flex;flex-direction:column;gap:4px;margin:6px 0}.lt-mail textarea{width:100%;box-sizing:border-box;font:13px system-ui}" +
-    ".lt-typing span:after,.msg.lt-typing span:after,.lt-typing:after{content:' ▍';animation:ltb 1s steps(2) infinite}@keyframes ltb{50%{opacity:0}}";
+  st.textContent = "#ltPill,#ltChatBtn{position:fixed;right:10px;z-index:60;font:600 12px system-ui;padding:5px 10px;border-radius:12px;border:1px solid #5a4a2a;background:#f4ead2;color:#2a2116;cursor:pointer}#ltPill{bottom:62px}#ltChatBtn{bottom:94px}#ltPill.is-up{background:#d9efd9;color:#0f3d18;border-color:#2c6b38}" +
+    "#ltPanel{position:fixed;right:10px;bottom:130px;z-index:61;width:min(380px,92vw);background:#fffaf0;border:2px solid #5a4a2a;border-radius:9px;padding:10px 12px;font:13px/1.4 system-ui;color:#1b150d;box-shadow:0 8px 30px rgba(0,0,0,.35);display:flex;flex-direction:column;gap:6px}#ltPanel input:not([type=checkbox]){width:100%;box-sizing:border-box;background:#fff;color:#111;border:1px solid #7a6a4a}" +
+    "#ltChat{position:fixed;right:10px;bottom:130px;z-index:62;width:min(460px,94vw);height:min(520px,70vh);display:flex;flex-direction:column;background:#fffaf0;color:#1b150d;border:2px solid #5a4a2a;border-radius:10px;box-shadow:0 10px 34px rgba(0,0,0,.4);font:14px/1.45 system-ui}#ltChat[hidden]{display:none}" +
+    "#ltChat.is-dock{position:static;width:auto;height:min(460px,60vh);box-shadow:none;margin-top:6px}" +
+    ".ltc-top{display:flex;gap:6px;align-items:center;padding:7px 9px;background:#2a2116;color:#fff;border-radius:8px 8px 0 0}.ltc-top b{color:#fff}.ltc-top select{flex:1;min-width:0;background:#fff;color:#111;border:1px solid #999;padding:3px}.ltc-top button,.ltc-row button{background:#f4ead2;color:#1b150d;border:1px solid #5a4a2a;border-radius:6px;padding:4px 10px;cursor:pointer;font-weight:600}" +
+    ".ltc-badge{font:700 11px system-ui;padding:2px 7px;border-radius:9px;background:#e8dcc0;color:#3a2a10}.ltc-badge.is-up{background:#1f7a33;color:#fff}" +
+    ".ltc-log{flex:1;overflow:auto;padding:8px 10px;background:#fffaf0}.ltc-m{margin:0 0 8px;padding:6px 9px;border-radius:8px;background:#efe6d2;color:#1b150d;max-width:88%}.ltc-m b{display:block;font-size:11px;color:#5a3d0a;text-transform:uppercase;letter-spacing:.04em}.ltc-you{margin-left:auto;background:#dde8f5;color:#0e1d30}.ltc-you b{color:#1d3d66}.ltc-note{color:#4a3f2e;font-style:italic}" +
+    ".ltc-row{display:flex;gap:6px;padding:8px;border-top:1px solid #c9b88f;background:#f7efdc;border-radius:0 0 8px 8px}.ltc-row input{flex:1;padding:6px 8px;background:#fff;color:#111;border:1px solid #7a6a4a;border-radius:6px}" +
+    ".lt-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.lt-row input{flex:1 1 200px;padding:5px 7px;background:#fff;color:#111;border:1px solid #7a6a4a}.lt-st{font-size:12px;color:#3d3426}.lt-mail{display:flex;flex-direction:column;gap:4px;margin:6px 0;background:#fffaf0;padding:6px;border:1px solid #b9a77a;border-radius:6px}.lt-mail textarea{width:100%;box-sizing:border-box;font:13px system-ui;background:#fff;color:#111;border:1px solid #7a6a4a}" +
+    ".lt-sit{background:#fffaf0;padding:6px;border:1px solid #b9a77a;border-radius:6px;margin-top:6px}" +
+    ".lt-typing span:after,.lt-typing:after{content:' ▍';animation:ltb 1s steps(2) infinite}@keyframes ltb{50%{opacity:0}}";
   document.head.appendChild(st);
-  probe(true).then(paintPill);
+  probe(true).then(paintPill); setInterval(() => probe(true), 30000);
   console.log("NEPTUNE livetalk ready");
 }catch(e){ try{ console.warn("NEPTUNE-LIVETALK block", e); }catch(e2){} }
 /* NEPTUNE-LIVETALK END */
+
 
 armFrame();
 
