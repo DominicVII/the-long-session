@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261012u">
+<meta name="onum-build" content="20261012v">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261012u";
+  var STAMP = "20261012v";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -7162,6 +7162,7 @@ function pcTab(){
     out.push(roleDutiesHTML());
   } else if(t === "bills"){
     const b = G.bill;
+    out.push('<div style="margin-bottom:6px"><button class="pc__btn" data-pcdk="1">Open the docket: the full bill, the count, your state</button></div>');
     out.push('<div class="pc__h">On the floor</div>');
     out.push(b && !b.done ? '<div><b>' + pcEsc(b.title) + '</b>' + (b.mine ? ' (yours)' : '') + '. Roll call day ' + b.voteDay + '.</div><div class="pc__m">' + pcEsc(b.line || "") + '</div>' : '<p class="pc__m">No bill is live.</p>');
     const dr = pcDeskAct("desk", /^Draft a bill/);
@@ -7224,6 +7225,7 @@ function pcRender(){
       chest:() => chestCard(), office:() => officeCard(), notebook:() => notebookCard()}[k];
     if(go) pcAway(go);
   }));
+  body.querySelectorAll("[data-pcdk]").forEach(b => b.addEventListener("click", () => { pcClose(); dkCard(0); }));
   body.querySelectorAll("[data-pcduty]").forEach(b => b.addEventListener("click", () => { roleDutyRun(b.getAttribute("data-pcduty")); pcRender(); }));
   body.querySelectorAll("[data-pcprop]").forEach(b => b.addEventListener("click", () => {
     const pr = (PROPS.office || []).find(p => p.id === b.getAttribute("data-pcprop"));
@@ -7731,7 +7733,7 @@ function roleDutyRun(key){
 function roleTitle(){ const k = heldOffice(); return {gov:"Governor", senate:"Senator", bench:"Justice", pres:"the Executive"}[k] || "Member"; }
 function roleDutiesHTML(){
   const L = roleDuties();
-  return '<div class="pc__h">Duties of the ' + roleTitle() + ' · today</div>' + L.map(x => {
+  return '<div style="margin-bottom:6px"><button class="pc__btn" data-pcdk="1">Open the docket: bills and cases before you</button></div><div class="pc__h">Duties of the ' + roleTitle() + ' · today</div>' + L.map(x => {
     const done = kOnceToday(x.key);
     return '<div class="pc__row"><b>' + pcEsc(x.t) + '</b>' + (x.h ? '<span class="d">' + hourLabel(x.h) + '</span>' : '') +
       '<div class="pc__m">' + pcEsc(x.d || "") + '</div>' +
@@ -8138,6 +8140,195 @@ document.addEventListener("keydown", e => {
 }, true);
 setTimeout(() => { try{ dmUI(); }catch(e){}
   try{ const t = document.querySelector("#pauseOverlay .settings-tabs"); if(t && !document.getElementById("pauseMap")){ const b = document.createElement("button"); b.id = "pauseMap"; b.className = "settings-tab"; b.textContent = "Map (M)"; b.onclick = e => { e.preventDefault(); try{ document.getElementById("closeSettings").click(); }catch(x){} mapToggle(true); }; t.appendChild(b); } }catch(e){} }, 1500);
+
+/* ===== 20261012u · the docket: every bill or case in front of you, in every chair, with the House's panel ===== */
+function dkStateLean(S, it){
+  if(!S) return 0;
+  if(it.pos){ const sp = {econ:S.lean, lib:-S.lean * 0.4, def:S.lean * 0.3, wel:-S.lean * 0.5}; try{ return clamp(Math.round(alignment({pos:sp}, it)), -100, 100); }catch(e){ return 0; } }
+  const b = it.sb; if(!b) return 0;
+  return clamp(Math.round((b.dir > 0 ? 1 : -1) * (b.axis === "econ" ? S.lean : b.axis === "lib" ? -S.lean * 0.4 : S.lean * 0.3) * 1.6), -100, 100);
+}
+function dkMeter(v, label){
+  const pct = (v + 100) / 2;
+  const col = v > 10 ? "#2f6b3a" : v < -10 ? "#8a2f36" : "#888";
+  return '<div style="display:flex;align-items:center;gap:8px;margin:3px 0;font:12px system-ui"><span style="flex:0 0 150px">' + pcEsc(label) + '</span><span style="flex:1;position:relative;height:8px;background:linear-gradient(90deg,#e7c9cc,#eee 50%,#cfe3d2);border-radius:4px"><b style="position:absolute;top:-3px;left:calc(' + pct + '% - 3px);width:6px;height:14px;background:' + col + ';border-radius:2px"></b></span><span style="flex:0 0 74px;text-align:right">' + (v > 10 ? "for" : v < -10 ? "against" : "split") + ' ' + (v > 0 ? "+" : "") + v + '</span></div>';
+}
+function dkProvisions(it){
+  const r = rng(seedOf("prov:" + it.title));
+  const L = [];
+  L.push("Sec. 1. Short title. This act may be cited as the " + it.title + ".");
+  if(it.line) L.push("Sec. 2. Purpose. " + it.line);
+  const ax = it.pos ? AXES.slice().sort((a, b) => Math.abs(it.pos[b.k]) - Math.abs(it.pos[a.k]))[0] : AXES.find(a => it.sb && a.k === it.sb.axis);
+  if(ax){ const dir = it.pos ? it.pos[ax.k] : (it.sb.dir || 1); L.push("Sec. 3. Direction. Moves policy toward " + (dir > 0 ? ax.hi : ax.lo) + "."); }
+  L.push("Sec. 4. " + drawn(["Appropriations. Such sums as are necessary, from the general fund.", "Offset. Paid for by a levy on " + drawn(["shipping","banking","timber","grain"], r) + ".", "Funding. A matching grant to the states, three to one."], r));
+  L.push("Sec. 5. " + drawn(["Reporting. The department reports to the committee every six months.", "Oversight. An inspector is named with power to subpoena.", "Sunset. This act lapses after six years unless renewed."], r));
+  L.push("Sec. 6. Effective date. " + drawn(["On signature.", "Ninety days after signature.", "The first day of the next fiscal year."], r));
+  return L;
+}
+/* deciding bodies */
+function dkCongress(it){
+  const by = {};
+  (G.members || []).filter(m => !m.gone && m.kind === "member").forEach(m => {
+    let a = 0; try{ a = alignment(m, it); }catch(e){}
+    const p = m.party || "IND"; const o = by[p] || (by[p] = {aye:0, no:0, un:0});
+    if(m.pledge && G.day - (m.pledgeDay || 0) < 8) (m.pledge > 0 ? o.aye++ : o.no++);
+    else if(Math.abs(a) < 12) o.un++; else (a > 0 ? o.aye++ : o.no++);
+  });
+  return by;
+}
+function dkSenate(it){
+  const by = {};
+  (G.states || []).forEach(S => { for(let i = 0; i < 2; i++){
+    const r = rng(seedOf("sen:" + S.n + i + ":" + (G.term || 1)));
+    const p = S.lean + (r() * 40 - 20) > 8 ? "FED" : S.lean + (r() * 40 - 20) < -8 ? "COM" : "IND";
+    const a = dkStateLean(S, it) + (r() * 50 - 25) + (p === "FED" ? 8 : p === "COM" ? -8 : 0) * (it.pos ? Math.sign(it.pos.econ || 1) : 1);
+    const o = by[p] || (by[p] = {aye:0, no:0, un:0}); Math.abs(a) < 10 ? o.un++ : a > 0 ? o.aye++ : o.no++;
+  } });
+  return by;
+}
+function dkStatehouse(S, it){
+  const by = {}, n = Math.max(20, (S.seats || 6) * 6);
+  for(let i = 0; i < n; i++){
+    const r = rng(seedOf("leg:" + S.n + i + ":" + it.title));
+    const p = S.lean + (r() * 70 - 35) > 6 ? "FED" : S.lean + (r() * 70 - 35) < -6 ? "COM" : "IND";
+    const a = dkStateLean(S, it) * (p === "IND" ? 0.5 : 1) + (r() * 60 - 30) + (S.bill && S.bill.pushed ? S.bill.pushed : 0);
+    const o = by[p] || (by[p] = {aye:0, no:0, un:0}); Math.abs(a) < 9 ? o.un++ : a > 0 ? o.aye++ : o.no++;
+  }
+  return by;
+}
+function dkBench(c){
+  const J = (G.court && G.court.length ? G.court : [{name:"Chief Justice Hale"},{name:"Justice Orr"},{name:"Justice Vance"},{name:"Justice Quist"},{name:"Justice Mbeki"}]);
+  const rows = J.map(j => { const r = rng(seedOf("j:" + j.name + ":" + c.t)); const lean = (j.pos ? (j.pos.lib || 0) / 2 : 0) + r() * 80 - 40;
+    return {name:j.name, v: Math.abs(lean) < 10 ? "undecided" : lean > 0 ? (c.dual != null ? "for the House" : "for the Union") : (c.dual != null ? "for the member" : "for the state")}; });
+  return rows;
+}
+function dkBreak(by, body){
+  let A = 0, N = 0, U = 0; const rows = Object.keys(by).map(p => { const o = by[p]; A += o.aye; N += o.no; U += o.un;
+    return '<div class="whip__row"><span class="whip__n">' + pcEsc(p) + '</span><span class="whip__w">aye ' + o.aye + ' · nay ' + o.no + ' · undecided ' + o.un + '</span></div>'; }).join("");
+  const T = Math.max(1, A + N + U);
+  return '<div class="eyebrow" style="margin-top:10px">' + pcEsc(body) + ' · how it leans</div>' +
+    '<div class="count"><div class="c-aye"><i>Aye</i><b>' + A + '</b></div><div class="c-no"><i>Nay</i><b>' + N + '</b></div><div class="c-un"><i>Undecided</i><b>' + U + '</b></div></div>' +
+    '<div class="countbar"><span style="width:' + (A / T * 100) + '%;background:var(--good)"></span><span style="width:' + (N / T * 100) + '%;background:var(--bad)"></span><span style="width:' + (U / T * 100) + '%;background:var(--line)"></span></div>' + rows;
+}
+function dkPublic(it, national){
+  const y = G.you, S = (G.states || []).find(s => s.n === y.state);
+  let h = '<div class="eyebrow" style="margin-top:10px">How ' + pcEsc(y.state) + ' leans</div><div>' + dkMeter(dkStateLean(S, it), y.state);
+  let towns = []; try{ towns = (townsOf(y.state) || []).slice(0, 3); }catch(e){}
+  towns.forEach(t => { const v = clamp(dkStateLean(S, it) + (seedOf(t.name + it.title) % 50) - 25, -100, 100); h += dkMeter(v, t.name); });
+  const creeds = [S && S.creed || "latin", "kerk", "none"].filter((v, i, a) => a.indexOf(v) === i);
+  creeds.forEach(c => { const v = clamp(dkStateLean(S, it) + ((seedOf(c + it.title) % 60) - 30) * (c === "none" ? -1 : 1), -100, 100); h += dkMeter(v, "faith: " + c); });
+  h += '</div>';
+  if(national){
+    let w = 0, s = 0; (G.states || []).forEach(St => { const p = St.pop || 1; w += p; s += dkStateLean(St, it) * p; });
+    h += '<div class="eyebrow" style="margin-top:8px">The nation</div><div>' + dkMeter(Math.round(s / Math.max(1, w)), "national") + '</div>';
+  }
+  return h;
+}
+/* what is in front of you */
+function dkItems(){
+  const y = G.you, k = roleKey(), out = [];
+  const S = (G.states || []).find(s => s.n === y.state);
+  const nat = b => b && !b.done ? {kind:"bill", title:b.title, line:b.line, sponsor:b.sponsor, pos:b.pos, b} : null;
+  if(k === "house" || k === "leader" || k === "chair"){ const it = nat(G.bill); if(it){ it.body = "The House"; it.by = dkCongress(it); it.acts = [
+      {t:"Vote aye (declare)", run(){ y.vote = 1; feed("You declare for the " + it.title + "."); return "Declared aye. The whip writes it down."; }},
+      {t:"Vote nay (declare)", run(){ y.vote = -1; feed("You declare against the " + it.title + "."); return "Declared nay. The whip writes that down too."; }}]; out.push(it); } }
+  if(k === "senate"){ const it = nat(G.bill); if(it){ it.body = "The Senate"; it.by = dkSenate(it); it.acts = ["aye","nay"].map(v => ({t:"Vote " + v, off:it.b.senateVote, run(){
+      const s = dkStateLean(S, it) * (v === "aye" ? 1 : -1); it.b.senateVote = v; y.approval = clamp(y.approval + (s > 0 ? 2 : -2), 0, 100);
+      (G.members || []).filter(m => m.party === y.party && m.rel).forEach(m => m.rel.warmth = clamp(m.rel.warmth + (partyLine(it.b)[y.party] === (v === "aye" ? 1 : -1) ? 1 : -2), -100, 100));
+      feed("Senator " + surname(y.name) + " votes " + v + " on the " + it.title + "."); return "Recorded " + v + ". " + (s > 0 ? y.state + " approves." : y.state + " will not forget it."); }})); out.push(it); } }
+  if(k === "gov" && S && S.bill){ const b = S.bill; const it = {kind:"state bill", title:b.title, line:"Passed by the legislature of " + y.state + ".", sponsor:"the " + y.state + " majority leader", sb:b, body:"The " + y.state + " legislature"};
+    it.by = dkStatehouse(S, it);
+    it.acts = [{t:"Sign it", run(){ S.ind = clamp(S.ind + (b.ind || 0), 0, 100); S.unrest = clamp(S.unrest + (b.unrest || 0), 0, 100); S.lean = clamp(Math.round(S.lean + b.dir * 3), -100, 100); S.bill = null;
+        y.approval = clamp(y.approval + (dkStateLean(S, it) > 0 ? 3 : -2), 0, 100); try{ kMark("gdesk"); }catch(e){} feed("Governor " + surname(y.name) + " signed the " + b.title + ".", "good"); return "Signed at the desk, with the sponsors behind you."; }},
+      {t:"Veto it", run(){ S.bill = null; S.unrest = clamp(S.unrest + 2, 0, 100); y.approval = clamp(y.approval + (dkStateLean(S, it) < 0 ? 3 : -2), 0, 100); try{ kMark("gdesk"); }catch(e){} feed("Governor " + surname(y.name) + " vetoed the " + b.title + ".", "bad"); return "Vetoed. The majority leader will not return your calls this week."; }}];
+    out.push(it); }
+  if(k === "bench"){ (G.cases || []).filter(c => !c.done).slice(0, 3).forEach(c => {
+      const it = {kind:"case", title:c.t, line:c.dual != null ? "Can one person hold two elected offices?" : "A state against the Union over a federal act.", sponsor:"filed day " + c.day, c, body:"The bench", benchRows:dkBench(c), sb:{dir:1, axis:"lib"}};
+      const recuse = c.state === y.state || (c.voted && c.voted.indexOf(y.name) >= 0);
+      it.acts = recuse ? [{t:"Recuse", run(){ c.done = true; c.recused = true; return "You recused. The bench decides without you."; }}]
+        : [{t:c.dual != null ? "Rule for the House" : "Rule for the Union", run(){ return benchRule(c, true); }}, {t:c.dual != null ? "Rule for the member" : "Rule for the state", run(){ return benchRule(c, false); }}];
+      out.push(it); }); }
+  if(k === "pres"){ (G.lastActs || []).filter(a => !a.signed && !a.vetoed).slice(0, 3).forEach(a => {
+      const it = {kind:"act", title:a.title, line:"Passed by the House and Senate on day " + a.day + ".", sponsor:"Congress", pos:a.pos || {econ:0, lib:0, def:0, wel:0}, body:"Congress", national:true};
+      it.by = dkCongress(it);
+      it.acts = [{t:"Sign it", run(){ a.signed = true; y.approval = clamp(y.approval + 2, 0, 100); feed(execTitle() + " " + surname(y.name) + " signed the " + a.title + ".", "good"); return "Signed, with eleven pens."; }},
+        {t:"Veto it", run(){ a.vetoed = true; y.standing = clamp(y.standing - 3, 0, 100); y.influence = clamp(y.influence + 3, 0, 100); feed(execTitle() + " " + surname(y.name) + " vetoed the " + a.title + ".", "bad"); return "Vetoed. The House can override with two thirds."; }}];
+      out.push(it); }); }
+  return out;
+}
+function dkCard(i){
+  const L = dkItems(); i = i || 0;
+  const it = L[i];
+  G.running = false;
+  let h = '<div class="eyebrow">The docket · ' + pcEsc(ROLE_T[roleKey()] || "Member") + (L.length > 1 ? ' · ' + (i + 1) + ' of ' + L.length : '') + '</div>';
+  if(!it){ h += '<h1>Nothing before you</h1><p class="dream">No bill or case is waiting on you today.</p>'; }
+  else {
+    h += '<h1>' + pcEsc(it.title) + '</h1><p class="muted">' + pcEsc(it.line || "") + ' Sponsor: ' + pcEsc(it.sponsor || "") + '.</p>' +
+      '<details><summary>Full text and provisions</summary><ol style="margin:6px 0 0 18px">' + dkProvisions(it).map(x => '<li>' + pcEsc(x) + '</li>').join("") + '</ol></details>' +
+      (it.benchRows ? '<div class="eyebrow" style="margin-top:10px">The bench · how it leans</div>' + it.benchRows.map(r => '<div class="whip__row"><span class="whip__n">' + pcEsc(r.name) + '</span><span class="whip__w">' + pcEsc(r.v) + '</span></div>').join("") : dkBreak(it.by || {}, it.body || "")) +
+      dkPublic(it, !!it.national || roleKey() === "pres") +
+      '<div id="dkSay" class="dream"></div>' +
+      '<div class="card__actions">' + it.acts.map((a, j) => '<button type="button" class="btn" data-dk="' + j + '"' + (a.off ? ' disabled' : '') + '>' + pcEsc(a.t) + '</button>').join("") + '</div>';
+  }
+  h += '<div class="card__actions">' + (L.length > 1 ? '<button type="button" class="btn btn--ghost" id="dkNext">Next item</button>' : '') + '<button type="button" class="btn btn--ghost" id="dkClose">Close</button></div>';
+  card.innerHTML = h; veil.hidden = false;
+  card.querySelectorAll("[data-dk]").forEach(b => b.onclick = () => { const r = it.acts[+b.getAttribute("data-dk")].run(); try{ el("dkSay").textContent = r || ""; }catch(e){} card.querySelectorAll("[data-dk]").forEach(x => x.disabled = true); try{ refreshPanels(); }catch(e){} });
+  const nx = el("dkNext"); if(nx) nx.onclick = () => dkCard((i + 1) % L.length);
+  el("dkClose").onclick = () => { veil.hidden = true; G.running = true; };
+}
+setTimeout(() => { try{
+  const bar = document.getElementById("uiToolbar");
+  if(bar && !document.getElementById("uiDocketBtn")){ const b = document.createElement("button"); b.type = "button"; b.id = "uiDocketBtn"; b.title = "Every bill or case in front of you"; b.textContent = "Docket"; b.onclick = () => { try{ if(PC.open) pcClose(); }catch(e){} dkCard(0); }; bar.insertBefore(b, bar.children[1] || null); }
+}catch(e){} }, 1600);
+
+/* ===== 20261012u · the moment decides: a glance, then maybe ===== */
+function momentLog(t){ G.moments = G.moments || []; G.moments.push({d:G.day, t}); if(G.moments.length > 60) G.moments.shift(); }
+function momentApproach(m, b){
+  const T = m.traits || {}, w = m.rel ? m.rel.warmth : 0;
+  const mood = (function(){ try{ return moodOf(m).val; }catch(e){ return 0; } })();
+  /* the glance */
+  m.faceUntil = G.t + 1.2 + Math.random();
+  const nerve = 0.35 + (T.ambition | 0) / 250 + (100 - (T.discretion | 0)) / 400 + w / 300 + mood / 400 - (G.you.standing > 70 ? 0.08 : 0);
+  const others = (G.members || []).filter(o => o && o !== m && !o.gone && o.room === m.room && Math.hypot(o.x - m.x, o.z - m.z) < 4);
+  const r = Math.random();
+  const come = () => { const ang = Math.random() * 6.283, rad = 1.35 + Math.random() * 0.8; m.tx = cam.x + Math.sin(ang) * rad; m.tz = cam.z + Math.cos(ang) * rad;
+    if(m._meant && m._meant < G.day && chance(.6)){ m.say = pick(["I meant to catch you yesterday.", "I was going to come over the other day. Here I am.", "I lost my nerve last time. Not today."]); m.sayT = 3; m.sayTo = "you"; }
+    m._meant = 0; };
+  if(r < clamp(nerve, 0.12, 0.85)){
+    if(others.length && chance(.18)){ /* waylaid */
+      const o = pick(others); m.tx = o.x + (Math.random() * 2 - 1) * 0.8; m.tz = o.z + (Math.random() * 2 - 1) * 0.8;
+      m._meant = G.day; o.say = pick(["A word, before you go?", "Have you got a minute?", "Hold on, I need you."]); o.sayT = 2.4;
+      momentLog(m.name + " started toward you and was caught by " + o.name + ".");
+      return;
+    }
+    come(); return;
+  }
+  /* lost their nerve, or a look held and broken */
+  m._meant = G.day;
+  if(chance(.35)){
+    m.faceUntil = G.t + 2.6;
+    momentLog(m.name + " held your eye, then looked away.");
+    G._lookNote = G._lookNote || {};
+    if(!G._lookNote[m.id] && chance(.4)){ G._lookNote[m.id] = G.day; setTimeout(() => { try{ feed(pick(["Someone noticed " + m.name + " watching you across " + (ROOMS[m.room] ? ROOMS[m.room].t : "the room") + ".", "Cloakroom talk: " + surname(m.name) + " was looking your way and thought better of it."])); }catch(e){} }, 30000 + Math.random() * 60000); }
+  } else momentLog(m.name + " meant to come over and did not.");
+  m.tx = (Math.random() * 2 - 1) * b.hw; m.tz = b.d0 + Math.random() * (b.d1 - b.d0);
+}
+function momentToAlly(m, a, b){
+  /* an NPC heading for another: the same coin, flipped by their tie */
+  let tw = 0; try{ tw = tieOf(m, a).w; }catch(e){}
+  const p = clamp(0.45 + tw / 200 + ((m.traits || {}).ambition | 0) / 400, 0.15, 0.9);
+  if(Math.random() < p){ m.tx = a.x + (Math.random() * 2 - 1) * 1.1; m.tz = a.z + (Math.random() * 2 - 1) * 1.1; }
+  else { m.faceUntil = G.t + 1; m.tx = (Math.random() * 2 - 1) * b.hw; m.tz = b.d0 + Math.random() * (b.d1 - b.d0); if(chance(.2)) momentLog(m.name + " meant to speak to " + a.name + " and did not."); }
+}
+/* the bottom bar: Menu and My Office sit with Floor, Members, Inbox */
+function myOfficeRoom(){ try{ const k = heldOffice(); if(k && k !== "house") return homeRoom(); }catch(e){} return "office"; }
+setTimeout(() => { try{
+  const tabs = document.querySelector(".dossier .tabs"); if(!tabs) return;
+  const mk = (id, t, fn) => { if(document.getElementById(id)) return; const b = document.createElement("button"); b.type = "button"; b.id = id; b.textContent = t; b.addEventListener("click", ev => { ev.preventDefault(); ev.stopPropagation(); fn(); }); tabs.appendChild(b); return b; };
+  mk("tabMyOffice", "My Office", () => { const r = myOfficeRoom(); if(G.room === r) return; try{ closePanels(); }catch(e){} try{ goTo(r); }catch(e){ enterRoom(r, G.room); } });
+  const menu = document.getElementById("btnMenu");
+  if(menu && menu.parentNode !== tabs){ menu.textContent = "Menu"; tabs.appendChild(menu); }
+}catch(e){ console.warn("bar", e); } }, 1700);
 
 const MATCACHE = new Map();
 /* Every distinct repeat used to clone the texture and its normal map, so
@@ -13428,8 +13619,7 @@ function wander(m, dt){
       const allies = (m.allies||[]).map(byId).filter(a => a && a.room === m.room);
       if(snt && snt.attending && snt.attending !== "self"){
         if(snt.attending === "you" && chance(.28)){
-          const ang = Math.random()*6.283, rad = 1.4 + Math.random()*0.8;
-          m.tx = cam.x + Math.sin(ang)*rad; m.tz = cam.z + Math.cos(ang)*rad;
+          momentApproach(m, b);
         } else {
           const a = byId(snt.attending);
           if(a && a.room === m.room){ m.tx = a.x + (Math.random()*2-1)*0.9; m.tz = a.z + (Math.random()*2-1)*0.9; }
@@ -13438,11 +13628,10 @@ function wander(m, dt){
       } else if(snt && snt.topic === "alone" && chance(.4)){
         m.tx = -Math.sign(cam.x||1)*b.hw*0.75; m.tz = cam.z > b.d1/2 ? b.d0+1.1 : b.d1-1.1;
       } else if(mood.val > 30 && chance(.18)){
-        const ang = Math.random()*6.283, rad = 1.35 + Math.random()*0.9;
-        m.tx = cam.x + Math.sin(ang)*rad; m.tz = cam.z + Math.cos(ang)*rad;
+        momentApproach(m, b);
       }
       else if(mood.val < -35 && chance(.5)){ m.tx = -Math.sign(cam.x||1)*b.hw*0.8; m.tz = cam.z > b.d1/2 ? b.d0+1 : b.d1-1; }
-      else if(allies.length && chance(.34)){ const a = pick(allies); m.tx = a.x + (Math.random()*2-1)*1.1; m.tz = a.z + (Math.random()*2-1)*1.1; }
+      else if(allies.length && chance(.34)){ momentToAlly(m, pick(allies), b); }
       else { m.tx = (Math.random()*2-1)*b.hw; m.tz = b.d0 + Math.random()*(b.d1-b.d0); }
       m.tx = clamp(m.tx,-b.hw,b.hw); m.tz = clamp(m.tz,b.d0,b.d1);
       if(m.room === "steps") m.tz = clamp(m.tz, b.d0, 4.6);
