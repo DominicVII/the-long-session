@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261012n">
+<meta name="onum-build" content="20261012o">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261012n";
+  var STAMP = "20261012o";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -4164,6 +4164,7 @@ function dressTextures(){
   if(G.gfx === "simple") return;
   /* 20261011a: standalone file:// cannot fetch these (CORS noise); canvas maps stand. */
   try{ if(location.protocol === "file:") return; }catch(e){}
+  try{ if(!/(?:\?|&)tex=1(?:&|$)/.test(location.search || "")) return; }catch(e){ return; }
   [
     ["oak","/tex/oak.jpg"],
     ["marble","/tex/marble.jpg"],
@@ -7247,7 +7248,7 @@ function kAmenities(id, w, d, h, hw){
   const S = kAmenSpots(id);
   /* if a teammate's amenities module is present, let it place them */
   if(typeof addOfficeAmenities === "function"){
-    try{ const r = addOfficeAmenities(THREE, roomGroup, {bounds:{hw, d}, doorPos:{x:0, z:0}, seed:(G.you && G.you.id) || 7});
+    try{ const r = addOfficeAmenities(THREE, roomGroup, {bounds:{minX:-hw, maxX:hw, minZ:0, maxZ:d, floorY:0}, doorPos:(() => { try{ const dr = (DOORS[id] || [])[0]; if(dr){ const p = doorAt(id, dr); return {x:p.x, z:p.z}; } }catch(e){} return {x:0, z:0}; })(), seed:(G.you && G.you.id) || 7});
       if(r && r.length){ r.forEach(a => { if(a.kind === "coffee" && a.pos) S.coffee = {x:a.pos.x, z:a.pos.z}; if(a.kind === "bed" && a.pos) S.bed = {x:a.pos.x, z:a.pos.z}; }); G._amen = {id, S}; return; } }catch(e){}
   }
   const wood = matCol(0x5a3b24, .7), steel = matCol(0x2b2d31, .45, .6), chrome = matCol(0xb9bcc2, .3, .9);
@@ -7273,16 +7274,9 @@ function kAmenProps(id){
   const S = (G._amen && G._amen.id === id && G._amen.S) || kAmenSpots(id);
   return [
     {id:"amenCoffee", label:"The coffee machine", sub:"Your own, and it works", x:S.coffee.x, z:S.coffee.z, r:1.8,
-     acts:() => [{t:"Pour a cup", c:"10m", off:G.you.energy > 88, run(){ spend(10, -16); setSay("Strong, hot, and nobody else's.", fx("+16 energy", "10 minutes")); }}]},
+     acts:() => [{t:G.you.energy > 88 ? "Pour a cup (you are already wide awake)" : "Pour a cup", c:"10m", run(){ spend(10, -16); setSay(G.you.energy > 88 ? "You do not need it. You drink it anyway." : "Strong, hot, and nobody else's.", fx("+16 energy", "10 minutes")); }}]},
     {id:"amenBed", label:"The bed", sub:"A narrow bed behind a screen; the job keeps odd hours", x:S.bed.x, z:S.bed.z, r:2.0,
-     acts:() => [{t:"Sleep until morning", c:"the rest of the day", run(){
-        feed("You lie down in your own office.");
-        setSay("You turn the lamp off and sleep until the building wakes you.", "");
-        closeTalk();
-        G.minute = Math.max(G.minute, 22*60);
-        G.pendingNight = true;
-        setTimeout(() => { nightfall(); }, 400);
-      }},
+     acts:() => [sleepAct("your office"),
       {t:"Lie down for an hour", c:"60m", off:G.you.energy > 96, run(){ spend(60, -40); setSay("An hour flat on your back. It helps.", fx("+40 energy", "60 minutes")); }}]}
   ];
 }
@@ -7290,6 +7284,20 @@ setTimeout(() => K_AMEN_ROOMS.forEach(id => {
   const base = PROPS[id] || [];
   Object.defineProperty(PROPS, id, {configurable:true, enumerable:true, get(){ return base.concat(kAmenProps(id)); }, set(v){ base.length = 0; (v || []).forEach(x => base.push(x)); }});
 }), 0);
+/* sleep to the next morning from any bed or sofa you own: after 5 PM, and it says why not before */
+function sleepToMorning(where){
+  if((G.minute || 0) < 17 * 60){ setSay("It is not yet five. The day is still going; lie down for a while instead.", ""); return; }
+  feed("You sleep in " + (where || "your office") + ".");
+  setSay("You turn the lamp off and sleep until the building wakes you.", "");
+  try{ closeTalk(); }catch(e){}
+  G.minute = Math.max(G.minute, 22*60);
+  G.pendingNight = true;
+  setTimeout(() => { try{ nightfall(); }catch(e){ G.pendingNight = false; try{ nextDay(false); }catch(e2){} } }, 400);
+}
+function sleepAct(where){
+  const early = (G.minute || 0) < 17 * 60;
+  return {t: early ? "Sleep until morning (after 5 PM)" : "Sleep until morning", c: "the night", off: early, run(){ sleepToMorning(where); }};
+}
 
 /* ===== 20261012n · bills never stall, the day always ends, and you can react ===== */
 /* Old saves and missed roll calls: a live bill whose vote day has passed was
@@ -7362,10 +7370,11 @@ function doorZone(room, x, z){
   for(const p of doorPointsHere(room)) if(Math.hypot(p.x - x, p.z - z) < DOORWAY.r) return p;
   return null;
 }
-/* true = this member waits this frame */
+/* true = this member waits this frame; after a few seconds they say excuse me and go */
 function doorYield(m, dt, nx, nz){
   const dp = doorZone(m.room, nx, nz);
   if(!dp){ m._yieldT = 0; return false; }
+  if(m._passUntil && performance.now() < m._passUntil) return false;
   let blocked = false;
   /* you first */
   if(m.room === G.room && Math.hypot(cam.x - dp.x, cam.z - dp.z) < DOORWAY.r + 0.35 && Math.hypot(cam.x - m.x, cam.z - m.z) < 2.2) blocked = true;
@@ -7382,8 +7391,9 @@ function doorYield(m, dt, nx, nz){
   m._yieldT = (m._yieldT || 0) + dt;
   if(m._yieldT > DOORWAY.hold){
     /* waited long enough: step aside and pick somewhere else to be */
-    m._yieldT = 0;
-    try{ const b = roomBox(m.room); m.tx = clamp(m.x * 0.4, -b.hw, b.hw); m.tz = clamp((b.d0 + b.d1) / 2, b.d0, b.d1); }catch(e){ m.tx = m.x; m.tz = m.z; }
+    /* waited long enough: excuse me, and through (one pass, a few seconds) */
+    m._yieldT = 0; m._passUntil = performance.now() + 4000;
+    try{ m.say = "Excuse me."; m.sayT = 1.6; m.sayTo = "you"; }catch(e){}
   }
   return true;
 }
@@ -7420,6 +7430,104 @@ function poseGuard(){
     }catch(e){}
   }
 }
+
+/* ── React: the same reactions the room has ─────────────── */
+const YOU_REACTS = [
+  {k:"applaud", t:"Applaud", key:"1", dir:1, w:3, line:"applauded", say:null},
+  {k:"hear",    t:"Hear, hear", key:"2", dir:1, w:2, line:"called \u201cHear, hear\u201d", say:"Hear, hear."},
+  {k:"nod",     t:"Nod", key:"3", dir:1, w:1, line:"nodded along", say:null},
+  {k:"shake",   t:"Shake your head", key:"4", dir:-1, w:1, line:"shook their head", say:null},
+  {k:"boo",     t:"Boo", key:"5", dir:-1, w:3, line:"booed", say:"Boo."},
+  {k:"laugh",   t:"Laugh", key:"6", dir:-1, w:2, line:"laughed out loud", say:null},
+  {k:"silence", t:"Stone silence", key:"7", dir:-1, w:1, line:"sat in stone silence", say:null}
+];
+function reactTarget(){
+  try{ if(PROC && PROC.on && PROC.speaker && PROC.speaker !== G.you) return PROC.speaker; }catch(e){}
+  let best = null, bt = 0;
+  for(const p of hereNow()){ if(p.sayT > bt && p.sayTo !== "you"){ bt = p.sayT; best = p; } }
+  if(best) return best;
+  try{ const f = focusThing(); if(f && f.type === "person") return f.ref; }catch(e){}
+  return null;
+}
+function reactContext(){
+  try{ if(PROC && PROC.on) return "the sitting"; }catch(e){}
+  if(G.room === "floor") return "the floor";
+  if(G.room === "steps") return "the steps";
+  return (ROOMS[G.room] && ROOMS[G.room].t) || "the room";
+}
+function youReact(k){
+  const R = YOU_REACTS.find(r => r.k === k); if(!R || !G.you || G.over) return;
+  const now = performance.now(); if(now - (G._reactT || 0) < 1200) return; G._reactT = now;
+  const tgt = reactTarget();
+  const where = reactContext();
+  const here = hereNow().filter(m => m.kind === "member" && !m.gone && m !== tgt);
+  try{ if(R.say){ speak(null, R.say); appendFloor("You", R.say); } }catch(e){}
+  if(tgt){
+    const warm = R.dir * (R.w + 1);
+    try{ ripple(tgt, warm, R.dir > 0 ? "You " + R.line + " when I spoke. I saw it." : "You " + R.line + " while I was speaking, in front of everyone.", R.dir * R.w, R.w >= 3); }catch(e){}
+    try{ tgt.say = null; }catch(e){}
+  }
+  /* the room reads it by how it already feels about the speaker */
+  let agree = 0, against = 0;
+  here.forEach(m => {
+    const likes = tgt && m.rel && m.party === tgt.party;
+    const withYou = R.dir > 0 ? !!likes : !likes;
+    if(chance(0.35 + R.w * 0.1)){
+      try{ ripple(m, withYou ? 1 : -1, withYou ? "You said with your hands what I was thinking." : "That was not the place for it.", withYou ? 1 : -1); }catch(e){}
+      if(withYou) agree++; else against++;
+    }
+  });
+  try{ if(G.bill && !G.bill.done && tgt && PROC && PROC.on) swayRoom((tgt.lean || 0) >= 0 ? R.dir : -R.dir, R.w, false); }catch(e){}
+  try{ G.mood = Math.max(-100, Math.min(100, (G.mood || 0) + R.dir * 0.3 * R.w)); }catch(e){}
+  const who = tgt ? surname(tgt.name) : "the room";
+  const line = surname(G.you.name) + " " + R.line + (tgt ? " at " + who : "") + " in " + where + ".";
+  try{ feed("You " + R.line + (tgt ? " at " + who : "") + "."); }catch(e){}
+  try{ nudge("You " + R.line + (tgt ? " · " + who + " noticed" : ""), 3500); }catch(e){}
+  if(R.w >= 2 && chance(0.55)){ try{ G._lNote = true; lLog(line + (agree > against ? " Some of the benches joined in." : against ? " It did not go down well around them." : ""), "react"); }catch(e){} }
+  if(R.w >= 3 && chance(0.4)){ try{ pushWireScrap("Gallery", line); }catch(e){} }
+  try{ journal(line); }catch(e){}
+  if(tgt && R.w >= 2){
+    setTimeout(() => { try{ if(!tgt.sayT || tgt.sayT < 0.2){ const back = R.dir > 0 ? pick(["Thank you.", "Kind of the member.", "I am grateful."]) : pick(["The member can boo all they like.", "I will finish, thank you.", "Order, please."]); sayInRoom(tgt, back); } }catch(e){} }, 900);
+  }
+  reactMenu(false);
+}
+function reactMenu(open){
+  let m = el("reactMenu");
+  if(!m){
+    m = document.createElement("div"); m.id = "reactMenu";
+    m.style.cssText = "position:absolute; right:12px; bottom:130px; background:rgba(20,32,52,.92); border:1px solid #3c5a78; padding:6px; z-index:31; display:flex; flex-direction:column; gap:3px; font-size:12px";
+    m.innerHTML = '<div style="color:#9fb6cc;font-size:10px;letter-spacing:.1em;text-transform:uppercase;padding:2px 4px">React · R then 1\u20137</div>' +
+      YOU_REACTS.map(r => '<button type="button" data-react="' + r.k + '" style="text-align:left;background:#1b2b3c;color:#e6ecf2;border:1px solid #2c4258;padding:4px 8px;cursor:pointer"><b>' + r.key + '</b> \u00b7 ' + r.t + '</button>').join("");
+    (el("veil") && el("veil").parentNode || document.body).appendChild(m);
+    m.querySelectorAll("[data-react]").forEach(b => b.addEventListener("click", e => { e.stopPropagation(); youReact(b.getAttribute("data-react")); }));
+    m.addEventListener("pointerdown", e => e.stopPropagation());
+  }
+  m.hidden = !open; m.style.display = open ? "flex" : "none";
+  G._reactOpen = !!open;
+}
+function reactBtnBoot(){
+  if(el("reactBtn")) return;
+  const ab = el("aloudBtn"); if(!ab || !ab.parentNode) return;
+  const b = document.createElement("button"); b.type = "button"; b.id = "reactBtn"; b.className = ab.className;
+  b.textContent = "React"; b.title = "React to whoever is speaking: applaud, hear hear, nod, boo... (R)";
+  b.style.marginRight = "6px";
+  ab.parentNode.insertBefore(b, ab);
+  /* sit beside Speak Aloud, never on top of it */
+  try{ const cs = getComputedStyle(ab); if(cs.position === "absolute" || cs.position === "fixed"){
+    b.style.position = cs.position; b.style.top = cs.top; b.style.bottom = cs.bottom; b.style.left = "auto";
+    const place = () => { try{ b.style.right = (parseFloat(getComputedStyle(ab).right) || 0) + ab.offsetWidth + 8 + "px"; }catch(e){} };
+    place(); setInterval(place, 2000); } }catch(e){}
+  b.addEventListener("click", e => { e.stopPropagation(); reactMenu(!G._reactOpen); });
+}
+setTimeout(() => { try{ reactBtnBoot(); }catch(e){} }, 1500);
+window.addEventListener("keydown", e => {
+  if(!G || !G.you || !veil.hidden) return;
+  const t = e.target; if(t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+  const k = (e.key || "").toLowerCase();
+  if(k === "r" && !e.ctrlKey && !e.metaKey && !e.altKey){ e.preventDefault(); e.stopImmediatePropagation(); reactMenu(!G._reactOpen); return; }
+  if(G._reactOpen && k >= "1" && k <= "7"){ e.preventDefault(); e.stopImmediatePropagation(); if(e.repeat) return; youReact(YOU_REACTS[k.charCodeAt(0) - 49].k); return; }
+  if(G._reactOpen && k === "escape"){ e.preventDefault(); e.stopImmediatePropagation(); reactMenu(false); }
+}, true);
 
 const MATCACHE = new Map();
 /* Every distinct repeat used to clone the texture and its normal map, so
@@ -9500,9 +9608,20 @@ function buildRoomInner(id, skipShell){
   if(id === "office" || id === "visit"){
     try{
     propDesk(woodMat, woodMat, 0, 8.15, 2.05, 0.95);              /* member desk, back of suite */
-    propChair(woodMat, leather, 0, 9.05, Math.PI);
+    propChair(woodMat, leather, 0, Math.min(9.05, d - 0.45), Math.PI);
     /* Shelves and cabinet share the same grounded prop recipes as every room. */
     propCabinet(matCol(0x2a2f36,.7), matCol(0x3a4048,.6), hw-0.55, 5.6, 0.55, 1.04, 0.62);
+    /* the sofa: a seat, a back, two arms and four feet (moved here from the cloakroom: PROPS.office sofa) */
+    {
+      const sx = -2.35, sz = 5.4;
+      addBox(leather, sx, 0.22, sz, 0.86, 0.44, 1.90, 0, true);
+      addBox(leather, sx-0.36, 0.48, sz, 0.16, 0.96, 1.90, 0, true);
+      addBox(leather, sx+0.02, 0.40, sz-0.88, 0.80, 0.36, 0.18, 0, true);
+      addBox(leather, sx+0.02, 0.40, sz+0.88, 0.80, 0.36, 0.18, 0, true);
+      [[-0.34,-0.80],[0.30,-0.80],[-0.34,0.80],[0.30,0.80]].forEach(f =>
+        addBox(woodMat, sx+f[0], 0.05, sz+f[1], 0.08, 0.10, 0.08, 0, true));
+      addBox(matTex(TEX.damask, 1, 1, .9), sx-0.02, 0.48, sz-0.55, 0.44, 0.14, 0.42, 0.3, true);
+    }
     /* flags via placeRoomFlags (national+NO7; Taylor Day: NO7 only) */
     addCyl(brass, 0.45, DIM.desk + 0.07, 7.86, 0.05, 0.14);
   
@@ -9534,17 +9653,6 @@ function buildRoomInner(id, skipShell){
     for(let i=0;i<8;i++) addBox(matCol(pick([0x2b2f38,0x3a3a3c,0x4a4238]),.9), -hw+1.0,1.35,1.4+i*0.85, 0.12,1.0,0.5);
     addBox(leather, hw-1.2,0.35,3.0, 1.4,0.16,0.7);
     addBox(leather, hw-1.2,0.35,5.4, 1.4,0.16,0.7);
-    /* the sofa: a seat, a back, two arms and four feet */
-    {
-      const sx = -2.35, sz = 5.4;
-      addBox(leather, sx, 0.22, sz, 0.86, 0.44, 1.90, 0, true);
-      addBox(leather, sx-0.36, 0.48, sz, 0.16, 0.96, 1.90, 0, true);
-      addBox(leather, sx+0.02, 0.40, sz-0.88, 0.80, 0.36, 0.18, 0, true);
-      addBox(leather, sx+0.02, 0.40, sz+0.88, 0.80, 0.36, 0.18, 0, true);
-      [[-0.34,-0.80],[0.30,-0.80],[-0.34,0.80],[0.30,0.80]].forEach(f =>
-        addBox(woodMat, sx+f[0], 0.05, sz+f[1], 0.08, 0.10, 0.08, 0, true));
-      addBox(matTex(TEX.damask, 1, 1, .9), sx-0.02, 0.48, sz-0.55, 0.44, 0.14, 0.42, 0.3, true);
-    }
     addCyl(brass, 0,h-0.5,d/2, 0.05,1.0);
   
     }catch(e){ if(window.console) console.warn("room cloak", e); }
@@ -9618,12 +9726,12 @@ function buildRoomInner(id, skipShell){
     const bench = matTex(TEX.leather, 2,1, .8);
     /* benches face the middle aisle; length 8 centered on z=7.5 */
     for(let s2=0;s2<2;s2++) for(let r=0;r<5;r++){
-      const x = (s2 ? 1 : -1) * (2.6 + r*1.45);
+      const x = (s2 ? 1 : -1) * (2.6 + r*1.38);
       const face = s2 ? -Math.PI/2 : Math.PI/2;
       propBench(bench, woodMat, x, 7.5, 8.0, 0.56, face);
       /* writing ledge: thick top, apron, upright panel toward aisle */
       const lx = x + (s2 ? 0.68 : -0.68);
-      (function plantLedge(){
+      if(r < 4) (function plantLedge(){
         const gL = new THREE.Group(); gL.position.set(lx, 0, 7.5); roomGroup.add(gL);
         const putL = (m,px,py,pz,sx,sy,sz) => {
           const e = new THREE.Mesh(UNIT.box, m);
@@ -9878,16 +9986,16 @@ function buildRoomInner(id, skipShell){
     propChair(woodMat, leather, -0.85, 6.95, 0);
     propChair(woodMat, leather,  0.85, 6.95, 0);
     propShelf(-hw+0.35, 2.55, Math.PI/2, 2.0, 2.05);
-    propShelf(-hw+0.35, 9.35, Math.PI/2, 1.55, 1.55);
+    propShelf(-hw+0.35, Math.min(9.35, d - 0.95), Math.PI/2, 1.55, 1.55);
     propPlant(hw-0.72, 1.85, 1.05);
     propLamp(-0.82, DIM.desk + 0.32, 7.90, 0xffd9a0, 0.75);
-    propCoatStand(hw-0.72, 9.55);
+    propCoatStand(hw-0.72, Math.min(9.55, d - 0.35));
     propPapers(0.25, DIM.desk + 0.018, 8.28, 4);
     propClock(0, 2.88, d-0.09);
     propFan(0, h-0.28, 5.4);
     propSconce(-hw+0.12, 2.15, 5.4, Math.PI/2);
     propSconce(hw-0.12, 2.15, 5.4, -Math.PI/2);
-    addBox(matCol(0x1e2126,.8), -hw+1.35, 0.16, 9.55, 0.30,0.32,0.30, 0, true);
+    addBox(matCol(0x1e2126,.8), -hw+1.35, 0.16, Math.min(9.55, d - 0.35), 0.30,0.32,0.30, 0, true);
     addBox(woodMat, 1.55, 0.22, 4.85, 0.55, 0.44, 0.50, 0, true);
     propPapers(1.55, 0.46, 4.85, 2);
     /* one desk lamp is enough; the second sat on the desk edge */
@@ -10143,7 +10251,10 @@ function buildRoomInner(id, skipShell){
       const rx = R.light === "left" ? -hw+0.20 : hw-0.20;
       propRadiator(rx, 0.36, d*0.34, 1.0, Math.PI/2);
       propRadiator(rx, 0.36, d*0.66, 1.0, Math.PI/2);
-    } else if(id !== "floor") propRadiator(0, 0.36, d-0.22, 1.4, 0);
+    } else if(id !== "floor"){
+      const backDoor = (DOORS[id] || []).some(dr => dr.side === "back");
+      propRadiator(backDoor ? Math.min(hw - 1.0, 1.7) : 0, 0.36, d-0.22, 1.4, 0);
+    }
   }
   /* Single picture-frame pass for every dressed room — same propFrame recipe everywhere. */
   if(R.style === "wood" || R.style === "marble" || R.style === "plain" || R.style === "chamber"){
@@ -11566,7 +11677,7 @@ function updatePlates(focus){
     const col = partyColorHex(p.party || "IND");
     const line = toYou ? "“" + p.say + "”"
                : toOther ? "to " + surname(partner.name) + ": “" + p.say + "”"
-               : toSelf ? "“" + String(p.say).slice(0, 72) + "”"
+               : toSelf ? "“" + (String(p.say).length > 84 ? String(p.say).slice(0, 80).replace(/\s+\S*$/, "") + "…" : String(p.say)) + "”"
                : "";
     const sig = p.name + "|" + sub + "|" + col + "|" + line;
     if(d._sig !== sig){
@@ -12169,7 +12280,7 @@ function seatsFor(id){
   } else if(id === "floor"){
     /* sit ON the benches (centered z=7.5, length 8), facing the aisle */
     for(let s2=0;s2<2;s2++) for(let r=0;r<5;r++) for(let k=0;k<3;k++){
-      const x = (s2 ? 1 : -1) * (2.6 + r*1.45);
+      const x = (s2 ? 1 : -1) * (2.6 + r*1.38);
       out.push({x, z:4.6 + k*2.9, face:s2 ? -Math.PI/2 : Math.PI/2});
     }
   } else if(id === "office"){
@@ -18465,7 +18576,10 @@ function procTick(dt){
   if((FRAME_ID & 7) === 0) tidySeats();
   PROC.t -= dt;
   if(PROC.phase === "you"){
-    PROC.clock -= dt;
+    const _wn = performance.now();
+    const _wd = PROC._wallAt ? Math.min(0.5, (_wn - PROC._wallAt) / 1000) : dt;
+    PROC._wallAt = _wn;
+    PROC.clock -= _wd;
     const c = el("procClock");
     if(c) c.textContent = procClockLabel(PROC.clock);
     if(PROC.clock <= 0){
@@ -18490,7 +18604,7 @@ function procTick(dt){
      (PROC.i === PROC.yourSlot2 && PROC.spoke && !PROC.spoke2)){
     if(PROC.spoke) PROC.spoke2 = true;
     PROC.phase = "you";
-    PROC.clock = PROC_SPEAK_SECS;
+    PROC.clock = PROC_SPEAK_SECS; PROC._wallAt = 0;
     const ch = PROC.chair;
     const call = fresh(() => pick(["The member for " + G.you.state + " " + G.you.dist + ".",
       "I call the member. You have the floor.",
@@ -22875,6 +22989,7 @@ const PROPS = {
   office:[
     {id:"sofa", label:"The office sofa", sub:"Older than the building's plumbing and better made", x:-2.35, z:5.4, r:2.0,
      acts:()=>[
+      sleepAct("your office, on the sofa"),
       {t:"Lie down until you are right again", c:"a couple of hours", off:G.you.energy > 96, run(){
         /* An hour or two flat on your back puts you back on your feet.
            It costs what it costs: the day is shorter for it. */
@@ -27189,8 +27304,9 @@ function buildHigherRoom(id, o){
         const th = side * (0.24 + (span - 0.24) * (k / Math.max(1, n/2 - 1)));
         const x = r * Math.sin(th), z = cz - r * Math.cos(th);
         if(Math.abs(x) > hw - 0.8 || z < 1.6) continue;
-        propDesk(wood, wood, x, z, 0.92, 0.52, -th, 0.78);
         const cx2 = (r + 0.62) * Math.sin(th), cz2 = cz - (r + 0.62) * Math.cos(th);
+        if((DOORS[id] || []).some(dr => { if(dr.side === "front") return false; const dp = doorAt(id, dr); return Math.hypot(dp.x - cx2, dp.z - cz2) < 1.6 || Math.hypot(dp.x - x, dp.z - z) < 1.4; })) continue;
+        propDesk(wood, wood, x, z, 0.92, 0.52, -th, 0.78);
         if(cz2 > 1.0) propChair(wood, leather, cx2, cz2, -th);
         propPapers(x, 0.80, z, 1);
       }
@@ -28223,6 +28339,7 @@ function agLedgerHTML(){
 }
 
 function refreshTravel(){
+  refreshTravel._r = G.room;
   const box = el("travel"); box.innerHTML = "";
   const t = dayType();
   ROOM_ORDER.forEach(id => {
@@ -28854,16 +28971,21 @@ addEventListener("keydown", e => {
     const idx = k.charCodeAt(0) - 49;
     /* Prefer glass #prompt buttons when live (seated voice, station waits, etc.) */
     if(kbmFireGlass(idx)){ e.preventDefault(); return; }
-    if(PICKS[idx]){
+    if(NUMS[idx]){
       e.preventDefault();
-      PICK = idx;
+      PICK = PICKS.indexOf(NUMS[idx]);
       PICKS.forEach(b => b.classList.remove("is-pick"));
-      PICKS[idx].classList.add("is-pick");
-      firePick();
+      NUMS[idx].classList.add("is-pick");
+      if(PICK >= 0) firePick(); else NUMS[idx].click();
       return;
     }
   }
   keys[k] = true;
+  if(k === "e" && !TALK.open && !(CATCH.on) && G.you && G.you.sitting && G.room === "office" && Math.hypot(cam.x, cam.z - 9.05) < 0.8 && veil.hidden){
+    e.preventDefault();
+    if(PC.open) pcClose(); else pcOpen();
+    return;
+  }
   if(k === "e" && !TALK.open){
     /* Catch / deliver / seated voice / live glass — all without pad or PICK arming */
     if(CATCH.on && CATCH.current){ e.preventDefault(); catchNow(); return; }
@@ -29792,6 +29914,16 @@ const HANDBOOK = [
     ["Voices", "Settings → Voices. They speak aloud by default, and quieter the further away they are."]
   ]}
 ];
+(function handbookInDom(){
+  try{
+    if(document.getElementById("handbookText")) return;
+    const s = document.createElement("section");
+    s.id = "handbookText"; s.setAttribute("aria-label", "The member's handbook");
+    s.style.cssText = "position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:normal";
+    s.innerHTML = "<h2>The member's handbook</h2>" + HANDBOOK.map(sec => "<h3>" + sec.t + "</h3>" + sec.rows.map(r => "<p><b>" + r[0] + "</b> " + r[1] + "</p>").join("")).join("");
+    document.body.appendChild(s);
+  }catch(e){}
+})();
 function handbookCard(){
   const wasRunning = G.running;
   G.running = false;
@@ -30147,6 +30279,7 @@ if(window.MutationObserver){
   const pbar = el("procBar"); if(pbar) mo.observe(pbar, {childList:true, subtree:true, attributes:true, attributeFilter:["hidden"]});
 }
 let pickKeyCheap = "";
+let NUMS = [];
 function refreshPicks(){
   const pr = el("prompt");
   const live = !!(pr && !pr.hidden && pr.classList.contains("is-live"));
@@ -30186,10 +30319,11 @@ function refreshPicks(){
   }
   PICKS = out.length ? out : NOPICKS;
   /* Number badges 1–9 for quick answers (keyboard + visible on pad). */
-  PICKS.forEach((b, i) => {
-    if(i < 9) b.dataset.btn = String(i + 1);
-    else if(b.dataset.btn) delete b.dataset.btn;
-  });
+  const _pb = el("procBar");
+  const _numOK = !veil.hidden || TALK.open || live || (_pb && !_pb.hidden);
+  NUMS = _numOK ? PICKS.filter(b => !b.closest(".tabs") && !b.closest("#travel") && !/^(close|back|×|✕)$/i.test((b.textContent || "").trim())) : [];
+  document.querySelectorAll("[data-btn]").forEach(b => { delete b.dataset.btn; });
+  NUMS.forEach((b, i) => { if(i < 9) b.dataset.btn = String(i + 1); });
   /* Preserve selection: never wipe PICK on an identical button set; re-apply is-pick by data-gp */
   let restored = -1;
   if(keepGp != null){
@@ -30625,19 +30759,20 @@ function tick(dt){
       try{ setImmersive(true); }catch(e){}
     }
   }
-  const top = sprint ? 1.48 : 0.88;
+  let _ws = 1; try{ const v = settingsState && settingsState.walkSpeed; _ws = v === "slow" ? 0.78 : v === "fast" ? 1.22 : 1; }catch(e){}
+  const top = (sprint ? 1.48 : 0.88) * _ws;
   const mag = Math.hypot(vx, vz) || 1;
   const wantX = (f.x*vz + r.x*vx) / mag * top * (vx||vz ? 1 : 0);
   const wantZ = (f.z*vz + r.z*vx) / mag * top * (vx||vz ? 1 : 0);
-  const moveDt = Math.min(dt, 0.05);   /* was 0.022: under ~45 fps every step came up short */
-  const catchUp = (vx||vz) ? Math.min(1, 5.5 * moveDt) : Math.min(1, 9 * moveDt);
+  const moveDt = Math.min(dt, 0.12);   /* time-based: the same metres per second at 15 fps or 144 */
+  const catchUp = 1 - Math.exp(-((vx||vz) ? 5.5 : 9) * moveDt);
   cam.vx += (wantX - cam.vx) * catchUp;
   cam.vz += (wantZ - cam.vz) * catchUp;
   cam.vx = clamp(cam.vx, -top, top);
   cam.vz = clamp(cam.vz, -top, top);
   let dx = cam.vx * moveDt, dz = cam.vz * moveDt;
   const span = Math.hypot(dx, dz);
-  if(span > 0.08){ const s = 0.08 / span; dx *= s; dz *= s; }
+  if(span > top * moveDt * 1.05 + 0.002){ const s = (top * moveDt * 1.05 + 0.002) / span; dx *= s; dz *= s; }
   const b = roomBox(G.room || "office");
   cam.x = clamp(cam.x + dx, -b.hw, b.hw);
   cam.z = clamp(cam.z + dz, b.d0, b.d1);
@@ -31504,6 +31639,8 @@ function frameBody(now, draw){
   if(PC.open) pcTick(dt);
   try{ dayWatch(dt); }catch(e){}
   try{ poseGuard(); }catch(e){}
+  try{ if(!G._marginFix && G.members){ G._marginFix = 1; G.members.forEach(m => { if(!(m.margin >= 1)){ let h = 7; for(const ch of String(m.name || m.id)) h = (h * 31 + ch.charCodeAt(0)) >>> 0; m.margin = 1 + h % 24; } }); } }catch(e){}
+  try{ if(refreshTravel._r !== G.room && !_buildingRoom) refreshTravel(); }catch(e){}
   acc += dt;
   if(acc > (MODEST ? 0.9 : 0.4)){ acc = 0; if(!G.over) refreshBar(); }
   if(_prof){ _prof.mark("ui"); _prof.end(true); }
@@ -31586,7 +31723,7 @@ function opening(){
   const dayN = hasSave ? (peek.day || 1) : 1;
   const cname = (peek && peek.country && peek.country.name) ? peek.country.name : (G.country && G.country.name);
   card.innerHTML =
-    '<img class="card__logo" src="assets/logo.png" width="220" height="147" alt="One Nation, Under, ME.">' +    '<div class="eyebrow">One Nation, Under, ME. · The ' + ordinal(cong) + ' Congress' +
+    '<img class="card__logo" src="assets/logo.png" width="220" height="147" alt="One Nation, Under, ME." onerror="this.onerror=null;this.replaceWith(Object.assign(document.createElement(\'div\'),{className:\'card__logo card__logo--text\',textContent:\'One Nation, Under, ME.\'}))">' +    '<div class="eyebrow">One Nation, Under, ME. · The ' + ordinal(cong) + ' Congress' +
       (cname ? ' · ' + cname : '') + '</div>' +
     '<h1>Everyone in this building remembers what you did to them.</h1>' +
     '<p>You are a member of the House. There is a bill on the calendar, a roll call coming, and twenty-five ' +
