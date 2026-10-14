@@ -84,6 +84,20 @@ You are one member of the **House of Representatives** in an invented republic.
 
 ---
 
+## Updating the Game
+
+**Without Git (Windows):** follow [UPDATE-NO-GIT.md](UPDATE-NO-GIT.md) — download the latest zip and copy it over your folder.
+
+**With Git:**
+```powershell
+cd C:\Users\Admin\the-long-session
+git pull
+```
+
+After updating, hard-refresh (Ctrl+F5) and check the address bar ends in `?v=20261013n`.
+
+---
+
 ## If Something Goes Wrong
 
 ### Something says a port, a folder, or the microphone is "in use"
@@ -123,6 +137,7 @@ You are one member of the **House of Representatives** in an invented republic.
 ## More Information
 
 - **Repository:** https://github.com/DominicVII/the-long-session
+- **Update without Git:** [UPDATE-NO-GIT.md](UPDATE-NO-GIT.md)
 - **Full controls:** `CONTROLS.md`
 - **If something is stuck or "in use":** `TROUBLESHOOTING.md`
 - **Game systems:** `PODIUM-CATCH.md`, `VOX.md`, `AUTONOMY.md`
