@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261012m">
+<meta name="onum-build" content="20261012n">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261012m";
+  var STAMP = "20261012n";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -7234,6 +7234,193 @@ function pcTick(dt){
   if(pcRefreshT <= 0){ pcRefreshT = 3; const tabs = el("pcTabs"); if(tabs){ const u = tabs.querySelector('[data-pct="inbox"]'); if(u) u.textContent = "Inbox" + (unreadCount() ? " (" + unreadCount() + ")" : ""); } }
 }
 
+/* ===== 20261012n · a new office of your own: coffee and a bed ===== */
+const K_AMEN_ROOMS = ["senate", "court", "exec", "govoffice"];
+function kAmenSpots(id){
+  const R = ROOMS[id]; if(!R) return null;
+  const hw = R.w / 2;
+  return {coffee:{x: hw - 0.75, z: 2.3}, bed:{x: -hw + 0.85, z: 3.4}};
+}
+function kAmenMine(id){ try{ return id !== "office" && homeRoom() === id; }catch(e){ return false; } }
+function kAmenities(id, w, d, h, hw){
+  if(K_AMEN_ROOMS.indexOf(id) < 0 || !kAmenMine(id)) return;
+  const S = kAmenSpots(id);
+  /* if a teammate's amenities module is present, let it place them */
+  if(typeof addOfficeAmenities === "function"){
+    try{ const r = addOfficeAmenities(THREE, roomGroup, {bounds:{hw, d}, doorPos:{x:0, z:0}, seed:(G.you && G.you.id) || 7});
+      if(r && r.length){ r.forEach(a => { if(a.kind === "coffee" && a.pos) S.coffee = {x:a.pos.x, z:a.pos.z}; if(a.kind === "bed" && a.pos) S.bed = {x:a.pos.x, z:a.pos.z}; }); G._amen = {id, S}; return; } }catch(e){}
+  }
+  const wood = matCol(0x5a3b24, .7), steel = matCol(0x2b2d31, .45, .6), chrome = matCol(0xb9bcc2, .3, .9);
+  const linen = matCol(0xe9e4d8, .95), blanket = matCol(0x2f4a66, .9), cup = matCol(0xf3efe6, .6);
+  const c = S.coffee;
+  addBox(wood, c.x, 0.45, c.z, 0.62, 0.9, 0.5, 0, true);                /* cabinet */
+  addBox(steel, c.x, 1.12, c.z + 0.04, 0.34, 0.44, 0.32, 0, true);      /* the machine */
+  addBox(chrome, c.x, 1.03, c.z - 0.13, 0.14, 0.05, 0.06, 0, true);     /* spout */
+  addCyl(cup, c.x - 0.18, 0.95, c.z - 0.1, 0.04, 0.09);
+  addCyl(cup, c.x + 0.2, 0.95, c.z - 0.08, 0.04, 0.09);
+  try{ propPlaque(c.x, 1.55, c.z - 0.2, 0, "COFFEE", "Press E", 0.42, 0.12); }catch(e){}
+  const b = S.bed;
+  addBox(wood, b.x, 0.22, b.z, 0.98, 0.3, 2.05, 0, true);               /* frame */
+  addBox(linen, b.x, 0.42, b.z, 0.92, 0.12, 1.98, 0, true);             /* mattress */
+  addBox(blanket, b.x, 0.5, b.z + 0.25, 0.94, 0.05, 1.4, 0, true);      /* blanket */
+  addBox(linen, b.x, 0.53, b.z - 0.78, 0.6, 0.1, 0.3, 0, true);         /* pillow */
+  addBox(wood, b.x, 0.6, b.z - 1.02, 0.98, 0.8, 0.06, 0, true);         /* headboard */
+  try{ propPlaque(b.x + 0.55, 1.2, b.z - 1.0, Math.PI / 2, "BED", "Sleep · Press E", 0.5, 0.12); }catch(e){}
+  G._amen = {id, S};
+}
+function kAmenProps(id){
+  if(K_AMEN_ROOMS.indexOf(id) < 0 || !kAmenMine(id)) return [];
+  const S = (G._amen && G._amen.id === id && G._amen.S) || kAmenSpots(id);
+  return [
+    {id:"amenCoffee", label:"The coffee machine", sub:"Your own, and it works", x:S.coffee.x, z:S.coffee.z, r:1.8,
+     acts:() => [{t:"Pour a cup", c:"10m", off:G.you.energy > 88, run(){ spend(10, -16); setSay("Strong, hot, and nobody else's.", fx("+16 energy", "10 minutes")); }}]},
+    {id:"amenBed", label:"The bed", sub:"A narrow bed behind a screen; the job keeps odd hours", x:S.bed.x, z:S.bed.z, r:2.0,
+     acts:() => [{t:"Sleep until morning", c:"the rest of the day", run(){
+        feed("You lie down in your own office.");
+        setSay("You turn the lamp off and sleep until the building wakes you.", "");
+        closeTalk();
+        G.minute = Math.max(G.minute, 22*60);
+        G.pendingNight = true;
+        setTimeout(() => { nightfall(); }, 400);
+      }},
+      {t:"Lie down for an hour", c:"60m", off:G.you.energy > 96, run(){ spend(60, -40); setSay("An hour flat on your back. It helps.", fx("+40 energy", "60 minutes")); }}]}
+  ];
+}
+setTimeout(() => K_AMEN_ROOMS.forEach(id => {
+  const base = PROPS[id] || [];
+  Object.defineProperty(PROPS, id, {configurable:true, enumerable:true, get(){ return base.concat(kAmenProps(id)); }, set(v){ base.length = 0; (v || []).forEach(x => base.push(x)); }});
+}), 0);
+
+/* ===== 20261012n · bills never stall, the day always ends, and you can react ===== */
+/* Old saves and missed roll calls: a live bill whose vote day has passed was
+   never voted (the check wants today exactly), so it sat on the calendar
+   forever and nothing new came. Repair on load and keep watching. */
+const WATCH = {t:0, lateSince:0, nightFails:0, stallDay:-1};
+function billRepair(why){
+  let fixed = 0;
+  try{
+    if(!Array.isArray(G.billQueue)) G.billQueue = [];
+    const b = G.bill;
+    if(!b){ G.bill = nextBillOrQueued(); fixed++; }
+    else {
+      if(typeof b.voteHour !== "number" || !(b.voteHour >= 8 && b.voteHour <= 21)){ b.voteHour = 15; fixed++; }
+      if(typeof b.voteDay !== "number" || !isFinite(b.voteDay)){ b.voteDay = (G.day || 1) + 2; fixed++; }
+      if(!b.done && b.voteDay < (G.day || 1)){
+        /* the roll call was missed: it is put back on the calendar, today if there is still time */
+        b.voteDay = ((G.minute || 0) < (b.voteHour * 60 - 30)) ? G.day : G.day + 1;
+        try{ note(b.title + ": the roll call that was missed is back on the calendar for " + (b.voteDay === G.day ? "today" : "tomorrow") + ".", true); }catch(e){}
+        fixed++;
+      }
+      if(b.done && G.running && veil.hidden){ G.bill = nextBillOrQueued(); fixed++; }
+      if(b.voteDay > (G.day || 1) + 12){ b.voteDay = G.day + 4; fixed++; }
+    }
+  }catch(e){ try{ G.bill = makeBill(); fixed++; }catch(e2){} }
+  if(fixed && window.console) console.info("bill watchdog (" + (why || "tick") + "): " + fixed + " fix(es)");
+  return fixed;
+}
+function dayWatch(dt){
+  /* wall clock, not game time: a slow machine must not slow the watchdog */
+  const now = performance.now();
+  if(now - WATCH.t < 2000) return;
+  WATCH.t = now;
+  if(!G || !G.you || G.over) return;
+  billRepair("tick");
+  /* the day past its end: night never started, or nightfall threw */
+  const late = (G.minute || 0) >= 22 * 60 + 15;
+  const busy = typeof nextDay === "function" && nextDay._busy;
+  if(late && !busy && veil.hidden){
+    if(!WATCH.lateSince) WATCH.lateSince = performance.now();
+    if(performance.now() - WATCH.lateSince > 6000){
+      WATCH.lateSince = performance.now();
+      WATCH.nightFails++;
+      try{ console.warn("day watchdog: forcing the night (try " + WATCH.nightFails + ")"); }catch(e){}
+      G.pendingNight = false;
+      if(WATCH.nightFails < 3){ try{ beginNight(); }catch(e){} }
+      else { try{ nextDay(false); WATCH.nightFails = 0; }catch(e){ G.minute = 8 * 60; G.day = (G.day || 1) + 1; G.running = true; } }
+    }
+  } else { WATCH.lateSince = 0; if(!late) WATCH.nightFails = 0; }
+}
+
+
+/* ===== 20261012n · doorways: right of way, unstick, never a bind pose ===== */
+/* Someone stood frozen in a doorway in the bind pose: a fresh body built while
+   you were walking was deep-frozen before it had ever been posed, and a member
+   pushing through the same door as you (or another member) could make no
+   progress at all. Every body is posed once before it is drawn, anyone left
+   unposed for a second falls back to idle, doors are taken one at a time
+   with you first, and a member who cannot make progress is nudged, rerouted,
+   then simply put through. */
+const DOORWAY = {r:1.25, hold:3.5};
+function doorPointsHere(room){
+  const C = (doorPointsHere._c = doorPointsHere._c || {});
+  if(C[room]) return C[room];
+  const out = [];
+  try{ for(const dr of (DOORS[room] || [])){ const p = doorAt(room, dr); if(p && isFinite(p.x) && isFinite(p.z)) out.push({x:p.x, z:p.z}); } }catch(e){}
+  return (C[room] = out);
+}
+function doorZone(room, x, z){
+  for(const p of doorPointsHere(room)) if(Math.hypot(p.x - x, p.z - z) < DOORWAY.r) return p;
+  return null;
+}
+/* true = this member waits this frame */
+function doorYield(m, dt, nx, nz){
+  const dp = doorZone(m.room, nx, nz);
+  if(!dp){ m._yieldT = 0; return false; }
+  let blocked = false;
+  /* you first */
+  if(m.room === G.room && Math.hypot(cam.x - dp.x, cam.z - dp.z) < DOORWAY.r + 0.35 && Math.hypot(cam.x - m.x, cam.z - m.z) < 2.2) blocked = true;
+  /* then one at a time: whoever is already nearer the door goes */
+  if(!blocked){
+    const md = Math.hypot(m.x - dp.x, m.z - dp.z);
+    for(const o of hereNow()){
+      if(o === m || o.sitting || o.gone) continue;
+      const od = Math.hypot(o.x - dp.x, o.z - dp.z);
+      if(od < DOORWAY.r && (od < md - 0.05 || (Math.abs(od - md) <= 0.05 && String(o.id) < String(m.id))) && Math.hypot(o.x - m.x, o.z - m.z) < 1.1){ blocked = true; break; }
+    }
+  }
+  if(!blocked){ m._yieldT = 0; return false; }
+  m._yieldT = (m._yieldT || 0) + dt;
+  if(m._yieldT > DOORWAY.hold){
+    /* waited long enough: step aside and pick somewhere else to be */
+    m._yieldT = 0;
+    try{ const b = roomBox(m.room); m.tx = clamp(m.x * 0.4, -b.hw, b.hw); m.tz = clamp((b.d0 + b.d1) / 2, b.d0, b.d1); }catch(e){ m.tx = m.x; m.tz = m.z; }
+  }
+  return true;
+}
+/* no progress for ~2 s while trying to go somewhere: nudge, reroute, put through */
+function unstick(m, dt){
+  const d = Math.hypot((m.tx ?? m.x) - m.x, (m.tz ?? m.z) - m.z);
+  if(d < 0.25 || m.sitting || (m._yieldT || 0) > 0){ m._stk = null; return; }
+  const s = m._stk || (m._stk = {t:0, d, stage:0});
+  if(d < s.d - 0.08){ s.d = d; s.t = 0; s.stage = 0; return; }
+  s.t += dt;
+  if(s.t < 2) return;
+  s.t = 0; s.stage++;
+  if(s.stage === 1){ const a = Math.random() * 6.283; m.x += Math.sin(a) * 0.3; m.z += Math.cos(a) * 0.3; }
+  else if(s.stage === 2){ try{ const b = roomBox(m.room); m.tx = clamp(m.tx * 0.5, -b.hw * 0.8, b.hw * 0.8); m.tz = clamp((m.tz + (b.d0 + b.d1) / 2) / 2, b.d0, b.d1); }catch(e){} s.d = 1e9; }
+  else { m.x = m.tx; m.z = m.tz; if(m.mesh){ m.mesh.position.x = m.x; m.mesh.position.z = m.z; } m._stk = null; try{ console.info("unstick: put " + m.name + " through"); }catch(e){} }
+}
+/* every drawn body has a pose; nobody stays in the bind pose */
+function poseGuard(){
+  const now = performance.now();
+  if(now - (poseGuard._t || 0) < 250) return;
+  poseGuard._t = now;
+  for(const p of hereNow()){
+    const ms = p.mesh;
+    if(!ms || ms.parent !== peopleGroup) continue;
+    if(!ms.userData) ms.userData = {};
+    const stale = !ms.userData._posed || (ms.visible && now - (p._animAt || 0) > 1500);
+    if(!stale) continue;
+    const fz = !!ms.userData._crowdFrozen;
+    try{
+      if(fz) crowdThawMesh(ms);
+      animatePerson(p, 0.05);
+      ms.userData._posed = true;
+      if(fz) crowdFreezeMesh(ms);
+    }catch(e){}
+  }
+}
+
 const MATCACHE = new Map();
 /* Every distinct repeat used to clone the texture and its normal map, so
    a wall tiled 4.13 times and the same wall tiled 4.2 times were two more
@@ -10134,6 +10321,7 @@ function buildRoomInner(id, skipShell){
   }
 
   try{ placeRoomFlags(id, w, d, h, hw); }catch(e){ if(window.console) console.warn("flags", e); }
+  try{ kAmenities(id, w, d, h, hw); }catch(e){ if(window.console) console.warn("amenities", e); }
 
   /* portraits of predecessors — propFrame (rabbet + flush wall contact) */
   if(R.style === "wood"){
@@ -10940,7 +11128,7 @@ function syncPeople(){
     if(p.look){
       ensureLookMorphs(p.look);
       /* v2 faces: remesh once so old sticker-heads become real faces */
-      if(p.mesh && (p.look._faceVer !== 2 || p.look._clothVer !== 6)){
+      if(p.mesh && (p.look._faceVer !== 2 || p.look._clothVer !== 7)){
         try{ disposePersonMesh(p.mesh); }catch(e){}
         p.mesh = null; p.faceTex = null;
         dirty = true;
@@ -10948,7 +11136,7 @@ function syncPeople(){
     }
     if(!p.mesh){
       p.mesh = buildPerson(p);
-      if(p.look){ p.look._faceVer = 2; p.look._clothVer = 6; }
+      if(p.look){ p.look._faceVer = 2; p.look._clothVer = 7; }
       dirty = true;
     }
     keep.add(p.mesh);
@@ -11108,6 +11296,7 @@ function wrapPi(a){
 }
 function animatePerson(p, dt){
   animatePerson0(p, dt);
+  p._animAt = performance.now(); if(p.mesh && p.mesh.userData) p.mesh.userData._posed = true;
   try{ if(p.mesh && p.mesh.parent === peopleGroup) peopleExtra(p, dt); }catch(e){}
 }
 function animatePerson0(p, dt){
@@ -12328,9 +12517,9 @@ function focusTarget(){
   const f = {x:Math.sin(cam.yaw), z:Math.cos(cam.yaw)};
   for(const p of hereNow()){
     const dx = p.x-cam.x, dz = p.z-cam.z, d = Math.hypot(dx,dz);
-    if(d < 0.35 || d > 2.05) continue;
+    if(d < 0.30 || d > 2.6) continue;
     const dot = (dx*f.x + dz*f.z)/d;
-    if(dot < 0.88) continue;
+    if(dot < (d < 1.3 ? 0.55 : 0.78)) continue;
     const s = d - dot*1.15;
     if(s < bs){ bs = s; best = p; }
   }
@@ -12361,13 +12550,13 @@ function focusProp(){
     const speech = !!(SPEECH_STATION_IDS[G.room] && SPEECH_STATION_IDS[G.room].indexOf(o.id) >= 0);
     if(speech){
       if(distToSpeechStand(o) > 1.05) continue;
-    } else if(d > (o.r || 2.6)) continue;
+    } else if(d > (o.r || 2.6) * 1.25) continue;
     /* Some things are only yours to use from one side. A lectern read from
        the audience side is somebody else's lectern. */
     if(o.minZ !== undefined && cam.z < o.minZ) continue;
     if(o.maxZ !== undefined && cam.z > o.maxZ) continue;
-    const dot = d < 0.4 ? 1 : (dx*f.x + dz*f.z)/d;
-    if(dot < 0.55) continue;
+    const dot = d < 0.6 ? 1 : (dx*f.x + dz*f.z)/d;
+    if(dot < 0.35) continue;
     const s = d - dot*1.6;
     if(s < bs){ bs = s; best = o; }
   }
@@ -12390,6 +12579,10 @@ function focusThing(){
   }
   if(p) return {type:"person", ref:p};
   if(o) return {type:"prop", ref:o};
+  /* nothing in front: the nearest person within arm's reach still counts */
+  let nb = null, nd = 1.25;
+  for(const q of hereNow()){ const dq = Math.hypot(q.x-cam.x, q.z-cam.z); if(dq > 0.3 && dq < nd){ nd = dq; nb = q; } }
+  if(nb) return {type:"person", ref:nb};
   return null;
 }
 function personInTalkRange(){
@@ -12542,7 +12735,9 @@ function wander(m, dt){
   m.spd = smooth(m.spd || 0, m.gait * arrive, 0.08, Math.min(dt, 0.022));
   m.spd = Math.min(m.spd, 0.55);
   const sp = Math.min(0.022, m.spd * Math.min(dt, 0.022));
+  try{ if(doorYield(m, dt, m.x + dx/d*sp, m.z + dz/d*sp)){ m.spd = 0; return; } }catch(e){}
   m.x += dx/d*sp; m.z += dz/d*sp;
+  try{ unstick(m, dt); }catch(e){}
 }
 /* ── two members find each other and talk ─────────────────── */
 const CONFER_OPEN = ["Have you got a minute?","Where are you on this?","Did you hear?",
@@ -13605,7 +13800,15 @@ function checkEvents(){
     eventCard(due); return;
   }
   const b = G.bill;
-  if(b && !b.done && G.day === b.voteDay && G.minute >= b.voteHour*60) holdVote();
+  if(b && !b.done && G.day >= b.voteDay && G.minute >= b.voteHour*60){
+    try{ holdVote(); }
+    catch(e){
+      /* an old save missing a field must not freeze the House: close the vote and move on */
+      if(window.console) console.warn("holdVote", e);
+      b.done = true; G.running = true; try{ veil.hidden = true; }catch(e2){}
+      try{ G.bill = nextBillOrQueued(); }catch(e2){}
+    }
+  }
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -18830,6 +19033,8 @@ function micInit(){
     micShow(e.error === "not-allowed"
       ? "The microphone is not allowed here."
       : "Nothing came through.");
+    if(e.error === "not-allowed" || e.error === "service-not-allowed" || e.error === "network" || e.error === "audio-capture")
+      aloudFallback(e.error === "network" ? "Speech recognition needs the network here." : "The microphone is not available.");
     setTimeout(micHide, 1600);
     listening = false;
   });
@@ -18843,10 +19048,15 @@ function micInit(){
 }
 function micShow(t){
   const b = el("micBar");
-  if(!b) return;
+  if(!b){ try{ if(t) nudge(t === "…" ? "Listening… speak now" : "You: " + t, 5000); }catch(e){} return; }
   if(!t){ b.hidden = true; return; }
   b.hidden = false;
   say(el("micText"), t);
+}
+function aloudFallback(why){
+  try{ nudge((why ? why + " " : "") + "Type it below and press Enter; it is said aloud to the room.", 7000); }catch(e){}
+  try{ const t = el("wireTo"); if(t && [...t.options].some(o => o.value === "room")) t.value = "room"; }catch(e){}
+  try{ const i = el("wireIn"); if(i){ i.focus(); i.placeholder = "Say it aloud to the room, then Enter"; } }catch(e){}
 }
 function micHide(){ const b = el("micBar"); if(b) b.hidden = true; }
 
@@ -18867,7 +19077,8 @@ function micStart(){
   listening = true; micText = "";
   /* No popup — listen like ordinary speech. Subtle HUD only if micBar exists. */
   micShow("");
-  try{ RECOG.start(); }catch(e){ listening = false; micHide(); }
+  try{ nudge("Listening… speak now. Tap Speak Aloud again to stop.", 8000); }catch(e){}
+  try{ RECOG.start(); }catch(e){ listening = false; micHide(); aloudFallback("The microphone would not start."); }
 }
 function micStop(){
   if(!RECOG) return;
@@ -19322,12 +19533,18 @@ const TICK_STOPS = 12;
 let tickStop = 0, tickPauseF = 0;
 let tickHoverPause = false;
 function paintTicker(){
-  const H = makeHeadlines();
-  if(!H.length) return;
+  const H0 = makeHeadlines();
+  if(!H0.length) return;
+  const seen = new Set(), H = [];
+  H0.forEach(h => { const k = String(h[1] || "").trim().toLowerCase(); if(!k || seen.has(k)) return; seen.add(k); H.push(h); });
   const html = H.map(h => '<span><b>' + h[0] + '</b>' + h[1] + '</span>').join("");
   const run = el("tickRun");
   if(!run) return;
-  setHTML(run, html + html);      /* doubled, so the loop is seamless */
+  setHTML(run, html);
+  const box = el("tick");
+  const wide = box && run.scrollWidth > box.clientWidth * 1.02;
+  run.dataset.loop = wide ? "1" : "0";
+  if(wide) setHTML(run, html + '<span aria-hidden="true" class="tick__gap"></span>' + html);   /* second copy only so the loop is seamless */
   tickStop = 0; tickPauseF = 0;
   run.style.transform = "translateX(0)";
 }
@@ -19343,6 +19560,7 @@ function tickScrollFrame(){
     }
   }catch(e){}
   if(tickHoverPause || box.matches(":hover")) return;
+  if(run.dataset.loop === "0"){ run.style.transform = "translateX(0)"; return; }
   if(tickPauseF++ < TICK_PAUSE_FRAMES) return;
   tickPauseF = 0;
   const half = run.scrollWidth * 0.5;
@@ -20913,9 +21131,19 @@ el("wireIn").addEventListener("keydown", e => { if(e.key === "Enter"){ e.prevent
   const ab = el("aloudBtn");
   const bindHold = (node) => {
     if(!node) return;
-    if(!micReady()){ node.hidden = true; return; }
-    const down = e => { e.preventDefault(); node.classList.add("is-live"); if(ab) ab.classList.add("is-live"); if(b) b.classList.add("is-live"); micStart(); };
-    const up   = () => { node.classList.remove("is-live"); if(ab) ab.classList.remove("is-live"); if(b) b.classList.remove("is-live"); micStop(); };
+    let t0 = 0, armed = false;
+    const lit = on => [node, ab, b].forEach(n => { if(n) n.classList.toggle("is-live", on); });
+    const down = e => {
+      e.preventDefault();
+      if(!micReady()){ aloudFallback("This browser cannot listen."); return; }
+      if(listening){ lit(false); micStop(); armed = false; return; }   /* second tap stops */
+      t0 = performance.now(); armed = true; lit(true); micStart();
+    };
+    const up = () => {
+      if(!armed) return; armed = false;
+      if(performance.now() - t0 < 350) return;      /* a tap: keep listening until they stop talking */
+      lit(false); micStop();                         /* a hold: let go to send */
+    };
     node.addEventListener("pointerdown", down);
     addEventListener("pointerup", up);
     node.addEventListener("pointercancel", up);
@@ -28614,6 +28842,14 @@ addEventListener("keydown", e => {
   if(k === (G.bind||DEFAULT_BIND).pause){ togglePause(); return; }
   /* Number keys = quick prompt answers — KBM path, no pad / PICK arming required */
   if(k >= "1" && k <= "9" && !e.ctrlKey && !e.metaKey && !e.altKey){
+    if(e.repeat){ e.preventDefault(); return; }
+    const _now = performance.now();
+    if(_now - (window._digitT || 0) < 260){ e.preventDefault(); return; }
+    window._digitT = _now;
+    if(!veil.hidden){
+      const opts = card.querySelectorAll(".qz__opts .mk__opt");
+      if(opts.length){ e.preventDefault(); const o = opts[k.charCodeAt(0) - 49]; if(o) o.click(); return; }
+    }
     refreshPicks();
     const idx = k.charCodeAt(0) - 49;
     /* Prefer glass #prompt buttons when live (seated voice, station waits, etc.) */
@@ -29373,6 +29609,8 @@ function setupSettingsUI(){
       row("War chest", "Spend it on ads, staff, offices, allies, counsel, polls and press time", '<button type="button" class="settings-btn settings-btn-secondary" id="pzChest">Open</button>') +
       row("Notebook", "Happenings, faith on the wire, and the things nobody explains", '<button type="button" class="settings-btn settings-btn-secondary" id="pzNote">Open</button>') +
       row("Whip count", "Who is with you on the bill, who to work, and where they are", '<button type="button" class="settings-btn settings-btn-secondary" id="pzWhip"' + (G.bill && !G.bill.done ? '' : ' disabled') + '>Open</button>') +
+      row("Export save", "Download this career as a file you can keep", '<button type="button" class="settings-btn settings-btn-secondary" id="pzExport">Export save</button>') +
+      row("Import save", "Load a career file; the game reloads into it", '<button type="button" class="settings-btn settings-btn-secondary" id="pzImport">Import save</button><input type="file" id="pzImportFile" accept=".json,application/json" hidden>') +
       row("Title", "Continue, or begin a new career", '<button type="button" class="settings-btn settings-btn-secondary" id="pzTitle">Title menu</button>') +
     '</div>' +
     '<div class="settings-section" data-section="graphics">' +
@@ -29419,6 +29657,9 @@ function setupSettingsUI(){
   const byAch = el("pzAch"); if(byAch) byAch.addEventListener("click", () => { closeSettings(); setTimeout(() => { try{ achCard(); }catch(e){} }, 30); });
   const byChest = el("pzChest"); if(byChest) byChest.addEventListener("click", () => { closeSettings(); setTimeout(() => { try{ chestCard(); }catch(e){} }, 30); });
   const byNote = el("pzNote"); if(byNote) byNote.addEventListener("click", () => { closeSettings(); setTimeout(() => { try{ notebookCard(); }catch(e){} }, 30); });
+  const byExp = el("pzExport"); if(byExp) byExp.addEventListener("click", () => { try{ save(true, true); }catch(e){} exportCareerSave(); });
+  const byImp = el("pzImport"), impF = el("pzImportFile");
+  if(byImp && impF){ byImp.addEventListener("click", () => impF.click()); impF.addEventListener("change", () => importCareerSave(impF.files && impF.files[0])); }
   const byWhip = el("pzWhip"); if(byWhip) byWhip.addEventListener("click", () => { closeSettings(); setTimeout(() => { try{ whipCard(); }catch(e){} }, 30); });
   const byTitle = el("pzTitle"); if(byTitle) byTitle.addEventListener("click", () => { closeSettings(); try{ G.running = true; showGameMenu(); }catch(e){} });
   const byKeys = el("pzKeys"); if(byKeys) byKeys.addEventListener("click", () => { closeSettings(); try{ settingsCard(); }catch(e){} });
@@ -30384,11 +30625,11 @@ function tick(dt){
       try{ setImmersive(true); }catch(e){}
     }
   }
-  const top = sprint ? 1.15 : 0.68;
+  const top = sprint ? 1.48 : 0.88;
   const mag = Math.hypot(vx, vz) || 1;
   const wantX = (f.x*vz + r.x*vx) / mag * top * (vx||vz ? 1 : 0);
   const wantZ = (f.z*vz + r.z*vx) / mag * top * (vx||vz ? 1 : 0);
-  const moveDt = Math.min(dt, 0.022);
+  const moveDt = Math.min(dt, 0.05);   /* was 0.022: under ~45 fps every step came up short */
   const catchUp = (vx||vz) ? Math.min(1, 5.5 * moveDt) : Math.min(1, 9 * moveDt);
   cam.vx += (wantX - cam.vx) * catchUp;
   cam.vz += (wantZ - cam.vz) * catchUp;
@@ -30396,7 +30637,7 @@ function tick(dt){
   cam.vz = clamp(cam.vz, -top, top);
   let dx = cam.vx * moveDt, dz = cam.vz * moveDt;
   const span = Math.hypot(dx, dz);
-  if(span > 0.028){ const s = 0.028 / span; dx *= s; dz *= s; }
+  if(span > 0.08){ const s = 0.08 / span; dx *= s; dz *= s; }
   const b = roomBox(G.room || "office");
   cam.x = clamp(cam.x + dx, -b.hw, b.hw);
   cam.z = clamp(cam.z + dz, b.d0, b.d1);
@@ -31261,6 +31502,8 @@ function frameBody(now, draw){
   say(el("hail"), waiting ? waiting.name.split(" ")[0] + " wants a word · E when close"
     : (window._nudge && performance.now() < window._nudge.until ? window._nudge.t : null));
   if(PC.open) pcTick(dt);
+  try{ dayWatch(dt); }catch(e){}
+  try{ poseGuard(); }catch(e){}
   acc += dt;
   if(acc > (MODEST ? 0.9 : 0.4)){ acc = 0; if(!G.over) refreshBar(); }
   if(_prof){ _prof.mark("ui"); _prof.end(true); }
