@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261012z">
+<meta name="onum-build" content="20261013a">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261012z";
+  var STAMP = "20261013a";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -34489,7 +34489,19 @@ try{
       return "staff";
     }catch(e){ return "staff"; }
   }
-  function realmOf(x){ try{ realmEnsure(); return (G.realms || []).find(r => x.from === "Mission of " + r.t || x.subject === "Cable — " + r.t) || null; }catch(e){ return null; } }
+  /* foreign people always have real names and titles: one head of mission per realm, drawn deterministically
+     from the realm's own name pool (FOREIGN_NAMES), titled by its regime, kept on the realm in the save */
+  const ENVOY_T = {reach:"Ambassador", horn:"Consul-General", pale:"Colonel-Attaché", marches:"Minister Plenipotentiary", isles:"High Commissioner", rift:"Chargé d'affaires"};
+  function envoyOf(r){
+    try{ if(typeof r === "string"){ realmEnsure(); r = (G.realms || []).find(x => x.k === r || x.t === r); } if(!r) return null;
+      if(!r.envoy || !r.envoy.name){ let h = 2166136261; for(const c of "envoy|" + r.k + "|" + (G.country || "")){ h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); }
+        let a = h >>> 0; const rn = () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+        let name = ""; try{ name = foreignName(rn, r.k); }catch(e){} if(!name) name = "Anouk Verhoeven";
+        const title = ENVOY_T[r.k] || "Ambassador"; r.envoy = {name, title, full:title + " " + name + " of " + r.t}; }
+      return r.envoy; }catch(e){ return null; }
+  }
+  CL.envoyOf = envoyOf; window.onumForeignEnvoy = envoyOf;
+  function realmOf(x){ try{ realmEnsure(); return (G.realms || []).find(r => x.from === "Mission of " + r.t || (r.envoy && x.from === r.envoy.full) || x.subject === "Cable — " + r.t) || null; }catch(e){ return null; } }
   function cableCtx(x){
     const r = realmOf(x); if(!r) return null;
     const you = G.you || {}, b = billNow();
@@ -34510,6 +34522,8 @@ try{
   wrap("pushMail(cable)", () => pushMail, f => { pushMail = f; }, orig => function(from, subject, body, opts){
     try{
       if(opts && opts.kind === "cable"){
+        try{ const m = from && /^Mission of (.+)$/.exec(from.name || ""); if(m){ const r = (G.realms || []).find(x => x.t === m[1]); const e = r && envoyOf(r);
+          if(e){ from = Object.assign({}, from, {name:e.full}); body = String(body).replace("— Mission of " + r.t, "— " + e.title + " " + e.name + ", for the Mission of " + r.t); arguments[0] = from; arguments[2] = body; } } }catch(e){}
         const name = from ? from.name : "";
         const ex = G.mail.find(x => x.kind === "cable" && x.from === name && !x.answered);
         if(ex){
@@ -34726,7 +34740,7 @@ try{
    Session Log ("What they meant") and follow the Session pace. Speakers turn to each other in 3D.
    Wraps sitStart/sitNext/sitPick/sitDraw/sitEnd; any error falls back to the original step card. */
 try{
-  const SX = window.NEPTUNE_SITTINGS = {ver:"20261012w", on:false, fails:0, log:[]};
+  const SX = window.NEPTUNE_SITTINGS = {ver:"20261012z", on:false, fails:0, log:[], matter:{}, castFor:{}, after:{}};
   const O = {sitStart, sitStep, sitBeat, sitPick, sitNext, sitOutcome, sitEnd, sitDraw};
   const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
   const CLr = () => window.NEPTUNE_CLARITY || null;
@@ -34749,6 +34763,7 @@ try{
 
   /* ── what is in front of the room ── */
   const matterFor = function(room){
+    if(SX.matter[room]) return SX.matter[room]();
     const y = G.you, bill = G.bill && !G.bill.done ? G.bill : null, cs = (G.cases || []).find(x => x && !x.done);
     const st = (G.states || []).find(s => s.n === y.state), hot = (G.states || []).slice().sort((a, b) => (b.unrest || 0) - (a.unrest || 0))[0];
     let side = 1; try{ if(bill) side = alignment(y, bill) >= 0 ? 1 : -1; }catch(e){}
@@ -34784,11 +34799,15 @@ try{
     const picked = here.filter(pref).slice(0, want);
     pool.filter(m => pref(m) && !picked.includes(m)).sort(() => Math.random() - 0.5).forEach(m => { if(picked.length < want) picked.push(m); });
     here.forEach(m => { if(picked.length < want && !picked.includes(m)) picked.push(m); });
-    const out = picked.map(m => ({m, name:m.name, role:(m.post ? m.post + ", " : "") + pl(m.party) + " · " + m.state, party:m.party, state:m.state,
+    let out = picked.map(m => ({m, name:m.name, role:(m.post ? m.post + ", " : "") + pl(m.party) + " · " + m.state, party:m.party, state:m.state,
       temper:m.traits.temper, conv:m.traits.conviction, vanity:m.traits.vanity, warmth:(m.rel && m.rel.warmth) || 0, want:null}));
     const C = (CIV[room] || []).slice().sort(() => Math.random() - 0.5).slice(0, room === "govoffice" ? 3 : room === "press" ? 3 : 2);
     if(room === "court" || room === "committee" || room === "exec") C.splice(0, 0); 
     C.forEach(c => out.push(civ(c[0], c[1], room === "govoffice" ? y.state : (M.cs && M.cs.state) || y.state)));
+    if(SX.castFor[room]) out = SX.castFor[room](M, out) || out;
+    /* never a generic foreigner: anyone labelled as an envoy/diplomat takes the realm's named head of mission */
+    out.forEach(p => { try{ if(/foreign|envoy|diplomat|emissary/i.test(p.name + " " + (p.role || "")) || (p.m && p.m.kind === "envoy")){ const rk = (p.m && p.m.realm) || (G.realms && G.realms[0] && G.realms[0].k); const e = window.onumForeignEnvoy && window.onumForeignEnvoy(rk);
+      if(e){ p.name = e.name; p.role = e.title + " of " + ((G.realms || []).find(r => r.k === rk) || {}).t; } } }catch(e){} });
     /* agenda, stance (0 = against you … 100 = with you), relationships */
     out.forEach((p, i) => {
       p.id = i; p.sn = sn(p.name); p.spoke = 0; p.cut = 0; p.dealt = false; p.moved = 0; p.hist = [];
@@ -34797,7 +34816,7 @@ try{
       if(p.m && p.party === y.party) lean += 10; else if(p.m && p.party) lean -= 6;
       if(/counsel for the Union|budget director|witness/.test(p.role)) lean -= 14;
       if(/petitioner|deputy for the states|home-state/.test(p.role)) lean += 8;
-      p.stance = cl(Math.round(50 + lean + p.warmth * 0.6 + rnd(-16, 16)), 8, 92);
+      p.stance = p.stance0 != null ? p.stance0 : cl(Math.round(50 + lean + p.warmth * 0.6 + rnd(-16, 16)), 8, 92);
       p.want = p.want || (p.m ? one([
         "a carve-out for " + p.state, "credit at home in " + p.state, "a seat at the table on " + M.short,
         p.party === y.party ? "the party line held, and seen to hold" : "making your side pay for " + M.short,
@@ -34808,6 +34827,7 @@ try{
       out.forEach(q => { if(q === p) return;
         if(p.m && q.m && ((p.m.allies || []).includes(q.m.id) || (p.party && p.party === q.party && Math.random() < 0.6))) p.allies.push(q.id);
         if(p.m && q.m && p.m.rival === q.m.id) p.rival = q.id; });
+      if(p.fixAllies) p.allies = p.fixAllies.filter(j => j !== p.id && out[j]); if(p.fixRival != null && out[p.fixRival] && p.fixRival !== p.id) p.rival = p.fixRival;
       if(p.rival == null){ const opp = out.filter(q => q !== p && Math.abs(q.stance - p.stance) > 30); if(opp.length && Math.random() < 0.7) p.rival = one(opp).id; } });
     return out;
   }
@@ -34842,7 +34862,7 @@ try{
       ally ? p.sn + " backs their ally " + q.sn + ". Allies move together; win one and the other often follows." : p.sn + " is signalling a cost to " + q.sn + ". Not a formal move, but the room heard it.");
   }
   const petition = function(S, p, M){
-    return L(p, one(["Governor, ", "Ma'am, sir, ", "Thank you for seeing me. "]) + "I'm " + p.name + ", " + p.role + ". " + p.want[0].toUpperCase() + p.want.slice(1) + ". " + one(["I've written four times.", "We need an answer this month.", "I don't want a letter. I want a date."]), null, "position",
+    return L(p, (S.x.M.greet ? one(S.x.M.greet) : one(["Governor, ", "Ma'am, sir, ", "Thank you for seeing me. "])) + "I'm " + p.name + ", " + p.role + ". " + p.want[0].toUpperCase() + p.want.slice(1) + ". " + one(["I've written four times.", "We need an answer this month.", "I don't want a letter. I want a date."]), null, "position",
       "A petitioner with a concrete ask: " + p.want + ". Granting it costs money others want.");
   }
   const exchange = function(S, step){
@@ -34852,23 +34872,23 @@ try{
     const chair = S.D.chair, civs = C.filter(p => !p.m);
     if(step === "gavel"){
       out.push(chairLine(S, {senate:"The Senate will come to order. The clerk will read the journal.", court:"Oyez, oyez, oyez. All persons having business before this Court draw near.", exec:"Everyone sit. We have forty minutes and the realm has a lot of problems.",
-        govoffice:"Open hours begin. " + civs.length + " on the list today, please keep it to ten minutes each.", committee:"This committee is in session. The witness will be sworn.", caucus:"Right. Doors shut. Phones down. We leave this room with one line.", press:"Thanks, everyone. Questions at the end. Hands, please."}[S.room] || "Order.", "The sitting opens. The question today: " + M.q + "."));
+        govoffice:"Open hours begin. " + civs.length + " on the list today, please keep it to ten minutes each.", committee:"This committee is in session. The witness will be sworn.", caucus:"Right. Doors shut. Phones down. We leave this room with one line.", press:"Thanks, everyone. Questions at the end. Hands, please."}[S.room] || M.gavel || "Order.", "The sitting opens. The question today: " + M.q + "."));
       const loud = by((a, b) => b.temper - a.temper)[0];
       if(loud && loud.temper > 55) out.push(L(loud, one(["Before we start — some of us got the papers at midnight.", "I want it noted that " + (loud.state || "my state") + " was not consulted.", "Is the chair going to let everyone speak this time?"]), null, "oppose", loud.sn + " is restless before a word is said. High temper: they interrupt, and they take being cut off badly."));
       return out;
     }
-    if(step === "adjourn"){ out.push(chairLine(S, {govoffice:"That is the list. Open hours are closed.", senate:"The Senate stands adjourned until tomorrow at ten.", court:"This honorable Court is now adjourned.", exec:"Thank you. Go do it.", committee:"The committee stands adjourned.", caucus:"That is the business. Out you go, and vote the way you said.", press:"That's all the time we have. Thank you."}[S.room] || "Adjourned.")); return out; }
+    if(step === "adjourn"){ out.push(chairLine(S, {govoffice:"That is the list. Open hours are closed.", senate:"The Senate stands adjourned until tomorrow at ten.", court:"This honorable Court is now adjourned.", exec:"Thank you. Go do it.", committee:"The committee stands adjourned.", caucus:"That is the business. Out you go, and vote the way you said.", press:"That's all the time we have. Thank you."}[S.room] || M.adjourn || "Adjourned.")); return out; }
     if(step === "open"){
-      if(S.room === "govoffice" && civs[0]) out.push(petition(S, civs[0], M)); else out.push(argue(S, pro, M));
+      if((S.room === "govoffice" || M.petition) && civs[0]) out.push(petition(S, civs[0], M)); else out.push(argue(S, pro, M));
       if(con !== pro) out.push(argue(S, con, M));
       if(Math.random() < 0.6 && con !== pro) out.push(rebut(S, pro, con, M));
       const mid = C.find(p => side(p) === 0 && p !== pro && p !== con); if(mid) out.push(argue(S, mid, M));
       return out;
     }
     if(step === "question"){
-      let a = S.room === "govoffice" ? civs[S.x.qi % Math.max(1, civs.length)] : one(C.filter(p => p.spoke <= 1) .concat([con]));
+      let a = (S.room === "govoffice" || M.petition) && civs.length ? civs[S.x.qi % Math.max(1, civs.length)] : one(C.filter(p => p.spoke <= 1) .concat([con]));
       S.x.qi++;
-      if(S.room === "govoffice" && a) out.push(petition(S, a, M)); else out.push(argue(S, a, M));
+      if((S.room === "govoffice" || M.petition) && a) out.push(petition(S, a, M)); else out.push(argue(S, a, M));
       const foes = C.filter(p => p !== a && (p.rival === a.id || Math.abs(p.stance - a.stance) > 25));
       const b = foes.length ? one(foes) : one(C.filter(p => p !== a)) || a;
       if(b !== a) out.push(rebut(S, b, a, M));
@@ -35126,13 +35146,14 @@ try{
     S.x.verdict = verdict; S.x.good = good;
     try{ tlog(S.D.chair, S.out, "sit"); }catch(e){}
     if(good && S.prep){ try{ achieve("sitting"); }catch(e){} }
+    try{ if(SX.after[S.room]) S.x.extra = SX.after[S.room](S, good, t, carried) || ""; }catch(e){ try{ console.warn("NEPTUNE-SITTINGS after", e); }catch(e2){} }
   }
   const recap = function(S){
     const C = S.x.cast, T = {gavel:"Called to order", open:"Openings", question:"Questions", motion:"Motions", deliberate:"Deliberation", vote:"The vote", ruling:"The ruling"};
     const rows = S.tally.map(x => '<li><b>' + esc(T[x.step] || x.step) + ':</b> ' + esc(x.pick) + ' — ' + (x.ok ? "it landed" : "it went badly") + (x.moved ? '. ' + esc(x.moved) : '') + '</li>').join("");
     const why = C.filter(p => Math.abs(p.stance - p.start) >= 6).map(p => '<li><b>' + esc(p.sn) + '</b> ' + p.start + ' → ' + p.stance + ': ' + esc(p.hist.slice(-2).join("; ")) + '</li>').join("");
     return '<div class="sx-recap"><h3>What happened</h3><p>' + esc(S.x.verdict || "") + (S.x.amended ? " The compromise was on the table." : "") + (S.rush ? " You rushed it, and the room noticed." : "") + '</p><ul>' + rows + '</ul>' +
-      (why ? '<h3>Who moved, and why</h3><ul>' + why + '</ul>' : '<p>Nobody really moved. Minds were made up before the gavel.</p>') + '</div>';
+      (why ? '<h3>Who moved, and why</h3><ul>' + why + '</ul>' : '<p>Nobody really moved. Minds were made up before the gavel.</p>') + (S.x.extra ? '<h3>What it means at home</h3><p>' + esc(S.x.extra) + '</p>' : '') + '</div>';
   }
   const end = function(walked){
     const S = SIT.on; if(!S) return;
@@ -35149,6 +35170,28 @@ try{
     SIT.on = null; SX.on = false;
     walkNow();
   }
+  /* free speech: the player types, the room answers through window.onumLiveTalk when it is there */
+  const talk = function(text){
+    const S = SIT.on; if(!S || !S.x || S.x.talking) return;
+    S.x.talking = true;
+    const C = S.x.cast.filter(p => !p.gone), last = S.x.lastSpeaker != null ? S.x.cast[S.x.lastSpeaker] : null;
+    const tgt = C.find(p => text.toLowerCase().indexOf(p.sn.toLowerCase()) >= 0) || last || C[0];
+    S.x.queue.push({p:null, who:"You", text, to:tgt ? tgt.id : null, tag:"position", gloss:"Your own words, now on the record."}); S.lines = S.x.queue; beat();
+    const ctx = {sitting:S.D.title, step:SIT_STEP_T[S.D.steps[S.i]], question:S.x.M.q, speaker:tgt ? {name:tgt.name, role:tgt.role, wants:tgt.want, stance:tgt.stance} : null,
+      room:S.x.cast.map(p => ({name:p.name, role:p.role, wants:p.want, stance:p.stance})), recent:S.x.lines.slice(-6).map(l => l.who + ": " + l.text)};
+    let pr; try{ pr = Promise.resolve(window.onumLiveTalk(text, ctx)); }catch(e){ pr = Promise.reject(e); }
+    Promise.race([pr, new Promise(r => setTimeout(() => r(null), 15000))]).then(rep => {
+      if(SIT.on !== S) return;
+      let who = tgt, t = typeof rep === "string" ? rep : rep && (rep.text || rep.reply || rep.content);
+      if(rep && rep.who){ const f = C.find(p => p.name === rep.who || p.sn === rep.who); if(f) who = f; }
+      if(!t) t = one(["Noted. Now, to the point.", "I hear you. I am not sure the room does.", "Say that again when the vote is called."]);
+      const d = rep && typeof rep.stance === "number" ? rep.stance : (/agree|fair|right|yes|good point|with you/i.test(t) ? 4 : /\bno\b|disagree|wrong|nonsense/i.test(t) ? -3 : 1);
+      if(who) shift(S, who, d, "answered you directly");
+      S.x.queue.push(L(who, String(t).slice(0, 400), "you", d > 0 ? "support" : d < 0 ? "oppose" : "position", (who ? who.sn : "They") + " answers you in their own words. " + (d > 0 ? "It moved them a little toward you." : d < 0 ? "It cost you a little with them." : "")));
+      S.lines = S.x.queue; S.x.talking = false; beat();
+    }).catch(e => { S.x.talking = false; try{ console.warn("NEPTUNE-SITTINGS live talk", e); }catch(e2){} });
+  };
+  SX.talk = talk;
   const meter = function(p, S){
     const now = S.x.queue[S.li - 1], talking = now && now.p === p, d = p.stance - p.start;
     const col = p.stance >= 55 ? "#3c8d5a" : p.stance <= 45 ? "#b0473c" : "#c08a1e";
@@ -35176,12 +35219,15 @@ try{
       '<div class="sx-grid"><div class="sx-cast">' + S.x.cast.map(p => meter(p, S)).join("") + '</div><div class="sit__lines sx-lines">' + lines + '</div></div>' +
       (S.res ? '<p class="dream">' + esc(S.res) + '</p>' : '') + (st === "adjourn" && S.out ? '<p class="dream">' + esc(S.out) + '</p>' + recap(S) : '') +
       (done && st !== "adjourn" && !S.picked ? '<p class="sx-hint">Your move. Hover a choice to see what it does; it shifts the meters live.</p>' : '') +
+      (done && st !== "adjourn" && !S.picked && typeof window.onumLiveTalk === "function" ? '<form class="sx-talk" id="sxTalk"><input id="sxTalkIn" maxlength="240" placeholder="Or say something in your own words…" autocomplete="off"><button type="button" class="btn btn--ghost" id="sxTalkGo">Say it</button></form>' : '') +
       '<div class="card__actions">' + acts + '<button type="button" class="btn btn--ghost" id="sitOut">Walk out</button></div>';
     veil.hidden = false;
     const g = el("sitGo"); if(g) g.addEventListener("click", sitNext);
     el("sitOut").addEventListener("click", () => sitEnd(true));
     card.querySelectorAll("[data-sit]").forEach(b => b.addEventListener("click", () => sitPick(+b.getAttribute("data-sit"))));
+    const tf = el("sxTalk"); if(tf){ const go = ev => { if(ev) ev.preventDefault(); const v = (el("sxTalkIn").value || "").trim(); if(v) talk(v); }; tf.addEventListener("submit", go); el("sxTalkGo").addEventListener("click", go); }
     const lb = card.querySelector(".sx-lines"); if(lb) lb.scrollTop = lb.scrollHeight;
+    try{ if(window.onumGlossary && typeof window.onumGlossary.scan === "function") card.querySelectorAll(".sx-l.is-new, .sx-q, .sx-recap").forEach(n => window.onumGlossary.scan(n)); }catch(e){}
     try{ refreshPicks(); }catch(e){}
   }
 
@@ -35220,11 +35266,170 @@ try{
     ".sx-support{border-color:#3c8d5a}.sx-oppose{border-color:#b0473c}.sx-threat{border-color:#8a2be2}.sx-deal{border-color:#c08a1e}.sx-procedural{border-color:#5b6b7c}.sx-g{font-size:12px;color:#5b5240;margin-top:2px}.sx-g span{font-weight:700}" +
     ".sx-gd{font-size:12px;color:#5b5240}.sx-gd summary{cursor:pointer;color:#8a7f66}.sx-moves{display:flex;flex-wrap:wrap;gap:6px;flex:1 1 100%}.sx-moves .btn{text-align:left;max-width:300px;white-space:normal}.sx-why{opacity:.7;font-weight:400}.sx-hint{font-size:12px;color:#6a5f46;margin:6px 0 0}" +
     ".sx-recap{border-top:1px solid rgba(0,0,0,.12);margin-top:8px;font-size:13px}.sx-recap h3{font-size:14px;margin:8px 0 4px}.sx-recap ul{margin:0 0 0 18px;padding:0}" +
+    ".sx-talk{display:flex;gap:6px;margin:8px 0 0}.sx-talk input{flex:1;padding:6px 8px;border:1px solid #b8ab8a;border-radius:6px;font:14px Georgia,serif;background:#fffdf7}" +
     "@media (max-width:760px){.sx-grid{grid-template-columns:1fr}}";
   document.head.appendChild(st);
   console.log("NEPTUNE sittings ready");
 }catch(e){ try{ console.warn("NEPTUNE-SITTINGS block", e); }catch(e2){} }
 /* NEPTUNE-SITTINGS END */
+/* NEPTUNE-LOCALPARTY BEGIN — regular local party meetings at home: a weekly district meeting and a monthly
+   state party meeting, with constituents and the lower elected officials of the district and state (state
+   reps, state senators, mayors, county officials). Officials are generated deterministically from the
+   state and district (names, party, faction, agenda, allies and rivals) and kept in the save with their
+   warmth to you. Agenda items come from JUPITER's feeds (window.ONUM_SUGGESTIONS / "onum-suggestion",
+   window.ONUM_DISTRICT_CHANGES / "onum-district-change"), else local issues. Meetings run on the
+   NEPTUNE-SITTINGS engine (debate, choices, stance meters, ruling, recap) and pay out in local standing,
+   endorsements, volunteers, the war chest and approval. Listed on the day schedule and in the notices. */
+try{
+  const SX = window.NEPTUNE_SITTINGS; if(!SX || !SX.matter) throw new Error("sittings engine missing");
+  const LP = window.NEPTUNE_LOCALPARTY = {ver:"20261012z"};
+  const cl = (v, a, b) => Math.max(a, Math.min(b, v));
+  const hash = s => { let h = 2166136261; for(const c of String(s)){ h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; };
+  const rng = seed => { let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; };
+  const FIRST = ["Ada","Walt","June","Ray","Marta","Owen","Lena","Gus","Rosa","Hank","Ines","Cal","Dora","Abe","Nell","Teo","Bea","Moss","Ivy","Luis","Greta","Sol","Faye","Otis","Nadia","Ezra","Pearl","Dev","Mae","Joaquin"];
+  const LAST = ["Halvorsen","Okafor","Pruitt","Delacroix","Brandt","Mercado","Tolliver","Ashby","Kowalczyk","Fenwick","Oduya","Lindqvist","Barrow","Castell","Whitcombe","Nakamura","Ridley","Abernathy","Szabo","Quinlan","Marchetti","Hollis","Varga","Ellery","Dunmore","Petrakis","Crane","Osei","Rourke","Vance"];
+  const FAC = ["Main Street", "Farm Bureau wing", "Labor table", "Reformers", "Old guard", "Young caucus", "Faith and family", "Fiscal hawks"];
+  const AGENDA = ["the county road budget", "keeping the hospital open", "a new grain elevator", "the school levy", "lower property taxes", "the river cleanup", "broadband out to the farms", "the plant's permit", "more deputies for the sheriff", "fixing the water main", "the county fair grounds", "a fair map at the next census"];
+  const people = (key, roles, st) => {
+    const r = rng(hash(key)), y = G.you, opp = y.party === "FED" ? "COM" : "FED", P = [];
+    roles.forEach((role, i) => {
+      const pr = r(), party = role.civ ? null : /party chair|precinct/i.test(role.t) ? y.party : pr < 0.62 ? y.party : pr < 0.88 ? opp : "IND";
+      P.push({id:key + ":" + i, name:FIRST[Math.floor(r() * FIRST.length)] + " " + LAST[Math.floor(r() * LAST.length)], role:role.t + (role.where ? ", " + role.where : ""),
+        party, faction:FAC[Math.floor(r() * FAC.length)], agenda:AGENDA[Math.floor(r() * AGENDA.length)], temper:Math.round(20 + r() * 65), conv:Math.round(20 + r() * 65), vanity:Math.round(10 + r() * 70),
+        warmth:Math.round(-10 + r() * 30) + (party === y.party ? 6 : party ? -6 : 0), state:st, allies:[], rival:null, endorse:false, met:0});
+    });
+    P.forEach((p, i) => { P.forEach((q, j) => { if(i !== j && (p.faction === q.faction || (p.party && p.party === q.party && r() < 0.35))) p.allies.push(j); }); if(r() < 0.6){ const j = Math.floor(r() * P.length); if(j !== i && !p.allies.includes(j)) p.rival = j; } });
+    return P;
+  };
+  const store = () => { const L = G.localParty = G.localParty || {}; L.off = L.off || {}; L.items = L.items || []; L.used = L.used || {}; L.held = L.held || {}; L.ev = L.ev || {};
+    L.standing = L.standing == null ? 50 : L.standing; L.volunteers = L.volunteers || 0; return L; };
+  const home = () => { const y = G.you; return {st:y.state, dist:y.dist || 1}; };
+  const town = (st, i) => { const r = rng(hash(st + "|town|" + i)); return ["Millbrook","Cedar Falls","Harlan","Fairmont","Two Rivers","Kettle Bend","Ashgrove","Port Wren","Dunmore","Sable Hill"][Math.floor(r() * 10)]; };
+  LP.officials = function(kind){
+    const L = store(), h = home();
+    const key = kind === "state" ? "s:" + h.st : "d:" + h.st + ":" + h.dist;
+    if(!L.off[key]){
+      const t1 = town(h.st, h.dist), t2 = town(h.st, h.dist + 7);
+      L.off[key] = kind === "state"
+        ? people(key, [{t:"State senator", where:"District " + (h.dist * 2 + 1)}, {t:"State senator", where:"District " + (h.dist * 2 + 6)}, {t:"State party chair"}, {t:"Mayor", where:t1}, {t:"State representative", where:"District " + (h.dist * 3)}, {t:"Precinct captain", civ:true}], h.st)
+        : people(key, [{t:"State representative", where:"District " + (h.dist * 3)}, {t:"Mayor", where:t1}, {t:"County commissioner", where:t2 + " County"}, {t:"County clerk"}, {t:"County party chair"}, {t:"Constituent", civ:true}, {t:"Constituent", civ:true}], h.st);
+    }
+    return L.off[key];
+  };
+  /* where it is held */
+  LP.place = function(kind){
+    let P = []; try{ P = (window.ONUM_TOWN_POIS || []).filter(Boolean); }catch(e){}
+    const nm = p => typeof p === "string" ? p : p.name || p.label || p.title || "";
+    const pref = kind === "state" ? /hall|grange|hotel|library|school|church|square/i : /church|diner|back room|hall|grange|square|cafe|café|vfw|legion/i;
+    const f = P.find(p => pref.test(nm(p) + " " + (p.kind || p.type || ""))) || P[0];
+    if(f && nm(f)) return {name:nm(f), poi:f};
+    const h = home(); return {name:kind === "state" ? "the ballroom at the " + town(h.st, 1) + " Hotel" : "the back room at Vaughn's diner", poi:null};
+  };
+  /* JUPITER's feeds */
+  const takeSug = s => { if(!s) return; const L = store(), id = "s:" + (s.id != null ? s.id : hash(s.text)); if(L.items.some(x => x.id === id) || !s.text) return;
+    L.items.push({id, src:"suggestion", from:s.from || "a constituent", topic:s.topic || "", text:String(s.text).slice(0, 200), at:G.day}); };
+  const takeChg = c => { if(!c) return; const L = store(), id = "c:" + (c.id != null ? c.id : hash(c.name + c.kind)); if(L.items.some(x => x.id === id)) return;
+    const need = c.status && !/open|done|approved|built/i.test(c.status) ? String(c.status).replace(/^needs\s+/i, "") : "a permit";
+    L.items.push({id, src:"change", from:c.owner || "a neighbour", topic:c.kind || "", text:(c.owner ? c.owner + "'s " : "The ") + (c.kind || "new place") + (c.name ? " \u201c" + c.name + "\u201d" : "") + " needs " + need + " from the county", at:G.day, chg:c}); };
+  const pull = () => { try{ (window.ONUM_SUGGESTIONS || []).forEach(takeSug); }catch(e){} try{ (window.ONUM_DISTRICT_CHANGES || []).forEach(takeChg); }catch(e){} };
+  window.addEventListener("onum-suggestion", e => { try{ takeSug(e.detail); }catch(x){} });
+  window.addEventListener("onum-district-change", e => { try{ takeChg(e.detail); }catch(x){} });
+  const LOCAL = ["the county wants to close the branch library two days a week", "potholes on the state road nobody will claim", "the volunteer fire company needs a new pumper", "the grain co-op wants a tax break to expand", "the high school lost its bus route", "a developer wants to rezone the old orchard"];
+  LP.agenda = function(kind, n){
+    pull(); const L = store();
+    const fresh = L.items.filter(x => !L.used[x.id]);
+    const out = fresh.slice(0, n);
+    const r = rng(hash(G.day + kind));
+    while(out.length < n){ const t = LOCAL[Math.floor(r() * LOCAL.length)]; if(!out.some(x => x.text === t)) out.push({id:"g:" + hash(t + G.day), src:"local", from:"the county party", text:t}); }
+    return out;
+  };
+  /* schedule */
+  LP.due = function(day){
+    const h = home(), dd = hash(h.st + h.dist) % 7, sd = hash(h.st) % 28; day = day == null ? G.day : day;
+    const L = [];
+    if(day % 7 === dd) L.push({kind:"district", hour:19});
+    if(day % 28 === sd) L.push({kind:"state", hour:18});
+    return L;
+  };
+  LP.next = kind => { for(let d = G.day; d < G.day + 30; d++) if(LP.due(d).some(x => x.kind === kind)) return d; return null; };
+  const title = k => k === "state" ? "State party meeting" : "District party meeting";
+  const evFor = (day, x) => { const L = store(), k = day + ":" + x.kind; if(!L.ev[k]){ const pl = LP.place(x.kind);
+      L.ev[k] = {t:title(x.kind) + " \u2014 " + pl.name, d:(x.kind === "state" ? "The " + G.you.state + " party: state senators, the state chair, mayors. " : "Your district's party: the state rep, the mayor, county officials and whoever walks in. ") + "Go home to your district to attend.", room:"district", hour:x.hour, day, k:"local party", lp:x.kind}; }
+    L.ev[k].done = !!L.held[k]; return L.ev[k]; };
+  try{ const dE = dayEventsToday; dayEventsToday = function(){ const A = dE.apply(this, arguments); try{ LP.due().forEach(x => A.push(evFor(G.day, x))); A.sort((a, b) => (a.hour || 0) - (b.hour || 0)); }catch(e){} return A; }; }catch(e){}
+  /* persist in the save */
+  try{ const sc = saveCaptureBase; saveCaptureBase = function(){ const o = sc.apply(this, arguments); try{ o.localParty = G.localParty || null; }catch(e){} return o; }; }catch(e){}
+  /* notices */
+  let lastDay = -1;
+  setInterval(() => { try{ if(!G || !G.you || !G.day || G.day === lastDay) return; lastDay = G.day;
+    LP.due().forEach(x => { const pl = LP.place(x.kind), t = title(x.kind) + " tonight at " + pl.name + ", " + (x.hour - 12) + " pm.";
+      try{ pushWireScrap("LOCAL", t); }catch(e){} try{ window.NEPTUNE_CLARITY && NEPTUNE_CLARITY.addItem({k:"localparty", kind:"note", title:title(x.kind), text:t + " Agenda: " + LP.agenda(x.kind, 2).map(i => i.text).join("; ") + "."}); }catch(e){} });
+  }catch(e){} }, 4000);
+
+  /* the sitting */
+  const STEPS = ["gavel","open","question","question","motion","deliberate","vote","adjourn"];
+  SIT_DEF.localdist = {title:"District party meeting", chair:"The county party chair", min:90, en:12, kind:"vote", key:"lpd", steps:STEPS};
+  SIT_DEF.localstate = {title:"State party meeting", chair:"The state party chair", min:120, en:16, kind:"vote", key:"lps", steps:STEPS};
+  const cur = {};
+  const matter = kind => () => {
+    const items = cur.items = LP.agenda(kind, 2), pl = cur.place = LP.place(kind);
+    const it = items.map(i => i.text);
+    return {q:"the party backing " + it[0] + (it[1] ? ", and " + it[1] : ""), short:"the agenda", yes:"back it", no:"table it", comp:"a working group that reports at the next meeting, with " + it[0] + " first", petition:true,
+      greet:["Congressman, ", "Thanks for coming home. ", "Evening, everybody. "], gavel:"Evening, all. Coffee's at the back. We're at " + pl.name + ", and there are " + items.length + " things on tonight's list.",
+      adjourn:"That's the list. Stack your chairs. Same time " + (kind === "state" ? "next month" : "next week") + ".", state:G.you.state, bill:null, items, kind};
+  };
+  const cast = kind => (M, out) => {
+    const O = LP.officials(kind), C = [];
+    O.filter(o => o.party || true).slice(0, 5).forEach(o => C.push({m:null, name:o.name, role:o.role + (o.party ? " · " + (function(){ try{ return partyLabel(o.party); }catch(e){ return o.party; } })() : "") + " · " + o.faction, party:o.party, state:o.state,
+      temper:o.temper, conv:o.conv, vanity:o.vanity, warmth:o.warmth, want:o.agenda, off:o, stance0:cl(Math.round(50 + o.warmth * 0.8 + (o.party === G.you.party ? 8 : -8) + (rng(hash(o.id + G.day))() - 0.5) * 30), 6, 94)}));
+    /* the people who brought tonight's items speak first */
+    (M.items || []).slice().reverse().forEach(it => C.unshift({m:null, name:it.src === "local" ? O[O.length - 1].name : it.from, role:it.src === "suggestion" ? "constituent (suggestion)" : it.src === "change" ? "neighbour (" + (it.topic || "change") + ")" : "constituent", party:null, state:G.you.state,
+      temper:45, conv:50, vanity:40, warmth:10, want:it.text, item:it, stance0:72}));
+    /* JUPITER's NPC minds, when present, drive what each official wants and how they lean */
+    C.forEach(p => { if(!p.off) return; let mind = null;
+      try{ if(typeof window.onumMind === "function") mind = window.onumMind(p.off.id) || window.onumMind(p.off.name); }catch(e){}
+      try{ const MS = window.ONUM_MINDS; if(!mind && MS) mind = Array.isArray(MS) ? MS.find(x => x && (x.id === p.off.id || x.npcId === p.off.id || x.name === p.off.name)) : (MS[p.off.id] || MS[p.off.name]); }catch(e){}
+      if(!mind || typeof mind !== "object") return;
+      const first = v => Array.isArray(v) ? v[0] : v, txt = v => v == null ? "" : typeof v === "string" ? v : (v.text || v.goal || v.t || v.name || "");
+      const g = txt(first(mind.goals)) || txt(first(mind.plans)) || txt(mind.goal);
+      if(g){ p.want = String(g).slice(0, 90); p.off.agenda = p.want; }
+      const bel = [].concat(mind.beliefs || []).map(txt).join(" ").toLowerCase();
+      let d = 0; if(typeof mind.stance === "number") p.stance0 = cl(Math.round(mind.stance <= 1 && mind.stance >= -1 ? 50 + mind.stance * 50 : mind.stance), 4, 96);
+      ["trust", "warmth", "opinionOfPlayer", "towardPlayer"].forEach(k => { if(typeof mind[k] === "number") d += cl(mind[k], -50, 50) * 0.4; });
+      if(/distrust|against (you|the congress)|oppose/.test(bel)) d -= 12; if(/trust (you|the congress)|support|ally/.test(bel)) d += 8;
+      if(typeof mind.temper === "number") p.temper = mind.temper; if(typeof mind.conviction === "number") p.conv = mind.conviction;
+      p.stance0 = cl(Math.round((p.stance0 == null ? 50 : p.stance0) + d), 4, 96); p.mind = true; p.role += " · mind";
+    });
+    const C2 = C.slice(0, 7);
+    C2.forEach((p, i) => { if(p.off){ const O2 = O; p.fixAllies = p.off.allies.map(j => C2.findIndex(q => q.off === O2[j])).filter(j => j >= 0); const rj = p.off.rival != null ? C2.findIndex(q => q.off === O2[p.off.rival]) : -1; if(rj >= 0) p.fixRival = rj; } });
+    return C2;
+  };
+  const after = kind => (S, good, t, carried) => {
+    const L = store(), y = G.you, C = S.x.cast, key = G.day + ":" + kind, fin = S.x.final || "room";
+    L.held[key] = true; (S.x.M.items || []).forEach(i => { L.used[i.id] = G.day; i.ruled = carried ? (fin === "rulecomp" ? "working group" : "backed") : "tabled"; });
+    const dS = (good ? 4 : carried ? 2 : -2) + (S.rush ? -2 : 0), vol = Math.max(0, Math.round((t.yes - t.no) * (kind === "state" ? 3 : 2) + (good ? 3 : 0))), cash = good ? (kind === "state" ? 4 : 2) : carried ? 1 : 0, appr = carried ? 2 : -1;
+    L.standing = cl(L.standing + dS, 0, 100); L.volunteers += vol; y.funds = Math.max(0, (y.funds || 0) + cash); y.approval = cl((y.approval || 0) + appr, 0, 100);
+    const end = [];
+    C.forEach(p => { if(!p.off) return; p.off.warmth = cl(p.off.warmth + Math.round((p.stance - p.start) / 6) + (p.stance >= 55 ? 2 : p.stance <= 45 ? -2 : 0), -60, 60); p.off.met++;
+      const was = p.off.endorse; p.off.endorse = p.off.warmth >= 18 && p.stance >= 55; if(p.off.endorse && !was) end.push(p.off.name + " (" + p.off.role.split(",")[0] + ")"); if(was && !p.off.endorse) end.push("lost " + p.off.name); });
+    L.log = (L.log || []).concat([{day:G.day, kind, carried, good, items:(S.x.M.items || []).map(i => [i.text, i.ruled])}]).slice(-20);
+    try{ (S.x.M.items || []).forEach(i => { if(i.chg) window.dispatchEvent(new CustomEvent("onum-district-ruling", {detail:{id:i.chg.id, ruling:i.ruled}})); if(i.src === "suggestion") window.dispatchEvent(new CustomEvent("onum-suggestion-ruling", {detail:{id:i.id.slice(2), ruling:i.ruled}})); }); }catch(e){}
+    try{ pushWireScrap("LOCAL", title(kind) + ": " + (S.x.M.items || []).map(i => i.text + " \u2014 " + i.ruled).join("; ") + "."); }catch(e){}
+    const nEnd = Object.values(L.off).flat().filter(o => o.endorse).length;
+    return (S.x.M.items || []).map(i => "\u201c" + i.text + "\u201d: " + i.ruled + ".").join(" ") + " Local standing " + (dS >= 0 ? "+" : "") + dS + " (now " + L.standing + "), " + vol + " new volunteers (" + L.volunteers + " in all), " + (cash ? "+" + cash + " war chest, " : "") + (appr >= 0 ? "+" : "") + appr + " approval. " +
+      (end.length ? "Endorsements: " + end.join(", ") + ". " : "") + nEnd + " local officials endorse you.";
+  };
+  ["district", "state"].forEach(k => { const r = k === "state" ? "localstate" : "localdist"; SX.matter[r] = matter(k); SX.castFor[r] = cast(k); SX.after[r] = after(k); });
+  LP.start = (kind, force) => { const k = kind === "state" ? "state" : "district"; const key = (k === "state" ? "lps" : "lpd") + G.day; sitStart((k === "state" ? "localstate" : "localdist") + ":" + key); };
+  /* attend from the district: the counter at Vaughn's (or the first prop there) */
+  try{ const P = (PROPS.district || [])[0]; if(P && !P._lp){ const a0 = P.acts; P._lp = true; P.acts = function(){ let A = []; try{ A = a0.apply(this, arguments) || []; }catch(e){}
+    try{ LP.due().forEach(x => { const key = (x.kind === "state" ? "lps" : "lpd") + G.day; const pl = LP.place(x.kind); A.unshift({t:"Go in to the " + title(x.kind).toLowerCase() + " at " + pl.name, c:(x.kind === "state" ? "2h" : "90m") + " · step by step", off:kOnceToday(key) || !!store().held[G.day + ":" + x.kind] || (G.minute || 0) < (x.hour - 2) * 60,
+      run(){ LP.start(x.kind); return null; }}); }); }catch(e){} return A; }; } }catch(e){}
+  LP.schedule = () => { try{ return dayEventsToday().filter(e => e && e.lp); }catch(e){ return []; } };
+  LP.saved = () => { try{ return saveCaptureBase().localParty || null; }catch(e){ return null; } };
+  console.log("NEPTUNE localparty ready");
+}catch(e){ try{ console.warn("NEPTUNE-LOCALPARTY block", e); }catch(e2){} }
+/* NEPTUNE-LOCALPARTY END */
 /* NEPTUNE-LIVETALK BEGIN — live, typed conversation with every NPC through a free local AI (Ollama).
    Setup (Windows): install Ollama, set user env OLLAMA_ORIGINS=* (so file:// and the app may call it),
    restart Ollama, then `ollama pull llama3.2:3b`. The game talks to http://127.0.0.1:11434/api/chat
