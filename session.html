@@ -32563,6 +32563,127 @@ try{
     gather(h){ try{ ensureConsularCaucus(); consularBody(h == null ? 12 : h); }catch(e){} return G.consularAtBronze || 0; }
   };
 }catch(e){}
+/* NEPTUNE-UNIFORMS BEGIN — loads neptune/onum-*.js (characters, flags, materials, office amenities).
+   Everything is guarded: if a module fails to load, the game runs exactly as before. */
+try{
+  const NEP = {mods:null, decree:null, failed:false};
+  window.NEPTUNE = NEP; NEP.debug = () => ({G, cam, camera, scene, govCard, PROPS, hereNow, syncPeople});
+  const GOV_MAP = {republic:"republic", democracy:"democracy", conservative:"parliamentary", commonwealth:"socialist",
+    national:"dictatorship", monarchy:"constitutional_monarchy", empire:"empire", consular:"consular_republic",
+    theocratic:"theocracy", junta:"junta", mob:"anarchist", oligarchy:"oligarchy", machine:"corporate"};
+  const nepGov = () => { try{ return GOV_MAP[(G.regime && G.regime.form) || "republic"] || "republic"; }catch(e){ return "republic"; } };
+  const nepHash = s => { let h = 2166136261; s = String(s == null ? "" : s); for(let i = 0; i < s.length; i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0) % 100000 + 1; };
+  const nepSeed = () => { try{ return nepHash(G.country && G.country.name); }catch(e){ return 1; } };
+  NEP.isLeader = () => { try{ const y = G.you; if(!y) return false; return y.post === "speaker" || y.post === "leader" || heldOffice() === "pres"; }catch(e){ return false; } };
+  NEP.nation = () => {
+    if(!G.nepDecree && NEP.decree) G.nepDecree = NEP.decree;
+    const d = G.nepDecree || null;
+    return {govType:nepGov(), seed:nepSeed(), decree: d && d.active ? {govType:nepGov(), seed:nepSeed(), style:d.style || undefined} : null};
+  };
+  NEP.setDecree = (on, style) => {
+    G.nepDecree = on ? {active:true, style:style || null, day:G.day} : null; NEP.decree = G.nepDecree;
+    NEP.remeshAll();
+  };
+  NEP.remeshAll = () => { try{ everyone().forEach(m => { if(m && m.mesh){ try{ disposePersonMesh(m.mesh); }catch(e){} m.mesh = null; m.faceTex = null; } }); }catch(e){}
+    try{ syncPeople(); }catch(e){}
+    try{ if(typeof mkMesh !== "undefined" && mkMesh && G.make) mkPreview(); }catch(e){} };
+
+  /* characters: the game's rig still runs (animation, seats, LOD), Neptune's figure is what is drawn */
+  const _buildPerson = buildPerson;
+  buildPerson = function(p){
+    const g = _buildPerson(p);
+    try{
+      const C = NEP.mods && NEP.mods.chars;
+      if(!C || !p || !p.look || !g || g.userData.cheap) return g;
+      const nat = NEP.nation();
+      const st = p.state || (p.kind === "you" && G.you && G.you.state) || (G.country && G.country.name) || "home";
+      const dress = C.dressFor({homeFlag:{type:nepGov(), seed:nepHash(st)}}, nat);
+      const L = p.look;
+      const o = C.optionsFromLook(L, {uniform:dress.uniform, homeFlag:dress.homeFlag, quality:G.gfx === "best" ? "high" : "med"});
+      o.beard = L.beard ? (L.kaiser || nepHash(p.name || p.id) % 9 === 0 ? "kaiser" : true) : false;
+      const h = C.makeCharacter(THREE, o);
+      g.traverse(m => { if(m.isMesh || m.isSkinnedMesh) m.layers.set(31); });   /* hide the old figure, keep its bones */
+      const n = h.group;
+      n.scale.set(1/(g.scale.x || 1), 1/(g.scale.y || 1), 1/(g.scale.z || 1));
+      g.add(n);
+      g.userData.nep = h;
+      let last = performance.now();
+      let hooked = false;
+      n.traverse(m => { if(hooked || !m.isMesh) return; hooked = true;
+        m.onBeforeRender = function(r, s, cam){ const t = performance.now(), dt = Math.min(0.1, (t - last)/1000); last = t; if(dt <= 0) return;
+          try{ h.update(dt, {camera:cam, sitting: p.kind === "you" ? !!(G.you && G.you.sitting) : !!(p.sitting && !G.noSit && !G.plainSit),
+            moving: !!p.moving || !!p.walking, talking: !!p.talking}); }catch(e){} }; });
+    }catch(e){ if(!NEP._warned){ NEP._warned = true; console.warn("NEPTUNE character", e); } }
+    return g;
+  };
+
+  /* flags: the national flag drawn by Neptune for the 21 government types */
+  const _flagTexture = flagTexture;
+  flagTexture = function(fl){
+    try{ const F = NEP.mods && NEP.mods.flags;
+      if(F && G.country && fl === G.country.flag) return F.makeFlagTexture(THREE, nepGov(), nepSeed(), {width:512}); }catch(e){}
+    return _flagTexture(fl);
+  };
+
+  /* materials: Neptune PBR surfaces in place of the canvas ones, brightness matched to the original */
+  const _matTex = matTex, NEP_MAT = new Map();
+  const nepLum = img => { try{ const c = document.createElement("canvas"); c.width = c.height = 16; const x = c.getContext("2d"); x.drawImage(img, 0, 0, 16, 16);
+    const d = x.getImageData(0, 0, 16, 16).data; let s = 0; for(let i = 0; i < d.length; i += 4) s += d[i]*.2126 + d[i+1]*.7152 + d[i+2]*.0722; return s / (d.length/4) / 255; }catch(e){ return 0; } };
+  matTex = function(tex, rx, ry, rough, col){
+    try{ const M = NEP.mods && NEP.mods.mats;
+      if(M && tex && tex.image && G.gfx !== "simple"){
+        const nm = tex.image === (TEX.marble && TEX.marble.image) ? "marble" : tex.image === (TEX.panel && TEX.panel.image) ? "wood_panel"
+          : tex.image === (TEX.carpet && TEX.carpet.image) ? "carpet" : tex.image === (TEX.stone && TEX.stone.image) ? "limestone"
+          : tex.image === (TEX.leather && TEX.leather.image) ? "leather" : null;
+        if(nm){
+          const k = nm + "|" + qrep(rx) + "|" + qrep(ry) + "|" + (col === undefined ? "x" : col);
+          if(NEP_MAT.has(k)) return NEP_MAT.get(k);
+          const m = M.makeMaterial(nm, THREE, {repeat:[qrep(rx), qrep(ry)], quality:G.gfx === "best" ? "high" : "med"});
+          m.aoMap = null;  /* game geometry has no uv2 */
+          const tx = M.getTextures(nm, THREE, {repeat:[qrep(rx), qrep(ry)], quality:G.gfx === "best" ? "high" : "med"});
+          const a = nepLum(tex.image), b = nepLum(tx.map.image);
+          const k2 = (a > 0 && b > 0) ? Math.max(0.5, Math.min(2, a / b)) : 1;
+          m.color.setScalar(k2); if(col !== undefined) m.color.multiply(new THREE.Color(col));
+          m.needsUpdate = true; NEP_MAT.set(k, m); return m;
+        }
+      } }catch(e){ if(!NEP._mw){ NEP._mw = true; console.warn("NEPTUNE material", e); } }
+    return _matTex(tex, rx, ry, rough, col);
+  };
+
+  /* office amenities: session.html's own kAmenities() calls window.addOfficeAmenities (loaded below) for a new office.
+     Its label sprites must not throw when the game's pick rays (no camera set) hit them. */
+  try{ const _sr = THREE.Sprite.prototype.raycast; THREE.Sprite.prototype.raycast = function(rc, out){ if(!rc || !rc.camera) return; return _sr.call(this, rc, out); }; }catch(e){}
+
+  /* the leader's decree: a button on the government card */
+  const _govCard = govCard;
+  govCard = function(){
+    _govCard();
+    try{
+      if(!NEP.mods) return;
+      const act = card.querySelector(".card__actions"); if(!act) return;
+      const on = !!(G.nepDecree && G.nepDecree.active), lead = NEP.isLeader();
+      const p = document.createElement("p");
+      p.innerHTML = "<strong>Dress code.</strong> " + (on ? "By decree, everyone in public life wears the " + nepGov().replace(/_/g, " ") + " uniform."
+        : "No uniform is decreed; members wear their own clothes and their home state's lapel pin.") + (lead ? "" : " Only the nation's leader can change it.");
+      act.parentNode.insertBefore(p, act);
+      if(lead){ const b = document.createElement("button"); b.type = "button"; b.className = "btn"; b.id = "nepDecree";
+        b.textContent = on ? "Revoke the uniform decree" : "Decree a uniform";
+        b.addEventListener("click", () => { NEP.setDecree(!on); govCard(); }); act.insertBefore(b, act.firstChild); }
+    }catch(e){ console.warn("NEPTUNE decree", e); }
+  };
+
+  /* loader */
+  const base = (() => { try{ return new URL("neptune/", location.href).href; }catch(e){ return "neptune/"; } })();
+  const sc = document.createElement("script"); sc.src = base + "onum-office-amenities.js"; sc.onerror = () => console.warn("NEPTUNE: amenities not loaded"); document.head.appendChild(sc);
+  if(location.protocol !== "file:") Promise.all([import(base + "onum-characters.js"), import(base + "onum-flags.js"), import(base + "onum-materials.js")]).then(([c, f, m]) => {
+    NEP.mods = {chars:c, flags:f, mats:m};
+    try{ if(G.country) TEX.flag = flagTexture(G.country.flag); }catch(e){}
+    NEP.remeshAll();
+    try{ if(_roomBuiltId && !_buildingRoom){ const r = _roomBuiltId; _roomBuiltId = null; _roomFurnished = false; clearRoom(); buildRoom(r); } }catch(e){ console.warn("NEPTUNE rebuild", e); }
+    console.log("NEPTUNE modules loaded");
+  }).catch(e => { NEP.failed = true; console.warn("NEPTUNE modules failed; game continues without them", e); });
+}catch(e){ try{ console.warn("NEPTUNE block", e); }catch(e2){} }
+/* NEPTUNE-UNIFORMS END */
 armFrame();
 
 })();
