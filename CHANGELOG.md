@@ -4,6 +4,17 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## Talk is never blocked by a note
+
+`20261013o` (on `20261013n`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- **Notes no longer stop the sitting:** opening "What's this?" or a notice used to freeze the sitting and the talk. It no longer does.
+- **Notices dock moved** to the top left, under the header, away from the talk box and the room labels. The transcript moved to the bottom left.
+- **Controller:** pressing the left stick (L3) turns immersive play on and off, as Shift+H does on the keyboard.
+- **Sittings explain each step:** "What's this?" during a sitting says what the current step is for and what your choices there do.
+- Not yet done: a spectator seat to watch a sitting without acting, and detail for the other procedures.
+- Stamp: meta + STAMP + `ONUM_BUILD` -> `20261013o`.
+
 ## Voices stay on
 
 `20261013n` (on `20261013m`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.

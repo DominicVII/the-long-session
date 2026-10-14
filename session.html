@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261013n">
+<meta name="onum-build" content="20261013o">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261013n";
+  var STAMP = "20261013o";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -33214,6 +33214,8 @@ function pollPad(){
   /* the shoulders walk the panels, so the whole dossier is reachable */
   if(edge(4)) padTab(-1);
   if(edge(5)){ if(PROC.on && PROC.phase !== "you") procHurry(); else padTab(1); }
+  /* 20261013o: L3 (press the left stick) toggles immersive play, as Shift+H does */
+  if(edge(10) && G.you && veil.hidden && !TALK.open){ try{ setImmersive(!G.bare); }catch(e){} }
   /* View / Back opens the phone too, for anyone who reaches for it */
   if(edge(8) || edge(16)){
     if(!veil.hidden && phoneWasRunning !== null) phoneClose();
@@ -35587,7 +35589,7 @@ try{
   css.textContent = `
   .cl-btn{font:600 12px/1 system-ui,sans-serif;background:#f4efe2;color:#222;border:1px solid #8a7f66;border-radius:12px;padding:5px 10px;cursor:pointer;margin-left:6px}
   .cl-go{background:#2f5d3a;color:#fff;border-color:#2f5d3a}
-  #clDock{position:fixed;right:14px;bottom:64px;z-index:9000;display:flex;gap:6px}
+  #clDock{position:fixed;left:12px;top:112px;z-index:9000;display:flex;gap:6px;flex-wrap:wrap;max-width:min(320px,46vw)}
   #clDock .n{background:#b0473c;color:#fff;border-radius:9px;padding:1px 6px;margin-left:4px;font-size:11px}
   #clPanel{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(680px,94vw);max-height:84vh;overflow:auto;z-index:100000;background:#fbf8f0;color:#1d1d1d;border:1px solid #8a7f66;border-radius:10px;box-shadow:0 12px 40px rgba(0,0,0,.45);padding:16px 18px;font:14px/1.45 Georgia,serif}
   #clPanel h2{margin:0 0 4px;font-size:20px} #clPanel h3{margin:12px 0 4px;font:700 12px system-ui;text-transform:uppercase;letter-spacing:.06em;color:#6a5f46}
@@ -35596,7 +35598,7 @@ try{
   .cl-it{border-top:1px solid #e3dccb;padding:6px 0;cursor:pointer} .cl-it:hover{background:#f1ead8}
   .cl-b{display:inline-block;font:600 11px system-ui;border-radius:8px;padding:1px 6px;margin-right:4px;color:#fff}
   .cl-high{background:#b0473c}.cl-med{background:#c08a1e}.cl-low{background:#8a8a8a}.cl-ok{background:#3c8d5a}.cl-new{background:#2a5d9f}
-  #clTx{position:fixed;right:12px;top:72px;width:380px;max-height:56vh;overflow:auto;z-index:8000;background:#fbf8f0;backdrop-filter:none;color:#1d1d1d;border:1px solid #8a7f66;border-radius:8px;font:13px/1.35 Georgia,serif;padding:8px 10px;box-shadow:0 6px 18px rgba(0,0,0,.35)}
+  #clTx{position:fixed;left:12px;bottom:12px;width:min(320px,40vw);max-height:30vh;overflow:auto;z-index:8000;pointer-events:auto;background:#fbf8f0;backdrop-filter:none;color:#1d1d1d;border:1px solid #8a7f66;border-radius:8px;font:13px/1.35 Georgia,serif;padding:8px 10px;box-shadow:0 6px 18px rgba(0,0,0,.35)}
   #clTx .hd{display:flex;justify-content:space-between;align-items:center;font:700 12px system-ui;text-transform:uppercase;letter-spacing:.05em;color:#6a5f46;position:sticky;top:-8px;background:#fbf8f0;padding:4px 0}
   .cl-ln{border-top:1px solid #e3dccb;padding:5px 0} .cl-ln u{text-decoration:none;color:#595959;font:11px monospace;margin-right:4px}
   .cl-ln i{display:block;color:#4a4a4a;font-size:12px;margin-top:2px} .cl-tag{font:600 10px system-ui;color:#fff;border-radius:6px;padding:0 5px;margin-left:4px;text-transform:uppercase}
@@ -35627,7 +35629,7 @@ try{
     p.innerHTML = '<button type="button" class="cl-btn x" id="clClose">Close ✕</button>' + html;
     p.hidden = false;
     el("clClose").addEventListener("click", closePanel);
-    CL.paused = !!(PROC && PROC.on);   /* a sitting waits while you read */
+    CL.paused = false;   /* 20261013o: reading a note never stops the sitting or the talk */
     return p;
   }
   function closePanel(){ const p = el("clPanel"); if(p) p.hidden = true; CL.paused = false; CL.lastReal = 0; CL.lastRun = 0; }
@@ -35656,14 +35658,25 @@ try{
     return o;
   }
   /* a sitting: the question, who asks for what, and what the words mean */
+  /* what each step of a sitting is for, and what your choices there do */
+  const PROC_STEP = {
+    gavel:"The chair opens the sitting and the clerk reads the record. Nothing is decided yet; this is where the room settles.",
+    open:"Each side makes its opening case. Listen first: what each person asks for is what they will vote or act on.",
+    question:"Members put questions to the speaker. A fair question makes the answer count; a hard one can move the room either way.",
+    motion:"A member moves to change the order of business or to object. Rulings here decide how the rest of the sitting runs.",
+    deliberate:"Members talk among themselves and count votes. Money and promises spent now change who is with you.",
+    vote:"The question is put and the result is recorded by name. Your vote here is remembered.",
+    ruling:"The chair or the court decides. A narrow ruling keeps you safe; a broad one takes a side and owns it.",
+    adjourn:"The sitting closes. What was agreed is entered in the record and the people named will remember it."
+  };
   function sittingExplain(){
-    const S = SIT.on, X = S.x, step = (typeof SIT_STEP_T !== "undefined" && SIT_STEP_T[S.D.steps[S.i]]) || "";
+    const S = SIT.on, X = S.x, stepKey = S.D.steps[S.i], step = (typeof SIT_STEP_T !== "undefined" && SIT_STEP_T[stepKey]) || "";
     const cast = (X.cast || []).filter(p => !p.gone);
     const who = cast.map(p => "<b>" + esc(p.name) + "</b> (" + esc(p.role) + ") wants " + esc(p.want) + ". " +
       (p.stance >= 55 ? "Leaning with you." : p.stance <= 45 ? "Leaning against you." : "Still undecided.")).join("<br>");
     const terms = glossTerms(X.M.q + " " + cast.map(p => p.want).join(" "));
     return {title:esc(S.D.title) + " · " + esc(step), kind:"Sitting · " + esc(step),
-      what:"<b>The question:</b> " + esc(X.M.q) + ". Every request is a claim on the same budget: a yes spends money the others also want.<br><br><b>Who is asking for what:</b><br>" + (who || "Nobody has spoken yet.") +
+      what:"<b>What happens at this step:</b> " + esc(PROC_STEP[stepKey] || "The sitting moves on.") + "<br><br><b>The question:</b> " + esc(X.M.q) + ". Every request is a claim on the same budget: a yes spends money the others also want.<br><br><b>Who is asking for what:</b><br>" + (who || "Nobody has spoken yet.") +
         (terms ? "<br><br><b>What the words mean:</b><br>" + terms : ""),
       why:"Whatever you agree to here is paid out of the money the question names, and the people named will remember your answer.",
       can:cardButtons(), conseq:[], when:now()};
