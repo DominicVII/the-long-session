@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261012z">
+<meta name="onum-build" content="20261013a">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261012z";
+  var STAMP = "20261013a";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -35430,6 +35430,393 @@ try{
   console.log("NEPTUNE localparty ready");
 }catch(e){ try{ console.warn("NEPTUNE-LOCALPARTY block", e); }catch(e2){} }
 /* NEPTUNE-LOCALPARTY END */
+/* NEPTUNE-LIVETALK BEGIN — live, typed conversation with every NPC through a free local AI (Ollama).
+   Setup (Windows): install Ollama, set user env OLLAMA_ORIGINS=* (so file:// and the app may call it),
+   restart Ollama, then `ollama pull llama3.2:3b`. The game talks to http://127.0.0.1:11434/api/chat
+   (streaming). Model, URL, Live talk and Live voices are in ⚙ Settings → "Live talk" (also the 🗣 pill).
+   If Ollama is not reachable, a one-line hint shows and every channel falls back to the scripted lines.
+   Channels: face (talk card + wire bar), sitting (step-card sittings get a "Say something…" box),
+   text (existing Texts panel), mail and cable (every letter/cable gets a reply box; the sender writes
+   back live as new mail later in game time), phone.
+   Memory: per-NPC transcript memory (localStorage "livetalk.mem"), and a shared WORLD MEMORY of facts
+   (localStorage "livetalk.world"): after each exchange a fact {who, with, said, promise, tone, secrecy, day}
+   is written (short JSON LLM call, heuristic fallback). Facts spread each game day to the speaker's allies,
+   party, staff and rival with some probability; press/leaks can spread widely; secrecy lowers the odds.
+   Every NPC prompt carries what THEY have heard (with source and confidence). Contradicting promises to
+   different NPCs cost trust when they find out. Spread events go to the CLARITY transcript and the feed.
+   PUBLIC API (for JUPITER's DMs/texting and anyone else):
+     window.onumLiveTalk.available()            -> Promise<boolean>  (probes Ollama; cached ~20 s)
+     window.onumLiveTalk.reply({npcId, channel:'dm'|'text'|'mail'|'cable'|'phone'|'face'|'sitting', text,
+                                onToken?(fullSoFar), signal?})
+                                                -> Promise<{text, live:boolean, effect}>; same memory + gossip.
+                                                   Falls back to a scripted line when Ollama is off.
+     window.onumLiveTalk.stream({...same})      -> async iterator of growing text chunks (last = full reply)
+     window.onumLiveTalk.memory(npcId)          -> {turns:[{r,c,ch,d}], heard:[{fact,src,conf,d}], facts:[...]}
+     window.onumLiveTalk.config / .setConfig({model,url,on,voices})
+   NPC MINDS CONTRACT (JUPITER): if window.onumMind(npcId) (function) or window.ONUM_MINDS[npcId] (object) exists,
+   it should return {goals, beliefs, plans, memory, family, job, wealth, mood} (strings, arrays or plain objects);
+   each present field is injected into that NPC's system prompt as "YOUR INNER LIFE". Missing = ignored.
+   All reply text is real DOM text (textContent); after each reply renders, window.onumGlossary?.scan(el) runs.
+   Foreign senders (cables, envoys) are given real, culturally fitting names and titles, never "foreign diplomat".
+   Channel style: dm/text terse lowercase-ok one or two lines; mail formal letter with salutation/sign-off;
+   cable telegraphic STOP-style diplomatic; phone spoken, clipped; face/sitting spoken 1–4 sentences. */
+try{
+  const LT = window.NEPTUNE_LIVETALK = {up:null, at:0, busy:0, cache:{}, qv:[], lastV:0, pend:[]};
+  const LSG = (k, d) => { try{ const v = JSON.parse(localStorage.getItem("livetalk." + k) || "null"); return v == null ? d : v; }catch(e){ return d; } };
+  const LSS = (k, v) => { try{ localStorage.setItem("livetalk." + k, JSON.stringify(v)); }catch(e){} };
+  const CFG = LT.cfg = Object.assign({url:"http://127.0.0.1:11434", model:"llama3.2:3b", on:true, voices:false}, LSG("cfg", {}));
+  const MEM = LT.mem = LSG("mem", {});              /* npcId -> [{r:"u"|"a", c, ch, d}] */
+  const W = LT.world = Object.assign({facts:[], heard:{}, seq:0, day:0, promises:[]}, LSG("world", {}));
+  LT.cache = LSG("vcache", {});
+  let saveT = 0; const save = () => { if(saveT) return; saveT = setTimeout(() => { saveT = 0; LSS("mem", MEM); LSS("world", W); LSS("cfg", CFG); LSS("vcache", LT.cache); }, 400); };
+  const esc2 = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+  const sn = n => { try{ return surname(n || ""); }catch(e){ return String(n || ""); } };
+  const day = () => { try{ return G.day || 1; }catch(e){ return 1; } };
+  const npc = id => { try{ return byId(+id) || (everyone() || []).find(m => String(m.id) === String(id)) || null; }catch(e){ return null; } };
+  const gloss = n => { try{ if(n && window.onumGlossary && window.onumGlossary.scan) window.onumGlossary.scan(n); }catch(e){} };
+  function clLog(who, text, tag, gloss){
+    try{ tlog(who, text, "clarity"); }catch(e){}
+    try{ const CL = window.NEPTUNE_CLARITY; if(CL && CL.sess){ CL.sess.lines.push({who, text, at:hhmm(), tag:tag || "procedural", gloss:gloss || "Live talk: how what you said landed."}); } }catch(e){}
+  }
+
+  /* ── Ollama ───────────────────────────────────────── */
+  async function probe(force){
+    if(!CFG.on){ LT.up = false; return false; }
+    if(!force && LT.up !== null && Date.now() - LT.at < 20000) return LT.up;
+    LT.at = Date.now();
+    try{ const c = new AbortController(); const t = setTimeout(() => c.abort(), 1800);
+      const r = await fetch(CFG.url + "/api/tags", {signal:c.signal}); clearTimeout(t);
+      const j = await r.json(); LT.models = (j.models || []).map(x => x.name); LT.up = r.ok;
+    }catch(e){ LT.up = false; }
+    paintPill(); return LT.up;
+  }
+  async function chat(messages, o){
+    o = o || {};
+    const body = {model:CFG.model, messages, stream:!o.json, options:{temperature:o.temp == null ? 0.85 : o.temp, num_predict:o.max || 160, repeat_penalty:1.18}};
+    if(o.json){ body.format = "json"; body.stream = false; }
+    const r = await fetch(CFG.url + "/api/chat", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body), signal:o.signal});
+    if(!r.ok) throw Object.assign(new Error("ollama " + r.status), {code:"http"});
+    if(!body.stream){ const j = await r.json(); return (j.message && j.message.content) || ""; }
+    const rd = r.body.getReader(), dec = new TextDecoder(); let buf = "", out = "";
+    for(;;){ const {done, value} = await rd.read(); if(done) break; buf += dec.decode(value, {stream:true});
+      let i; while((i = buf.indexOf("\n")) >= 0){ const ln = buf.slice(0, i).trim(); buf = buf.slice(i + 1); if(!ln) continue;
+        try{ const j = JSON.parse(ln); if(j.message && j.message.content){ out += j.message.content; if(o.onText) o.onText(out); } }catch(e){} } }
+    return out;
+  }
+  LT.chat = chat; LT.probe = probe;
+
+  /* ── prompt ───────────────────────────────────────── */
+  const STYLE = {
+    face:"You are speaking aloud, face to face. 1-4 sentences, plain spoken.",
+    sitting:"You are speaking on the record in a formal sitting. 1-3 sentences, in the register of the chamber.",
+    phone:"You are on the telephone. Spoken, clipped, 1-3 short sentences.",
+    dm:"This is a private text message. Terse: one or two short lines, no greeting, no sign-off.",
+    text:"This is a private text message. Terse: one or two short lines, no greeting, no sign-off.",
+    mail:"This is a formal letter. Open with a salutation to them, 2-5 sentences, close with a sign-off and your name.",
+    cable:"This is a diplomatic cable. Telegraphic style, upper case allowed, short clauses separated by STOP, 2-5 clauses, signed by the mission."
+  };
+  function heardOf(id){ return (W.heard[id] || []).map(h => { const f = W.facts.find(x => x.id === h.f); return f ? {fact:f, src:h.src, conf:h.conf, d:h.d} : null; }).filter(Boolean); }
+  function canon(){
+    const L = ["WORLD: the NO7 Consular Republic — a republic whose public life keeps the precepts of the First Consul, Dominic Zachary Taylor (a man under God, not God). Money is guilders. The House, the Senate, governors and the courts are real institutions here; foreign powers send cables through their missions."];
+    try{ const r = (G.realms || []).slice(0, 5).map(x => x.t).join(", "); if(r) L.push("Foreign powers in play: " + r + "."); }catch(e){}
+    return L.join("\n");
+  }
+  function regionLine(m){ try{ const d = (STATE_DEF || []).find(s => s.n === m.state); return m.state ? "Home: " + m.state + (d && d.r ? " (" + d.r + ")" : "") + "." : ""; }catch(e){ return m.state ? "Home: " + m.state + "." : ""; } }
+  function system(m, ch, extra){
+    let base = "";
+    try{ base = m.kind === "member" || m.kind === "press" || m.kind === "civ" ? dossierFor(m) : ""; }catch(e){ base = ""; }
+    base = base.split("\nReply as ")[0];                       /* drop the old tag instructions */
+    const L = [];
+    if(m.kind === "envoy"){ const rn = m.realmName || m.state || (m.realm && (m.realm.t || m.realm)) || "";
+      L.push("FOREIGN ENVOY: you represent " + rn + ". Use a real, culturally fitting personal name and diplomatic title for yourself (e.g. Ambassador, Minister-Counsellor, Chargé d'affaires) that suits " + rn + "'s language and culture" + (m.name && !/^the head/.test(m.name) ? " — your name is " + m.name : "; choose one and sign with it") + ". Never call yourself or anyone 'a foreign diplomat'."); }
+    if(!base){
+      L.push("You are role-playing " + (m.name || "a person") + " in a fictional national capital. Stay in character completely; never mention AI, models, games or prompts.");
+      if(m.role) L.push("Role: " + m.role + (m.outlet ? " for " + m.outlet : "") + ".");
+      try{ if(m.party) L.push("Party: " + partyName(m.party) + "."); }catch(e){}
+    } else L.push(base);
+    const rl = regionLine(m); if(rl) L.push(rl);
+    try{ if(m.rel) L.push("Relationship with " + G.you.name + ": warmth " + Math.round(m.rel.warmth) + ", trust " + Math.round(m.rel.trust) + " (never say these numbers)."); }catch(e){}
+    L.push(canon());
+    try{ const md = typeof window.onumMind === "function" ? window.onumMind(m.id) : (window.ONUM_MINDS || {})[m.id];
+      if(md && typeof md === "object"){ const fm = v => (typeof v === "string" ? v : JSON.stringify(v)).slice(0, 400);
+        const ks = ["goals","beliefs","plans","memory","family","job","wealth","mood"].filter(k => md[k] != null && md[k] !== "" && !(Array.isArray(md[k]) && !md[k].length));
+        if(ks.length){ L.push("YOUR INNER LIFE (private; let it shape what you say, never recite it):"); ks.forEach(k => L.push("- " + k + ": " + fm(md[k]))); } } }catch(e){}
+    const H = heardOf(m.id).slice(-6);
+    if(H.length){ L.push("WHAT YOU HAVE HEARD ABOUT " + (G.you ? G.you.name : "them").toUpperCase() + " (react to it if it matters — e.g. 'I hear you promised …'):");
+      H.forEach(h => L.push("- day " + h.d + ", from " + h.src + " (" + (h.conf > .7 ? "sure" : h.conf > .4 ? "fairly sure" : "a rumour") + "): " + h.fact.said)); }
+    const mine = (MEM[m.id] || []).filter(t => t.r === "a").slice(-8).map(t => t.c);
+    if(mine.length) L.push("Things you have ALREADY said to them — never repeat or closely rephrase any of these:\n- " + mine.join("\n- "));
+    try{ L.push("SITUATION: " + ((ROOMS[G.room] || {}).t || "the building") + ", " + hhmm() + ", day " + G.day + "."); }catch(e){}
+    try{ const ev = (G.tlog || []).slice(-5).map(r => r.who + ": " + r.t).join(" | "); if(ev) L.push("Just now around you: " + ev.slice(0, 500)); }catch(e){}
+    if(extra) L.push(extra);
+    L.push("STYLE: " + (STYLE[ch] || STYLE.face) + " Period-appropriate, in character, concise. No stage directions, no quotation marks, no name label. Be difficult if your mood and history say so.");
+    L.push("Then on a FINAL separate line an effect tag like <<warmth:+2 trust:-1 pledge:aye remember:short note>> with only what applies (small integers -10..10).");
+    return L.join("\n");
+  }
+  function turnsFor(m, ch){
+    const T = (MEM[m.id] || []).slice(-12).map(t => ({role:t.r === "u" ? "user" : "assistant", content:(t.ch && t.ch !== ch ? "[" + t.ch + "] " : "") + t.c}));
+    return T;
+  }
+  function remember2(m, r, c, ch){ const a = MEM[m.id] || (MEM[m.id] = []); a.push({r, c:String(c).slice(0, 500), ch, d:day()}); if(a.length > 40) a.splice(0, a.length - 40); save(); }
+
+  /* ── intent / sentiment: heuristic now, JSON call for the world fact ── */
+  function intent(text){
+    let t = {}; try{ t = readTone(text); }catch(e){}
+    const low = String(text).toLowerCase();
+    const side = /\b(vote (for|aye|yes)|support|back (it|the bill)|i'?ll vote aye)\b/.test(low) ? 1 : /\b(vote (against|no)|oppose|kill (it|the bill)|i'?ll vote no)\b/.test(low) ? -1 : 0;
+    return {hostile:!!t.hostile, warm:!!t.warm, promise:!!t.promise || /\b(i will|i'll|my word|i promise|guarantee)\b/.test(low), side, secret:/\b(between us|off the record|don'?t tell|keep this quiet|in confidence)\b/.test(low), threat:/\b(or else|you'?ll regret|ruin you|expose)\b/.test(low)};
+  }
+  function nudge(m, it, ch){
+    if(!m || !m.rel) return "";
+    let dw = 0, dt = 0;
+    if(it.warm) dw += 2; if(it.hostile) { dw -= 3; dt -= 1; } if(it.threat){ dw -= 4; dt -= 2; } if(it.promise) dt += 1;
+    try{ if(dw) ripple(m, dw, null, 0); if(dt) m.rel.trust = clamp(m.rel.trust + dt, 0, 100); }catch(e){}
+    try{ const b = G.bill; if(it.side && b && !b.done && m.kind === "member" && m.pos){ /* stance drift, tiny */ m.lean = clamp((m.lean || 0) + (it.warm ? 1 : 0) - (it.hostile ? 1 : 0), -10, 10); } }catch(e){}
+    const bits = []; if(dw) bits.push("warmth " + (dw > 0 ? "+" : "") + dw); if(dt) bits.push("trust " + (dt > 0 ? "+" : "") + dt);
+    const read = it.threat ? "a threat" : it.hostile ? "hostile" : it.promise ? "a promise" : it.warm ? "warm" : "neutral";
+    clLog("Live talk", "You → " + m.name + " (" + ch + "): read as " + read + (bits.length ? " · " + bits.join(", ") : ""), it.hostile || it.threat ? "threat" : it.promise ? "deal" : "procedural", "How your words changed where you stand with them.");
+    return read;
+  }
+
+  /* ── WORLD MEMORY: facts and how they spread ─────── */
+  async function addFact(m, ch, said, reply, it){
+    const f = {id:++W.seq, who:G.you ? G.you.name : "You", whoId:"you", with:m.name, withId:m.id, ch, d:day(), tone:it.hostile ? "hostile" : it.warm ? "warm" : "neutral",
+      secrecy:it.secret ? .8 : (ch === "dm" || ch === "text" || ch === "mail") ? .45 : ch === "cable" ? .6 : .25, promise:it.promise ? said.slice(0, 120) : "", side:it.side, bill:(G.bill && !G.bill.done) ? G.bill.title : "",
+      said:"you told " + m.name + ": \"" + said.slice(0, 110) + "\"", heardBy:[m.id]};
+    W.facts.push(f); if(W.facts.length > 160) W.facts.splice(0, W.facts.length - 160);
+    contradict(f, m);
+    save();
+    if(LT.up) try{
+      const j = JSON.parse(await chat([{role:"system", content:"Summarise a conversation between politicians into ONE fact line as JSON: {\"fact\":\"<12-25 words, third person, who said/promised what to whom>\",\"promise\":\"<the promise or empty>\",\"tone\":\"warm|neutral|hostile\",\"secrecy\":0..1}"},
+        {role:"user", content:(G.you ? G.you.name : "The member") + " said to " + m.name + " (" + ch + "): " + said + "\n" + m.name + " replied: " + reply}], {json:true, max:120, temp:.2}) || "{}");
+      if(j.fact) f.said = String(j.fact).slice(0, 200); if(j.promise) f.promise = String(j.promise).slice(0, 160); if(j.tone) f.tone = j.tone;
+      if(typeof j.secrecy === "number") f.secrecy = clamp(Math.max(f.secrecy * .5, j.secrecy), 0, 1); save();
+    }catch(e){}
+  }
+  function contradict(f, m){
+    if(!f.side || !f.bill) return;
+    W.promises.push({id:f.id, to:m.id, side:f.side, bill:f.bill, d:f.d}); if(W.promises.length > 60) W.promises.shift();
+  }
+  function hearsFact(o, f, src, conf){
+    if(!o || o.id === f.withId) return false;
+    const L = W.heard[o.id] || (W.heard[o.id] = []);
+    if(L.some(h => h.f === f.id)) return false;
+    L.push({f:f.id, src, conf:Math.round(conf * 100) / 100, d:day()}); if(L.length > 20) L.shift();
+    f.heardBy.push(o.id);
+    try{ hears(o, "Heard from " + src + ": " + f.said); }catch(e){}
+    /* contradiction: they were promised one thing, and hear you promised the opposite to someone else */
+    try{ const mine = W.promises.find(p => p.to === o.id && p.bill === f.bill && f.side && p.side === -f.side);
+      if(mine && o.rel){ o.rel.trust = clamp(o.rel.trust - 8, 0, 100); ripple(o, -6, null, 0);
+        clLog(o.name, "You told me one thing about " + f.bill + " and " + f.with + " another. I heard.", "threat", "A broken promise has been found out: trust falls.");
+        try{ feed(o.name + " has heard you promised " + sn(f.with) + " the opposite on " + f.bill + ".", "bad"); }catch(e){} } }catch(e){}
+    return true;
+  }
+  function spreadDay(){
+    let ev = 0;
+    const all = (() => { try{ return everyone().filter(x => !x.gone); }catch(e){ return []; } })();
+    W.facts.filter(f => day() - f.d <= 6).forEach(f => {
+      f.heardBy.slice().forEach(hid => {
+        const h = npc(hid); if(!h) return;
+        const disc = h.traits ? (h.traits.discretion || 50) / 100 : .5;
+        const p0 = (1 - f.secrecy) * (1 - disc * .7) * (f.promise ? 1.2 : .8);
+        const circle = [];
+        (h.allies || []).forEach(id => circle.push([npc(id), .55, "ally"]));
+        if(h.rival) circle.push([npc(h.rival), .3, "rival"]);
+        all.filter(x => x.party && x.party === h.party && x.kind === "member").slice(0, 40).forEach(x => circle.push([x, .08, "party"]));
+        all.filter(x => x.staffOf === h.id || x.boss === h.id).forEach(x => circle.push([x, .5, "staff"]));
+        circle.forEach(([o, w, rel]) => { if(o && Math.random() < p0 * w && hearsFact(o, f, (hid === f.withId ? h.name : sn(h.name) + " (via " + sn(f.with) + ")"), clamp(.9 - .25 * (f.heardBy.length > 3) - (hid !== f.withId ? .2 : 0), .2, .95))){ ev++; if(ev <= 4) clLog("Word travels", o.name + " (" + rel + " of " + sn(h.name) + ") has heard: " + f.said, "procedural", "Gossip in the building: what you say reaches people you did not say it to."); } });
+      });
+      /* press / leaks: wide, rare, secrecy-sensitive */
+      if(!f.leaked && f.heardBy.length > 2 && Math.random() < (1 - f.secrecy) * .12){
+        f.leaked = day(); let n = 0;
+        all.filter(x => x.kind === "member").forEach(o => { if(Math.random() < .35 && hearsFact(o, f, "the papers", .6)) n++; });
+        if(n){ ev++; try{ feed("THE WIRE · It is being said in the corridors that " + f.said.replace(/^you /, (G.you ? G.you.name : "a member") + " "), "news"); }catch(e){}
+          clLog("The Wire", "Leaked: " + f.said + " — " + n + " members now know.", "threat", "A leak: the press spread it widely."); }
+      }
+    });
+    if(ev) save();
+    return ev;
+  }
+  LT.spreadDay = spreadDay;
+  setInterval(() => { try{ if(G && G.day && W.day !== G.day){ const first = !W.day; W.day = G.day; if(!first) spreadDay(); save(); } }catch(e){} }, 1500);
+
+  /* ── the one reply function every channel uses ───── */
+  function scripted(m, ch, text){
+    try{ if(ch === "text" || ch === "dm") return dmReply(m, text); }catch(e){}
+    try{ return improvise(m, text); }catch(e){}
+    return ch === "cable" ? "RECEIVED STOP WILL REVERT STOP" : "I will think on it.";
+  }
+  async function reply(o){
+    o = o || {}; const ch = o.channel || "face"; const m = o.npc || npc(o.npcId); const text = String(o.text || "").trim().slice(0, 600);
+    if(!m || !text) throw new Error("onumLiveTalk.reply: need npcId and text");
+    const it = intent(text);
+    remember2(m, "u", text, ch);
+    let out = "", live = false, raw = "";
+    if(await probe()){
+      try{ raw = await chat([{role:"system", content:system(m, ch, o.extra)}].concat(turnsFor(m, ch)), {signal:o.signal, max:ch === "mail" || ch === "cable" ? 260 : 150,
+          onText:t => { try{ o.onToken && o.onToken(stripEffect(t.replace(/<<[^>]*$/, ""))); }catch(e){} }});
+        out = stripEffect(raw).replace(/^["“]|["”]$/g, "").replace(/^\w[\w .'-]{0,30}:\s+/, "").trim(); live = !!out; }catch(e){ if(e && e.name === "AbortError") throw e; }
+    }
+    if(!out){ out = scripted(m, ch, text); if(o.onToken) try{ o.onToken(out); }catch(e){} }
+    remember2(m, "a", out, ch);
+    try{ if(live) applyEffect(m, raw); }catch(e){}
+    nudge(m, it, ch);
+    try{ m.chat = m.chat || []; m.chat.push({role:"user", content:text}, {role:"assistant", content:out}); if(m.chat.length > 40) m.chat.splice(0, m.chat.length - 40); }catch(e){}
+    addFact(m, ch, text, out, it);
+    return {text:out, live, effect:(EFFECT_RE.exec(raw) || [])[1] || ""};
+  }
+  async function* stream(o){
+    const q = []; let wake = null, done = false, res, err;
+    reply(Object.assign({}, o, {onToken:t => { q.push(t); if(wake){ wake(); wake = null; } }})).then(r => { res = r; done = true; if(wake) wake(); }, e => { err = e; done = true; if(wake) wake(); });
+    for(;;){ if(q.length){ yield q.shift(); continue; } if(done) break; await new Promise(r => wake = r); }
+    if(err) throw err; if(res) yield res.text;
+  }
+  window.onumLiveTalk = {
+    available:() => probe(),
+    reply, stream,
+    memory:id => ({turns:(MEM[id] || []).slice(), heard:heardOf(id).map(h => ({fact:h.fact.said, src:h.src, conf:h.conf, d:h.d})), facts:W.facts.filter(f => f.withId == id || f.heardBy.indexOf(+id) >= 0 || f.heardBy.indexOf(id) >= 0)}),
+    get config(){ return Object.assign({}, CFG); },
+    setConfig(c){ Object.assign(CFG, c || {}); LT.up = null; save(); probe(true); paintPill(); },
+    world:() => W, spreadDay
+  };
+
+  /* ── face to face: replace the improvise-only converse with live streaming ── */
+  const converse0 = converse;
+  converse = async function(m, text){
+    if(!m || chatCtl) return;
+    if(!(await probe())){ hint(); return converse0.apply(this, arguments); }
+    try{ if(checkSpeakBlasphemy(text, "you")) return converse0.apply(this, arguments); }catch(e){}
+    appendMsg("you", text);
+    const bubble = appendMsg("them", "", sn(m.name)); bubble.classList.add("lt-typing"); bubble.textContent = "…";
+    el("wireSend").disabled = true; el("wireStop").hidden = false; el("wireState").textContent = sn(m.name) + " is answering…";
+    chatCtl = new AbortController();
+    try{
+      const r = await reply({npc:m, channel:"face", text, signal:chatCtl.signal, onToken:t => { bubble.textContent = t || "…"; try{ el("tkSay").textContent = t; }catch(e){} }});
+      bubble.textContent = r.text; bubble.classList.remove("lt-typing"); setSay(r.text, ""); gloss(bubble); gloss(el("tkSay"));
+      spend(4, 1);
+      try{ const rr = roomHears(text, {exclude:m, weight:1}); const tone = readTone(text); if(rr && rr.heard && (tone.hostile || tone.promise)) reportRoom(rr); }catch(e){}
+    }catch(e){ bubble.textContent = "…"; }
+    finally{ chatCtl = null; bubble.classList.remove("lt-typing"); el("wireSend").disabled = false; el("wireStop").hidden = true; el("wireState").textContent = ""; if(TALK.open && TALK.m === m) renderTalk(); refreshPanels(); }
+  };
+  try{ const cl0 = converseLive; converseLive = function(m, text){ if(!LT.up) return cl0.apply(this, arguments);
+    reply({npc:m, channel:"face", text}).then(r => { try{ speakAt(m, r.text); }catch(e){} try{ setSay(r.text, sn(m.name)); }catch(e){} try{ refreshPanels(); }catch(e){} }); }; }catch(e){}
+  try{ el("wireStop").addEventListener("click", () => { try{ chatCtl && chatCtl.abort(); }catch(e){} }); }catch(e){}
+
+  /* ── texts (the existing phone Texts panel) ── */
+  try{ const ds0 = dmSend; dmSend = function(id, text){
+    if(!LT.up) return ds0.apply(this, arguments);
+    const m = byId(id); text = String(text || "").trim().slice(0, 400); if(!m || !text) return;
+    dmPush(id, "you", text, {}); dmState().typing = id; dmRender();
+    reply({npc:m, channel:"text", text}).then(r => { dmState().typing = null; dmPush(id, id, r.text); setTimeout(() => gloss(document.querySelector(".dm, #dmPanel") || document.body), 50); }, () => { dmState().typing = null; dmPush(id, id, dmReply(m, text)); });
+  }; }catch(e){}
+
+  /* ── mail and cables: a reply box on every letter; the answer arrives later in game time ── */
+  function senderOf(x){
+    let m = x.fromId != null ? npc(x.fromId) : null;
+    if(!m && (x.kind === "cable" || /^Mission of /.test(x.from || ""))){ const rn = String(x.from || "").replace(/^Mission of /, "").replace(/^Cable — /, "");
+      const E = (LT.envoys = LT.envoys || LSG("envoys", {}));
+      m = {id:"realm:" + rn, name:E[rn] || ("the head of the " + rn + " mission"), kind:"envoy", role:"head of mission for " + rn + " in the capital, writing on behalf of their government", state:rn, realmName:rn}; }
+    return m;
+  }
+  document.addEventListener("click", e => {
+    const b = e.target.closest && e.target.closest("[data-ltmail]"); if(!b) return;
+    const box = b.parentElement, inp = box.querySelector("textarea"), t = (inp.value || "").trim(); if(!t) return;
+    const x = (G.mail || []).find(y => String(y.id) === b.dataset.ltmail); if(!x) return;
+    const m = senderOf(x); if(!m) return;
+    const ch = x.kind === "cable" || String(m.id).startsWith("realm:") ? "cable" : "mail";
+    try{ pushMail(G.you, "Re: " + x.subject, t, {outgoing:true}); }catch(err){}
+    inp.value = ""; box.querySelector(".lt-st").textContent = "Sent. A reply will come later in the day.";
+    try{ spend(6, 1); }catch(err){}
+    LT.pend.push({m, ch, t, subj:x.subject, at:(G.minute || 0) + 20 + (Math.random() * 70 | 0), d:day(), p:reply({npc:m, channel:ch, text:"[" + (ch === "cable" ? "Your cable" : "Your letter") + " re: " + x.subject + "] " + t, extra:"You are answering a " + ch + " they sent in reply to yours titled '" + x.subject + "'. Your original said: " + String(x.body || "").slice(0, 400)})});
+  });
+  setInterval(() => { try{ for(let i = LT.pend.length - 1; i >= 0; i--){ const q = LT.pend[i]; if(q.d === G.day && (G.minute || 0) < q.at) continue; LT.pend.splice(i, 1);
+      q.p.then(r => { try{ if(q.m.realmName && /^the head/.test(q.m.name)){ const sg = String(r.text).match(/(?:STOP|\n|—|-)\s*([A-Z][\w'’.-]+(?:\s+[A-Z][\w'’.-]+){1,3})\s*\.?\s*$/); if(sg){ LT.envoys[q.m.realmName] = sg[1].replace(/\s*STOP$/i, ""); LSS("envoys", LT.envoys); q.m.name = LT.envoys[q.m.realmName] + ", " + q.m.realmName + " mission"; } } }catch(e){}
+        const from = String(q.m.id).startsWith("realm:") ? null : q.m; pushMail(from, (q.ch === "cable" ? "Cable — " : "Re: ") + q.subj, r.text, from ? {kind:"reply"} : {kind:"note"});
+        if(!from){ try{ G.mail[0].from = q.m.name; }catch(e){} } note("A reply from " + q.m.name + "."); refreshPanels(); setTimeout(() => document.querySelectorAll(".mailrow__b").forEach(gloss), 80); }); } }catch(e){} }, 2000);
+  function decorMail(){
+    document.querySelectorAll("[data-clwhatmail]").forEach(b => { const p = b.closest("p") || b.parentElement; if(!p || (p.nextSibling && p.nextSibling.classList && p.nextSibling.classList.contains("lt-mail"))) return;
+      const x = (G.mail || []).find(y => String(y.id) === b.dataset.clwhatmail); if(!x || x.outgoing || !senderOf(x)) return;
+      const d = document.createElement("div"); d.className = "lt-mail";
+      d.innerHTML = '<textarea rows="2" placeholder="' + (x.kind === "cable" ? "Cable your reply…" : "Write a reply…") + '"></textarea><button type="button" class="cl-btn" data-ltmail="' + x.id + '">Send reply</button><span class="lt-st"></span>';
+      p.after(d); });
+  }
+
+  /* ── sittings: a 'Say something…' box under the moves; the current speaker answers ── */
+  function decorSit(){
+    const v = document.querySelector("#veil.sitx #card"); if(!v || v.querySelector(".lt-sit")) return;
+    const mv = v.querySelector(".sx-moves"); if(!mv) return;
+    const d = document.createElement("div"); d.className = "lt-sit lt-row";
+    d.innerHTML = '<input type="text" maxlength="300" placeholder="Say something…"><button type="button" class="btn">Say it</button><span class="lt-st"></span>';
+    mv.after(d);
+    const go = async () => { const inp = d.querySelector("input"), t = inp.value.trim(); if(!t) return; inp.value = "";
+      const nm = ((v.querySelector(".sx-p.is-talk .sx-n") || v.querySelector(".sx-p .sx-n") || {}).textContent || "").split(/\s{2,}|\n/)[0].trim();
+      const m = (G.members || []).find(x => !x.gone && nm && nm.indexOf(sn(x.name)) >= 0) || hereNow().find(x => x.kind === "member");
+      const lines = v.querySelector(".sx-lines") || mv;
+      const me = document.createElement("div"); me.className = "sx-l"; me.innerHTML = "<b>You</b> " + esc2(t); lines.appendChild(me);
+      clLog("You", t, "procedural", "What you put on the record.");
+      if(!m){ d.querySelector(".lt-st").textContent = "Nobody here to answer."; return; }
+      const r0 = document.createElement("div"); r0.className = "sx-l lt-typing"; r0.innerHTML = "<b>" + esc2(sn(m.name)) + "</b> <span>…</span>"; lines.appendChild(r0);
+      const r = await reply({npc:m, channel:"sitting", text:t, onToken:x => { r0.lastChild.textContent = x; lines.scrollTop = 1e9; }});
+      r0.lastChild.textContent = r.text; r0.classList.remove("lt-typing"); gloss(r0); clLog(sn(m.name), r.text, "talk", "Their answer to you, live.");
+      if(!r.live) hint(); };
+    d.querySelector("button").onclick = go; d.querySelector("input").addEventListener("keydown", e => { e.stopPropagation(); if(e.key === "Enter") go(); });
+  }
+  try{ new MutationObserver(() => { if(LT._dec) return; LT._dec = true; requestAnimationFrame(() => { LT._dec = false; try{ decorMail(); decorSit(); }catch(e){} }); }).observe(document.body, {childList:true, subtree:true}); }catch(e){}
+
+  /* ── Live voices: scripted lines get rephrased live in the background (cached, rate-limited) ── */
+  function voice(text, who){
+    if(!CFG.voices || !LT.up || !text || text.length < 18) return text;
+    const k = String(text).slice(0, 200), c = LT.cache[k];
+    if(c && c.length){ if(Math.random() < .75) return c[(Math.random() * c.length) | 0]; }
+    if((!c || c.length < 3) && LT.qv.length < 6 && !LT.qv.some(q => q.k === k)) LT.qv.push({k, who});
+    return text;
+  }
+  LT.voice = voice;
+  setInterval(async () => {
+    if(LT.vbusy || !LT.qv.length || !CFG.voices || !LT.up || Date.now() - LT.lastV < 4000) return;
+    const q = LT.qv.shift(); LT.vbusy = true; LT.lastV = Date.now();
+    try{ const s = (await chat([{role:"system", content:"Rephrase one line of dialogue spoken in a fictional 20th-century-style legislature of the NO7 Consular Republic. Keep the meaning, the speaker's register and roughly the length; new wording. Output only the new line."}, {role:"user", content:(q.who ? q.who + ": " : "") + q.k}], {max:90, temp:.9})).trim().replace(/^["“]|["”]$/g, "");
+      if(s && s.length > 8 && s.length < 400){ const a = LT.cache[q.k] || (LT.cache[q.k] = []); if(a.indexOf(s) < 0) a.push(s); const ks = Object.keys(LT.cache); if(ks.length > 400) delete LT.cache[ks[0]]; save(); } }catch(e){}
+    LT.vbusy = false;
+  }, 1200);
+  try{ const sl0 = sitLines; sitLines = function(){ const S = sl0.apply(this, arguments); try{ if(CFG.voices && S) Object.keys(S).forEach(k => { const v = S[k]; if(Array.isArray(v)) v.forEach(p => { if(Array.isArray(p) && typeof p[1] === "string") p[1] = voice(p[1], p[0]); }); else if(v && typeof v === "object") Object.keys(v).forEach(j => { if(Array.isArray(v[j])) v[j].forEach(p => { if(Array.isArray(p) && typeof p[1] === "string") p[1] = voice(p[1], p[0]); }); }); }); }catch(e){} return S; }; }catch(e){}
+  try{ const fr0 = fresh; fresh = function(build, tries){ return voice(fr0.call(this, build, tries)); }; }catch(e){}
+  try{ const sa0 = speakAt; speakAt = function(p, text){ return sa0.call(this, p, (p && LT.up && CFG.voices) ? voice(text, p.name) : text); }; }catch(e){}
+
+  /* ── UI: pill, settings, hint ── */
+  function hint(){ try{ const s = el("wireState"); if(s) s.textContent = "Live talk is off: start Ollama"; }catch(e){} paintPill(); }
+  function paintPill(){ const p = document.getElementById("ltPill"); if(!p) return; p.textContent = "🗣 " + (!CFG.on ? "Live talk off" : LT.up ? "Live · " + CFG.model : LT.up === false ? "Live talk is off: start Ollama" : "Live talk…"); p.classList.toggle("is-up", !!LT.up); }
+  function panel(){
+    let P = document.getElementById("ltPanel");
+    if(!P){ P = document.createElement("div"); P.id = "ltPanel"; document.body.appendChild(P); }
+    P.hidden = false;
+    P.innerHTML = '<b>Live talk (local AI via Ollama)</b><label><input type="checkbox" id="ltOn"' + (CFG.on ? " checked" : "") + '> Live talk — NPCs answer what you type</label>' +
+      '<label><input type="checkbox" id="ltVo"' + (CFG.voices ? " checked" : "") + '> Live voices — rephrase scripted lines so they never repeat</label>' +
+      '<label>Model <input id="ltModel" value="' + esc2(CFG.model) + '" list="ltModels"><datalist id="ltModels">' + (LT.models || []).map(x => '<option value="' + esc2(x) + '">').join("") + '</datalist></label>' +
+      '<label>Server <input id="ltUrl" value="' + esc2(CFG.url) + '"></label><div class="lt-st">' + (LT.up ? "Connected. Models: " + esc2((LT.models || []).join(", ")) : "Not reachable. Install Ollama, set OLLAMA_ORIGINS=*, run `ollama pull llama3.2:3b`.") + '</div>' +
+      '<div class="lt-row"><button type="button" class="btn btn--ghost" id="ltTest">Test</button><button type="button" class="btn btn--ghost" id="ltForget">Forget conversations</button><button type="button" class="btn" id="ltClose">Done</button></div>';
+    const upd = () => { CFG.on = P.querySelector("#ltOn").checked; CFG.voices = P.querySelector("#ltVo").checked; CFG.model = P.querySelector("#ltModel").value.trim() || "llama3.2:3b"; CFG.url = P.querySelector("#ltUrl").value.trim().replace(/\/$/, "") || "http://127.0.0.1:11434"; LT.up = null; save(); };
+    P.querySelectorAll("input").forEach(i => i.addEventListener("change", upd));
+    P.querySelectorAll("input").forEach(i => i.addEventListener("keydown", e => e.stopPropagation()));
+    P.querySelector("#ltTest").onclick = async () => { upd(); await probe(true); panel(); };
+    P.querySelector("#ltForget").onclick = () => { Object.keys(MEM).forEach(k => delete MEM[k]); W.facts = []; W.heard = {}; W.promises = []; save(); panel(); };
+    P.querySelector("#ltClose").onclick = () => { upd(); P.hidden = true; probe(true); };
+  }
+  LT.panel = panel; LT.decor = () => { decorMail(); decorSit(); };
+  LT.open = m => { try{ openTalk(typeof m === "object" ? m : npc(m)); }catch(e){} };   /* for tests and other workers */
+  const pill = document.createElement("button"); pill.type = "button"; pill.id = "ltPill"; pill.onclick = panel; document.body.appendChild(pill);
+  try{ new MutationObserver(() => { const d = document.getElementById("setDone"); if(d && !document.getElementById("setLive")){ const b = document.createElement("button"); b.className = "btn btn--ghost"; b.type = "button"; b.id = "setLive"; b.textContent = "Live talk"; b.onclick = panel; d.before(b); } }).observe(document.body, {childList:true, subtree:true}); }catch(e){}
+  const st = document.createElement("style");
+  st.textContent = "#ltPill{position:fixed;right:10px;bottom:62px;z-index:60;font:12px system-ui;padding:4px 9px;border-radius:12px;border:1px solid rgba(0,0,0,.2);background:#f3ead6;color:#6a5f46;cursor:pointer;opacity:.85}#ltPill.is-up{background:#e3f1e3;color:#245a2e}" +
+    "#ltPanel{position:fixed;right:10px;bottom:96px;z-index:61;width:min(380px,92vw);background:#fbf6ea;border:1px solid #b9a77a;border-radius:9px;padding:10px 12px;font:13px/1.4 system-ui;color:#3a3226;box-shadow:0 8px 30px rgba(0,0,0,.25);display:flex;flex-direction:column;gap:6px}#ltPanel input:not([type=checkbox]){width:100%;box-sizing:border-box}" +
+    ".lt-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.lt-row input{flex:1 1 200px;padding:5px 7px}.lt-st{font-size:11px;color:#8a7f66}.lt-mail{display:flex;flex-direction:column;gap:4px;margin:6px 0}.lt-mail textarea{width:100%;box-sizing:border-box;font:13px system-ui}" +
+    ".lt-typing span:after,.msg.lt-typing span:after,.lt-typing:after{content:' ▍';animation:ltb 1s steps(2) infinite}@keyframes ltb{50%{opacity:0}}";
+  document.head.appendChild(st);
+  probe(true).then(paintPill);
+  console.log("NEPTUNE livetalk ready");
+}catch(e){ try{ console.warn("NEPTUNE-LIVETALK block", e); }catch(e2){} }
+/* NEPTUNE-LIVETALK END */
+
 armFrame();
 
 })();
