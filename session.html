@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261012r">
+<meta name="onum-build" content="20261012s">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261012r";
+  var STAMP = "20261012s";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -7377,7 +7377,23 @@ function doorZone(room, x, z){
 /* true = this member waits this frame; after a few seconds they say excuse me and go */
 function doorYield(m, dt, nx, nz){
   const dp = doorZone(m.room, nx, nz);
-  if(!dp){ m._yieldT = 0; return false; }
+  if(!dp){ m._yieldT = 0; m._doorT = 0; return false; }
+  /* 20261012r: nobody lives in a doorway. Whatever the reason (a Neptune figure, a target
+     on the far side of an outdoor door, a crowd freeze), 6 s in the door zone = right of way;
+     10 s = stepped clear into the room. */
+  m._doorT = (m._doorT || 0) + dt;
+  if(m._doorT > 10){
+    m._doorT = 0; m._yieldT = 0; m._passUntil = 0;
+    try{ const b = roomBox(m.room); const cx = 0, cz = (b.d0 + b.d1) / 2; const vx = cx - dp.x, vz = cz - dp.z, L = Math.hypot(vx, vz) || 1;
+      m.x = dp.x + vx / L * (DOORWAY.r + 0.6); m.z = dp.z + vz / L * (DOORWAY.r + 0.6);
+      if(m.mesh){ m.mesh.position.x = m.x; m.mesh.position.z = m.z; }
+      if(Math.hypot((m.tx ?? m.x) - dp.x, (m.tz ?? m.z) - dp.z) < DOORWAY.r){ m.tx = m.x; m.tz = m.z; }
+      m.moving = false; m.walking = false; m._stk = null;
+      if(m.mesh && m.mesh.userData) m.mesh.userData._posed = false;
+    }catch(e){}
+    return true;
+  }
+  if(m._doorT > 6) return false;
   if(m._passUntil && performance.now() < m._passUntil) return false;
   let blocked = false;
   /* you first */
@@ -7404,7 +7420,7 @@ function doorYield(m, dt, nx, nz){
 /* no progress for ~2 s while trying to go somewhere: nudge, reroute, put through */
 function unstick(m, dt){
   const d = Math.hypot((m.tx ?? m.x) - m.x, (m.tz ?? m.z) - m.z);
-  if(d < 0.25 || m.sitting || (m._yieldT || 0) > 0){ m._stk = null; return; }
+  if(d < 0.25 || m.sitting || ((m._yieldT || 0) > 0 && (m._yieldT || 0) < DOORWAY.hold)){ m._stk = null; return; }
   const s = m._stk || (m._stk = {t:0, d, stage:0});
   if(d < s.d - 0.08){ s.d = d; s.t = 0; s.stage = 0; return; }
   s.t += dt;
@@ -7418,7 +7434,16 @@ function unstick(m, dt){
 function poseGuard(){
   const now = performance.now();
   if(now - (poseGuard._t || 0) < 250) return;
+  const gdt = Math.min(1, (now - (poseGuard._t || now)) / 1000);
   poseGuard._t = now;
+  /* parked in a doorway (not walking, so doorYield never sees them): same 10 s rule */
+  for(const p of hereNow()){
+    if(!p || p.sitting || p.gone || p === G.you) continue;
+    const dp = doorZone(p.room, p.x, p.z);
+    if(!dp){ p._parkT = 0; continue; }
+    p._parkT = (p._parkT || 0) + gdt;
+    if(p._parkT > 10){ p._parkT = 0; p._doorT = 11; try{ doorYield(p, 0, p.x, p.z); }catch(e){} }
+  }
   for(const p of hereNow()){
     const ms = p.mesh;
     if(!ms || ms.parent !== peopleGroup) continue;
