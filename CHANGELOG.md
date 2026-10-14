@@ -4,6 +4,12 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## No more white shoulder balls
+
+On `20261012m`, on top of `20261012l`. Walk **0.68** / sprint **1.15** kept. Best default, `history.replaceState` only, no CDN, no external LLM. God is the Most High; Christ is King; the First Consul is a man under God. The House is unchanged.
+
+- **Shoulders:** members in a waistcoat had two white balls on their shoulders. The shoulder caps were drawn in the shirt colour while the arms themselves wear the waistcoat cloth. The caps now use the same cloth as the arm, and sit a little smaller and lower so the shoulder line reads as one piece. Jackets and shirtsleeves are unchanged apart from the smaller cap.
+
 ## The desk computer, the form of the state, and you in the Rite
 
 On `20261012l`, on top of `20261012k` with all of the helper's work kept. Walk **0.68** / sprint **1.15** kept. Best default, `history.replaceState` only, no CDN, no external LLM. God is the Most High; Christ is King; the First Consul is a man under God and never God. The House and its procedures are unchanged.
