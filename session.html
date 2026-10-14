@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261013k">
+<meta name="onum-build" content="20261013l">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261013k";
+  var STAMP = "20261013l";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -8248,6 +8248,56 @@ function dkItems(){
       out.push(it); }); }
   return out;
 }
+/* ── 20261013l · say what a bill is, clause by clause, in plain words ── */
+const DK_CLAUSE_MEANING = [
+  ["Sec. 1. Short title", "The name it goes by. It changes nothing by itself."],
+  ["Sec. 2. Purpose", "What the act says it is for."],
+  ["Sec. 3. Direction", "Which way it pushes policy on its main axis."],
+  ["Sec. 4. Appropriations", "Money the act lets government spend, taken from the general fund."],
+  ["Sec. 4. Offset", "Who pays for it: a levy on the trade named."],
+  ["Sec. 4. Funding", "Money sent to the states, usually with a rule that they must match it."],
+  ["Sec. 5. Reporting", "A department must tell a committee how it is going, on a fixed schedule."],
+  ["Sec. 5. Oversight", "An inspector who can demand papers and call witnesses."],
+  ["Sec. 5. Sunset", "The act expires on its own after six years unless the House votes to renew it."],
+  ["Sec. 6. Effective date", "When it starts to apply to anyone."]
+];
+function dkMeaning(line){ const h = DK_CLAUSE_MEANING.find(x => String(line).indexOf(x[0]) === 0); return h ? h[1] : ""; }
+/* the clauses, each with what it does in ordinary words */
+function dkProvisionsRich(it){
+  return dkProvisions(it).map(x => {
+    const m = dkMeaning(x);
+    return "<li>" + pcEsc(x) + (m ? '<br><span class="muted" style="font-size:12px">' + pcEsc(m) + '</span>' : "") + "</li>";
+  }).join("");
+}
+/* what the bill does, who pays, who is for and against, in a few sentences */
+function dkPlain(it){
+  if(it.kind === "case") return (it.line || "A court case.") + " Whatever the bench rules binds the states from the day it is read.";
+  const pos = it.pos || (it.sb ? {[it.sb.axis || "econ"]:(it.sb.dir || 1) * 40} : {});
+  const top = AXES.slice().sort((a, b) => Math.abs(pos[b.k] || 0) - Math.abs(pos[a.k] || 0))[0];
+  const v = top ? (pos[top.k] || 0) : 0;
+  const dir = top && Math.abs(v) >= 8 ? "It pushes the country toward " + (v > 0 ? top.hi : top.lo) + " on " + top.n + " (" + (Math.abs(v) > 30 ? "strongly" : "somewhat") + ")." : "It barely moves the country on any axis.";
+  let cost = ""; try{ cost = dkCostLine(it); }catch(e){}
+  const money = /struck/.test(cost) ? "The funding section is struck, so the act would pay for nothing." : cost.replace(/^Cost: /, "It costs ");
+  let rows = []; try{ rows = dkStakeholders(it); }catch(e){}
+  const gain = rows.filter(r => r[1] === "for it").map(r => r[0]), lose = rows.filter(r => r[1] === "against it").map(r => r[0]);
+  const who = (gain.length ? " Groups for it: " + gain.slice(0, 2).join(", ") + "." : "") + (lose.length ? " Groups against it: " + lose.slice(0, 2).join(", ") + "." : "");
+  return dir + " " + money + who;
+}
+/* why each interest group takes its side: [reason if for it, reason if against it] */
+const DK_WHY = {
+  "The Chamber of Commerce": ["it lowers what firms pay and cuts the rules they must follow", "it adds costs and rules to business"],
+  "The union delegates": ["it protects wages and gives workers more say", "it cuts the protections that keep wages up"],
+  "The farm co-ops": ["it helps the markets farmers sell into", "it pushes down the prices farmers get"],
+  "The civil liberties union": ["it protects people's right to act and be heard", "it gives the state more say over what people may do"],
+  "The Consular Guard": ["it keeps order in the faith and under the First Consul", "it puts the Rite's own liberties at risk"],
+  "The bar association": ["it is written to hold up in court", "it invites lawsuits and leaves duties unclear"],
+  "The veterans' league": ["it keeps the country ready to defend itself", "it spends on arms that do not serve veterans"],
+  "The peace churches": ["it commits the country to restraint", "it asks people to fight a war they did not choose"],
+  "The shipyards": ["it means orders and jobs at the yards", "it costs the yards' private buyers more"],
+  "The county hospitals": ["it keeps care open where people live", "it asks counties to fund care they cannot pay for"],
+  "The taxpayers' league": ["it is paid for without raising the tax they pay", "it spends money that has to come from somewhere"],
+  "The parishes' charities": ["it sends help to those who need it", "it leans on charity the parish cannot afford"]
+};
 function dkCard(i){
   const L = dkItems(); i = i || 0;
   const it = L[i];
@@ -8256,9 +8306,10 @@ function dkCard(i){
   if(!it){ h += '<h1>Nothing before you</h1><p class="dream">No bill or case is waiting on you today.</p>'; }
   else {
     h += '<h1>' + pcEsc(it.title) + '</h1><p class="muted">' + pcEsc(it.line || "") + ' Sponsor: ' + pcEsc(it.sponsor || "") + '.</p>' +
-      '<details><summary>Full text and provisions</summary><ol style="margin:6px 0 0 18px">' + dkProvisions(it).map(x => '<li>' + pcEsc(x) + '</li>').join("") + '</ol></details>' +
+      '<div class="eyebrow" style="margin-top:8px">In plain words</div><p>' + pcEsc(dkPlain(it)) + '</p>' +
+      '<div class="eyebrow" style="margin-top:8px">Full text, clause by clause</div><ol style="margin:6px 0 0 18px">' + dkProvisionsRich(it) + '</ol>' +
       (it.benchRows ? '<div class="eyebrow" style="margin-top:10px">The bench · how it leans</div>' + it.benchRows.map(r => '<div class="whip__row"><span class="whip__n">' + pcEsc(r.name) + '</span><span class="whip__w">' + pcEsc(r.v) + '</span></div>').join("") : dkBreak(it.by || {}, it.body || "")) +
-      dkPublic(it, !!it.national || roleKey() === "pres") +
+      dkPublic(it, !!it.national || roleKey() === "pres") + (it.benchRows ? "" : dkExtraHTML(it)) +
       '<div id="dkSay" class="dream"></div>' +
       '<div class="card__actions">' + it.acts.map((a, j) => '<button type="button" class="btn" data-dk="' + j + '"' + (a.off ? ' disabled' : '') + '>' + pcEsc(a.t) + '</button>').join("") + '</div>';
   }
@@ -9056,19 +9107,20 @@ const DK_STAKE = {econ:[["The Chamber of Commerce", 1], ["The union delegates", 
 function dkStakeholders(it){
   const pos = it.pos || (it.sb ? {[it.sb.axis || "econ"]:(it.sb.dir || 1) * 40} : {lib:30});
   const rows = [];
-  Object.keys(DK_STAKE).forEach(k => { const v = pos[k] || 0; if(Math.abs(v) < 6) return; DK_STAKE[k].forEach(([n, s]) => { const lean = v * s; rows.push([n, Math.abs(lean) < 8 ? "watching" : lean > 0 ? "for it" : "against it"]); }); });
-  try{ const by = dkCongress(it); Object.keys(by).forEach(p => { const o = by[p]; rows.push(["Party: " + p, o.aye > o.no ? "mostly for" : o.no > o.aye ? "mostly against" : "split"]); }); }catch(e){}
-  return rows.slice(0, 9);
+  Object.keys(DK_STAKE).forEach(k => { const v = pos[k] || 0; if(Math.abs(v) < 6) return; DK_STAKE[k].forEach(([n, s]) => { const lean = v * s; const why = DK_WHY[n] || []; rows.push([n, Math.abs(lean) < 8 ? "watching" : lean > 0 ? "for it" : "against it", Math.abs(lean) < 8 ? "it does not touch what they care about much" : why[lean > 0 ? 0 : 1] || ""]); }); });
+  let aye = 0, nay = 0; try{ const by = dkCongress(it); Object.keys(by).forEach(p => { const o = by[p]; aye += o.aye; nay += o.no; rows.push(["Party: " + p, o.aye > o.no ? "mostly for" : o.no > o.aye ? "mostly against" : "split", "the party's members lean the same way on it"]); }); }catch(e){}
+  rows.push(["The Wire (news)", aye >= nay ? "runs it as a win for the bill" : "runs it as a defeat for the bill", "the press reports what the House does and what it means to voters"]);
+  return rows.slice(0, 11);
 }
 function dkSum(by){ let a = 0, n = 0, u = 0; Object.keys(by || {}).forEach(p => { a += by[p].aye; n += by[p].no; u += by[p].un; }); return {a, n, u}; }
 function dkChambers(it){
   const y = G.you || {}, S = (G.states || []).find(s => s.n === y.state);
   const rows = [];
-  const add = (name, by) => { const s = dkSum(by); rows.push('<div class="whip__row"><span class="whip__n">' + pcEsc(name) + '</span><span class="whip__w">aye ' + s.a + ' · nay ' + s.n + ' · undecided ' + s.u + ' · ' + Object.keys(by).map(p => pcEsc(p) + ' ' + by[p].aye + '/' + by[p].no + '/' + by[p].un).join(", ") + '</span></div>'); };
+  const add = (name, by, why) => { const s = dkSum(by); rows.push('<div class="whip__row"><span class="whip__n">' + pcEsc(name) + '</span><span class="whip__w">aye ' + s.a + ' · nay ' + s.n + ' · undecided ' + s.u + ' · ' + Object.keys(by).map(p => pcEsc(p) + ' ' + by[p].aye + '/' + by[p].no + '/' + by[p].un).join(", ") + (why ? '<br><span class="muted">' + pcEsc(why) + '</span>' : '') + '</span></div>'); };
   if(it.kind === "case"){ try{ (it.benchRows || dkBench(it.c)).forEach(r => rows.push('<div class="whip__row"><span class="whip__n">' + pcEsc(r.name) + '</span><span class="whip__w">' + pcEsc(r.v) + '</span></div>')); }catch(e){} return rows.join(""); }
-  try{ add("The House", dkCongress(it)); }catch(e){}
-  try{ add("The Senate", dkSenate(it)); }catch(e){}
-  try{ if(S) add("The " + y.state + " legislature", dkStatehouse(S, it)); }catch(e){}
+  try{ add("The House", dkCongress(it), "Party lines decide most seats. The undecided are members whose districts split on it."); }catch(e){}
+  try{ add("The Senate", dkSenate(it), "Each state sends two senators. They follow their state's lean and their party."); }catch(e){}
+  try{ if(S) add("The " + y.state + " legislature", dkStatehouse(S, it), "Your state's lawmakers vote on what their own voters want and what the bill does to their state."); }catch(e){}
   return rows.join("");
 }
 /* the powers you hold over it, by chair */
@@ -9111,7 +9163,7 @@ function dkAmend(it){
 function dkExtraHTML(it){
   return '<div class="eyebrow" style="margin-top:8px">Cost and effects</div><div class="muted">' + pcEsc(dkCostLine(it)) + '</div><ul style="margin:4px 0 0 18px">' + dkEffects(it).map(e => '<li>' + pcEsc(e) + '</li>').join("") + '</ul>' +
     '<div class="eyebrow" style="margin-top:8px">Every chamber</div>' + dkChambers(it) +
-    '<div class="eyebrow" style="margin-top:8px">Who is for and against</div>' + dkStakeholders(it).map(r => '<div class="whip__row"><span class="whip__n">' + pcEsc(r[0]) + '</span><span class="whip__w">' + pcEsc(r[1]) + '</span></div>').join("");
+    '<div class="eyebrow" style="margin-top:8px">Who is for and against, and why</div>' + dkStakeholders(it).map(r => '<div class="whip__row"><span class="whip__n">' + pcEsc(r[0]) + '</span><span class="whip__w">' + pcEsc(r[1]) + (r[2] ? ' — ' + pcEsc(r[2]) : '') + '</span></div>').join("");
 }
 function dkWire(root, it, sayEl, rerender){
   const said = r => { dkWire._last = r; const s2 = card.querySelector(".dk-say") || el("dkSay") || sayEl; if(s2) s2.textContent = r; };
@@ -9140,7 +9192,7 @@ function dkPowHTML(it){
 })();
 /* every decision card: the docket inline, collapsed to one line until opened */
 function dkInlineHTML(it){
-  return '<details class="dk-inline" style="border:1px solid rgba(0,0,0,.15);border-radius:8px;padding:6px 10px;margin:0 0 10px;background:rgba(255,255,255,.55);text-align:left">' +
+  return '<details open class="dk-inline" style="border:1px solid rgba(0,0,0,.15);border-radius:8px;padding:6px 10px;margin:0 0 10px;background:rgba(255,255,255,.55);text-align:left">' +
     '<summary style="cursor:pointer;font:600 13px system-ui">Docket: ' + pcEsc(it.title) + ' · clauses, cost, every chamber, your state, your powers ▾</summary>' +
     '<p class="muted" style="margin:6px 0">' + pcEsc(it.line || "") + ' Sponsor: ' + pcEsc(it.sponsor || "") + '.</p>' +
     '<ol style="margin:4px 0 0 18px;font-size:13px">' + dkClauseHTML(it) + '</ol>' + dkExtraHTML(it) +
@@ -9198,7 +9250,20 @@ const ONUM_GLOSS = {
   "sunset":"A date when the act stops applying unless renewed.",
   "offset":"How the cost is paid for, usually a cut or a levy.",
   "markup":"Committee session where a bill's text is edited line by line.",
-  "statehouse":"Your state's own legislature and its building."
+  "statehouse":"Your state's own legislature and its building.",
+  "strike":"In a bill, to delete one section from the text before the vote. Struck means it is gone.",
+  "amend":"To change a bill's words before the vote. Cutting a cost is an amendment.",
+  "lobby":"To press members in person, in private, to vote your way.",
+  "budget":"The money the state has for the year. Each yes spends some of it, so there is less for everything else.",
+  "petitioner":"Someone who brings a request to an official in person, at open hours.",
+  "open hours":"A set time when an official sees members of the public one at a time.",
+  "pension letter":"A letter from the pension office about a payment. One that comes back unopened means it did not reach the person, so the payment is still unanswered.",
+  "undecided":"A member who has not said how they will vote. These are the ones a whip or a lobbyist works on.",
+  "wire":"The news feed of short stories about the country. Districts read it, so it shapes how people see you.",
+  "hawk":"On the defence axis, the push toward firm force and spending on arms.",
+  "dove":"On the defence axis, the push toward restraint and talk before force.",
+  "thrift":"On the spending axis, the push toward keeping public money small.",
+  "provision axis":"On the spending axis, the push toward paying for services and people."
 };
 const onumGlossary = window.onumGlossary = {
   terms:ONUM_GLOSS,
@@ -35567,15 +35632,49 @@ try{
     if(it.ev && !it.handled) return explainEvent(it.ev, it);
     return o;
   }
+  /* a sitting: the question, who asks for what, and what the words mean */
+  function sittingExplain(){
+    const S = SIT.on, X = S.x, step = (typeof SIT_STEP_T !== "undefined" && SIT_STEP_T[S.D.steps[S.i]]) || "";
+    const cast = (X.cast || []).filter(p => !p.gone);
+    const who = cast.map(p => "<b>" + esc(p.name) + "</b> (" + esc(p.role) + ") wants " + esc(p.want) + ". " +
+      (p.stance >= 55 ? "Leaning with you." : p.stance <= 45 ? "Leaning against you." : "Still undecided.")).join("<br>");
+    const terms = glossTerms(X.M.q + " " + cast.map(p => p.want).join(" "));
+    return {title:esc(S.D.title) + " · " + esc(step), kind:"Sitting · " + esc(step),
+      what:"<b>The question:</b> " + esc(X.M.q) + ". Every request is a claim on the same budget: a yes spends money the others also want.<br><br><b>Who is asking for what:</b><br>" + (who || "Nobody has spoken yet.") +
+        (terms ? "<br><br><b>What the words mean:</b><br>" + terms : ""),
+      why:"Whatever you agree to here is paid out of the money the question names, and the people named will remember your answer.",
+      can:cardButtons(), conseq:[], when:now()};
+  }
+  /* the glossary terms that appear in some text */
+  function glossTerms(text){
+    const t = String(text || "").toLowerCase(), out = [], seen = {};
+    Object.keys(ONUM_GLOSS).sort((a, b) => b.length - a.length).forEach(k => {
+      if(seen[k] || !new RegExp("\\b" + k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "s?\\b").test(t)) return;
+      seen[k] = 1; out.push("<b>" + esc(k) + "</b>: " + esc(ONUM_GLOSS[k]));
+    });
+    return out.join("<br>");
+  }
+  function cardButtons(){ const c = el("card"); return c ? [...c.querySelectorAll("button")].map(b => b.textContent.trim()).filter(x => x && x.length < 60 && !/^(What's this\??|Close|Walk out|Save)/i.test(x)).slice(0, 8).map(esc) : []; }
+  /* what the bill means for you, from the same readings the Floor panel shows */
+  function billWhy(bl){
+    try{
+      const d = districtFit(bl), a = alignment(G.you, bl);
+      return "Your district reads it as " + (d > 20 ? "a win" : d < -20 ? "a problem" : "noise") + "; you read it as " + (a > 20 ? "right" : a < -20 ? "wrong" : "borderline") + ". The groups named above and the members who count the cost will remember how you vote.";
+    }catch(e){ return "Every choice here is remembered by the people named in it."; }
+  }
   function explainCard(){
+    try{ if(SIT.on && SIT.on.x && SIT.on.x.M) return sittingExplain(); }catch(e){}
     const c = el("card"); const eb = c && c.querySelector(".eyebrow"), h = c && c.querySelector("h1");
     const t = ((eb && eb.textContent) || "") + " " + ((h && h.textContent) || "");
     const btns = c ? [...c.querySelectorAll("button")].map(b => b.textContent.trim()).filter(x => x && x.length < 60).slice(0, 8) : [];
     const b = billNow();
     if(/vote|ballot|roll/i.test(t)) return Object.assign({title:esc(t.trim())}, {kind:KIND.vote.n, what:KIND.vote.what + (b ? "<br><br>On the paper: <b>" + esc(b.title) + "</b>." : ""), why:KIND.vote.why, can:btns.length ? btns : KIND.vote.can, conseq:[], when:"Now · the floor"});
     const p = phrase(t);
-    return {title:esc(t.trim() || "This screen"), kind:p ? p[1] : "Decision card", what:p ? p[2] : "A moment that needs your decision. The text above the buttons is the situation; each button is a different answer.",
-      why:"Every choice here is remembered by the people named in it.", can:btns.length ? btns.map(esc) : ["Read and continue"], conseq:p && p[4] ? [p[4]] : [], when:now()};
+    const bill = b && t.indexOf(b.title) >= 0 ? b : null;
+    const plain = bill ? (function(){ try{ return dkPlain({kind:"bill", title:bill.title, pos:bill.pos, sb:bill.sb, line:bill.line, sponsor:bill.sponsor}); }catch(e){ return ""; } })() : "";
+    return {title:esc(t.trim() || "This screen"), kind:p ? p[1] : bill ? "Bill on the desk" : "Decision card",
+      what:bill ? "<b>" + esc(bill.title) + ".</b> " + esc(plain) + (glossTerms(t) ? "<br><br>" + glossTerms(t) : "") : p ? p[2] : "A moment that needs your decision. The text above the buttons is the situation; each button is a different answer.",
+      why:bill ? billWhy(bill) : "Every choice here is remembered by the people named in it.", can:btns.length ? btns.map(esc) : ["Read and continue"], conseq:p && p[4] ? [p[4]] : [], when:now()};
   }
   function render(x){
     return '<h2>What\'s this? — ' + x.title + '</h2>' + (x.it ? '<div class="cl-card">' + badges(x.it) + '</div>' : '') +

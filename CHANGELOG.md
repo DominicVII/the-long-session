@@ -4,6 +4,16 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## Say what you are arguing about
+
+`20261013l` (on `20261013k`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- **The docket shows the bill without opening anything:** "In plain words" says what it does, what it costs and which groups are for and against it. The full text is always visible, clause by clause, with each clause's meaning (Short title, Appropriations, Offset, Sunset and so on). The inline docket opens by itself.
+- **Every chamber gives its reason:** the House, the Senate and your state's legislature each say why they vote as they do, and the groups say why they take their side. The Wire is listed too, with how it will report the bill.
+- **"What's this?" explains the thing in front of you:** a bill on the desk is explained in its own terms, and the reason it matters to you is read from your district and your own view. A State House sitting names the question, who is asking for what, and what their words mean.
+- **Glossary:** strike, amend, lobby, budget, petitioner, open hours, pension letter, undecided, the Wire, hawk, dove and thrift are defined where they appear.
+- Stamp: meta + STAMP + `ONUM_BUILD` -> `20261013l`.
+
 ## The chat knows who you are
 
 `20261013k` (on `20261013j`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
