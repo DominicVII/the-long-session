@@ -4,6 +4,14 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## Voices stay on
+
+`20261013n` (on `20261013m`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- **Cause:** the "Hear them" / "Read only" choice was kept in memory only. It was not in the save and not stored anywhere else, so every reload turned voices back on or off to the default.
+- **Fix:** the choice is stored on this computer (browser `localStorage`, key `onum.voice`) whenever you change it in Settings or the talk panel, and it is read back on startup.
+- Stamp: meta + STAMP + `ONUM_BUILD` -> `20261013n`.
+
 ## The day can always end
 
 `20261013m` (on `20261013l`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
