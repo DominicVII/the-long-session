@@ -4,6 +4,20 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## Doorways for every figure, desks in every office, offices that fit their owners, a Vox that never repeats
+
+`20261012s` (on `20261012r`, on Neptune's `20261012q`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps Neptune's `../neptune/` path.
+
+- **s — doorways:** anyone (Neptune figures included) parked in a door zone gets right of way after 6 s and is stepped into the room after 10 s, walking or not.
+- **r — desk in every office:** Senate, Court, Executive, Governor: E to sit, E/computer to open, as in My Office.
+- **r — decor by owner:** wealth (ornate/spartan), books or trophies, crucifix or Consular standard, home-state banner, a frame per term. Deterministic; yours follows you.
+- **r — role duties:** as Governor the computer has Duties (sign/veto, budget, appointments, pardons, emergencies, the legislature) and Citizens & press; today's aims follow.
+- **r — Vox:** each member has a home culture (customs, sayings, food, institutions, history, the sacred, industry, money). Posts carry 1–3 lines never said before in the whole game (a said-hash in the save; 153/153 unique over 50 days). Culture and money move ties.
+
+## The clock stops behind cards; real names abroad
+
+`20261012p`. The day no longer runs behind cards, the pause menu or a hidden tab (the 4:30 PM → 11:10 AM jump). Foreign people get pronounceable names. Furniture QA 3, 8–11. Beds sleep you after 5 PM.
+
 ## React, and the furniture where it belongs
 
 On `20261012o`, on top of `20261012n`. Keeps Neptune's NEPTUNE-UNIFORMS block (0cd27f8) verbatim.

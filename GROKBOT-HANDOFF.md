@@ -188,3 +188,11 @@ Play path: Continue → office/corridor → bronze 7/12/18 → witness/kneel/reb
 ## Tone in the House
 
 Dry. Unsentimental. The remnant is heresy, not a secret good ending. The chaplain does not move. God is the Most High. Not a consul. Not you.
+
+
+## State at 20261012s (Grokbot)
+
+- Build: `P.py j_base.html work.html` + patches through `p_q1.py` (t/q.js). Neptune blocks are injected verbatim from main.
+- Five copies identical **except** `public/session.html`, which loads `../neptune/`.
+- Leave the stray `One Nation, Under, ME..html` (two dots) alone.
+- Next: DMs with leaks (in Neptune's inbox), lore and shading on Neptune's Union map, state visits, Guard/Commonwealth sites and ads.
