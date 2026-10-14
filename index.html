@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261012w">
+<meta name="onum-build" content="20261012x">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261012w";
+  var STAMP = "20261012x";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -3489,7 +3489,7 @@ function placeInRoom(m){
     if(!blocked) break;
   }
   if(m.room === "steps"){
-    m.z = 1.3 + Math.random() * 3.2;
+    m.z = 2.3 + Math.random() * 2.2;
     m.x = (Math.random() * 2 - 1) * b.hw * 0.62;
   }
   if(m.room === "district"){
@@ -7376,53 +7376,31 @@ function doorZone(room, x, z){
   for(const p of doorPointsHere(room)) if(Math.hypot(p.x - x, p.z - z) < DOORWAY.r) return p;
   return null;
 }
-/* true = this member waits this frame; after a few seconds they say excuse me and go */
+/* 20261012w: walk-ins. Nobody waits, knocks or queues at a door: people walk straight into any office,
+   yours included. The only door rule left is that nobody may END UP standing in the frame: a target inside
+   a door zone is moved into the room, and anyone parked there for 3 s is stepped clear. Returns false always. */
+function doorClearPoint(m, dp){
+  try{ const b = roomBox(m.room); const cz = (b.d0 + b.d1) / 2; const vx = -dp.x, vz = cz - dp.z, L = Math.hypot(vx, vz) || 1;
+    return {x:clamp(dp.x + vx / L * (DOORWAY.r + 0.7), -b.hw, b.hw), z:clamp(dp.z + vz / L * (DOORWAY.r + 0.7), b.d0, b.d1)}; }catch(e){ return null; }
+}
 function doorYield(m, dt, nx, nz){
-  const dp = doorZone(m.room, nx, nz);
-  if(!dp){ m._yieldT = 0; m._doorT = 0; return false; }
-  /* 20261012r: nobody lives in a doorway. Whatever the reason (a Neptune figure, a target
-     on the far side of an outdoor door, a crowd freeze), 6 s in the door zone = right of way;
-     10 s = stepped clear into the room. */
+  m._yieldT = 0;
+  const tp = (m.tx != null) ? doorZone(m.room, m.tx, m.tz) : null;
+  if(tp){ const c = doorClearPoint(m, tp); if(c){ m.tx = c.x; m.tz = c.z; } }
+  const dp = doorZone(m.room, m.x, m.z);
+  if(!dp){ m._doorT = 0; return false; }
   m._doorT = (m._doorT || 0) + dt;
-  if(m._doorT > 10){
-    m._doorT = 0; m._yieldT = 0; m._passUntil = 0;
-    try{ const b = roomBox(m.room); const cx = 0, cz = (b.d0 + b.d1) / 2; const vx = cx - dp.x, vz = cz - dp.z, L = Math.hypot(vx, vz) || 1;
-      m.x = dp.x + vx / L * (DOORWAY.r + 0.6); m.z = dp.z + vz / L * (DOORWAY.r + 0.6);
-      if(m.mesh){ m.mesh.position.x = m.x; m.mesh.position.z = m.z; }
-      if(Math.hypot((m.tx ?? m.x) - dp.x, (m.tz ?? m.z) - dp.z) < DOORWAY.r){ m.tx = m.x; m.tz = m.z; }
-      m.moving = false; m.walking = false; m._stk = null;
-      if(m.mesh && m.mesh.userData) m.mesh.userData._posed = false;
-    }catch(e){}
-    return true;
+  if(m._doorT > 3){
+    m._doorT = 0; const c = doorClearPoint(m, dp);
+    if(c){ m.x = c.x; m.z = c.z; if(m.mesh){ m.mesh.position.x = m.x; m.mesh.position.z = m.z; } if(Math.hypot((m.tx ?? m.x) - dp.x, (m.tz ?? m.z) - dp.z) < DOORWAY.r + 0.2){ m.tx = m.x; m.tz = m.z; } }
+    m._stk = null; if(m.mesh && m.mesh.userData) m.mesh.userData._posed = false;
   }
-  if(m._doorT > 6) return false;
-  if(m._passUntil && performance.now() < m._passUntil) return false;
-  let blocked = false;
-  /* you first */
-  if(m.room === G.room && Math.hypot(cam.x - dp.x, cam.z - dp.z) < DOORWAY.r + 0.35 && Math.hypot(cam.x - m.x, cam.z - m.z) < 2.2) blocked = true;
-  /* then one at a time: whoever is already nearer the door goes */
-  if(!blocked){
-    const md = Math.hypot(m.x - dp.x, m.z - dp.z);
-    for(const o of hereNow()){
-      if(o === m || o.sitting || o.gone) continue;
-      const od = Math.hypot(o.x - dp.x, o.z - dp.z);
-      if(od < DOORWAY.r && (od < md - 0.05 || (Math.abs(od - md) <= 0.05 && String(o.id) < String(m.id))) && Math.hypot(o.x - m.x, o.z - m.z) < 1.1){ blocked = true; break; }
-    }
-  }
-  if(!blocked){ m._yieldT = 0; return false; }
-  m._yieldT = (m._yieldT || 0) + dt;
-  if(m._yieldT > DOORWAY.hold){
-    /* waited long enough: step aside and pick somewhere else to be */
-    /* waited long enough: excuse me, and through (one pass, a few seconds) */
-    m._yieldT = 0; m._passUntil = performance.now() + 4000;
-    try{ m.say = "Excuse me."; m.sayT = 1.6; m.sayTo = "you"; }catch(e){}
-  }
-  return true;
+  return false;
 }
 /* no progress for ~2 s while trying to go somewhere: nudge, reroute, put through */
 function unstick(m, dt){
   const d = Math.hypot((m.tx ?? m.x) - m.x, (m.tz ?? m.z) - m.z);
-  if(d < 0.25 || m.sitting || ((m._yieldT || 0) > 0 && (m._yieldT || 0) < DOORWAY.hold)){ m._stk = null; return; }
+  if(d < 0.25 || m.sitting){ m._stk = null; return; }
   const s = m._stk || (m._stk = {t:0, d, stage:0});
   if(d < s.d - 0.08){ s.d = d; s.t = 0; s.stage = 0; return; }
   s.t += dt;
@@ -7444,7 +7422,7 @@ function poseGuard(){
     const dp = doorZone(p.room, p.x, p.z);
     if(!dp){ p._parkT = 0; continue; }
     p._parkT = (p._parkT || 0) + gdt;
-    if(p._parkT > 10){ p._parkT = 0; p._doorT = 11; try{ doorYield(p, 0, p.x, p.z); }catch(e){} }
+    if(p._parkT > 3){ p._parkT = 0; p._doorT = 4; try{ doorYield(p, 0, p.x, p.z); }catch(e){} }
   }
   for(const p of hereNow()){
     const ms = p.mesh;
@@ -12230,8 +12208,14 @@ function animatePerson0(p, dt){
   if(p.mesh.userData && p.mesh.userData._crowdFrozen) crowdThawMesh(p.mesh);
   const u = p.mesh.userData || {};
   const dx = (p.tx||p.x) - p.x, dz = (p.tz||p.z) - p.z;
-  const moving = Math.hypot(dx,dz) > 0.25;
-  p.phase = (p.phase || 0) + dt * (moving ? 6.4 : 1.0);
+  /* 20261012x: the gait eases in and out with the real speed; on stopping the
+     stride finishes onto a planted foot instead of freezing mid-swing */
+  const wantGo = Math.hypot(dx,dz) > 0.25 && !p.sitting, pv = p._v || 0;
+  p._gw = (p._gw || 0) + (((wantGo && pv > 0.04) ? Math.min(1, pv / 0.35) : 0) - (p._gw || 0)) * Math.min(1, dt * (wantGo ? 3.5 : 5));
+  const moving = p._gw > 0.03;
+  if(wantGo && pv > 0.02) p.phase = (p.phase || 0) + dt * Math.min(9, 12.8 * pv);
+  else if(moving){ const pl = Math.round((p.phase || 0) / Math.PI) * Math.PI; p.phase += clamp(pl - p.phase, -dt * 4, dt * 4); }
+  else p.phase = (p.phase || 0) + dt;
   const k = Math.min(1, dt * 14);
   p.mesh.position.x += (p.x - p.mesh.position.x) * k;
   p.mesh.position.z += (p.z - p.mesh.position.z) * k;
@@ -12240,7 +12224,7 @@ function animatePerson0(p, dt){
   p.mesh.visible = true;
   if(MODEST){
     if(u.pelvis && u.legL && u.legR){
-      const s = Math.sin(p.phase), A = moving ? 0.52 : 0;
+      const s = Math.sin(p.phase), A = 0.52 * (p._gw || 0);
       u.legL.up.rotation.x = s*A;
       u.legR.up.rotation.x = -s*A;
       if(u.legL.lo) u.legL.lo.rotation.x = -Math.max(0, Math.sin(p.phase - 1.05)) * A * 1.2;
@@ -12308,7 +12292,7 @@ function animatePerson0(p, dt){
   if(!moving && !talking && !seatedNow && dist >= LOD_NEAR && dist < LOD_MID && (u.poseN % 2)) return;
   if(!moving && !talking && !seatedNow && dist >= LOD_MID && (u.poseN % 5)) return;
 
-  const ph = p.phase, s = Math.sin(ph), A = moving ? 0.58 : 0.0;
+  const ph = p.phase, s = Math.sin(ph), A = 0.58 * (p._gw || 0);
 
   /* Sitting: the hips come down onto the seat, the thighs go level and
      the shins hang straight to the floor. Nobody walks sitting down. */
@@ -13634,7 +13618,7 @@ function wander(m, dt){
       else if(allies.length && chance(.34)){ momentToAlly(m, pick(allies), b); }
       else { m.tx = (Math.random()*2-1)*b.hw; m.tz = b.d0 + Math.random()*(b.d1-b.d0); }
       m.tx = clamp(m.tx,-b.hw,b.hw); m.tz = clamp(m.tz,b.d0,b.d1);
-      if(m.room === "steps") m.tz = clamp(m.tz, b.d0, 4.6);
+      if(m.room === "steps") m.tz = clamp(m.tz, Math.max(b.d0, 2.2), 4.6);
       if(m.room === "district"){
         if(Math.abs(m.tx) < 2.4) m.tx = (m.tx < 0 ? -3.5 : 3.5);
       }
@@ -13658,9 +13642,27 @@ function wander(m, dt){
   const arrive = clamp(d/1.6, 0.22, 1);
   m.spd = smooth(m.spd || 0, m.gait * arrive, 0.08, Math.min(dt, 0.022));
   m.spd = Math.min(m.spd, 0.55);
+  /* 20261012x: turn before walking (in place if facing away, along an arc otherwise),
+     step around each other, never overlap, never freeze */
+  let hx = dx/d, hz = dz/d;
+  try{ const herr = Math.abs(wrapPi(Math.atan2(dx, dz) - (m.facing || 0)));
+    const tk = herr > 1.3 ? 0.05 : Math.max(0.2, Math.cos(herr));
+    m.spd = Math.min(m.spd, 0.55 * tk + 0.02);
+    if(m.room === G.room){ for(const o of hereNow()){ if(o === m || o.sitting || o.room !== m.room) continue;
+        const ox = m.x - o.x, oz = m.z - o.z, r = Math.hypot(ox, oz);
+        if(r > 0.001 && r < 0.8){ const w = (0.8 - r) / 0.8 * 1.3; hx += ox / r * w; hz += oz / r * w;
+          if(o.tx != null && (hx * (o.tx - o.x) + hz * (o.tz - o.z)) < 0){ hx += -oz / r * w * 0.6; hz += ox / r * w * 0.6; } } }
+      const cx = m.x - cam.x, cz = m.z - cam.z, cr = Math.hypot(cx, cz);
+      if(cr > 0.001 && cr < 0.8){ const w = (0.8 - cr) / 0.8 * 1.3; hx += cx / cr * w; hz += cz / cr * w; }
+      const hl = Math.hypot(hx, hz) || 1; hx /= hl; hz /= hl; }
+  }catch(e){}
   const sp = Math.min(0.022, m.spd * Math.min(dt, 0.022));
-  try{ if(doorYield(m, dt, m.x + dx/d*sp, m.z + dz/d*sp)){ m.spd = 0; return; } }catch(e){}
-  m.x += dx/d*sp; m.z += dz/d*sp;
+  m._v = dt > 0 ? sp / Math.min(dt, 0.022) : 0;
+  try{ doorYield(m, dt, m.x + hx*sp, m.z + hz*sp); }catch(e){}
+  m.x += hx*sp; m.z += hz*sp;
+  try{ if(m.room === G.room) for(const o of hereNow()){ if(o === m || o.room !== m.room) continue;
+      const ox = m.x - o.x, oz = m.z - o.z, r = Math.hypot(ox, oz);
+      if(r > 0.001 && r < 0.42){ const push = (0.42 - r) * (o.sitting ? 1 : 0.5); m.x += ox / r * push; m.z += oz / r * push; } } }catch(e){}
   try{ unstick(m, dt); }catch(e){}
 }
 /* ── two members find each other and talk ─────────────────── */
