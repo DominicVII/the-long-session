@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261012s">
+<meta name="onum-build" content="20261012t">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261012s";
+  var STAMP = "20261012t";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -7616,12 +7616,11 @@ function cultRival(m, others){
 }
 
 /* ── the Vox: up to three things nobody has ever said, in the whole game ── */
-let _saidSet = null;
+let _saidSet = null, _saidArr = null;
 function saidSet(){
-  if(_saidSet && G._saidRef === _saidSet) return _saidSet;
   if(!Array.isArray(G.saidHash)) G.saidHash = [];
-  _saidSet = new Set(G.saidHash); G._saidRef = _saidSet;
-  try{ Object.defineProperty(G, "_saidRef", {value:_saidSet, enumerable:false, configurable:true, writable:true}); }catch(e){}
+  if(_saidSet && _saidArr === G.saidHash) return _saidSet;
+  _saidArr = G.saidHash; _saidSet = new Set(G.saidHash);
   return _saidSet;
 }
 function saidKey(t){ return String(t).toLowerCase().replace(/[^a-z0-9]+/g, " ").trim(); }
@@ -7801,6 +7800,344 @@ function decorOwner(person, id){
   const terms = Math.min(4, person.terms | 0);
   for(let i = 0; i < terms; i++) addBox(i % 2 ? gilt : dark, hw - 0.035, 1.75, d * 0.55 + i * 0.42, 0.02, 0.32, 0.26, 0, true);
 }
+
+/* ===== 20261012r · texts (live DMs that can leak) and the map of the Republic ===== */
+
+/* ── DMs ── */
+function dmState(){
+  if(!G.dm || G.dm.v !== 1) G.dm = {v:1, th:{}, npc:[], leaks:[], unread:0, open:null, seq:0};
+  return G.dm;
+}
+function dmThread(id){ const D = dmState(); return D.th[id] || (D.th[id] = []); }
+const DM_SECRET = /\b(secret|between us|don'?t tell|do not tell|off the record|private|confidential|quietly|nobody knows|keep this)\b/i;
+const DM_INSULT = /\b(idiot|fool|liar|coward|crook|useless|traitor|stupid|joke|clown|snake|weasel|hate)\b/i;
+const DM_PRAISE = /\b(thank|thanks|great|good job|well done|admire|respect|proud|brilliant|appreciate|love)\b/i;
+const DM_ASKVOTE = /\b(vote|support|back|cosponsor|pledge|with me|sign on)\b/i;
+const DM_MONEY = /\b(money|donor|cash|fund|check|cheque|bribe|pay|dinner)\b/i;
+const DM_FAITH = /\b(god|christ|church|mass|pray|faith|rite|consul)\b/i;
+function dmAbout(text){
+  const t = String(text || ""), low = t.toLowerCase();
+  const about = (G.members || []).filter(m => m && !m.gone && (low.indexOf(surname(m.name).toLowerCase()) >= 0)).slice(0, 2);
+  return {q:/\?\s*$/.test(t.trim()) || /^(what|why|how|when|who|where|will|would|can|could|do|did|are|is)\b/i.test(t.trim()),
+    secret:DM_SECRET.test(t), insult:DM_INSULT.test(t), praise:DM_PRAISE.test(t), ask:DM_ASKVOTE.test(t), money:DM_MONEY.test(t), faith:DM_FAITH.test(t), about};
+}
+function dmStakes(A, text){
+  let s = 0.08;
+  if(A.secret) s += 0.30; if(A.insult) s += 0.22; if(A.money) s += 0.18; if(A.about.length) s += 0.16 * A.about.length;
+  if(A.ask && G.bill && !G.bill.done) s += 0.06;
+  if(String(text).length > 120) s += 0.05;
+  return Math.min(1, s);
+}
+function dmClean(s, m){
+  s = String(s || "").trim(); if(!s) return "";
+  try{ if(typeof DTCNO !== "undefined"){ const g = DTCNO.guard(s); if(!g) return ""; s = g; } }catch(e){}
+  return canonOk(s, m) ? s : "";
+}
+/* comprehension: the reply answers what you said, in their own voice, then (sometimes) one thing they have never said */
+function dmReply(m, text){
+  const A = dmAbout(text), T = m.traits || {}, w = (m.rel ? m.rel.warmth : 0);
+  const parts = [];
+  if(A.insult && A.about.length){ const x = A.about[0]; const tw = tieOf(m, x).w;
+    parts.push(tw > 20 ? pick(["Careful. " + surname(x.name) + " is a friend of mine.", "I will pretend I did not read that about " + surname(x.name) + "."]) : pick(["Ha. You are not wrong about " + surname(x.name) + ".", "Say that louder and " + surname(x.name) + " might finally hear it."])); }
+  else if(A.insult){ if(m.rel) m.rel.warmth = clamp(w - 6, -100, 100); parts.push(pick(["Excuse me?", "I will keep this text. You should know that.", "That is a strange way to ask a favour."])); }
+  if(A.praise){ if(m.rel) m.rel.warmth = clamp((m.rel.warmth || 0) + 2, -100, 100); parts.push(pick(["That is kind. I will remember it.", "Thank you. Not many say it in this building.", "Appreciated. Truly."])); }
+  if(A.ask){ const yes = w + (T.loyalty | 0) / 4 - 15 + (m.party === G.you.party ? 12 : -8) > 0;
+    parts.push(dmClean(DTCNO.say(m, {intent: yes ? "agree" : "refuse", sent: yes ? 1 : -1, topic:"bills"}), m) || (yes ? "Put me down as a probable." : "Not this time.")); }
+  if(A.money) parts.push(pick(["Not over text.", "Call my office about that, not this phone.", "I do not talk money in writing. Nobody sensible does."]));
+  if(A.secret) parts.push((T.discretion | 0) > 60 ? "Understood. It stays with me." : pick(["Of course. Between us.", "My lips are sealed.", "Sure, sure."]));
+  if(A.faith){ const c = memberCulture(m); parts.push(m.creed === "latin" || m.creed === "kerk" ? "God is the Most High; I hold to that. At home we keep " + c.custom + "." : "Faith is a home matter for me. " + cap(c.sacred) + " is what we keep sacred."); }
+  if(A.q && !parts.length) parts.push(dmClean(DTCNO.say(m, {intent:"react", sent: w > 15 ? 1 : w < -15 ? -1 : 0}), m) || "Good question. Let me think on it.");
+  if(!parts.length) parts.push(dmClean(DTCNO.say(m, {intent: chance(.5) ? "react" : "small", sent: w > 15 ? 1 : w < -15 ? -1 : 0}), m) || "Mm. Noted.");
+  if(chance(.45)){ const f = voxFresh(m, 1); if(f.length) parts.push(f[0]); }
+  return parts.filter(Boolean).join(" ").slice(0, 420);
+}
+function dmPush(id, from, t, extra){
+  const D = dmState(); const L = dmThread(id);
+  const msg = Object.assign({i:++D.seq, f:from, t, d:G.day, at:hhmm()}, extra || {});
+  L.push(msg); if(L.length > 60) L.splice(0, L.length - 60);
+  if(from !== "you" && D.open !== id){ D.unread++; msg.unread = true; }
+  dmBadge(); if(D.open === id) dmRender();
+  return msg;
+}
+function dmSend(id, text){
+  const m = byId(id); text = String(text || "").trim().slice(0, 400); if(!m || !text) return;
+  const A = dmAbout(text);
+  dmPush(id, "you", text, {stakes:dmStakes(A, text), about:A.about.map(x => x.id)});
+  const delay = 700 + Math.random() * 1600;
+  dmState().typing = id; dmRender();
+  setTimeout(() => { const D = dmState(); D.typing = null; dmPush(id, id, dmReply(m, text)); }, delay);
+}
+/* members text you, and each other, on their own */
+function dmInitiative(){
+  const L = (G.members || []).filter(m => m && !m.gone && m.kind === "member");
+  if(!L.length || !G.you) return;
+  if(chance(.5)){
+    const m = pick(L), w = m.rel ? m.rel.warmth : 0;
+    const t = dmClean(DTCNO.say(m, {intent: chance(.35) ? "ask" : chance(.5) ? "gossip" : "warn", sent: w > 15 ? 1 : w < -15 ? -1 : 0}), m);
+    if(t){ const f = voxFresh(m, chance(.4) ? 1 : 0); dmPush(m.id, m.id, (t + (f.length ? " " + f[0] : "")).slice(0, 400)); }
+  }
+  const D = dmState();
+  for(let i = 0; i < 3; i++){
+    const a = pick(L), b = pick(L); if(a === b) continue;
+    const tw = tieOf(a, b).w, X = pick(L.filter(x => x !== a && x !== b));
+    const t = dmClean(DTCNO.say(a, {intent: tw > 20 ? "agree" : tw < -20 ? "warn" : "gossip", sent: tw > 20 ? 1 : tw < -20 ? -1 : 0}), a);
+    if(!t) continue;
+    const spicy = chance(.35) && X ? (tw > 0 ? " Between us, " + surname(X.name) + " is " + pick(["finished","bought","lying about the count","drinking again","in over their head"]) + "." : "") : "";
+    D.npc.push({i:++D.seq, a:a.id, b:b.id, t:(t + spicy).slice(0, 400), d:G.day, stakes:0.1 + (spicy ? 0.45 : 0), about:spicy ? [X.id] : []});
+  }
+  if(D.npc.length > 240) D.npc.splice(0, D.npc.length - 240);
+}
+/* leaks: never scripted; whether the reader forwards depends on who they are, what they owe, and what it is worth */
+function dmLeakOdds(holder, senderId, stakes){
+  const T = holder.traits || {};
+  const w = senderId === "you" ? (holder.rel ? holder.rel.warmth : 0) : (tieOf(holder, byId(senderId) || holder).w || 0);
+  let p = stakes * 0.35;
+  p += (60 - (T.discretion | 0)) / 300;
+  p += (T.ambition | 0) / 600 + (T.temper | 0) / 800;
+  p += w < 0 ? -w / 250 : -w / 400;
+  p -= (T.loyalty | 0) / 700;
+  if(holder.rival === senderId) p += 0.12;
+  if(holder.pressFriend || ((seedOf("rep:" + holder.id) % 7) === 0)) p += 0.08;  /* a reporter friend */
+  return Math.max(0, Math.min(0.7, p));
+}
+function dmLeakDay(){
+  const D = dmState();
+  const cand = [];
+  Object.keys(D.th).forEach(id => D.th[id].forEach(x => { if(x.f === "you" && !x.leaked && !x.leakTried && G.day - x.d <= 3) cand.push({holder:byId(+id) || byId(id), from:"you", x}); }));
+  D.npc.forEach(x => { if(!x.leaked && !x.leakTried && G.day - x.d <= 3) cand.push({holder:byId(x.b), from:x.a, x}); });
+  cand.forEach(c => {
+    if(!c.holder) return;
+    if(G.day - c.x.d >= 3) c.x.leakTried = true;
+    if(Math.random() > dmLeakOdds(c.holder, c.from, c.x.stakes || 0.1) * 0.5) return;
+    dmLeak(c.holder, c.from, c.x);
+  });
+}
+function dmLeak(holder, from, x){
+  const D = dmState(); x.leaked = true;
+  const sender = from === "you" ? G.you : byId(from);
+  const sName = from === "you" ? (G.you.name || "the Member") : sender.name;
+  const quote = "\u201c" + String(x.t).slice(0, 140) + (x.t.length > 140 ? "\u2026" : "") + "\u201d";
+  const T = holder.traits || {};
+  const how = (holder.pressFriend || (seedOf("rep:" + holder.id) % 7) === 0) ? "press" : (T.vanity | 0) > 60 ? "vox" : chance(.5) ? "wire" : "rumour";
+  let line = "";
+  if(how === "vox"){
+    line = "Screenshot, no comment: " + sName + " to me, privately: " + quote;
+    try{ voxAdd({id:G.vox.id++, by:holder.id, t:line, k:"leak", v:0, day:G.day, at:hhmm(), backs:0, hits:0, voices:[], mine:false}); }catch(e){}
+  } else if(how === "press"){
+    line = "LEDGER: a private message from " + sName + " reaches the press: " + quote;
+    try{ pushWireScrap("PRESS", line); }catch(e){}
+  } else if(how === "wire"){
+    line = "WIRE: " + sName + "'s text to " + holder.name + " is circulating: " + quote;
+    try{ pushWireScrap("LEAK", line); }catch(e){}
+  } else {
+    line = "Cloakroom rumour: " + sName + " said something in a text to " + surname(holder.name) + " that is going around.";
+  }
+  try{ feed(line); }catch(e){}
+  const sev = (x.stakes || 0.1);
+  /* consequences: the sender's trust in the leaker, the subject's view of the sender, the sender's scandal */
+  if(from === "you"){
+    if(holder.rel){ holder.rel.trust = clamp((holder.rel.trust || 30) - 4, 0, 100); }
+    G.you.scandal = Math.round(((G.you.scandal || 0) + sev * 10) * 10) / 10;
+    G.you.approval = clamp(G.you.approval - sev * 2, 0, 100);
+    (x.about || []).forEach(id => { const s = byId(id); if(s && s.rel) s.rel.warmth = clamp(s.rel.warmth - Math.round(6 + sev * 14), -100, 100); });
+    dmPush(holder.id, holder.id, pick(["I may have shown that to someone. It got away from me.", "Sorry. It was too good not to share.", "You should not write things down."]), {sys:true});
+    try{ note("Your text to " + holder.name + " leaked (" + how + ").", false); }catch(e){}
+  } else if(sender){
+    tieShift(sender, holder, -Math.round(8 + sev * 20), "leaked a private text");
+    sender.scandal = Math.round(((sender.scandal || 0) + sev * 8) * 10) / 10;
+    (x.about || []).forEach(id => { const s = byId(id); if(s) tieShift(s, sender, -Math.round(6 + sev * 16), "what was said in a text"); });
+  }
+  D.leaks.push({d:G.day, from:sName, holder:holder.name, how, t:line});
+  if(D.leaks.length > 80) D.leaks.shift();
+  try{ loreAdd(sender && sender.state, "Day " + G.day + ": a private text from " + sName + " leaked (" + how + ")."); }catch(e){}
+}
+
+/* texts live inside the (Neptune) sectioned inbox as its first section; a small corner badge points at them */
+function dmCSS(){
+  if(document.getElementById("dmCss")) return;
+  const st = document.createElement("style"); st.id = "dmCss";
+  st.textContent = '#dmBadge{position:fixed;right:12px;bottom:84px;z-index:60;background:#1b2433;color:#e9e2cf;border:1px solid #6d5a2e;border-radius:14px;padding:3px 9px;font:600 11px Georgia,serif;cursor:pointer;opacity:.8}#dmBadge.has{background:#6d2230;opacity:1}' +
+    '.dmw{border:1px solid var(--line-soft,#ccc);border-radius:6px;margin:0 0 10px;display:flex;flex-direction:column}.dmw .h{padding:5px 6px;display:flex;gap:6px;align-items:center}.dmw select{flex:1}.dmw .l{overflow:auto;padding:6px;max-height:260px;min-height:90px}' +
+    '.dmw .m{margin:4px 0;padding:5px 8px;border-radius:10px;max-width:84%;line-height:1.3;font:13px Georgia,serif}.dmw .me{background:#2e4a6b;color:#fff;margin-left:auto}.dmw .them{background:#e9e1cc;color:#222}.dmw .sys{font-style:italic;background:#f3d6d6}.dmw .t{font-size:10px;opacity:.6}' +
+    '.dmw form{display:flex;border-top:1px solid var(--line-soft,#ccc)}.dmw input{flex:1;padding:6px;border:0}.dmw button{padding:0 10px}';
+  document.head.appendChild(st);
+}
+function dmUI(){
+  dmCSS();
+  if(!document.getElementById("dmBadge")){ const b = document.createElement("div"); b.id = "dmBadge"; b.onclick = () => dmToggle(true); document.body.appendChild(b); }
+  dmBadge();
+}
+function dmBadge(){ const b = document.getElementById("dmBadge"); if(!b) return; const n = dmState().unread; b.textContent = n ? "\u2709 " + n + " text" + (n > 1 ? "s" : "") + " (N)" : "Texts (N)"; b.classList.toggle("has", !!n); b.style.display = G.you ? "" : "none"; }
+function dmMount(P){
+  if(!P || !G.you) return;
+  dmCSS();
+  let w = P.querySelector(".dmw");
+  if(!w){
+    w = document.createElement("div"); w.className = "dmw";
+    w.innerHTML = '<div class="h"><b class="eyebrow" style="margin:0">Texts</b><select class="dmWho"></select></div><div class="l dmList"></div><form class="dmForm"><input class="dmIn" autocomplete="off" maxlength="400" placeholder="Text them\u2026"><button>Send</button></form>';
+    P.insertBefore(w, P.firstChild);
+    const inp = w.querySelector(".dmIn");
+    ["keydown","keyup","keypress"].forEach(ev => inp.addEventListener(ev, e => { e.stopPropagation(); }));
+    w.querySelector(".dmWho").onchange = e => { dmState().open = isNaN(+e.target.value) ? e.target.value : +e.target.value; dmRender(); };
+    w.querySelector(".dmForm").onsubmit = e => { e.preventDefault(); const D = dmState(); if(D.open != null){ dmSend(D.open, inp.value); inp.value = ""; } };
+  }
+  dmRender();
+}
+function dmToggle(on, id){
+  const D = dmState();
+  if(id != null) D.open = id;
+  if(D.open == null){ const ids = Object.keys(D.th).sort((a, b) => (D.th[b].slice(-1)[0] || {i:0}).i - (D.th[a].slice(-1)[0] || {i:0}).i); D.open = ids.length ? +ids[0] : (G.members.find(m => !m.gone) || {}).id; }
+  try{ if(PC.open){ PC.tab = "inbox"; pcRender(); } else openPanels("inbox"); }catch(e){}
+  setTimeout(() => { try{ refreshInbox(); }catch(e){} const i = document.querySelector(".dmw .dmIn"); if(i) i.focus(); }, 60);
+}
+function dmRender(){
+  const D = dmState();
+  const mem = (G.members || []).filter(m => m && !m.gone).slice().sort((a, b) => ((D.th[b.id] || []).length - (D.th[a.id] || []).length) || a.name.localeCompare(b.name));
+  if(D.open == null && mem[0]) D.open = mem[0].id;
+  const L = D.th[D.open] || [];
+  L.forEach(x => { if(x.unread){ x.unread = false; D.unread = Math.max(0, D.unread - 1); } });
+  document.querySelectorAll(".dmw").forEach(w => {
+    const sel = w.querySelector(".dmWho"), list = w.querySelector(".dmList");
+    sel.innerHTML = mem.map(m => { const T = D.th[m.id] || []; const u = T.filter(x => x.unread).length; return '<option value="' + m.id + '"' + (m.id == D.open ? ' selected' : '') + '>' + pcEsc(m.name) + ' (' + m.party + '-' + pcEsc(m.state) + ')' + (T.length ? ' \u00b7 ' + T.length : '') + (u ? ' \u2022' + u : '') + '</option>'; }).join("");
+    list.innerHTML = L.map(x => '<div class="m ' + (x.f === "you" ? "me" : "them") + (x.sys ? " sys" : "") + '">' + pcEsc(x.t) + '<div class="t">d' + x.d + ' ' + pcEsc(x.at || "") + (x.leaked ? ' \u00b7 leaked' : '') + '</div></div>').join("") + (D.typing == D.open ? '<div class="m them"><i>typing\u2026</i></div>' : '') || '<p class="muted">No texts yet. Pick anyone and write.</p>';
+    list.scrollTop = 1e6;
+  });
+  dmBadge();
+}
+/* ── the map: a deterministic SVG of the Republic, its capital, its neighbours and its chapels ── */
+function loreState(){ if(!G.lore) G.lore = {}; return G.lore; }
+function loreAdd(place, t){
+  if(!place) return; const L = loreState(); const a = L[place] || (L[place] = []);
+  if(a.some(x => x.t === t)) return; a.push({d:G.day || 1, t}); if(a.length > 40) a.shift();
+}
+function loreScan(text){
+  try{
+    const s = String(text || ""); if(!s || !G.states) return;
+    G.states.forEach(st => { if(s.indexOf(st.n) >= 0) loreAdd(st.n, "Day " + (G.day || 1) + ": " + s.slice(0, 220)); });
+    WORLD_POWERS.forEach(p => { if(s.indexOf(p.t.replace(/^the /, "")) >= 0) loreAdd(p.t, "Day " + (G.day || 1) + ": " + s.slice(0, 220)); });
+  }catch(e){}
+}
+const MAP = {open:false, mode:"lean", sel:null};
+function mapColor(st){
+  if(MAP.mode === "tension"){ const u = Math.max(0, Math.min(100, st.unrest || 0)); return "hsl(" + (120 - u * 1.2) + ",45%," + (52 - u * 0.15) + "%)"; }
+  if(MAP.mode === "faith"){ const ch = (G.rite && G.rite.chapels && G.rite.chapels[st.n]) || 0; if(ch >= 2) return "#c46a1a"; if(ch) return "#d89b55"; return {latin:"#7c5aa6", kerk:"#4f6fa8", circle:"#5b8f6a", flame:"#b5473a", none:"#888", self:"#a79b4f"}[st.creed] || "#777"; }
+  const ms = (G.members || []).filter(m => !m.gone && m.state === st.n);
+  const by = {}; ms.forEach(m => by[m.party] = (by[m.party] || 0) + 1);
+  const top = Object.keys(by).sort((a, b) => by[b] - by[a])[0];
+  try{ if(top) return partyColorHex(top); }catch(e){}
+  return st.lean > 0 ? "#8a4b4b" : "#4b5f8a";
+}
+function no7FlagURL(){
+  try{ const t = oranje7FlagTex(); const im = t && t.image; if(im && im.toDataURL) return im.toDataURL(); }catch(e){}
+  return "";
+}
+function mapSVG(){
+  const S = G.states || [], C = 58, ox = 150, oy = 70;
+  const maxC = Math.max(...S.map(s => s.col)), maxR = Math.max(...S.map(s => s.row));
+  const W = ox * 2 + (maxC + 1) * C, H = oy * 2 + (maxR + 1) * C + 40;
+  let g = '<svg id="mapSvg" viewBox="0 0 ' + W + ' ' + H + '" width="100%" style="max-height:72vh;background:#16314a;font-family:Georgia,serif">';
+  g += '<rect x="' + (ox - 16) + '" y="' + (oy - 16) + '" width="' + ((maxC + 1) * C + 32) + '" height="' + ((maxR + 1) * C + 32) + '" rx="26" fill="#cbbf98" stroke="#6d5a2e" stroke-width="3"/>';
+  /* neighbours on the compass */
+  const POS = {reach:[W - 60, H / 2], horn:[W / 2, H - 22], pale:[W / 2, 26], marches:[60, H / 2], isles:[W - 70, H - 30], rift:[70, 40]};
+  WORLD_POWERS.forEach(p => { const q = POS[p.k] || [W - 60, 40]; const foe = G.world && G.world.foe === p.k;
+    g += '<g class="mp" data-place="' + p.t + '" style="cursor:pointer"><rect x="' + (q[0] - 58) + '" y="' + (q[1] - 14) + '" width="116" height="24" rx="5" fill="' + (foe ? "#7a2a2a" : "#3d4b5a") + '" stroke="#d8c78f"/><text x="' + q[0] + '" y="' + (q[1] + 3) + '" fill="#f3ead2" font-size="11" text-anchor="middle">' + pcEsc(p.t) + (foe ? " ⚔" : "") + '</text></g>'; });
+  S.forEach(st => {
+    const x = ox + st.col * C, y = oy + st.row * C, mine = G.you && G.you.state === st.n, sel = MAP.sel === st.n;
+    const cap = STATE_DEF.find(d => d.n === st.n) || {};
+    g += '<g class="mp" data-place="' + pcEsc(st.n) + '" style="cursor:pointer"><rect x="' + (x + 2) + '" y="' + (y + 2) + '" width="' + (C - 4) + '" height="' + (C - 4) + '" rx="6" fill="' + mapColor(st) + '" stroke="' + (sel ? "#fff" : mine ? "#ffd36b" : "#2a2418") + '" stroke-width="' + (sel || mine ? 3 : 1) + '"/>' +
+      '<circle cx="' + (x + 12) + '" cy="' + (y + 13) + '" r="3.2" fill="#111"/>' +
+      '<text x="' + (x + C / 2) + '" y="' + (y + C / 2 + 3) + '" fill="#fff" font-size="8.6" text-anchor="middle" style="paint-order:stroke;stroke:#000;stroke-width:2px">' + pcEsc(st.n.length > 13 ? st.n.slice(0, 12) + "." : st.n) + '</text>';
+    const ch = (G.rite && G.rite.chapels && G.rite.chapels[st.n]) || 0;
+    if(ch) g += '<text x="' + (x + C - 10) + '" y="' + (y + 14) + '" fill="#ffb347" font-size="11" text-anchor="middle">✠' + (ch > 1 ? ch : "") + '</text>';
+    if(cap.n === "Nieuw Oranje" || st.capital) g += '<text x="' + (x + C / 2) + '" y="' + (y + C - 8) + '" fill="#ffe9a8" font-size="8" text-anchor="middle">★ Capitol</text>';
+    g += '</g>';
+  });
+  const nm = (G.country && G.country.name) || "Nieuw Oranje 7";
+  g += '<text x="' + (W / 2) + '" y="' + (H - 46) + '" fill="#f3ead2" font-size="15" text-anchor="middle">' + pcEsc(nm) + '</text></svg>';
+  return g;
+}
+function mapLore(place){
+  const st = (G.states || []).find(s => s.n === place);
+  const L = (loreState()[place] || []).slice(-8).reverse();
+  if(st){
+    const def = STATE_DEF.find(d => d.n === place) || {}, B = CULT_BANK[st.cult || def.cult] || CULT_BANK.midlands;
+    const reps = (G.members || []).filter(m => !m.gone && m.state === place);
+    const ch = (G.rite && G.rite.chapels && G.rite.chapels[place]) || 0;
+    const r = rng(seedOf("lore:" + place));
+    return '<h2 style="margin:0 0 4px">' + pcEsc(place) + (G.you && G.you.state === place ? ' · home' : '') + '</h2>' +
+      '<p><i>' + pcEsc(def.note || "") + '</i></p>' +
+      '<p><b>History.</b> Remembered for ' + pcEsc(drawn(B.hist, r)) + ' and ' + pcEsc(drawn(B.hist, r)) + '.</p>' +
+      '<p><b>Culture.</b> ' + pcEsc(cap(drawn(B.custom, r))) + '; ' + pcEsc(drawn(B.food, r)) + '; people say "' + pcEsc(drawn(B.phrase, r)) + '". Sacred: ' + pcEsc(drawn(B.sacred, r)) + '.</p>' +
+      '<p><b>Faith.</b> Mostly ' + pcEsc(st.creed || def.creed || "mixed") + '.' + (ch ? ' Consular Rite chapels: ' + ch + '.' : ' No Consular chapel yet.') + ' God is the Most High; Christ is King.</p>' +
+      '<p><b>Economy.</b> ' + pcEsc(B.ind.join(", ")) + '; industry index ' + Math.round(st.ind || def.ind || 0) + ', population ' + (st.pop || def.pop || "?") + 'm.</p>' +
+      '<p><b>Represented by.</b> ' + (reps.length ? reps.slice(0, 8).map(m => pcEsc(m.name) + ' (' + m.party + ')').join(", ") + (reps.length > 8 ? ", and " + (reps.length - 8) + " more" : "") : "no sitting members") + '.</p>' +
+      '<p><b>Tension.</b> Unrest ' + Math.round(st.unrest || 0) + '/100.' + (st.bill ? ' On the governor\u2019s desk: ' + pcEsc(st.bill.title) + '.' : '') + '</p>' +
+      '<p><b>Recent.</b></p>' + (L.length ? '<ul>' + L.map(x => '<li>' + pcEsc(x.t) + '</li>').join("") + '</ul>' : '<p class="pc__m">Nothing on record yet. The record grows as the session does.</p>') +
+      (typeof tripButton === "function" ? tripButton(place) : "");
+  }
+  const p = WORLD_POWERS.find(x => x.t === place);
+  if(p) return '<h2 style="margin:0 0 4px">' + pcEsc(p.t) + '</h2><p>' + pcEsc(p.adj) + ' neighbour. They want ' + pcEsc(p.want) + '. Creed: ' + pcEsc(p.creed) + '.</p>' +
+    (G.world && G.world.foe === p.k ? '<p><b>Current tension.</b> The Republic\u2019s chief rival this term; heat ' + Math.round(G.world.heat || 0) + '.</p>' : '') +
+    '<p><b>Recent.</b></p>' + (L.length ? '<ul>' + L.map(x => '<li>' + pcEsc(x.t) + '</li>').join("") + '</ul>' : '<p class="pc__m">No dispatches yet.</p>');
+  return "";
+}
+/* the lore and shading extend the Union pane (Neptune's map); M opens it */
+function mapShade(P){
+  const svg = P.querySelector("svg"); if(!svg || MAP.mode === "lean") return;
+  P.querySelectorAll("[data-st]").forEach(g => { const st = stateOf(g.getAttribute("data-st")); if(!st) return; const sh = g.matches("rect,path,polygon") ? g : g.querySelector("rect,path,polygon"); if(sh){ sh.setAttribute("fill", mapColor(st)); sh.setAttribute("fill-opacity", ".8"); } });
+}
+function mapExtra(){
+  const consular = G.regime && /consul/.test(G.regime.form || "");
+  const flag = consular ? no7FlagURL() : "";
+  const chap = Object.keys((G.rite && G.rite.chapels) || {}).filter(k => G.rite.chapels[k] > 0);
+  return '<div class="billbox q-world" style="margin:10px 0">' +
+    '<div class="eyebrow">' + (flag ? '<img src="' + flag + '" style="height:16px;vertical-align:middle;margin-right:6px;border:1px solid #000">' : '') + pcEsc((G.country && G.country.name) || "Nieuw Oranje 7") + (consular ? ' \u00b7 the Consular Republic, under Nieuw Oranje VII' : '') + '</div>' +
+    '<div style="margin:6px 0">Shade by: ' + [["lean","lean"],["party","party"],["faith","faith"],["tension","tension"]].map(([k, t]) => '<button type="button" class="cl-btn" data-qmode="' + k + '"' + (MAP.mode === k ? ' style="background:#6d5a2e;color:#fff"' : '') + '>' + t + '</button>').join("") + '</div>' +
+    '<div style="margin:4px 0;font:12px system-ui"><b>Neighbours:</b> ' + WORLD_POWERS.map(p => '<button type="button" class="cl-btn" data-qplace="' + pcEsc(p.t) + '">' + pcEsc(p.t) + (G.world && G.world.foe === p.k ? ' \u2694' : '') + '</button>').join("") + '</div>' +
+    '<div style="margin:4px 0;font:12px system-ui"><b>The Capitol:</b> ' + Object.keys(ROOMS).filter(k => ROOMS[k].t && !/^visit$/.test(k)).slice(0, 18).map(k => pcEsc(ROOMS[k].t)).join(" \u00b7 ") + '</div>' +
+    '<div style="margin:4px 0;font:12px system-ui"><b>Consular Rite chapels:</b> ' + (chap.length ? chap.map(k => '\u2720 ' + pcEsc(k) + (G.rite.chapels[k] > 1 ? ' \u00d7' + G.rite.chapels[k] : '')).join(", ") : 'none yet') + '</div>' +
+    '</div>' + (MAP.sel && MAP.sel !== (G.mapSel || "") && WORLD_POWERS.some(p => p.t === MAP.sel) ? '<div class="billbox q-lore">' + mapLore(MAP.sel) + '</div>' : '') +
+    (G.mapSel ? '<div class="billbox q-lore" style="margin-top:10px"><div class="eyebrow">Lore</div>' + mapLore(G.mapSel) + '</div>' : '');
+}
+/* M: the Union pane as a sheet over the room, in any layout (immersive too); M or Esc again puts it away */
+function mapToggle(on){
+  const isOn = document.body.classList.contains("ui-open") && el("paneUnion") && el("paneUnion").classList.contains("is-on");
+  if(on === false || (on === undefined && isOn)){ try{ closePanels(); }catch(e){} return; }
+  try{ if(!veil.hidden && phoneWasRunning !== null) phoneClose(); }catch(e){}
+  document.body.classList.add("ui-open"); picksDirty = true;
+  try{ const b = document.querySelector('[data-pane="paneUnion"]'); if(b) b.click(); else showPane("paneUnion"); }catch(e){}
+  setTimeout(() => { try{ dropRect(); resize(); }catch(e){} }, 30);
+}
+setTimeout(function wrapUnion(){
+  if(typeof refreshUnion !== "function") return;
+  const orig = refreshUnion;
+  refreshUnion = function(){
+    const r = orig.apply(this, arguments);
+    try{
+      const P = el("paneUnion"); if(!P) return r;
+      mapShade(P);
+      const d = document.createElement("div"); d.innerHTML = mapExtra();
+      const svg = P.querySelector("svg"); const anchor = svg ? (svg.closest("div") || svg) : null;
+      if(anchor && anchor.parentNode === P) P.insertBefore(d, anchor.nextSibling); else P.appendChild(d);
+      d.querySelectorAll("[data-qmode]").forEach(b => b.onclick = () => { MAP.mode = b.getAttribute("data-qmode"); refreshUnion(); });
+      d.querySelectorAll("[data-qplace]").forEach(b => b.onclick = () => { MAP.sel = b.getAttribute("data-qplace"); refreshUnion(); });
+      d.querySelectorAll("[data-trip]").forEach(b => b.onclick = () => { try{ tripGo(b.getAttribute("data-trip")); }catch(e){ console.warn(e); } refreshUnion(); });
+    }catch(e){ console.warn("q map", e); }
+    return r;
+  };
+  const oi = refreshInbox;
+  refreshInbox = function(){ const r = oi.apply(this, arguments); try{ dmMount(el("paneInbox")); const Q = el("clPhoneInbox"); if(Q) dmMount(Q); }catch(e){} return r; };
+}, 2600);
+document.addEventListener("keydown", e => {
+  if(e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
+  const k = (e.key || "").toLowerCase();
+  if(!G.you || !G.running) return;
+  if(k === "m"){ e.preventDefault(); e.stopImmediatePropagation(); mapToggle(); }
+  else if(k === "escape" && document.body.classList.contains("ui-open") && el("paneUnion") && el("paneUnion").classList.contains("is-on")){ e.preventDefault(); e.stopImmediatePropagation(); e._pzHandled = true; mapToggle(false); }
+  else if(k === "n"){ e.preventDefault(); e.stopImmediatePropagation(); dmToggle(true); }
+}, true);
+setTimeout(() => { try{ dmUI(); }catch(e){}
+  try{ const t = document.querySelector("#pauseOverlay .settings-tabs"); if(t && !document.getElementById("pauseMap")){ const b = document.createElement("button"); b.id = "pauseMap"; b.className = "settings-tab"; b.textContent = "Map (M)"; b.onclick = e => { e.preventDefault(); try{ document.getElementById("closeSettings").click(); }catch(x){} mapToggle(true); }; t.appendChild(b); } }catch(e){} }, 1500);
 
 const MATCACHE = new Map();
 /* Every distinct repeat used to clone the texture and its normal map, so
@@ -13473,6 +13810,7 @@ function voxTick(w){
   const m = pick(pool);
   const line = voxFree(m, {});
   try{ line.t = voxSpice(m, line.t); }catch(e){}
+  try{ if(chance(.07)) dmInitiative(); }catch(e){}
   const post = {id:G.vox.id++, by:m.id, t:line.t, k:line.k, v:line.v,
                 day:G.day, at:hhmm(), backs:0, hits:0, voices:[], mine:false};
   voxAdd(post);
@@ -24145,6 +24483,7 @@ function note(text, big){
 }
 /* The running record: nothing happens without leaving a line behind. */
 function feed(text, kind){
+  try{ loreScan(typeof text === "string" ? text : (text && text.t) || ""); }catch(e){}
   text = wallScrub(text);
   G.feed.unshift({t:text, at:hhmm(), kind:kind||"", born:G.t});
   try{ lLog(text, kind); }catch(e){}
@@ -24436,6 +24775,7 @@ function nextDay(late){
     try{ riteYouDay(); }catch(e){}
     try{ govDay(); }catch(e){}
     try{ cultDay(); }catch(e){}
+    try{ dmLeakDay(); dmInitiative(); }catch(e){ console.warn("dm day", e); }
   }catch(e){
     if(window.console) console.warn("nextDay clock", e);
   }
@@ -24926,9 +25266,11 @@ function goalsEnsure(){
     const hr = homeRoom(), nd = Math.min(3, docketToday().length);
     const L = [];
     /* the chair you hold sets the list: a Governor signs, budgets, appoints, pardons; nothing about House pledges */
-    const RG = {gov:["gdesk","gbud"], senate:[], bench:[], pres:[]}[heldOffice()] || [];
+    const RG = {gov:["gdesk","gbud"], senate:["conf","ksen","treaty"], bench:["kct","bopin"], pres:["pacts","aid"]}[heldOffice()] || [];
+    const RT = {gdesk:"Sign or veto what the legislature sent", conf:"Question a nominee under oath", ksen:"Take your seat when the Senate sits", treaty:"Weigh a treaty before ratification",
+                kct:"Hear oral argument", bopin:"Write an opinion", pacts:"Sign or veto the acts on your desk", aid:"Take the calls from foreign capitals"};
     const DT = docketToday();
-    RG.forEach(k => { const d = DT.find(x => x.key === k); if(d) L.push({k:"dk", key:k, t:k === "gdesk" ? "Sign or veto what the legislature sent" : d.t, need:1, room:hr}); });
+    RG.forEach(k => { const d = DT.find(x => x.key === k); if(d) L.push({k:"dk", key:k, t:RT[k] || d.t, need:1, room:hr}); });
     if(!L.length) L.push({k:"docket", t:"Work " + nd + " items on today's docket", need:nd, room:hr});
     const EX = ROLE_EXTRA[heldOffice()] || [];
     if(EX.length){ const x = EX[(G.day + seedOf(G.you.name || "")) % EX.length]; L.push({k:"dk", key:x.key, t:x.t, need:1, room:hr}); }
