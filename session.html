@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261013h">
+<meta name="onum-build" content="20261013i">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261013h";
+  var STAMP = "20261013i";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -3163,6 +3163,7 @@ function restaff(force){
   everyone().forEach(m => {
     if(TALK.m === m || visiting() === m) return;
     if(m.kind === "envoy") return;
+    if(m.ohK) return;
     if(m.away) return;
     try{ if(PROC.on && m.room === G.room) return; }catch(e){}
     try{
@@ -3199,7 +3200,7 @@ function ensureLivedIn(){
   const want = ({office:2, corridor:4, floor:5, cloak:3, caucus:4, committee:3, press:2, steps:2, district:2, staff:1})[G.room] || 2;
   const here = everyone().filter(m => m && m.room === G.room && !m.gone && !m.away);
   if(here.length >= want) return;
-  const pool = everyone().filter(m => m && !m.gone && !m.away && m.room !== G.room && TALK.m !== m && visiting() !== m);
+  const pool = everyone().filter(m => m && !m.gone && !m.away && !m.ohK && m.room !== G.room && TALK.m !== m && visiting() !== m);
   for(let i = pool.length - 1; i > 0; i--){
     const j = (Math.random() * (i + 1)) | 0;
     const t = pool[i]; pool[i] = pool[j]; pool[j] = t;
@@ -7067,7 +7068,7 @@ setTimeout(() => { try{ govRiteBoot(); }catch(e){} }, 0);
    systems; nothing here invents a second copy of a number. */
 const PC = {open:false, tab:"inbox", openMail:null};
 const PC_TABS = [["inbox","Inbox"],["news","News & Ledger"],["bills","Bills"],["sched","Schedule"],
-  ["const","Constituents"],["polls","Polls"],["money","War chest"],["staff","Staff"],["desk","On the desk"],["sbox","Suggestions"],["lore","Family lore"]];
+  ["const","Constituents"],["polls","Polls"],["money","War chest"],["staff","Staff"],["desk","On the desk"],["sbox","Suggestions"],["lore","Family lore"],["party","Party history"]];
 function pcEsc(s){ return String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
 function pcBoot(){
   if(el("pcScreen")) return;
@@ -7200,6 +7201,8 @@ function pcTab(){
     try{ out.push(cpHTML()); }catch(e){}
   } else if(t === "lore"){
     out.push(loreHTML());
+  } else if(t === "party"){
+    out.push(phHTML());
   } else if(t === "desk"){
     out.push('<div class="pc__h">On the desk</div><div class="pc__m">The telephone, the files and the papers. Each opens its own list, as it does when you walk up to it.</div>');
     out.push('<div style="margin-top:6px"><button class="pc__btn" data-pcprop="phone">The telephone</button><button class="pc__btn" data-pcprop="desk">Files and drawers</button>' +
@@ -9498,12 +9501,196 @@ function cpHTML(){
   return '<div class="pc__h">Your counterparts in the other states</div>' + rows.join("");
 }
 
-/* ══ 20261013h · Phone button: calls, texts & DMs, contacts (officeholders, counterparts), Neptune chat ══ */
+/* ══ 20261013i · every office has a named, embodied holder at their post ══ */
+const OH = {list:[]};
+function ohSpec(){
+  const X = (function(){ try{ return execTitle(); }catch(e){ return "President"; } })();
+  const out = [];
+  out.push({k:"pres", title:X, name:G.exec && G.exec.name, room:"exec", spot:[0, 0.78], party:G.exec && G.exec.party});
+  out.push({k:"vp", title:X === "President" ? "Vice President" : "Deputy to the " + X, room:"exec", spot:[-2.6, 0.45], wk:"senate"});
+  [["sos","Secretary of State"],["treas","Secretary of the Treasury"],["war","Secretary of Defense"],["ag","Attorney General"]].forEach((c, i) => out.push({k:"cab:" + c[0], title:c[1], room:"exec", spot:[-3 + i * 2, 0.55]}));
+  out.push({k:"speaker", title:"Speaker of the House", room:"floor", spot:[0, 0.12]});
+  [["maj","Senate Majority Leader"],["min","Senate Minority Leader"],["ppt","President pro tempore of the Senate"]].forEach((c, i) => out.push({k:"sen:" + c[0], title:c[1], room:"senate", spot:[-3 + i * 3, 0.22]}));
+  (G.states || []).slice(0, 18).forEach((s, i) => out.push({k:"sen:" + s.n, title:"Senator from " + s.n, room:"senate", spot:[-5.2 + (i % 6) * 2.08, 0.42 + Math.floor(i / 6) * 0.15], state:s.n}));
+  (G.court && G.court.length ? G.court : [{}, {}, {}, {}, {}]).forEach((j, i) => out.push({k:"bench:" + i, title:i === 0 ? "Chief Justice" : "Associate Justice", name:j.name, room:"court", spot:[-3.2 + i * 1.6, 0.93], chambers:true, seat:true}));
+  (G.states || []).forEach(s => out.push({k:"gov:" + s.n, title:"Governor of " + s.n, room:(G.you && s.n === G.you.state) ? "govoffice" : "abroad", spot:[0, 0.35], state:s.n, gov:true}));
+  return out;
+}
+function ohYours(o){
+  const y = G.you, k = (function(){ try{ return heldOffice(); }catch(e){ return null; } })(); if(!y) return false;
+  if(o.k === "pres") return k === "pres" || (G.exec && G.exec.you);
+  if(o.gov) return k === "gov" && o.state === y.state;
+  if(o.k.indexOf("bench:") === 0) return k === "bench" && o.k === "bench:" + ((G.court || []).length ? (G.court.length - 1) : 4);
+  if(o.k === "sen:" + y.state) return k === "senate";
+  if(o.k === "speaker") return !!y.speaker;
+  return false;
+}
+function ohEnsure(){
+  const specs = ohSpec(); OH.list = [];
+  specs.forEach(o => {
+    let p = null;
+    if(o.gov){ try{ const S = scEnsure(); const s = S.st[o.state]; if(s && s.govId != null) p = byId(s.govId); }catch(e){} }
+    const key = "oh:" + o.k;
+    if(!p && o.name){ try{ p = everyone().find(q => q && q.name === o.name && !q.gone && q !== G.you) || null; if(p && !p.scKey) p.scKey = key; }catch(e){} }
+    if(!p) p = scPerson(key, o.name || newName(o.state), o.title, o.state || "capital");
+    if(!p) return;
+    if(o.name && p.name !== o.name && !p.formerOf) p.name = o.name;
+    p.role = o.title; p.ohK = o.k; p.ohRoom = o.room; p.ohSpot = o.spot; p.ohWk = o.wk; p.ohCh = o.chambers; p.ohSeat = o.seat; p.caseOpen = false; p.cause = null; p.party = p.party || o.party;
+    if(ohYours(o)){
+      if(!p.formerOf){ p.formerOf = o.title; p.role = "Former " + o.title; p.ohK = null; p.scKey = "former:" + o.k; p.room = "abroad";
+        try{ feed(p.name + ", the former " + o.title + ", hands over the office to you.", "good"); }catch(e){} }
+      return;
+    }
+    OH.list.push(p);
+  });
+  return OH.list;
+}
+function ohWhere(p){
+  const h = (G.minute || 0) / 60, d = G.day || 0;
+  if(h < 8 || h >= 18) return "abroad";
+  if(p.ohK === "pres" && d % 7 === 3 && h >= 11 && h < 12) return "floor";           /* addresses the House */
+  if(p.ohK === "pres" && d % 5 === 1 && h >= 15 && h < 16) return "steps";           /* events on the steps */
+  if(p.ohWk && h >= 10 && h < 12) return p.ohWk;                                       /* VP presides in the Senate */
+  if(p.ohCh && (h >= 12 && h < 14)) return "abroad";                                   /* in chambers over lunch */
+  return p.ohRoom;
+}
+function ohPlace(p, r){
+  const R = ROOMS[r]; if(!R || !p.ohSpot) return;
+  const b = roomBox(r), sp = p.ohSpot;
+  let x = Math.max(-b.hw, Math.min(b.hw, sp[0])), z = b.d0 + (b.d1 - b.d0) * sp[1];
+  if(p.ohK === "pres" && r === "floor"){ x = 0; z = b.d0 + 0.6; }
+  if(p.room !== r || p.x == null){ p.x = x; p.z = z; }
+  if(p.ohSeat){ p.x = p.tx = x; p.z = p.tz = z; p.facing = Math.PI; p.sitting = true; p.sitY = 0.15; p.seatFace = Math.PI; return; }
+  p.sitting = false;
+  p.tx = x + (Math.random() * 2 - 1) * 0.6; p.tz = z + (Math.random() * 2 - 1) * 0.4;
+}
+function ohTick(){
+  if(!G || !G.states) return;
+  if(!G.you || !G.civ) return;
+  if(!OH.list.length || G.day !== OH.day || OH.civ !== G.civ || OH.list.some(p => !p.gov && G.civ.indexOf(p) < 0 && G.members.indexOf(p) < 0)){ OH.civ = G.civ; OH.day = G.day; ohEnsure(); ohPublish(); }
+  OH.list.forEach(p => { const r = ohWhere(p); const moved = p.room !== r;
+    if(r === "abroad"){ p.room = "abroad"; p.abroad = true; return; }
+    p.abroad = false; if(moved || chance(.25)) ohPlace(p, r); p.room = r; });
+  try{ const N = new Set(OH.list.map(p => p.name)); everyone().forEach(q => { if(q && !q.ohK && !q.formerOf && N.has(q.name) && q !== G.you) q.room = "abroad"; }); }catch(e){}
+  try{ _allCache = null; }catch(e){}
+}
+function ohMind(p){
+  const t = p.role || "";
+  const goals = t.indexOf("Justice") >= 0 ? ["decide the cases before the bench by the law", "keep the court above the fight"]
+    : t.indexOf("Governor") >= 0 ? ["keep " + (p.home || "the state") + " solvent and calm", "get my share from the capital"]
+    : t.indexOf("Senat") >= 0 ? ["hold the chamber together", "pass the next appropriations"]
+    : t.indexOf("Speaker") >= 0 ? ["keep the majority in line", "move the floor schedule"]
+    : t.indexOf("Secretary") >= 0 || t.indexOf("Attorney") >= 0 ? ["carry out the " + ((function(){ try{ return execTitle(); }catch(e){ return "President"; } })()) + "'s program", "keep my department out of the papers"]
+    : ["govern the Union", "keep the coalition together", "win the next term"];
+  let plans = [];
+  try{ const it = (dkItems() || [])[0]; if(it) plans.push("make my view known on the " + it.title); }catch(e){}
+  plans.push("be at " + (((ROOMS[p.ohRoom] || {}).t) || "my post") + " during working hours");
+  return {name:p.name, goals, beliefs:["God is the Most High", "the office is bigger than the person"], plans, memory:[], family:null, job:t, wealth:"public salary", mood:null, office:p.ohK, where:p.room};
+}
+function ohPublish(){
+  const M = window.ONUM_MINDS = window.ONUM_MINDS || {};
+  const H = window.ONUM_OFFICEHOLDERS = [];
+  OH.list.forEach(p => { M[p.id] = ohMind(p); H.push({npcId:p.id, name:p.name, title:p.role, office:p.ohK, post:p.ohRoom, room:p.room});
+    try{ ONUM_GLOSS[p.name.toLowerCase()] = p.role + ". Works at " + (((ROOMS[p.ohRoom] || {}).t) || "their post") + ", 8 to 6. Reachable by Phone and DM."; }catch(e){} });
+  try{ (G.civ || []).filter(c => c.formerOf).forEach(c => { M[c.id] = {name:c.name, goals:["write the memoir", "stay relevant"], beliefs:["I did it better"], plans:[], memory:["held the office of " + c.formerOf], family:null, job:"Former " + c.formerOf, wealth:"comfortable", mood:null};
+    try{ ONUM_GLOSS[c.name.toLowerCase()] = "Former " + c.formerOf + "."; }catch(e){} }); }catch(e){}
+  try{ window.dispatchEvent(new CustomEvent("onum-officeholders", {detail:H})); }catch(e){}
+}
+(function(){ const base = window.onumMind; window.onumMind = function(id){ const p = (function(){ try{ return byId(id); }catch(e){ return null; } })(); if(p && (p.ohK || p.formerOf)) return (window.ONUM_MINDS || {})[p.id] || ohMind(p); return base ? base(id) : null; }; })();
+setInterval(() => { try{ ohTick(); }catch(e){ console.warn("oh", e); } }, 3000);
+
+/* ══ 20261013i · parties have a philosophy that drifts, and a history that is cited ══ */
+const PH_AX = [["econ","Economic","market","provision"],["soc","Social","liberty","order"],["fed","Federal vs state","the Union","the states"],["faith","Faith","public faith","secular"],["frn","Foreign","hawk","dove"]];
+function phEnsure(){
+  ensureParties();
+  const H = G.ph = G.ph || {v:1, p:{}};
+  Object.keys(G.parties).forEach(id => {
+    if(H.p[id]) return;
+    const M = (G.members || []).filter(m => m.party === id && m.pos);
+    const av = k => M.length ? Math.round(M.reduce((a, m) => a + (m.pos[k] || 0), 0) / M.length) : 0;
+    const r = rng(seedOf("ph:" + id));
+    const L = {econ:av("econ"), soc:av("lib"), fed:Math.round((r() * 2 - 1) * 40), faith:Math.round((r() * 2 - 1) * 50), frn:av("def")};
+    H.p[id] = {id, lean:L, snaps:[{d:G.day || 0, lean:Object.assign({}, L), why:"founding position"}], leaders:[], splits:[], votes:[], last:{acts:0}};
+  });
+  return H;
+}
+function phLeader(id){ const M = (G.members || []).filter(m => m.party === id && !m.gone); if(!M.length) return null; return M.slice().sort((a, b) => ((b.influence || b.standing || 0) - (a.influence || a.standing || 0)))[0]; }
+function phDay(){
+  const H = phEnsure();
+  Object.values(H.p).forEach(P => {
+    const L = P.lean, M = (G.members || []).filter(m => m.party === P.id && m.pos && !m.gone);
+    const why = [];
+    const pull = (k, tgt, w, tag) => { const d = (tgt - L[k]) * w; if(Math.abs(d) > 0.05){ L[k] = clamp(L[k] + d, -100, 100); if(tag && Math.abs(d) > 0.4) why.push(tag); } };
+    if(M.length){ const av = k => M.reduce((a, m) => a + (m.pos[k] || 0), 0) / M.length; pull("econ", av("econ"), 0.02, "the members"); pull("soc", av("lib"), 0.02, "the members"); pull("frn", av("def"), 0.02, "the members"); }
+    try{ const S = G.sc; if(S && S.crises && S.crises.filter(c => c.d > G.day - 3).length){ pull("frn", L.frn + 12, 0.08, "a crisis"); pull("fed", L.fed + 10, 0.06, "a crisis"); } }catch(e){}
+    try{ const S = G.sc; if(S && S.polities && S.polities.some(p => p.status === "tension" || p.status === "seceded")) pull("fed", L.fed + (P.id === "COM" ? -14 : 14), 0.05, "secession talk"); }catch(e){}
+    try{ const mood = (G.mood && G.mood.val) || 0; if(mood < -20) pull("econ", L.econ + (P.id === "FED" ? -10 : 10), 0.04, "hard times"); }catch(e){}
+    if(P.id === "OWN" && G.you && G.you.pos){ pull("econ", G.you.pos.econ || 0, 0.04, "its founder"); pull("soc", G.you.pos.lib || 0, 0.04, "its founder"); }
+    const ld = phLeader(P.id);
+    if(ld && (!P.leaders.length || P.leaders.slice(-1)[0].id !== ld.id)){ P.leaders.push({id:ld.id, name:ld.name, d:G.day}); if(P.leaders.length > 1) phNote(P, ld.name + " now leads the " + partyName(P.id) + "."); }
+    if(ld && ld.pos){ pull("econ", ld.pos.econ || 0, 0.01, null); pull("soc", ld.pos.lib || 0, 0.01, null); }
+    /* factions: a wide party may split, rarely */
+    if(M.length > 8 && P.id !== "IND"){ const xs = M.map(m => m.pos.econ || 0); const spread = Math.max(...xs) - Math.min(...xs);
+      if(spread > 90 && chance(.004) && !P.splits.some(s => s.d > G.day - 60)){ const side = L.econ > 0 ? "provision" : "market"; P.splits.push({d:G.day, t:"A " + side + " faction walked out of the " + partyName(P.id) + " caucus."}); phNote(P, P.splits.slice(-1)[0].t); pull("econ", L.econ + (side === "provision" ? 15 : -15), 0.3, "the split"); } }
+    /* landmark votes */
+    try{ const A = (G.lastActs || []); if(A.length > P.last.acts){ A.slice(P.last.acts).forEach(a => { const ayes = (a.parties && a.parties[P.id]) || null; P.votes.push({d:a.day || G.day, t:a.title, how:ayes != null ? (ayes > 0 ? "aye" : "no") : (alignmentOf(P, a) >= 0 ? "aye" : "no")}); }); P.last.acts = A.length; if(P.votes.length > 40) P.votes.splice(0, P.votes.length - 40); } }catch(e){}
+    if((G.day || 0) % 7 === 0 && (!P.snaps.length || P.snaps.slice(-1)[0].d !== G.day)){
+      const prev = P.snaps.slice(-1)[0].lean, moved = PH_AX.filter(a => Math.abs(L[a[0]] - prev[a[0]]) >= 3);
+      P.snaps.push({d:G.day, lean:Object.fromEntries(PH_AX.map(a => [a[0], Math.round(L[a[0]])])), why:[...new Set(why)].join(", ") || "drift"});
+      if(P.snaps.length > 60) P.snaps.splice(1, 1);
+      if(moved.length) phNote(P, "The " + partyName(P.id) + " has moved toward " + moved.map(a => L[a[0]] > prev[a[0]] ? a[2] : a[3]).join(" and ") + " since day " + P.snaps[P.snaps.length - 2].d + ".");
+    }
+  });
+  try{ if((G.day || 0) % 3 === 0) phVox(); }catch(e){}
+  phPublish();
+}
+function alignmentOf(P, a){ const p = a.pos || {}; return (p.econ || 0) * P.lean.econ + (p.lib || 0) * P.lean.soc + (p.def || 0) * P.lean.frn; }
+function phNote(P, t){ P.notes = P.notes || []; P.notes.push({d:G.day, t}); if(P.notes.length > 40) P.notes.shift(); try{ feed(t, "info"); }catch(e){} }
+function phDesc(id){ const P = phEnsure().p[id]; if(!P) return ""; return PH_AX.map(a => { const v = Math.round(P.lean[a[0]]); return a[1] + ": " + (Math.abs(v) < 12 ? "centre" : (v > 0 ? a[2] : a[3])) + " (" + v + ")"; }).join("; "); }
+function onumPartyPrecedent(id){
+  const P = phEnsure().p[id]; if(!P) return null;
+  const v = P.votes.slice(-6), s = P.snaps;
+  const out = [];
+  if(v.length){ const x = pick(v); out.push("On day " + x.d + " the " + partyName(id) + " voted " + x.how + " on the " + x.t + "."); }
+  if(s.length > 1){ const a = s[0], b = s.slice(-1)[0]; const k = pick(PH_AX); out.push("On " + k[1].toLowerCase() + " questions the party stood at " + a.lean[k[0]] + " on day " + a.d + "; it stands at " + b.lean[k[0]] + " now."); }
+  if(P.splits.length) out.push("Remember day " + P.splits.slice(-1)[0].d + ": " + P.splits.slice(-1)[0].t);
+  if(P.leaders.length > 1) out.push(P.leaders[P.leaders.length - 2].name + " led this party before " + P.leaders.slice(-1)[0].name + ".");
+  return out.length ? pick(out) : null;
+}
+window.onumPartyPrecedent = onumPartyPrecedent;
+function phVox(){
+  try{ voxInit(); }catch(e){} if(!G.vox) return;
+  const ids = Object.keys(phEnsure().p).filter(i => i !== "IND"); if(!ids.length) return;
+  const id = pick(ids), line = onumPartyPrecedent(id); if(!line) return;
+  const m = pick((G.members || []).filter(x => !x.gone && x.party !== G.you.party) || []); if(!m) return;
+  voxAdd({id:G.vox.id++, by:m.id, t:"Precedent matters. " + line, k:"party", v:0, day:G.day, at:hhmm(), backs:0, hits:0, voices:[], mine:false});
+}
+function phPublish(){
+  const H = phEnsure(), out = window.ONUM_PARTY_HISTORY = {};
+  Object.values(H.p).forEach(P => { out[P.id] = {id:P.id, name:partyName(P.id), lean:Object.fromEntries(PH_AX.map(a => [a[0], Math.round(P.lean[a[0]])])), axes:PH_AX.map(a => ({k:a[0], name:a[1], plus:a[2], minus:a[3]})), snapshots:P.snaps, leaders:P.leaders, splits:P.splits, landmarkVotes:P.votes, notes:P.notes || []};
+    try{ ONUM_GLOSS[partyName(P.id).toLowerCase()] = partyName(P.id) + ". " + phDesc(P.id) + "." + (P.leaders.length ? " Led by " + P.leaders.slice(-1)[0].name + "." : ""); }catch(e){} });
+  try{ window.dispatchEvent(new CustomEvent("onum-party-history", {detail:out})); }catch(e){}
+}
+function phHTML(){
+  const H = phEnsure();
+  return '<div class="pc__h">Party history</div>' + Object.values(H.p).map(P => {
+    const bar = a => { const v = Math.round(P.lean[a[0]]); return '<div class="pc__m"><b>' + a[1] + '</b> · ' + (Math.abs(v) < 12 ? "centre" : v > 0 ? a[2] : a[3]) + ' (' + v + ')</div>'; };
+    return '<div style="margin:10px 0;padding:8px;border:1px solid #445">' + '<div class="pc__h">' + pcEsc(partyName(P.id)) + '</div>' + PH_AX.map(bar).join("") +
+      '<div class="pc__m"><b>Leaders:</b> ' + (P.leaders.map(l => pcEsc(l.name) + ' (day ' + l.d + ')').join(", ") || "none yet") + '</div>' +
+      '<div class="pc__m"><b>Snapshots:</b> ' + P.snaps.slice(-8).map(s => 'day ' + s.d + ': econ ' + s.lean.econ + ', social ' + s.lean.soc + ', federal ' + s.lean.fed + ', faith ' + s.lean.faith + ', foreign ' + s.lean.frn + ' <i>(' + pcEsc(s.why) + ')</i>').join("<br>") + '</div>' +
+      (P.splits.length ? '<div class="pc__m"><b>Splits:</b> ' + P.splits.map(s => 'day ' + s.d + ': ' + pcEsc(s.t)).join("<br>") + '</div>' : '') +
+      '<div class="pc__m"><b>Landmark votes:</b> ' + (P.votes.slice(-8).map(v => 'day ' + v.d + ' ' + pcEsc(v.t) + ': ' + v.how).join("<br>") || "none yet") + '</div></div>';
+  }).join("");
+}
+function phRecap(){ try{ const H = phEnsure(); const n = Object.values(H.p).flatMap(P => (P.notes || []).filter(x => x.d >= G.day - 1)); return n.length ? n.slice(-2).map(x => x.t).join(" ") : ""; }catch(e){ return ""; } }
+
+/* ══ 20261013i · Phone button: calls, texts & DMs, contacts (officeholders, counterparts), Neptune chat ══ */
 const PB = {tab:"contacts", call:null};
 function pbEsc(s){ return String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"\u0026amp;","<":"\u0026lt;",">":"\u0026gt;",'"':"\u0026quot;"}[c])); }
 function pbContacts(){
   const out = [], seen = {};
   const add = (id, name, role, grp) => { if(id == null || seen[id]) return; seen[id] = 1; out.push({id, name, role, grp}); };
+  try{ (OH.list || []).forEach(p => add(p.id, p.name, p.role, "Officeholders")); }catch(e){}
   try{ (G.members || []).filter(m => m.office || m.lead || m.title).slice(0, 30).forEach(m => add(m.id, m.name, m.title || m.office || "Member", "Officeholders")); }catch(e){}
   try{ const S = G.sc; if(S) Object.keys(S.st).forEach(n => { const s = S.st[n]; if(s.govId != null) add(s.govId, s.gov, "Governor of " + n, "Officeholders"); }); }catch(e){}
   try{ const C = window.ONUM_COUNTERPARTS || {}; Object.keys(C).forEach(k => { const c = C[k]; add(c.npcId, c.name, (c.relation || "counterpart") + " · " + k, "Counterparts"); }); }catch(e){}
@@ -9563,7 +9750,7 @@ setTimeout(() => { try{
   inbox.insertAdjacentElement("afterend", b);
 }catch(e){ console.warn("phone btn", e); } }, 1800);
 
-/* ══ 20261013h · anyone with something to say comes and says it (non-blocking) ══ */
+/* ══ 20261013i · anyone with something to say comes and says it (non-blocking) ══ */
 const AP = {last:0, toast:null};
 function apAgenda(m){
   const out = [];
@@ -9596,7 +9783,7 @@ function apSpeak(m, a, to){
 function apTick(){
   if(!G || !G.running || (typeof TALK !== "undefined" && TALK.open)) return;
   if(G.t - AP.last < 25) return;
-  const here = (G.members || []).concat(G.people || []).filter(m => m && !m.gone && m.room === G.room && m.x != null && apBudget(m) && !m.wantsWord && m.kind !== "player");
+  const here = everyone().filter(m => m && !m.gone && !m.ohSeat && m.room === G.room && m.x != null && apBudget(m) && !m.wantsWord && m.kind !== "player");
   if(!here.length) return;
   const m = pick(here), A = apAgenda(m); if(!A.length) return;
   const a = pick(A); AP.last = G.t;
@@ -9613,6 +9800,57 @@ function apTick(){
   try{ momentLog(m.name + " came over to you: " + a.k + "."); }catch(e){}
 }
 setInterval(() => { try{ apTick(); }catch(e){} }, 4000);
+
+/* ══ 20261013i · phone layout: sheets, scrollable bar, touch sizes, safe areas ══ */
+(function(){ try{
+  const css = `
+@media (max-width: 900px), (max-height: 500px) and (orientation: landscape) {
+  html, body { font-size: 15px; -webkit-text-size-adjust: 100%; }
+  body * { min-font-size: 14px; }
+  .dossier .tabs { position: fixed !important; left: 0 !important; right: 0 !important; bottom: 0 !important; top: auto !important; width: auto !important;
+    display: flex !important; flex-wrap: nowrap !important; overflow-x: auto !important; overflow-y: hidden !important; -webkit-overflow-scrolling: touch; gap: 6px;
+    padding: 6px max(8px, env(safe-area-inset-right)) calc(6px + env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left)) !important;
+    background: #1c2128 !important; z-index: 9990 !important; scrollbar-width: none; }
+  .dossier .tabs::-webkit-scrollbar { display: none; }
+  .dossier .tabs > button, .dossier .tabs > a { flex: 0 0 auto !important; min-height: 44px !important; min-width: 64px; font-size: 15px !important; padding: 8px 12px !important; white-space: nowrap; }
+  body.ui-open .dossier, #pcScreen, #pbPhone, #ltChat, #ltPanel, #card, .dmw {
+    position: fixed !important; left: 0 !important; right: 0 !important; top: 0 !important; bottom: 0 !important; width: auto !important; max-width: none !important; height: auto !important; max-height: none !important;
+    margin: 0 !important; border-radius: 0 !important; transform: none !important; overflow-y: auto !important; -webkit-overflow-scrolling: touch;
+    padding-top: max(10px, env(safe-area-inset-top)) !important; padding-left: max(10px, env(safe-area-inset-left)) !important; padding-right: max(10px, env(safe-area-inset-right)) !important;
+    padding-bottom: calc(70px + env(safe-area-inset-bottom)) !important; font-size: 15px !important; z-index: 9995 !important; box-sizing: border-box !important; }
+
+  .scene { aspect-ratio: auto !important; height: calc(100dvh - 64px - env(safe-area-inset-bottom)) !important; min-height: 240px !important; }
+  #uiToolbar { position: fixed !important; left: 0 !important; right: 0 !important; bottom: 0 !important; top: auto !important; display: flex !important; flex-wrap: nowrap !important;
+    overflow-x: auto !important; gap: 6px; padding: 6px max(8px, env(safe-area-inset-right)) calc(6px + env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left)) !important;
+    background: #1c2128 !important; z-index: 9990 !important; scrollbar-width: none; }
+  #uiToolbar > * { flex: 0 0 auto !important; min-height: 44px !important; font-size: 15px !important; }
+  #clWhatBtn, #clLogBtn, #ltChatBtn { font-size: 14px !important; min-height: 36px !important; padding: 4px 10px !important; bottom: calc(66px + env(safe-area-inset-bottom)) !important; top: auto !important; }
+  body:has(#veil:not([hidden])) #clWhatBtn, body:has(#veil:not([hidden])) #clLogBtn, body:has(#veil:not([hidden])) #ltChatBtn, body.ui-open #clWhatBtn, body.ui-open #clLogBtn, body.ui-open #ltChatBtn { display: none !important; }
+  .kbd { display: none !important; }
+  #card { z-index: 9996 !important; padding-bottom: calc(130px + env(safe-area-inset-bottom)) !important; }
+  body:has(#veil:not([hidden])) .dossier .tabs { display: none !important; }
+  #pbPhone { z-index: 9997 !important; }
+  body.ui-open .dossier .tabs { z-index: 9998 !important; }
+  #pcScreen .pc__body, #pcBody, .ltc-log, .phone__scroll { max-height: none !important; overflow-y: auto !important; font-size: 15px !important; }
+  #pcTabs { display: flex !important; flex-wrap: nowrap !important; overflow-x: auto !important; }
+  #pcTabs button { flex: 0 0 auto; }
+  #mapSvg { width: 100% !important; height: auto !important; max-height: 70vh; touch-action: pan-x pan-y pinch-zoom; }
+  button, .btn, select, input, [role="button"] { min-height: 44px; font-size: 15px !important; }
+  #pbPhone button, #apToast button, .card__actions .btn { min-height: 44px; padding: 8px 14px !important; }
+  #apToast { left: 8px !important; right: 8px !important; transform: none !important; max-width: none !important; bottom: calc(68px + env(safe-area-inset-bottom)) !important; font-size: 15px !important; }
+  .hud, #uiToolbar { padding-top: env(safe-area-inset-top); padding-left: env(safe-area-inset-left); flex-wrap: wrap; }
+  #uiToolbar button { min-height: 40px; font-size: 14px !important; }
+  .gloss { font-size: inherit; } [class*="tip"] { font-size: 15px !important; max-width: 92vw !important; }
+  p, li, small, .muted, .pc__m, .dream, .sx-l, .sx-p, .ltc-m { font-size: max(14px, 1em) !important; }
+}
+@media (max-height: 500px) and (orientation: landscape) {
+  .dossier .tabs > button { min-height: 40px !important; padding: 6px 10px !important; }
+  body.ui-open .dossier, #pcScreen, #pbPhone, #card { padding-bottom: calc(58px + env(safe-area-inset-bottom)) !important; }
+}`;
+  setTimeout(() => { try{ const bar = document.getElementById("uiToolbar"); if(bar && !document.getElementById("uiPhoneBtn")){ const b = document.createElement("button"); b.type = "button"; b.id = "uiPhoneBtn"; b.textContent = "Phone"; b.onclick = () => { try{ const w = document.getElementById("pbPhone"); if(w) w.remove(); else pbOpen(); }catch(e){} }; const d = document.getElementById("uiDocketBtn"); if(d) d.insertAdjacentElement("afterend", b); else bar.appendChild(b); } }catch(e){} try{ resize(); }catch(e){} }, 2200);
+  addEventListener("orientationchange", () => setTimeout(() => { try{ resize(); }catch(e){} }, 300));
+  const st = document.createElement("style"); st.id = "onumMobile"; st.textContent = css; (document.head || document.documentElement).appendChild(st);
+}catch(e){} })();
 
 const MATCACHE = new Map();
 /* Every distinct repeat used to clone the texture and its normal map, so
@@ -26281,6 +26519,7 @@ function nextDay(late){
     try{ caDay(); }catch(e){}
     try{ famDay(); }catch(e){}
     try{ scDay(); }catch(e){}
+    try{ phDay(); }catch(e){}
     try{ cpDay(); }catch(e){}
     try{ sbDay(); }catch(e){}
     try{ lorePublish(); loreMapSeed(); }catch(e){}
@@ -31544,7 +31783,7 @@ function saveCaptureBase(){
     termLength:G.termLength, country:G.country,
     greatest:G.greatest, blasphemy:G.blasphemy, loreNote:G.loreNote, greatnessOpen:G.greatnessOpen,
     relics:G.relics, relicSpots:G.relicSpots, consularLore:G.consularLore, bind:G.bind, sens:G.sens, invertY:!!G.invertY, voiceVol:G.voiceVol, goals:G.goals, whip:G.whip || null, billQueue:G.billQueue || [], faith:G.faith || null, life:G.life || null, ach:G.ach || {}, law:G.law || null, ladder:G.ladder || [], cases:G.cases || [], lastActs:G.lastActs || [], wx:G.wx || null, town:G.town || null, rivals:G.rivals || [], rivalNext:G.rivalNext || 0, daylog:(G.daylog || []).slice(-120), paperRead:G.paperRead || 0, seedL:G.seedL || 0, mHints:G.mHints || {}, tlog:(G.tlog || []).slice(-500), ag:G.ag || null, sitPrep:G.sitPrep || {}, echoes:G.echoes || [], billKinds:G.billKinds || {}, realmRel:G.realmRel || {}, listened:G.listened || 0,
-    world:G.world, sc:G.sc || null, sbox:G.sbox || null, dist:G.dist || null, fam:G.fam || null, loreBookSeeded:!!G.loreBookSeeded, saidHash:G.saidHash || [], dm:G.dm || null, lore:G.lore || null, trip:G.trip || null,
+    world:G.world, sc:G.sc || null, ph:G.ph || null,  sbox:G.sbox || null, dist:G.dist || null, fam:G.fam || null, loreBookSeeded:!!G.loreBookSeeded, saidHash:G.saidHash || [], dm:G.dm || null, lore:G.lore || null, trip:G.trip || null,
     pendingNight:!!G.pendingNight,
     cam:{x:cam.x, z:cam.z, yaw:cam.yaw, pitch:cam.pitch},
     /* the clock the shared save is compared by — not the game clock, the
