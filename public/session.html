@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261012v">
+<meta name="onum-build" content="20261012w">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261012v";
+  var STAMP = "20261012w";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -34455,6 +34455,515 @@ try{
   console.log("NEPTUNE clarity ready");
 }catch(e){ try{ console.warn("NEPTUNE-CLARITY block", e); }catch(e2){} }
 /* NEPTUNE-CLARITY END */
+/* NEPTUNE-SITTINGS BEGIN — every step-card sitting (Senate, oral argument, the morning briefing,
+   State House open hours) plus committee hearings, party meetings and press conferences becomes a
+   live scene: a cast of named people drawn from the game's members, parties and states, each with an
+   agenda, a temper and allies or rivals, who speak, interrupt, rebut and react (2–6 exchanges a step).
+   At each step you choose: a pointed question, object, yield, side with a speaker, propose a
+   compromise, cut someone off, whisper a deal, or stay silent. Stance meters per speaker move live and
+   decide the ruling, which is explained in a recap. Lines feed the transcript, the NEPTUNE-CLARITY
+   Session Log ("What they meant") and follow the Session pace. Speakers turn to each other in 3D.
+   Wraps sitStart/sitNext/sitPick/sitDraw/sitEnd; any error falls back to the original step card. */
+try{
+  const SX = window.NEPTUNE_SITTINGS = {ver:"20261012w", on:false, fails:0, log:[]};
+  const O = {sitStart, sitStep, sitBeat, sitPick, sitNext, sitOutcome, sitEnd, sitDraw};
+  const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+  const CLr = () => window.NEPTUNE_CLARITY || null;
+  const PACE_MS = {slow:3400, normal:2400, fast:1500};
+  const beatMs = () => { const c = CLr(); return PACE_MS[(c && c.pace) || "normal"] || 2400; };
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  const one = a => a[Math.floor(Math.random() * a.length)];
+  const cl = (v, a, b) => Math.max(a, Math.min(b, v));
+  const sn = n => { try{ return surname(n); }catch(e){ return String(n).split(" ").pop(); } };
+  const pl = p => { try{ return partyLabel(p); }catch(e){ return p || ""; } };
+
+  /* the three new sittings use the same step headers */
+  SIT_DEF.committee = {title:"Committee hearing", chair:"The Chair", min:50, en:12, kind:"vote", key:"sxcmte",
+    steps:["gavel","open","question","question","motion","deliberate","vote","adjourn"]};
+  SIT_DEF.caucus = {title:"Party meeting", chair:"The Whip", min:40, en:8, kind:"vote", key:"sxcauc",
+    steps:["gavel","open","question","motion","deliberate","vote","adjourn"]};
+  SIT_DEF.press = {title:"Press conference", chair:"The press secretary", min:30, en:6, kind:"decision", key:"sxpress",
+    steps:["gavel","open","question","question","motion","ruling","adjourn"]};
+  const KEY = {senate:"ksen", court:"kct", exec:"kex", govoffice:"kgv"};
+
+  /* ── what is in front of the room ── */
+  const matterFor = function(room){
+    const y = G.you, bill = G.bill && !G.bill.done ? G.bill : null, cs = (G.cases || []).find(x => x && !x.done);
+    const st = (G.states || []).find(s => s.n === y.state), hot = (G.states || []).slice().sort((a, b) => (b.unrest || 0) - (a.unrest || 0))[0];
+    let side = 1; try{ if(bill) side = alignment(y, bill) >= 0 ? 1 : -1; }catch(e){}
+    const bt = bill ? bill.title : "the appropriations calendar";
+    const M = {
+      senate:{q:(side > 0 ? "passing " : "defeating ") + bt, short:bt, yes:"aye", no:"no", comp:"a sunset clause and a cap on the first-year cost"},
+      committee:{q:(side > 0 ? "reporting " : "holding ") + bt + (side > 0 ? " to the floor" : " in committee"), short:bt, yes:"report it", no:"hold it", comp:"a markup that strikes section four and adds a review in two years"},
+      caucus:{q:"the party line on " + bt + " being " + (side > 0 ? "yes" : "no"), short:bt, yes:"hold the line", no:"a free vote", comp:"a free vote for members from close districts, the line for everyone else"},
+      court:{q:cs ? "a ruling that " + (cs.t || "the act") + " stands" : "denying the motion on filing deadlines", short:cs ? (cs.t || "the case") : "the motion", yes:"for the Union", no:"for the petitioner", comp:"a narrow holding on this record only"},
+      exec:{q:"sending emergency money to " + (hot ? hot.n : "the worst-hit state") + " today", short:"aid to " + (hot ? hot.n : "the states"), yes:"sign it", no:"hold it", comp:"half now, half after the auditors report"},
+      govoffice:{q:"fixing what the petitioners brought in today out of this year's budget", short:"the petitions", yes:"grant", no:"defer", comp:"the road and the school now, the water main in the spring budget"},
+      press:{q:"your line on " + bt + " leading tomorrow's papers", short:bt, yes:"your line", no:"their story", comp:"a straight answer and a promise of figures by Friday"}
+    };
+    const m = M[room] || M.senate; m.state = st ? st.n : y.state; m.hot = hot ? hot.n : y.state; m.bill = bill; m.cs = cs; return m;
+  }
+
+  /* ── the cast: real members where we can, named townspeople where the room calls for them ── */
+  const CIV = {
+    govoffice:[["dairy farmer","the co-op road washed out in spring and is still out"],["school board chair","three teachers short and the state check is late"],["mayor","the water main the state required, which the town cannot pay for"],["union steward","the plant permit, or the plant closes"],["county clerk","ballots for the special election that never came"],["widow","a pension letter that came back unopened"]],
+    court:[["counsel for the petitioner","the act reaches past the Charter"],["counsel for the Union","the act is the law and the law is clear"]],
+    exec:[["budget director","not moving money the treasury has not got"],["deputy for the states","calm in the states before the weekend"]],
+    committee:[["deputy secretary (witness)","the department's figures, defended under oath"]],
+    press:[["reporter, the Capitol Ledger","the cost nobody has published"],["reporter, the Evening Wire","who wrote the bill and who paid for it"],["reporter, a home-state paper","what this means back home"]],
+    caucus:[], senate:[]
+  };
+  const civ = function(role, want, st){ let n = "Pat Doe"; try{ n = newName(st || G.you.state); }catch(e){} return {m:null, name:n, role, want, party:null, state:st || G.you.state, temper:rnd(20, 80), conv:rnd(20, 80), vanity:rnd(10, 70), warmth:rnd(-10, 15)}; }
+  const buildCast = function(room, M){
+    const y = G.you; let here = [];
+    try{ here = hereNow().filter(m => m && m.name && m !== y && !m.machine && !m.gone && m.kind === "member"); }catch(e){}
+    let pool = (G.members || []).filter(m => m && !m.gone && !m.machine && m.kind === "member" && m !== y);
+    const pref = {committee:m => m.cmte === y.committee, caucus:m => m.party === y.party, govoffice:m => m.state === y.state, senate:m => m.house === "senate" || true}[room] || (() => true);
+    const want = {govoffice:2, court:1, exec:2, committee:4, caucus:4, senate:4, press:1}[room] || 3;
+    const picked = here.filter(pref).slice(0, want);
+    pool.filter(m => pref(m) && !picked.includes(m)).sort(() => Math.random() - 0.5).forEach(m => { if(picked.length < want) picked.push(m); });
+    here.forEach(m => { if(picked.length < want && !picked.includes(m)) picked.push(m); });
+    const out = picked.map(m => ({m, name:m.name, role:(m.post ? m.post + ", " : "") + pl(m.party) + " · " + m.state, party:m.party, state:m.state,
+      temper:m.traits.temper, conv:m.traits.conviction, vanity:m.traits.vanity, warmth:(m.rel && m.rel.warmth) || 0, want:null}));
+    const C = (CIV[room] || []).slice().sort(() => Math.random() - 0.5).slice(0, room === "govoffice" ? 3 : room === "press" ? 3 : 2);
+    if(room === "court" || room === "committee" || room === "exec") C.splice(0, 0); 
+    C.forEach(c => out.push(civ(c[0], c[1], room === "govoffice" ? y.state : (M.cs && M.cs.state) || y.state)));
+    /* agenda, stance (0 = against you … 100 = with you), relationships */
+    out.forEach((p, i) => {
+      p.id = i; p.sn = sn(p.name); p.spoke = 0; p.cut = 0; p.dealt = false; p.moved = 0; p.hist = [];
+      let lean = 0;
+      try{ if(p.m && M.bill){ const v = memberVote(p.m, M.bill); lean = v * (alignment(y, M.bill) >= 0 ? 1 : -1) * 22; } }catch(e){}
+      if(p.m && p.party === y.party) lean += 10; else if(p.m && p.party) lean -= 6;
+      if(/counsel for the Union|budget director|witness/.test(p.role)) lean -= 14;
+      if(/petitioner|deputy for the states|home-state/.test(p.role)) lean += 8;
+      p.stance = cl(Math.round(50 + lean + p.warmth * 0.6 + rnd(-16, 16)), 8, 92);
+      p.want = p.want || (p.m ? one([
+        "a carve-out for " + p.state, "credit at home in " + p.state, "a seat at the table on " + M.short,
+        p.party === y.party ? "the party line held, and seen to hold" : "making your side pay for " + M.short,
+        "the cost written down before anyone votes", "a hearing for the " + (p.m.cmte ? committeeOf(p.m.cmte).t.toLowerCase() : "committee")]) : p.want);
+      p.start = p.stance;
+    });
+    out.forEach(p => { p.allies = []; p.rival = null;
+      out.forEach(q => { if(q === p) return;
+        if(p.m && q.m && ((p.m.allies || []).includes(q.m.id) || (p.party && p.party === q.party && Math.random() < 0.6))) p.allies.push(q.id);
+        if(p.m && q.m && p.m.rival === q.m.id) p.rival = q.id; });
+      if(p.rival == null){ const opp = out.filter(q => q !== p && Math.abs(q.stance - p.stance) > 30); if(opp.length && Math.random() < 0.7) p.rival = one(opp).id; } });
+    return out;
+  }
+
+  /* ── voices ── */
+  const side = p => p.stance >= 60 ? 1 : p.stance <= 40 ? -1 : 0;
+  const call = function(p){ return p.m ? (p.m.house === "senate" ? "the Senator from " : "the member for ") + p.state : "the " + p.role.replace(/ \(witness\)/, ""); }
+  const L = function(p, text, to, tag, gloss){ return {p, who:p ? p.sn : null, text, to:to == null ? null : to, tag:tag || "position", gloss:gloss || ""}; }
+  const chairLine = function(S, text, gloss){ return {p:null, who:S.D.chair, text, to:null, tag:"procedural", gloss:gloss || "The chair keeping order: who speaks, when, and for how long."}; }
+  const argue = function(S, p, M){
+    const s = side(p);
+    if(s > 0) return L(p, one(["I rise for " + M.q + ". " + one(["Ask anyone in " + p.state + ".", "The figures are in the file and they hold.", "We have waited two sessions for this."]),
+      "On " + M.short + ", I am with the chair, and I want " + p.want + " said out loud.", "If we lose " + M.short + " today we will not get it back this year.", "Hear, hear. " + one(["Move it.", "Let us get on with it.", "Put my name down."])]), null, "support",
+      "Backs your side. What they want for it: " + p.want + ".");
+    if(s < 0) return L(p, one(["I cannot support " + M.q + ". Where is the costing?", "With respect, this does the opposite of what it says. " + one(["Read section four.", "Ask the clerks.", "The people of " + p.state + " will pay for it."]),
+      "Nobody in " + p.state + " asked for " + M.short + ". They asked for " + p.want + ".", "I will not be rushed on " + M.short + ". Name the figure."]), null, "oppose",
+      "Against your side as it stands. What would move them: " + p.want + ".");
+    return L(p, one(["I could live with a version of this everyone can live with. I am not there yet.", "I am undecided, and I will say so until somebody gives me a reason. " + one(["Mine is " + p.want + ".", "Mine has to do with " + p.state + "."]),
+      "We are close to something workable on " + M.short + ", if the chair is listening."]), null, "deal",
+      "On the fence. They are signalling a price: " + p.want + ". A compromise or a quiet word could tip them.");
+  }
+  const rebut = function(S, p, q, M){
+    const hot = p.temper > 62;
+    const t = hot ? one(["— if " + call(q) + " would let me finish! That is nonsense.", "Point of order. " + call(q)[0].toUpperCase() + call(q).slice(1) + " is arguing facts not in the record.", "No. No. That is not what the clause says, and " + q.sn + " knows it."])
+                  : one(["Will " + call(q) + " yield? I ask plainly: who pays for this?", "On that point I agree with " + q.sn + ". On the rest, not a word of it.", "I hear " + q.sn + ". " + one(["I heard the same speech last year.", "The record shows otherwise.", "Two different figures in one speech. Which one is in the record?"])]);
+    return L(p, t, q.id, hot ? "oppose" : side(p) === side(q) ? "position" : "oppose",
+      (hot ? "An interruption. " + p.sn + " is hot-tempered and cuts across " + q.sn + "." : "A rebuttal aimed at " + q.sn + ".") + (p.rival === q.id ? " They are rivals, so expect it to get personal." : "") + " " + p.sn + " stands " + (side(p) > 0 ? "with you" : side(p) < 0 ? "against you" : "in the middle") + ".");
+  }
+  const react = function(S, p, q){
+    const ally = p.allies.includes(q.id);
+    return L(p, ally ? one(["Hear, hear.", "Quite right.", "What " + q.sn + " said."]) : one(["Oh, come on.", "Shame.", "That will be remembered, " + q.sn + "."]), q.id, ally ? "support" : "threat",
+      ally ? p.sn + " backs their ally " + q.sn + ". Allies move together; win one and the other often follows." : p.sn + " is signalling a cost to " + q.sn + ". Not a formal move, but the room heard it.");
+  }
+  const petition = function(S, p, M){
+    return L(p, one(["Governor, ", "Ma'am, sir, ", "Thank you for seeing me. "]) + "I'm " + p.name + ", " + p.role + ". " + p.want[0].toUpperCase() + p.want.slice(1) + ". " + one(["I've written four times.", "We need an answer this month.", "I don't want a letter. I want a date."]), null, "position",
+      "A petitioner with a concrete ask: " + p.want + ". Granting it costs money others want.");
+  }
+  const exchange = function(S, step){
+    const M = S.x.M, C = S.x.cast.filter(p => !p.gone), out = [];
+    const by = f => C.slice().sort(f);
+    const pro = by((a, b) => b.stance - a.stance)[0], con = by((a, b) => a.stance - b.stance)[0];
+    const chair = S.D.chair, civs = C.filter(p => !p.m);
+    if(step === "gavel"){
+      out.push(chairLine(S, {senate:"The Senate will come to order. The clerk will read the journal.", court:"Oyez, oyez, oyez. All persons having business before this Court draw near.", exec:"Everyone sit. We have forty minutes and the realm has a lot of problems.",
+        govoffice:"Open hours begin. " + civs.length + " on the list today, please keep it to ten minutes each.", committee:"This committee is in session. The witness will be sworn.", caucus:"Right. Doors shut. Phones down. We leave this room with one line.", press:"Thanks, everyone. Questions at the end. Hands, please."}[S.room] || "Order.", "The sitting opens. The question today: " + M.q + "."));
+      const loud = by((a, b) => b.temper - a.temper)[0];
+      if(loud && loud.temper > 55) out.push(L(loud, one(["Before we start — some of us got the papers at midnight.", "I want it noted that " + (loud.state || "my state") + " was not consulted.", "Is the chair going to let everyone speak this time?"]), null, "oppose", loud.sn + " is restless before a word is said. High temper: they interrupt, and they take being cut off badly."));
+      return out;
+    }
+    if(step === "adjourn"){ out.push(chairLine(S, {govoffice:"That is the list. Open hours are closed.", senate:"The Senate stands adjourned until tomorrow at ten.", court:"This honorable Court is now adjourned.", exec:"Thank you. Go do it.", committee:"The committee stands adjourned.", caucus:"That is the business. Out you go, and vote the way you said.", press:"That's all the time we have. Thank you."}[S.room] || "Adjourned.")); return out; }
+    if(step === "open"){
+      if(S.room === "govoffice" && civs[0]) out.push(petition(S, civs[0], M)); else out.push(argue(S, pro, M));
+      if(con !== pro) out.push(argue(S, con, M));
+      if(Math.random() < 0.6 && con !== pro) out.push(rebut(S, pro, con, M));
+      const mid = C.find(p => side(p) === 0 && p !== pro && p !== con); if(mid) out.push(argue(S, mid, M));
+      return out;
+    }
+    if(step === "question"){
+      let a = S.room === "govoffice" ? civs[S.x.qi % Math.max(1, civs.length)] : one(C.filter(p => p.spoke <= 1) .concat([con]));
+      S.x.qi++;
+      if(S.room === "govoffice" && a) out.push(petition(S, a, M)); else out.push(argue(S, a, M));
+      const foes = C.filter(p => p !== a && (p.rival === a.id || Math.abs(p.stance - a.stance) > 25));
+      const b = foes.length ? one(foes) : one(C.filter(p => p !== a)) || a;
+      if(b !== a) out.push(rebut(S, b, a, M));
+      if(b !== a && Math.random() < 0.65) out.push(L(a, one(["I'll answer that. " + one(["The money is in line six.", "We asked; nobody wrote back.", "It is in the record, if anyone read it."]), "That's beneath you, " + b.sn + ".", "Fine. Then put it to a vote and we will see."]), b.id, side(a) > 0 ? "support" : "position", a.sn + " answers " + b.sn + " directly. Watch who in the room nods."));
+      const r = C.find(p => p !== a && p !== b && (p.allies.includes(a.id) || p.allies.includes(b.id)));
+      if(r) out.push(react(S, r, r.allies.includes(a.id) ? a : b));
+      if(out.length > 3 && Math.random() < 0.5) out.push(chairLine(S, "Order. One at a time."));
+      return out.slice(0, 6);
+    }
+    if(step === "motion"){
+      const mv = C.filter(p => p.temper > 45).sort((a, b) => Math.abs(b.stance - 50) - Math.abs(a.stance - 50))[0] || con;
+      out.push(L(mv, side(mv) < 0 ? one(["I move to table.", "Point of order: it is not germane.", "I object, and I ask for the yeas and nays on the objection."]) : one(["I move the previous question.", "I ask unanimous consent to limit debate to one hour.", "I move we take it as read."]), null, side(mv) < 0 ? "oppose" : "support",
+        side(mv) < 0 ? mv.sn + " is trying to stop it on procedure, which is easier than winning on the merits." : mv.sn + " is trying to close debate while the count is good."));
+      const ob = C.find(p => p !== mv && side(p) !== side(mv)); if(ob) out.push(L(ob, "Objection.", mv.id, "oppose", ob.sn + " objects to " + mv.sn + "'s motion. Now it has to be argued."));
+      if(ob && Math.random() < 0.6) out.push(rebut(S, mv, ob, M));
+      out.push(chairLine(S, "The objection is heard. The chair will rule after argument."));
+      return out;
+    }
+    if(step === "deliberate"){
+      out.push(chairLine(S, S.room === "govoffice" ? "Shall I clear the room, Governor?" : "Take a minute. We will stand at ease.", "A pause: the real deals get done now, in low voices."));
+      const mids = C.filter(p => side(p) === 0); const w = mids[0] || one(C);
+      out.push(L(w, one(["(low) If " + p_or(w) + " gets " + w.want + ", I can be there.", "(low) I need something to take home. Anything.", "(low) Who else is with you? Give me names."]), "you", "deal", w.sn + " is open to a deal in private. Their price: " + w.want + "."));
+      const r = C.find(p => p !== w && side(p) < 0); if(r) out.push(L(r, one(["(across the room) I can see what is happening over there.", "We all know how this gets done.", "I hope the papers are watching."]), w.id, "threat", r.sn + " is warning " + w.sn + " off a deal with you."));
+      return out;
+    }
+    if(step === "vote" || step === "ruling"){
+      const t = S.x.tally(); out.push(chairLine(S, S.kind === "vote" || S.D.kind === "vote" ? "The question is on " + M.q + ". The clerk will call the roll." : "The chair has heard enough. The room leans " + t.yes + " to " + t.no + ".",
+        "Decision time. The meters are the room: " + t.yes + " with you, " + t.no + " against, " + t.mid + " undecided."));
+      const holdout = C.filter(p => side(p) < 0).sort((a, b) => b.conv - a.conv)[0]; if(holdout) out.push(L(holdout, "For the record: no. " + one(["Not like this.", "And I will say why at home.", "Write it down."]), null, "oppose", holdout.sn + " is a firm no and wants it on the record."));
+      return out;
+    }
+    return out;
+  }
+  const p_or = function(p){ return p.state || "my state"; }
+
+  /* ── your moves ── */
+  const movesFor = function(S, step){
+    const C = S.x.cast.filter(p => !p.gone), last = S.x.lastSpeaker != null ? C.find(p => p.id === S.x.lastSpeaker) : null;
+    const con = C.slice().sort((a, b) => a.stance - b.stance)[0], pro = C.slice().sort((a, b) => b.stance - a.stance)[0];
+    const mid = C.filter(p => !p.dealt).sort((a, b) => Math.abs(a.stance - 50) - Math.abs(b.stance - 50))[0];
+    const talker = C.slice().sort((a, b) => (b.spoke + b.temper / 50) - (a.spoke + a.temper / 50))[0];
+    const A = [];
+    const add = (k, t, tgt, risk, why) => A.push({k, t, tgt:tgt ? tgt.id : null, risk, why});
+    if(step === "gavel"){
+      add("limits", "Set strict time limits", null, 0.1, "Hot tempers bristle; the room moves faster.");
+      add("openfloor", "Let everyone have their say", null, 0.05, "Speakers soften toward you; it takes longer.");
+      add("silent", "Stay silent and watch", null, 0, "You learn who is loud. No cost.");
+      return A;
+    }
+    if(step === "vote" || step === "ruling"){
+      const t = S.x.tally();
+      add("rule", (S.D.kind === "vote" ? "Call the vote on your line" : "Rule with your line") + " (" + t.yes + " with you)", null, t.yes >= t.no ? 0.1 : 0.5, "Wins big if the room is with you; backfires if it is not.");
+      if(S.x.amended) add("rulecomp", "Settle it on the compromise: " + S.x.M.comp, null, 0.1, "Safer; nobody gets all they wanted.");
+      else add("amend", "Propose a compromise before the vote: " + S.x.M.comp, mid, 0.25, "Moves the middle; costs your firmest allies a little.");
+      add("room", "Go with the room", null, 0, "No risk. You follow the majority, and the record says so.");
+      if(con && side(con) < 0) add("whisper", "Whisper a last deal to " + con.sn, con, 0.45, "Turns a no, or gets you caught.");
+      return A;
+    }
+    if(con && side(con) < 0) add("question", "Ask " + con.sn + " a pointed question", con, 0.35, con.sn + " (conviction " + Math.round(con.conv) + ") must answer or look evasive.");
+    if(last && side(last) < 0 && step !== "deliberate") add("object", "Object to " + last.sn + "'s point", last, 0.3, "Undecideds watch how it lands.");
+    if(pro && side(pro) > 0) add("side", "Side with " + pro.sn, pro, 0.1, "Lifts " + pro.sn + " and their allies; their rival cools.");
+    if(step === "motion" || step === "deliberate" || step === "question") if(!S.x.amended) add("amend", "Propose a compromise: " + S.x.M.comp, mid, 0.25, "Pulls everyone toward the middle.");
+    if(talker && talker.cut < 2 && (step === "question" || step === "motion" || step === "open")) add("cut", "Cut " + talker.sn + " off", talker, 0.3, "Silences them for a step. They will not forget it.");
+    if(mid && side(mid) <= 0) add("whisper", "Whisper a deal to " + mid.sn + " (" + mid.want + ")", mid, 0.3, "Costs the war chest; turns them if it holds.");
+    if(pro && step !== "deliberate") add("yield", "Yield your time to " + pro.sn, pro, 0.05, pro.sn + " argues your case in their own words.");
+    add("silent", "Stay silent", null, 0, "The room argues on without you; it drifts toward the louder side.");
+    return A.slice(0, 7);
+  }
+  const STAT = {question:[{standing:2, influence:1, heat:-3}, {standing:-2, heat:5}], object:[{influence:2}, {standing:-1, influence:-1}], side:[{standing:1}, {}], amend:[{standing:2, approval:1}, {standing:-1}],
+    cut:[{influence:2, heat:4}, {standing:-2, heat:8}], whisper:[{pledge:1, funds:-2}, {funds:-2, standing:-2}], yield:[{standing:1}, {}], silent:[{}, {}], limits:[{standing:1}, {}], openfloor:[{approval:1}, {}],
+    rule:[{standing:2, influence:2}, {standing:-3}], rulecomp:[{standing:1, approval:1}, {}], room:[{}, {}]};
+  const SCORE = {question:2, object:1, side:1, amend:2, cut:1, whisper:2, yield:1, silent:0, limits:1, openfloor:1, rule:2, rulecomp:1, room:0};
+  const shift = function(S, p, d, why){ if(!p || p.gone) return; const o = p.stance; p.stance = cl(Math.round(p.stance + d * (1 - p.conv / 260)), 0, 100); p.moved += p.stance - o; if(p.stance !== o) p.hist.push((p.stance > o ? "+" : "") + (p.stance - o) + " " + why); }
+  const doMove = function(S, mv){
+    const C = S.x.cast.filter(p => !p.gone), t = mv.tgt != null ? S.x.cast[mv.tgt] : null, y = G.you, said = [];
+    let p = 1 - mv.risk + (S.prep ? 0.15 : 0) + ((y.standing || 50) - 50) / 250 - S.rush * 0.08;
+    if(mv.k === "whisper" && (y.funds || 0) < 2) p -= 0.5;
+    if(mv.k === "question" && t) p -= (t.conv - 50) / 200;
+    if(mv.k === "rule"){ const tl = S.x.tally(); p = tl.yes > tl.no ? 0.85 + (S.prep ? 0.1 : 0) : tl.yes === tl.no ? 0.5 : 0.15; }
+    const ok = mv.risk === 0 || Math.random() < p;
+    const you = text => said.push({p:null, who:"You", text, to:t ? t.id : null, tag:"position", gloss:"Your own words, now on the record."});
+    const allies = q => C.filter(o => o !== q && o.allies.includes(q.id)), rival = q => q && q.rival != null ? S.x.cast[q.rival] : null;
+    switch(mv.k){
+      case "limits": you("Three minutes each. The chair will hold you to it."); C.forEach(o => { if(o.temper > 60) shift(S, o, -4, "bristled at the time limit"); }); S.x.brisk = 1; break;
+      case "openfloor": you("Everyone will be heard. Take the time you need."); C.forEach(o => shift(S, o, 3, "glad to be heard")); break;
+      case "silent": you("(You say nothing and watch the room.)"); { const lean = S.x.tally(); C.forEach(o => shift(S, o, (lean.yes >= lean.no ? 2 : -3), "the room argued on without you")); } break;
+      case "question": you(one(["A plain question for " + t.sn + ": who pays, and when?", t.sn + ", have you read section four, or only the summary?", "Will " + t.sn + " tell this room what " + t.state + " gets out of it?"]));
+        if(ok){ shift(S, t, 10, "had no answer to your question"); C.filter(o => side(o) === 0).forEach(o => shift(S, o, 6, "watched " + t.sn + " fail to answer")); said.push(L(t, one(["I — the figures are being revised.", "That is a fair question. I will come back with it.", "...I take the point."]), "you", "position", t.sn + " has no good answer. The undecideds noticed."));}
+        else { shift(S, t, -5, "answered you well"); allies(t).forEach(o => shift(S, o, -4, "cheered " + t.sn + "'s answer")); said.push(L(t, one(["Page twelve. Read it.", "I have, and I will read it to you slowly if you like.", "A question the member could have answered with a phone call."]), "you", "oppose", t.sn + " turned the question round on you. It cost you."));}
+        break;
+      case "object": you("Objection. " + one(["That is not in the record.", "The member is misstating the bill.", "That figure is wrong and " + t.sn + " knows it."]));
+        if(ok){ C.filter(o => side(o) === 0).forEach(o => shift(S, o, 7, "your objection landed")); shift(S, t, -2, "dug in after your objection"); said.push(chairLine(S, "The objection is sustained.", "You won the point: the chair agrees, and the undecideds moved."));}
+        else { shift(S, t, -4, "dug in"); C.filter(o => side(o) === 0).forEach(o => shift(S, o, -3, "thought your objection was thin")); said.push(chairLine(S, "Overruled. The member may continue.", "You lost the point on procedure."));
+          if(t.temper > 55) said.push(L(t, "As I was saying, before I was so rudely interrupted —", "you", "threat", t.sn + " is enjoying this."));}
+        break;
+      case "side": you("I'm with " + t.sn + " on this. " + one(["Every word.", "Put me down.", "They said it better than I could."]));
+        shift(S, t, 10 + t.vanity / 10, "you sided with them publicly"); allies(t).forEach(o => shift(S, o, 5, "their ally " + t.sn + " has you now")); { const r = rival(t); if(r) shift(S, r, -8, "you sided with their rival " + t.sn); }
+        said.push(L(t, one(["Thank you. I won't forget that.", "Hear, hear. Thank you.", "There. The chair agrees with me."]), "you", "support", t.sn + " is pleased (vanity " + Math.round(t.vanity) + "): flattery works best on the vain."));
+        { const r = rival(t); if(r) said.push(react(S, r, t)); }
+        break;
+      case "amend": if(/vote|ruling/.test(S.D.steps[S.i])){ S.x.final = "rulecomp"; S.x.finalOk = true; }
+        you("Then let me offer a way through: " + S.x.M.comp + ".");
+        if(ok){ S.x.amended = true; C.forEach(o => shift(S, o, o.stance < 50 ? 14 : o.stance > 80 ? -5 : 6, "the compromise met them halfway")); const m2 = t || C[0]; said.push(L(m2, one(["I can live with that.", "Now that is a version everyone can live with.", "Put my name on the amendment."]), "you", "deal", "The compromise lands: the middle comes over and the hard edges soften."));}
+        else { if(S.x.final === "rulecomp") S.x.final = "room"; C.forEach(o => shift(S, o, o.stance > 70 ? -7 : -2, "thought you blinked")); const h = C.slice().sort((a, b) => b.stance - a.stance)[0]; said.push(L(h, "We didn't come here to split the difference.", "you", "oppose", "Your own side thinks you gave ground too early."));}
+        break;
+      case "cut": you(t.sn + ", your time has expired. The chair recognises the next speaker.");
+        t.cut++; shift(S, t, -12, "you cut them off"); allies(t).forEach(o => shift(S, o, -6, "you cut off their ally " + t.sn)); if(ok) C.filter(o => side(o) === 0 && o !== t).forEach(o => shift(S, o, 4, "liked a firm chair"));
+        said.push(L(t, t.temper > 55 ? "You can gavel me down. You can't gavel down " + t.state + "." : "...Very well. The record will show I was not allowed to finish.", "you", "threat", t.sn + " was cut off and holds it against you." + (t.temper > 55 ? " High temper: expect it again." : "")));
+        S.x.silenced = t.id; break;
+      case "whisper": you("(low, to " + t.sn + ") " + one(["Back me on this and " + t.want + " is yours.", "I can get you " + t.want + ". Not today, but in writing.", "Name it. Within reason."]));
+        t.dealt = true;
+        if(ok){ shift(S, t, 28, "took your deal (" + t.want + ")"); if(t.m){ try{ t.m.pledge = 1; t.m.pledgeDay = G.day; }catch(e){} } said.push(L(t, "(low) Done. Don't make me regret it.", "you", "deal", t.sn + " is with you now. They will expect " + t.want + "."));}
+        else { shift(S, t, -6, "turned your deal down"); C.filter(o => o !== t).forEach(o => shift(S, o, -4, "heard about the whisper")); said.push(L(t, "(out loud) I think the room should know what I was just offered.", null, "threat", t.sn + " exposed the deal. Everyone heard."));}
+        break;
+      case "yield": you("I yield my time to " + t.sn + ".");
+        shift(S, t, 6, "you gave them the floor"); C.filter(o => o !== t).forEach(o => shift(S, o, side(t) > 0 ? 4 : -2, t.sn + " argued your case"));
+        said.push(argue(S, t, S.x.M)); break;
+      case "rule": case "rulecomp": case "room": S.x.final = mv.k; you(mv.k === "rule" ? (S.D.kind === "vote" ? "Call the roll." : "Then I rule for " + S.x.M.q + ".") : mv.k === "rulecomp" ? "On the compromise, then: " + S.x.M.comp + "." : "The room has spoken. I'll go with it."); S.x.finalOk = ok; break;
+    }
+    const r = sitApply(ok ? STAT[mv.k][0] : STAT[mv.k][1]);
+    S.score += ok ? SCORE[mv.k] : -1;
+    S.tally.push({step:S.D.steps[S.i], pick:mv.t, ok, r, k:mv.k, who:t ? t.sn : null});
+    return {said, ok, r};
+  }
+
+  /* ── 3D: speakers turn toward whom they address, bubble and a little gesture ── */
+  const face = function(S, line){
+    try{
+      S.x.cast.forEach(p => { if(p.m){ p.m.sayT = 0; } });
+      const p = line.p; if(!p || !p.m) return;
+      const m = p.m, tgt = line.to === "you" || line.to == null ? null : S.x.cast[line.to];
+      m.say = line.text.slice(0, 140); m.sayT = beatMs() / 1000 + 0.6; m.sayTo = tgt && tgt.m ? tgt.m.id : "you"; m.faceUntil = (G.t || 0) + 4; m._sxTalk = performance.now();
+      if(tgt && tgt.m){ tgt.m._sxLook = m.id; tgt.m.faceUntil = (G.t || 0) + 4; }
+      if(m.room === G.room){ const tx = tgt && tgt.m ? tgt.m.x : (typeof cam !== "undefined" && cam ? cam.x : m.x), tz = tgt && tgt.m ? tgt.m.z : (typeof cam !== "undefined" && cam ? cam.z : m.z + 1); m._sxYaw = Math.atan2(tx - m.x, tz - m.z); }
+    }catch(e){}
+  }
+  const anim = function(){
+    const S = SIT.on; if(!S || !S.x){ SX.raf = 0; return; }
+    try{ const t = performance.now();
+      S.x.cast.forEach(p => { const m = p.m; if(!m || !m.mesh || m.room !== G.room) return;
+        if(m._sxBrought){ m.mesh.position.x = m.x; m.mesh.position.z = m.z; m.mesh.visible = true; }
+        if(m._sxYaw != null){ let d = m._sxYaw - m.mesh.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d)); m.mesh.rotation.y += d * 0.15; m.facing = m.mesh.rotation.y; }
+        const talking = m._sxTalk && t - m._sxTalk < beatMs();
+        if(m.mesh.userData){ if(m.mesh.userData._sxY == null) m.mesh.userData._sxY = m.mesh.position.y; m.mesh.position.y = m.mesh.userData._sxY + (talking ? Math.abs(Math.sin(t / 140)) * 0.025 : 0); }
+        if(m._sxLook != null){ const o = S.x.cast.find(q => q.m && q.m.id === m._sxLook); if(o) m._sxYaw = Math.atan2(o.m.x - m.x, o.m.z - m.z); m._sxLook = null; } });
+    }catch(e){}
+    SX.raf = requestAnimationFrame(anim);
+  }
+  const bring = function(S){
+    /* members drawn into the sitting come into the room for it, and go back after */
+    S.x.moved = [];
+    S.x.cast.forEach((p, i) => { const m = p.m; if(!m || m.room === G.room) return;
+      S.x.moved.push([m, m.room, m.x, m.z]); m.room = G.room; m._sxBrought = true;
+      let cx = 0, cz = 6, yw = Math.PI; try{ if(typeof cam !== "undefined" && cam){ cx = cam.x; cz = cam.z; yw = cam.yaw; } }catch(e){}
+      const fx = Math.sin(yw), fz = Math.cos(yw), lat = -(0.7 + (i % 4) * 0.75), dist = 2.8 + (i % 2) * 0.5 + Math.floor(i / 4) * 0.8;
+      m.x = cx + fx * dist + fz * lat; m.z = cz + fz * dist - fx * lat; m.tx = m.x; m.tz = m.z; m.wait = 30; m.sitting = false; });
+    try{ if(S.x.moved.length && typeof syncPeople === "function") syncPeople(); }catch(e){}
+  }
+  const sendBack = function(S){ try{ (S.x.moved || []).forEach(([m, r, x, z]) => { m._sxBrought = false; m.room = r; m.x = x; m.z = z; m.tx = x; m.tz = z; if(m.mesh && m.mesh.userData) m.mesh.userData._sxY = null; }); if(S.x.moved.length && typeof syncPeople === "function") syncPeople(); }catch(e){} }
+
+  /* ── transcript + Session Log ── */
+  const record = function(S, line){
+    try{ tlog(line.who || S.D.chair, line.text, line.who === "You" ? "you" : "sit"); }catch(e){}
+    const c = CLr(), at = (() => { try{ return hhmm(); }catch(e){ return ""; } })();
+    S.x.lines.push({who:line.who || S.D.chair, text:line.text, at, tag:line.tag, gloss:line.gloss, p:line.p ? line.p.id : null});
+    if(c){ c.said = c.said || {}; }
+  }
+  const saveLog = function(S, outcome){
+    try{ const c = CLr(); if(!c) return;
+      const sess = {title:S.D.title, k:"sitting", day:G.day, at:S.x.at0, room:(ROOMS[G.room] && ROOMS[G.room].t) || G.room, lines:S.x.lines.map(l => ({who:l.who, text:l.text, at:l.at, tag:l.tag, gloss:l.gloss})).slice(-120), outcome};
+      c.past = [sess].concat(c.past || []).slice(0, 15); try{ localStorage.setItem("clarity.sessions", JSON.stringify(c.past)); }catch(e){}
+    }catch(e){}
+  }
+
+  /* ── engine ── */
+  const start = function(room, key){
+    const D = SIT_DEF[room]; if(!D) return false;
+    try{ if(TALK.open) closeTalk(); }catch(e){}
+    G.sitPrep = G.sitPrep || {};
+    const prep = G.sitPrep[room] === G.day;
+    const M = matterFor(room);
+    const S = SIT.on = {room, D, i:0, li:0, lines:[], cast:{}, score:0, rush:0, prep, t0:performance.now(), m0:G.minute || 0, tally:[], picked:false, key:key || KEY[room] || D.key};
+    S.x = {M, cast:buildCast(room, M), lines:[], queue:[], qi:0, at0:(() => { try{ return hhmm(); }catch(e){ return ""; } })(), amended:false, lastSpeaker:null, moves:null, said:[]};
+    S.x.tally = () => { const C = S.x.cast.filter(p => !p.gone); return {yes:C.filter(p => p.stance >= 55).length, no:C.filter(p => p.stance <= 45).length, mid:C.filter(p => p.stance > 45 && p.stance < 55).length, avg:C.reduce((a, p) => a + p.stance, 0) / Math.max(1, C.length)}; };
+    S.cast = {a:(S.x.cast[0] || {}).name, b:(S.x.cast[1] || {}).name, c:(S.x.cast[2] || {}).name, ppl:S.x.cast.map(p => p.m).filter(Boolean)};
+    try{ kMark(S.key); kMarkChamber(); }catch(e){}
+    G.running = false;
+    bring(S);
+    try{ veil.classList.add("sitx"); }catch(e){}
+    SX.on = true; if(!SX.raf) SX.raf = requestAnimationFrame(anim);
+    step();
+    return true;
+  }
+  const step = function(){
+    const S = SIT.on, st = S.D.steps[S.i];
+    S.picked = false; S.res = ""; S.x.moves = null; S.x.said = [];
+    if(S.x.silenced != null && st !== "question") S.x.silenced = null;
+    let q = exchange(S, st);
+    if(S.x.silenced != null) q = q.filter(l => !l.p || l.p.id !== S.x.silenced);
+    if(S.x.brisk && q.length > 3) q = q.slice(0, 3 + (Math.random() < 0.5 ? 1 : 0));
+    S.x.queue = q.length ? q : [chairLine(S, "Order.")];
+    S.lines = S.x.queue; S.li = 0;
+    spend(Math.round(S.D.min / S.D.steps.length), Math.round(S.D.en / S.D.steps.length));
+    draw(); beat();
+  }
+  const beat = function(){
+    const S = SIT.on; if(!S || !S.x) return;
+    clearTimeout(SIT.timer);
+    const c = CLr(); if(c && c.paused){ SIT.timer = setTimeout(beat, 400); return; }
+    if(S.li < S.x.queue.length){
+      const ln = S.x.queue[S.li++];
+      if(ln.p){ ln.p.spoke++; S.x.lastSpeaker = ln.p.id; }
+      record(S, ln); face(S, ln); S.x.said.push(ln);
+      draw();
+      SIT.timer = setTimeout(beat, beatMs());
+    } else draw();
+  }
+  const pick = function(ci){
+    const S = SIT.on; if(!S || !S.x || S.picked) return;
+    const mv = (S.x.moves || [])[ci]; if(!mv) return;
+    const before = S.x.cast.map(p => p.stance);
+    const r = doMove(S, mv);
+    S.picked = true;
+    const moved = S.x.cast.map((p, i) => [p, p.stance - before[i]]).filter(x => x[1]).map(x => x[0].sn + " " + (x[1] > 0 ? "+" : "") + x[1]).join(", ");
+    S.res = (r.ok ? "It lands." : "It goes badly.") + (moved ? " Moved: " + moved + "." : "") + (r.r ? " (" + r.r + ")" : "");
+    S.tally[S.tally.length - 1].moved = moved;
+    S.x.queue = S.x.queue.concat(r.said); S.lines = S.x.queue;
+    beat();
+  }
+  const next = function(){
+    const S = SIT.on; if(!S || !S.x) return;
+    if(S.li < S.x.queue.length){ beat(); return; }
+    const st = S.D.steps[S.i];
+    if(st !== "adjourn" && !S.picked) return;
+    if(st === "vote" || st === "ruling") outcome();
+    S.i++;
+    if(S.i >= S.D.steps.length){ end(false); return; }
+    step();
+  }
+  const outcome = function(){
+    const S = SIT.on, y = G.you, t = S.x.tally(), M = S.x.M, fin = S.x.final || "room";
+    const carried = t.avg >= 50 || t.yes > t.no;
+    let verdict, good;
+    if(fin === "rule"){ good = carried && S.x.finalOk; verdict = carried ? "Your line carried, " + t.yes + " to " + t.no + "." : "You pushed your line against the room and lost, " + t.yes + " to " + t.no + "."; }
+    else if(fin === "rulecomp"){ good = t.avg >= 45; verdict = "Settled on the compromise (" + M.comp + "). " + (good ? "Most of the room can live with it." : "Even the compromise was a stretch."); }
+    else { good = carried && S.score >= 2; verdict = "You went with the room: " + (carried ? M.yes : M.no) + ", " + t.yes + " to " + t.no + "."; }
+    if(S.rush) good = false;
+    const res = sitApply(good ? {standing:2, influence:1, approval:S.room === "govoffice" ? 3 : S.room === "press" ? 2 : 0, support:M.bill && (S.room === "senate" || S.room === "committee" || S.room === "caucus") ? Math.round((t.avg - 50) / 4) : 0} : S.score < 0 ? {standing:-2} : {standing:1});
+    if(S.room === "exec" || S.room === "govoffice"){
+      try{ const st = S.room === "exec" ? (G.states || []).slice().sort((a, b) => (b.unrest || 0) - (a.unrest || 0))[0] : (G.states || []).find(s => s.n === y.state);
+        if(st) st.unrest = clamp((st.unrest || 0) - (good ? 3 : carried ? 1 : -1), 0, 100); }catch(e){}
+    }
+    try{ const r = rivalLive(); const rv = r && S.x.cast.find(p => p.m === r); if(rv && rv.stance < 40) r.heat = clamp((r.heat || 0) + 4, 0, 100); }catch(e){}
+    S.out = (good ? "A clean sitting." : S.score < 0 ? "A rough sitting." : "A middling sitting.") + " " + verdict + (res ? " " + res : "");
+    S.x.verdict = verdict; S.x.good = good;
+    try{ tlog(S.D.chair, S.out, "sit"); }catch(e){}
+    if(good && S.prep){ try{ achieve("sitting"); }catch(e){} }
+  }
+  const recap = function(S){
+    const C = S.x.cast, T = {gavel:"Called to order", open:"Openings", question:"Questions", motion:"Motions", deliberate:"Deliberation", vote:"The vote", ruling:"The ruling"};
+    const rows = S.tally.map(x => '<li><b>' + esc(T[x.step] || x.step) + ':</b> ' + esc(x.pick) + ' — ' + (x.ok ? "it landed" : "it went badly") + (x.moved ? '. ' + esc(x.moved) : '') + '</li>').join("");
+    const why = C.filter(p => Math.abs(p.stance - p.start) >= 6).map(p => '<li><b>' + esc(p.sn) + '</b> ' + p.start + ' → ' + p.stance + ': ' + esc(p.hist.slice(-2).join("; ")) + '</li>').join("");
+    return '<div class="sx-recap"><h3>What happened</h3><p>' + esc(S.x.verdict || "") + (S.x.amended ? " The compromise was on the table." : "") + (S.rush ? " You rushed it, and the room noticed." : "") + '</p><ul>' + rows + '</ul>' +
+      (why ? '<h3>Who moved, and why</h3><ul>' + why + '</ul>' : '<p>Nobody really moved. Minds were made up before the gavel.</p>') + '</div>';
+  }
+  const end = function(walked){
+    const S = SIT.on; if(!S) return;
+    clearTimeout(SIT.timer);
+    if(walked){ sitApply({standing:-3, influence:-1}); try{ tlog("", "You walked out of the sitting.", "sit"); }catch(e){} S.x.cast.forEach(p => { if(p.m && p.m.rel) p.m.rel.warmth = clamp((p.m.rel.warmth || 0) - 2, -100, 100); }); }
+    else S.x.cast.forEach(p => { if(p.m && p.m.rel){ p.m.rel.warmth = clamp((p.m.rel.warmth || 0) + Math.round((p.stance - p.start) / 10), -100, 100); } });
+    SIT.log.push({room:S.room, ms:Math.round(performance.now() - S.t0), gameMin:(G.minute || 0) - S.m0, steps:S.i, walked:!!walked, score:S.score, live:true});
+    saveLog(S, walked ? "You walked out" : (S.out || "Sat through"));
+    SX.log.push({room:S.room, verdict:S.x.verdict, score:S.score, lines:S.x.lines.length, tally:S.tally.map(x => x.k)});
+    try{ note((walked ? "Walked out of " : "Sat through ") + S.D.title.toLowerCase() + "." + (S.x.verdict ? " " + S.x.verdict : "")); }catch(e){}
+    sendBack(S);
+    S.x.cast.forEach(p => { if(p.m){ p.m._sxYaw = null; p.m._sxTalk = 0; p.m._sxLook = null; } });
+    try{ veil.classList.remove("sitx"); }catch(e){}
+    SIT.on = null; SX.on = false;
+    walkNow();
+  }
+  const meter = function(p, S){
+    const now = S.x.queue[S.li - 1], talking = now && now.p === p, d = p.stance - p.start;
+    const col = p.stance >= 55 ? "#3c8d5a" : p.stance <= 45 ? "#b0473c" : "#c08a1e";
+    return '<div class="sx-p' + (talking ? ' is-talk' : '') + (S.x.silenced === p.id ? ' is-cut' : '') + '" title="' + esc(p.name + " — wants " + p.want + ". Temper " + Math.round(p.temper) + ", conviction " + Math.round(p.conv)) + '">' +
+      '<div class="sx-n"><b>' + esc(p.sn) + '</b> <small>' + esc(p.role) + '</small></div>' +
+      '<div class="sx-bar"><i style="width:' + p.stance + '%;background:' + col + '"></i><u style="left:50%"></u></div>' +
+      '<div class="sx-w"><small>wants ' + esc(p.want) + '</small><small>' + (p.stance >= 55 ? "with you" : p.stance <= 45 ? "against" : "undecided") + (d ? ' <em>' + (d > 0 ? "+" : "") + d + '</em>' : '') + '</small></div></div>';
+  }
+  const draw = function(){
+    const S = SIT.on; if(!S || !S.x) return;
+    const st = S.D.steps[S.i], done = S.li >= S.x.queue.length;
+    const prog = S.D.steps.map((s, i) => '<span class="sit__dot' + (i < S.i ? ' is-done' : i === S.i ? ' is-now' : '') + '">' + SIT_STEP_T[s] + '</span>').join("");
+    const shown = S.x.said, lastI = shown.length - 1;
+    const lines = shown.map((l, i) => '<div class="sit__l sx-l sx-' + l.tag + (i === lastI ? ' is-new' : '') + '"><b>' + esc(l.who || S.D.chair) + (l.to != null && l.to !== "you" && S.x.cast[l.to] ? ' <small>→ ' + esc(S.x.cast[l.to].sn) + '</small>' : l.to === "you" ? ' <small>→ you</small>' : '') + '</b> ' + esc(l.text) +
+      (l.gloss ? (i === lastI ? '<div class="sx-g"><span>What they meant:</span> ' + esc(l.gloss) + '</div>' : '<details class="sx-gd"><summary>What they meant</summary>' + esc(l.gloss) + '</details>') : '') + '</div>').join("");
+    let acts = "";
+    if(done && st !== "adjourn" && !S.picked){
+      S.x.moves = S.x.moves || movesFor(S, st);
+      acts = '<div class="sx-moves">' + S.x.moves.map((m, i) => '<button type="button" class="btn' + (i ? ' btn--ghost' : '') + '" data-sit="' + i + '" title="' + esc(m.why) + '">' + esc(m.t) + (m.risk >= 0.3 ? ' <small>(risky)</small>' : '') + '<br><small class="sx-why">' + esc(m.why) + '</small></button>').join("") + '</div>';
+    } else acts = '<button type="button" class="btn" id="sitGo">' + (done ? (S.i === S.D.steps.length - 1 ? "Rise" : "Next step") : "Continue") + '</button>';
+    const t = S.x.tally();
+    card.innerHTML = '<div class="eyebrow">' + esc(S.D.title) + ' · step ' + (S.i + 1) + ' of ' + S.D.steps.length + (S.prep ? ' · you read the file' : '') + ' · pace ' + esc((CLr() && CLr().pace) || "normal") + '</div>' +
+      '<h1>' + SIT_STEP_T[st] + '</h1><div class="sit__prog">' + prog + '</div>' +
+      '<p class="sx-q"><b>The question:</b> ' + esc(S.x.M.q) + ' · <span class="sx-c">' + t.yes + ' with you · ' + t.mid + ' undecided · ' + t.no + ' against</span>' + (S.x.amended ? ' · <i>compromise on the table</i>' : '') + '</p>' +
+      '<div class="sx-grid"><div class="sx-cast">' + S.x.cast.map(p => meter(p, S)).join("") + '</div><div class="sit__lines sx-lines">' + lines + '</div></div>' +
+      (S.res ? '<p class="dream">' + esc(S.res) + '</p>' : '') + (st === "adjourn" && S.out ? '<p class="dream">' + esc(S.out) + '</p>' + recap(S) : '') +
+      (done && st !== "adjourn" && !S.picked ? '<p class="sx-hint">Your move. Hover a choice to see what it does; it shifts the meters live.</p>' : '') +
+      '<div class="card__actions">' + acts + '<button type="button" class="btn btn--ghost" id="sitOut">Walk out</button></div>';
+    veil.hidden = false;
+    const g = el("sitGo"); if(g) g.addEventListener("click", sitNext);
+    el("sitOut").addEventListener("click", () => sitEnd(true));
+    card.querySelectorAll("[data-sit]").forEach(b => b.addEventListener("click", () => sitPick(+b.getAttribute("data-sit"))));
+    const lb = card.querySelector(".sx-lines"); if(lb) lb.scrollTop = lb.scrollHeight;
+    try{ refreshPicks(); }catch(e){}
+  }
+
+  /* ── wrap the step-card engine; any failure drops back to the original card ── */
+  const live = () => SIT.on && SIT.on.x;
+  const guard = (name, f, fb) => function(){ try{ return f.apply(this, arguments); }catch(e){ SX.fails++; try{ console.warn("NEPTUNE-SITTINGS " + name, e); }catch(e2){}
+    try{ if(SIT.on && SIT.on.x){ sendBack(SIT.on); delete SIT.on.x; veil.classList.remove("sitx"); } }catch(e3){} return fb.apply(this, arguments); } };
+  sitStart = guard("start", function(room){
+    let key = null; const r0 = String(room); if(r0.indexOf(":") > 0){ key = r0.split(":")[1]; room = r0.split(":")[0]; }
+    if(SX.disabled || !start(room, key)) return O.sitStart(room);
+  }, function(room){ return O.sitStart(String(room).split(":")[0]); });
+  sitStep = guard("step", function(){ return live() ? step() : O.sitStep(); }, () => O.sitStep());
+  sitBeat = guard("beat", function(){ return live() ? beat() : O.sitBeat(); }, () => O.sitBeat());
+  sitPick = guard("pick", function(i){ return live() ? pick(i) : O.sitPick(i); }, i => O.sitPick(i));
+  sitNext = guard("next", function(){ return live() ? next() : O.sitNext(); }, () => O.sitNext());
+  sitOutcome = guard("outcome", function(){ return live() ? outcome() : O.sitOutcome(); }, () => O.sitOutcome());
+  sitEnd = guard("end", function(w){ return live() ? end(w) : O.sitEnd(w); }, w => O.sitEnd(w));
+  sitDraw = guard("draw", function(){ return live() ? draw() : O.sitDraw(); }, () => O.sitDraw());
+  SX.cur = () => SIT.on && SIT.on.x ? SIT.on.x.cast.map(p => p.m).filter(Boolean) : [];
+  SX.start = (room, key) => sitStart(key ? room + ":" + key : room);
+
+  /* committee dais, caucus lectern, press lectern: the new sittings */
+  const addAct = function(room, id, mk){ try{ const P = (PROPS[room] || []).find(p => p.id === id); if(!P || P._sx) return; const a0 = P.acts; P._sx = true; P.acts = function(){ let A = []; try{ A = a0.apply(this, arguments) || []; }catch(e){ A = []; } try{ const x = mk(); if(x) A.unshift(x); }catch(e){} return A; }; }catch(e){} }
+  addAct("committee", "dais", () => ({t:"Sit the hearing: question the witness with the committee", c:"50m · step by step", off:kOnceToday("sxcmte"), run(){ sitStart("committee"); return null; }}));
+  addAct("caucus", "lectern", () => ({t:"Hold a party meeting on the line", c:"40m · step by step", off:kOnceToday("sxcauc"), run(){ sitStart("caucus"); return null; }}));
+  addAct("press", "podium", () => ({t:"Hold a press conference", c:"30m · step by step", off:kOnceToday("sxpress"), run(){ sitStart("press"); return null; }}));
+  /* the governor's and president's press availability on the docket becomes a press conference */
+  try{ const dF = docketFor; docketFor = function(k){ const D = dF.apply(this, arguments); try{ if(!SX.disabled) D.forEach(d => { if(d && (d.key === "gpress" || d.key === "ppress") && d.run){ d.sit = "press:" + d.key; d.d += " Step by step, with the reporters in the room."; } }); }catch(e){} return D; }; }catch(e){}
+
+  const st = document.createElement("style");
+  st.textContent = "#veil.sitx{background:rgba(20,18,14,.18);backdrop-filter:none;place-items:end start}#veil.sitx #card{width:min(980px,96vw);max-width:none;max-height:92vh;overflow:auto;background:rgba(251,248,240,.97)}" +
+    ".sx-q{margin:2px 0 8px;font-size:13px}.sx-c{color:#6a5f46}.sx-grid{display:grid;grid-template-columns:300px 1fr;gap:12px;align-items:start}" +
+    ".sx-cast{display:flex;flex-direction:column;gap:6px}.sx-p{border:1px solid rgba(120,100,60,.25);border-radius:7px;padding:5px 7px;transition:all .25s}.sx-p.is-talk{border-color:#b08a2e;box-shadow:0 0 0 2px rgba(176,138,46,.35);background:rgba(176,138,46,.10)}.sx-p.is-cut{opacity:.55}" +
+    ".sx-n{font-size:13px;line-height:1.2}.sx-n small{color:#777}.sx-bar{position:relative;height:7px;background:rgba(0,0,0,.08);border-radius:4px;margin:4px 0 2px;overflow:hidden}.sx-bar i{position:absolute;left:0;top:0;bottom:0;transition:width .5s}.sx-bar u{position:absolute;top:0;bottom:0;width:1px;background:rgba(0,0,0,.35)}" +
+    ".sx-w{display:flex;justify-content:space-between;gap:6px;font-size:11px;color:#6a5f46}.sx-w em{font-style:normal;font-weight:700}.sx-lines{max-height:46vh}.sx-l{border-left:3px solid #999;padding:3px 8px;margin:5px 0}.sx-l.is-new{background:rgba(176,138,46,.08)}" +
+    ".sx-support{border-color:#3c8d5a}.sx-oppose{border-color:#b0473c}.sx-threat{border-color:#8a2be2}.sx-deal{border-color:#c08a1e}.sx-procedural{border-color:#5b6b7c}.sx-g{font-size:12px;color:#5b5240;margin-top:2px}.sx-g span{font-weight:700}" +
+    ".sx-gd{font-size:12px;color:#5b5240}.sx-gd summary{cursor:pointer;color:#8a7f66}.sx-moves{display:flex;flex-wrap:wrap;gap:6px;flex:1 1 100%}.sx-moves .btn{text-align:left;max-width:300px;white-space:normal}.sx-why{opacity:.7;font-weight:400}.sx-hint{font-size:12px;color:#6a5f46;margin:6px 0 0}" +
+    ".sx-recap{border-top:1px solid rgba(0,0,0,.12);margin-top:8px;font-size:13px}.sx-recap h3{font-size:14px;margin:8px 0 4px}.sx-recap ul{margin:0 0 0 18px;padding:0}" +
+    "@media (max-width:760px){.sx-grid{grid-template-columns:1fr}}";
+  document.head.appendChild(st);
+  console.log("NEPTUNE sittings ready");
+}catch(e){ try{ console.warn("NEPTUNE-SITTINGS block", e); }catch(e2){} }
+/* NEPTUNE-SITTINGS END */
 armFrame();
 
 })();
