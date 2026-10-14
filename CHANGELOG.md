@@ -4,6 +4,14 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## Answer them and you are in the conversation
+
+`20261013p` (on `20261013o`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- **Replying opens the talk:** when someone comes to you ("Have you got a minute?") or is speaking to you, answering through the wire bar now opens the talk panel with them first, then sends your reply into it.
+- Not yet done: walking up to someone who is already talking to another person does not yet drop you straight into that exchange.
+- Stamp: meta + STAMP + `ONUM_BUILD` -> `20261013p`.
+
 ## Talk is never blocked by a note
 
 `20261013o` (on `20261013n`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
