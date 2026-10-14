@@ -4,6 +4,14 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## The chat knows who you are
+
+`20261013k` (on `20261013j`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- **Cause:** the briefing the chat model gets for each person always described you as "a member of the House" and told it to treat you as a fellow House member, even after you became Governor, Senator, Justice or President. The model was given one role and shown another, so it sometimes slipped into the wrong title or claimed to be you.
+- **Fix:** the briefing names the office you hold now ("Address them as Governor"), says whether you sit in the House with them, and tells the character it is a separate person who never says it belongs to you or is yours or theirs.
+- Stamp: meta + STAMP + `ONUM_BUILD` -> `20261013k`.
+
 ## Every office, its own title and map
 
 `20261013j` (on `20261013i`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
