@@ -15,7 +15,9 @@ God is the Most High. Christ is King. The First Consul is a man under God, not G
 | **raw.githack** | https://raw.githack.com/DominicVII/the-long-session/main/index.html |
 | **jsDelivr** | https://cdn.jsdelivr.net/gh/DominicVII/the-long-session@main/index.html |
 
-**Build stamp: `20260921e`.** Saves live in the browser (`localStorage`). Continue never deletes a career. Sleep is a clock, not a 3D rebuild.
+**Build stamp: `20261013n`.** Saves live in the browser (`localStorage`). Continue never deletes a career. Sleep is a clock, not a 3D rebuild.
+
+**Update without Git (Windows):** [UPDATE-NO-GIT.md](UPDATE-NO-GIT.md) — download the zip and copy it over your folder.
 
 **Grok bot:** paste [GROKBOT-HANDOFF.md](GROKBOT-HANDOFF.md) in full. Do not summarize it.
 
@@ -23,10 +25,13 @@ This is the working log of the published HTML — not a Claude artifact. There i
 
 ---
 
-## Now (`20260921e`) — walk freeze rigor
+## Now (`20261013n`) — voices persist, day can always end
 
-- **Walk freeze:** async chunked save, one AI drain lane after stop, dispose on remesh, kickFrame guards while saving/building/fading.
-- **Keep:** walk 0.68 / sprint 1.15, full people, Consular / horcruxes / sentience, `history.replaceState` only.
+See [CHANGELOG.md](CHANGELOG.md) for the full recent log.
+
+- **Voices stay on:** the Hear them / Read only choice is saved in the browser and restored on startup.
+- **The day can always end:** after 5 pm you can go home and sleep from any room; idle watchdog ends the day after 8 pm.
+- **Office-aware titles:** header, panel, map, and address match the office you actually hold (Governor, Senator, etc.).
 
 - **Best / fullDetail** is the default. Chandeliers, full plants, every statue, lamps, long LODs. Modest machines still **stride the loop at 30** and skip minds while you walk. They no longer get silently shoved into Simple. `?safe=1` is the hatch.
 - **Walk 0.68 / sprint 1.15.** One frame cannot carry you more than ~an inch. Holding W does not tick the House twice.
@@ -37,7 +42,7 @@ This is the working log of the published HTML — not a Claude artifact. There i
 - **Lives kept:** sentience, pulse (no feeling bar), youSent, local AGI, foreign **realms / envoys**.
 - **East Steps** are treads you climb; **District** has a church of what you follow.
 
-Wrapper iframe: `/session.html?v=20260921e` (`src/lib/onum-build.ts`).
+Wrapper iframe: `/session.html?v=20261013n` (`src/lib/onum-build.ts`).
 
 ---
 
@@ -154,3 +159,5 @@ Doors walk you through. No menu required.
 ---
 
 Older entries stay in [CHANGELOG.md](CHANGELOG.md) on the GitHub repo. The law for the next bot is [GROKBOT-HANDOFF.md](GROKBOT-HANDOFF.md).
+
+**Update without Git:** [UPDATE-NO-GIT.md](UPDATE-NO-GIT.md)
