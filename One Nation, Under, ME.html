@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261013b">
+<meta name="onum-build" content="20261013c">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -35274,6 +35274,835 @@ try{
   console.log("NEPTUNE sittings ready");
 }catch(e){ try{ console.warn("NEPTUNE-SITTINGS block", e); }catch(e2){} }
 /* NEPTUNE-SITTINGS END */
+/* NEPTUNE-DISTRICT BEGIN — the outdoor haul: East Steps + Capitol plaza, and the home district as a walkable town.
+   Wraps buildRoomInner (and plantTree / propStreetLamp while an outdoor room is dressed) and roomBox (district walk
+   bounds), and adds: nosed steps, balustrades, candelabra standards, paving inlays, monuments, Capitol wings and dome,
+   dense street walls (storefronts with signage, framed windows with mullions), sidewalks, curbs, crosswalks, parked
+   cars, street furniture, layered trees, a square, a park, civic buildings, homes, NO7 (Consular Republic) flags on
+   poles and buildings, and Taylor Day bunting and banners (when isTaylorDay()).
+
+   PUBLIC API
+   window.onumBuildTown(THREE, {stateId, culture, seed, style}) -> {group, pois, style, solids, dispose}
+     Builds a whole town (the home district's street plan) in a state's housing style. culture (STATE_DEF .cult)
+     or stateId (STATE_DEF .n) picks the style; seed varies details; opts.style forces one of window.onumTownStyles:
+       dutch -> "dutch_gable" (stepped and neck gables, brick)   yankee / pacific / prairie -> "clapboard"
+       midlands -> "brick_row"   delta -> "gallery"   highplains -> "adobe"   mountain -> "stone_cottage"
+     group is a THREE.Group in metres, Main Street on x=0 running +z. dispose() frees its geometry.
+     The home district is built by the same code in the player's home-state style.
+   window.ONUM_TOWN_POIS = [{id, kind, name, room, pos:{x,y,z}, door:{x,y,z}, stand:[{x,y,z},...]}]
+     kinds: diner, church, bank, post_office, newsstand, shop, home, park, square, capitol_steps.
+     Coordinates are the "district" room's (capitol_steps is in room "steps"). Set each time the district is
+     dressed; then window.ONUM_TOWN_READY = true and window fires "onum-town-ready" (detail {pois, style}).
+   window.NEPTUNE_DISTRICT: {on, stats, style, cache}. ?nodistrict switches the whole block off.
+
+   Night: shop and house windows carry a per-window threshold attribute (aOn); the shader lights a pane when the
+   dusk ramp from the game clock passes it, so windows come on one by one around dusk at no per-window cost.
+   A pool of 3 point lights moves to the lamps nearest the camera after dusk.
+   Performance: geometry is merged per material and per streaming chunk (core, north, west, east, south), cached
+   per room/variant and prewarmed when idle; chunks are frustum culled and distance streamed, far blocks use a lower
+   LOD, nothing here casts shadows, and flag cloth animates only near the camera.
+   Citizen changes: window.ONUM_DISTRICT_CHANGES = [{id, kind, name, owner, pos:{x,z}, pos2?, status}] is read on build,
+   and 'onum-district-change' events (detail = change) or window.onumTownApplyChange(change) apply one live. kinds:
+   home restaurant shop church school lab station (planned = stakes + sign, construction = scaffold + frame, built =
+   full building in district style + name sign + POI), road (pos..pos2 street with curbs, sidewalks, lamps), statue
+   (pedestal, figure, plaque), park (paths, trees, benches, fountain), expansion (adds the free 64 m cell adjacent to
+   the town edge nearest pos; it streams in fully built with new POIs). demolished removes. Applied changes persist
+   in localStorage 'onum-district-changes' and rebuild identically on reload. New POIs dispatch 'onum-town-pois-updated'.
+   Streaming: 64 m cells around the player, built on idle time, 3 LODs (full / simplified / boxes), max 25 active.
+   Guarded: any failure leaves the original room exactly as before. */
+try{
+  const ND = window.NEPTUNE_DISTRICT = {version:2, on:!/[?&]nodistrict\b/.test(location.search), stats:{}, cache:new Map(), mats:null, warned:false, style:null};
+  const ndWarn = (w, e) => { if(!ND.warned){ ND.warned = true; try{ console.warn("NEPTUNE-DISTRICT " + w, e); }catch(e2){} } };
+  const ndTier = () => { try{ return nmTier(); }catch(e){ return 1; } };
+  const ndActive = id => { try{ return ND.on && (id === "steps" || id === "district") && ndTier() > 0 && G.gfx !== "simple"; }catch(e){ return false; } };
+  const ndTaylor = () => { try{ return typeof isTaylorDay === "function" && isTaylorDay(); }catch(e){ return false; } };
+  const ndNight = () => { let h = 12; try{ h = (((G.minute || 0) / 60) % 24 + 24) % 24; }catch(e){}
+    if(h >= 20.2 || h < 5.6) return 1; if(h >= 17.8) return (h - 17.8) / 2.4; if(h < 7.0) return (7.0 - h) / 1.4; return 0; };
+  const rngOf = s => () => { s |= 0; s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  const hashS = s => { let h = 2166136261; s = String(s || ""); for(let i = 0; i < s.length; i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
+
+  const T = {};
+  const tmpl = () => {
+    if(T.box) return T;
+    T.box = new THREE.BoxGeometry(1, 1, 1).toNonIndexed();
+    T.ico = new THREE.IcosahedronGeometry(1, 1); if(T.ico.index) T.ico = T.ico.toNonIndexed();
+    T.dome = new THREE.SphereGeometry(1, 24, 10, 0, Math.PI * 2, 0, Math.PI / 2).toNonIndexed();
+    T.ring = new THREE.RingGeometry(0.94, 1, 48, 1).toNonIndexed(); T.ring.rotateX(-Math.PI / 2);
+    T._cyl = new Map();
+    T.cyl = (seg, top) => { const k = seg + "|" + top; if(!T._cyl.has(k)) T._cyl.set(k, new THREE.CylinderGeometry(0.5 * top, 0.5, 1, seg).toNonIndexed()); return T._cyl.get(k); };
+    const fl = new THREE.PlaneGeometry(1, 1, 8, 1); const p = fl.attributes.position;
+    for(let i = 0; i < p.count; i++){ const u = p.getX(i) + 0.5; p.setZ(i, Math.sin(u * 5.2) * 0.035 * u); }
+    fl.computeVertexNormals(); T.flag = fl.toNonIndexed();
+    const sh = new THREE.Shape(); sh.moveTo(-0.5, 0); sh.lineTo(0.5, 0); sh.lineTo(0, 1); sh.lineTo(-0.5, 0);
+    let pr = new THREE.ExtrudeGeometry(sh, {depth:1, bevelEnabled:false}); pr.translate(0, 0, -0.5); pr.rotateY(Math.PI / 2); if(pr.index) pr = pr.toNonIndexed(); pr.computeVertexNormals(); T.prism = pr;
+    return T;
+  };
+
+  const COL = new Map(); const colOf = h => { let c = COL.get(h); if(!c){ c = new THREE.Color(h); COL.set(h, c); } return c; };
+  const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _e = new THREE.Euler(), _v = new THREE.Vector3(), _s = new THREE.Vector3(), _n = new THREE.Vector3(), _nm = new THREE.Matrix3(), _mm = new THREE.Matrix4();
+  let F = new THREE.Matrix4(), BK = null, ON = 1.5, CHUNK = null, KMAP = null, DRY = false;
+  const chunkOf = (x, z) => (z > -7 && z < 18.6 && Math.abs(x) < 14.5) ? "c" : z >= 18.6 && Math.abs(x) < 15 ? "n" : z <= -7 ? "s" : x < 0 ? "w" : "e";
+  const putM = (k, g, m, hex, ownUv, uvBox) => {
+    if(DRY) return;
+    if(KMAP && KMAP[k]){ if(hex == null) hex = k === "brass" ? 0xb08b45 : hex; if(k === "asphalt") hex = 0x55575a; k = KMAP[k]; }
+    const mm = _mm.multiplyMatrices(F, m), ch = CHUNK || chunkOf(mm.elements[12], mm.elements[14]), key = k + "@" + ch;
+    const b = BK[key] || (BK[key] = {k, ch, p:[], n:[], u:[], c:[], a:[]});
+    const P = g.attributes.position, N = g.attributes.normal, U = g.attributes.uv, c = colOf(hex == null ? 0xffffff : hex);
+    _nm.getNormalMatrix(mm); const sc = 1 / 1.6, isWin = k === "win";
+    for(let i = 0; i < P.count; i++){
+      _v.fromBufferAttribute(P, i).applyMatrix4(mm); _n.fromBufferAttribute(N, i).applyMatrix3(_nm).normalize();
+      b.p.push(_v.x, _v.y, _v.z); b.n.push(_n.x, _n.y, _n.z); b.c.push(c.r, c.g, c.b); if(isWin) b.a.push(ON);
+      if(ownUv && U){ b.u.push(uvBox ? uvBox[0] + U.getX(i) * uvBox[2] : U.getX(i), uvBox ? uvBox[1] + U.getY(i) * uvBox[3] : U.getY(i)); }
+      else { const ax = Math.abs(_n.x), ay = Math.abs(_n.y), az = Math.abs(_n.z);
+        if(ax >= ay && ax >= az) b.u.push(_v.z * sc, _v.y * sc); else if(ay >= az) b.u.push(_v.x * sc, _v.z * sc); else b.u.push(_v.x * sc, _v.y * sc); }
+    }
+  };
+  const put = (k, g, x, y, z, sx, sy, sz, hex, rx, ry, rz) => { _e.set(rx || 0, ry || 0, rz || 0); _q.setFromEuler(_e); _m.compose(_v.set(x, y, z), _q, _s.set(sx, sy, sz)); putM(k, g, _m.clone(), hex); };
+  const box = (k, x, y, z, w, h, d, hex, ry, rx, rz) => put(k, T.box, x, y, z, w, h, d, hex, rx, ry, rz);
+  const cyl = (k, x, y, z, r, h, hex, seg, top, rx, rz) => put(k, T.cyl(seg || 10, top == null ? 1 : top), x, y, z, r * 2, h, r * 2, hex, rx, 0, rz);
+  const ico = (k, x, y, z, sx, sy, sz, hex) => put(k, T.ico, x, y, z, sx, sy, sz, hex);
+  const along = (k, g, a, b, r, hex) => {
+    const dir = _s.set(b[0] - a[0], b[1] - a[1], b[2] - a[2]); const L = dir.length(); dir.normalize();
+    _q.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir); _m.compose(new THREE.Vector3((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2), _q, new THREE.Vector3(r * 2, L, r * 2)); putM(k, g, _m.clone(), hex); };
+  const quad = (k, x, y, z, w, h, ry, uvBox, hex) => { _e.set(0, ry || 0, 0); _q.setFromEuler(_e); _m.compose(_v.set(x, y, z), _q, _s.set(w, h, 1)); putM(k, T.flag, _m.clone(), hex, true, uvBox); };
+  const win = (x, y, z, w, h, d, on, ry) => { ON = on; box("win", x, y, z, w, h, d, null, ry); ON = 1.5; };
+  const frame = (x, z, ry) => { F = new THREE.Matrix4().compose(new THREE.Vector3(x, 0, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, ry, 0)), new THREE.Vector3(1, 1, 1)); };
+  const noFrame = () => { F = new THREE.Matrix4(); };
+  const local = (x, z) => { const v = new THREE.Vector3(x, 0, z).applyMatrix4(F); return [v.x, v.z]; };
+  let SOLIDS = null, POIS = null, LAMPS = null;
+  const solidLocal = (x0, z0, x1, z1) => { if(!SOLIDS) return; const a = local(x0, z0), b = local(x1, z1);
+    SOLIDS.push({x:(a[0] + b[0]) / 2, z:(a[1] + b[1]) / 2, hx:Math.abs(a[0] - b[0]) / 2, hz:Math.abs(a[1] - b[1]) / 2}); };
+  const solidAt = (x, z, hx, hz) => { if(!SOLIDS) return; const p = local(x, z); SOLIDS.push({x:p[0], z:p[1], hx, hz}); };
+  const V = (x, y, z) => ({x:+x.toFixed(2), y:+(y || 0).toFixed(2), z:+z.toFixed(2)});
+  const poi = (kind, name, px, pz, dx, dz, stand, room) => { if(!POIS) return; const n = POIS.filter(p => p.kind === kind).length;
+    POIS.push({id:kind + "_" + (n + 1), kind, name, room:room || "district", pos:V(px, 0, pz), door:V(dx, 0, dz), stand:(stand || []).map(s => V(s[0], 0, s[1]))}); };
+  const poiLocal = (kind, name, lx, lz, ldx, ldz, lstand) => { const p = local(lx, lz), d = local(ldx, ldz); poi(kind, name, p[0], p[1], d[0], d[1], (lstand || []).map(s => local(s[0], s[1]))); };
+
+  const SIGNS = ["VAUGHN'S DINER", "ORANJE APOTHEEK", "DE GOUDEN KROON", "BAKKERIJ TAYLOR", "CONSULAR POST", "THE NO7 LEDGER", "VAN DIJK & ZONEN", "TOBACCONIST",
+    "HABERDASHERY", "BOOKSELLER", "CAFE ZEVEN", "BANK OF NIEUW ORANJE", "WATCHMAKER", "TAILOR & CUTTER", "CINEMA REX", "FLORIST"];
+  const SIGN_BG = [0x1f3d2c, 0x5a1f24, 0x1d2b44, 0x22201e, 0x6b4a1f, 0x7a2a22, 0x1f3d2c, 0x3a2418, 0x1d2b44, 0x2a3a2a, 0x5a1f24, 0x14243a, 0x22201e, 0x3c2a1a, 0x6a1a1e, 0x24402a];
+  const relief = (cv, H, k) => {
+    const w = cv.width, h = cv.height, src = H.getImageData(0, 0, w, h).data, o = document.createElement("canvas"); o.width = w; o.height = h;
+    const g = o.getContext("2d"), id = g.createImageData(w, h), d = id.data, at = (x, y) => src[(((y + h) % h) * w + ((x + w) % w)) * 4] / 255;
+    for(let y = 0; y < h; y++) for(let x = 0; x < w; x++){ const dx = (at(x + 1, y) - at(x - 1, y)) * k, dy = (at(x, y + 1) - at(x, y - 1)) * k, l = Math.hypot(dx, dy, 1), i = (y * w + x) * 4;
+      d[i] = (-dx / l * 0.5 + 0.5) * 255; d[i + 1] = (dy / l * 0.5 + 0.5) * 255; d[i + 2] = (1 / l * 0.5 + 0.5) * 255; d[i + 3] = 255; }
+    g.putImageData(id, 0, 0); return o; };
+  const texOf = cv => { const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; return t; };
+  const brickTex = () => { const S = 512, a = document.createElement("canvas"), hc = document.createElement("canvas"); a.width = a.height = hc.width = hc.height = S;
+    const g = a.getContext("2d"), H = hc.getContext("2d"), r = rngOf(4242), cols = 8, rows = 24, bw = S / cols, bh = S / rows, mo = 3;
+    g.fillStyle = "#c4beb3"; g.fillRect(0, 0, S, S); H.fillStyle = "#202020"; H.fillRect(0, 0, S, S);
+    for(let y = 0; y < rows; y++) for(let x = -1; x < cols; x++){ const ox = (y % 2) * bw / 2, X = x * bw + ox, Y = y * bh, v = 0.74 + r() * 0.26, wv = r() * 0.08;
+      g.fillStyle = `rgb(${Math.round(255 * v)},${Math.round(255 * (v - wv - 0.05))},${Math.round(255 * (v - wv - 0.1))})`; g.fillRect(X + mo / 2, Y + mo / 2, bw - mo, bh - mo);
+      for(let k = 0; k < 6; k++){ g.fillStyle = `rgba(0,0,0,${r() * 0.14})`; g.fillRect(X + mo + r() * (bw - 8), Y + mo + r() * (bh - 6), 2 + r() * 5, 1 + r() * 2); }
+      H.fillStyle = `rgb(${200 + (r() * 40) | 0},0,0)`; H.fillRect(X + mo / 2, Y + mo / 2, bw - mo, bh - mo); }
+    return {map:texOf(a), normal:texOf(relief(a, H, 2.6))}; };
+  const sidingTex = () => { const S = 256, a = document.createElement("canvas"), hc = document.createElement("canvas"); a.width = a.height = hc.width = hc.height = S;
+    const g = a.getContext("2d"), H = hc.getContext("2d"), n = 8, bh = S / n, r = rngOf(77);
+    for(let i = 0; i < n; i++){ const y = i * bh; const gr = g.createLinearGradient(0, y, 0, y + bh); gr.addColorStop(0, "#f4f1ea"); gr.addColorStop(0.85, "#e2ddd2"); gr.addColorStop(1, "#9c968a"); g.fillStyle = gr; g.fillRect(0, y, S, bh);
+      const hg = H.createLinearGradient(0, y, 0, y + bh); hg.addColorStop(0, "#202020"); hg.addColorStop(1, "#f0f0f0"); H.fillStyle = hg; H.fillRect(0, y, S, bh);
+      for(let k = 0; k < 14; k++){ g.fillStyle = `rgba(90,80,60,${r() * 0.05})`; g.fillRect(r() * S, y + r() * bh, 20 + r() * 60, 1); } }
+    return {map:texOf(a), normal:texOf(relief(a, H, 3.2))}; };
+  const mats = () => {
+    const has = !!(window.NEPTUNE && NEPTUNE.mods);
+    if(ND.mats && ND.mats._mods === has) return ND.mats;
+    if(ND.mats) ND.cache.clear();
+    const M = has && NEPTUNE.mods.mats, Fm = has && NEPTUNE.mods.flags;
+    const pbr = (nm, fb) => { try{ if(M){ const m = M.makeMaterial(nm, THREE, {repeat:[1, 1], quality:"med", physical:false}); m.aoMap = null; return m; } }catch(e){ ndWarn("pbr " + nm, e); } return fb; };
+    const o = {};
+    o.stone = pbr("limestone", new THREE.MeshStandardMaterial({color:0xd9d2c2, roughness:.9})); o.stone.vertexColors = true; o.stone.color.setScalar(1.05);
+    try{ const b = brickTex(); o.brick = new THREE.MeshStandardMaterial({map:b.map, normalMap:b.normal, normalScale:new THREE.Vector2(1.1, 1.1), vertexColors:true, roughness:.88}); }catch(e){ o.brick = new THREE.MeshStandardMaterial({vertexColors:true, roughness:.9}); }
+    try{ const b = sidingTex(); o.siding = new THREE.MeshStandardMaterial({map:b.map, normalMap:b.normal, vertexColors:true, roughness:.7}); }catch(e){ o.siding = new THREE.MeshStandardMaterial({vertexColors:true, roughness:.7}); }
+    o.paint = new THREE.MeshStandardMaterial({vertexColors:true, roughness:.62, metalness:.2});
+    o.leaf = new THREE.MeshStandardMaterial({vertexColors:true, roughness:.92, metalness:0, flatShading:true});
+    o.uNight = {value:0};
+    o.win = new THREE.MeshStandardMaterial({color:0x1d2731, roughness:.1, metalness:.6, emissive:new THREE.Color(0xffbe72), emissiveIntensity:1.25});
+    o.win.onBeforeCompile = sh => { sh.uniforms.uNight = o.uNight;
+      sh.vertexShader = "attribute float aOn;\nvarying float vOn;\n" + sh.vertexShader.replace("#include <begin_vertex>", "#include <begin_vertex>\n  vOn = aOn;");
+      sh.fragmentShader = "uniform float uNight;\nvarying float vOn;\n" + sh.fragmentShader.replace("#include <emissivemap_fragment>", "#include <emissivemap_fragment>\n  totalEmissiveRadiance *= step(vOn, uNight);"); };
+    o.win.customProgramCacheKey = () => "nd-win";
+    o.glow = new THREE.MeshStandardMaterial({color:0xfff2d4, roughness:.4, emissive:new THREE.Color(0xffd9a0), emissiveIntensity:.5});
+    o.brass = pbr("brass", new THREE.MeshStandardMaterial({color:0xb08b45, roughness:.32, metalness:.86}));
+    o.asphalt = pbr("asphalt", new THREE.MeshStandardMaterial({color:0x3a3d3a, roughness:.95}));
+    const cv = document.createElement("canvas"); cv.width = 1024; cv.height = 1024; const g = cv.getContext("2d");
+    SIGNS.forEach((t, i) => { const y = i * 64; g.fillStyle = "#" + SIGN_BG[i].toString(16).padStart(6, "0"); g.fillRect(0, y, 1024, 64);
+      g.strokeStyle = "#c9a24a"; g.lineWidth = 3; g.strokeRect(6, y + 6, 1012, 52);
+      g.fillStyle = "#e3c06a"; g.font = "bold 40px Georgia, 'Times New Roman', serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(t, 512, y + 33); });
+    const st = new THREE.CanvasTexture(cv); st.anisotropy = 4;
+    o.sign = new THREE.MeshStandardMaterial({map:st, roughness:.5, metalness:.1, emissive:new THREE.Color(0xffffff), emissiveMap:st, emissiveIntensity:0});
+    let ft = null; try{ if(Fm) ft = Fm.makeFlagTexture(THREE, "consular_republic", 7, {width:256}); }catch(e){ ndWarn("flag tex", e); }
+    if(ft) o.flag = new THREE.MeshStandardMaterial({map:ft, roughness:.85, side:THREE.DoubleSide});
+    else { try{ o.flag = oranje7FlagMat(); }catch(e){ o.flag = new THREE.MeshStandardMaterial({color:0xb5432f, side:THREE.DoubleSide}); } }
+    o.pennant = new THREE.MeshStandardMaterial({roughness:.8, side:THREE.DoubleSide});
+    o.flagsMod = Fm || null; o._mods = has;
+    return (ND.mats = o);
+  };
+
+  /* ── housing styles ── */
+  const STYLE_BY_CULT = {dutch:"dutch_gable", yankee:"clapboard", pacific:"clapboard", prairie:"clapboard", midlands:"brick_row", delta:"gallery", highplains:"adobe", mountain:"stone_cottage"};
+  const STYLES = {
+    dutch_gable:  {wall:"brick", cols:[0x9a4a36, 0x7b3a30, 0xa5553c, 0x8a4434, 0x6e3a2e], top:"gable", roof:0x3c3a3a, trim:0xf1ece0, shut:0x24503a, door:0x2a3a2a},
+    brick_row:    {wall:"brick", cols:[0x9a4a36, 0xb5654a, 0x8e5a44, 0x7b3a30, 0xa86a4c], top:"cornice", roof:0x3a3a3c, trim:0xe8e0cc, shut:0x1d2b44, door:0x2a1d14},
+    clapboard:    {wall:"siding", cols:[0xf3f0e8, 0xdfe6e8, 0xe8dcc0, 0xc9d6c6, 0xd9c4b8], top:"falsefront", roof:0x45484c, trim:0xffffff, shut:0x22303c, door:0x6a1a1e},
+    gallery:      {wall:"siding", cols:[0xe9d7b5, 0xcfe0d4, 0xe8c9c0, 0xd8d0e6, 0xf2ecd8], top:"cornice", roof:0x5a5048, trim:0xffffff, shut:0x2f5a3a, door:0x2f4a6a, raised:true},
+    adobe:        {wall:"stone", cols:[0xc89b6e, 0xb88a5e, 0xd4a97c, 0xc4946a, 0xdcb48a], top:"parapet", roof:0x8a6a4a, trim:0xd8c0a0, shut:0x2d5f8a, door:0x2d5f8a},
+    stone_cottage:{wall:"stone", cols:[0x8e8678, 0x9a9282, 0x7e776a, 0xa39a88, 0x878070], top:"cornice", roof:0x3e4248, trim:0xd8d2c4, shut:0x5a2a24, door:0x3a2a1c}
+  };
+  const styleFor = o => { o = o || {}; if(o.style && STYLES[o.style]) return o.style;
+    let cult = o.culture; try{ if(!cult && o.stateId){ const s = (typeof STATE_DEF !== "undefined" ? STATE_DEF : []).find(s => s.n === o.stateId || s.id === o.stateId); if(s) cult = s.cult; } }catch(e){}
+    if(cult && STYLE_BY_CULT[cult]) return STYLE_BY_CULT[cult];
+    const k = Object.keys(STYLES); return k[hashS(o.stateId || o.seed || "x") % k.length]; };
+  const homeStyle = () => { try{ return styleFor({stateId:(G.you && G.you.state) || "Nieuw Oranje"}); }catch(e){ return "dutch_gable"; } };
+
+  /* ── pieces ── */
+  let signI = 0, ST = STYLES.brick_row;
+  const WF = 0xf0ebe0;
+  const gableTop = (cx, H, bw, wc, mat, r, z0) => { z0 = z0 || 0; const gh = Math.min(3.2, bw * 0.75);
+    put("paint", T.prism, cx, H, z0 - 2.7, 5.4, gh * 0.92, bw - 0.1, ST.roof, 0, Math.PI / 2, 0);
+    if(r() < 0.55){ const k = 4; for(let i = 0; i < k; i++){ const w = bw * (1 - (i + 1) / (k + 1)) + 0.25; box(mat, cx, H + i * gh / k + gh / k / 2, z0 - 0.12, w, gh / k, 0.25, wc); box("stone", cx, H + (i + 1) * gh / k, z0 - 0.1, w + 0.12, 0.08, 0.3, ST.trim); } }
+    else { box(mat, cx, H + gh * 0.45, z0 - 0.12, bw * 0.46, gh * 0.9, 0.25, wc); [-1, 1].forEach(s => cyl("stone", cx + s * bw * 0.28, H + 0.35, z0 - 0.12, 0.32, 0.25, ST.trim, 8, 1, Math.PI / 2));
+      box("stone", cx, H + gh * 0.92, z0 - 0.1, bw * 0.56, 0.14, 0.32, ST.trim); cyl("stone", cx, H + gh * 0.92 + 0.22, z0 - 0.1, 0.24, 0.12, ST.trim, 10, 0.2); }
+    win(cx, H + gh * 0.35, z0 + 0.02, 0.5, 0.75, 0.03, 0.3 + r() * 0.7); };
+  const building = (x0, bw, floors, r, lod, flagHere, civic) => {
+    const cx = x0 + bw / 2, gh = 3.5, fh = 2.9, H = gh + floors * fh + 0.7, wc = ST.cols[(r() * ST.cols.length) | 0], mat = ST.wall, D = 5.4;
+    if(lod < 0){ box("paint", cx, H / 2, -D / 2, bw - 0.1, H, D, wc); box("paint", cx, 1.4, 0.02, bw - 0.6, 2.0, 0.04, 0x2a3036); return {cx, si:0}; }
+    box(mat, cx, H / 2, -D / 2 - 0.12, bw, H, D, wc); solidLocal(x0, -D - 0.12, x0 + bw, 0.12);
+    box("stone", x0 + 0.11, H / 2, 0.05, 0.22, H, 0.12, ST.trim); box("stone", x0 + bw - 0.11, H / 2, 0.05, 0.22, H, 0.12, ST.trim);
+    const si = civic != null ? civic : (signI++) % SIGNS.length, sc = SIGN_BG[si];
+    box("stone", cx, 0.25, 0.06, bw - 0.44, 0.5, 0.12, 0xcfc6b2);
+    const gx0 = x0 + 0.34, gx1 = x0 + bw - 1.25, gw = gx1 - gx0;
+    win((gx0 + gx1) / 2, 1.5, -0.05, gw, 1.95, 0.03, 0.02 + r() * 0.2);
+    box("paint", cx, 2.52, 0.05, bw - 0.44, 0.12, 0.14, sc);
+    box("paint", gx0 - 0.06, 1.5, 0.05, 0.1, 2.0, 0.14, sc); box("paint", gx1 + 0.05, 1.5, 0.05, 0.1, 2.0, 0.14, sc);
+    if(lod){ const nm = Math.max(1, Math.floor(gw / 0.85)); for(let i = 1; i < nm; i++) box("paint", gx0 + gw * i / nm, 1.5, 0.0, 0.045, 1.95, 0.06, sc);
+      box("paint", (gx0 + gx1) / 2, 2.08, 0.0, gw, 0.045, 0.06, sc); box("paint", (gx0 + gx1) / 2, 0.55, 0.02, gw + 0.1, 0.08, 0.16, sc); }
+    box("paint", x0 + bw - 0.72, 1.17, -0.02, 0.86, 2.3, 0.06, 0x2a1d14);
+    if(lod){ win(x0 + bw - 0.72, 1.6, 0.015, 0.5, 0.9, 0.02, 0.1); box("brass", x0 + bw - 0.42, 1.1, 0.04, 0.03, 0.22, 0.04); }
+    box("paint", cx, 2.95, 0.07, bw - 0.36, 0.64, 0.12, sc);
+    quad("sign", cx, 2.95, 0.135, bw - 0.6, 0.48, 0, [0, 1 - (si + 1) / 16, 1, 1 / 16]);
+    box("stone", cx, 3.34, 0.14, bw, 0.14, 0.32, ST.trim);
+    if(r() < 0.5){ const ac = [0x8a2f36, 0x2f4a6a, 0x2f6b45, 0xb07a2e, 0xe8e0cc][(r() * 5) | 0];
+      box("paint", cx, 2.62, 0.55, bw - 0.5, 0.04, 1.08, ac, 0, 0.38); box("paint", cx, 2.34, 1.06, bw - 0.5, 0.2, 0.02, ac); }
+    const nW = Math.max(1, Math.floor((bw - 0.5) / 1.05)), shut = ST.top === "gable" || ST.top === "falsefront";
+    for(let f = 0; f < floors; f++){ const y0 = gh + f * fh, wy = y0 + 1.4;
+      if(lod) box("stone", cx, y0 + 0.05, 0.05, bw - 0.2, 0.1, 0.1, ST.trim);
+      for(let i = 0; i < nW; i++){ const wx = x0 + (bw / nW) * (i + 0.5);
+        win(wx, wy, -0.03, 0.7, 1.5, 0.02, r() < 0.72 ? r() : 1.5);
+        box("stone", wx, wy - 0.84, 0.07, 0.96, 0.07, 0.16, ST.trim);
+        if(lod){
+          box("paint", wx, wy + 0.77, 0.02, 0.86, 0.07, 0.06, WF); box("paint", wx, wy - 0.77, 0.02, 0.86, 0.07, 0.06, WF);
+          box("paint", wx - 0.4, wy, 0.02, 0.07, 1.6, 0.06, WF); box("paint", wx + 0.4, wy, 0.02, 0.07, 1.6, 0.06, WF);
+          box("paint", wx, wy, 0.0, 0.04, 1.5, 0.03, WF); box("paint", wx, wy + 0.3, 0.0, 0.7, 0.04, 0.03, WF);
+          box("stone", wx, wy + 0.9, 0.06, 0.98, 0.13, 0.13, ST.trim);
+          if(shut && bw / nW > 1.25){ box("paint", wx - 0.53, wy, 0.04, 0.24, 1.5, 0.03, ST.shut); box("paint", wx + 0.53, wy, 0.04, 0.24, 1.5, 0.03, ST.shut); } } } }
+    if(ST.top === "gable" && civic == null) gableTop(cx, H - 0.2, bw, wc, mat, r);
+    else if(ST.top === "falsefront" && civic == null){ box(mat, cx, H + 0.5, -0.12, bw, 1.4, 0.24, wc); box("stone", cx, H + 1.24, 0.0, bw + 0.1, 0.12, 0.34, ST.trim); }
+    else if(ST.top === "parapet" && civic == null){ box(mat, cx, H + 0.2, -0.12, bw, 0.8, 0.26, wc); for(let i = 0; i < Math.floor(bw / 0.9); i++) cyl("paint", x0 + 0.45 + i * 0.9, H - 0.55, 0.15, 0.08, 0.5, 0x5a4030, 6, 1, Math.PI / 2); }
+    else { box("stone", cx, H - 0.45, 0.2, bw + 0.08, 0.22, 0.46, ST.trim); if(lod) box("stone", cx, H - 0.62, 0.1, bw, 0.1, 0.22, 0xd2c8b2); box("stone", cx, H - 0.2, 0.0, bw, 0.5, 0.2, wc); }
+    if(flagHere){ const fy = gh + 1.2; along("brass", T.cyl(6, 1), [cx, fy, 0.05], [cx, fy + 0.9, 1.45], 0.025); quad("flag", cx, fy + 0.45, 1.05, 1.3, 0.82, Math.PI / 2); }
+    return {cx, si};
+  };
+  const row = (len, seed, o) => { const r = rngOf(seed); let x = 0, k = 0; const out = [];
+    while(x < len - 1.6){ let bw = 2.8 + r() * 1.8; if(len - x - bw < 2.2) bw = len - x; const xm = x + bw / 2;
+      const fl = o.floors ? o.floors[0] + ((r() * (o.floors[1] - o.floors[0] + 1)) | 0) : 2 + ((r() * 3) | 0);
+      if(o.skip && o.skip(x, bw)){ x += bw; k++; continue; }
+      const civ = o.civic && o.civic[k]; const b = building(x, bw, fl, r, o.lod ? o.lod(xm) : 1, o.flagEvery && (k % o.flagEvery === 1), civ ? civ.sign : null);
+      out.push({x0:x, bw, cx:b.cx, si:b.si}); x += bw; k++; } return out; };
+  const tree = (x, z, th, cr, seed, y0) => { const r = rngOf(seed); y0 = y0 || 0;
+    put("paint", T.cyl(7, 0.55), x, y0 + th * 0.5, z, 0.22 + cr * 0.08, th, 0.22 + cr * 0.08, 0x4a3828);
+    const tops = [[x, y0 + th + cr * 0.55, z]];
+    for(let i = 0; i < 5; i++){ const a = i * 1.26 + r() * 0.6, t = 0.55 + r() * 0.35, L = cr * (0.75 + r() * 0.35), by = y0 + th * (0.62 + r() * 0.3);
+      const e = [x + Math.cos(a) * Math.sin(t) * L, by + Math.cos(t) * L, z + Math.sin(a) * Math.sin(t) * L];
+      along("paint", T.cyl(5, 0.5), [x, by, z], e, 0.035 + cr * 0.02, 0x4f3c2a); tops.push(e); }
+    const G3 = [0x2f5a28, 0x3a6a32, 0x264d22, 0x46723a, 0x335f2c];
+    tops.forEach((p, i) => { const s = cr * (i ? 0.52 + r() * 0.2 : 0.72);
+      ico("leaf", p[0], p[1] + s * 0.1, p[2], s, s * 0.78, s, G3[(r() * 5) | 0]);
+      ico("leaf", p[0] + (r() - 0.5) * s, p[1] + s * 0.45, p[2] + (r() - 0.5) * s, s * 0.62, s * 0.5, s * 0.62, G3[(r() * 5) | 0]);
+      ico("leaf", p[0] + (r() - 0.5) * s * 1.2, p[1] - s * 0.3, p[2] + (r() - 0.5) * s * 1.2, s * 0.55, s * 0.42, s * 0.55, G3[(r() * 5) | 0]); });
+    solidAt(x, z, 0.2, 0.2); };
+  const lamp = (x, z, h, y0, two) => { y0 = y0 || 0; const ir = 0x1f2a24;
+    cyl("paint", x, y0 + 0.2, z, 0.2, 0.4, ir, 8, 0.8); cyl("paint", x, y0 + 0.45, z, 0.12, 0.12, ir, 8);
+    cyl("paint", x, y0 + h * 0.5, z, 0.065, h - 0.4, ir, 8, 0.75); cyl("brass", x, y0 + h * 0.62, z, 0.085, 0.06, null, 8);
+    const lan = (lx, ly) => { box("paint", lx, ly, z, 0.2, 0.04, 0.2, ir); box("glow", lx, ly + 0.17, z, 0.15, 0.28, 0.15);
+      cyl("paint", lx, ly + 0.38, z, 0.15, 0.14, ir, 6, 0.15); cyl("brass", lx, ly + 0.48, z, 0.02, 0.08, null, 6); };
+    if(two){ box("paint", x, y0 + h - 0.2, z, 1.0, 0.05, 0.05, ir); lan(x - 0.46, y0 + h - 0.18); lan(x + 0.46, y0 + h - 0.18); lan(x, y0 + h + 0.05); }
+    else lan(x, y0 + h);
+    if(LAMPS) LAMPS.push(new THREE.Vector3(x, y0 + h, z).applyMatrix4(F)); };
+  const baluster = (a, b, y0a, y0b, opts) => {
+    const dx = b[0] - a[0], dz = b[1] - a[1], L = Math.hypot(dx, dz), n = Math.max(2, Math.round(L / 0.26)), hh = 0.72;
+    for(let i = 0; i <= n; i++){ const t = i / n, x = a[0] + dx * t, z = a[1] + dz * t, y = y0a + (y0b - y0a) * t;
+      cyl("stone", x, y + 0.12, z, 0.045, 0.24, 0xe2dccd, 6, 1.4); cyl("stone", x, y + 0.3, z, 0.07, 0.14, 0xe2dccd, 6, 0.6); cyl("stone", x, y + 0.5, z, 0.042, 0.28, 0xe2dccd, 6); }
+    along("stone", T.cyl(4, 1), [a[0], y0a + 0.04, a[1]], [b[0], y0b + 0.04, b[1]], 0.13, 0xd6cfbe);
+    along("stone", T.cyl(4, 1), [a[0], y0a + hh, a[1]], [b[0], y0b + hh, b[1]], 0.12, 0xece6d8);
+    [[a, y0a], [b, y0b]].forEach(([p, y]) => { box("stone", p[0], y + 0.5, p[1], 0.36, 1.0, 0.36, 0xe6e0d2); box("stone", p[0], y + 1.04, p[1], 0.44, 0.08, 0.44, 0xece6d8);
+      if(!(opts && opts.noUrn)) cyl("stone", p[0], y + 1.2, p[1], 0.13, 0.24, 0xece6d8, 8, 1.5); }); };
+  const bench = (x, z, ry) => { const c = Math.cos(ry), s = Math.sin(ry), L = (u, v) => [x + u * c + v * s, z - u * s + v * c];
+    [-0.7, 0.7].forEach(u => { const p = L(u, 0); box("paint", p[0], 0.24, p[1], 0.07, 0.48, 0.46, 0x1f2a24, ry); });
+    for(let j = 0; j < 3; j++){ const p = L(0, -0.14 + j * 0.13); box("paint", p[0], 0.45, p[1], 1.6, 0.04, 0.1, 0x6b4f34, ry); }
+    for(let j = 0; j < 2; j++){ const p = L(0, -0.24); box("paint", p[0], 0.6 + j * 0.15, p[1], 1.6, 0.09, 0.03, 0x6b4f34, ry); } };
+  const bin = (x, z) => { cyl("paint", x, 0.45, z, 0.22, 0.9, 0x1f3d2c, 10, 0.9); cyl("brass", x, 0.92, z, 0.22, 0.05, null, 10); };
+  const hydrant = (x, z) => { cyl("paint", x, 0.3, z, 0.11, 0.6, 0xa8302a, 8); ico("paint", x, 0.62, z, 0.12, 0.08, 0.12, 0xa8302a); box("paint", x, 0.4, z, 0.36, 0.08, 0.08, 0xa8302a); };
+  const mailbox = (x, z) => { box("paint", x, 0.62, z, 0.46, 0.85, 0.44, 0x1d2b44); cyl("paint", x, 1.05, z, 0.23, 0.44, 0x1d2b44, 10, 1, 0, Math.PI / 2); box("brass", x, 0.85, z + 0.225, 0.26, 0.03, 0.01); };
+  const bollard = (x, z, y0) => { y0 = y0 || 0; cyl("paint", x, y0 + 0.42, z, 0.08, 0.84, 0x1f2a24, 8, 0.85); ico("brass", x, y0 + 0.88, z, 0.07, 0.07, 0.07); };
+  const kiosk = (x, z) => { cyl("paint", x, 1.1, z, 0.62, 2.2, 0x1f3d2c, 8); cyl("paint", x, 2.35, z, 0.85, 0.3, 0x1f3d2c, 8, 0.2);
+    for(let i = 0; i < 8; i++){ const a = i * Math.PI / 4 + Math.PI / 8, px = x + Math.cos(a) * 0.6, pz = z + Math.sin(a) * 0.6;
+      if(i % 2) box("paint", px, 1.25, pz, 0.38, 0.9, 0.02, 0xe8e0cc, -a + Math.PI / 2); else win(px, 1.25, pz, 0.38, 0.9, 0.02, 0.05, -a + Math.PI / 2); }
+    cyl("brass", x, 2.62, z, 0.05, 0.3, null, 6); solidAt(x, z, 0.62, 0.62); };
+  const hedge = (x0, z0, x1, z1, h) => { const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, w = Math.abs(x1 - x0) || 0.8, d = Math.abs(z1 - z0) || 0.8;
+    box("leaf", cx, h / 2, cz, w, h, d, 0x2f5528); const n = Math.round(Math.max(w, d) / 0.7);
+    for(let i = 0; i < n; i++){ const t = (i + 0.5) / n; ico("leaf", x0 + (x1 - x0) * t, h, z0 + (z1 - z0) * t, Math.min(w, 0.9) * 0.5 + 0.05, 0.16, Math.min(d, 0.9) * 0.5 + 0.05, 0x355e2c); } };
+  const statue = (x, z) => { box("stone", x, 0.25, z, 1.3, 0.5, 1.3, 0xd6cfbe); box("stone", x, 1.0, z, 0.95, 1.0, 0.95, 0xe2dccd); box("stone", x, 1.56, z, 1.1, 0.12, 1.1, 0xece6d8);
+    const bz = 0x5d5a3c; cyl("paint", x - 0.1, 2.05, z, 0.09, 0.85, bz, 8); cyl("paint", x + 0.1, 2.05, z, 0.09, 0.85, bz, 8);
+    cyl("paint", x, 2.75, z, 0.24, 0.85, bz, 10, 0.75); cyl("paint", x, 2.25, z, 0.3, 0.45, bz, 10, 0.8); ico("paint", x, 3.36, z, 0.13, 0.15, 0.13, bz);
+    along("paint", T.cyl(6, 0.8), [x + 0.2, 3.05, z], [x + 0.45, 3.65, z + 0.1], 0.055, bz); along("paint", T.cyl(6, 0.8), [x - 0.2, 3.05, z], [x - 0.28, 2.5, z + 0.12], 0.055, bz); };
+  const urnPlanter = (x, z, y0) => { y0 = y0 || 0; cyl("stone", x, y0 + 0.1, z, 0.42, 0.2, 0xd6cfbe, 12); cyl("stone", x, y0 + 0.32, z, 0.18, 0.28, 0xe2dccd, 10, 1.6); cyl("stone", x, y0 + 0.66, z, 0.5, 0.42, 0xe2dccd, 12, 1.25);
+    ico("leaf", x, y0 + 1.05, z, 0.5, 0.42, 0.5, 0x2f5a28); ico("leaf", x, y0 + 1.42, z, 0.32, 0.3, 0.32, 0x3a6a32); };
+  const flagpole = (x, z, h, y0) => { y0 = y0 || 0; box("stone", x, y0 + 0.2, z, 0.9, 0.4, 0.9, 0xd6cfbe); cyl("stone", x, y0 + 0.52, z, 0.3, 0.24, 0xe2dccd, 10);
+    cyl("paint", x, y0 + h / 2, z, 0.06, h, 0xd4d1c8, 10, 0.55); ico("brass", x, y0 + h + 0.06, z, 0.09, 0.09, 0.09); solidAt(x, z, 0.45, 0.45); return [x, y0, z, h]; };
+  const car = (x, z, ry, col) => { const c = Math.cos(ry), s = Math.sin(ry), L = (u, v) => [x + u * c + v * s, z - u * s + v * c];
+    box("paint", x, 0.55, z, 1.7, 0.55, 4.1, col, ry); const cb = L(0, -0.2); box("paint", cb[0], 1.05, cb[1], 1.5, 0.5, 2.0, col, ry);
+    win(cb[0], 1.07, cb[1], 1.52, 0.38, 1.7, 1.5, ry);
+    [[-0.78, 1.3], [0.78, 1.3], [-0.78, -1.3], [0.78, -1.3]].forEach(([u, v]) => { const p = L(u, v); put("paint", T.cyl(10, 1), p[0], 0.33, p[1], 0.62, 0.22, 0.62, 0x1c1c1e, 0, ry, Math.PI / 2); });
+    const hl = L(0, 2.06); box("glow", hl[0], 0.62, hl[1], 1.3, 0.1, 0.02, null, ry); box("brass", hl[0], 0.38, hl[1], 1.75, 0.08, 0.06, null, ry);
+    const ac = Math.abs(c), as = Math.abs(s); solidAt(x, z, ac * 0.85 + as * 2.05, as * 0.85 + ac * 2.05); };
+  const crosswalk = (cx, cz, dir, len) => { for(let i = 0; i < Math.floor(len / 0.52); i++){ const o = -len / 2 + 0.26 + i * 0.52;
+    if(dir === "x") box("stone", cx + o, 0.048, cz, 0.26, 0.012, 1.3, 0xe8e6dc); else box("stone", cx, 0.048, cz + o, 1.3, 0.012, 0.26, 0xe8e6dc); } };
+
+  /* a detached house in the local frame: street at +z, front wall at z=-3.2, footprint x0..x0+w */
+  const house = (x0, w, r, name) => {
+    const S = ST, cx = x0 + w / 2, wc = S.cols[(r() * S.cols.length) | 0], mat = S.wall, D = 6.5, z0 = -3.2, adobe = S === STYLES.adobe, two = r() < 0.6 && !adobe, lift = S.raised ? 0.9 : 0.15;
+    const H = lift + (two ? 5.6 : 3.0), wh = adobe ? 0.9 : 1.3;
+    if(house.lod < 0){ box("paint", cx, H / 2, z0 - D / 2, w, H, D, wc); if(!adobe && S !== STYLES.brick_row) put("paint", T.prism, cx, H, z0 - D / 2, w + 0.3, 2.0, D + 0.4, S.roof); return; }
+    box("stone", cx, lift / 2, z0 - D / 2, w + 0.1, lift, D + 0.1, 0x9d968a);
+    box(mat, cx, lift + (H - lift) / 2, z0 - D / 2, w, H - lift, D, wc);
+    solidLocal(x0 - 0.1, z0 - D - 0.1, x0 + w + 0.1, z0 + 0.1);
+    const floors = two ? 2 : 1, nW = Math.max(2, Math.floor(w / 1.6));
+    for(let f = 0; f < floors; f++){ const wy = lift + 1.45 + f * 2.8;
+      for(let i = 0; i < nW; i++){ const wx = x0 + (w / nW) * (i + 0.5); if(f === 0 && i === nW - 1) continue;
+        box("paint", wx, wy, z0 + 0.03, 0.95, wh + 0.12, 0.04, S.trim);
+        win(wx, wy, z0 + 0.06, 0.8, wh, 0.02, r() < 0.8 ? 0.15 + r() * 0.85 : 1.5);
+        box("paint", wx, wy, z0 + 0.08, 0.04, wh, 0.02, S.trim); box("paint", wx, wy + 0.1, z0 + 0.08, 0.8, 0.04, 0.02, S.trim); box("stone", wx, wy - wh / 2 - 0.08, z0 + 0.1, 1.05, 0.07, 0.16, S.trim);
+        if(!adobe){ box("paint", wx - 0.6, wy, z0 + 0.06, 0.28, wh, 0.03, S.shut); box("paint", wx + 0.6, wy, z0 + 0.06, 0.28, wh, 0.03, S.shut); } } }
+    const dx = x0 + (w / nW) * (nW - 0.5);
+    box("paint", dx, lift + 1.1, z0 + 0.04, 0.95, 2.2, 0.06, S.door); box("brass", dx + 0.3, lift + 1.05, z0 + 0.09, 0.04, 0.04, 0.04);
+    win(dx, lift + 2.4, z0 + 0.04, 0.85, 0.3, 0.02, 0.1);
+    for(let i = 0; i < 3; i++){ const hh = Math.max(0.06, lift - i * 0.3); box("stone", dx, hh / 2, z0 + 0.25 + i * 0.3, 1.3, hh, 0.3, 0xb9b3a6); }
+    if(adobe){ box(mat, cx, H + 0.25, z0 - D / 2, w + 0.05, 0.5, D + 0.05, wc); for(let i = 0; i < Math.floor(w / 0.8); i++) cyl("paint", x0 + 0.4 + i * 0.8, H - 0.35, z0 + 0.15, 0.09, 0.5, 0x5a4030, 6, 1, Math.PI / 2); }
+    else if(S === STYLES.dutch_gable){ const gh = 3.2; put("paint", T.prism, cx, H, z0 - D / 2, D, gh, w - 0.05, S.roof, 0, Math.PI / 2, 0);
+      const k = 5; for(let i = 0; i < k; i++){ const ww = w * (1 - (i + 1) / (k + 1)) + 0.3; box(mat, cx, H + i * gh / k + gh / k / 2, z0 - 0.12, ww, gh / k, 0.25, wc); box("stone", cx, H + (i + 1) * gh / k, z0 - 0.1, ww + 0.12, 0.08, 0.3, S.trim); }
+      win(cx, H + 1.0, z0 + 0.02, 0.55, 0.8, 0.03, 0.4 + r() * 0.6); }
+    else if(S === STYLES.brick_row){ box("stone", cx, H + 0.1, z0 + 0.1, w + 0.1, 0.25, 0.4, S.trim); box(mat, cx, H + 0.35, z0 - 0.1, w, 0.5, 0.2, wc); }
+    else { const gh = S === STYLES.stone_cottage ? 2.6 : 1.9, ang = Math.atan2(gh, D / 2), sl = Math.hypot(D / 2, gh) + 0.5;
+      put(mat, T.prism, cx, H, z0 - D / 2, w, gh, D, wc);
+      [-1, 1].forEach(sd => box("paint", cx, H + gh / 2 + 0.07, z0 - D / 2 + sd * D / 4, w + 0.5, 0.1, sl, S.roof, 0, sd * ang));
+      if(S === STYLES.stone_cottage || r() < 0.5) box("stone", x0 + 0.6, H + gh * 0.7, z0 - D * 0.7, 0.6, gh * 1.2, 0.6, 0x7e776a);
+      if(S === STYLES.clapboard || S === STYLES.gallery){ const pz = z0 + 1.1, n = Math.max(2, Math.floor(w / 1.8)); box("paint", cx, lift + 0.05, pz, w, 0.1, 2.2, 0x8a7a66);
+        for(let i = 0; i <= n; i++) cyl("paint", x0 + 0.15 + i * (w - 0.3) / n, lift + 1.35, z0 + 2.05, 0.07, 2.6, S.trim, 8);
+        box("paint", cx, lift + 2.72, pz, w + 0.3, 0.12, 2.5, S.roof); box("paint", cx, lift + 0.95, z0 + 2.08, w - 1.6, 0.05, 0.05, S.trim);
+        if(S.raised && two){ box("paint", cx, lift + 2.9, pz, w, 0.1, 2.2, 0x8a7a66); for(let i = 0; i <= n; i++) cyl("paint", x0 + 0.15 + i * (w - 0.3) / n, lift + 4.1, z0 + 2.05, 0.05, 2.4, S.trim, 6);
+          box("paint", cx, lift + 3.85, z0 + 2.08, w - 0.3, 0.05, 0.05, S.trim); } } }
+    const fz = 1.9;
+    if(adobe) box(mat, cx, 0.4, fz, w, 0.8, 0.25, wc);
+    else if(r() < 0.5){ for(let i = 0; i <= Math.floor(w / 0.18); i++) if(Math.abs(x0 + i * 0.18 - dx) > 0.55) box("paint", x0 + i * 0.18, 0.4, fz, 0.06, 0.8, 0.03, 0xf4f1ea); box("paint", cx, 0.62, fz, w, 0.05, 0.04, 0xf4f1ea); }
+    else hedge(x0 + 0.3, fz, Math.max(x0 + 0.8, dx - 0.7), fz, 0.8);
+    box("stone", dx, 0.03, (z0 + fz) / 2 + 0.4, 1.0, 0.03, fz - z0, 0xc9c2b2);
+    box("leaf", cx, 0.015, (z0 + fz) / 2, w, 0.02, fz - z0 + 0.2, adobe ? 0xb59a72 : 0x4e7a3a);
+    if(r() < 0.6) tree(x0 + 0.9, 0.6, 2.2, 0.95, hashS(name) & 1023);
+    poiLocal("home", name, cx, z0 - D / 2, dx, z0 + 0.5, [[dx, 1.2], [dx + 0.8, 1.0]]);
+  };
+
+  /* ── the street plan, shared by the home district and onumBuildTown ── */
+  const NAMES = ["Vermeer", "de Wit", "Haskins", "Okafor", "Brandt", "Lindqvist", "Morales", "Achterberg", "Callahan", "Dekker", "Poole", "Ruiz", "Stavros", "Visser", "Whitlock", "Yoon", "Bakker", "Fairweather", "Gallo", "Huisman"];
+  const townPlan = (seed, lowCap, inRoom) => {
+    const r = rngOf(seed), lodZ = z => lowCap ? 0 : (z < 17 ? 1 : 0), shopStyle = ST, sx = inRoom ? ND._sx : 4.1;
+    box("stone", 0, -0.012, 21, 92, 0.02, 62, 0xb9b3a6);
+    box("asphalt", 0, inRoom ? -0.004 : 0.02, 21, 4.4, 0.03, 56, 0x7b7d78); box("asphalt", 0, 0.025, 22, 88, 0.035, 4.4, 0x7b7d78); box("asphalt", 0, 0.02, -3.2, 26, 0.035, 3.2, 0x7b7d78);
+    [-1, 1].forEach(s => { box("stone", s * 2.27, 0.07, 36.7, 0.16, 0.14, 24.6, 0x9d998f); box("stone", s * 5.0, 0.05, 37, 5.2, 0.1, 23.6, 0xc8c2b4); box("stone", s * 7.83, 0.05, 9, 0.5, 0.1, 19, 0xc4beb0);
+      box("stone", s * 26, 0.05, 19.2, 36, 0.1, 2.0, 0xc8c2b4); box("stone", s * 26, 0.05, 24.8, 36, 0.1, 2.0, 0xc8c2b4);
+      box("stone", s * 26, 0.07, 20.15, 36, 0.14, 0.16, 0x9d998f); box("stone", s * 26, 0.07, 23.85, 36, 0.14, 0.16, 0x9d998f);
+      if(!inRoom){ box("stone", s * 5.0, 0.05, 8.2, 5.2, 0.1, 20.4, 0xc8c2b4); box("stone", s * 2.27, 0.07, 8.2, 0.16, 0.14, 20.4, 0x9d998f); } });
+    for(let i = 0; i < 12; i++) box("stone", 0, 0.046, 26.2 + i * 2.0, 0.1, 0.012, 0.9, 0xd4b84a);
+    for(let i = 0; i < 18; i++) box("stone", -40 + i * 2.2 + (i > 8 ? 4.4 : 0), 0.064, 22, 0.9, 0.012, 0.1, 0xd4b84a);
+    crosswalk(0, 18.9, "x", 4.2); crosswalk(0, 25.1, "x", 4.2); crosswalk(-3.0, 22, "z", 4.2); crosswalk(3.0, 22, "z", 4.2);
+    /* Main Street walls, broken for Taylor Lane; the bank and the post office face the street */
+    frame(8.05, -1.6, -Math.PI / 2); const rE1 = row(19.8, seed + 1, {lod:x => lodZ(x - 1.6), flagEvery:3});
+    frame(8.05, 25.8, -Math.PI / 2); const rE2 = row(24, seed + 2, {lod:() => lowCap ? 0 : 1, flagEvery:3, civic:{0:{sign:11}}});
+    frame(-8.05, 18.2, Math.PI / 2); const rW1 = row(19.8, seed + 3, {lod:x => lodZ(18.2 - x), flagEvery:3});
+    frame(-8.05, 49.8, Math.PI / 2); const rW2 = row(24, seed + 4, {lod:() => lowCap ? 0 : 1, flagEvery:3, civic:{3:{sign:4}}});
+    frame(-14, -4.8, 0); row(Math.max(4, sx - 3.3 + 14), seed + 5, {lod:() => lowCap ? 0 : 1, flagEvery:2});
+    frame(sx + 3.3, -4.8, 0); row(Math.max(3, 14 - sx - 3.3), seed + 6, {lod:() => lowCap ? 0 : 1});
+    frame(8.05, 25.8, -Math.PI / 2); { const b = rE2[0]; box("stone", b.cx, 4.6, 0.55, b.bw, 0.5, 1.1, 0xe6dfcf); for(let i = 0; i < 4; i++) cyl("stone", b.x0 + 0.35 + i * (b.bw - 0.7) / 3, 2.2, 0.9, 0.17, 4.2, 0xece6d8, 10);
+      put("stone", T.prism, b.cx, 4.85, 0.6, b.bw + 0.2, 1.0, 1.2, 0xe6dfcf); poiLocal("bank", "Bank of Nieuw Oranje", b.cx, -2.7, b.x0 + b.bw - 0.72, 0.8, [[b.cx - 0.8, 1.6], [b.cx + 0.8, 1.6]]);
+      rE2.slice(1).forEach(b2 => poiLocal("shop", SIGNS[b2.si], b2.cx, -2.7, b2.x0 + b2.bw - 0.72, 0.8, [[b2.cx, 1.5]])); }
+    frame(-8.05, 49.8, Math.PI / 2); { const pi = Math.min(3, rW2.length - 1), b = rW2[pi]; poiLocal("post_office", "Consular Post Office", b.cx, -2.7, b.x0 + b.bw - 0.72, 0.8, [[b.cx, 1.5], [b.cx + 0.9, 1.5]]); mailbox(b.cx - 1.0, 1.6);
+      rW2.forEach((b2, i) => { if(i !== pi) poiLocal("shop", SIGNS[b2.si], b2.cx, -2.7, b2.x0 + b2.bw - 0.72, 0.8, [[b2.cx, 1.5]]); }); }
+    frame(-8.05, 18.2, Math.PI / 2); rW1.forEach(b => poiLocal("shop", SIGNS[b.si], b.cx, -2.7, b.x0 + b.bw - 0.72, 0.8, [[b.cx, 1.5]]));
+    frame(8.05, -1.6, -Math.PI / 2); rE1.forEach(b => poiLocal("shop", SIGNS[b.si], b.cx, -2.7, b.x0 + b.bw - 0.72, 0.8, [[b.cx, 1.5]]));
+    /* homes along Taylor Lane */
+    let ni = seed % 7;
+    const homes = (x0, x1, zf, ry) => { frame(ry === 0 ? x0 : x1, zf, ry); let x = 0; const L = x1 - x0;
+      while(x < L - 6){ const w = Math.min(6.2 + r() * 1.8, L - x); house(x, w, r, NAMES[(ni++) % NAMES.length] + " house"); x += w + 1.2; } };
+    homes(-44, -14.5, 16.3, 0); homes(14.5, 44, 16.3, 0); homes(-44, -26.5, 27.7, Math.PI); homes(33, 44, 27.7, Math.PI);
+    noFrame(); ST = shopStyle;
+    /* the square */
+    box("stone", -20.5, 0.06, 33.5, 11, 0.06, 14, 0xc9c2b2); for(let i = 0; i < 6; i++) box("stone", -20.5, 0.095, 27.6 + i * 2.4, 11, 0.008, 0.08, 0x8b867c);
+    cyl("stone", -20.5, 0.25, 31.5, 1.6, 0.5, 0xd6cfbe, 20); cyl("paint", -20.5, 0.48, 31.5, 1.4, 0.06, 0x5f8fa8, 20); cyl("stone", -20.5, 1.0, 31.5, 0.25, 1.2, 0xe2dccd, 10); cyl("stone", -20.5, 1.65, 31.5, 0.7, 0.15, 0xe2dccd, 14);
+    solidAt(-20.5, 31.5, 1.6, 1.6);
+    { const bx = -20.5, bz = 36.8; cyl("stone", bx, 0.3, bz, 2.4, 0.6, 0xd6cfbe, 8); for(let i = 0; i < 8; i++){ const a = i * Math.PI / 4; cyl("paint", bx + Math.cos(a) * 2.15, 1.9, bz + Math.sin(a) * 2.15, 0.07, 2.6, 0xf4f1ea, 8); }
+      cyl("paint", bx, 3.5, bz, 2.7, 0.9, 0x2f4a3a, 8, 0.15); ico("brass", bx, 4.05, bz, 0.15, 0.2, 0.15); solidAt(bx, bz, 2.2, 2.2); }
+    [-24.5, -16.5].forEach(x => { bench(x, 31.5, x < -20 ? Math.PI / 2 : -Math.PI / 2); lamp(x, 28.0, 3.6, 0, false); lamp(x, 39.5, 3.6, 0, false); tree(x, 34.2, 2.6, 1.05, 300 + (x | 0) * -1); });
+    kiosk(-15.8, 27.2);
+    poi("square", "Consul's Square", -20.5, 33.5, -20.5, 27.0, [[-22.5, 29.5], [-18.5, 29.5], [-23.5, 34], [-17.5, 34], [-20.5, 39.5]]);
+    poi("newsstand", "Square newsstand", -15.8, 27.2, -16.6, 27.2, [[-16.8, 27.9]]);
+    { const cx = -20.5, cz = 45.5;
+      box("stone", cx, 4, cz, 7.5, 8, 9, 0xcfc6b2); put("paint", T.prism, cx, 8, cz, 9.2, 3.6, 7.9, 0x3c3a3a, 0, Math.PI / 2, 0);
+      box("stone", cx, 6.5, cz - 4.9, 3.2, 13, 3.2, 0xd6cdb8); put("paint", T.cyl(4, 0.02), cx, 16.5, cz - 4.9, 3.6, 7, 3.6, 0x3c4a4a, 0, Math.PI / 4, 0); ico("brass", cx, 20.1, cz - 4.9, 0.18, 0.3, 0.18);
+      ON = 0.08; put("win", T.cyl(16, 1), cx, 9.5, cz - 6.52, 1.4, 0.05, 1.4, null, Math.PI / 2, 0, 0); ON = 1.5;
+      box("paint", cx, 1.4, cz - 6.52, 1.4, 2.8, 0.08, 0x3a2a1c); put("stone", T.prism, cx, 2.9, cz - 6.6, 1.8, 0.7, 0.2, 0xe6dfcf);
+      for(let i = 0; i < 4; i++){ win(cx - 3.77, 4.5, cz - 3 + i * 2.2, 0.03, 2.6, 0.7, 0.1 + i * 0.05); win(cx + 3.77, 4.5, cz - 3 + i * 2.2, 0.03, 2.6, 0.7, 0.12 + i * 0.05); }
+      solidAt(cx, cz, 3.8, 4.6); solidAt(cx, cz - 4.9, 1.6, 1.6);
+      poi("church", "St. Willibrord's", cx, cz, cx, cz - 6.9, [[cx - 1.2, cz - 7.8], [cx + 1.2, cz - 7.8], [cx, cz - 8.6]]); }
+    /* the park */
+    box("leaf", 23.5, 0.03, 36, 17, 0.04, 19, 0x4e7a3a);
+    box("stone", 23.5, 0.055, 36, 1.6, 0.02, 19, 0xc9b99a); box("stone", 23.5, 0.056, 36, 17, 0.02, 1.6, 0xc9b99a);
+    cyl("paint", 19.0, 0.05, 41.0, 2.6, 0.04, 0x4f7f96, 24); cyl("stone", 19.0, 0.07, 41.0, 2.75, 0.04, 0xb9b3a6, 24);
+    for(let i = 0; i < 12; i++){ const a = i * 0.9 + r(), rr = 3 + r() * 5; tree(23.5 + Math.cos(a) * rr * 1.1, 36 + Math.sin(a) * rr, 2.6 + r(), 1.0 + r() * 0.5, 500 + i); }
+    [[21.5, 34.2, 0], [25.5, 37.8, Math.PI], [22, 38, Math.PI / 2], [25, 34, -Math.PI / 2]].forEach(b => bench(b[0], b[1], b[2]));
+    [[22.4, 27.5], [24.6, 27.5], [22.4, 44.5], [24.6, 44.5]].forEach(p => lamp(p[0], p[1], 3.4, 0, false));
+    hedge(15.2, 26.8, 21.8, 26.8, 0.8); hedge(25.2, 26.8, 31.8, 26.8, 0.8); hedge(31.8, 26.8, 31.8, 45.4, 0.8);
+    poi("park", "Oranje Park", 23.5, 36, 23.5, 26.6, [[21.5, 34.2], [25.5, 37.8], [19, 38.2], [23.5, 30], [27.5, 40]]);
+    /* parked cars, lane lamps and furniture */
+    const CC = [0x6b1f24, 0x23384f, 0xb9b6ad, 0x2f4a3a, 0x1c1c1e, 0x8a6a3a, 0x5a6670];
+    [28.5, 33.4, 38.6, 44.0].forEach((z, i) => { car(-1.55, z, 0, CC[i % 7]); if(i % 2) car(1.55, z + 1.2, Math.PI, CC[(i + 3) % 7]); });
+    [-36, -29, -19, 11.5, 18, 27, 38].forEach((x, i) => car(x, i % 2 ? 20.95 : 23.05, i % 2 ? Math.PI / 2 : -Math.PI / 2, CC[(i + 1) % 7]));
+    [-1, 1].forEach(s => { for(let i = 0; i < 4; i++) lamp(s * 2.85, 28 + i * 6, 3.8, 0, false); for(let i = 0; i < 5; i++){ lamp(s * (12 + i * 7.5), 19.6, 3.8, 0, false); lamp(s * (15 + i * 7.5), 24.4, 3.8, 0, false); }
+      for(let i = 0; i < 3; i++) tree(s * 3.45, 30 + i * 7, 2.6, 1.0, 600 + i * 2 + (s > 0 ? 1 : 0)); bin(s * 2.9, 26.4); });
+    hydrant(-2.9, 33.2); hydrant(13.2, 19.5); mailbox(-12.5, 19.6);
+    noFrame();
+  };
+  const buildDistrict = (tay, lowCap) => {
+    const poles = [];
+    let sx = 4.1; try{ const dr = (DOORS.district || []).find(x => x.to === "govoffice"); if(dr) sx = doorAt("district", dr).x; }catch(e){} ND._sx = sx;
+    if(SOLIDS) SOLIDS.push({x:sx, z:-1.55, hx:2.8, hz:1.5});
+    townPlan(7, lowCap, true);
+    const vz = 60; box("stone", 0, 3, vz, 26, 6, 8, 0xd6cdb8); cyl("stone", 0, 7.5, vz, 5, 3, 0xe2d9c6, 24); put("stone", T.dome, 0, 9, vz, 5.2, 5.4, 5.2, 0xe9e2d2); cyl("brass", 0, 14.8, vz, 0.7, 1.2, null, 10, 0.2);
+    [-1, 1].forEach(s => { lamp(s * 2.85, 1.2, 3.8, 0, false); lamp(s * 2.85, 13.6, 3.8, 0, false);
+      tree(s * 3.45, 2.95, 2.6, 1.0, 81 + s); tree(s * 3.45, 10.95, 2.5, 1.0, 83 + s);
+      [2.95, 10.95].forEach(z => { box("paint", s * 3.45, 0.105, z, 1.0, 0.01, 1.0, 0x2a2d30); box("stone", s * 3.45, 0.1, z, 1.1, 0.03, 1.1, 0x9d998f); });
+      bin(s * 2.9, 4.45); bin(s * 2.9, 9.7); bollard(s * 2.55, 0.45); bollard(s * 3.1, 0.45); });
+    bench(-7.35, 6.35, Math.PI / 2); bench(7.35, 4.1, -Math.PI / 2); bench(7.35, 15.8, -Math.PI / 2); bench(-7.35, 16.5, Math.PI / 2);
+    hydrant(-2.9, 7.25); mailbox(-2.95, 3.9); kiosk(-3.5, 7.0);
+    poles.push(flagpole(sx + 2.4, 0.15, 5.2, 0));
+    poi("diner", "Vaughn's Diner", -5.35, 12.85, -5.35, 12.0, [[-6.1, 11.05], [-5.25, 11.05], [-4.4, 11.05]]);
+    poi("church", "The parish church", 5.6, 8.2, 5.6, 7.0, [[5.0, 6.4], [6.2, 6.4]]);
+    poi("newsstand", "Main Street newsstand", -3.5, 7.0, -3.0, 6.4, [[-2.9, 6.2]]);
+    poi("shop", "Hardware", 5.15, 12.85, 5.15, 12.2, [[5.15, 11.6]]); poi("shop", "Market", -5.2, 8.4, -5.2, 7.8, [[-5.2, 7.2]]);
+    poi("square", "Main Street crossing", 0, 22, 0, 22, [[-3.6, 18.8], [3.6, 18.8], [-3.6, 25.2], [3.6, 25.2]]);
+    poi("capitol_steps", "East Steps", 0, 3.0, 0, 1.05, [[-3, 2.2], [3, 2.2], [0, 4.4], [-5.6, 2.6], [5.6, 2.6]], "steps");
+    if(tay){ ND._bunting = [[[-8, 6.2, 3.2], [8, 6.2, 3.2]], [[-8, 6.0, 7.6], [8, 6.0, 7.6]], [[-8, 6.2, 12.0], [8, 6.2, 12.0]], [[-8, 6.0, 30], [8, 6.0, 30]], [[-26, 6.5, 26.6], [-15, 6.5, 40.4]], [[-26, 6.5, 40.4], [-15, 6.5, 26.6]]];
+      [-1, 1].forEach(s => [1.2, 13.6, 28, 34].forEach(z => quad("flag", s * 3.13, 2.6, z, 0.5, 0.8, Math.PI / 2, [0, 0, 1, 1]))); }
+    return poles;
+  };
+  const buildSteps = (tay, lowCap) => {
+    const R = ROOMS.steps, w = R.w, d = R.d, deckY = 1.62, facadeZ = d - 0.42; const poles = [];
+    /* nosed steps: a bullnose on every tread and a shadow line under it */
+    const treads = 10, rise = deckY / treads, run = 0.58;
+    for(let i = 0; i < treads; i++){ const yTop = (i + 1) * rise, zc = 5.05 + i * run, zf = zc - run / 2 - 0.03;
+      box("stone", 0, yTop - 0.02, zf, w * 0.54 - 0.04, 0.05, 0.075, 0xe9e3d4); box("stone", 0, yTop - 0.065, zf + 0.04, w * 0.54 - 0.06, 0.02, 0.01, 0x7f786a); }
+    /* brass handrails up the flight */
+    [-2.7, 2.7].forEach(x => { for(let i = 0; i <= 5; i++){ const z = 4.9 + i * 1.12, y = Math.min(deckY, Math.max(0, (z - 4.76) / 5.8 * deckY)); cyl("brass", x, y + 0.45, z, 0.022, 0.9, null, 6); }
+      along("brass", T.cyl(6, 1), [x, 0.95, 4.6], [x, deckY + 0.92, 10.8], 0.03); });
+    /* balustrades on the cheeks and along the deck */
+    [-1, 1].forEach(s => { baluster([s * 5.82, 4.72], [s * 5.82, 10.6], 0.02, deckY, {});
+      baluster([s * 5.82, 11.32], [s * 9.3, 11.32], deckY, deckY, {noUrn:true}); });
+    /* candelabra standards on the newels */
+    [-1, 1].forEach(s => { lamp(s * 5.82, 4.72, 2.6, 1.0, true); lamp(s * 5.82, 10.6, 2.4, deckY + 1.0, true); });
+    /* paving: granite border, fountain rings and spokes */
+    const gr = 0x8b867c;
+    box("stone", 0, 0.043, 0.18, w * 0.88, 0.006, 0.26, gr); box("stone", 0, 0.043, 4.98, w * 0.88, 0.006, 0.18, gr);
+    box("stone", -w * 0.44 + 0.13, 0.043, 2.55, 0.26, 0.006, 4.9, gr); box("stone", w * 0.44 - 0.13, 0.043, 2.55, 0.26, 0.006, 4.9, gr);
+    [1.75, 2.15, 2.25].forEach(rr => put("stone", T.ring, 0, 0.045, 3.05, rr, 1, rr, gr));
+    for(let i = 0; i < 16; i++){ const a = i * Math.PI / 8; const r0 = 2.25, r1 = Math.min(2.25 + 1.6, 4.9); box("stone", Math.cos(a) * (r0 + r1) / 2, 0.044, 3.05 + Math.sin(a) * (r0 + r1) / 2, r1 - r0, 0.006, 0.06, gr, -a); }
+    /* monuments, urns, bins, flagpoles */
+    statue(-3.5, 0.75); statue(3.5, 0.75);
+    urnPlanter(-6.6, 0.75); urnPlanter(6.6, 0.75); urnPlanter(-4.6, 4.3); urnPlanter(4.6, 4.3);
+    urnPlanter(-8.6, 12.1, deckY); urnPlanter(8.6, 12.1, deckY);
+    bin(-4.6, 2.35); bin(4.6, 2.35);
+    poles.push(flagpole(-7.8, 6.9, 9, 0)); poles.push(flagpole(7.8, 6.9, 9, 0));
+    /* velvet ropes at the door */
+    [-1.4, -0.6, 0.6, 1.4].forEach(x => bollard(x, 12.3, deckY));
+    [[-1.4, -0.6], [0.6, 1.4]].forEach(([a, b]) => along("paint", T.cyl(5, 1), [a, deckY + 0.72, 12.3], [b, deckY + 0.72, 12.3], 0.02, 0x7a1e22));
+    /* hedges and lawn parterres at the plaza edges */
+    [-1, 1].forEach(s => { hedge(s * 9.55, 0.3, s * 9.55, 10.6, 0.95); hedge(s * 7.2, 5.6, s * 7.2, 10.2, 0.6); hedge(s * 9.3, 10.6, s * 7.2, 10.6, 0.6);
+      box("leaf", s * 8.25, 0.02, 8.0, 1.9, 0.04, 4.6, 0x4a7a3c); tree(s * 8.3, 9.4, 2.6, 0.9, 41 + s); });
+    /* the Capitol: wings, drum, dome, lantern */
+    [-1, 1].forEach(s => { const x0 = s * 9.6, x1 = s * 17, cx = (x0 + x1) / 2, ww = Math.abs(x1 - x0), Hh = deckY + 6.2;
+      box("stone", cx, Hh / 2, 14.6, ww, Hh, 4.4, 0xd6cdb8); box("stone", cx, deckY / 2, 12.2, ww, deckY, 0.6, 0xc9bfa8);
+      box("stone", cx, Hh + 0.2, 12.45, ww + 0.2, 0.4, 0.6, 0xe6dfcf); box("stone", cx, Hh + 0.55, 12.5, ww, 0.5, 0.3, 0xd6cdb8);
+      for(let i = 0; i < 6; i++){ const px = x0 + s * (0.6 + i * (ww - 1.2) / 5);
+        box("stone", px, deckY + 3.1, 12.35, 0.42, 6.0, 0.18, 0xe6dfcf);
+        if(i < 5){ const wx = px + s * (ww - 1.2) / 10;
+          [deckY + 1.5, deckY + 4.4].forEach(wy => { win(wx, wy, 12.38, 0.9, 1.7, 0.02, 0.1 + ((i * 7 + (wy > 4 ? 3 : 0) + (s > 0 ? 5 : 0)) % 10) / 11);
+            box("stone", wx, wy - 0.95, 12.42, 1.1, 0.08, 0.16, 0xe6dfcf); box("stone", wx, wy + 1.0, 12.42, 1.15, 0.14, 0.14, 0xe6dfcf); }); } } });
+    const dz = 16.4, dy = deckY + 7.0;
+    cyl("stone", 0, dy + 0.6, dz, 3.9, 1.2, 0xd6cdb8, 32); cyl("stone", 0, dy + 2.4, dz, 3.3, 2.4, 0xe2d9c6, 32);
+    for(let i = 0; i < 20; i++){ const a = i * Math.PI / 10; cyl("stone", Math.cos(a) * 3.55, dy + 2.4, dz + Math.sin(a) * 3.55, 0.13, 2.4, 0xece6d8, 8); }
+    cyl("stone", 0, dy + 3.75, dz, 3.8, 0.3, 0xece6d8, 32);
+    put("stone", T.dome, 0, dy + 3.9, dz, 3.45, 3.6, 3.45, 0xe9e2d2);
+    for(let i = 0; i < 12; i++){ const a = i * Math.PI / 6; along("stone", T.cyl(4, 1), [Math.cos(a) * 3.45, dy + 3.95, dz + Math.sin(a) * 3.45], [Math.cos(a) * 0.9, dy + 7.3, dz + Math.sin(a) * 0.9], 0.07, 0xd6cdb8); }
+    cyl("stone", 0, dy + 7.9, dz, 0.8, 1.3, 0xece6d8, 12); cyl("brass", 0, dy + 8.75, dz, 0.85, 0.4, null, 12, 0.1); ico("brass", 0, dy + 9.25, dz, 0.18, 0.28, 0.18);
+    /* the city around the grounds: pavements, roads, dense street walls */
+    box("stone", 0, -0.012, 3.5, 40, 0.02, 22, 0xb9b3a6);
+    box("asphalt", 0, -0.004, -5.3, 40, 0.02, 2.8, 0x7b7d78); [-1, 1].forEach(s => box("asphalt", s * 11.15, -0.004, 3.2, 1.9, 0.02, 14, 0x7b7d78));
+    [-1, 1].forEach(s => { for(let i = 0; i < 4; i++) tree(s * 10.25, -2.6 + i * 3.4, 2.7, 1.05, 70 + i * 3 + s); for(let i = 0; i < 3; i++) lamp(s * 10.2, -1.0 + i * 3.4, 3.6, 0, false); });
+    ST = STYLES.brick_row;
+    const lodFar = xm => lowCap ? 0 : (xm < 3 || xm > 15 ? 0 : 1);
+    frame(12.3, -7.8, -Math.PI / 2); row(19.6, 501, {lod:lodFar, flagEvery:3});
+    frame(-12.3, 11.8, Math.PI / 2); row(19.6, 502, {lod:lodFar, flagEvery:3});
+    frame(-20, -7.0, 0); row(16.6, 503, {lod:xm => lowCap ? 0 : (xm > 9 ? 1 : 0), flagEvery:4});
+    frame(3.4, -7.0, 0); row(16.6, 504, {lod:xm => lowCap ? 0 : (xm < 7 ? 1 : 0), flagEvery:4});
+    noFrame();
+    if(tay){ /* Taylor Day: banners between the columns, bunting along the deck and between the flagpoles */
+      [-5.78, -3.27, 3.27, 5.78].forEach(x => quad("flag", x, deckY + 3.1, facadeZ - 0.29, 1.15, 3.2, 0, [0, 0, 1, 1]));
+      ND._bunting = [[[-9.3, deckY + 1.2, 11.32], [-5.82, deckY + 1.2, 11.32]], [[5.82, deckY + 1.2, 11.32], [9.3, deckY + 1.2, 11.32]],
+        [[-7.8, 8.6, 6.9], [7.8, 8.6, 6.9]], [[-7.8, 7.4, 6.9], [-5.82, 3.6, 4.72]], [[7.8, 7.4, 6.9], [5.82, 3.6, 4.72]]];
+    }
+    return poles;
+  };
+
+  /* ── assembly ── */
+  const meshOf = (b, geo) => { const M = mats(); const m = new THREE.Mesh(geo, M[b.k] || M.paint); m.castShadow = false; m.receiveShadow = b.k === "stone" || b.k === "asphalt" || b.k === "brick";
+    m.matrixAutoUpdate = false; m.updateMatrix(); m.userData.ndDistrict = b.k; m.userData.ndChunk = b.ch; return m; };
+  const makeGeo = b => { const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.Float32BufferAttribute(b.p, 3)); g.setAttribute("normal", new THREE.Float32BufferAttribute(b.n, 3));
+    g.setAttribute("uv", new THREE.Float32BufferAttribute(b.u, 2)); g.setAttribute("color", new THREE.Float32BufferAttribute(b.c, 3));
+    if(b.k === "win") g.setAttribute("aOn", new THREE.Float32BufferAttribute(b.a, 1)); g.computeBoundingSphere(); return g; };
+  const buntingMesh = segs => { const M = mats(); const pts = [];
+    segs.forEach(([a, b]) => { const L = Math.hypot(b[0] - a[0], b[2] - a[2]); const n = Math.max(4, Math.round(L / 0.34));
+      for(let i = 0; i < n; i++){ const t = (i + 0.5) / n; pts.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t - Math.sin(t * Math.PI) * L * 0.06, a[2] + (b[2] - a[2]) * t, Math.atan2(b[2] - a[2], b[0] - a[0])]); } });
+    const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute([-0.13, 0, 0, 0.13, 0, 0, 0, -0.3, 0], 3)); g.computeVertexNormals();
+    const im = new THREE.InstancedMesh(g, M.pennant, pts.length); const pal = [0xb5432f, 0xf1e6cc, 0xd4a64a]; const o = new THREE.Object3D();
+    pts.forEach((p, i) => { o.position.set(p[0], p[1], p[2]); o.rotation.set(0, -p[3], 0); o.updateMatrix(); im.setMatrixAt(i, o.matrix); im.setColorAt(i, colOf(pal[i % 3])); });
+    im.castShadow = false; im.userData.ndDistrict = "bunting"; return im; };
+  const geoFor = (id, tay, lowCap, style) => {
+    const M = mats(), key = id + "|" + tay + "|" + lowCap + "|" + !!M.flagsMod + "|" + style + (id === "town" ? "|" + ND._seed : "");
+    let c = ND.cache.get(key); if(c) return c;
+    tmpl(); BK = {}; signI = id === "steps" ? 3 : 0; ND._bunting = null; noFrame(); SOLIDS = []; POIS = []; LAMPS = []; ST = STYLES[style] || STYLES.brick_row;
+    const t0 = performance.now(); let poles = [];
+    try{
+      poles = id === "steps" ? buildSteps(tay, lowCap) : id === "town" ? (townPlan(ND._seed || 7, lowCap, false), []) : buildDistrict(tay, lowCap);
+      if(id !== "town"){ (ND._trees || []).forEach((t, i) => tree(t[0], t[1], t[2] || 2.6, t[3] || 1.2, 900 + i)); (ND._lamps || []).forEach(l => lamp(l[0], l[1], l[2] || 3.5, 0, false)); }
+    } finally { noFrame(); }
+    const parts = []; let verts = 0; Object.keys(BK).forEach(k => { parts.push({b:{k:BK[k].k, ch:BK[k].ch}, geo:makeGeo(BK[k])}); verts += BK[k].p.length / 3; }); BK = null;
+    c = {parts, poles, bunting:ND._bunting, verts, solids:SOLIDS, pois:POIS, lamps:LAMPS, ms:Math.round(performance.now() - t0)}; SOLIDS = POIS = LAMPS = null;
+    if(id !== "town") ND.cache.set(key, c); return c;
+  };
+  const assemble = (c, opts) => {
+    const M = mats(); const grp = new THREE.Group(); grp.name = "NEPTUNE-DISTRICT";
+    c.parts.forEach(p => grp.add(meshOf(p.b, p.geo)));
+    if(c.bunting) try{ grp.add(buntingMesh(c.bunting)); }catch(e){ ndWarn("bunting", e); }
+    const waves = [];
+    c.poles.forEach(p => { try{ const fw = p[3] > 6 ? 2.3 : 1.5;
+      if(M.flagsMod){ const f = M.flagsMod.makeWavingFlag(THREE, {type:"consular_republic", seed:7, width:fw, height:fw / 1.6, segments:14, poleHeight:p[3] - 0.1, pole:false, quality:"low"});
+        f.group.position.set(p[0] + 0.05, p[1], p[2]); f.cloth.castShadow = false; grp.add(f.group); waves.push(f); }
+      else { const q = new THREE.Mesh(new THREE.PlaneGeometry(fw, fw / 1.6), M.flag); q.position.set(p[0] + fw / 2 + 0.06, p[1] + p[3] - fw / 3.2 - 0.1, p[2]); grp.add(q); }
+    }catch(e){ ndWarn("flag", e); } });
+    const pool = []; if(!(opts && opts.noLights)) for(let i = 0; i < 3; i++){ const L = new THREE.PointLight(0xffcf96, 0, 11, 2); L.castShadow = false; L.position.set(0, -50, 0); grp.add(L); pool.push(L); }
+    const lamps = (c.lamps || []).slice(); grp.userData.lamps = lamps;
+    const tickM = grp.children.find(m => m.userData.ndDistrict === "stone" && m.userData.ndChunk === "c") || grp.children.find(m => m.isMesh);
+    let fr = 0, lastN = -1, lastT = performance.now(), lastS = -1e9, lgSeen = null; const cp = new THREE.Vector3();
+    if(tickM) tickM.onBeforeRender = function(r, s, cam){
+      ND.ticks = (ND.ticks || 0) + 1; try{ fr++;
+        const now = performance.now();
+        if(now - lastS > 400){ lastS = now; const n = ndNight(); cam.getWorldPosition(cp); grp.worldToLocal(cp);
+          if(Math.abs(n - lastN) > 0.004){ lastN = n; M.uNight.value = n; M.glow.emissiveIntensity = 0.5 + n * 1.6; M.sign.emissiveIntensity = n * 0.55; }
+          if(grp.userData.streamer) try{ grp.userData.streamer.update(cp); }catch(e){ ndWarn("stream", e); }
+          grp.children.forEach(m => { const ch = m.userData.ndChunk; if(!ch || ch === "c" || !m.geometry || !m.geometry.boundingSphere) return;
+            const bs = m.geometry.boundingSphere; m.visible = cp.distanceTo(bs.center) - bs.radius < 55; });
+          if(pool.length){ if(n > 0.15 && lamps.length){ const near = lamps.map(p => [p.distanceToSquared(cp), p]).sort((a, b) => a[0] - b[0]);
+              pool.forEach((L, i) => { const q = near[i]; if(q){ L.position.copy(q[1]); L.position.y -= 0.25; L.intensity = 1.4 * Math.min(1, n * 1.4); } else L.intensity = 0; }); }
+            else pool.forEach(L => { L.intensity = 0; }); } }
+        try{ if(typeof landGroup !== "undefined" && landGroup && landGroup !== lgSeen){ lgSeen = landGroup; landGroup.updateMatrixWorld(true); const wp = new THREE.Vector3();
+          landGroup.children.forEach(h => { h.getWorldPosition(wp); grp.worldToLocal(wp); if(Math.abs(wp.x) < 48 && wp.z > -14 && wp.z < 66) h.visible = false; }); } }catch(e){}
+        if(fr & 1){ const t = now, dt = Math.min(0.1, (t - lastT) / 1000); lastT = t;
+          waves.forEach(f => { const gp = f.group.position; if(Math.abs(gp.x - cp.x) + Math.abs(gp.z - cp.z) < 34) f.update(dt, {wind:0.9}); }); }
+      }catch(e){ ND.tickErr = String(e && e.message); } };
+    return grp;
+  };
+  const ndBuild = id => {
+    const t0 = performance.now(); const tay = ndTaylor(), lowCap = (typeof G !== "undefined" && G.gfx === "balanced"), style = id === "district" ? homeStyle() : "brick_row";
+    const c = geoFor(id, tay, lowCap, style); const grp = assemble(c); grp.userData.ndDistrict = id; roomGroup.add(grp);
+    if(id === "district"){
+      try{ if(typeof NM !== "undefined" && NM.solids) c.solids.forEach(s => NM.solids.push(s)); }catch(e){}
+      ND.style = style;
+      try{ const sink = (typeof NM !== "undefined" && NM.solids) ? NM.solids : null; grp.userData.streamer = streamer(grp, 7, style, sink, grp.userData.lamps); }catch(e){ ndWarn("streamer", e); }
+      if(!ND._static || ND._static.style !== style){ let sp = []; try{ sp = staticPois(7, 3); }catch(e){ ndWarn("pois", e); } ND._static = {style, pois:sp}; }
+      ND._seedPois = c.pois; ND._basePois = c.pois.concat(ND._static.pois);
+      const cg = new THREE.Group(); cg.name = "nd-changes"; grp.add(cg); try{ attachChanges(cg); }catch(e){ ndWarn("changes", e); }
+      window.ONUM_TOWN_POIS = ND._basePois.concat([...CHG.list.values()].flatMap(v => v.pois || [])); window.ONUM_TOWN_READY = true;
+      try{ window.dispatchEvent(new CustomEvent("onum-town-ready", {detail:{pois:window.ONUM_TOWN_POIS, style}})); }catch(e){}
+    }
+    ND.stats[id] = {ms:Math.round(performance.now() - t0), buildMs:c.ms, verts:c.verts, meshes:grp.children.length, taylor:tay, style, solids:c.solids.length, pois:c.pois.length};
+    return grp;
+  };
+
+
+  /* ── the wider town: 64 m cells streamed around the walker ──
+     Cell (i,j) spans x [64i-32, 64i+32], z [64j-10, 64j+54]; each lays its own west and south roads and fills
+     one superblock with buildings facing the streets. Type is a pure function of seed and (i,j): downtown and civic
+     near the Capitol core, a commercial strip on the axes, residential neighbourhoods, parks, schools, churches.
+     LOD: 0 = full detail (own and adjacent cells near the walker), 1 = simplified facades, 2 = boxes (outer ring).
+     Cells build one at a time between frames and are disposed when they fall out of the ring. */
+  const CELL = 64, KEEP = [-47, -11, 47, 56], RING = 2, BASE_R = 3, EXTRA = new Set(), MAX_ACTIVE = 25;
+  const cellExists = (i, j) => (Math.max(Math.abs(i), Math.abs(j - 0.5)) <= BASE_R + 0.5) || EXTRA.has(i + "," + j);
+  const cellX0 = i => i * CELL - 32, cellZ0 = j => j * CELL - 10;
+  const cellOf = (x, z) => [Math.floor((x + 32) / CELL), Math.floor((z + 10) / CELL)];
+  const hitKeep = (x0, z0, x1, z1) => !(Math.max(x0, x1) < KEEP[0] || Math.min(x0, x1) > KEEP[2] || Math.max(z0, z1) < KEEP[1] || Math.min(z0, z1) > KEEP[3]);
+  const cellType = (i, j, seed) => { const h = hashS(seed + ":" + i + "," + j) % 100, d = Math.max(Math.abs(i), Math.abs(j));
+    if(i === 0 && j === 1) return "civic";
+    if(d <= 1) return h < 18 ? "civic" : h < 30 ? "church" : "downtown";
+    if(i === 0 || j === 0) return h < 10 ? "park" : "strip";
+    return h < 12 ? "park" : h < 22 ? "school" : h < 32 ? "church" : "residential"; };
+  const CELL_NAMES = {park:["Linden Green", "Polder Park", "Veterans' Common", "Willow Gardens", "Founders' Park", "Mill Pond Park"], school:["Taylor Primary", "Oranje Grammar", "Consular High", "St. Agnes School", "Harbour Street School"],
+    church:["St. Bavo's", "Grace Chapel", "First Reformed", "Holy Cross", "Our Lady of the Dike", "Westerkerk"], civic:["City Hall", "Public Library", "Hall of Records", "County Courthouse", "Consular Exchange"]};
+  const pick = (arr, i, j, s) => arr[hashS(s + "|" + i + "," + j) % arr.length];
+  const churchAt = (cx, cz, name) => {
+    box("stone", cx, 4, cz, 7.5, 8, 9, 0xcfc6b2); put("paint", T.prism, cx, 8, cz, 9.2, 3.6, 7.9, 0x3c3a3a, 0, Math.PI / 2, 0);
+    box("stone", cx, 6.5, cz - 4.9, 3.2, 13, 3.2, 0xd6cdb8); put("paint", T.cyl(4, 0.02), cx, 16.5, cz - 4.9, 3.6, 7, 3.6, 0x3c4a4a, 0, Math.PI / 4, 0); ico("brass", cx, 20.1, cz - 4.9, 0.18, 0.3, 0.18);
+    ON = 0.08; put("win", T.cyl(16, 1), cx, 9.5, cz - 6.52, 1.4, 0.05, 1.4, null, Math.PI / 2, 0, 0); ON = 1.5;
+    box("paint", cx, 1.4, cz - 6.52, 1.4, 2.8, 0.08, 0x3a2a1c);
+    for(let i = 0; i < 4; i++){ win(cx - 3.77, 4.5, cz - 3 + i * 2.2, 0.03, 2.6, 0.7, 0.1 + i * 0.05); win(cx + 3.77, 4.5, cz - 3 + i * 2.2, 0.03, 2.6, 0.7, 0.12 + i * 0.05); }
+    solidAt(cx, cz, 3.8, 4.6); solidAt(cx, cz - 4.9, 1.6, 1.6);
+    poi("church", name, cx, cz, cx, cz - 6.9, [[cx - 1.2, cz - 7.8], [cx + 1.2, cz - 7.8], [cx, cz - 8.6]]); };
+  const civicAt = (cx, cz, w, name, kind) => { const H = 9;
+    box("stone", cx, 0.4, cz, w + 2, 0.8, 16, 0xd6cfbe); box("stone", cx, H / 2 + 0.8, cz + 1, w, H, 12, 0xe2dccd);
+    for(let i = 0; i < 6; i++) cyl("stone", cx - w / 2 + 0.8 + i * (w - 1.6) / 5, 4.6, cz - 5.6, 0.32, 7.6, 0xece6d8, 12);
+    box("stone", cx, 8.7, cz - 5.6, w + 0.4, 0.8, 1.6, 0xe6dfcf); put("stone", T.prism, cx, 9.1, cz - 5.6, w + 0.4, 2.0, 1.6, 0xe6dfcf, 0, 0, 0);
+    put("stone", T.dome, cx, H + 0.8, cz + 1, 3, 3.2, 3, 0xe9e2d2);
+    for(let f = 0; f < 2; f++) for(let i = 0; i < 6; i++) win(cx - w / 2 + 1.2 + i * (w - 2.4) / 5, 3 + f * 3.4, cz - 4.98, 1.0, 2.0, 0.03, 0.1 + ((i + f) % 5) / 6);
+    for(let k = 0; k < 6; k++) box("stone", cx, 0.1 + k * 0.13, cz - 7.2 - k * 0.32, w * 0.6, 0.13, 0.32 + (5 - k) * 0, 0xd6cfbe);
+    solidAt(cx, cz + 1, w / 2, 6.2); poi(kind || "civic", name, cx, cz, cx, cz - 7.8, [[cx - 2, cz - 9], [cx + 2, cz - 9], [cx, cz - 10]]); };
+  const schoolAt = (cx, cz, name) => { const w = 30, H = 7.4;
+    box(ST.wall, cx, H / 2, cz, w, H, 10, ST.cols[1]); box("stone", cx, H + 0.2, cz - 0.1, w + 0.3, 0.4, 10.4, ST.trim);
+    for(let f = 0; f < 2; f++) for(let i = 0; i < 12; i++) win(cx - w / 2 + 1.3 + i * (w - 2.6) / 11, 1.8 + f * 3.2, cz - 5.02, 1.4, 1.9, 0.03, 0.05 + ((i * 3 + f) % 7) / 9);
+    box("paint", cx, 1.2, cz - 5.05, 2.2, 2.4, 0.06, ST.door); box("stone", cx, 3.0, cz - 5.2, 3.2, 0.3, 0.6, ST.trim);
+    box("stone", cx, 0.02, cz - 10, w, 0.03, 9, 0x8f9088); for(let i = 0; i < 4; i++) box("stone", cx - 9 + i * 6, 0.05, cz - 10, 0.08, 0.01, 7, 0xe8e6dc);
+    [-1, 1].forEach(s => { cyl("paint", cx + s * 10, 1.2, cz - 12.5, 0.05, 2.4, 0x2a2d30, 6); box("paint", cx + s * 10, 2.6, cz - 12.5, 1.8, 0.05, 0.05, 0x2a2d30); });
+    flagpole(cx + w / 2 - 1, cz - 6.5, 7, 0); solidAt(cx, cz, w / 2, 5.1);
+    poi("school", name, cx, cz, cx, cz - 5.6, [[cx - 3, cz - 8], [cx + 3, cz - 8], [cx, cz - 11]]); };
+  const parkAt = (x0, z0, x1, z1, name, r) => { const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, w = x1 - x0, d = z1 - z0;
+    box("leaf", cx, 0.03, cz, w, 0.04, d, 0x4e7a3a); box("stone", cx, 0.055, cz, 2.0, 0.02, d, 0xc9b99a); box("stone", cx, 0.056, cz, w, 0.02, 2.0, 0xc9b99a);
+    cyl("stone", cx, 0.25, cz, 1.8, 0.5, 0xd6cfbe, 20); cyl("paint", cx, 0.48, cz, 1.6, 0.06, 0x5f8fa8, 20); solidAt(cx, cz, 1.8, 1.8);
+    for(let i = 0; i < 14; i++){ const tx = x0 + 3 + r() * (w - 6), tz = z0 + 3 + r() * (d - 6); if(Math.abs(tx - cx) < 2.5 || Math.abs(tz - cz) < 2.5) continue; tree(tx, tz, 2.4 + r(), 1.0 + r() * 0.6, (r() * 1e6) | 0); }
+    [[cx - 4, cz + 1.6, 0], [cx + 4, cz - 1.6, Math.PI], [cx + 1.6, cz + 4, -Math.PI / 2], [cx - 1.6, cz - 4, Math.PI / 2]].forEach(b => bench(b[0], b[1], b[2]));
+    [[cx - 1.4, z0 + 1], [cx + 1.4, z1 - 1], [x0 + 1, cz - 1.4], [x1 - 1, cz + 1.4]].forEach(p => lamp(p[0], p[1], 3.4, 0, false));
+    poi("park", name, cx, cz, cx, z0 + 0.5, [[cx - 4, cz + 1.6], [cx + 4, cz - 1.6], [cx, cz + 5], [cx - 6, cz - 6], [cx + 6, cz + 6]]); };
+  const genCell = (i, j, seed, lvl) => {
+    const x0 = cellX0(i), z0 = cellZ0(j), type = cellType(i, j, seed), r = rngOf(hashS("cell:" + seed + ":" + i + "," + j));
+    const rd = 0x55575a, sw = 0xc4beb0;
+    /* roads: west (along z) and south (along x), each with sidewalks */
+    const road = (rx0, rz0, rx1, rz1, alongZ) => { if(hitKeep(rx0, rz0, rx1, rz1)) return;
+      box("asphalt", (rx0 + rx1) / 2, 0.01, (rz0 + rz1) / 2, rx1 - rx0, 0.03, rz1 - rz0, rd);
+      if(lvl < 2){ if(alongZ){ for(let k = 0; k < 10; k++) box("stone", (rx0 + rx1) / 2, 0.03, rz0 + 3 + k * 6.4, 0.1, 0.01, 2.4, 0xd4b84a); box("stone", rx0 - 1, 0.05, (rz0 + rz1) / 2, 2, 0.1, rz1 - rz0, sw); box("stone", rx1 + 1, 0.05, (rz0 + rz1) / 2, 2, 0.1, rz1 - rz0, sw); }
+        else { for(let k = 0; k < 10; k++) box("stone", rx0 + 3 + k * 6.4, 0.03, (rz0 + rz1) / 2, 2.4, 0.01, 0.1, 0xd4b84a); box("stone", (rx0 + rx1) / 2, 0.05, rz0 - 1, rx1 - rx0, 0.1, 2, sw); box("stone", (rx0 + rx1) / 2, 0.05, rz1 + 1, rx1 - rx0, 0.1, 2, sw); } } };
+    road(x0 + 1, z0, x0 + 9, z0 + CELL, true); road(x0 + 9, z0 + 1, x0 + CELL, z0 + 9, false);
+    if(lvl < 2) box("stone", x0 + 32, -0.015, z0 + 32, CELL, 0.02, CELL, 0xb9b3a6);
+    const bx0 = x0 + 11, bx1 = x0 + CELL - 1, bz0 = z0 + 11, bz1 = z0 + CELL - 1, L = bx1 - bx0;
+    const lod = lvl === 0 ? 1 : lvl === 1 ? 0 : -1; house.lod = lvl === 2 ? -1 : 0;
+    const keepSkip = (lx0, w) => { const a = local(lx0, -7), b = local(lx0 + w, 2.5); return hitKeep(a[0], a[1], b[0], b[1]); };
+    const sides = [[bx0, bz0 + 5.6, -Math.PI / 2], [bx1, bz1 - 5.6, Math.PI / 2], [bx1 - 5.6, bz0, Math.PI], [bx0 + 5.6, bz1, 0]];
+    const lens = [L - 11.2, L - 11.2, L - 11.2, L - 11.2];
+    const dense = type === "downtown" ? [4, 7] : type === "strip" ? [1, 2] : [2, 4];
+    const shops = (sideIdx, sd) => { const s = sides[sideIdx]; frame(s[0], s[1], s[2]); const rr = row(lens[sideIdx], sd, {lod:() => lod, floors:dense, flagEvery:lvl === 0 ? 4 : 0, skip:keepSkip});
+      rr.forEach(b => poiLocal("shop", SIGNS[b.si], b.cx, -2.7, b.x0 + b.bw - 0.72, 0.8, [[b.cx, 1.5]])); };
+    const homesSide = (sideIdx) => { const s = sides[sideIdx]; frame(s[0], s[1], s[2]); let x = 0; const Ls = lens[sideIdx];
+      while(x < Ls - 6){ const w = Math.min(6.4 + r() * 2, Ls - x); if(!keepSkip(x, w)){ const s2 = sides[sideIdx]; frame(s2[0], s2[1], s2[2]); F = F.clone().multiply(new THREE.Matrix4().makeTranslation(0, 0, -2.0)); house(x, w, r, NAMES[(r() * NAMES.length) | 0] + " house"); frame(s2[0], s2[1], s2[2]); } x += w + 1.4; } };
+    const sd = hashS("rows:" + seed + i + "," + j);
+    if(type === "downtown" || type === "strip"){ for(let k = 0; k < 4; k++) shops(k, sd + k);
+      noFrame(); if(lvl < 2) for(let k = 0; k < 6; k++) tree(bx0 + 12 + r() * (L - 24), bz0 + 12 + r() * (L - 24), 2.6, 1.1, sd + 50 + k); }
+    else if(type === "residential"){ for(let k = 0; k < 4; k++) homesSide(k); noFrame(); if(lvl < 2) for(let k = 0; k < 5; k++) tree(bx0 + 14 + r() * (L - 28), bz0 + 14 + r() * (L - 28), 2.8, 1.3, sd + 70 + k); }
+    else if(type === "park"){ noFrame(); if(!hitKeep(bx0, bz0, bx1, bz1)) parkAt(bx0, bz0, bx1, bz1, pick(CELL_NAMES.park, i, j, seed), r); }
+    else if(type === "school"){ homesSide(1); homesSide(3); noFrame(); schoolAt(bx0 + L / 2 - 4, bz0 + 22, pick(CELL_NAMES.school, i, j, seed)); }
+    else if(type === "church"){ homesSide(0); homesSide(1); homesSide(3); noFrame(); if(!hitKeep(bx0 + 14, bz0, bx0 + 30, bz0 + 24)) churchAt(bx0 + 22, bz0 + 15, pick(CELL_NAMES.church, i, j, seed)); }
+    else if(type === "civic"){ for(let k = 0; k < 2; k++) shops(k, sd + k); noFrame(); if(!hitKeep(bx0 + 10, bz0, bx1 - 10, bz0 + 30)) civicAt(bx0 + L / 2, bz0 + 16, 22, pick(CELL_NAMES.civic, i, j, seed), "civic"); }
+    noFrame(); house.lod = 0;
+    if(lvl === 0 && type !== "park"){ for(let k = 0; k < 3; k++) lamp(x0 + 10.2, z0 + 12 + k * 18, 3.8, 0, false); for(let k = 0; k < 3; k++) lamp(x0 + 14 + k * 18, z0 + 10.2, 3.8, 0, false); }
+    return type;
+  };
+  /* the static place list for NPC schedules: every cell within RINGS of the core, computed without geometry */
+  const staticPois = (seed, rings) => { const out = []; const sv = [POIS, SOLIDS, LAMPS, BK, DRY]; POIS = out; SOLIDS = null; LAMPS = null; BK = {}; DRY = true;
+    try{ const keys = new Set(); for(let i = -rings; i <= rings; i++) for(let j = -rings; j <= rings + 1; j++) if(cellExists(i, j)) keys.add(i + "," + j); EXTRA.forEach(k => keys.add(k));
+      keys.forEach(k => { const [i, j] = k.split(",").map(Number); try{ genCell(i, j, seed, 1); }catch(e){} }); } finally { [POIS, SOLIDS, LAMPS, BK, DRY] = sv; noFrame(); house.lod = 0; }
+    out.forEach((p, k) => { p.id = p.kind + "_c" + (k + 1); p.cell = cellOf(p.pos.x, p.pos.z).join(","); }); return out; };
+  const CELL_KMAP = {leaf:"paint", brass:"paint", asphalt:"stone"};
+  const buildCellGeo = (i, j, seed, lvl, style) => { const sv = [BK, SOLIDS, POIS, LAMPS, CHUNK, KMAP, ST, signI];
+    BK = {}; SOLIDS = lvl < 2 ? [] : null; POIS = null; LAMPS = []; CHUNK = "x"; KMAP = CELL_KMAP; ST = STYLES[style] || STYLES.brick_row; signI = (i * 7 + j * 3) & 15;
+    let out; try{ const type = genCell(i, j, seed, lvl); const parts = []; Object.keys(BK).forEach(k => parts.push({b:{k:BK[k].k, ch:"cell"}, geo:makeGeo(BK[k])})); out = {parts, solids:SOLIDS || [], lamps:LAMPS, type}; }
+    finally { [BK, SOLIDS, POIS, LAMPS, CHUNK, KMAP, ST, signI] = sv; noFrame(); house.lod = 0; }
+    return out; };
+  const streamer = (grp, seed, style, solidsSink, lampsSink) => {
+    const cells = new Map(), lru = new Map(); let busy = false, queue = [];
+    const want = cp => { const [ci, cj] = cellOf(cp.x, cp.z), w = new Map();
+      for(let di = -RING; di <= RING; di++) for(let dj = -RING; dj <= RING; dj++){ const i = ci + di, j = cj + dj, ch = Math.max(Math.abs(di), Math.abs(dj));
+        if(!cellExists(i, j)) continue;
+        const ccx = cellX0(i) + 32, ccz = cellZ0(j) + 32, dist = Math.hypot(ccx - cp.x, ccz - cp.z);
+        w.set(i + "," + j, ch === 0 || dist < 70 ? 0 : ch === 1 ? 1 : 2); }
+      return w; };
+    const drop = key => { const c = cells.get(key); if(!c) return; grp.remove(c.g); cells.delete(key);
+      if(solidsSink) c.solids.forEach(s => { const k = solidsSink.indexOf(s); if(k >= 0) solidsSink.splice(k, 1); });
+      if(lampsSink) c.lamps.forEach(s => { const k = lampsSink.indexOf(s); if(k >= 0) lampsSink.splice(k, 1); });
+      lru.set(c.cacheKey, c.geo); while(lru.size > 10){ const [k0, g0] = lru.entries().next().value; lru.delete(k0); g0.parts.forEach(p => p.geo.dispose()); } };
+    const build = (key, lvl) => { const [i, j] = key.split(",").map(Number), ck = key + "|" + lvl;
+      let geo = lru.get(ck); if(geo) lru.delete(ck); else geo = buildCellGeo(i, j, seed, lvl, style);
+      const g = new THREE.Group(); g.name = "nd-cell " + key; geo.parts.forEach(p => g.add(meshOf(p.b, p.geo)));
+      g.children.forEach(m => { m.userData.ndChunk = "cell"; m.userData.ndCell = key; });
+      drop(key); grp.add(g); cells.set(key, {g, lvl, solids:geo.solids, lamps:geo.lamps, geo, cacheKey:ck});
+      if(solidsSink) geo.solids.forEach(s => solidsSink.push(s)); if(lampsSink) geo.lamps.forEach(s => lampsSink.push(s)); };
+    const pump = () => { busy = false; const job = queue.shift(); if(!job) return; const c = cells.get(job[0]);
+      if(!c || c.lvl !== job[1]){ const t0 = performance.now(); try{ build(job[0], job[1]); }catch(e){ ndWarn("cell " + job[0], e); } ND.stats.cellMs = Math.round(performance.now() - t0); }
+      if(queue.length){ busy = true; (window.requestIdleCallback ? requestIdleCallback(pump, {timeout:400}) : setTimeout(pump, 60)); } };
+    let lastKey = ""; const api = {};
+    const update = cp => { const [ci, cj] = cellOf(cp.x, cp.z), near = Math.floor(cp.x / 24) + ":" + Math.floor(cp.z / 24); if(near === lastKey && !queue.length) return; lastKey = near;
+      const w = want(cp); for(const k of [...cells.keys()]) if(!w.has(k)) drop(k);
+      if(w.size > MAX_ACTIVE){ /* cap: the farthest go to boxes */ [...w.entries()].sort((a, b) => a[1] - b[1]).slice(MAX_ACTIVE).forEach(([k]) => w.set(k, 2)); }
+      queue = [...w.entries()].filter(([k, l]) => !cells.has(k) || cells.get(k).lvl !== l).sort((a, b) => a[1] - b[1]);
+      if(queue.length && !busy){ busy = true; setTimeout(pump, 30); } };
+    api.refresh = () => { lastKey = ""; }; ND._streamers = (ND._streamers || []).filter(x => x.alive()); let alive = true; api.alive = () => alive; ND._streamers.push(api);
+    return Object.assign(api, {update, cells, dispose(){ alive = false; for(const k of [...cells.keys()]) drop(k); lru.forEach(g0 => g0.parts.forEach(p => p.geo.dispose())); lru.clear(); }});
+  };
+
+  /* ── citizen-built buildings (JUPITER: window.ONUM_DISTRICT_CHANGES + "onum-district-change") ── */
+  const CHG = {list:new Map(), grp:null, solids:[], pois:[]};
+  const isRoad = (x, z) => { if(Math.abs(x) < 8.2 && z > -6 && z < 50) return true; if(z > 18 && z < 26 && Math.abs(x) < 45) return true; if(z > -5 && z < -1.4 && Math.abs(x) < 14) return true;
+    const lx = ((x + 32) % CELL + CELL) % CELL, lz = ((z + 10) % CELL + CELL) % CELL; return !hitKeep(x, z, x, z) && (lx < 11 || lz < 11); };
+  const freeLot = (pos, w, d, own) => { const solids = [].concat((typeof NM !== "undefined" && NM.solids) || [], CHG.solids.filter(s => s.owner !== own));
+    const ok = (x, z) => { for(let a = -1; a <= 1; a++) for(let b = -1; b <= 1; b++) if(isRoad(x + a * w / 2, z + b * d / 2)) return false;
+      for(const s of solids) if(Math.abs(s.x - x) < s.hx + w / 2 + 0.6 && Math.abs(s.z - z) < s.hz + d / 2 + 0.6) return false; return true; };
+    const x0 = +((pos && pos.x) || 0), z0 = +((pos && pos.z) || 0);
+    for(let rr = 0; rr < 60; rr += 2) for(let a = 0; a < Math.max(1, rr * 3); a++){ const t = a / Math.max(1, rr * 3) * Math.PI * 2, x = x0 + Math.cos(t) * rr, z = z0 + Math.sin(t) * rr; if(ok(x, z)) return {x, z}; }
+    return {x:x0, z:z0}; };
+  const CHG_SIGN = {home:null, restaurant:0, shop:6, church:null, school:null, lab:5, station:4};
+  const buildChange = ch => {
+    const kind = String(ch.kind || "home"), st = String(ch.status || "planned"), name = String(ch.name || kind), w = kind === "home" ? 7.5 : kind === "statue" ? 3.5 : kind === "park" ? 18 : kind === "church" || kind === "school" ? 12 : 9, d = kind === "home" ? 9 : kind === "statue" ? 3.5 : kind === "park" ? 18 : 11;
+    const lot = kind === "road" ? {x:+((ch.pos && ch.pos.x) || 0), z:+((ch.pos && ch.pos.z) || 0)} : freeLot(ch.pos, w + 2, d + 2, ch.id); const sv = [BK, SOLIDS, POIS, LAMPS, CHUNK, KMAP, ST];
+    BK = {}; SOLIDS = []; POIS = []; LAMPS = []; CHUNK = "chg"; KMAP = CELL_KMAP; ST = STYLES[ND.style || "brick_row"] || STYLES.brick_row;
+    let out;
+    try{
+      frame(lot.x, lot.z + d / 2, 0); const r = rngOf(hashS(ch.id || name));
+      const kindDone = st === "built" && (kind === "road" || kind === "statue" || kind === "park");
+      if(kindDone && kind === "road"){ noFrame(); const a = ch.pos || {x:0, z:0}, b = ch.pos2 || {x:(a.x || 0) + 24, z:a.z || 0}, ax = +a.x || 0, az = +a.z || 0, bx = +b.x || 0, bz = +b.z || 0;
+        const L = Math.hypot(bx - ax, bz - az) || 1, ang = Math.atan2(bx - ax, bz - az), cx = (ax + bx) / 2, cz = (az + bz) / 2, ux = Math.cos(ang), uz = -Math.sin(ang);
+        box("asphalt", cx, 0.03, cz, 6, 0.03, L, 0x55575a, ang); [-1, 1].forEach(sd => { box("stone", cx + ux * sd * 3.08, 0.07, cz + uz * sd * 3.08, 0.16, 0.14, L, 0x9d998f, ang); box("stone", cx + ux * sd * 4.15, 0.05, cz + uz * sd * 4.15, 2.0, 0.1, L, 0xc4beb0, ang);
+          for(let t = 6; t < L; t += 12){ const px = ax + (bx - ax) * t / L + ux * sd * 3.5, pz = az + (bz - az) * t / L + uz * sd * 3.5; lamp(px, pz, 3.8, 0, false); } });
+        for(let t = 2; t < L - 1; t += 4.5) box("stone", ax + (bx - ax) * t / L, 0.05, az + (bz - az) * t / L, 0.1, 0.01, 2.2, 0xd4b84a, ang);
+        poi("square", name, cx, cz, ax, az, [[ax + ux * 3.6, az + uz * 3.6], [bx + ux * 3.6, bz + uz * 3.6]]); }
+      else if(kindDone && kind === "statue"){ noFrame(); const px = lot.x, pz = lot.z; statue(px, pz); box("paint", px, 0.9, pz - 0.49, 0.6, 0.3, 0.02, 0xb08b45); solidAt(px, pz, 0.7, 0.7);
+        hedge(px - 1.6, pz - 1.6, px + 1.6, pz - 1.6, 0.5); poi("square", name, px, pz, px, pz - 1.4, [[px - 1.2, pz - 2.2], [px + 1.2, pz - 2.2]]); }
+      else if(kindDone && kind === "park"){ noFrame(); parkAt(lot.x - 9, lot.z - 9, lot.x + 9, lot.z + 9, name, r); }
+      else if(st === "planned"){ [[-w / 2, 0], [w / 2, 0], [-w / 2, -d], [w / 2, -d]].forEach(p => { box("paint", p[0], 0.4, p[1], 0.08, 0.8, 0.08, 0xc9a24a); box("paint", p[0], 0.75, p[1], 0.1, 0.08, 0.1, 0xd23a2a); });
+        [[0, 0, w, 0.02], [0, -d, w, 0.02], [-w / 2, -d / 2, 0.02, d], [w / 2, -d / 2, 0.02, d]].forEach(q => box("paint", q[0], 0.5, q[1], q[2], 0.015, q[3] || 0.02, 0xf0e6c0));
+        box("paint", -w / 2 + 0.8, 0.9, 0.4, 0.08, 1.8, 0.08, 0x5a4030); box("paint", -w / 2 + 2.2, 0.9, 0.4, 0.08, 1.8, 0.08, 0x5a4030); box("paint", -w / 2 + 1.5, 1.5, 0.42, 1.8, 0.9, 0.05, 0xf4f1ea);
+        box("paint", -w / 2 + 1.5, 1.75, 0.45, 1.5, 0.16, 0.01, 0x1d2b44); box("paint", -w / 2 + 1.5, 1.4, 0.45, 1.2, 0.08, 0.01, 0x8a2f36); }
+      else if(st === "construction"){ const H = kind === "home" ? 5.6 : 8;
+        box("stone", 0, 0.15, -d / 2, w, 0.3, d, 0x9d968a); box(ST.wall, 0, 0.9, -d / 2, w, 1.2, d, ST.cols[0]);
+        for(let a = 0; a <= 4; a++) for(const zz of [0, -d]){ const x = -w / 2 + a * w / 4; box("paint", x, H / 2, zz, 0.12, H, 0.12, 0xb08b5a); }
+        for(let a = 0; a <= 3; a++){ const x = -w / 2 + a * w / 3; box("paint", x, H / 2, -d / 2, 0.12, H, 0.12, 0xb08b5a); }
+        [H * 0.5, H].forEach(y => { box("paint", 0, y, 0, w, 0.12, 0.12, 0xb08b5a); box("paint", 0, y, -d, w, 0.12, 0.12, 0xb08b5a); box("paint", -w / 2, y, -d / 2, 0.12, 0.12, d, 0xb08b5a); box("paint", w / 2, y, -d / 2, 0.12, 0.12, d, 0xb08b5a); });
+        for(let a = 0; a <= 5; a++){ const x = -w / 2 - 0.2 + a * (w + 0.4) / 5; cyl("paint", x, H / 2 + 0.5, 1.0, 0.03, H + 1, 0x8a8f96, 6); }
+        [1.6, 3.4, 5.2].forEach(y => { box("paint", 0, y, 1.0, w + 0.6, 0.04, 0.04, 0x8a8f96); box("paint", 0, y - 0.05, 0.75, w + 0.4, 0.04, 0.5, 0x8a6a3a); });
+        box("paint", w / 2 + 1.2, 0.5, 1.2, 1.4, 1.0, 1.0, 0xd8a52a); box("paint", w / 2 + 1.2, 1.1, 0.7, 1.0, 0.12, 0.12, 0x2a2a2a);
+        solidLocal(-w / 2 - 0.3, -d - 0.3, w / 2 + 0.3, 1.3); }
+      else { /* built */
+        if(kind === "home"){ house.lod = 0; F = F.clone().multiply(new THREE.Matrix4().makeTranslation(-w / 2, 0, 3.2 - 0.0)); house(0, w, r, name); }
+        else if(kind === "church"){ noFrame(); churchAt(lot.x, lot.z + 1, name); }
+        else if(kind === "school"){ noFrame(); schoolAt(lot.x, lot.z + 2, name); }
+        else { const si = CHG_SIGN[kind] != null ? CHG_SIGN[kind] : 6; const b = building(-w / 2, w, kind === "lab" || kind === "station" ? 2 : 1 + (r() < 0.5 ? 1 : 0), r, 1, kind === "station", si);
+          quad("sign", 0, 2.95, 0.15, w - 0.6, 0.48, 0, [0, 1 - (si + 1) / 16, 1, 1 / 16]);
+          if(kind === "station"){ box("paint", 0, 4.4 + 2 * 2.9, 0.6, 2.2, 1.2, 0.2, 0xf4f1ea); }
+          poiLocal(kind === "restaurant" ? "diner" : kind, name, 0, -2.7, w / 2 - 0.72, 0.8, [[0, 1.5], [1, 1.5]]); }
+        /* the name board out front */
+        frame(lot.x, lot.z + d / 2, 0); box("paint", -w / 2 + 0.6, 0.6, 1.4, 0.08, 1.2, 0.08, 0x3a2a1c); box("paint", -w / 2 + 0.6, 1.2, 1.42, 1.6, 0.5, 0.06, 0x1f3d2c);
+      }
+      const parts = []; Object.keys(BK).forEach(k => parts.push({b:{k:BK[k].k, ch:"chg"}, geo:makeGeo(BK[k])}));
+      out = {parts, solids:SOLIDS.map(s => Object.assign(s, {owner:ch.id})), pois:POIS.map(p => Object.assign(p, {id:"chg_" + ch.id, owner:ch.owner || null, change:ch.id})), lot, name};
+    } finally { [BK, SOLIDS, POIS, LAMPS, CHUNK, KMAP, ST] = sv; noFrame(); house.lod = 0; }
+    return out; };
+  const nameLabel = (text, x, y, z) => { try{ const c = document.createElement("canvas"); c.width = 256; c.height = 64; const g = c.getContext("2d"); g.fillStyle = "#1f3d2c"; g.fillRect(0, 0, 256, 64);
+      g.fillStyle = "#e3c06a"; g.font = "bold 26px Georgia, serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(String(text).slice(0, 22), 128, 33);
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 0.38), new THREE.MeshStandardMaterial({map:new THREE.CanvasTexture(c), roughness:.6})); m.position.set(x, y, z); return m; }catch(e){ return null; } };
+  const poisUpdated = () => { try{ const base = (ND._basePois || []).slice(); window.ONUM_TOWN_POIS = base.concat([...CHG.list.values()].flatMap(v => v.pois || []));
+      window.dispatchEvent(new CustomEvent("onum-town-pois-updated", {detail:{pois:window.ONUM_TOWN_POIS}})); }catch(e){} };
+  const removeChange = id => { const v = CHG.list.get(id); if(!v) return; try{ if(v.g && v.g.parent) v.g.parent.remove(v.g); v.parts.forEach(p => p.geo.dispose()); }catch(e){}
+    (v.solids || []).forEach(s => { const k = CHG.solids.indexOf(s); if(k >= 0) CHG.solids.splice(k, 1); try{ const k2 = NM.solids.indexOf(s); if(k2 >= 0) NM.solids.splice(k2, 1); }catch(e){} }); CHG.list.delete(id); };
+  const LS = "onum-district-changes";
+  const persist = () => { try{ localStorage.setItem(LS, JSON.stringify([...CHG.all.values()])); }catch(e){} };
+  CHG.all = new Map(); try{ (JSON.parse(localStorage.getItem(LS) || "[]") || []).forEach(c => { if(c && c.id != null) CHG.all.set(c.id, c); }); }catch(e){}
+  const expand = (ch, on) => { const p = ch.pos || {x:0, z:0}; let best = null, bd = 1e9;
+    for(let i = -12; i <= 12; i++) for(let j = -12; j <= 12; j++){ const k = i + "," + j; if(cellExists(i, j) && !(ch._cell === k)) continue;
+      const adj = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => cellExists(i + a, j + b) && (i + a) + "," + (j + b) !== ch._cell); if(!adj) continue;
+      const dd = Math.hypot(cellX0(i) + 32 - (+p.x || 0), cellZ0(j) + 32 - (+p.z || 0)); if(dd < bd){ bd = dd; best = k; } }
+    if(ch._cell){ if(!on) EXTRA.delete(ch._cell); else EXTRA.add(ch._cell); }
+    else if(on && best){ ch._cell = best; EXTRA.add(best); }
+    ND._static = null; (ND._streamers || []).forEach(s => s.refresh());
+    try{ if(ND._seedPois){ const sp = staticPois(7, 3); ND._static = {style:ND.style, pois:sp}; ND._basePois = ND._seedPois.concat(sp); } }catch(e){}
+    return ch._cell; };
+  const applyChange = ch => { if(!ch || ch.id == null) return null;
+    ch = Object.assign({}, CHG.all.get(ch.id) && CHG.all.get(ch.id)._cell ? {_cell:CHG.all.get(ch.id)._cell} : {}, ch);
+    if(String(ch.status) === "demolished") CHG.all.delete(ch.id); else CHG.all.set(ch.id, ch); persist();
+    if(String(ch.kind) === "expansion"){ const on = ch.status === "built" || ch.status === "construction"; const cell = expand(ch, on); persist(); poisUpdated(); return {id:ch.id, cell, status:ch.status}; }
+    try{ removeChange(ch.id);
+      if(String(ch.status) === "demolished"){ poisUpdated(); return {id:ch.id, removed:true}; }
+      const o = buildChange(ch); const g = new THREE.Group(); g.name = "nd-change " + ch.id; o.parts.forEach(p => g.add(meshOf(p.b, p.geo)));
+      if(String(ch.status) === "built"){ const lb = nameLabel(o.name, o.lot.x - (ch.kind === "home" ? 7.5 : 9) / 2 + 0.6, 1.2, o.lot.z + (ch.kind === "home" ? 9 : 11) / 2 + 1.46); if(lb) g.add(lb); }
+      if(String(ch.status) === "planned"){ const lb = nameLabel(o.name, o.lot.x - (ch.kind === "home" ? 7.5 : 9) / 2 + 1.5, 1.62, o.lot.z + (ch.kind === "home" ? 9 : 11) / 2 + 0.47); if(lb) g.add(lb); }
+      const v = {g, parts:o.parts, solids:o.solids, pois:String(ch.status) === "built" ? o.pois : [], lot:o.lot, change:ch}; CHG.list.set(ch.id, v);
+      o.solids.forEach(s => { CHG.solids.push(s); try{ if(CHG.grp && NM && NM.solids) NM.solids.push(s); }catch(e){} });
+      if(CHG.grp) CHG.grp.add(g); poisUpdated(); return {id:ch.id, lot:o.lot, status:ch.status};
+    }catch(e){ ndWarn("change", e); return null; } };
+  const attachChanges = grp => { CHG.grp = grp; const all = new Map(CHG.all); for(const v of CHG.list.values()) all.set(v.change.id, v.change);
+    try{ (window.ONUM_DISTRICT_CHANGES || []).forEach(ch => { if(ch && ch.id != null) all.set(ch.id, ch); }); }catch(e){}
+    for(const id of [...CHG.list.keys()]) removeChange(id); CHG.solids.length = 0; for(const ch of all.values()) applyChange(ch); poisUpdated(); };
+  window.onumTownApplyChange = applyChange;
+  window.addEventListener("onum-district-change", ev => { try{ if(ev && ev.detail) applyChange(ev.detail); }catch(e){} });
+  window.onumBuildTown = function(THREEarg, opts){
+    opts = opts || {}; const style = styleFor(opts); ND._seed = (opts.seed != null ? (opts.seed | 0) : hashS(opts.stateId || opts.culture || "town") % 9973) + 11;
+    const c = geoFor("town", false, false, style);
+    const grp = assemble(c, opts); grp.userData.ndTown = style; const seed = ND._seed;
+    const sm = streamer(grp, seed, style, null, grp.userData.lamps); grp.userData.streamer = sm; sm.update({x:0, z:10});
+    let pois = c.pois; try{ pois = c.pois.concat(staticPois(seed, 3)); }catch(e){}
+    return {group:grp, pois, style, solids:c.solids, update(camOrPos){ const p = camOrPos && camOrPos.isCamera ? camOrPos.position : camOrPos; if(p) sm.update(p); },
+      dispose(){ try{ if(grp.parent) grp.parent.remove(grp); sm.dispose(); c.parts.forEach(p => p.geo.dispose()); }catch(e){} }};
+  };
+  window.onumTownStyles = Object.keys(STYLES);
+
+  /* walk bounds: the district is a town now; buildings, cars, kiosks and monuments collide through NM.solids */
+  const _roomBox = roomBox;
+  roomBox = function(id){ const b = _roomBox.apply(this, arguments);
+    try{ if(id === "district" && window.ONUM_TOWN_READY && ndActive("district")) return {hw:200, d0:-180, d1:230}; }catch(e){}
+    return b; };
+
+  let ndIn = null;
+  const _plantTree = plantTree; plantTree = function(x, z, th, cr){ if(ndIn){ ND._trees.push([x, z, th, cr]); return; } return _plantTree.apply(this, arguments); };
+  const _lamp = propStreetLamp; propStreetLamp = function(x, z, h){ if(ndIn){ ND._lamps.push([x, z, h]); return; } return _lamp.apply(this, arguments); };
+  const _bri = buildRoomInner;
+  buildRoomInner = function(id, skipShell){
+    if(!ndActive(id)) return _bri.apply(this, arguments);
+    ND._trees = []; ND._lamps = []; ndIn = id;
+    let r; try{ r = _bri.apply(this, arguments); } finally { ndIn = null; }
+    try{
+      if(id === "steps") roomGroup.traverse(o => { if(o.isMesh && Math.abs(o.position.z - 6.35) < 0.06 && Math.abs(o.position.y - 0.58) < 0.06) o.visible = false; });
+      ndBuild(id);
+    }catch(e){ ndWarn("build " + id, e);
+      try{ (ND._trees || []).forEach(t => _plantTree(t[0], t[1], t[2], t[3])); (ND._lamps || []).forEach(l => _lamp(l[0], l[1], l[2])); }catch(e2){} }
+    ND._trees = []; ND._lamps = [];
+    return r;
+  };
+  const prewarm = () => { try{ if(!ND.on || ndTier() === 0 || typeof G === "undefined" || !G.you || !(window.NEPTUNE && NEPTUNE.mods)) return setTimeout(prewarm, 4000);
+      const lowCap = G.gfx === "balanced";
+      ["steps", "district"].forEach((id, i) => setTimeout(() => { try{ if(ndIn) return; ND._trees = []; ND._lamps = []; geoFor(id, ndTaylor(), lowCap, id === "district" ? homeStyle() : "brick_row"); }catch(e){ ndWarn("prewarm", e); } }, 600 + i * 900)); }catch(e){} };
+  setTimeout(prewarm, 6000);
+  console.log("NEPTUNE district ready");
+}catch(e){ try{ console.warn("NEPTUNE-DISTRICT block", e); }catch(e2){} }
+/* NEPTUNE-DISTRICT END */
 /* NEPTUNE-LOCALPARTY BEGIN — regular local party meetings at home: a weekly district meeting and a monthly
    state party meeting, with constituents and the lower elected officials of the district and state (state
    reps, state senators, mayors, county officials). Officials are generated deterministically from the
