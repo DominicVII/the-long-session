@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261012q">
+<meta name="onum-build" content="20261012r">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261012q";
+  var STAMP = "20261012r";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -7112,7 +7112,7 @@ function pcBoot(){
     if(PC.open && e.key === "Escape"){ e.preventDefault(); e.stopImmediatePropagation(); e._pzHandled = true; pcClose(); }
   }, true);
 }
-function pcCanOpen(){ return !!(G && G.you && G.room === "office" && !G.over); }
+function pcCanOpen(){ return !!(G && G.you && myDeskRoom() && !G.over); }
 function pcOpen(tab){
   if(!pcCanOpen()) return false;
   pcBoot();
@@ -7158,6 +7158,8 @@ function pcTab(){
     try{ if(typeof govLine === "function"){ const g = govLine(); if(g) out.push('<div class="pc__h">The state</div><div>' + pcEsc(g) + '</div>'); } }catch(e){}
     out.push('<div style="margin-top:8px"><button class="pc__btn" data-pcgo="paper">Open this morning\'s Ledger</button>' +
       (typeof govCard === "function" ? '<button class="pc__btn" data-pcgo="gov">The government</button>' : '') + '</div>');
+  } else if(t === "bills" && abroadOffice()){
+    out.push(roleDutiesHTML());
   } else if(t === "bills"){
     const b = G.bill;
     out.push('<div class="pc__h">On the floor</div>');
@@ -7200,7 +7202,7 @@ function pcTab(){
 function pcRender(){
   if(!PC.open) return;
   const tabs = el("pcTabs");
-  tabs.innerHTML = PC_TABS.map(([k, n]) => '<button type="button" class="pc__tab' + (PC.tab === k ? ' is-on' : '') + '" data-pct="' + k + '">' + n + (k === "inbox" && unreadCount() ? ' (' + unreadCount() + ')' : '') + '</button>').join("");
+  tabs.innerHTML = PC_TABS.map(([k, n]) => [k, k === "bills" && abroadOffice() ? "Duties" : k === "const" && heldOffice() === "gov" ? "Citizens & press" : n]).map(([k, n]) => '<button type="button" class="pc__tab' + (PC.tab === k ? ' is-on' : '') + '" data-pct="' + k + '">' + n + (k === "inbox" && unreadCount() ? ' (' + unreadCount() + ')' : '') + '</button>').join("");
   tabs.querySelectorAll("[data-pct]").forEach(b => b.addEventListener("click", () => { PC.tab = b.getAttribute("data-pct"); PC.openMail = null; pcRender(); }));
   const body = el("pcBody");
   let html = ""; try{ html = pcTab(); }catch(e){ html = '<p class="pc__m">This screen froze. Try another tab.</p>'; }
@@ -7222,6 +7224,7 @@ function pcRender(){
       chest:() => chestCard(), office:() => officeCard(), notebook:() => notebookCard()}[k];
     if(go) pcAway(go);
   }));
+  body.querySelectorAll("[data-pcduty]").forEach(b => b.addEventListener("click", () => { roleDutyRun(b.getAttribute("data-pcduty")); pcRender(); }));
   body.querySelectorAll("[data-pcprop]").forEach(b => b.addEventListener("click", () => {
     const pr = (PROPS.office || []).find(p => p.id === b.getAttribute("data-pcprop"));
     if(pr) pcAway(() => openProp(pr));
@@ -7230,7 +7233,7 @@ function pcRender(){
 let pcRefreshT = 0;
 function pcTick(dt){
   if(!PC.open) return;
-  if(!G.you || G.room !== "office" || G.over){ pcClose(); return; }
+  if(!G.you || !myDeskRoom() || G.over){ pcClose(); return; }
   pcRefreshT -= dt;
   if(pcRefreshT <= 0){ pcRefreshT = 3; const tabs = el("pcTabs"); if(tabs){ const u = tabs.querySelector('[data-pct="inbox"]'); if(u) u.textContent = "Inbox" + (unreadCount() ? " (" + unreadCount() + ")" : ""); } }
 }
@@ -7272,13 +7275,14 @@ function kAmenities(id, w, d, h, hw){
 function kAmenProps(id){
   if(K_AMEN_ROOMS.indexOf(id) < 0 || !kAmenMine(id)) return [];
   const S = (G._amen && G._amen.id === id && G._amen.S) || kAmenSpots(id);
-  return [
+  const DP = deskProp(id);
+  return (DP ? [DP] : []).concat([
     {id:"amenCoffee", label:"The coffee machine", sub:"Your own, and it works", x:S.coffee.x, z:S.coffee.z, r:1.8,
      acts:() => [{t:G.you.energy > 88 ? "Pour a cup (you are already wide awake)" : "Pour a cup", c:"10m", run(){ spend(10, -16); setSay(G.you.energy > 88 ? "You do not need it. You drink it anyway." : "Strong, hot, and nobody else's.", fx("+16 energy", "10 minutes")); }}]},
     {id:"amenBed", label:"The bed", sub:"A narrow bed behind a screen; the job keeps odd hours", x:S.bed.x, z:S.bed.z, r:2.0,
      acts:() => [sleepAct("your office"),
       {t:"Lie down for an hour", c:"60m", off:G.you.energy > 96, run(){ spend(60, -40); setSay("An hour flat on your back. It helps.", fx("+40 energy", "60 minutes")); }}]}
-  ];
+  ]);
 }
 setTimeout(() => K_AMEN_ROOMS.forEach(id => {
   const base = PROPS[id] || [];
@@ -7528,6 +7532,250 @@ window.addEventListener("keydown", e => {
   if(G._reactOpen && k >= "1" && k <= "7"){ e.preventDefault(); e.stopImmediatePropagation(); if(e.repeat) return; youReact(YOU_REACTS[k.charCodeAt(0) - 49].k); return; }
   if(G._reactOpen && k === "escape"){ e.preventDefault(); e.stopImmediatePropagation(); reactMenu(false); }
 }, true);
+
+/* ===== 20261012q · every office yours, every office its owner's, every role its own duties, a Vox that never repeats ===== */
+
+/* ── culture: each member's own region, customs, dialect, food, institutions, history, what is sacred, and money ── */
+const CULT_BANK = {
+  dutch:     {custom:["ringing the polder bell at the first thaw","keeping the dike-watch rota by family name","a cold herring on the quay at the first catch"], phrase:["ja, so it goes","the water decides","we build it once and build it right"], food:["herring and onions","pea soup thick enough to stand a spoon in","oliebollen at New Year"], inst:["the water board","the Exchange on the Dam","the dike-reeve's court"], hist:["the flood of the old century","the year the Exchange closed for a week","the charter the Republic never renamed"], sacred:["the dike","an honest scale","the Sunday quiet"], ind:["banking","shipping","milling"]},
+  yankee:    {custom:["town meeting in March, every warrant article read aloud","the church supper with beans on Saturday","sugaring off in the late snow"], phrase:["ayuh","wicked plain","we do not waste a thing up here"], food:["baked beans and brown bread","chowder with the clams still arguing","maple on everything"], inst:["the town meeting","the grange hall","the mill trust"], hist:["the mill strike","the winter the harbour froze shut","the first free school"], sacred:["the town meeting","a paid debt","a mended fence"], ind:["textiles","fishing","shipbuilding"]},
+  midlands:  {custom:["the county fair judged by the oldest farmer living","the Friday fish fry at the lodge","the Saturday market under the courthouse clock"], phrase:["mind you","fair play","that is the long and short of it"], food:["pork tenderloin the size of a hubcap","sweetcorn on the fourth of the month","pie at the lodge"], inst:["the lodge","the county extension office","the union hall"], hist:["the rail strike","the canal that never paid","the year the bank failed on a Tuesday"], sacred:["the union card","the county fair","a handshake"], ind:["steel","rail","machine tools"]},
+  prairie:   {custom:["harvest supper in the church basement","the co-op meeting where nobody hurries","the threshing bee"], phrase:["way I see it","out our way","you do not rush the weather"], food:["hotdish","fried chicken after church","wheat bread from the co-op mill"], inst:["the grain co-op","the farm bureau","the township board"], hist:["the dust years","the grain elevator fire","the year the railroad doubled the freight"], sacred:["the harvest","the co-op","a full granary"], ind:["grain","cattle","farm credit"]},
+  delta:     {custom:["the river baptism in June","a fish fry on the levee","the Sunday dinner that runs to supper"], phrase:["I will tell you","Lord knows","down home we say"], food:["catfish and hushpuppies","red beans on Monday","pecan pie"], inst:["the levee board","the cotton exchange","the river parish"], hist:["the great flood","the cotton bust","the bridge that took eleven years"], sacred:["the levee","family land","the river church"], ind:["cotton","river freight","timber"]},
+  highplains:{custom:["the rodeo after branding","the stockmen's dinner","the long drive to the county seat"], phrase:["plain speaking","straight up","short version"], food:["beef and beans","green chile stew","fry bread at the fair"], inst:["the stockgrowers' association","the water district","the county sheriff"], hist:["the range wars","the winter that killed the herds","the first irrigation ditch"], sacred:["water rights","the open range","a man's word"], ind:["cattle","oil","water"]},
+  mountain:  {custom:["the mine-rescue picnic","the miners' memorial in the snow","the Fourth on the ridge"], phrase:["honest to it","up our way","not fancy, but square"], food:["pasties from the company store","elk stew","trout from the high lakes"], inst:["the miners' union","the company store","the mountain clinic"], hist:["the mine collapse","the strike the militia broke","the year the silver ran out"], sacred:["the mine-rescue whistle","the union","the high country"], ind:["mining","timber","rail"]},
+  pacific:   {custom:["the salmon blessing on the dock","the harbour races","the cannery picnic"], phrase:["real talk","bottom line","here is my thing"], food:["salmon on cedar","oysters from the bay","sourdough"], inst:["the port commission","the cannery union","the harbour pilots"], hist:["the waterfront strike","the big fire","the year the run failed"], sacred:["the salmon run","the harbour","the coast"], ind:["fishing","timber","shipping"]}
+};
+const CULT_KEYS = Object.keys(CULT_BANK);
+function memberCulture(m){
+  if(!m) return null;
+  if(m._cult && m._cult.v === 1) return m._cult;
+  const st = (G.states || []).find(s => s.n === m.state) || {};
+  const r = rng(seedOf("cult:" + m.id + ":" + (m.name || "")));
+  let cult = st.cult && CULT_BANK[st.cult] ? st.cult : CULT_KEYS[seedOf("c:" + (m.state || "x")) % CULT_KEYS.length];
+  const B = CULT_BANK[cult];
+  const ind = drawn(B.ind, r);
+  const wealth = Math.max(0, Math.min(100, Math.round((st.ind || 50) * 0.5 + r() * 60 - 5)));
+  m._cult = {v:1, cult, custom:drawn(B.custom, r), phrase:drawn(B.phrase, r), food:drawn(B.food, r), inst:drawn(B.inst, r),
+    hist:drawn(B.hist, r), sacred:drawn(B.sacred, r), ind, wealth,
+    donor: drawn(["the " + ind + " men", "the " + ind + " trust", "a " + ind + " family with a pew up front", "the " + ind + " union", "small givers who mail cash"], r)};
+  return m._cult;
+}
+/* 0 (kin) .. 1 (strangers with opposed money) */
+function cultDistance(a, b){
+  const A = memberCulture(a), B = memberCulture(b); if(!A || !B) return 0.3;
+  let d = 0;
+  if(A.cult !== B.cult) d += 0.42;
+  if(a.state !== b.state) d += 0.08;
+  if(a.creed && b.creed && a.creed !== b.creed) d += 0.12;
+  d += Math.abs(A.wealth - B.wealth) / 100 * 0.25;
+  if(A.ind !== B.ind) d += 0.13;
+  return Math.min(1, d);
+}
+function cultTieBias(a, b){ try{ const d = cultDistance(a, b); return Math.round(10 - d * 34); }catch(e){ return 0; } }
+/* money and place, every day: the far apart drift apart, the kin close ranks */
+function cultDay(){
+  const L = (G.members || []).filter(m => m && !m.gone && m.kind === "member");
+  if(L.length < 4) return;
+  for(let i = 0; i < 40; i++){
+    const a = pick(L), b = pick(L); if(a === b) continue;
+    const d = cultDistance(a, b), A = memberCulture(a), B = memberCulture(b);
+    if(d > 0.55) tieShift(a, b, -Math.round(2 + d * 5), A.ind !== B.ind ? "money: " + A.ind + " against " + B.ind : "home: " + A.cult + " against " + B.cult);
+    else if(d < 0.2) tieShift(a, b, 2, "the same " + A.inst);
+  }
+}
+function cultRival(m, others){
+  let best = null, bd = -1;
+  for(let i = 0; i < 6 && others.length; i++){ const o = pick(others); const d = cultDistance(m, o); if(d > bd){ bd = d; best = o; } }
+  return bd > 0.45 ? best : null;
+}
+
+/* ── the Vox: up to three things nobody has ever said, in the whole game ── */
+let _saidSet = null;
+function saidSet(){
+  if(_saidSet && G._saidRef === _saidSet) return _saidSet;
+  if(!Array.isArray(G.saidHash)) G.saidHash = [];
+  _saidSet = new Set(G.saidHash); G._saidRef = _saidSet;
+  try{ Object.defineProperty(G, "_saidRef", {value:_saidSet, enumerable:false, configurable:true, writable:true}); }catch(e){}
+  return _saidSet;
+}
+function saidKey(t){ return String(t).toLowerCase().replace(/[^a-z0-9]+/g, " ").trim(); }
+function saidHashOf(t){ let h = 2166136261; const s = saidKey(t); for(let i = 0; i < s.length; i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(36) + s.length.toString(36); }
+const FRESH_T = [
+  (m,C,X,n) => "In " + bioOf(m).town + " we have " + C.custom + ", and I will not apologise for it to anyone from " + (X ? X.state : "the coast") + ".",
+  (m,C,X,n) => cap(C.inst) + " back home kept better books than this House ever has. " + cap(C.phrase) + ".",
+  (m,C,X,n) => (X ? "@" + surname(X.name) + ", " : "") + "your " + (X ? memberCulture(X).ind : "money") + " people never once paid for " + C.food + " in " + bioOf(m).town + ".",
+  (m,C,X,n) => "Nobody who remembers " + C.hist + " votes the way " + (X ? surname(X.name) : "the leadership") + " just did.",
+  (m,C,X,n) => "What we hold sacred at home is " + C.sacred + ". What this building holds sacred is the next fundraiser.",
+  (m,C,X,n) => "I count " + n + " " + C.ind + " jobs in my district that this week's paper did not mention once.",
+  (m,C,X,n) => "Tell " + C.donor + " I read their letter. Then tell them " + bioOf(m).town + " reads mine.",
+  (m,C,X,n) => (X ? surname(X.name) + " has never eaten " + C.food + " and it shows in every amendment." : "Somebody bring " + C.food + " to the cloakroom; it might civilise it."),
+  (m,C,X,n) => "My grandmother lived through " + C.hist + " on " + n + " cents a day. Do not lecture me about thrift.",
+  (m,C,X,n) => "The " + C.ind + " money and the " + (X ? memberCulture(X).ind : "bank") + " money will never sit at one table, and I know which one feeds " + bioOf(m).town + ".",
+  (m,C,X,n) => cap(C.phrase) + ": " + n + " families in " + bioOf(m).town + " are waiting on a letter from this House.",
+  (m,C,X,n) => "When " + C.inst + " meets on " + drawn(["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"], Math.random) + ", they ask about me before they ask about " + (X ? surname(X.name) : "the weather") + "."
+];
+function canonOk(t, m){
+  try{
+    if(/\btaylor\b/i.test(t) && /\b(god|lord|divine|almighty|messiah|saviou?r)\b/i.test(t)) return false;
+    if(typeof CANON_MAN_AS_GOD !== "undefined" && CANON_MAN_AS_GOD.test(t)) return false;
+    return wallScrub(t, m) === t;
+  }catch(e){ return true; }
+}
+function voxFresh(m, k){
+  const C = memberCulture(m); if(!C) return [];
+  const S = saidSet(), out = [];
+  const others = (G.members || []).filter(o => o && o !== m && !o.gone && o.kind === "member");
+  for(let i = 0, tries = 0; i < k && tries < 40; tries++){
+    const X = cultRival(m, others) || (others.length ? pick(others) : null);
+    const n = 3 + ((Math.random() * 4000) | 0);
+    let t = "";
+    try{ t = pick(FRESH_T)(m, C, X, n); }catch(e){ continue; }
+    if(!canonOk(t, m)) continue;
+    const h = saidHashOf(t);
+    if(S.has(h)) { G._saidDup = (G._saidDup || 0) + 1; continue; }
+    S.add(h); G.saidHash.push(h); out.push(t); i++;
+  }
+  G._saidMade = (G._saidMade || 0) + out.length;
+  return out;
+}
+function voxSpice(m, t){
+  const k = 1 + ((Math.random() * 3) | 0);
+  const fresh = voxFresh(m, k);
+  if(!fresh.length) return t;
+  const C = memberCulture(m);
+  const open = Math.random() < 0.45 ? cap(C.phrase) + " — " : "";
+  return (open + t + " " + fresh.join(" ")).slice(0, 560);
+}
+
+/* ── every player office: sit at your desk, use your computer ── */
+const DESK_OF = {senate:"ksdesk", court:"kbench", exec:"kxdesk", govoffice:"kgdesk"};
+function deskSeatFor(room){
+  if(room === "office") return {x:0, z:9.05, face:Math.PI};
+  const id = DESK_OF[room]; if(!id) return null;
+  if(deskSeatFor._in) return null;
+  let p = null; deskSeatFor._in = true;
+  try{ p = (PROPS[room] || []).find(x => x.id === id); }finally{ deskSeatFor._in = false; }
+  if(!p) return null;
+  const d = (ROOMS[room] && ROOMS[room].d) || 12;
+  return {x:p.x, z:Math.min(d - 0.5, p.z + 0.85), face:Math.PI};
+}
+function myDeskRoom(){ try{ return G.room === "office" || (homeRoom() === G.room && !!DESK_OF[G.room]); }catch(e){ return false; } }
+function atMyDesk(){
+  if(!G.you || !G.you.sitting || !myDeskRoom()) return false;
+  const s = deskSeatFor(G.room); return !!s && Math.hypot(cam.x - s.x, cam.z - s.z) < 0.85;
+}
+function sitAtMyDesk(){
+  const s = deskSeatFor(G.room); if(!s) return false;
+  if(G.room === "office"){ try{ return sitCasuallyAtDesk(); }catch(e){} }
+  cam.x = s.x + Math.sin(s.face) * 0.12; cam.z = s.z + Math.cos(s.face) * 0.12; cam.yaw = s.face; cam.vx = cam.vz = 0;
+  G.you.sitting = true; if(!G.over) G.running = true;
+  feed("You sit at your desk. E wakes the computer; Esc closes it.");
+  return true;
+}
+function deskProp(room){
+  const s = deskSeatFor(room); if(!s) return null;
+  return {id:"amenDesk", label:"Your desk and computer", sub:"Your chair, your screen, your work", x:s.x, z:s.z - 0.6, r:2.0,
+    acts:() => [
+      G.you.sitting ? {t:PC.open ? "Close the computer" : "Use the computer", c:"E", run(){ if(PC.open) pcClose(); else pcOpen(); }}
+                    : {t:"Sit at your desk", c:"E", run(){ sitAtMyDesk(); }},
+      ...(G.you.sitting ? [{t:"Stand up", c:"", run(){ try{ pcClose(); }catch(e){} G.you.sitting = false; feed("You stand."); }}] : [])
+    ]};
+}
+
+/* ── role duties: the checklist and the desk computer follow the chair you hold ── */
+const ROLE_EXTRA = {
+  gov:[
+    {key:"gappt", t:"Make an appointment", d:"A judge, a commissioner, a board seat.", run(){ spend(30, 4); const y = G.you; y.standing = clamp(y.standing + 1, 0, 100); return "You fill the seat with someone who will answer the phone. Two people who wanted it will remember."; }},
+    {key:"gemer", t:"The emergency file", d:"Floods, fires, strikes: what the state needs from you today.", run(){ spend(45, 6); const S = (G.states || []).find(s => s.n === G.you.state); if(S) S.unrest = clamp((S.unrest || 0) - 3, 0, 100); G.you.approval = clamp(G.you.approval + 1, 0, 100); return "You send the guard, the money and your own face. Unrest eases a little."; }},
+    {key:"gpard", t:"Pardons", d:"The clemency board's list, and the families waiting on it.", run(){ spend(30, 3); const g = chance(.5); G.you.approval = clamp(G.you.approval + (g ? 1 : -1), 0, 100); return g ? "You sign one pardon, for a man who has served his time twice over. The papers are kind." : "You refuse them all. The board is relieved and one family is not."; }},
+    {key:"gleg", t:"The state legislature", d:"Leaders of both houses, about what comes next.", run(){ spend(40, 4); G.you.influence = clamp((G.you.influence || 0) + 2, 0, 100); return "The majority leader wants a road; you want a vote. You both leave with half."; }}
+  ],
+  senate:[{key:"sstaff", t:"Hold a staff meeting on legislation", d:"What the Senate sends back, line by line.", run(){ spend(30, 3); G.you.influence = clamp((G.you.influence || 0) + 1, 0, 100); return "Your counsel finds the clause that matters."; }}],
+  bench:[{key:"bread", t:"Read the briefs", d:"Every word counsel filed, before argument.", run(){ spend(45, 4); G.you.standing = clamp(G.you.standing + 1, 0, 100); return "You read until the light goes. Nobody will catch you unprepared."; }}],
+  pres:[{key:"pcab", t:"Meet the cabinet", d:"Departments, one at a time.", run(){ spend(45, 5); G.you.influence = clamp((G.you.influence || 0) + 2, 0, 100); return "Two secretaries agree with you, which is two more than yesterday."; }}]
+};
+function roleDuties(){
+  const k = heldOffice(); if(!k || k === "house") return [];
+  return docketToday().map(d => ({key:d.key, t:d.t, d:d.d, h:d.h, dock:d})).concat((ROLE_EXTRA[k] || []).map(x => Object.assign({extra:true}, x)));
+}
+function roleDutyRun(key){
+  const it = roleDuties().find(x => x.key === key); if(!it || kOnceToday(key)) return;
+  if(it.dock){ docketRun(it.dock); return; }
+  const line = it.run(); kMark(key); try{ setSay(line, ""); feed(it.t + "."); }catch(e){} try{ refreshPanels(); }catch(e){}
+}
+function roleTitle(){ const k = heldOffice(); return {gov:"Governor", senate:"Senator", bench:"Justice", pres:"the Executive"}[k] || "Member"; }
+function roleDutiesHTML(){
+  const L = roleDuties();
+  return '<div class="pc__h">Duties of the ' + roleTitle() + ' · today</div>' + L.map(x => {
+    const done = kOnceToday(x.key);
+    return '<div class="pc__row"><b>' + pcEsc(x.t) + '</b>' + (x.h ? '<span class="d">' + hourLabel(x.h) + '</span>' : '') +
+      '<div class="pc__m">' + pcEsc(x.d || "") + '</div>' +
+      '<button class="pc__btn" data-pcduty="' + x.key + '"' + (done ? ' disabled' : '') + '>' + (done ? 'Done today' : 'Do it') + '</button></div>';
+  }).join("");
+}
+
+/* ── an office that fits its owner: wealth, books or trophies, faith, home, seniority ── */
+function stateBannerMatFor(name){
+  const nm = String(name || "The State");
+  TEX._stban2 = TEX._stban2 || {};
+  if(!TEX._stban2[nm]){
+    let h = 7; for(const ch of nm) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+    const PAL = [["#1f3b63","#e8d9a8"],["#5a1e22","#efe3c2"],["#24452f","#e6d7a4"],["#3a2c55","#eadfc0"],["#6b4a1c","#f1e6c8"],["#1d4d52","#ecdcae"]];
+    const [bg, fg] = PAL[h % PAL.length];
+    const c = document.createElement("canvas"); c.width = 160; c.height = 256; const x = c.getContext("2d");
+    x.fillStyle = bg; x.fillRect(0, 0, 160, 256); x.strokeStyle = fg; x.lineWidth = 6; x.strokeRect(10, 10, 140, 236);
+    x.fillStyle = fg; x.font = "bold 18px Georgia, serif"; x.textAlign = "center";
+    nm.toUpperCase().split(" ").slice(0, 3).forEach((w, i) => x.fillText(w, 80, 150 + i * 24));
+    x.beginPath(); for(let i = 0; i < 10; i++){ const a = -Math.PI/2 + i * Math.PI/5, r = i % 2 ? 14 : 34; x.lineTo(80 + Math.cos(a)*r, 80 + Math.sin(a)*r); } x.closePath(); x.fill();
+    const t = new THREE.CanvasTexture(c); try{ t.encoding = THREE.sRGBEncoding; }catch(e){}
+    TEX._stban2[nm] = t;
+  }
+  const m = new THREE.MeshStandardMaterial({map:TEX._stban2[nm], roughness:.9, side:THREE.DoubleSide}); m._shared = true; return m;
+}
+function decorOwner(person, id){
+  if(!person) return;
+  const R = ROOMS[id]; if(!R) return;
+  const hw = R.w / 2, d = R.d;
+  const C = memberCulture(person.kind === "you" || person === G.you ? Object.assign({}, person, {id:"you:" + person.name}) : person) || {wealth:50, ind:"trade"};
+  const r = rng(seedOf("decor:" + (person.id || person.name) + ":" + id));
+  const T = person.traits || {};
+  const wealth = person === G.you ? Math.max(0, Math.min(100, Math.round((person.funds || 0) / 4000 + (person.terms || 0) * 8 + 20))) : C.wealth;
+  const gilt = matCol(0xb08b45, .35, .75), dark = matCol(0x2a1d14, .7);
+  /* ornate or spartan */
+  if(wealth > 62){
+    propRug(0, d * 0.5, Math.min(3.6, R.w - 3), Math.min(3.0, d - 4));
+    if(!MODEST) try{ propChandelier(0, R.h - 0.7, d * 0.5, 4, 0.7); }catch(e){}
+    addBox(gilt, hw - 0.06, 2.55, d * 0.30, 0.04, 0.05, 1.3, 0, true);   /* gilt picture rail */
+  } else if(wealth < 32){
+    addBox(matCol(0x8d8577, .9), -hw + 0.03, 1.05, d * 0.30, 0.02, 0.6, 0.9, 0, true);  /* a bare notice board */
+  }
+  /* books or trophies, on a low sideboard against the right wall */
+  const sx = hw - 0.45, sz = d * 0.30;
+  addBox(dark, sx, 0.42, sz, 0.5, 0.84, 1.4, 0, true);
+  if((T.vanity | 0) > 55 || (T.ambition | 0) > 70){
+    for(let i = 0; i < 3; i++){ addCyl(gilt, sx, 0.84 + 0.12, sz - 0.45 + i * 0.45, 0.06, 0.24); addBox(dark, sx, 0.86, sz - 0.45 + i * 0.45, 0.16, 0.04, 0.16, 0, true); }
+  } else {
+    const cols = [0x5a2a2a, 0x2a3f5a, 0x3a4a2a, 0x6b5a2a, 0x40304a, 0x2a2a2a];
+    for(let i = 0; i < 14; i++) addBox(matCol(cols[(r() * cols.length) | 0], .8), sx, 0.84 + 0.13, sz - 0.62 + i * 0.09, 0.24, 0.24 + r() * 0.06, 0.07, 0, true);
+  }
+  /* faith on the back wall, high: a crucifix for the Christian, the Consular standard for the Rite */
+  let consular = false; try{ consular = isConsular(person); }catch(e){}
+  const cr = person.creed || "";
+  if(consular){
+    try{ const fm = oranje7FlagMat(); addBox(fm, hw - 1.3, 2.55, d - 0.04, 0.9, 0.6, 0.02, 0, true); }catch(e){}
+    try{ propPlaque(hw - 1.3, 2.12, d - 0.03, Math.PI, "NON SOLIS RADIOS", "the Consular Rite", 0.9, 0.16); }catch(e){}
+  } else if(cr === "latin" || cr === "kerk" || cr === "circle" || cr === "rite" || cr === "reformed" || (person === G.you && !cr)){
+    addBox(dark, 0, 2.75, d - 0.035, 0.05, 0.62, 0.03, 0, true);
+    addBox(dark, 0, 2.88, d - 0.035, 0.34, 0.05, 0.03, 0, true);
+    if(cr === "latin") addBox(gilt, 0, 2.70, d - 0.02, 0.07, 0.24, 0.01, 0, true);
+  }
+  /* home state banner on the left wall */
+  try{ addBox(stateBannerMatFor(person.state || (G.you && G.you.state)), -hw + 0.035, 2.05, d * 0.70, 0.02, 0.9, 0.56, 0, true); }catch(e){}
+  /* seniority: one framed commission per term, up to four, along the right wall */
+  const terms = Math.min(4, person.terms | 0);
+  for(let i = 0; i < terms; i++) addBox(i % 2 ? gilt : dark, hw - 0.035, 1.75, d * 0.55 + i * 0.42, 0.02, 0.32, 0.26, 0, true);
+}
 
 const MATCACHE = new Map();
 /* Every distinct repeat used to clone the texture and its normal map, so
@@ -10466,9 +10714,11 @@ function buildRoomInner(id, skipShell){
     try{
     const person = (id === "visit") ? byId(G.visitId) : G.you;
     decorateOfficeFor(person);
+    try{ decorOwner(person, id); }catch(e){ if(window.console) console.warn("decorOwner", e); }
   
     }catch(e){ if(window.console) console.warn("room office", e); }
   }
+  if(K_AMEN_ROOMS.indexOf(id) >= 0){ try{ if(kAmenMine(id)) decorOwner(G.you, id); }catch(e){ if(window.console) console.warn("decorOwner k", e); } }
   try{ positionLights(id); }catch(e){}
   try{ buildMotes(R); }catch(e){ if(window.console) console.warn("buildMotes", e); }
   try{
@@ -12080,7 +12330,7 @@ function tieOf(a, b){
     const near = a.party === b.party ? 12 : -6;
     const home = a.state === b.state ? 10 : 0;
     G.ties[k] = {
-      w: clamp((ally ? 46 : rival ? -44 : 0) + near + home + rint(-8, 8), -100, 100),
+      w: clamp((ally ? 46 : rival ? -44 : 0) + near + home + cultTieBias(a, b) + rint(-8, 8), -100, 100),
       debt: 0, mem: [], since: G.day
     };
   }
@@ -13197,6 +13447,7 @@ function voxTick(w){
   if(!pool.length) return;
   const m = pick(pool);
   const line = voxFree(m, {});
+  try{ line.t = voxSpice(m, line.t); }catch(e){}
   const post = {id:G.vox.id++, by:m.id, t:line.t, k:line.k, v:line.v,
                 day:G.day, at:hhmm(), backs:0, hits:0, voices:[], mine:false};
   voxAdd(post);
@@ -13205,10 +13456,11 @@ function voxTick(w){
   const nn = rint(1, 3);
   for(let i=0;i<nn && others.length;i++) voxReact(post, pick(others));
   /* members @ each other without the player */
-  if(chance(.22) && others.length){
-    const o = pick(others);
-    if(chance((o.voxAppetite || 30)/160)){
+  if(chance(.34) && others.length){
+    const o = cultRival(m, others) || pick(others);
+    if(chance((o.voxAppetite || 30)/120)){
       const jab = voxFree(o, {});
+      try{ jab.t = voxSpice(o, jab.t); try{ tieShift(m, o, -2, "on the Vox"); }catch(e){} }catch(e){}
       if(jab.t.indexOf("@") < 0) jab.t = handleOf(m) + " " + jab.t;
       const jp = {id:G.vox.id++, by:o.id, t:jab.t, k:jab.k, v:jab.v,
                   day:G.day, at:hhmm(), backs:0, hits:0, voices:[], mine:false};
@@ -22187,6 +22439,7 @@ function interactPropOrSpeech(o){
   else if(G.room === "office" && (o.id === "pc" || (o.id === "desk" && G.you && G.you.sitting))){
     if(PC.open) pcClose(); else pcOpen();
   }
+  else if(o.id === "amenDesk"){ if(!G.you.sitting) sitAtMyDesk(); else { if(PC.open) pcClose(); else pcOpen(); } }
   else openProp(o);
 }
 function deploySpeechBeat(beat, prop){
@@ -24157,6 +24410,7 @@ function nextDay(late){
     try{ riteDay(); }catch(e){}
     try{ riteYouDay(); }catch(e){}
     try{ govDay(); }catch(e){}
+    try{ cultDay(); }catch(e){}
   }catch(e){
     if(window.console) console.warn("nextDay clock", e);
   }
@@ -24645,8 +24899,15 @@ function goalsEnsure(){
   const unread = (G.mail || []).filter(x => !x.read).length;
   if(abroadOffice()){
     const hr = homeRoom(), nd = Math.min(3, docketToday().length);
-    const L = [{k:"docket", t:"Work " + nd + " items on today's docket", need:nd, room:hr},
-               {k:"room", room:hr, kc:true, t:"Keep your hours in " + ROOMS[hr].t.replace(/^The /, "the "), need:1}];
+    const L = [];
+    /* the chair you hold sets the list: a Governor signs, budgets, appoints, pardons; nothing about House pledges */
+    const RG = {gov:["gdesk","gbud"], senate:[], bench:[], pres:[]}[heldOffice()] || [];
+    const DT = docketToday();
+    RG.forEach(k => { const d = DT.find(x => x.key === k); if(d) L.push({k:"dk", key:k, t:k === "gdesk" ? "Sign or veto what the legislature sent" : d.t, need:1, room:hr}); });
+    if(!L.length) L.push({k:"docket", t:"Work " + nd + " items on today's docket", need:nd, room:hr});
+    const EX = ROLE_EXTRA[heldOffice()] || [];
+    if(EX.length){ const x = EX[(G.day + seedOf(G.you.name || "")) % EX.length]; L.push({k:"dk", key:x.key, t:x.t, need:1, room:hr}); }
+    L.push({k:"room", room:hr, kc:true, t:"Keep your hours in " + ROOMS[hr].t.replace(/^The /, "the "), need:1});
     L.push(unread ? {k:"mail", t:"Clear your inbox", need:1} : {k:"room", room:"district", t:"Go home to " + G.you.state, need:1});
     G.goals = {day:G.day, list:L.map(g => Object.assign({have:0, done:false}, g)), talked:[], seen:{}, rollcall:false, all:false, pledged0:[], co0:0, whipped:[]};
     return G.goals;
@@ -24706,6 +24967,7 @@ function goalsTick(){
     }
     else if(g.k === "rollcall") have = Gs.rollcall ? 1 : 0;
     else if(g.k === "docket") have = docketDone();
+    else if(g.k === "dk") have = kOnceToday(g.key) ? 1 : 0;
     else if(g.k === "room") have = (Gs.seen && Gs.seen[g.room]) || G.room === g.room ? 1 : 0;
     else if(g.k === "mail") have = (G.mail || []).filter(x => !x.read).length ? 0 : 1;
     else if(g.k === "whip") have = (Gs.whipped || []).length ? 1 : 0;
@@ -29008,7 +29270,7 @@ addEventListener("keydown", e => {
     }
   }
   keys[k] = true;
-  if(k === "e" && !TALK.open && !(CATCH.on) && G.you && G.you.sitting && G.room === "office" && Math.hypot(cam.x, cam.z - 9.05) < 0.8 && veil.hidden){
+  if(k === "e" && !TALK.open && !(CATCH.on) && G.you && G.you.sitting && atMyDesk() && veil.hidden){
     e.preventDefault();
     if(PC.open) pcClose(); else pcOpen();
     return;
@@ -29405,7 +29667,7 @@ function saveCaptureBase(){
     termLength:G.termLength, country:G.country,
     greatest:G.greatest, blasphemy:G.blasphemy, loreNote:G.loreNote, greatnessOpen:G.greatnessOpen,
     relics:G.relics, relicSpots:G.relicSpots, consularLore:G.consularLore, bind:G.bind, sens:G.sens, invertY:!!G.invertY, voiceVol:G.voiceVol, goals:G.goals, whip:G.whip || null, billQueue:G.billQueue || [], faith:G.faith || null, life:G.life || null, ach:G.ach || {}, law:G.law || null, ladder:G.ladder || [], cases:G.cases || [], lastActs:G.lastActs || [], wx:G.wx || null, town:G.town || null, rivals:G.rivals || [], rivalNext:G.rivalNext || 0, daylog:(G.daylog || []).slice(-120), paperRead:G.paperRead || 0, seedL:G.seedL || 0, mHints:G.mHints || {}, tlog:(G.tlog || []).slice(-500), ag:G.ag || null, sitPrep:G.sitPrep || {}, echoes:G.echoes || [], billKinds:G.billKinds || {}, realmRel:G.realmRel || {}, listened:G.listened || 0,
-    world:G.world,
+    world:G.world, saidHash:G.saidHash || [], dm:G.dm || null, lore:G.lore || null, trip:G.trip || null,
     pendingNight:!!G.pendingNight,
     cam:{x:cam.x, z:cam.z, yaw:cam.yaw, pitch:cam.pitch},
     /* the clock the shared save is compared by — not the game clock, the
