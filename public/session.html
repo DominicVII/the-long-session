@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261012x">
+<meta name="onum-build" content="20261012y">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261012x";
+  var STAMP = "20261012y";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -7067,7 +7067,7 @@ setTimeout(() => { try{ govRiteBoot(); }catch(e){} }, 0);
    systems; nothing here invents a second copy of a number. */
 const PC = {open:false, tab:"inbox", openMail:null};
 const PC_TABS = [["inbox","Inbox"],["news","News & Ledger"],["bills","Bills"],["sched","Schedule"],
-  ["const","Constituents"],["polls","Polls"],["money","War chest"],["staff","Staff"],["desk","On the desk"]];
+  ["const","Constituents"],["polls","Polls"],["money","War chest"],["staff","Staff"],["desk","On the desk"],["sbox","Suggestions"]];
 function pcEsc(s){ return String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
 function pcBoot(){
   if(el("pcScreen")) return;
@@ -7193,6 +7193,8 @@ function pcTab(){
     out.push('<div>' + (y.dOffice ? 'The district office is open.' : 'No district office yet.') + ' Field organisers: ' + (y.field || 0) + '.</div>');
     const rm = pcDeskAct("desk", /^Read the mail/);
     out.push('<div style="margin-top:8px"><button class="pc__btn" data-pcgo="chest">Hire, through the war chest</button><button class="pc__btn" data-pcgo="files"' + (rm ? '' : ' disabled') + '>Ask staff for a file on a member (20m)</button></div>');
+  } else if(t === "sbox"){
+    out.push(sbHTML());
   } else if(t === "desk"){
     out.push('<div class="pc__h">On the desk</div><div class="pc__m">The telephone, the files and the papers. Each opens its own list, as it does when you walk up to it.</div>');
     out.push('<div style="margin-top:6px"><button class="pc__btn" data-pcprop="phone">The telephone</button><button class="pc__btn" data-pcprop="desk">Files and drawers</button>' +
@@ -7225,6 +7227,7 @@ function pcRender(){
       chest:() => chestCard(), office:() => officeCard(), notebook:() => notebookCard()}[k];
     if(go) pcAway(go);
   }));
+  body.querySelectorAll("[data-sb]").forEach(b => b.addEventListener("click", () => { const [i, h] = b.getAttribute("data-sb").split(":"); sbRespond(+i, h); }));
   body.querySelectorAll("[data-pcdk]").forEach(b => b.addEventListener("click", () => { pcClose(); dkCard(0); }));
   body.querySelectorAll("[data-pcduty]").forEach(b => b.addEventListener("click", () => { roleDutyRun(b.getAttribute("data-pcduty")); pcRender(); }));
   body.querySelectorAll("[data-pcprop]").forEach(b => b.addEventListener("click", () => {
@@ -7278,7 +7281,8 @@ function kAmenProps(id){
   if(K_AMEN_ROOMS.indexOf(id) < 0 || !kAmenMine(id)) return [];
   const S = (G._amen && G._amen.id === id && G._amen.S) || kAmenSpots(id);
   const DP = deskProp(id);
-  return (DP ? [DP] : []).concat([
+  const SBP = sbProp(id);
+  return (DP ? [DP] : []).concat(SBP ? [SBP] : [], [
     {id:"amenCoffee", label:"The coffee machine", sub:"Your own, and it works", x:S.coffee.x, z:S.coffee.z, r:1.8,
      acts:() => [{t:G.you.energy > 88 ? "Pour a cup (you are already wide awake)" : "Pour a cup", c:"10m", run(){ spend(10, -16); setSay(G.you.energy > 88 ? "You do not need it. You drink it anyway." : "Strong, hot, and nobody else's.", fx("+16 energy", "10 minutes")); }}]},
     {id:"amenBed", label:"The bed", sub:"A narrow bed behind a screen; the job keeps odd hours", x:S.bed.x, z:S.bed.z, r:2.0,
@@ -8307,6 +8311,258 @@ setTimeout(() => { try{
   const menu = document.getElementById("btnMenu");
   if(menu && menu.parentNode !== tabs){ menu.textContent = "Menu"; tabs.appendChild(menu); }
 }catch(e){ console.warn("bar", e); } }, 1700);
+
+/* ══ 20261012y · bodies in rooms: walls and furniture block, sitting eases ══ */
+const PHYS = {room:null, boxes:[], at:0};
+function physScan(){
+  const out = [];
+  try{
+    const bb = new THREE.Box3();
+    roomGroup.updateMatrixWorld(true);
+    roomGroup.traverse(o => {
+      if(!o.isMesh || !o.visible || o.userData && o.userData.noCollide) return;
+      bb.setFromObject(o);
+      if(!isFinite(bb.min.x)) return;
+      const w = bb.max.x - bb.min.x, d = bb.max.z - bb.min.z, h = bb.max.y - bb.min.y;
+      if(Math.max(w, d) > 3.4 || Math.max(w, d) < 0.14) return;    /* walls, floors, trims, pens */
+      if(bb.min.y > 0.95 || bb.max.y < 0.38) return;                  /* shelves above heads, rugs */
+      if(h < 0.03) return;
+      out.push({x0:bb.min.x, x1:bb.max.x, z0:bb.min.z, z1:bb.max.z});
+    });
+  }catch(e){}
+  PHYS.boxes = out.slice(0, 400); PHYS.room = G.room; PHYS.at = performance.now();
+}
+(function(){
+  if(typeof buildRoom !== "function") return;
+  const _b = buildRoom;
+  buildRoom = function(id){ const r = _b.apply(this, arguments); PHYS.boxes = []; PHYS.room = null; setTimeout(physScan, 250); setTimeout(physScan, 1800); return r; };
+})();
+/* a body is a 0.22 m circle; it slides along whatever it meets. The chair or desk you
+   are walking TO never blocks you (that is where you sit). */
+function physCollide(m){
+  if(!m || m.sitting || m.room !== G.room || PHYS.room !== G.room) return;
+  const R = 0.22, tx = m.tx ?? m.x, tz = m.tz ?? m.z;
+  for(const b of PHYS.boxes){
+    if(tx > b.x0 - 0.55 && tx < b.x1 + 0.55 && tz > b.z0 - 0.55 && tz < b.z1 + 0.55) continue;
+    const cx = clamp(m.x, b.x0, b.x1), cz = clamp(m.z, b.z0, b.z1);
+    const dx = m.x - cx, dz = m.z - cz, dd = Math.hypot(dx, dz);
+    if(dd >= R) continue;
+    if(dd > 1e-4){ m.x = cx + dx / dd * R; m.z = cz + dz / dd * R; }
+    else { /* inside: leave by the nearest face */
+      const L = m.x - b.x0, Rr = b.x1 - m.x, F = m.z - b.z0, B = b.z1 - m.z, mn = Math.min(L, Rr, F, B);
+      if(mn === L) m.x = b.x0 - R; else if(mn === Rr) m.x = b.x1 + R; else if(mn === F) m.z = b.z0 - R; else m.z = b.z1 + R;
+    }
+  }
+  try{ const rb = roomBox(m.room); if(!doorZone(m.room, m.x, m.z)){ m.x = clamp(m.x, -rb.hw + 0.2, rb.hw - 0.2); m.z = clamp(m.z, rb.d0 + 0.05, rb.d1); } }catch(e){}
+}
+/* sitting down and standing up ease through ~0.7 s instead of snapping between poses */
+const SIT_BONES = ["pelvis","spine","headG"];
+function sitSnap(u){
+  const s = [];
+  const add = o => { if(o) s.push([o, o.rotation.x, o.rotation.y, o.rotation.z, o.position.y]); };
+  SIT_BONES.forEach(k => add(u[k]));
+  ["legL","legR","armL","armR"].forEach(k => { const l = u[k]; if(l){ add(l.up); add(l.lo); add(l.foot); } });
+  return s;
+}
+function sitBlendWrap(){
+  if(typeof animatePerson !== "function" || animatePerson._sb) return;
+  const _a = animatePerson;
+  animatePerson = function(p, dt){
+    const sit = !!p.sitting;
+    if(p._lastSit === undefined) p._lastSit = sit;
+    if(sit !== p._lastSit){ p._lastSit = sit; p._sitBlend = 0.75; }
+    const u = p.mesh && p.mesh.userData;
+    const pre = (p._sitBlend > 0 && u && u.pelvis) ? sitSnap(u) : null;
+    const r = _a.apply(this, arguments);
+    if(pre){
+      p._sitBlend -= dt;
+      const k = Math.min(1, dt * 7.5);
+      for(const [o, x, y, z, py] of pre){
+        o.rotation.x = x + (o.rotation.x - x) * k; o.rotation.y = y + (o.rotation.y - y) * k;
+        o.rotation.z = z + (o.rotation.z - z) * k; o.position.y = py + (o.position.y - py) * k;
+      }
+    }
+    return r;
+  };
+  animatePerson._sb = true;
+}
+sitBlendWrap();
+
+/* ══ 20261012y · THE SUGGESTION BOX ══
+   People at home think of things on their own, from their own street, purse, church and
+   culture, and drop them in a box in your office. Plain words: who, where, what, why.
+   You can adopt one as a bill idea, write back, or leave it. They notice which. No points. */
+const SB_TOPICS = [
+  {k:"bridge",  what:x => "Fix " + x.need, why:["my husband drives the long way round every day","the trucks have stopped coming to {street}","the county says it is a federal matter and nobody comes"], tag:"need"},
+  {k:"bus",     what:x => "Put the school bus back on " + x.street, why:["the children walk two miles in the dark now","three families on our street have no car"], tag:"need"},
+  {k:"clinic",  what:x => "Keep the clinic in " + x.town + " open on Saturdays", why:["the nearest doctor is an hour away on a weekday","the night shift at the plant cannot get there in the week"], tag:"money"},
+  {k:"tariff",  what:x => "Stop the new tariff on " + x.goods, why:["half the jobs on " + "{street}" + " depend on it","prices at the shop went up again this month"], tag:"money"},
+  {k:"wage",    what:x => "Pay a fair wage to " + x.trade, why:["they work the hours and still need the food bank","my son quit because it did not cover rent"], tag:"money"},
+  {k:"tax",     what:x => "Cut the property tax on old homes in " + x.town, why:["the widows on our street are being taxed out of houses they paid for","my mother's assessment doubled"], tag:"money"},
+  {k:"bank",    what:x => "Let the small bank in " + x.town + " lend to farmers again", why:["the big banks will not look at us","the co-op cannot carry everyone through the winter"], tag:"money"},
+  {k:"sabbath", what:x => "Keep the Lord's Day free from county business in " + x.town, why:["we will not choose between church and a permit hearing","God is the Most High; the county can meet on Monday"], tag:"faith"},
+  {k:"chapel",  what:x => "Let " + x.creed + " congregations use the school hall on Sunday", why:["our church burned and we are meeting in a barn","the hall sits empty all weekend"], tag:"faith"},
+  {k:"charity", what:x => "Let church food banks get the surplus grain", why:["the grain rots in the elevator while families go without","Christ said feed the hungry and the parish is ready"], tag:"faith"},
+  {k:"custom",  what:x => "Fund " + x.custom + " again", why:["it is who we are here and the money stopped","the young people leave when there is nothing like it"], tag:"culture"},
+  {k:"food",    what:x => "Let home cooks sell " + x.food + " at the market without a licence", why:["the licence costs more than a summer of sales","everyone on " + "{street}" + " buys from Mrs. " + "{fam2}"], tag:"culture"},
+  {k:"lang",    what:x => "Print the county notices in the old language as well", why:["my grandmother cannot read the ballot","we were here before the county was"], tag:"culture"},
+  {k:"road",    what:x => "Pave the farm road out past " + x.street, why:["the school bus gets stuck in the mud every spring","the milk truck will not come in March"], tag:"region"},
+  {k:"water",   what:x => "Test the well water on " + x.street, why:["three children on the street have been sick","the mill upstream changed what it dumps"], tag:"region"},
+  {k:"broadband",what:x => "Bring a proper telephone and wire line to " + x.town, why:["my daughter does her schooling at the library parking lot","the farm cannot sell online without it"], tag:"region"},
+  {k:"police",  what:x => "Put a constable on foot on " + x.street + " at night", why:["two cars were broken into this month","the patrol only drives past"], tag:"region"},
+  {k:"plant",   what:x => "Make the owners of the shut plant clean the site", why:["it sits there leaking and nobody is responsible","we could build homes there"], tag:"event"},
+  {k:"bill",    what:x => "Vote against " + x.bill + " unless it covers people like us", why:["nobody asked anyone on our street","it helps the cities and forgets the county"], tag:"event"},
+  {k:"bill2",   what:x => "Add a line to " + x.bill + " for " + x.trade, why:["it is close to right but leaves them out","they keep the town running"], tag:"event"},
+  {k:"vets",    what:x => "Open the veterans' clinic two days a week in " + x.town, why:["my father drives four hours for a ten-minute visit","the old soldiers here will not ask twice"], tag:"need"},
+  {k:"library", what:x => "Keep the library open in the evening", why:["the working people cannot get there by five","it is the only warm room for the kids after school"], tag:"need"}
+];
+const SB_GOODS = ["grain","steel","lumber","fishing boats","machine parts","cotton","cattle feed"];
+const SB_TRADES = ["the home nurses","the school cooks","the county road crews","the dock workers","the farmhands","the bus drivers"];
+const SB_TOWNS = ["Millbrook","Harlan Ford","Cedar Bend","New Leyden","St. Agnes","Port Vale","Oakridge"];
+function sbEnsure(){
+  if(!G.sbox) G.sbox = {items:[], used:[], ideas:[], id:1, day:0};
+  return G.sbox;
+}
+function sbTown(){ const st = G.you && G.you.state || ""; return SB_TOWNS[seedOf("tw:" + st) % SB_TOWNS.length]; }
+function sbCtx(h){
+  const st = (G.states || []).find(s => s.n === (G.you && G.you.state)) || {};
+  const cult = st.cult && CULT_BANK[st.cult] ? CULT_BANK[st.cult] : CULT_BANK[CULT_KEYS[seedOf("c:" + (st.n || "x")) % CULT_KEYS.length]];
+  let creed = "local"; try{ creed = creedOf(st.creed || "latin").adj || creedOf(st.creed || "latin").t || "local"; }catch(e){}
+  const T = townEnsure(); const other = T.hh.find(o => o !== h) || h;
+  return {need:h.need, street:h.street, town:sbTown(), creed, goods:pick(SB_GOODS), trade:pick(SB_TRADES),
+    custom:pick(cult.custom || ["the town fair"]), food:pick(cult.food || ["pies"]), phrase:pick(cult.phrase || [""]),
+    bill:(G.bill && !G.bill.done) ? G.bill.title : null, fam2:other.fam, rich:(st.ind || 50) > 70, poor:(st.ind || 50) < 40};
+}
+/* who is likely to think of what: money worries rise where the state is poor, faith where the household's mood is low */
+function sbPickTopic(h, x){
+  const S = sbEnsure(), cand = [];
+  SB_TOPICS.forEach(t => {
+    if((t.k === "bill" || t.k === "bill2") && !x.bill) return;
+    let w = 1;
+    if(t.tag === "money") w += x.poor ? 1.6 : x.rich ? -0.4 : 0.4;
+    if(t.tag === "faith") w += h.mood < 45 ? 1 : 0.4;
+    if(t.tag === "need" && h.need && t.k !== "bus") w += 0.6;
+    if(t.tag === "event") w += 0.9;
+    for(let i = 0; i < 6; i++){ const key = t.k + ":" + h.id + ":" + i; if(S.used.indexOf(key) < 0){ cand.push({t, key, w:Math.max(.1, w)}); break; } }
+  });
+  if(!cand.length) return null;
+  let r = Math.random() * cand.reduce((a, c) => a + c.w, 0);
+  for(const c of cand){ r -= c.w; if(r <= 0) return c; }
+  return cand[0];
+}
+function sbWrite(h){
+  const S = sbEnsure(), x = sbCtx(h), c = sbPickTopic(h, x);
+  if(!c) return null;
+  const what = c.t.what(x);
+  if(S.items.some(i => i.what === what)) { S.used.push(c.key); return null; }
+  const fill = s => s.replace("{street}", x.street).replace("{fam2}", x.fam2);
+  const why = fill(pick(c.t.why)).trim();
+  const who = pick(h.people);
+  const item = {id:S.id++, d:G.day, at:hhmm(), hh:h.id, who, where:(h.id * 7 + 3) + " " + h.street + ", " + x.town, what, why,
+    voice:(x.phrase ? x.phrase.charAt(0).toUpperCase() + x.phrase.slice(1) + ". " : "") + "I am not one to write, but " + why + ".", tag:c.t.tag, k:c.t.k, state:"new"};
+  S.used.push(c.key); S.items.unshift(item); if(S.items.length > 80) S.items.pop();
+  sbPublish(item);
+  return item;
+}
+function sbDay(){
+  const S = sbEnsure(); if(S.day === G.day) return; S.day = G.day;
+  const T = townEnsure();
+  const n = 1 + (chance(.55) ? 1 : 0) + (chance(.2) ? 1 : 0);
+  for(let i = 0; i < n; i++){ const it = sbWrite(pick(T.hh)); if(it){ try{ lLog(it.who + " of " + it.where.split(", ")[0].replace(/^\d+ /, "") + " dropped a note in the suggestion box: " + it.what.charAt(0).toLowerCase() + it.what.slice(1) + ".", "world"); }catch(e){} } }
+  /* left unanswered for four days, it reads as an answer */
+  S.items.forEach(it => { if(it.state === "new" && G.day - it.d >= 4){ it.state = "ignored"; const h = hhById(it.hh); if(h){ h.mood = clamp(h.mood - 3, 0, 100); hhRemember(h, "Wrote to the office about " + it.k + "; heard nothing."); } } });
+  sbPublish(null);
+  try{ document.dispatchEvent(new CustomEvent("onum-suggestions", {detail:{count:sbWaiting()}})); }catch(e){}
+}
+/* for Neptune: window.ONUM_SUGGESTIONS = [{id, from, text, topic, ...}], plus 'onum-suggestion' per new one */
+function sbShape(it){ return {id:it.id, from:it.who, text:it.what + ". " + it.why.charAt(0).toUpperCase() + it.why.slice(1) + ".", topic:it.k,
+  where:it.where, what:it.what, why:it.why, tag:it.tag, day:it.d, state:it.state}; }
+function sbPublish(it){
+  try{ window.ONUM_SUGGESTIONS = sbEnsure().items.map(sbShape);
+    if(it){ const d = sbShape(it); window.dispatchEvent(new CustomEvent("onum-suggestion", {detail:d})); document.dispatchEvent(new CustomEvent("onum-suggestion", {detail:d})); } }catch(e){}
+}
+function sbWaiting(){ return sbEnsure().items.filter(i => i.state === "new").length; }
+function sbRespond(id, how){
+  const S = sbEnsure(), it = S.items.find(i => i.id === id); if(!it || it.state !== "new" && it.state !== "read") return;
+  const h = hhById(it.hh), T = townEnsure();
+  if(how === "adopt"){
+    it.state = "adopted"; S.ideas.unshift({d:G.day, t:it.what, from:it.who, why:it.why});
+    if(h){ h.mood = clamp(h.mood + 9, 0, 100); hhRemember(h, "The office took up the idea: " + it.what + "."); }
+    T.hh.forEach(o => { if(o !== h) o.mood = clamp(o.mood + 1, 0, 100); });
+    try{ lLog(it.who + "'s idea, " + it.what.charAt(0).toLowerCase() + it.what.slice(1) + ", is now on the member's list of bills to write.", "world"); }catch(e){}
+    try{ feed(it.who + " tells the neighbours the office listened. \"" + it.what + ". They wrote it down.\"", "world"); }catch(e){}
+    setSay("You file it under bills to write: " + it.what + ".");
+  } else if(how === "reply"){
+    it.state = "replied";
+    if(h){ h.mood = clamp(h.mood + 4, 0, 100); hhRemember(h, "Got a letter back from the office about " + it.k + "."); }
+    try{ feed(it.who + " got a letter back from your office and is showing it round " + it.where.split(", ")[0].replace(/^\d+ /, "") + ".", "world"); }catch(e){}
+    setSay("You write back to " + it.who + " by hand. It takes ten minutes; it will be read twenty times.");
+    try{ spend(10, 0); }catch(e){}
+  } else if(how === "ignore"){
+    it.state = "ignored";
+    if(h){ h.mood = clamp(h.mood - 2, 0, 100); hhRemember(h, "The office never answered about " + it.k + "."); }
+  }
+  sbPublish(null);
+  try{ if(PC.open) pcRender(); }catch(e){}
+}
+function sbHTML(){
+  const S = sbEnsure(), out = [];
+  out.push('<div class="pc__h">The suggestion box · ' + sbWaiting() + ' waiting</div><div class="pc__m">Notes from people at home, in their own words. Adopting one puts it on your list of bills to write. Leaving one for four days is an answer too.</div>');
+  if(!S.items.length) out.push('<p class="pc__m">The box is empty. Give it a day.</p>');
+  S.items.slice(0, 30).forEach(it => {
+    const st = {new:"new", read:"new", adopted:"adopted as a bill idea", replied:"you wrote back", ignored:"left unanswered"}[it.state];
+    out.push('<div class="pc__open" style="margin:6px 0"><div class="pc__m">d' + it.d + ' · ' + pcEsc(it.at) + ' · ' + pcEsc(st) + '</div>' +
+      '<div><b>From:</b> ' + pcEsc(it.who) + ', ' + pcEsc(it.where) + '</div>' +
+      '<div><b>Wants:</b> ' + pcEsc(it.what) + '</div>' +
+      '<div><b>Why:</b> ' + pcEsc(it.why.charAt(0).toUpperCase() + it.why.slice(1)) + '.</div>' +
+      '<div class="pc__m">"' + pcEsc(it.voice) + '"</div>' +
+      (it.state === "new" || it.state === "read" ? '<div><button class="pc__btn" data-sb="' + it.id + ':adopt">Adopt as a bill idea</button><button class="pc__btn" data-sb="' + it.id + ':reply">Write back (10m)</button><button class="pc__btn" data-sb="' + it.id + ':ignore">Set it aside</button></div>' : '') + '</div>');
+  });
+  if(S.ideas.length){ out.push('<div class="pc__h">Bills to write (from home)</div>'); S.ideas.slice(0, 10).forEach(i => out.push('<div>· ' + pcEsc(i.t) + ' <span class="pc__m">(' + pcEsc(i.from) + ', d' + i.d + ')</span></div>')); }
+  return out.join("");
+}
+function sbLedgerHTML(){
+  const S = sbEnsure(), fresh = S.items.filter(i => G.day - i.d <= 1).slice(0, 2);
+  if(!fresh.length) return "";
+  return '<p><strong>The suggestion box:</strong> ' + fresh.map(i => pcEsc(i.who) + ' of ' + pcEsc(i.where.split(", ")[0].replace(/^\d+ /, "")) + ' wants to ' + pcEsc(i.what.charAt(0).toLowerCase() + i.what.slice(1))).join("; ") + '.</p>';
+}
+function sbRecapLine(){
+  const S = sbEnsure(), w = sbWaiting(), last = S.items[0];
+  if(!last) return "";
+  return "From the suggestion box: " + w + " note" + (w === 1 ? "" : "s") + " waiting. Latest, " + last.who + ": " + last.what + ".";
+}
+/* Neptune's sitting recaps get one quiet line at the bottom (their block is untouched) */
+(function(){
+  try{
+    const mo = new MutationObserver(() => {
+      document.querySelectorAll(".sx-recap").forEach(r => { if(r.querySelector(".sb-line")) return; const t = sbRecapLine(); if(!t) return;
+        const p = document.createElement("p"); p.className = "sb-line"; p.style.cssText = "font-size:12px;opacity:.85;margin-top:6px"; p.textContent = t; r.appendChild(p); });
+    });
+    mo.observe(document.body, {childList:true, subtree:true});
+  }catch(e){}
+})();
+/* the box itself: a small oak box with a slot, on a stand inside your office door */
+function sbSpot(id){ const R = ROOMS[id]; if(!R) return null; return {x:Math.min(1.45, R.w / 2 - 0.6), z:0.32}; }
+function sbMine(id){ try{ return id === "office" ? !abroadOffice() : (K_AMEN_ROOMS.indexOf(id) >= 0 && kAmenMine(id)); }catch(e){ return id === "office"; } }
+function sbProp(id){
+  if(!sbMine(id)) return null; const s = sbSpot(id); if(!s) return null;
+  return {id:"sbox", label:"The suggestion box", sub:"Notes from people at home", x:s.x, z:s.z, r:1.6,
+    acts:() => [{t:"Read the suggestions (" + sbWaiting() + " new)", c:"", run(){ try{ pcOpen("sbox"); }catch(e){} }}]};
+}
+(function(){
+  if(typeof buildRoom !== "function") return;
+  const _b = buildRoom;
+  buildRoom = function(id){
+    const r = _b.apply(this, arguments);
+    try{ if(sbMine(id)){ const s = sbSpot(id), oak = matCol(0x4a2c17, .55), brass = matCol(0xb08d57, .35, .8);
+      addBox(oak, s.x, 0.5, s.z, 0.12, 1.0, 0.12, 0);                /* post */
+      addBox(oak, s.x, 1.12, s.z, 0.44, 0.3, 0.34, 0);               /* box */
+      addBox(brass, s.x, 1.2, s.z + 0.175, 0.22, 0.03, 0.02, 0, true); /* slot */
+      try{ propPlaque(s.x, 1.5, s.z + 0.18, 0, "SUGGESTIONS", "From home · Press E", 0.5, 0.12); }catch(e){} } }catch(e){}
+    return r;
+  };
+})();
+setTimeout(() => { try{ const b = PROPS.office || []; if(!b.some(p => p.id === "sbox")){ const p = sbProp("office"); if(p) b.push(p); } }catch(e){} }, 0);
 
 const MATCACHE = new Map();
 /* Every distinct repeat used to clone the texture and its normal map, so
@@ -13663,6 +13919,7 @@ function wander(m, dt){
   try{ if(m.room === G.room) for(const o of hereNow()){ if(o === m || o.room !== m.room) continue;
       const ox = m.x - o.x, oz = m.z - o.z, r = Math.hypot(ox, oz);
       if(r > 0.001 && r < 0.42){ const push = (0.42 - r) * (o.sitting ? 1 : 0.5); m.x += ox / r * push; m.z += oz / r * push; } } }catch(e){}
+  try{ physCollide(m); }catch(e){}
   try{ unstick(m, dt); }catch(e){}
 }
 /* ── two members find each other and talk ─────────────────── */
@@ -24966,6 +25223,7 @@ function nextDay(late){
     try{ riteYouDay(); }catch(e){}
     try{ govDay(); }catch(e){}
     try{ cultDay(); }catch(e){}
+    try{ sbDay(); }catch(e){}
     try{ dmLeakDay(); dmInitiative(); }catch(e){ console.warn("dm day", e); }
   }catch(e){
     if(window.console) console.warn("nextDay clock", e);
@@ -28758,6 +29016,7 @@ function paperCard(){
     (P.rival ? '<p><strong>The feud:</strong> ' + P.rival + '</p>' : '') +
     (P.letter ? '<p><strong>Letters from home:</strong> ' + P.letter + '</p>' : '') +
     (function(){ try{ return agLedgerHTML(); }catch(e){ return ""; } })() +
+    (function(){ try{ return sbLedgerHTML(); }catch(e){ return ""; } })() +
     (function(){ try{ return riteLedgerHTML(); }catch(e){ return ""; } })() +
     (function(){ try{ return govLedgerHTML(); }catch(e){ return ""; } })() +
     '<p class="dream">' + P.poll + '</p>' +
@@ -30225,7 +30484,7 @@ function saveCaptureBase(){
     termLength:G.termLength, country:G.country,
     greatest:G.greatest, blasphemy:G.blasphemy, loreNote:G.loreNote, greatnessOpen:G.greatnessOpen,
     relics:G.relics, relicSpots:G.relicSpots, consularLore:G.consularLore, bind:G.bind, sens:G.sens, invertY:!!G.invertY, voiceVol:G.voiceVol, goals:G.goals, whip:G.whip || null, billQueue:G.billQueue || [], faith:G.faith || null, life:G.life || null, ach:G.ach || {}, law:G.law || null, ladder:G.ladder || [], cases:G.cases || [], lastActs:G.lastActs || [], wx:G.wx || null, town:G.town || null, rivals:G.rivals || [], rivalNext:G.rivalNext || 0, daylog:(G.daylog || []).slice(-120), paperRead:G.paperRead || 0, seedL:G.seedL || 0, mHints:G.mHints || {}, tlog:(G.tlog || []).slice(-500), ag:G.ag || null, sitPrep:G.sitPrep || {}, echoes:G.echoes || [], billKinds:G.billKinds || {}, realmRel:G.realmRel || {}, listened:G.listened || 0,
-    world:G.world, saidHash:G.saidHash || [], dm:G.dm || null, lore:G.lore || null, trip:G.trip || null,
+    world:G.world, sbox:G.sbox || null, saidHash:G.saidHash || [], dm:G.dm || null, lore:G.lore || null, trip:G.trip || null,
     pendingNight:!!G.pendingNight,
     cam:{x:cam.x, z:cam.z, yaw:cam.yaw, pitch:cam.pitch},
     /* the clock the shared save is compared by — not the game clock, the
