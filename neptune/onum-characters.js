@@ -346,12 +346,12 @@ function rollSpec(o) {
     height: o.height || (fem ? 1.56 + r() * 0.18 : 1.68 + r() * 0.2),
     hair: hexMix(baseHair, 0xc8c4bc, grey * 0.9), eye: o.eye || pick(EYES),
     suit: (s => o.suitColor ?? s)(pickC(SUITS)), shirt: (s => o.shirtColor ?? s)(pickC(SHIRTS)), tie: (s => o.tieColor ?? s)(pickC(TIES)), dress: o.dressColor,
-    face: { faceW: fem ? 0.92 + r() * 0.08 : 0.98 + r() * 0.08, jaw: fem ? 0.80 + r() * 0.1 : 0.92 + r() * 0.14, brow: fem ? 0.6 + r() * 0.3 : 0.9 + r() * 0.4,
+    face: ((F) => o.face ? Object.assign(F, o.face) : F)({ faceW: fem ? 0.92 + r() * 0.08 : 0.98 + r() * 0.08, jaw: fem ? 0.80 + r() * 0.1 : 0.92 + r() * 0.14, brow: fem ? 0.6 + r() * 0.3 : 0.9 + r() * 0.4,
       nose: fem ? 0.82 + r() * 0.25 : 0.95 + r() * 0.35, cheek: 0.8 + r() * 0.5, chin: 0.7 + r() * 0.6, lip: fem ? 1.1 + r() * 0.2 : 0.85 + r() * 0.2, age: a01,
       bridge: 0.8 + r() * 0.5, wing: 0.85 + r() * 0.35, hook: (r() - 0.45) * (fem ? 0.8 : 1.4), tip: 0.6 + r() * 0.9, up: (r() - 0.4) * 0.06,
       mouthW: 0.92 + r() * 0.16, lidDrop: r() * 0.12 + a01 * 0.1, ear: 0.9 + r() * 0.2, tilt: (r() - 0.5) * 0.12,
       browShape: { arch: r() * (fem ? 1.3 : 0.9), thick: fem ? 0.8 + r() * 0.4 : 0.9 + r() * 0.6, len: r(), tail: r(), gap: (r() - 0.5) * 0.04 },
-      asym: { eyeL: (r() - 0.5) * 0.02, eyeR: (r() - 0.5) * 0.02, browL: (r() - 0.5) * 0.02, browR: (r() - 0.5) * 0.02, nose: (r() - 0.5) * 0.03, cheek: (r() - 0.5) * 0.12, mouth: (r() - 0.5) * 0.06 } },
+      asym: { eyeL: (r() - 0.5) * 0.02, eyeR: (r() - 0.5) * 0.02, browL: (r() - 0.5) * 0.02, browR: (r() - 0.5) * 0.02, nose: (r() - 0.5) * 0.03, cheek: (r() - 0.5) * 0.12, mouth: (r() - 0.5) * 0.06 } }),
     seed: o.seed >>> 0, phase: r() * 100, blinkSeed: (r() * 1e9) | 0
   };
 }
@@ -359,9 +359,14 @@ function rollSpec(o) {
 export function makeCharacter(THREE, opts = {}) {
   T = THREE; MODE = opts.colorMode === 'linear' ? 'linear' : 'game'; matCache = matCaches[MODE];
   const opts0 = opts; { const s0 = rollSpec({ seed: 1, ...opts }), U0 = resolveUniform(opts.uniform, s0.fem);
-    if (U0) opts = { ...opts, outfit: U0.outfit, suitColor: U0.main, shirtColor: U0.shirt, tieColor: U0.tie, dressColor: U0.dress }; opts.__U = U0; }
+    if (U0) opts = { ...opts, outfit: U0.outfit, suitColor: liftCloth(U0.main), shirtColor: U0.shirt, tieColor: U0.tie, dressColor: U0.dress }; opts.__U = U0; }
   const q = Q[opts.quality] ? opts.quality : 'med', QQ = Q[q], S = rollSpec({ seed: 1, ...opts }), seg = QQ.seg; S.uniform = opts.__U;
-  const fem = S.fem, B = S.build, root = new T.Group(), rig = new T.Group(); root.add(rig);
+  const fem = S.fem, B = S.build, root = new T.Group(), body = new T.Group(), rig = new T.Group();
+  // render hook: always drawn (never culled, never LOD-hidden), so a host that hooks onBeforeRender on the first mesh keeps
+  // getting update() calls at every LOD (hooking a rig mesh froze LOD 3: rig hidden -> hook never ran again)
+  const hook = new T.Mesh(cached(geoCache, 'hook', () => new T.BufferGeometry().setAttribute('position', new T.Float32BufferAttribute([0, 1, 0, 0.001, 1, 0, 0, 1.001, 0], 3))),
+    cached(matCache, 'hookmat', () => new T.MeshBasicMaterial({ colorWrite: false, depthWrite: false, depthTest: false }))); hook.frustumCulled = false; hook.name = 'onumc-hook';
+  root.add(hook); root.add(body); body.add(rig);
   root.name = 'onum-character'; const meshes = [], faceFine = [], bodyFine = [];
   const add = (parent, geo, mat, x = 0, y = 0, z = 0, list) => { const m = new T.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true;
     parent.add(m); meshes.push(m); if (list) list.push(m); return m; };
@@ -383,16 +388,16 @@ export function makeCharacter(THREE, opts = {}) {
   const tieGeo = () => cached(geoCache, 'tie', () => loft([{ y: 0.46, w: 0.012, d: 0.005 }, { y: 0.43, w: 0.018, d: 0.005 }, { y: 0.17, w: 0.032, d: 0.004 }, { y: 0.15, w: 0.001, d: 0.003 }], 8));
 
   // --- dimensions (canonical 1.75 m person; root scaled to height) ---
-  const sc = S.height / 1.75; root.scale.set(sc * bw, sc, sc * (0.92 + 0.08 * B));
+  const sc = S.height / 1.75; body.scale.set(sc * bw, sc, sc * (0.92 + 0.08 * B));   // on body, not root: hosts may set root.scale
   const hipY = 0.95, legX = fem ? 0.085 : 0.09;
   const hips = new T.Group(); hips.position.y = hipY; rig.add(hips);
   const torso = new T.Group(); hips.add(torso);
   const heavy = clamp((B - 1) * 4);
-  const tp = fem ? [[-0.09, .175, .115], [0, .172, .112], [0.10, .132, .095], [0.2, .14, .1], [0.29, .155, .118, .018], [0.36, .158, .11, .01], [0.44, .168, .098], [0.475, .15, .085], [0.505, .09, .065], [0.53, .055, .055]]
-    : [[-0.09, .165, .11], [0, .163, .108], [0.12, .15 + .015 * heavy, .105 + .035 * heavy, .02 * heavy], [0.25, .165 + .01 * heavy, .115 + .02 * heavy, .01 * heavy], [0.35, .18, .12], [0.44, .192, .108], [0.475, .172, .09], [0.505, .10, .07], [0.53, .058, .058]];
+  const tp = fem ? [[-0.09, .175, .115], [0, .172, .112], [0.10, .132, .095], [0.2, .14, .1], [0.29, .155, .118, .018], [0.36, .152, .108, .01], [0.42, .152, .096], [0.46, .128, .084], [0.495, .088, .066], [0.53, .055, .055]]
+    : [[-0.09, .165, .11], [0, .163, .108], [0.12, .15 + .015 * heavy, .105 + .035 * heavy, .02 * heavy], [0.25, .165 + .01 * heavy, .115 + .02 * heavy, .01 * heavy], [0.35, .172, .118], [0.42, .172, .108], [0.465, .145, .092], [0.495, .10, .072], [0.53, .058, .058]];
   const ring = (a, k = 1, dk = 0) => ({ y: a[0], w: a[1] * k + dk, d: a[2] * k + dk, z: a[3] || 0 });
   add(torso, gb('torso', () => loft(tp.map(a => ring(a)), seg)), (jacket || vest) ? shirtM : (longB ? dressM : shirtM));
-  const shoulderY = 0.445, shX = (fem ? 0.155 : 0.175);
+  const shoulderY = 0.44, shX = (fem ? 0.162 : 0.185);
   // neck + head
   const neckG = new T.Group(); neckG.position.set(0, 0.5, -0.005); torso.add(neckG);
   add(neckG, gb('neck', () => limb(-0.1, [0.058, 0.055, 0.052], seg)), skinM);
@@ -636,7 +641,7 @@ export function makeCharacter(THREE, opts = {}) {
 
   // --- far proxy (LOD 3): one merged vertex-coloured mesh ---
   const proxy = buildProxy(S, bottom, jacket, false), proxySit = buildProxy(S, bottom, jacket, true);
-  root.add(proxy); root.add(proxySit); proxy.visible = proxySit.visible = false;
+  body.add(proxy); body.add(proxySit); proxy.visible = proxySit.visible = false;
   // contact shadow-ish disc is left to the game (it has its own)
 
   // ---------- animation ----------
@@ -672,9 +677,13 @@ export function makeCharacter(THREE, opts = {}) {
     dt = Math.min(dt || 0, 0.1); st.t += dt;
     // LOD by camera distance
     let d = state.camDist;
-    if (d == null && state.camera) { root.getWorldPosition(v3); d = v3.distanceTo(state.camera.position); }
+    const cam = state.camera, viewCam = cam && cam.isPerspectiveCamera && !(cam.fov === 90 && cam.aspect === 1);
+    if (d == null && viewCam) { root.getWorldPosition(v3); cam.getWorldPosition(st.cw || (st.cw = new T.Vector3())); d = v3.distanceTo(st.cw); }
+    if (d == null && cam && !viewCam && st.lod >= 0) d = st.lastD;   // keep the last view-camera LOD
+    if (d != null) st.lastD = d;
     const lodD = opts.lodDistances || [3.5, 10, 30];
-    setLod(state.lod != null ? state.lod : d == null ? 0 : d < lodD[0] ? 0 : d < lodD[1] ? 1 : d < lodD[2] ? 2 : 3);
+    const hy = (i) => lodD[i] * (st.lod > i ? 0.92 : 1.0);   // 8% hysteresis: no flicker at a band edge
+    setLod(state.lod != null ? state.lod : d == null ? (st.lod < 0 ? 0 : st.lod) : d < hy(0) ? 0 : d < hy(1) ? 1 : d < hy(2) ? 2 : 3);
     const sitT = state.sitting ? 1 : 0; st.sit += (sitT - st.sit) * Math.min(1, dt * 5); if (dt === 0 || state.snap) st.sit = sitT;
     if (st.lod >= 3) { const sp = st.sit >= 0.5; if (proxySit.visible !== sp) { proxySit.visible = sp; proxy.visible = !sp; } return; }
     const sit = st.sit, seatH = state.seatHeight ?? 0.46, desk = state.desk ? 1 : 0;
@@ -710,7 +719,7 @@ export function makeCharacter(THREE, opts = {}) {
       for (let k = 0; k < A.fingers.length - 1; k++) A.fingers[k].rotation.x = -0.25 - (A.sx > 0 ? -gs * 0.2 : 0.15); }
     // sitting: thighs forward, shins down to the floor, hands on lap or desk (blended by st.sit)
     if (sit > 0.001) {
-      const hipSit = seatH / root.scale.y + 0.115, kh = hipSit - 0.03, L = 0.505, phi = Math.acos(clamp(kh / L, -1, 1));
+      const hipSit = seatH / (body.scale.y * root.scale.y) + 0.115, kh = hipSit - 0.03, L = 0.505, phi = Math.acos(clamp(kh / L, -1, 1));
       hips.position.y = mix(hips.position.y, hipSit, sit); hips.position.x *= 1 - sit; hips.rotation.y *= 1 - sit; hips.rotation.z *= 1 - sit;
       torso.rotation.x = mix(torso.rotation.x, mix(-0.06, 0.12, desk), sit);
       for (const Lg of legs) { const spread = Lg.sx * 0.06;
@@ -724,7 +733,7 @@ export function makeCharacter(THREE, opts = {}) {
     if (skirt && st.lod <= 2) skinSkirt();
     // head look
     let ly = state.lookYaw || 0, lp = state.lookPitch || 0;
-    if (state.lookAt) { headPivot.updateMatrixWorld(); root.worldToLocal(v3.copy(state.lookAt)); ly = clamp(Math.atan2(v3.x, v3.z), -1.1, 1.1); lp = clamp(-Math.atan2(v3.y - 1.6 / root.scale.y, Math.hypot(v3.x, v3.z)), -0.5, 0.5); }
+    if (state.lookAt) { headPivot.updateMatrixWorld(); root.worldToLocal(v3.copy(state.lookAt)); ly = clamp(Math.atan2(v3.x, v3.z), -1.1, 1.1); lp = clamp(-Math.atan2(v3.y - 1.6 / body.scale.y, Math.hypot(v3.x, v3.z)), -0.5, 0.5); }
     st.lookYaw += (ly - st.lookYaw) * Math.min(1, dt * 4); st.lookPitch += (lp - st.lookPitch) * Math.min(1, dt * 4);
     neckG.rotation.y = st.lookYaw * 0.4; head.rotation.y = st.lookYaw * 0.6 + Math.sin(t * 0.43) * 0.04;
     head.rotation.x = st.lookPitch + Math.sin(t * 0.31) * 0.02 - torso.rotation.x + (state.talking ? Math.sin(t * 2.3) * 0.035 : 0);
@@ -777,9 +786,114 @@ function buildProxy(S, bottom, jacket, sitting) {
 export function optionsFromLook(L, extra = {}) {
   const styles = ['short', 'side_part', 'bun', 'receding', 'long', 'curls', 'caesar'];
   const fem = L.frame === 'fem';
-  let style = styles[(L.style | 0) % styles.length]; if (fem && (style === 'receding' || style === 'caesar')) style = 'bob'; if (!fem && (style === 'bun' || style === 'long')) style = 'short';
-  return { seed: extra.seed ?? Math.round((L.height * 1e4 + L.build * 1e3 + (L.skin || 0)) % 2147483647), sex: fem ? 'f' : 'm', age: L.age, skin: L.skin, build: L.build,
+  // game style index (session.html buildPerson hs): 0 short, 1 side part, 2 pinned-up, 3 thinning, 4 long, 5 curls, 6 caesar
+  let style = styles[(L.style | 0) % styles.length]; if (fem && (style === 'receding' || style === 'caesar')) style = 'bob'; if (!fem && style === 'bun') style = 'short';
+  const cl = (v, a = 0.7, b = 1.3) => v == null || isNaN(v) ? undefined : Math.min(b, Math.max(a, +v));
+  const face = {}; const put = (k, v) => { if (v !== undefined) face[k] = v; };
+  put('faceW', cl(L.faceW)); put('jaw', cl(L.jawW)); put('brow', cl(L.browH) != null ? (cl(L.browH) - (fem ? 0.3 : 0.05)) : undefined);
+  put('nose', cl(L.noseL)); put('lip', cl(L.lipF)); put('cheek', cl(L.cheek));
+  return { face: Object.keys(face).length ? face : undefined, seed: extra.seed ?? Math.round((L.height * 1e4 + L.build * 1e3 + (L.skin || 0)) % 2147483647), sex: fem ? 'f' : 'm', age: L.age, skin: L.skin, build: L.build,
     height: L.height, outfit: L.wear, hair: style, hairColor: L.hair, suitColor: L.suit, shirtColor: L.shirt, eye: L.eye, glasses: !!L.glasses, beard: !!L.beard, ...extra };
+}
+
+// ---------- game-rig dress (fallback: NEPTUNE.fullFigure = false, 20261012u) ----------
+// The full Neptune figure is authored to its own proportions (torso half-width = the arm line, a separate head
+// sculpt, its own hair shell) and cannot be fitted reliably over session.html's skinned rig, so the game keeps its
+// own figure (its face, hair, tailoring, LOD tiers) and Neptune only (1) re-colours the clothes for a decreed
+// uniform via uniformLook() before the game builds the person, and (2) adds the uniform insignia and the lapel pin
+// as small overlays parented to the game's bones (dressGameRig). Placement is measured from the built rig
+// (surface ray-casts), so it follows height, build and frame without hard-coded offsets.
+const UNI_WEAR = { court: ['suit_tie', 'skirt_suit'], military: ['suit_tie', 'trouser_suit'], tunic: ['suit_tie', 'trouser_suit'],
+  robe: ['suit_open', 'dress_jacket'], sleek: ['suit_open', 'trouser_suit'], tribal: ['suit_open', 'dress_jacket'],
+  consular: ['suit_tie', 'skirt_suit'], civic: ['suit_tie', 'skirt_suit'] };
+// lift very dark uniform cloth so it still reads as cloth (folds, seams) under the game's night lighting / ACES
+function liftCloth(h, minLum = 0.17) { let l = lumOf(h), k = 0; while (l < minLum && k < 12) { h = hm(h, 0xb8b4ac, 0.08); l = lumOf(h); k++; } return h; }
+export function uniformLook(look, uniform) {
+  if (!look || !uniform) return look;
+  const fem = look.frame === 'fem', U = resolveUniform(uniform, fem); if (!U) return look;
+  const w = (UNI_WEAR[U.style] || UNI_WEAR.civic)[fem ? 1 : 0];
+  return { ...look, suit: liftCloth(U.main), shirt: U.style === 'sleek' ? liftCloth(U.shirt, 0.12) : U.shirt, wear: w, _nepUniform: U.style };
+}
+export function dressGameRig(THREE, g, o = {}) {
+  T = THREE; MODE = 'game'; matCache = matCaches[MODE];
+  const u = g && g.userData; if (!u || !u.spine) return null;
+  const old = g.getObjectByName('nep-dress'); if (old) old.parent && old.parent.remove(old);
+  const look = o.look || {}, fem = look.frame === 'fem';
+  const U = o.uniform ? resolveUniform(o.uniform, fem) : null;
+  g.updateMatrixWorld(true);
+  const skip = new Set([u.armL, u.armR, u.headG, u.detailHead, u.legL, u.legR].filter(Boolean));
+  const under = (m, root) => { for (let q = m; q; q = q.parent) { if (skip.has(q) && q !== root) return false; if (q === root) return true; } return false; };
+  const meshesOf = root => { const a = []; root.traverse(m => { if (m.isMesh && !m.isSkinnedMesh && m.geometry && under(m, root)) a.push(m); }); return a; };
+  const boxIn = (root, list) => { const inv = new T.Matrix4().copy(root.matrixWorld).invert(), b = new T.Box3(), mb = new T.Box3(), mm = new T.Matrix4();
+    for (const m of list) { if (!m.geometry.boundingBox) m.geometry.computeBoundingBox(); mb.copy(m.geometry.boundingBox).applyMatrix4(mm.multiplyMatrices(inv, m.matrixWorld)); b.union(mb); } return b; };
+  const rc = new T.Raycaster(), hits = [];
+  // local point on root at (x, y) with the ray cast along -z (front) or -y (top); returns local surface point or null
+  const cast = (root, list, x, y, z, dir) => { const o3 = new T.Vector3(x, y, z).applyMatrix4(root.matrixWorld), d = dir.clone().transformDirection(root.matrixWorld);
+    rc.set(o3, d); rc.near = 0; rc.far = 10; hits.length = 0; for (const m of list) m.raycast(rc, hits); if (!hits.length) return null;
+    hits.sort((a, b) => a.distance - b.distance); return root.worldToLocal(hits[0].point.clone()); };
+  const shared = [];
+  const mark = (m) => { if (m.geometry) m.geometry._shared = true; const mt = m.material; if (mt) { mt._shared = true; if (mt.map) mt.map._shared = true; if (mt.normalMap) mt.normalMap._shared = true; } m.castShadow = false; m.receiveShadow = false; shared.push(m); return m; };
+  const put = (parent, geo, mat, x, y, z) => { const m = new T.Mesh(geo, mat); m.position.set(x, y, z); parent.add(m); return mark(m); };
+  const solid = (hex, rough = 0.5, metal = 0) => stdMat('u' + hex + '|' + rough + '|' + metal, { color: lin(hex), roughness: rough, metalness: metal });
+  const goldM = solid(0xd4a64a, 0.3, 1);
+  const out = new T.Group(); out.name = 'nep-dress';
+  // chest frame
+  const spine = u.spine, sList = meshesOf(spine), sb = boxIn(spine, sList);
+  if (sb.isEmpty()) return null;
+  const chest = new T.Group(); chest.name = 'nep-dress'; spine.add(chest);
+  const hw = Math.max(sb.max.x, -sb.min.x), top = sb.max.y, bot = sb.min.y, ht = top - bot, fz = sb.max.z + 0.05, cz = (sb.max.z + sb.min.z) / 2;
+  const front = (x, y, lift = 0.003) => { const p = cast(spine, sList, x, y, fz + 0.2, new T.Vector3(0, 0, -1)); return p ? p.setZ(p.z + lift) : new T.Vector3(x, y, sb.max.z + lift); };
+  const onTop = (x) => cast(spine, sList, x, top + 0.2, cz, new T.Vector3(0, -1, 0));
+  const k = hw / 0.2;                                  // insignia scale relative to a 0.2 m half-chest
+  const pinAt = (src) => { const tex = pinTexture(src), y = bot + ht * 0.70, x = hw * (fem ? 0.36 : 0.40), p = front(x, y, 0.004);
+    const pg = new T.Group(); pg.position.copy(p); pg.rotation.set(-0.12, 0.18, 0.12); chest.add(pg); pg.scale.setScalar(Math.min(1.25, Math.max(0.8, k)));
+    put(pg, cached(geoCache, 'pinback', () => new T.BoxGeometry(0.034, 0.022, 0.003)), goldM, 0, 0, -0.0005);
+    put(pg, cached(geoCache, 'pinface', () => new T.PlaneGeometry(0.03, 0.0185)), pinMat(tex), 0, 0, 0.0012); g.userData.nepPin = pg; };
+  if (U) {
+    const accM = solid(U.accent, 0.55), trimM = U.trim === 0xd4a64a ? goldM : solid(U.trim, 0.35, 0.5);
+    const medals = (n) => { for (let i = 0; i < n; i++) { const x = hw * 0.32 + (i % 3) * 0.022 * k, y = bot + ht * 0.66 - Math.floor(i / 3) * 0.045 * k, p = front(x, y, 0.004);
+      put(chest, cached(geoCache, 'ribbon', () => new T.BoxGeometry(0.016, 0.014, 0.003)), solid([U.accent, U.trim, U.dark][i % 3], 0.6), p.x, p.y + 0.014, p.z);
+      put(chest, cached(geoCache, 'medal', () => new T.CylinderGeometry(0.0075, 0.0075, 0.0025, 14).rotateX(Math.PI / 2)), goldM, p.x, p.y - 0.002, p.z + 0.001); } };
+    const epaulettes = (fringe) => { for (const sx of [-1, 1]) { const x = sx * hw * 0.74, p = onTop(x) || new T.Vector3(x, top, cz);
+      const e = put(chest, cached(geoCache, 'epau2', () => new T.BoxGeometry(0.07, 0.01, 0.055)), trimM, p.x, p.y + 0.004, p.z); e.rotation.z = -sx * 0.22; e.scale.set(k, 1, k);
+      if (fringe) { const f = put(chest, cached(geoCache, 'fringe', () => new T.CylinderGeometry(0.036, 0.034, 0.03, 12, 1, true)), trimM, p.x + sx * 0.03 * k, p.y - 0.016, p.z); f.scale.set(0.35 * k, 1, k); } } };
+    const buttons = (n, hex) => { for (let i = 0; i < n; i++) { const y = bot + ht * (0.18 + 0.62 * i / Math.max(1, n - 1)), p = front(0, y, 0.002);
+      put(chest, cached(geoCache, 'btn2', () => new T.CylinderGeometry(0.0075, 0.0075, 0.004, 10).rotateX(Math.PI / 2)), hex === 'gold' ? goldM : solid(hex, 0.3), p.x, p.y, p.z); } };
+    const sash = (mat, w = 0.05) => { // diagonal band, shoulder to opposite hip, laid on the measured chest surface
+      const pts = []; for (let i = 0; i <= 10; i++) { const t = i / 10, x = mix(-hw * 0.62, hw * 0.55, t), y = mix(top - ht * 0.08, bot + ht * 0.08, t); pts.push(front(x, y, 0.006)); }
+      const c = new T.CatmullRomCurve3(pts), tg = new T.TubeGeometry(c, 20, w * 0.5 * k, 4); tg.scale(1, 1, 1); return put(chest, tg, mat, 0, 0, 0); };
+    const head = u.detailHead || u.headG, hList = head ? (() => { const a = []; head.traverse(m => { if (m.isMesh && m.geometry) a.push(m); }); return a; })() : [];
+    let hb = null; if (head && hList.length) hb = boxIn(head, hList);
+    const cap = (kind) => { if (!hb || hb.isEmpty()) return; const r = Math.max(hb.max.x - hb.min.x, hb.max.z - hb.min.z) / 2, cx = (hb.max.x + hb.min.x) / 2, cz2 = (hb.max.z + hb.min.z) / 2, y = hb.max.y;
+      const hg = new T.Group(); hg.name = 'nep-dress'; hg.position.set(cx, y - r * 0.32, cz2); head.add(hg); hg.scale.setScalar(r / 0.095);
+      if (kind === 'military') { put(hg, cached(geoCache, 'capcrown', () => new T.CylinderGeometry(0.104, 0.086, 0.06, 28)), solid(liftCloth(U.main), 0.8), 0, 0.03, 0);
+        put(hg, cached(geoCache, 'capband', () => new T.CylinderGeometry(0.0875, 0.0875, 0.018, 28)), accM, 0, 0.005, 0);
+        const v = put(hg, cached(geoCache, 'visor', () => new T.CircleGeometry(0.088, 20, 0, Math.PI).rotateX(-Math.PI / 2)), solid(0x0d0d0f, 0.15), 0, -0.002, 0.004); v.scale.set(1, 1, 0.75); v.rotation.x = 0.18;
+        put(hg, cached(geoCache, 'capbadge', () => new T.CylinderGeometry(0.011, 0.011, 0.004, 12).rotateX(Math.PI / 2)), goldM, 0, 0.025, 0.098); }
+      if (kind === 'tunic') put(hg, cached(geoCache, 'softcap', () => new T.CylinderGeometry(0.095, 0.088, 0.05, 24)), solid(liftCloth(U.main), 0.8), 0, 0.025, 0);
+      if (kind === 'robe') { const c = put(hg, cached(geoCache, 'skullcap', () => weld(new T.SphereGeometry(0.09, 20, 8, 0, Math.PI * 2, 0, 0.9))), accM, 0, -0.03, -0.01); c.scale.set(1.04, 0.9, 1.08); }
+      if (kind === 'tribal') { const b = put(hg, cached(geoCache, 'headband', () => new T.TorusGeometry(0.085, 0.008, 6, 32)), accM, 0, -0.01, 0); b.rotation.x = Math.PI / 2; b.scale.set(1.08, 1.2, 1); } };
+    switch (U.style) {
+      case 'court': sash(accM); medals(fem ? 3 : 5); break;
+      case 'military': epaulettes(true); medals(4); buttons(4, 'gold'); cap('military'); break;
+      case 'tunic': buttons(5, 0x1a1a1a); { const starG = cached(geoCache, 'starshape', () => { const s2 = new T.Shape(); for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, r = i % 2 ? 0.0038 : 0.0095; i ? s2.lineTo(Math.cos(a) * r, -Math.sin(a) * r) : s2.moveTo(Math.cos(a) * r, -Math.sin(a) * r); } return new T.ShapeGeometry(s2); });
+        for (const sx of [-1, 1]) { const p = front(sx * hw * 0.3, top - ht * 0.1, 0.004); const st2 = put(chest, starG, solid(U.accent === U.main ? 0xd4a64a : U.accent, 0.4, 0.3), p.x, p.y, p.z); st2.rotation.y = sx * 0.5; } }
+        cap('tunic'); break;
+      case 'robe': { const p = front(0, bot + ht * 0.6, 0.006); put(chest, cached(geoCache, 'pect', () => new T.BoxGeometry(0.012, 0.06, 0.004)), goldM, p.x, p.y, p.z); put(chest, cached(geoCache, 'pectb', () => new T.BoxGeometry(0.04, 0.012, 0.004)), goldM, p.x, p.y + 0.01, p.z + 0.001); } cap('robe'); break;
+      case 'sleek': for (const sx of [-1, 1]) { const a = front(sx * hw * 0.42, top - ht * 0.12, 0.003), b = front(sx * hw * 0.42, bot + ht * 0.1, 0.003);
+        const m = put(chest, cached(geoCache, 'piping', () => new T.BoxGeometry(0.005, 1, 0.004)), solid(U.accent, 0.3, 0.2), (a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2); m.scale.y = a.distanceTo(b); m.rotation.x = Math.atan2(a.z - b.z, a.y - b.y); } break;
+      case 'tribal': sash(accM, 0.08); cap('tribal'); break;
+      case 'consular': epaulettes(false); sash(solid(0xf3e6c4, 0.6), 0.04); { const p = front(hw * 0.42, bot + ht * 0.62, 0.006); const bt = put(chest, cached(geoCache, 'badge', () => new T.CircleGeometry(0.03, 24)), badgeMat(U), p.x, p.y, p.z); bt.rotation.y = 0.18; bt.scale.setScalar(k); } break;
+      default: pinAt(U.flag);
+    }
+  } else if (o.homeFlag) pinAt(o.homeFlag);
+  // the game's distance tiers: insignia are fine detail, dropped with the buttons
+  try { const f = u.fine || (u.fine = []), md = u.mid || (u.mid = []);
+    for (const m of shared) { const gm = m.geometry; if (!gm.boundingSphere) gm.computeBoundingSphere(); const ws = new T.Vector3(); m.getWorldScale(ws);
+      (gm.boundingSphere.radius * Math.max(ws.x, ws.y, ws.z) < 0.035 ? f : md).push(m); } } catch (e) {}
+  for (const m of shared) if (m.geometry && m.geometry.type === 'TubeGeometry') m.geometry._shared = false;
+  g.userData.nepDress = { style: U ? U.style : null, pieces: shared.length };
+  return g.userData.nepDress;
 }
 
 // Dispose per-character geometry (head, hair, beard). Shared geometry/materials stay cached.
@@ -789,4 +903,4 @@ export function disposeCharacter(group) {
   if (group.parent) group.parent.remove(group);
 }
 export function cacheStats() { return { geometries: geoCache.size, materials: matCache.size, textures: texCache.size }; }
-export default { applyDressCode, dressFor, resolveUniform, UNIFORM_STYLES, makeCharacter, optionsFromLook, disposeCharacter, cacheStats, OUTFITS, HAIR_STYLES, SKIN_TONES };
+export default { uniformLook, dressGameRig, applyDressCode, dressFor, resolveUniform, UNIFORM_STYLES, makeCharacter, optionsFromLook, disposeCharacter, cacheStats, OUTFITS, HAIR_STYLES, SKIN_TONES };
