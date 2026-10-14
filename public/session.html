@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261012t">
+<meta name="onum-build" content="20261012u">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261012t";
+  var STAMP = "20261012u";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -33390,13 +33390,30 @@ try{
     try{ syncPeople(); }catch(e){}
     try{ if(typeof mkMesh !== "undefined" && mkMesh && G.make) mkPreview(); }catch(e){} };
 
-  /* characters: the game's rig still runs (animation, seats, LOD), Neptune's figure is what is drawn */
+  /* characters: the game's rig still runs (animation, seats), Neptune's figure is what is drawn.
+     20261012u fallback: NEPTUNE.fullFigure = false keeps the game's own figure and only re-colours its clothes for a
+     decreed uniform (uniformLook) with Neptune's insignia + lapel pin as overlays on the game's bones (dressGameRig). */
   const _buildPerson = buildPerson;
+  const nepDressInfo = p => { const nat = NEP.nation();
+    const st = p.state || (p.kind === "you" && G.you && G.you.state) || (G.country && G.country.name) || "home";
+    return NEP.mods.chars.dressFor({homeFlag:{type:nepGov(), seed:nepHash(st)}}, nat); };
   buildPerson = function(p){
+    try{
+      const C = NEP.mods && NEP.mods.chars;
+      if(NEP.fullFigure === false && C && C.dressGameRig && p && p.look){
+        const dress = nepDressInfo(p), L0 = p.look, L1 = dress.uniform ? C.uniformLook(L0, dress.uniform) : L0;
+        let g = null;
+        if(L1 !== L0) p.look = L1;
+        try{ g = _buildPerson(p); } finally { p.look = L0; }
+        try{ if(g && !g.userData.cheap) C.dressGameRig(THREE, g, {look:L0, uniform:dress.uniform, homeFlag:dress.homeFlag}); }
+        catch(e){ if(!NEP._dw){ NEP._dw = true; console.warn("NEPTUNE dress", e); } }
+        return g;
+      }
+    }catch(e){ if(!NEP._warned){ NEP._warned = true; console.warn("NEPTUNE character", e); } }
     const g = _buildPerson(p);
     try{
       const C = NEP.mods && NEP.mods.chars;
-      if(!C || !p || !p.look || !g || g.userData.cheap) return g;
+      if(NEP.fullFigure === false || !C || !p || !p.look || !g || g.userData.cheap) return g;
       const nat = NEP.nation();
       const st = p.state || (p.kind === "you" && G.you && G.you.state) || (G.country && G.country.name) || "home";
       const dress = C.dressFor({homeFlag:{type:nepGov(), seed:nepHash(st)}}, nat);
@@ -33477,7 +33494,16 @@ try{
   /* loader */
   const base = (() => { try{ return new URL("../neptune/", location.href).href; }catch(e){ return "../neptune/"; } })();
   const sc = document.createElement("script"); sc.src = base + "onum-office-amenities.js"; sc.onerror = () => console.warn("NEPTUNE: amenities not loaded"); document.head.appendChild(sc);
-  if(location.protocol !== "file:") Promise.all([import(base + "onum-characters.js"), import(base + "onum-flags.js"), import(base + "onum-materials.js")]).then(([c, f, m]) => {
+  /* 20261012u: ES modules cannot load from file:// (Play.bat / double-click), so Neptune never ran there and every
+     person was the game's boxy fallback figure. The same modules ship pre-bundled as a classic script for that case. */
+  const nepClassic = () => new Promise((ok, no) => { if(window.ONUM_NEPTUNE) return ok(window.ONUM_NEPTUNE);
+    const s2 = document.createElement("script"); s2.src = base + "onum-neptune.js";
+    s2.onload = () => window.ONUM_NEPTUNE ? ok(window.ONUM_NEPTUNE) : no(new Error("onum-neptune.js empty"));
+    s2.onerror = () => no(new Error("onum-neptune.js missing")); document.head.appendChild(s2); });
+  (location.protocol === "file:" ? nepClassic().then(b => [b.chars, b.flags, b.mats])
+    : Promise.all([import(base + "onum-characters.js"), import(base + "onum-flags.js"), import(base + "onum-materials.js")])
+      .catch(e => { console.warn("NEPTUNE: module import failed, using the bundled copy", e); return nepClassic().then(b => [b.chars, b.flags, b.mats]); })
+  ).then(([c, f, m]) => {
     NEP.mods = {chars:c, flags:f, mats:m};
     try{ if(G.country) TEX.flag = flagTexture(G.country.flag); }catch(e){}
     NEP.remeshAll();
