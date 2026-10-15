@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261015d">
+<meta name="onum-build" content="20261015e">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261015d";
+  var STAMP = "20261015e";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -8263,6 +8263,7 @@ function realmDo(k, a){
   const y = G.you, p = WORLD_POWERS.find(x => x.k === k); if(!y || !p) return;
   G.realmRel = G.realmRel || {}; const was = G.realmRel[k] || 0, d = DLG[k] || {};
   const bump = n => { G.realmRel[k] = clamp(was + n, -100, 100); };
+  if(a === "aid" || a === "trade" || a === "press") reactEmit("foreign", {k, verb:a});
   if(a === "call"){ const e = realmFolk(k)[0]; PB.call = {id:"rl:" + k + ":" + e.id, name:e.name, lines:[{w:e.name, t:"This is " + e.name + ", " + e.title + " of " + p.t + ". I will be brief; what do you wish to raise?"}]}; PB.tab = "calls"; try{ mapToggle(false); }catch(x){} try{ pbOpen(); }catch(x){} return; }
   if(a === "aud"){ if(G.room !== homeRoom()){ note("Go to your own chair first: " + (ROOMS[homeRoom()] ? ROOMS[homeRoom()].t : "your office") + ". A delegation is received there.", true); return; } try{ mapToggle(false); }catch(x){} G._dlgRealm = k; setTimeout(() => { try{ sitStart("delegation"); }catch(e){ console.warn(e); } }, 60); return; }
   if(a === "aid"){ if(y.influence < 6) return; y.influence -= 6; spend(30, 3); bump(9); if(G.world && G.world.foe === k) G.world.heat = clamp((G.world.heat || 0) - 4, 0, 100); feed("You send aid to " + p.t + ". " + (REALM_GOV[k] ? cap(REALM_GOV[k].powers[0][0]) + " take note." : ""), "good"); note("Aid goes to " + p.t + ". Relations: " + was + " to " + G.realmRel[k] + ".", true); return; }
@@ -8464,12 +8465,12 @@ function dkItems(){
   if(k === "senate"){ const it = nat(G.bill); if(it){ it.body = "The Senate"; it.by = dkSenate(it); it.acts = ["aye","nay"].map(v => ({t:"Vote " + v, off:it.b.senateVote, run(){
       const s = dkStateLean(S, it) * (v === "aye" ? 1 : -1); it.b.senateVote = v; y.approval = clamp(y.approval + (s > 0 ? 2 : -2), 0, 100);
       (G.members || []).filter(m => m.party === y.party && m.rel).forEach(m => m.rel.warmth = clamp(m.rel.warmth + (partyLine(it.b)[y.party] === (v === "aye" ? 1 : -1) ? 1 : -2), -100, 100));
-      feed("Senator " + surname(y.name) + " votes " + v + " on the " + it.title + "."); return "Recorded " + v + ". " + (s > 0 ? y.state + " approves." : y.state + " will not forget it."); }})); out.push(it); } }
+      reactEmit("senVote", {title:it.title, pos:it.pos || null, v}); feed("Senator " + surname(y.name) + " votes " + v + " on the " + it.title + "."); return "Recorded " + v + ". " + (s > 0 ? y.state + " approves." : y.state + " will not forget it."); }})); out.push(it); } }
   if(k === "gov" && S && S.bill){ const b = S.bill; const it = {kind:"state bill", title:b.title, line:"Passed by the legislature of " + y.state + "." + amendText(S), sponsor:"the " + y.state + " majority leader", sb:b, body:"The " + y.state + " legislature"};
     it.by = dkStatehouse(S, it);
     it.acts = [{t:"Sign it", run(){ S.ind = clamp(S.ind + (b.ind || 0), 0, 100); S.unrest = clamp(S.unrest + (b.unrest || 0), 0, 100); S.lean = clamp(Math.round(S.lean + b.dir * 3), -100, 100); S.bill = null;
-        y.approval = clamp(y.approval + (dkStateLean(S, it) > 0 ? 3 : -2), 0, 100); try{ kMark("gdesk"); }catch(e){} feed("Governor " + surname(y.name) + " signed the " + b.title + ".", "good"); return "Signed at the desk, with the sponsors behind you." + amendApply(S); }},
-      {t:"Veto it", run(){ S.bill = null; S.unrest = clamp(S.unrest + 2, 0, 100); y.approval = clamp(y.approval + (dkStateLean(S, it) < 0 ? 3 : -2), 0, 100); try{ kMark("gdesk"); }catch(e){} feed("Governor " + surname(y.name) + " vetoed the " + b.title + ".", "bad"); return "Vetoed. The majority leader will not return your calls this week."; }}];
+        y.approval = clamp(y.approval + (dkStateLean(S, it) > 0 ? 3 : -2), 0, 100); try{ kMark("gdesk"); }catch(e){} reactState(S, b, true); feed("Governor " + surname(y.name) + " signed the " + b.title + ".", "good"); return "Signed at the desk, with the sponsors behind you." + amendApply(S); }},
+      {t:"Veto it", run(){ S.bill = null; S.unrest = clamp(S.unrest + 2, 0, 100); y.approval = clamp(y.approval + (dkStateLean(S, it) < 0 ? 3 : -2), 0, 100); try{ kMark("gdesk"); }catch(e){} reactState(S, b, false); feed("Governor " + surname(y.name) + " vetoed the " + b.title + ".", "bad"); return "Vetoed. The majority leader will not return your calls this week."; }}];
     out.push(it); }
   if(k === "bench"){ (G.cases || []).filter(c => !c.done).slice(0, 3).forEach(c => {
       const it = {kind:"case", title:c.t, line:c.dual != null ? "Can one person hold two elected offices?" : "A state against the Union over a federal act.", sponsor:"filed day " + c.day, c, body:"The bench", benchRows:dkBench(c), sb:{dir:1, axis:"lib"}};
@@ -8480,8 +8481,8 @@ function dkItems(){
   if(k === "pres"){ (G.lastActs || []).filter(a => !a.signed && !a.vetoed).slice(0, 3).forEach(a => {
       const it = {kind:"act", title:a.title, line:"Passed by the House and Senate on day " + a.day + ".", sponsor:"Congress", pos:a.pos || {econ:0, lib:0, def:0, wel:0}, body:"Congress", national:true};
       it.by = dkCongress(it);
-      it.acts = [{t:"Sign it", run(){ a.signed = true; y.approval = clamp(y.approval + 2, 0, 100); feed(execTitle() + " " + surname(y.name) + " signed the " + a.title + ".", "good"); return "Signed, with eleven pens."; }},
-        {t:"Veto it", run(){ a.vetoed = true; y.standing = clamp(y.standing - 3, 0, 100); y.influence = clamp(y.influence + 3, 0, 100); feed(execTitle() + " " + surname(y.name) + " vetoed the " + a.title + ".", "bad"); return "Vetoed. The House can override with two thirds."; }}];
+      it.acts = [{t:"Sign it", run(){ a.signed = true; y.approval = clamp(y.approval + 2, 0, 100); reactAct(a.title, a.pos, true); feed(execTitle() + " " + surname(y.name) + " signed the " + a.title + ".", "good"); return "Signed, with eleven pens."; }},
+        {t:"Veto it", run(){ a.vetoed = true; y.standing = clamp(y.standing - 3, 0, 100); y.influence = clamp(y.influence + 3, 0, 100); reactAct(a.title, a.pos, false); feed(execTitle() + " " + surname(y.name) + " vetoed the " + a.title + ".", "bad"); return "Vetoed. The House can override with two thirds."; }}];
       out.push(it); }); }
   return out;
 }
@@ -27258,6 +27259,7 @@ function nextDay(late){
     try{ riteDay(); }catch(e){}
     try{ riteYouDay(); }catch(e){}
     try{ govDay(); }catch(e){}
+    try{ reactDay(); }catch(e){}
     try{ cultDay(); }catch(e){}
     try{ caDay(); }catch(e){}
     try{ famDay(); }catch(e){}
@@ -29222,7 +29224,7 @@ function rolePowers(){
   if(k === "gov"){
     const S = (G.states || []).find(s => s.n === y.state);
     P.push({t:"Veto the statehouse bill", off:!(S && S.bill), d:S && S.bill ? S.bill.title : "Nothing on your desk from the statehouse.", run(){
-      const t = S.bill.title; S.bill = null; S.unrest = clamp(S.unrest + 2, 0, 100); y.approval = clamp(y.approval + rint(-3, 4), 0, 100);
+      const t = S.bill.title; reactState(S, S.bill, false); S.bill = null; S.unrest = clamp(S.unrest + 2, 0, 100); y.approval = clamp(y.approval + rint(-3, 4), 0, 100);
       feed("Governor " + surname(y.name) + " vetoed the " + t + ".", "bad"); return "Vetoed. The statehouse will try again next session."; }});
     P.push({t:"Appoint a state judge", off:once("appt"), d:"Three named candidates, each with their own views and backers.", run(){ appointCard("judge"); return null; }});
     P.push({t:"Appoint an agency head", off:once("appt2"), d:"Roads, schools, the constabulary or health: a named person who will advise you from their own view.", run(){
@@ -29239,8 +29241,8 @@ function rolePowers(){
     const last = (G.lastActs || []).find(a => !a.signed && !a.vetoed);
     P.push({t:last ? "Veto: " + last.title : "No act awaits your signature", off:!last, d:"Send it back to the House.", run(){
       last.vetoed = true; y.standing = clamp(y.standing - 3, 0, 100); y.influence = clamp(y.influence + 3, 0, 100);
-      feed(execTitle() + " " + surname(y.name) + " vetoed the " + last.title + ".", "bad"); return "Vetoed. The House can override with two thirds, if it can find them."; }});
-    if(last) P.push({t:"Sign: " + last.title, d:"Make it law with your name on it.", run(){ last.signed = true; y.approval = clamp(y.approval + 2, 0, 100); return "Signed, with eleven pens."; }});
+      reactAct(last.title, last.pos, false); feed(execTitle() + " " + surname(y.name) + " vetoed the " + last.title + ".", "bad"); return "Vetoed. The House can override with two thirds, if it can find them."; }});
+    if(last) P.push({t:"Sign: " + last.title, d:"Make it law with your name on it.", run(){ last.signed = true; reactAct(last.title, last.pos, true); y.approval = clamp(y.approval + 2, 0, 100); return "Signed, with eleven pens."; }});
     P.push({t:"Appoint a cabinet secretary", off:once("cab"), d:"Three named candidates; the Senate will have its say.", run(){ appointCard("cab"); return null; }});
     P.push({t:"Send foreign aid on your own authority", off:once("aid"), d:"Money abroad, a realm warmer, a district colder.", run(){
       mark("aid"); const r = pick(realmEnsure()); G.realmRel = G.realmRel || {}; G.realmRel[r.k] = clamp((G.realmRel[r.k] || 0) + 12, -100, 100);
@@ -29273,6 +29275,7 @@ function rolePowers(){
   return P;
 }
 function benchRule(c, forUnion){
+  reactEmit("ruling", {t:c.t, forUnion, state:c.state, dual:c.dual != null});
   if(c.dual != null){
     c.done = true; c.ruled = forUnion ? "union" : "member";
     const m = byId(c.dual);
@@ -29319,6 +29322,79 @@ function senBrief(){
   card.querySelectorAll("[data-sa]").forEach(b => b.addEventListener("click", () => { const [k, j] = b.getAttribute("data-sa").split(":"); if(done[k]) return; done[k] = 1; spend(10, 1); el("sa_" + k).textContent = acts[k][+j].run(); }));
   return null;
 }
+/* ── the President's day: a cabinet with views, acts with consequences, capitals with a voice ── */
+const PRES_ROLES = {treasury:"Secretary of the Treasury", state:"Secretary of State", war:"Secretary of War", justice:"Attorney General"};
+function presStaff(){
+  const y = G.you; G.presStaff = G.presStaff || {}; const S = {n:y.state};
+  Object.keys(PRES_ROLES).forEach(k => { if(!G.presStaff[k]) G.presStaff[k] = mkOfficial("pres:" + k + ":" + y.name, S, PRES_ROLES[k]); });
+  return G.presStaff;
+}
+function presAdvice(o, role, act){
+  const p = o.pos, pos = act.pos || {econ:0, lib:0, def:0, wel:0};
+  const axis = {treasury:"econ", state:"def", war:"def", justice:"lib"}[role];
+  const v = pos[axis] || 0, mine = p[axis] || 0, agree = v * mine > 0 || (Math.abs(v) < 8 && Math.abs(mine) < 14), X = DK_AXIS[axis];
+  const topic = {treasury:"the Treasury's books", state:"how the neighbours will read it", war:"the frontier and the fleet", justice:"how the courts will take it"}[role];
+  if(Math.abs(v) < 8) return "On " + topic + " it barely matters, Mr President. " + (mine > 20 ? "My own bent is toward " + (X.hi.w).toLowerCase() + ", so I would not lose sleep over it either way." : "I would sign it and spend the effort elsewhere.");
+  return (agree ? "I would sign it. On " + topic + " it moves the country " + dkStr(v) + " toward " + (v > 0 ? X.hi.w : X.lo.w).toLowerCase() + ", which is where I would take it myself." : "I would hold it back. On " + topic + " it moves the country " + dkStr(v) + " toward " + (v > 0 ? X.hi.w : X.lo.w).toLowerCase() + ", and I read that the other way.") + " You should know that is my own view and not the whole cabinet's.";
+}
+function presActs(){
+  const y = G.you, st = presStaff(), acts = (G.lastActs || []).filter(a => !a.signed && !a.vetoed).slice(0, 3);
+  if(!acts.length){ govCardOpen("Acts awaiting signature", "Nothing on the desk", "The House and Senate have sent nothing over today.", "", "pacts"); return null; }
+  const mem = (G.members || []).filter(m => m && !m.gone && m.kind === "member" && m.pos);
+  const body = acts.map((a, i) => { const bill = {pos:a.pos || {econ:0, lib:0, def:0, wel:0}, title:a.title, id:"act:" + a.title};
+    let aye = 0; mem.forEach(m => { try{ if(alignment(m, bill) > 0) aye++; }catch(e){} }); const frac = mem.length ? aye / mem.length : 0.5, ovr = frac > 0.68 ? "probable" : frac > 0.55 ? "possible" : "unlikely";
+    const lines = ["treasury", "state", "war", "justice"].map(k => '<div style="margin:6px 0"><b>' + pcEsc(st[k].name) + '</b> <span class="muted">· ' + pcEsc(PRES_ROLES[k]) + ' · ' + pcEsc(viewWords(st[k].pos)) + '</span><div style="font-size:13px">“' + pcEsc(presAdvice(st[k], k, a)) + '”</div></div>').join("");
+    return '<div style="margin:12px 0;padding:8px 10px;border-left:3px solid var(--line-soft)"><b>' + pcEsc(a.title) + '</b> <span class="muted">passed day ' + a.day + '</span>' +
+      '<details open style="margin:4px 0"><summary class="muted">What it does</summary>' + dkShiftsHTML({pos:bill.pos, title:a.title}) + '</details>' +
+      '<details style="margin:4px 0"><summary class="muted">What your cabinet says</summary>' + lines + '</details>' +
+      '<p class="muted" style="font-size:12px">If you veto it, a two-thirds override is ' + ovr + ' (about ' + Math.round(frac * 100) + '% of the chamber reads it favourably).</p>' +
+      '<div class="card__actions" style="flex-wrap:wrap"><button type="button" class="btn" data-ps="' + i + ':s">Sign it</button><button type="button" class="btn btn--ghost" data-ps="' + i + ':v">Veto it</button></div><div class="dream" id="ps_' + i + '"></div></div>'; }).join("");
+  govCardOpen("Acts awaiting signature", "On the President's desk", "Each act, what it does axis by axis, and what four members of your cabinet make of it, in their own words.", body, "pacts");
+  card.querySelectorAll("[data-ps]").forEach(b => b.addEventListener("click", () => { const [i, k] = b.getAttribute("data-ps").split(":"), a = acts[+i]; if(a.signed || a.vetoed) return; spend(15, 2);
+    let r; if(k === "s"){ a.signed = true; y.approval = clamp(y.approval + 2, 0, 100); reactAct(a.title, a.pos, true); feed(execTitle() + " " + surname(y.name) + " signed the " + a.title + ".", "good"); r = "Signed, with eleven pens."; }
+    else { a.vetoed = true; y.standing = clamp(y.standing - 3, 0, 100); y.influence = clamp(y.influence + 3, 0, 100); reactAct(a.title, a.pos, false); feed(execTitle() + " " + surname(y.name) + " vetoed the " + a.title + ".", "bad"); r = "Vetoed. The House can override with two thirds."; }
+    el("ps_" + i).textContent = r; card.querySelectorAll('[data-ps^="' + i + ':"]').forEach(z => z.disabled = true); }));
+  return null;
+}
+function presForeign(){
+  const y = G.you, rs = realmEnsure(), rel = G.realmRel = G.realmRel || {}, st = presStaff();
+  const lowest = rs.slice().sort((a, c) => (rel[a.k] || 0) - (rel[c.k] || 0));
+  const picks = [lowest[0], lowest[Math.floor(lowest.length / 2)], lowest[lowest.length - 1]].filter((x, i, a) => a.indexOf(x) === i);
+  const body = picks.map((r, i) => { const D = DLG[r.k] || {ask:r.want, give:"goodwill", red:"being asked too much"}, g = REALM_GOV[r.k] || {}, head = realmFolk(r.k).find(f => f.id === "head"), rl = rel[r.k] || 0;
+    return '<div style="margin:12px 0;padding:8px 10px;border-left:3px solid var(--line-soft)"><b>' + pcEsc(head.name) + '</b> <span class="muted">· ' + pcEsc(g.head || "Head of government") + ' of ' + pcEsc(r.t) + ' · ' + realmRelLabel(rl) + ' (' + rl + ')</span>' +
+      '<p style="margin:6px 0">“' + pcEsc(realmVoice(r.k, {}, "what do you want") + " " + (rl < -20 ? "I will be plain, Mr President: the way things are going I cannot promise you a quiet frontier." : rl > 25 ? "We have not forgotten who helped us." : "We would like to be taken seriously.")) + '”</p>' +
+      '<p class="muted" style="font-size:12px">' + pcEsc(st.state.name) + ' (' + pcEsc(viewWords(st.state.pos)) + '): “' + pcEsc((st.state.pos.def || 0) > 20 ? "Give them nothing they have not earned." : (st.state.pos.def || 0) < -20 ? "A little generosity now is cheaper than a garrison later." : "Hear them out; decide after.") + '”</p>' +
+      '<div class="card__actions" style="flex-wrap:wrap"><button type="button" class="btn btn--ghost" data-pf="' + i + ':aid">Offer grain and credit</button><button type="button" class="btn btn--ghost" data-pf="' + i + ':trade">Offer a trade schedule</button><button type="button" class="btn btn--ghost" data-pf="' + i + ':warn">Warn them off ' + pcEsc(D.red) + '</button><button type="button" class="btn btn--ghost" data-pf="' + i + ':none">Say nothing yet</button></div><div class="dream" id="pf_' + i + '"></div></div>'; }).join("");
+  govCardOpen("Calls with foreign capitals", "Three capitals on the line", "Each head of government, in their own words, and what your Secretary of State makes of them.", body, "aid");
+  card.querySelectorAll("[data-pf]").forEach(b => b.addEventListener("click", () => { const [i, k] = b.getAttribute("data-pf").split(":"), r = picks[+i]; if(b.parentNode.getAttribute("data-done")) return; b.parentNode.setAttribute("data-done", "1"); spend(20, 3);
+    let t;
+    if(k === "aid"){ rel[r.k] = clamp((rel[r.k] || 0) + 12, -100, 100); y.approval = clamp(y.approval - 2, 0, 100); t = r.t + " will remember. So will the farm counties."; }
+    else if(k === "trade"){ rel[r.k] = clamp((rel[r.k] || 0) + 6, -100, 100); const S = (G.states || []).find(x => x.n === y.state); if(S) S.ind = clamp(S.ind + 1, 0, 100); t = "A modest schedule is drawn up for the ministers to sign."; }
+    else if(k === "warn"){ rel[r.k] = clamp((rel[r.k] || 0) - 5, -100, 100); y.standing = clamp(y.standing + 1, 0, 100); if(G.world && G.world.foe === r.k) G.world.heat = clamp((G.world.heat || 0) + 3, 0, 100); t = "The line is delivered. " + r.t + " does not reply, which is a reply."; }
+    else t = "You say you will think about it. They say they will wait.";
+    reactEmit("foreign", {k:r.k, verb:k}); el("pf_" + i).textContent = t; feed("The President spoke with " + r.t + ". " + t); b.parentNode.querySelectorAll("button").forEach(z => z.disabled = true); }));
+  return null;
+}
+function presBrief(){
+  const y = G.you, st = presStaff(), rel = G.realmRel || {}, foe = WORLD_POWERS.find(p => G.world && p.k === G.world.foe), hot = (G.states || []).slice().sort((a, c) => (c.unrest || 0) - (a.unrest || 0))[0], done = {};
+  const say = {
+    treasury:"The Union's books are " + ((G.money && G.money.index < 0.5) ? "thin; I would not announce anything new." : "sound for now.") + (hot ? " " + hot.n + " is the worst for unrest, at " + Math.round(hot.unrest) + ", and it will ask for money." : "") + " " + ((st.treasury.pos.econ || 0) > 20 ? "I would answer it with a tax holiday, not a grant." : (st.treasury.pos.econ || 0) < -20 ? "I would answer it with a public works grant, and I would take the heat." : "I would wait for the auditors."),
+    state:foe ? cap(foe.t) + " is the rival this term; the temperature is " + Math.round((G.world && G.world.heat) || 0) + ". " + ((st.state.pos.def || 0) > 20 ? "I would meet strength with strength, and say so quietly." : "I would open a channel before anyone opens a fire.") : "No rival is hot this week, which is the time to mend fences.",
+    war:"The fleet and the garrisons are at their usual state, which is to say short. " + ((st.war.pos.def || 0) > 20 ? "I want the second base on the strait, and I will argue for it." : (st.war.pos.def || 0) < -20 ? "I would rather not ask for more ships; I would rather ask what they are for." : "I will tell you what they cost when you decide what you want from them."),
+    justice:"Two states have a mandate in the courts. " + ((st.justice.pos.lib || 0) > 20 ? "I will defend the people's liberties against the executive, and that includes yours." : (st.justice.pos.lib || 0) < -20 ? "I would not let a technicality slow the Union's work." : "I will give you the law as it is, and you can decide how hard to lean on it.")
+  };
+  const acts = {
+    treasury:[{t:"Answer unrest with a grant", d:"Unrest down, treasury thinner", run(){ if(hot) hot.unrest = clamp(hot.unrest - 3, 0, 100); y.approval = clamp(y.approval + 1, 0, 100); return "A grant is drawn up for " + (hot ? hot.n : "the worst-hit state") + "."; }}, {t:"Wait for the auditors", d:"Nothing spent", run(){ return "You wait."; }}],
+    state:[{t:"Open a quiet channel", d:"Realm warmer", run(){ if(foe){ G.realmRel = G.realmRel || {}; G.realmRel[foe.k] = clamp((G.realmRel[foe.k] || 0) + 4, -100, 100); } return "A channel is opened through the Secretary's office."; }}, {t:"Meet strength with strength", d:"Standing up, tension up", run(){ y.standing = clamp(y.standing + 1, 0, 100); if(G.world) G.world.heat = clamp((G.world.heat || 0) + 3, 0, 100); return "The Secretary is told to say it plainly."; }}],
+    war:[{t:"Ask what the fleet is for", d:"A fairer review", run(){ y.influence = clamp(y.influence + 1, 0, 100); return "The Secretary of War is told to write you the answer."; }}, {t:"Fund the strait base", d:"Hawk, costly", run(){ y.approval = clamp(y.approval - 1, 0, 100); if(G.world) G.world.heat = clamp((G.world.heat || 0) + 2, 0, 100); return "The base is put on the budget."; }}],
+    justice:[{t:"Defend the mandate", d:"Standing", run(){ y.standing = clamp(y.standing + 1, 0, 100); return "The Attorney General files in your name."; }}, {t:"Hold off for now", d:"Nothing", run(){ return "The filing waits."; }}]
+  };
+  const body = Object.keys(PRES_ROLES).map(k => '<div style="margin:10px 0;padding:8px 10px;border-left:3px solid var(--line-soft)">' + officialHTML(st[k]) + '<p style="margin:6px 0">“' + pcEsc(say[k]) + '”</p><div class="card__actions" style="flex-wrap:wrap">' + acts[k].map((x, j) => '<button type="button" class="btn btn--ghost" data-pb2="' + k + ':' + j + '" title="' + pcEsc(x.d) + '">' + pcEsc(x.t) + '</button>').join("") + '<button type="button" class="btn btn--ghost" data-pw="' + k + '">Ask why</button></div><div class="dream" id="pb2_' + k + '"></div></div>').join("");
+  govCardOpen("The morning briefing", "The cabinet, in their own words", "Four secretaries, four different lines.", body, null);
+  card.querySelectorAll("[data-pw]").forEach(b => b.addEventListener("click", () => { const k = b.getAttribute("data-pw"), o = st[k], cr = creedOf(o.creed), og = originOf(o.origin); el("pb2_" + k).textContent = "“I am " + o.bg + ", of " + cr.t + ", and my people carry the grievance " + og.grievance + ". Weigh me knowing it, Mr President.”"; }));
+  card.querySelectorAll("[data-pb2]").forEach(b => b.addEventListener("click", () => { const [k, j] = b.getAttribute("data-pb2").split(":"); if(done[k]) return; done[k] = 1; spend(10, 1); el("pb2_" + k).textContent = acts[k][+j].run(); }));
+  return null;
+}
 function confirmCard(){
   const y = G.you, nom = mkOfficial("nom:" + G.day + ":" + y.name, {n:pick(STATES)}, "Nominee to the federal bench");
   const fit = alignment(y, {pos:nom.pos}), asked = {};
@@ -29344,7 +29420,7 @@ function confirmCard(){
     if(how === "yes"){ G.court = G.court || []; if(G.court.length) G.court[rint(0, G.court.length - 1)] = {name:nom.name, by:"the Senate", pos:nom.pos}; y.standing = clamp(y.standing + 1, 0, 100); msg = nom.name + " is confirmed to the bench."; }
     else if(how === "no"){ y.standing = clamp(y.standing + (fit < 0 ? 2 : -2), 0, 100); msg = "The committee rejects " + nom.name + ". " + senateColleague() + " is not pleased."; }
     else { const won = chance(1 - odds); y.standing = clamp(y.standing + (won ? 4 : -3), 0, 100); if(!won){ G.court = G.court || []; if(G.court.length) G.court[rint(0, G.court.length - 1)] = {name:nom.name, by:"the Senate", pos:nom.pos}; } msg = won ? nom.name + "'s nomination is withdrawn after a week of hearings." : nom.name + " is confirmed over your objection."; }
-    el("cqSay").textContent += "\n" + msg; feed(msg, "good"); card.querySelectorAll("#cfYes,#cfNo,#cfFight,[data-cq]").forEach(x => x.disabled = true); };
+    reactEmit("confirm", {name:nom.name, confirmed:/is confirmed/.test(msg)}); el("cqSay").textContent += "\n" + msg; feed(msg, "good"); card.querySelectorAll("#cfYes,#cfNo,#cfFight,[data-cq]").forEach(x => x.disabled = true); };
   el("cfYes").addEventListener("click", () => done("yes")); el("cfNo").addEventListener("click", () => done("no")); el("cfFight").addEventListener("click", () => done("fight"));
   return null;
 }
@@ -29372,7 +29448,7 @@ function treatyCard(){
       msg = ok ? "The Senate ratifies the treaty with " + r.t + (k === "res" ? ", with your reservation on " + D.red : "") + ". " + senateColleague() + " shakes your hand in the cloakroom." : "The treaty with " + r.t + " falls short of two thirds."; }
     else if(k === "hold"){ rel[r.k] = clamp((rel[r.k] || 0) - 2, -100, 100); msg = "You hold it in committee. " + r.t + " will say you are stalling."; }
     else { rel[r.k] = clamp((rel[r.k] || 0) - 8, -100, 100); y.standing = clamp(y.standing + 1, 0, 100); msg = "You vote it down. " + (env ? env.name : "Their envoy") + " asks for a meeting."; }
-    el("trSay").textContent += "\n" + msg; feed(msg, "good"); card.querySelectorAll("[data-trv],[data-tr]").forEach(x => x.disabled = true); }));
+    reactEmit("treaty", {k:r.k, verb:k, ok:/ratifies/.test(msg)}); el("trSay").textContent += "\n" + msg; feed(msg, "good"); card.querySelectorAll("[data-trv],[data-tr]").forEach(x => x.disabled = true); }));
   return null;
 }
 function senCalls(){
@@ -30023,9 +30099,9 @@ function docketFor(k){
     ],
     pres:[
       {h:8,  key:"kex",    t:"The morning briefing", d:"The overnight file: states, realms, the treasury.", sit:"exec"},
-      {h:11, key:"pacts",  t:"Acts awaiting signature", d:"Sign or veto what the House and Senate send.", run:() => { officeCard(); kMark("pacts"); return null; }},
+      {h:11, key:"pacts",  t:"Acts awaiting signature", d:"Sign or veto what the House and Senate send.", run:() => presActs()},
       {h:14, key:"cab",    t:"Cabinet", d:"Appoint, or hear the secretaries out.", power:"Appoint a cabinet secretary"},
-      {h:16, key:"aid",    t:"Calls with foreign capitals", d:"Aid, credit and the realms.", power:"Send foreign aid on your own authority"},
+      {h:16, key:"aid",    t:"Calls with foreign capitals", d:"Three heads of government on the line, in their own words. Aid, trade or a warning.", run:() => presForeign()},
       {h:17, key:"ppress", t:"The press room", d:"Questions from the whole Union.", run:() => officePress("the Executive's press room")}
     ]
   };
@@ -30191,10 +30267,106 @@ function appointCard(kind){
     if(kind === "cab" && ok){ const m = pick(G.members.filter(x => x.party === y.party && !x.machine && !x.gone && !x.cabinet)); if(m){ m.cabinet = pick(["Treasury", "State", "War", "Interior", "Labour"]); c.o.name = m.name; ripple(m, 12, "Named to the cabinet. I owe this one.", 10, true); } }
     if(ok){ if(S && (GOV_AGENCIES[kind])){ govStaff(S); S.agency[kind] = c.o; } if(kind === "judge"){ y.approval = clamp(y.approval + ((c.o.pos.lib || 0) > 0 ? 1 : 0), 0, 100); } y.standing = clamp(y.standing + 1, 0, 100); try{ y.used = y.used || {}; y.used[kind === "judge" ? "appt" : kind === "cab" ? "cab" : "appt2"] = G.day; }catch(e){} }
     const msg = ok ? c.o.name + " is confirmed as " + P.post.toLowerCase() + ". " + cap(viewWords(c.o.pos)) + "; you will hear it in how they advise you." : "The legislature balks at " + c.o.name + ". The name is withdrawn and the seat stays open.";
-    el("gcSay").textContent = msg; feed(msg, ok ? "good" : "bad"); card.querySelectorAll("[data-ap]").forEach(x => { x.disabled = true; x.setAttribute("data-done", "1"); }); }));
+    reactEmit("appoint", {kind, name:c.o.name, ok, post:P.post}); el("gcSay").textContent = msg; feed(msg, ok ? "good" : "bad"); card.querySelectorAll("[data-ap]").forEach(x => { x.disabled = true; x.setAttribute("data-done", "1"); }); }));
   return null;
 }
 const CASE_BILL = {road:"the Rural Road and Culvert Act", school:"the Schoolhouse and Teachers Act", water:"the Municipal Water Compliance Act", plant:"the Local Industry Retention Act", ballots:"the Special Elections (Mail Ballot) Act", pension:"the Widows' Pension Notice Act"};
+/* ── nothing you do stays yours: once it is out, the House, the Senate, the bench, the executive and the neighbours each have their own job to do about it ── */
+function reactEmit(kind, data, delay){
+  G.react = G.react || []; G.react.push({kind, data:data || {}, due:(G.day || 0) + (delay == null ? 1 : delay), from:G.day});
+  const who = {actSigned:"the courts, the House and the press", actVetoed:"the Speaker and the Senate leader", stateBill:"the statehouse, the Union's attorney and the press", treaty:"the executive, their assembly and the hawks",
+    confirm:"the bench and the minority", foreign:"the opposition, the rival realms and the press", appoint:"the legislature and the department", ruling:"Congress and the states", senVote:"the House and the President"}[kind] || "everyone concerned";
+  try{ feed("Word is out. " + cap(who) + " will answer it tomorrow.", ""); }catch(e){}
+}
+function reactAct(title, pos, signed){ reactEmit(signed ? "actSigned" : "actVetoed", {title, pos:pos || null}); }
+function reactState(S, b, signed){ try{ reactEmit("stateBill", {state:S ? S.n : (G.you && G.you.state), title:b.title, signed, ind:b.ind || 0, unrest:b.unrest || 0, dir:b.dir || 1, axis:b.axis || "econ"}); }catch(e){} }
+function reactHolder(post, party){
+  const m = (G.members || []).filter(x => x && !x.gone && x.kind === "member");
+  return m.find(x => x.post === post) || (party ? m.find(x => x.party === party) : null) || m[Math.floor(Math.random() * Math.max(1, m.length))] || null;
+}
+function reactSay(m, text, news){
+  try{ feed(text); journal(text); }catch(e){}
+  try{ if(m){ voxInit(); voxAdd({id:G.vox.id++, by:m.id, t:text, k:"react", v:0, day:G.day, at:hhmm(), backs:Math.round(Math.random() * 40), hits:Math.round(Math.random() * 25), voices:[], mine:false}); } }catch(e){}
+  if(news !== false){ G.reactNews = (G.reactNews || []).concat([{t:text, d:G.day}]).slice(-12); }
+}
+function reactFrac(pos, title){
+  const bill = {pos:pos || {econ:0, lib:0, def:0, wel:0}, title:title || "act", id:"r:" + title}, mem = (G.members || []).filter(m => m && !m.gone && m.kind === "member" && m.pos);
+  let n = 0; mem.forEach(m => { try{ if(alignment(m, bill) > 0) n++; }catch(e){} }); return mem.length ? n / mem.length : 0.5;
+}
+function reactResolve(e){
+  const y = G.you, d = e.data, opp = pty => pty === "FED" ? "COM" : "FED";
+  if(e.kind === "actVetoed"){
+    const act = (G.lastActs || []).find(a => a.title === d.title), fr = reactFrac(d.pos, d.title), sp = reactHolder("speaker");
+    const ok = chance(clamp((fr - 0.55) * 4, 0, 0.95));
+    if(ok){ if(act){ act.vetoed = false; act.signed = true; act.overridden = true; } y.standing = clamp(y.standing - 2, 0, 100); reactSay(sp, (sp ? "Speaker " + surname(sp.name) + ": " : "") + "the House and Senate have overridden the veto of the " + d.title + ". It is law without a signature."); }
+    else reactSay(sp, (sp ? "Speaker " + surname(sp.name) + ": " : "") + "the House tried to override the veto of the " + d.title + " and fell short of two thirds. The veto stands.");
+    return; }
+  if(e.kind === "actSigned"){
+    const act = (G.lastActs || []).find(a => a.title === d.title), ct = courtTest({pos:d.pos || {econ:0, lib:0, def:0, wel:0}, title:d.title, id:"c:" + d.title});
+    const o = reactHolder("minority"), a = reactHolder("speaker");
+    if(ct && !ct.ignored){ if(act) act.struck = true; y.approval = clamp(y.approval - 1, 0, 100); reactSay(null, "The bench has struck down the " + d.title + ", " + ct.strike + " to " + ((G.court || []).length - ct.strike) + ". It never took effect."); }
+    else if(ct && ct.ignored) reactSay(null, "The bench objected to the " + d.title + " and was ignored. Nobody enforced the ruling.");
+    else reactSay(null, "The " + d.title + " survives a challenge in the courts and goes into force.");
+    if(o) reactSay(o, "Minority Leader " + surname(o.name) + ": the " + d.title + " " + (reactFrac(d.pos, d.title) > 0.5 ? "is a step, and we will watch how it is run." : "is the wrong answer to the right question."), false);
+    return; }
+  if(e.kind === "stateBill"){
+    const S = (G.states || []).find(x => x.n === d.state); if(!S) return;
+    if(d.signed){
+      if(d.axis === "lib" || d.axis === "def" ? chance(0.3) : chance(0.1)){ G.cases = G.cases || []; G.cases.push({t:"the Union v. " + d.state, state:d.state, day:G.day, voted:[]}); reactSay(null, "The Union's attorney has filed against " + d.state + " over the " + d.title + ". It goes to the bench."); }
+      else reactSay(null, "The " + d.title + " takes effect in " + d.state + ". " + (d.unrest > 0 ? "The counties are bracing." : "The counties are watching."));
+      const rep = (G.members || []).find(m => m && !m.gone && m.state === d.state && m.kind === "member"); if(rep) reactSay(rep, "Representative " + surname(rep.name) + ": the governor signed the " + d.title + "; home will see what it does.", false);
+    } else {
+      const ok = chance(clamp(0.3 + (d.dir * (S.lean || 0)) / 200, 0.1, 0.8));
+      if(ok){ S.ind = clamp(S.ind + d.ind, 0, 100); S.unrest = clamp(S.unrest + d.unrest, 0, 100); y.approval = clamp(y.approval - 2, 0, 100); reactSay(null, "The " + d.state + " legislature overrode your veto of the " + d.title + ". It is law."); }
+      else reactSay(null, "The " + d.state + " legislature tried to override your veto of the " + d.title + " and could not find the votes.");
+    }
+    return; }
+  if(e.kind === "treaty"){
+    const r = WORLD_POWERS.find(p => p.k === d.k), rel = G.realmRel = G.realmRel || {}; if(!r) return;
+    if(d.ok){
+      const ex = G.exec && !G.exec.you ? G.exec : null;
+      if(ex && chance(0.2)){ rel[d.k] = clamp((rel[d.k] || 0) - 4, -100, 100); reactSay(null, "The President declines to exchange instruments with " + r.t + ". The Senate has consented; the executive has not acted."); }
+      else if(d.verb === "res" && chance(0.4)){ rel[d.k] = clamp((rel[d.k] || 0) - 6, -100, 100); reactSay(null, "The assembly of " + r.t + " refuses the Senate's reservation. The treaty is in doubt."); }
+      else { rel[d.k] = clamp((rel[d.k] || 0) + 3, -100, 100); reactSay(null, "Instruments are exchanged with " + r.t + ". The treaty is in force."); }
+      const h = reactHolder("armed"); if(h) reactSay(h, "Armed Services Chair " + surname(h.name) + ": the treaty with " + r.t + " will be read line by line, and the Chair will be asking what the garrisons get out of it.", false);
+    } else if(d.verb === "no"){ rel[d.k] = clamp((rel[d.k] || 0) - 3, -100, 100); reactSay(null, (rel[d.k] < -20 ? cap(r.t) + " recalls its ambassador for consultations." : cap(r.t) + " asks for a meeting at the working level.")); }
+    else reactSay(null, cap(r.t) + " says the Senate is stalling, and will say so at home.");
+    return; }
+  if(e.kind === "confirm"){
+    if(d.confirmed){ const J = G.court || [], avg = J.length ? J.reduce((a, j) => a + ((j.pos && j.pos.econ) || 0), 0) / J.length : 0; const o = reactHolder("minority");
+      reactSay(null, d.name + " takes the bench. The court now leans " + (avg > 8 ? "toward the market" : avg < -8 ? "toward the public" : "neither way") + " on the economy; its next opinions will show it.");
+      if(o) reactSay(o, "Minority Leader " + surname(o.name) + ": the new justice will be judged by the opinions, not by the introductions.", false);
+    } else reactSay(null, "The White House is said to be looking for another name after " + d.name + ". The seat stays open for now.");
+    return; }
+  if(e.kind === "foreign"){
+    const r = WORLD_POWERS.find(p => p.k === d.k), rel = G.realmRel = G.realmRel || {}; if(!r) return;
+    const o = reactHolder("minority");
+    if(d.verb === "aid"){ if(o) reactSay(o, "Minority Leader " + surname(o.name) + ": money to " + r.t + " while the farm counties go short is a choice, and the House will ask for the figures."); if(G.world && G.world.foe && G.world.foe !== d.k){ const f = WORLD_POWERS.find(p => p.k === G.world.foe); rel[G.world.foe] = clamp((rel[G.world.foe] || 0) - 2, -100, 100); reactSay(null, f.t + " notes the aid to " + r.t + " and files it."); } else reactSay(null, cap(r.t) + " thanks the Union publicly and privately asks for more."); }
+    else if(d.verb === "trade"){ reactSay(null, "Merchants in the harbour towns welcome the " + r.t + " schedule; the farm co-ops want to read it first."); }
+    else if(d.verb === "warn" || d.verb === "press"){ if(G.world && G.world.foe === d.k) G.world.heat = clamp((G.world.heat || 0) + 2, 0, 100); reactSay(null, cap(r.t) + " " + (d.verb === "warn" ? "answers the warning with a statement for its own papers." : "gives a little ground and asks for something in return.")); }
+    return; }
+  if(e.kind === "appoint"){
+    const s2 = reactHolder("speaker");
+    reactSay(null, d.ok ? d.name + " takes up the post of " + String(d.post || "").toLowerCase() + ". The department's staff are reading everything they have written." : "The legislature rejected " + d.name + "; the post of " + String(d.post || "").toLowerCase() + " is still vacant.", true);
+    return; }
+  if(e.kind === "ruling"){
+    const S = (G.states || []).find(x => x.n === d.state), h = reactHolder("judic");
+    if(d.dual) reactSay(null, "The House is drafting an amendment on holding two offices, after the bench's ruling in " + d.t + ".");
+    else if(d.forUnion){ if(S) S.unrest = clamp(S.unrest + 2, 0, 100); reactSay(null, "The governor of " + d.state + " says the state will comply, slowly, and that the legislature will ask Congress to revisit the mandate."); }
+    else { reactSay(null, d.state + " keeps its money and its rules. The Union's attorney says the administration will study the opinion."); }
+    if(h) reactSay(h, "Judiciary Chair " + surname(h.name) + ": the committee will look at the bench's reasoning in " + d.t + " before anything is written down.", false);
+    return; }
+  if(e.kind === "senVote"){
+    const ex = G.exec, fit = ex && !ex.you ? alignment(ex, {pos:d.pos || {econ:0, lib:0, def:0, wel:0}, title:d.title}) : 0, sp = reactHolder("speaker");
+    reactSay(sp, (sp ? "Speaker " + surname(sp.name) + ": " : "") + "the House will take up the Senate's action on the " + d.title + " this week.", false);
+    if(ex && !ex.you) reactSay(null, "The White House " + (fit > 0 ? "signals the President would sign the " + d.title + "." : fit < -18 ? "issues a veto threat on the " + d.title + "." : "says the President is reading the " + d.title + "."));
+    return; }
+}
+function reactDay(){
+  const Q = G.react || []; if(!Q.length) return; const keep = [];
+  Q.forEach(e => { if(e.due <= G.day){ try{ reactResolve(e); }catch(x){ try{ console.warn("react", x); }catch(e2){} } } else keep.push(e); });
+  G.react = keep;
+}
 function amendText(S){ const A = (S && S.amend) || []; return A.length ? " Amendments agreed at open hours, to be attached: " + A.map(a => a.title + " (" + a.from + ")").join("; ") + "." : ""; }
 function amendApply(S){ const A = (S && S.amend) || []; if(!A.length) return ""; const y = G.you; S.unrest = clamp(S.unrest - A.length, 0, 100); y.approval = clamp(y.approval + A.length, 0, 100); S.amend = []; return " The amendments from open hours were attached: " + A.map(a => a.title).join(", ") + "."; }
 function govBrief(S){
@@ -30213,11 +30385,11 @@ function govDesk(S){
       S.lean = clamp(Math.round(S.lean + b.dir*3), -100, 100); S.bill = null;
       const fit = (b.dir > 0 ? 1 : -1) * (b.axis === "econ" ? S.lean : b.axis === "lib" ? -S.lean*0.4 : S.lean*0.3);
       y.approval = clamp(y.approval + (fit > 0 ? 3 : -2), 0, 100);
-      feed("Governor " + surname(y.name) + " signed the " + b.title + ".", "good");
+      reactState(S, b, true); feed("Governor " + surname(y.name) + " signed the " + b.title + ".", "good");
       return "Signed at the desk, with the bill's sponsors standing behind you." + amendApply(S); }},
     {t:"Veto it", d:"Back to the legislature. They may try again next session.", run(){
       S.bill = null; S.unrest = clamp(S.unrest + 2, 0, 100); y.approval = clamp(y.approval + rint(-3, 4), 0, 100);
-      feed("Governor " + surname(y.name) + " vetoed the " + b.title + ".", "bad");
+      reactState(S, b, false); feed("Governor " + surname(y.name) + " vetoed the " + b.title + ".", "bad");
       return "Vetoed. The majority leader of the statehouse will not return your calls this week."; }}
   ], "gdesk", 15);
   return null;
@@ -31269,7 +31441,7 @@ function lHeadline(t){
 function paperBuild(){
   const D = G.day, y = G.you;
   const prev = (G.daylog || []).filter(x => x.d === D - 1 || (x.d === D && /overnight|this morning/i.test(x.t)));
-  const night = (G.nightNews && (G.nightNews.day === D - 1 || G.nightNews.day === D)) ? G.nightNews.items.map(t => ({t, k:"", d:D})) : [];
+  const night = ((G.nightNews && (G.nightNews.day === D - 1 || G.nightNews.day === D)) ? G.nightNews.items.map(t => ({t, k:"", d:D})) : []).concat((G.reactNews || []).filter(x => x.d >= D - 1).map(x => ({t:x.t, k:"", d:D})));
   const seen = new Set(), all = [];
   const sn = y ? surname(y.name) : "The member";
   night.concat(prev).forEach(x => {
@@ -32920,7 +33092,7 @@ function saveCaptureBase(){
     withWhom:G.withWhom, ties:G.ties, rite:G.rite, gov:G.gov, placed:G.placed, panel:null, court:G.court, own:G.own, parties:G.parties,
     termLength:G.termLength, country:G.country,
     greatest:G.greatest, blasphemy:G.blasphemy, loreNote:G.loreNote, greatnessOpen:G.greatnessOpen,
-    relics:G.relics, relicSpots:G.relicSpots, consularLore:G.consularLore, bind:G.bind, sens:G.sens, invertY:!!G.invertY, voiceVol:G.voiceVol, goals:G.goals, whip:G.whip || null, billQueue:G.billQueue || [], faith:G.faith || null, life:G.life || null, ach:G.ach || {}, law:G.law || null, ladder:G.ladder || [], cases:G.cases || [], lastActs:G.lastActs || [], wx:G.wx || null, town:G.town || null, rivals:G.rivals || [], rivalNext:G.rivalNext || 0, daylog:(G.daylog || []).slice(-120), paperRead:G.paperRead || 0, seedL:G.seedL || 0, mHints:G.mHints || {}, tlog:(G.tlog || []).slice(-500), ag:G.ag || null, sitPrep:G.sitPrep || {}, echoes:G.echoes || [], billKinds:G.billKinds || {}, realmRel:G.realmRel || {}, listened:G.listened || 0,
+    relics:G.relics, relicSpots:G.relicSpots, consularLore:G.consularLore, bind:G.bind, sens:G.sens, invertY:!!G.invertY, voiceVol:G.voiceVol, goals:G.goals, whip:G.whip || null, billQueue:G.billQueue || [], faith:G.faith || null, life:G.life || null, ach:G.ach || {}, law:G.law || null, ladder:G.ladder || [], cases:G.cases || [], lastActs:G.lastActs || [], wx:G.wx || null, town:G.town || null, rivals:G.rivals || [], rivalNext:G.rivalNext || 0, daylog:(G.daylog || []).slice(-120), paperRead:G.paperRead || 0, seedL:G.seedL || 0, mHints:G.mHints || {}, tlog:(G.tlog || []).slice(-500), ag:G.ag || null, sitPrep:G.sitPrep || {}, echoes:G.echoes || [], billKinds:G.billKinds || {}, realmRel:G.realmRel || {}, react:G.react || [], reactNews:G.reactNews || [], senStaff:G.senStaff || null, presStaff:G.presStaff || null, listened:G.listened || 0,
     world:G.world, sc:G.sc || null, ph:G.ph || null,  sbox:G.sbox || null, dist:G.dist || null, fam:G.fam || null, loreBookSeeded:!!G.loreBookSeeded, saidHash:G.saidHash || [], dm:G.dm || null, lore:G.lore || null, trip:G.trip || null,
     pendingNight:!!G.pendingNight,
     cam:{x:cam.x, z:cam.z, yaw:cam.yaw, pitch:cam.pitch},
@@ -37249,6 +37421,7 @@ try{
     steps:["gavel","open","question","question","motion","deliberate","vote","adjourn"]};
   SIT_DEF.caucus = {title:"Party meeting", chair:"The Whip", min:40, en:8, kind:"vote", key:"sxcauc",
     steps:["gavel","open","question","motion","deliberate","vote","adjourn"]};
+  SIT_DEF.floor = {title:"The House sits", chair:"The Speaker", min:60, en:0, kind:"vote", steps:["gavel","open","question","question","motion","deliberate","vote","adjourn"]};
   SIT_DEF.press = {title:"Press conference", chair:"The press secretary", min:30, en:6, kind:"decision", key:"sxpress",
     steps:["gavel","open","question","question","motion","ruling","adjourn"]};
   const KEY = {senate:"ksen", court:"kct", exec:"kex", govoffice:"kgv"};

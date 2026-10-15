@@ -4,6 +4,15 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## Nothing you do stays yours: the other branches answer
+
+`20261015e` (on `20261015d`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- **Every branch has its own job:** once you sign, veto, appoint, ratify, confirm, rule or send aid, the other institutions get a turn the next morning, on their own. Vetoes go to a House and Senate override vote; signed acts face the courts; a governor's bill can draw a federal suit, and a governor's veto can be overridden by the statehouse; a treaty needs the President to exchange instruments and the other country's assembly to accept your reservation; a confirmed justice changes the bench; aid and warnings draw the opposition, the rival realms and the press; a bench ruling sends Congress and the states off to answer it.
+- They answer in the open: a feed line, a Vox post from the member whose job it is (Speaker, Minority Leader, Armed Services or Judiciary chair, your own state's Representative), and the Ledger's next edition. Pending reactions are saved.
+- **The President's day:** a cabinet briefing (Treasury, State, War, Attorney General, each with their own line); acts on the desk with the axis-by-axis meaning, four cabinet opinions and the odds of an override; and three foreign capitals on the line, with aid, a trade schedule, a warning or silence.
+- **Gallery:** you can now watch the House floor too.
+
 ## Vox you can post from, a huddle you can join, the Senator's day
 
 `20261015d` (on `20261015c`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
