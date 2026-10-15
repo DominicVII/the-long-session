@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261015e">
+<meta name="onum-build" content="20261015f">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261015e";
+  var STAMP = "20261015f";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -29274,6 +29274,92 @@ function rolePowers(){
   }
   return P;
 }
+/* ── the bench: clerks who read the case, justices who argue it, an opinion you write, and petitions that choose what the Court hears ── */
+const BENCH_CLERKS = {senior:"Senior law clerk", clerk:"Law clerk", junior:"Junior law clerk"};
+function benchClerks(){
+  const y = G.you; G.benchStaff = G.benchStaff || {}; const S = {n:y.state};
+  Object.keys(BENCH_CLERKS).forEach(k => { if(!G.benchStaff[k]) G.benchStaff[k] = mkOfficial("clerk:" + k + ":" + y.name, S, BENCH_CLERKS[k]); });
+  return G.benchStaff;
+}
+/* which way a justice leans on a case: federalism for state-v-Union suits, one-person-one-office for dual-seat suits */
+function justiceLean(j, c){
+  const r = rng(seedOf("jl:" + j.name + ":" + c.t)), p = j.pos || {};
+  const v = c.dual != null ? (p.lib || 0) * 0.5 - (p.def || 0) * 0.2 : (p.def || 0) * 0.5 + (p.econ || 0) * 0.4 - (p.lib || 0) * 0.2 + (p.wel || 0) * -0.1;
+  return v + (r() - 0.5) * 30;
+}
+function justiceWhy(j, c, forSide, idx){
+  const p = j.pos || {}, ax = AXES.slice().sort((a, b) => Math.abs(p[b.k] || 0) - Math.abs(p[a.k] || 0))[0], X = DK_AXIS[ax.k], P = (p[ax.k] || 0) > 0 ? X.hi : X.lo;
+  const r = rng(seedOf("jw:" + j.name + ":" + c.t));
+  const bank = c.dual != null ? (forSide ? ["The Charter says one person, one office, and I will not read in an exception because it is convenient.", "A seat held in two places is held fully in neither.", "Offices are trusts. A person cannot hold two trusts that may one day pull against each other.", "The framers feared a man in two rooms at once. I take them at their word.", "If we allow it today for someone we like, we allow it tomorrow for someone we do not."]
+      : ["The Charter is silent, and a court should not write what the framers left out.", "The voters chose this person twice; I would not undo that on an inference.", "A prohibition has to be written down by someone with the power to write it. We are not that someone.", "I want to see the harm before I vacate a seat. I have not been shown it.", "Silence in the Charter is the legislature's invitation, not ours."])
+    : (forSide ? ["The act is the law of the Union and the states may not pick which laws bind them.", "A republic of fifty rulebooks is not a republic. The mandate stands.", "The supremacy clause is not a suggestion, and the state's quarrel is with Congress, not with us.", "If every state may opt out of what it dislikes, the Union is a debating society.", "I see a valid exercise of a power the Charter plainly gives. The policy is for the voters to revisit."]
+      : ["The Charter gives the Union enumerated powers, and this is not on the list.", "The states are not the Union's departments. This mandate reaches past what the Charter allows.", "A power that is not named is reserved, and I do not find this one named.", "The state is being told to spend its own money on the Union's idea. That is a commandeering the framers refused.", "Federalism is not a courtesy. It is the reason the states agreed to be a Union at all."]);
+  const i0 = Math.floor(r() * bank.length), k = (idx == null ? i0 : (i0 + idx) % bank.length);
+  return bank[k] + " I come to it as a person who leans " + P.w.toLowerCase() + ", and I will not pretend that has nothing to do with it.";
+}
+function benchCase(){ return (G.cases || []).find(x => x && !x.done) || null; }
+function benchConf2(){
+  const y = G.you, c = benchCase(); if(!c){ govCardOpen("Conference", "Nothing is ripe", "No case is ready for conference today. You talk about the long view and the coffee.", "", "bconf"); return null; }
+  const clerks = benchClerks(), J = (G.court || []).filter(j => j && !j.you), forS = (j) => justiceLean(j, c) > 0, lobbied = G.confLobby = {};
+  const lab = c.dual != null ? ["for the House", "for the member"] : ["for the Union", "for the state"];
+  const tally = () => { let u = 0, s2 = 0; J.forEach(j => { const l = lobbied[j.name]; const v = l != null ? l : (forS(j) ? 1 : 0); if(v === 1) u++; else s2++; }); return {u, s2}; };
+  const render = () => {
+    const t = tally();
+    el("cfCount").textContent = "The count so far, without you: " + lab[0] + " " + t.u + ", " + lab[1] + " " + t.s2 + ". Five justices sit; you are the fifth, and three carry it.";
+    J.forEach((j, i) => { const l = lobbied[j.name]; const side = l != null ? l === 1 : forS(j); el("jc_" + i).textContent = "“" + justiceWhy(j, c, side, i) + "” — leans " + (side ? lab[0] : lab[1]) + (l != null ? " (you have spoken to them)" : ""); });
+  };
+  const body = '<div class="muted" style="margin:6px 0">' + pcEsc(c.dual != null ? "Can one person hold two elected offices?" : "A state against the Union over a federal act.") + ' Filed day ' + c.day + (c.state ? ' · ' + pcEsc(c.state) : '') + '.</div>' +
+    '<div id="cfCount" class="eyebrow" style="margin:8px 0"></div>' +
+    J.map((j, i) => '<div style="margin:8px 0;padding:6px 10px;border-left:3px solid var(--line-soft)"><b>' + pcEsc(j.name) + '</b> <span class="muted">· Justice · ' + pcEsc(viewWords(j.pos || {})) + ' · named by ' + pcEsc(j.by || "a previous executive") + '</span><div id="jc_' + i + '" style="font-size:13px;margin:4px 0"></div>' +
+      '<div class="card__actions"><button type="button" class="btn btn--ghost" data-lobby="' + i + ':1">Press them ' + lab[0] + ' (3 influence)</button><button type="button" class="btn btn--ghost" data-lobby="' + i + ':0">Press them ' + lab[1] + ' (3 influence)</button></div></div>').join("") +
+    '<div class="eyebrow" style="margin-top:10px">Your clerks</div>' +
+    Object.keys(BENCH_CLERKS).map(k => '<div style="margin:6px 0;padding:6px 10px;border-left:3px solid var(--line-soft)">' + officialHTML(clerks[k]) + '<div class="card__actions"><button type="button" class="btn btn--ghost" data-clk="' + k + '">Ask what they make of it</button></div><div class="dream" id="ck_' + k + '"></div></div>').join("") +
+    '<p class="muted" style="font-size:12px">Nothing is decided in conference; it only tells you where the votes are. The opinion is written afterwards.</p>';
+  govCardOpen("Conference · " + c.t, "The justices, in their own words", "Each of them has argued it already in their own heads. Their lines are not yours.", body, "bconf");
+  render();
+  card.querySelectorAll("[data-lobby]").forEach(b => b.addEventListener("click", () => { const [i, side] = b.getAttribute("data-lobby").split(":"), j = J[+i]; if(lobbied[j.name] != null) return; if(y.influence < 3){ el("gcSay").textContent = "You are short of influence."; return; }
+    y.influence -= 3; spend(15, 2); const natural = forS(j) ? 1 : 0, want = +side, odds = (natural === want ? 0.9 : 0.25 + (Math.abs(justiceLean(j, c)) < 12 ? 0.3 : 0));
+    lobbied[j.name] = chance(odds) ? want : natural; el("gcSay").textContent = lobbied[j.name] === want ? j.name + " will think about it, and gives you more than they meant to." : j.name + " listens politely and does not move."; render(); }));
+  card.querySelectorAll("[data-clk]").forEach(b => b.addEventListener("click", () => { const k = b.getAttribute("data-clk"), o = clerks[k], v = justiceLean({pos:o.pos, name:o.name}, c) > 0;
+    el("ck_" + k).textContent = "“I read it " + (v ? lab[0] : lab[1]) + ", Justice. " + justiceWhy({pos:o.pos, name:o.name}, c, v) + "”"; }));
+  return null;
+}
+function benchOpinion(){
+  const y = G.you, c = benchCase(); if(!c){ govCardOpen("Opinions", "No case is ripe", "There is nothing to decide today. State-versus-Union suits land here once the House passes a mandate.", "", "bopin"); return null; }
+  const J = (G.court || []).filter(j => j && !j.you), conf = G.confLobby || {};
+  const lab = c.dual != null ? ["for the House", "for the member"] : ["for the Union", "for the state"];
+  const recuse = c.state === y.state || (c.voted && c.voted.indexOf(y.name) >= 0);
+  if(recuse){ govCardOpen("Opinions · " + c.t, "You must recuse", "Your own state, or a vote you already cast on it. The rule is plain.", '<div class="card__actions"><button type="button" class="btn" id="rcGo">Recuse</button></div>', null); el("rcGo").addEventListener("click", () => { c.done = true; c.recused = true; el("gcSay").textContent = "You recused. The bench decides without you."; try{ kMark("bopin"); }catch(e){} }); return null; }
+  const form = [["narrow", "Narrow opinion", "Decide it on this record only. More justices will join; less changes."], ["broad", "Broad opinion", "Settle the principle for every state. Fewer will join; much changes."]];
+  const body = '<p class="muted">Filed day ' + c.day + (c.state ? ' · ' + pcEsc(c.state) : '') + '. Choose your side, then how far you write.</p>' +
+    form.map(f => '<div style="margin:8px 0;padding:6px 10px;border-left:3px solid var(--line-soft)"><b>' + pcEsc(f[1]) + '</b> <span class="muted">' + pcEsc(f[2]) + '</span><div class="card__actions" style="flex-wrap:wrap"><button type="button" class="btn" data-op="' + f[0] + ':1">Write ' + lab[0] + '</button><button type="button" class="btn btn--ghost" data-op="' + f[0] + ':0">Write ' + lab[1] + '</button></div></div>').join("");
+  govCardOpen("Opinions · " + c.t, "Write the opinion", "You are the fifth vote. Your opinion is the Court's voice if three join you; if not, it is a dissent.", body, null);
+  card.querySelectorAll("[data-op]").forEach(b => b.addEventListener("click", () => { if(c.done) return; const [fm, side] = b.getAttribute("data-op").split(":"), forU = side === "1";
+    let joins = 1; J.forEach(j => { const l = conf[j.name], nat = l != null ? l : (justiceLean(j, c) > 0 ? 1 : 0); let vote = nat === (forU ? 1 : 0); if(vote && fm === "broad" && Math.abs(justiceLean(j, c)) < 14 && chance(0.5)) vote = false; if(vote) joins++; });
+    const win = joins >= 3, ax = AXES.slice().sort((a, d) => Math.abs((y.pos || {})[d.k] || 0) - Math.abs((y.pos || {})[a.k] || 0))[0], X = DK_AXIS[ax.k], P = ((y.pos || {})[ax.k] || 0) > 0 ? X.hi : X.lo;
+    const text = "Justice " + surname(y.name) + ", " + (win ? "for the Court" : "dissenting") + ": “" + (c.dual != null ? (forU ? "The Charter's plain meaning is one person, one office." : "The Charter is silent on a second seat, and silence is not a prohibition.") : (forU ? "The act is a valid exercise of the Union's powers, and the state's objection is to the policy, not the power." : "The Charter does not enumerate this power, and what is not enumerated is reserved to the states.")) + " " + (fm === "narrow" ? "We decide this record and no more." : "We settle the principle for every state, so that no one needs to litigate it again.") + " I write as one who leans " + P.w.toLowerCase() + ", and I invite the reader to weigh that.”";
+    spend(60, 6);
+    if(win){ const msg = benchRule(c, forU); y.standing = clamp(y.standing + (fm === "broad" ? 3 : 1), 0, 100); if(fm === "broad"){ try{ setPrecedent("wrote the opinion for the Court in " + c.t, "that the Union's reach " + (forU ? "extends to what the states would rather not do" : "stops short of what the Charter does not name")); }catch(e){} const S = (G.states || []).find(x => x.n === c.state); if(S) S.unrest = clamp(S.unrest + (forU ? 2 : -2), 0, 100); }
+      el("gcSay").textContent = text + "\n\nJoined by " + (joins - 1) + " of the other four. " + msg; feed("The Court rules in " + c.t + ", " + joins + " to " + (5 - joins) + ".", "good"); }
+    else { const msg = benchRule(c, !forU); y.standing = clamp(y.standing + 1, 0, 100); el("gcSay").textContent = text + "\n\nOnly " + (joins - 1) + " of the other four joined you; the Court goes the other way, " + (5 - joins) + " to " + joins + ". Your dissent is printed beside it. " + msg; feed("The Court rules in " + c.t + ", " + (5 - joins) + " to " + joins + ", over your dissent.", "bad"); }
+    el("gcSay").style.whiteSpace = "pre-line"; G.confLobby = {}; try{ kMark("bopin"); }catch(e){} card.querySelectorAll("[data-op]").forEach(z => z.disabled = true); }));
+  return null;
+}
+function benchCert(){
+  const y = G.you, clerks = benchClerks(), S0 = (G.states || []), done = {};
+  const pool = [["the grain tariff act", "a state's refusal to collect it", 0], ["the pension mandate", "a state's refusal to fund it", 1], ["a school standards act", "a state's objection that education is its own", 2], ["the militia levy", "a state's claim that its own militia is not the Union's to call", 3], ["the river survey act", "a state's claim to its own waters", 4]];
+  const picks = pool.slice().sort(() => Math.random() - 0.5).slice(0, 3).map(p => { const st = pick(S0).n; return {t:st + " v. the Union (" + p[0] + ")", state:st, what:p[0], gist:p[1], petitioner:newName(st)}; });
+  const body = picks.map((p, i) => { const cl = clerks[["senior", "clerk", "junior"][i]], v = (cl.pos.def || 0) > 5 || (cl.pos.econ || 0) > 12;
+    return '<div style="margin:10px 0;padding:8px 10px;border-left:3px solid var(--line-soft)"><b>' + pcEsc(p.t) + '</b> <span class="muted">petition by ' + pcEsc(p.petitioner) + ', ' + pcEsc(p.state) + '</span><p style="margin:4px 0;font-size:13px">The state objects to ' + pcEsc(p.what) + ': ' + pcEsc(p.gist) + '.</p>' +
+      '<div class="muted" style="font-size:12px">' + pcEsc(cl.name) + ' (' + pcEsc(viewWords(cl.pos)) + '): “' + pcEsc(v ? "I would take it. The question is real and the lower courts disagree." : "I would deny it. The record is thin and the question will come back in better shape.") + '”</div>' +
+      '<div class="card__actions"><button type="button" class="btn" data-ce="' + i + ':1">Grant review</button><button type="button" class="btn btn--ghost" data-ce="' + i + ':0">Deny</button></div><div class="dream" id="ce_' + i + '"></div></div>'; }).join("");
+  govCardOpen("Petitions for review", "What the Court will hear", "The Court chooses its own docket. Four justices must agree; you have the vote of one. Granting a petition puts a real case on the bench.", body, "bcert");
+  card.querySelectorAll("[data-ce]").forEach(b => b.addEventListener("click", () => { const [i, g] = b.getAttribute("data-ce").split(":"), p = picks[+i]; if(done[i]) return; done[i] = 1; spend(15, 2);
+    if(g === "1"){ const ok = chance(0.6); if(ok){ G.cases = G.cases || []; G.cases.push({t:p.t, state:p.state, day:G.day, voted:[]}); y.standing = clamp(y.standing + 1, 0, 100); el("ce_" + i).textContent = "Review is granted. " + p.t + " is on the docket and will be argued."; feed("The Court granted review in " + p.t + ".", "good"); } else el("ce_" + i).textContent = "You vote to grant, but the other justices do not join you. It is denied."; }
+    else { el("ce_" + i).textContent = "Denied. " + p.petitioner + " will be told by letter, and the lower ruling stands."; }
+    card.querySelectorAll('[data-ce^="' + i + ':"]').forEach(z => z.disabled = true); }));
+  return null;
+}
 function benchRule(c, forUnion){
   reactEmit("ruling", {t:c.t, forUnion, state:c.state, dual:c.dual != null});
   if(c.dual != null){
@@ -30093,9 +30179,10 @@ function docketFor(k){
       {h:16, key:"scalls", t:"Calls from " + y.state, d:"Three constituents with real problems; what you promise is remembered.", run:() => senCalls()}
     ],
     bench:[
-      {h:9,  key:"bconf",  t:"Conference with the other justices", d:"The docket, argued in private.", run:() => benchConference()},
+      {h:9,  key:"bconf",  t:"Conference with the other justices", d:"The case, argued in private: four justices in their own words, and your clerks.", run:() => benchConf2()},
       {h:10, key:"kct",    t:"Oral argument", d:"Counsel for each side, and your questions.", sit:"court"},
-      {h:14, key:"bopin",  t:"Write opinions", d:"Rule on what is ripe, or recuse.", run:() => { officeCard(); kMark("bopin"); return null; }}
+      {h:13, key:"bcert",  t:"Petitions for review", d:"Choose which cases the Court will hear.", run:() => benchCert()},
+      {h:14, key:"bopin",  t:"Write the opinion", d:"Pick your side and how far to write; three votes make it the Court's.", run:() => benchOpinion()}
     ],
     pres:[
       {h:8,  key:"kex",    t:"The morning briefing", d:"The overnight file: states, realms, the treasury.", sit:"exec"},

@@ -4,6 +4,15 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## The bench: clerks, conference, cert, and the opinion you write
+
+`20261015f` (on `20261015e`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- **Conference:** the case is argued with the four other justices, each in their own words (and each with their own reasons, not the same line), plus three law clerks with views of their own. You can press a justice for 3 influence, and see the count move.
+- **Petitions for review:** the Court chooses its own docket. Three named petitions with a clerk's recommendation each; granting one puts a real case on the bench.
+- **The opinion:** choose your side and a narrow or broad opinion; three votes make it the Court's, otherwise it prints as your dissent. A broad opinion that carries sets precedent and moves the state; the other branches answer the ruling the next morning, as before.
+- The docket for a justice is now conference, oral argument, petitions, then the opinion.
+
 ## Nothing you do stays yours: the other branches answer
 
 `20261015e` (on `20261015d`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
