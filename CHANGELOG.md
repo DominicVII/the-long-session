@@ -4,6 +4,17 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## The purse: one money for everyone
+
+`20261015g` (on `20261015f`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- **A purse for every person, the same rules for all:** you, a Senator, a baker and a clerk each have their own purse (ƒ). Everyone earns a salary, pays for where they live and eats, and decides for themselves what to spend and what to keep, by their own temper. Nothing in the code treats the player differently from anyone else.
+- **Not the war chest:** money raised in a campaign, and anything a donor or lobby put in the chest, cannot be spent on yourself. The purse card says so, and there is no way to move chest money into it.
+- **Shops in the district:** Vaughn's counter (coffee, lunch, a round for the counter), the market (groceries for a household, flowers, a tailored coat, a fine suit, a gold watch), the newsstand, the hardware store (mend a neighbour's gate) and the church box (a poor-box coin, a family's rent). Meals restore energy, clothes change how you dress (worn to lavish), and where you live (a room, a flat or a townhouse) changes what you pay a day.
+- **Being seen:** spend in public and everyone nearby reacts by their own temperament and their own means: awe, gladness, envy, jealousy, disapproval or indifference. Some boast and some don't; for showy purchases you choose whether to make a show of it or keep it quiet, and a show costs you with people who have less. Their reactions move how they feel about you, and the district's approval of you.
+- **They can do something about it, and so can you:** whoever sees a purchase can say something warm, ask to borrow, make a sharp remark, tell others, spend to keep up, or say nothing. NPCs choose by temperament; you choose from the same list in your purse (and you can lend to someone who asks, or refuse). Others shop on their own time, in the district, and show off or keep quiet by their own will.
+- A ƒ button on the toolbar and an Apps entry open the purse.
+
 ## The bench: clerks, conference, cert, and the opinion you write
 
 `20261015f` (on `20261015e`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.

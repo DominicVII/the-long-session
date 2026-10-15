@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261015f">
+<meta name="onum-build" content="20261015g">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261015f";
+  var STAMP = "20261015g";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -952,6 +952,7 @@ body.boot-menu .shell{grid-template-rows:minmax(0,1fr)}
           <button type="button" id="uiOpenBtn" title="House panels on phone (H). Pad: RB. Independent.">Panels</button>
           <button type="button" id="uiMapBtn" title="Travel">Map</button>
           <button type="button" id="uiWalkOut" title="Leave this room without wiping the sitting">Walk out</button>
+          <button type="button" id="uiPurseBtn" title="Your purse: your own money, not the war chest">ƒ</button>
           <button type="button" id="uiGalleryBtn" title="Sit in and watch a sitting">Gallery</button>
           <button type="button" id="uiPaperBtn" title="Read the Capitol Ledger">Ledger</button>
           <button type="button" id="uiSettingsBtn" title="Pause and settings (Esc)">⚙ Settings</button>
@@ -10281,6 +10282,7 @@ function pbContacts(){
 function pbApps(){
   const k = (function(){ try{ return heldOffice(); }catch(e){ return null; } })();
   const L = [
+    ["purse", "Your purse", "Your own money: salary, rent, what you spend and what people think of it. Not the war chest."],
     ["chest", "War chest", "Funds, the ledger, and what they can hire. " + (G.you ? money(G.you.funds || 0) : "")],
     ["office", "Powers of my office", "What the chair lets you do, and what it costs."],
     ["sched", "The schedule", "Counsel's diary: meetings, events and travel awaiting a yes or a no."],
@@ -10309,7 +10311,7 @@ function watchCard(){
     if(G.room !== k){ try{ goTo(k); }catch(e){} setTimeout(() => { try{ G._sitWatch = true; sitStart(k); }catch(e){ console.warn(e); } }, 500); } else sitStart(k); }));
 }
 function pbAppGo(id){
-  const go = {watch:() => watchCard(), chest:() => chestCard(), office:() => officeCard(), sched:() => scheduleCard(), docket:() => dkCard(0), gov:() => govCard(), paper:() => paperCard(),
+  const go = {purse:() => purseCard(), watch:() => watchCard(), chest:() => chestCard(), office:() => officeCard(), sched:() => scheduleCard(), docket:() => dkCard(0), gov:() => govCard(), paper:() => paperCard(),
     notebook:() => notebookCard(), rival:() => rivalCard(),
     career:() => { try{ showPane("paneCareer"); document.body.classList.add("ui-open"); }catch(e){} },
     union:() => { try{ mapToggle(true); }catch(e){} },
@@ -26440,13 +26442,13 @@ const PROPS = {
   ],
   district:[
     {id:"diner", label:"The counter at Vaughn's", sub:"Coffee, and everybody who votes", x:-5.5, z:12.4, r:3.0,
-     acts:()=>[{t:"Work the counter", c:"70m", run(){
+     acts:()=>purseShopActs("diner").concat([{t:"Work the counter", c:"70m", run(){
         spend(70, 18);
         G.you.approval = clamp(G.you.approval+6,0,100);
         const c2 = pick(G.civ);
         if(c2) c2.caseOpen = true;
         setSay("Two hours of eggs and grievances. Somebody's brother needs a letter written.",
-          fx("+6 approval · a new case worth taking","")); }}]},
+          fx("+6 approval · a new case worth taking","")); }}])},
     {id:"hq", label:"Campaign office", sub:"Folding tables, a phone bank, a whiteboard", x:5.8, z:12.4, r:3.0,
      acts:()=>[{t:"Organise for November", c:"100m", run(){
         spend(100, 24);
@@ -27260,6 +27262,7 @@ function nextDay(late){
     try{ riteYouDay(); }catch(e){}
     try{ govDay(); }catch(e){}
     try{ reactDay(); }catch(e){}
+    try{ purseDay(); }catch(e){}
     try{ cultDay(); }catch(e){}
     try{ caDay(); }catch(e){}
     try{ famDay(); }catch(e){}
@@ -30453,6 +30456,182 @@ function reactDay(){
   const Q = G.react || []; if(!Q.length) return; const keep = [];
   Q.forEach(e => { if(e.due <= G.day){ try{ reactResolve(e); }catch(x){ try{ console.warn("react", x); }catch(e2){} } } else keep.push(e); });
   G.react = keep;
+}
+/* ═════════════════════════════════════════════════════════
+   THE PURSE · one money for everyone
+   You, a Senator, a baker and a clerk all keep the same kind of purse and play by
+   the same rules: you earn, you pay for where you live, and the rest is yours to
+   spend or keep, on your own time and by your own temper. A person who spends in
+   public is seen, and everyone who sees it has an opinion and a choice about what
+   to do with it, the player no differently from anybody else. The campaign's war
+   chest, and anything taken from a donor, is not the purse: it cannot be spent on
+   yourself, so there is nothing here to launder it through.
+   ═════════════════════════════════════════════════════════ */
+const PURSE_ITEMS = {
+  coffee:{shop:"diner", t:"a coffee", price:2, show:0, min:10, energy:4, line:"A coffee, thanks."},
+  lunch:{shop:"diner", t:"the lunch special", price:6, show:0, min:30, energy:10, line:"The lunch special, please."},
+  round:{shop:"diner", t:"a round for the counter", price:30, show:2, min:25, appr:2, line:"This round is on me."},
+  paper:{shop:"newsstand", t:"the morning paper", price:1, show:0, min:5, paper:1, line:"The Ledger, please."},
+  book:{shop:"newsstand", t:"a book", price:12, show:0, min:20, infl:1, line:"I'll take that one."},
+  groceries:{shop:"market", t:"groceries for a household", price:15, show:0, min:15, gift:"hh", line:"Put together a basket for somebody who needs it."},
+  flowers:{shop:"market", t:"flowers", price:8, show:1, min:10, gift:"person", line:"Those flowers, wrapped."},
+  coat:{shop:"market", t:"a tailored coat", price:140, show:2, min:30, style:2, line:"I'll have the coat taken in."},
+  suit:{shop:"market", t:"a fine suit", price:380, show:3, min:45, style:3, line:"The best cloth you have, cut to me."},
+  watch:{shop:"market", t:"a gold watch", price:900, show:3, min:20, style:4, line:"That one, in the case."},
+  gate:{shop:"hardware", v:"Pay for", t:"mending a neighbour's gate", price:15, show:1, min:40, appr:2, line:"Hinges and a latch, please."},
+  box:{shop:"church", v:"Put", t:"coins in the poor box", price:10, show:0, min:10, appr:1, line:""},
+  rent:{shop:"church", v:"Pay", t:"a family's rent for the month", price:60, show:1, min:20, appr:3, line:""}
+};
+const PURSE_HOMES = {room:{t:"a rented room", cost:12, move:0, rest:-8}, flat:{t:"a flat", cost:24, move:40, rest:0}, house:{t:"a townhouse", cost:55, move:180, rest:2}};
+const PURSE_STYLE = ["worn", "plain", "smart", "fine", "lavish"];
+function purseTr(p){ return p.traits || {vanity:45, ambition:50, loyalty:50, discretion:55, conviction:50, temper:40}; }
+function purseOf(p){
+  if(!p.purse){
+    const seed = seedOf("cash:" + (p.id != null ? p.id : p.name));
+    const cash = p === G.you ? 150 : p.kind === "member" ? 60 + Math.round((p.influence || 20) * 2) + (p.post ? 40 : 0) : 25 + (seed % 170);
+    p.purse = {cash, style:cash < 60 ? 1 : cash < 220 ? 2 : cash < 520 ? 3 : 4, home:cash < 50 ? "room" : cash < 400 ? "flat" : "house", spent:0, log:[], feel:{}, broke:0};
+  }
+  return p.purse;
+}
+function purseWill(p){ const t = purseTr(p); return {boast:clamp((t.vanity || 40) * 0.7 + (t.ambition || 50) * 0.3 - (t.discretion || 55) * 0.35 + 10, 0, 100), thrift:clamp((t.discretion || 55) * 0.5 + (100 - (t.vanity || 40)) * 0.3 + (t.conviction || 50) * 0.2, 0, 100), guarded:clamp((t.conviction || 50) * 0.4 + (100 - (t.loyalty || 50)) * 0.3 + (100 - (t.ambition || 50)) * 0.3, 0, 100)}; }
+function purseSalary(p){
+  if(p === G.you){ let k = null; try{ k = heldOffice(); }catch(e){} return {house:45, senate:60, gov:70, bench:75, pres:95}[k] || 18; }
+  return p.kind === "member" ? 45 + (p.post ? 10 : 0) : 18 + (seedOf("wage:" + p.id) % 22);
+}
+function purseLog(p, text, amt){ const P = purseOf(p); P.log.unshift({d:G.day, t:text, a:amt}); if(P.log.length > 14) P.log.length = 14; }
+function purseChip(){ try{ const b = el("uiPurseBtn"); if(b && G.you) b.textContent = "ƒ" + Math.floor(purseOf(G.you).cash); }catch(e){} }
+const PURSE_LINES = {
+  awe:["That is something. I will say so.", "Well. Look at you.", "I have not seen cloth like that in this district."],
+  glad:["Good for you. You have earned it.", "I am glad somebody is enjoying it.", "Nice. Enjoy it."],
+  envy:["Must be nice.", "(says nothing, and looks at it a moment too long)", "I would not mind one of those myself."],
+  jealous:["Some of us count every coin, you know.", "Funny how it is always the same people.", "I saw what that cost. I know what I make."],
+  disapprove:["There are families on Elm Street who would live a month on that.", "That is a lot of money to wear on one's back.", "I do not say it is wrong. I say people will notice."],
+  indifferent:["", "", ""]
+};
+function pickReaction(w, actor, item, mode){
+  const t = purseTr(w), cashW = purseOf(w).cash, rel = (w.rel && w.rel.warmth) || 0;
+  const sh = (item.show || 0) * (mode === "show" ? 1.5 : mode === "quiet" ? 0.35 : 1);
+  if(sh < 0.4) return "indifferent";
+  const price = item.price * (1 + sh / 2), gap = clamp((price - cashW * 0.6) / (price + 60), 0, 1) * Math.min(1, sh / 1.5);
+  const W = {indifferent:Math.max(0.05, 1.1 - gap), glad:(t.loyalty || 50) / 100 * 1.1 + (rel > 10 ? 0.5 : 0) - gap * 0.5, awe:(t.ambition || 50) / 100 * gap * 1.5 + (sh >= 2 ? 0.2 : 0), envy:(t.vanity || 40) / 100 * gap * 1.4 + (rel < 0 ? 0.3 : 0), jealous:((t.vanity || 40) + (t.temper || 40)) / 200 * gap * (rel < 10 ? 1.6 : 0.5), disapprove:(t.conviction || 50) / 100 * gap * (cashW < 80 ? 1.3 : 0.3)};
+  let tot = 0; Object.keys(W).forEach(k => { W[k] = Math.max(0, W[k]); tot += W[k]; });
+  let r = Math.random() * tot; for(const k in W){ r -= W[k]; if(r <= 0) return k; }
+  return "indifferent";
+}
+const PURSE_DW = {awe:3, glad:2, envy:-2, jealous:-4, disapprove:-2, indifferent:0};
+/* what anyone who saw it can do about it: the same choices for you and for them */
+const PURSE_OPTS = [["admire", "Say something warm"], ["ask", "Ask to borrow ƒ 20"], ["remark", "Make a sharp remark"], ["gossip", "Tell others about it"], ["copy", "Spend to keep up"], ["nothing", "Say nothing"]];
+function pursePersonName(p){ return p === G.you ? "You" : p.name; }
+function purseDoOpt(w, actor, opt, item, reaction){
+  const wn = pursePersonName(w), an = pursePersonName(actor); let out = "";
+  const aW = (a) => { try{ if(a !== G.you && a.rel) ripple(a, 0, null, 0, false); }catch(e){} };
+  if(opt === "admire"){ out = wn + " tells " + (actor === G.you ? "you" : an) + " it suits them."; if(actor !== G.you && actor.rel) ripple(actor, 2, w === G.you ? "They noticed what I bought and said something kind." : null, 1, false); else if(actor === G.you) G.you.approval = clamp(G.you.approval + 0.5, 0, 100); }
+  else if(opt === "ask"){ const A = purseOf(actor), ok = A.cash >= 60 && (purseTr(actor).temper || 40) < 70 && (actor === G.you ? true : chance(0.55 + ((actor.rel && actor.rel.warmth) || 0) / 200));
+    if(actor === G.you){ G.you.asks = G.you.asks || []; G.you.asks.push({from:w.id, name:w.name, amt:20, day:G.day}); out = wn + " asks if you could spare ƒ 20, seeing how things are going."; }
+    else if(ok){ const W = purseOf(w); A.cash -= 20; W.cash += 20; if(w === G.you) purseLog(G.you, "Borrowed from " + an, 20); out = an + " lends " + wn + " ƒ 20 without a fuss."; if(actor.rel && w === G.you) ripple(actor, 1, "They asked to borrow a little and I gave it.", 1, false); }
+    else { out = an + " says no, politely, and means it."; if(actor.rel && w === G.you) ripple(actor, -2, "They asked me to lend them money the day I spent on " + item.t + ".", 2, false); } }
+  else if(opt === "remark"){ out = wn + " says something sharp about " + item.t + "."; if(actor === G.you) G.you.approval = clamp(G.you.approval - 1, 0, 100); else if(actor.rel) ripple(actor, -1, null, 0, false); }
+  else if(opt === "gossip"){ out = wn + " tells anybody who will listen about " + an + " and " + item.t + "."; try{ pursePeople().forEach(o => { if(o !== w && o !== actor){ const P = purseOf(o); P.feel[actor.id != null ? actor.id : "you"] = (P.feel[actor.id != null ? actor.id : "you"] || 0) - 1; } }); }catch(e){}
+    if(actor === G.you) G.you.approval = clamp(G.you.approval - 1, 0, 100); }
+  else if(opt === "copy"){ const lesser = Object.keys(PURSE_ITEMS).filter(k => PURSE_ITEMS[k].show > 0 && PURSE_ITEMS[k].price < item.price && PURSE_ITEMS[k].price <= purseOf(w).cash).sort((a, b) => PURSE_ITEMS[b].price - PURSE_ITEMS[a].price)[0];
+    if(lesser && w !== G.you){ purseBuy(w, lesser, {mode:"show", quiet:true}); out = wn + " goes and buys " + PURSE_ITEMS[lesser].t + " to keep up."; } else out = wn + " thinks about keeping up, and does not."; }
+  else out = wn + " says nothing, and the moment passes.";
+  return out;
+}
+function pursePeople(){ try{ return hereNow().filter(m => m && m !== G.you && !m.gone && m.traits).slice(0, 10); }catch(e){ return []; } }
+/* the same engine whether the buyer is you or anyone else */
+function purseWitness(actor, item, mode, shopSpot){
+  const lines = []; let net = 0;
+  const near = pursePeople().filter(w => w !== actor);
+  const witnesses = near.slice(0, 8);
+  if(actor !== G.you && G.room === (actor.room || G.room)) witnesses.push(G.you);
+  witnesses.forEach(w => {
+    const r = pickReaction(w, actor, item, mode); if(r === "indifferent") return;
+    const dW = PURSE_DW[r], bank = PURSE_LINES[r], line = bank[Math.floor(Math.random() * bank.length)];
+    if(w === G.you){ G.you.saw = G.you.saw || []; G.you.saw.push({actor:actor.id, name:actor.name, item:item.t, key:item.key, r, day:G.day}); if(G.you.saw.length > 8) G.you.saw.shift(); lines.push("You see " + actor.name + " buying " + item.t + ". Your own feeling about it: " + r + "."); return; }
+    if(actor === G.you){ try{ ripple(w, dW, "They bought " + item.t + " where everyone could see. I felt " + r + ".", Math.abs(dW), r === "jealous" || r === "envy"); }catch(e){} net += dW; }
+    else { const P = purseOf(w); P.feel[actor.id] = (P.feel[actor.id] || 0) + dW; }
+    if(line){ try{ w.say = line; w.sayT = 4.2; w.sayTo = actor.id; speakAt(w, line); }catch(e){} }
+    /* and they may do something about it, by their own will */
+    const act = r === "jealous" ? pick(["gossip", "remark", "nothing"]) : r === "envy" ? pick(["ask", "nothing", "nothing"]) : r === "awe" ? pick(["admire", "copy", "admire"]) : r === "disapprove" ? pick(["remark", "nothing"]) : r === "glad" ? pick(["admire", "nothing"]) : "nothing";
+    if(act !== "nothing" && chance(0.5)){ const o = purseDoOpt(w, actor, act, item, r); if(o) lines.push(o); }
+    if(!lines.length || lines.length < 4) lines.push(w.name + " (" + r + "): " + (line ? "“" + line + "”" : "says nothing"));
+  });
+  if(actor === G.you && item.show >= 2){ G.you.approval = clamp(G.you.approval + clamp(net * 0.6, -4, 4), 0, 100); }
+  return lines;
+}
+function purseBuy(p, key, opt){
+  opt = opt || {}; const item = Object.assign({key}, PURSE_ITEMS[key]), P = purseOf(p); if(!item.t) return {ok:false, msg:"Not for sale."};
+  if(P.cash < item.price) return {ok:false, msg:(p === G.you ? "You have" : p.name + " has") + " ƒ " + Math.floor(P.cash) + "; that is ƒ " + item.price + ". The war chest is not yours to dip into."};
+  P.cash -= item.price; P.spent += item.price; purseLog(p, "Bought " + item.t, -item.price);
+  if(item.style) P.style = Math.max(P.style, item.style);
+  const mode = opt.mode || (p === G.you ? "plain" : (purseWill(p).boast > 58 ? "show" : purseWill(p).boast < 30 ? "quiet" : "plain"));
+  if(p === G.you){
+    const y = G.you; if(item.min) spend(item.min, item.energy ? -item.energy : 1);
+    if(item.appr) y.approval = clamp(y.approval + item.appr, 0, 100);
+    if(item.infl) y.influence = clamp(y.influence + item.infl, 0, 100);
+    if(item.paper){ try{ paperCard(); }catch(e){} }
+    if(item.gift === "hh"){ try{ const T = townEnsure(); const h = pick(T.hh); h.mood = clamp((h.mood || 50) + 8, 0, 100); h.mem = h.mem || []; h.mem.push({t:"a basket of groceries from you", d:G.day}); }catch(e){} }
+    if(item.gift === "person"){ const m = pursePeople().filter(x => x.kind === "member")[0]; if(m) ripple(m, 3, "They brought me flowers for no reason I could name.", 2, false); }
+    purseChip();
+  }
+  let lines = [];
+  if(!opt.quiet || item.show >= 2){ try{ lines = purseWitness(p, item, mode); }catch(e){ console.warn("purse witness", e); } }
+  if(p !== G.you && item.show >= 2 && chance(0.5)){ G.reactNews = (G.reactNews || []).concat([{t:p.name + " was seen with " + item.t + " in the district. People had thoughts.", d:G.day}]).slice(-12); }
+  return {ok:true, item, mode, lines};
+}
+function purseShopActs(shop){
+  const y = G.you, P = purseOf(y);
+  return Object.keys(PURSE_ITEMS).filter(k => PURSE_ITEMS[k].shop === shop).map(k => { const it = PURSE_ITEMS[k], base = {c:"ƒ " + it.price + (it.min ? " · " + it.min + "m" : ""), off:P.cash < it.price};
+    const go = mode => () => { const r = purseBuy(y, k, {mode}); setSay(it.line ? "“" + it.line + "”" : cap(it.t) + ".", r.ok ? fx(r.lines.slice(0, 3).join(" · ") || "Nobody paid it any mind.", "ƒ " + Math.floor(purseOf(y).cash) + " left") : fx(r.msg, "")); };
+    if(it.show >= 2) return [Object.assign({t:"Buy " + it.t + " — and make a show of it"}, base, {run:go("show")}), Object.assign({t:"Buy " + it.t + " — quietly"}, base, {run:go("quiet")})];
+    return [Object.assign({t:(it.v || "Buy") + " " + it.t}, base, {run:go("plain")})]; }).reduce((a, b) => a.concat(b), []);
+}
+function purseDay(){
+  try{ everyone().concat([G.you]).forEach(p => { if(!p || p.gone) return; const P = purseOf(p), H = PURSE_HOMES[P.home] || PURSE_HOMES.flat, will = purseWill(p);
+    P.cash += purseSalary(p) - H.cost - 4; if(P.cash < 0){ P.cash = 0; P.broke++; } else P.broke = 0;
+    if(p === G.you){ purseLog(p, "Salary, less rent and food", purseSalary(p) - H.cost - 4); if(P.broke) try{ feed("You are counting coins this week."); }catch(e){} return; }
+    /* their time and money are their own: some spend, some save, and some show off */
+    if(p.room !== undefined && chance(0.08 + will.boast / 500 + (P.cash > 250 ? 0.1 : 0)) && P.cash > 20){
+      const aff = Object.keys(PURSE_ITEMS).filter(k => PURSE_ITEMS[k].price <= P.cash * (will.thrift > 60 ? 0.4 : 0.8) && PURSE_ITEMS[k].shop !== "newsstand" && k !== "box" && k !== "rent");
+      if(aff.length){ const k = will.boast > 55 ? aff.sort((a, b) => PURSE_ITEMS[b].show * 1000 + PURSE_ITEMS[b].price - (PURSE_ITEMS[a].show * 1000 + PURSE_ITEMS[a].price))[0] : pick(aff); if(PURSE_ITEMS[k].show < 2 || chance(0.5)) purseBuy(p, k, {quiet:PURSE_ITEMS[k].show < 2}); }
+    } }); }catch(e){ console.warn("purseDay", e); }
+  purseChip();
+}
+try{ if(!(PROPS.district || []).some(p => p.id === "market")){ PROPS.district.push(
+  {id:"newsstand", label:"Main Street newsstand", sub:"Papers, and books nobody asked for", x:-3.5, z:7.0, r:2.0, acts:() => purseShopActs("newsstand")},
+  {id:"market", label:"The market", sub:"Bread, cloth and the better end of the district", x:-5.2, z:8.4, r:2.4, acts:() => purseShopActs("market")},
+  {id:"hardware", label:"Hardware", sub:"Hinges, nails and neighbours", x:5.15, z:12.85, r:2.2, acts:() => purseShopActs("hardware")}); } }catch(e){}
+try{ const _ch = (PROPS.district || []).find(p => p.id === "church"); if(_ch && !_ch._pu){ _ch._pu = true; const a0 = _ch.acts; _ch.acts = function(){ return a0.apply(this, arguments).concat(purseShopActs("church")); }; } }catch(e){}
+let _purseT = 20;
+function purseLive(dt){
+  try{ purseChip(); }catch(e){}
+  if(!G.running || G.room !== "district" || !G.you) return; _purseT -= dt; if(_purseT > 0) return; _purseT = 25 + Math.random() * 25;
+  const cand = pursePeople().filter(p => p.room === "district"); if(!cand.length) return;
+  const p = pick(cand), P = purseOf(p), will = purseWill(p); if(P.cash < 5 || !chance(0.35 + will.boast / 300)) return;
+  const aff = Object.keys(PURSE_ITEMS).filter(k => PURSE_ITEMS[k].price <= P.cash * (will.thrift > 60 ? 0.4 : 0.8) && k !== "paper" && k !== "box"); if(!aff.length) return;
+  const k = will.boast > 55 ? aff.sort((a, b) => PURSE_ITEMS[b].show - PURSE_ITEMS[a].show || PURSE_ITEMS[b].price - PURSE_ITEMS[a].price)[0] : pick(aff);
+  const it = PURSE_ITEMS[k]; try{ if(it.line) { p.say = it.line; p.sayT = 4; speakAt(p, it.line); } }catch(e){}
+  const r = purseBuy(p, k, {}); if(r.ok && r.lines.length){ try{ feed(r.lines.slice(0, 2).join(" ")); }catch(e){} }
+  purseChip();
+}
+function purseCard(){
+  const y = G.you, P = purseOf(y), H = PURSE_HOMES[P.home] || PURSE_HOMES.flat, W = purseWill(y);
+  const saw = (y.saw || []).slice().reverse(), asks = y.asks || [];
+  const body = '<div style="font:700 28px Georgia,serif;margin:4px 0">ƒ ' + Math.floor(P.cash) + '</div><div class="muted" style="font-size:12px">Your own money. Salary ƒ ' + purseSalary(y) + ' a day; ' + pcEsc(H.t) + ' costs ƒ ' + H.cost + ' a day; food about ƒ 4. You dress ' + PURSE_STYLE[P.style] + '. Spent so far: ƒ ' + P.spent + '.</div>' +
+    '<div class="muted" style="font-size:12px;margin:6px 0"><b>The war chest is not here.</b> The ' + money(y.funds || 0) + ' in your campaign chest, and anything a donor or lobby put in it, belongs to the campaign. It cannot buy a coat, a lunch or a lease, and there is no way to move it into this purse.</div>' +
+    '<div class="muted" style="font-size:12px">By temper you would ' + (W.boast > 55 ? "rather be seen spending" : W.boast < 30 ? "rather nobody knew" : "go either way") + ', and you ' + (W.thrift > 60 ? "keep a tight hand on a coin" : "do not mind spending") + '. Your time is your own too: nobody can spend it for you.</div>' +
+    '<div class="eyebrow" style="margin-top:10px">Where you live</div><div class="card__actions" style="flex-wrap:wrap">' + Object.keys(PURSE_HOMES).map(k => '<button type="button" class="btn btn--ghost" data-ph="' + k + '"' + (k === P.home || P.cash < PURSE_HOMES[k].move ? ' disabled' : '') + '>' + pcEsc(cap(PURSE_HOMES[k].t)) + ' · ƒ ' + PURSE_HOMES[k].cost + '/day' + (k !== P.home ? ' (move: ƒ ' + PURSE_HOMES[k].move + ')' : ' (here)') + '</button>').join("") + '</div>' +
+    (asks.length ? '<div class="eyebrow" style="margin-top:10px">Asking you for money</div>' + asks.map((a, i) => '<div class="whip__row"><span class="whip__n">' + pcEsc(a.name) + '</span><span class="whip__w">asks to borrow ƒ ' + a.amt + ' (day ' + a.day + ')</span><span class="whip__b"><button type="button" class="btn btn--ghost whip__go" data-ask="' + i + ':1"' + (P.cash < a.amt ? ' disabled' : '') + '>Lend it</button><button type="button" class="btn btn--ghost whip__go" data-ask="' + i + ':0">Refuse</button></span></div>').join("") : '') +
+    (saw.length ? '<div class="eyebrow" style="margin-top:10px">What you saw, and what you might do about it</div>' + saw.map((a, i) => '<div style="margin:6px 0;padding:6px 8px;border-left:3px solid var(--line-soft)"><b>' + pcEsc(a.name) + '</b> bought ' + pcEsc(a.item) + '. You felt <i>' + pcEsc(a.r) + '</i>.<div class="card__actions" style="flex-wrap:wrap">' + PURSE_OPTS.filter(o => o[0] !== "copy" || true).map(o => '<button type="button" class="btn btn--ghost" data-saw="' + (saw.length - 1 - i) + ':' + o[0] + '">' + pcEsc(o[1]) + '</button>').join("") + '</div></div>').join("") + '<div id="pcSay" class="dream"></div>' : '<div id="pcSay" class="dream"></div>') +
+    '<div class="eyebrow" style="margin-top:10px">The ledger</div>' + (P.log.length ? P.log.slice(0, 8).map(l => '<div class="careerline"><b>d' + l.d + '</b><span>' + pcEsc(l.t) + ' <span class="muted">' + (l.a > 0 ? "+" : "") + l.a + '</span></span></div>').join("") : '<p class="muted">Nothing yet.</p>') +
+    '<p class="muted" style="font-size:12px;margin-top:8px">Shops are in the district: Vaughn\'s counter, the market, the newsstand, the hardware store and the church box. Everyone else shops there too, with their own purse and their own temper, and everyone who sees what you spend has a view of it.</p>';
+  govCardOpen("Your purse", "What is yours to spend", "", body, null);
+  card.querySelectorAll("[data-ph]").forEach(b => b.addEventListener("click", () => { const k = b.getAttribute("data-ph"), H2 = PURSE_HOMES[k]; if(P.cash < H2.move) return; P.cash -= H2.move; P.home = k; purseLog(y, "Moved to " + H2.t, -H2.move); if(k === "house") try{ purseWitness(y, {key:"house", t:"a townhouse", price:H2.move, show:3}, "plain"); }catch(e){} purseChip(); purseCard(); }));
+  card.querySelectorAll("[data-ask]").forEach(b => b.addEventListener("click", () => { const [i, g] = b.getAttribute("data-ask").split(":"), a = asks[+i], w = byId(a.from); if(g === "1"){ P.cash -= a.amt; if(w){ purseOf(w).cash += a.amt; ripple(w, 4, "They lent me money without being asked twice.", 3, true); } purseLog(y, "Lent to " + a.name, -a.amt); } else if(w) ripple(w, -2, "They would not lend me a little.", 2, false); asks.splice(+i, 1); purseChip(); purseCard(); }));
+  card.querySelectorAll("[data-saw]").forEach(b => b.addEventListener("click", () => { const [i, o] = b.getAttribute("data-saw").split(":"), a = saw[0] && (y.saw || [])[+i]; if(!a) return; const actor = byId(a.actor) || (G.civ || []).find(c => c.id === a.actor); if(!actor) return;
+    const out = purseDoOpt(y, actor, o, Object.assign({key:a.key}, PURSE_ITEMS[a.key] || {t:a.item, price:20, show:1}), a.r); el("pcSay").textContent = out; y.saw.splice(+i, 1); purseChip(); }));
+  return null;
 }
 function amendText(S){ const A = (S && S.amend) || []; return A.length ? " Amendments agreed at open hours, to be attached: " + A.map(a => a.title + " (" + a.from + ")").join("; ") + "." : ""; }
 function amendApply(S){ const A = (S && S.amend) || []; if(!A.length) return ""; const y = G.you; S.unrest = clamp(S.unrest - A.length, 0, 100); y.approval = clamp(y.approval + A.length, 0, 100); S.amend = []; return " The amendments from open hours were attached: " + A.map(a => a.title).join(", ") + "."; }
@@ -34014,6 +34193,8 @@ loadSettings();
   if(walkBtn) walkBtn.addEventListener("click", () => { try{ walkOutNow(); }catch(e){} });
   const ub = el("unBare");
   if(ub) ub.addEventListener("click", () => openPanels());
+  const purseBtn = el("uiPurseBtn");
+  if(purseBtn) purseBtn.addEventListener("click", () => { try{ if(G.you && veil.hidden) purseCard(); }catch(e){ console.warn(e); } });
   const galBtn = el("uiGalleryBtn");
   if(galBtn) galBtn.addEventListener("click", () => { try{ if(G.you && veil.hidden) watchCard(); }catch(e){ console.warn(e); } });
   const paperBtn = el("uiPaperBtn");
@@ -34655,6 +34836,7 @@ function drainHouseOne(w, dt){
     try{ tickWanderBatch(w); }catch(e){}
   } else if(lane === 9){
     try{ confabulate(w); }catch(e){}
+    try{ purseLive(w); }catch(e){}
   } else if(lane === 10){
     try{ tieTick(w); }catch(e){}
   } else if(lane === 11){
