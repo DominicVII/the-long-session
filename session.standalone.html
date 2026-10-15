@@ -31021,6 +31021,7 @@ const KIN_JOBS = {
 };
 const KIN_PARTY = ["FED", "COM", "IND", null];
 const KIN_OFFICES = ["Representative", "Senator", "Governor", "judge of the state bench", "county sheriff", "mayor"];
+function kinArt(o){ return o === "Governor" ? "Governor" : /^[AEIOU]/i.test(o) ? "an " + o : "a " + o; }
 function kinAge(p){ if(p.age) return p.age; const r = seedOf("age:" + (p.id != null ? p.id : p.name)); return p === G.you ? 38 : p.kind === "member" ? 30 + (p.terms || 1) * 3 + (r % 14) : 20 + (r % 55); }
 function kinName(p, last){ let n = ""; try{ n = wallSafeMint(() => newName(p.state || (G.you && G.you.state))); }catch(e){} if(!n) n = "Alex Doe"; return last ? n.split(" ")[0] + " " + last : n; }
 function kinEnsure(p){
@@ -31062,7 +31063,7 @@ function kinTensions(p){
   const K = kinEnsure(p), out = [], b = G.bill && !G.bill.done ? G.bill : null;
   if(K.spouse && K.marital === "married" && K.spouse.party && p.party && K.spouse.party !== p.party) out.push(K.spouse.name + " votes " + (K.spouse.party === "FED" ? "Federalist" : K.spouse.party === "COM" ? "Commonwealth" : "independent") + " and says so at dinner.");
   if(K.spouse && K.marital === "married" && K.spouse.supportive < -0.2) out.push(K.spouse.name + " has said plainly that they do not want the life this job brings.");
-  K.siblings.forEach(x => { if(x.tie === "estranged") out.push("They have not spoken to " + x.name + " in years."); if(x.tie === "rival") out.push(x.name + " resents how far they have come."); if(x.debt) out.push(x.name + " owes money to people it is unwise to owe."); if(x.office) out.push(x.name + " is " + x.office + (x.party && p.party && x.party !== p.party ? ", in the other party" : "") + "."); });
+  K.siblings.forEach(x => { if(x.tie === "estranged") out.push("They have not spoken to " + x.name + " in years."); if(x.tie === "rival") out.push(x.name + " resents how far they have come."); if(x.debt) out.push(x.name + " owes money to people it is unwise to owe."); if(x.office) out.push(x.name + " is " + kinArt(x.office) + (x.party && p.party && x.party !== p.party ? ", in the other party" : "") + "."); });
   const par = K.parents.filter(x => x.alive && x.need !== "none")[0]; if(par) out.push("Their " + par.role + " " + par.name + " is " + par.need + ", and somebody has to be there.");
   if(K.kids.some(x => x.ill)) out.push("A child is unwell, and nothing else matters on those days.");
   if(K.kids.some(x => x.state === "small")) out.push("Young children at home, and sleep is a rumour.");
@@ -31074,7 +31075,7 @@ function kinTensions(p){
 }
 function kinRunScore(p){
   const K = kinEnsure(p), n = []; let sc = 50;
-  if(K.dynasty){ sc += K.dynasty.strength * 0.25; n.push("a name that carries: " + K.dynasty.who + " was " + K.dynasty.office + " " + K.dynasty.years + " years ago"); }
+  if(K.dynasty){ sc += K.dynasty.strength * 0.25; n.push("a name that carries: " + K.dynasty.who + " was " + kinArt(K.dynasty.office) + " " + K.dynasty.years + " years ago"); }
   sc += {"old money":12, comfortable:6, modest:0, struggling:-8}[K.wealth]; if(K.wealth === "old money") n.push("old money behind them"); if(K.wealth === "struggling") n.push("money is a worry");
   if(K.spouse && K.marital === "married"){ sc += K.spouse.supportive * 9; n.push(K.spouse.supportive > 0.3 ? K.spouse.name + " backs the run" : K.spouse.supportive < -0.2 ? K.spouse.name + " does not want it" : K.spouse.name + " is wary"); } else if(!K.spouse){ sc += 3; n.push("no spouse to persuade"); }
   const care = K.parents.filter(x => x.alive && x.need !== "none").length + (K.kids.some(x => x.ill) ? 1 : 0); if(care){ sc -= care * 10; n.push("caring for family"); }
@@ -31089,7 +31090,7 @@ function kinSummary(p){
   if(K.kids.length) bits.push(K.kids.length + " child" + (K.kids.length > 1 ? "ren" : "") + ": " + K.kids.map(k => k.name.split(" ")[0] + " (" + k.age + (k.ill ? ", unwell" : "") + ")").join(", ") + "."); else bits.push("No children.");
   const par = K.parents.filter(x => x.alive); bits.push(par.length ? "Parents living: " + par.map(x => x.name.split(" ")[0] + (x.need !== "none" ? " (" + x.need + ")" : "")).join(", ") + "." : "Both parents gone.");
   if(K.siblings.length) bits.push(K.siblings.length + " sibling" + (K.siblings.length > 1 ? "s" : "") + ": " + K.siblings.map(x => x.name.split(" ")[0] + " (" + x.job + ", " + x.tie + ")").join(", ") + "."); else bits.push("An only child.");
-  bits.push("The family is " + K.wealth + "." + (K.dynasty ? " Political name: " + K.dynasty.who + " was " + K.dynasty.office + "." : ""));
+  bits.push("The family is " + K.wealth + "." + (K.dynasty ? " Political name: " + K.dynasty.who + " was " + kinArt(K.dynasty.office) + "." : ""));
   return bits.join(" ");
 }
 function kinLine(p){
@@ -31100,8 +31101,8 @@ function kinLine(p){
   if(small) L.push(small.name.split(" ")[0] + " is " + small.age + " and has decided sleep is optional. So I am awake for both of us.");
   if(sch) L.push(sch.name.split(" ")[0] + " came home with a school report and an opinion about it.");
   if(K.spouse && K.marital === "married") L.push(K.spouse.supportive > 0.3 ? K.spouse.name + " says I should stay in it, and means it, which helps." : K.spouse.supportive < -0.2 ? K.spouse.name + " asked me last night how much longer. I gave a bad answer." : K.spouse.name + " is a " + K.spouse.job + ". It is not a job that cares about the House.");
-  K.siblings.forEach(x => { if(x.tie === "estranged") L.push("I have a brother or sister, " + x.name.split(" ")[0] + ", I do not speak to. Funny how often it comes up here."); if(x.office) L.push(x.name.split(" ")[0] + " is " + x.office + ". We are not in competition. People assume otherwise."); });
-  if(K.dynasty && p.kind === "member") L.push("My " + K.dynasty.who + " was " + K.dynasty.office + ". People still say the name before they say mine.");
+  K.siblings.forEach(x => { if(x.tie === "estranged") L.push("I have a brother or sister, " + x.name.split(" ")[0] + ", I do not speak to. Funny how often it comes up here."); if(x.office) L.push(x.name.split(" ")[0] + " is " + kinArt(x.office) + ". We are not in competition. People assume otherwise."); });
+  if(K.dynasty && p.kind === "member") L.push("My " + K.dynasty.who + " was " + kinArt(K.dynasty.office) + ". People still say the name before they say mine.");
   if(K.wealth === "struggling") L.push("Money is tight at home. I do not say so in the corridor.");
   if(!L.length) L.push(K.marital === "single" && !K.kids.length ? "I go home to nobody, which is its own kind of freedom and its own kind of weather." : "Home is quiet this week, which I take as a good sign.");
   return L[Math.floor(Math.random() * L.length)];
