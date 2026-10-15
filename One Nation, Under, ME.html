@@ -31843,13 +31843,15 @@ function wipeCareerSaves(){
     try{ localStorage.removeItem(k); }catch(e){}
   });
 }
-let saveBusy = false, saveCount = 0, saveQueued = false;
+let saveBusy = false, saveCount = 0, saveQueued = false, saveStartedAt = 0;
+/* 20261013q: an autosave that is slow or never finishes must not hold the clock. After 6 s it stops blocking the tick and the next save. */
+function saveBlocking(){ return saveBusy && (Date.now() - saveStartedAt) < 6000; }
 function queueSave(explicit){
   if(explicit){ try{ return save(true); }catch(e){ return false; } }
   if(PROC.on || TALK.open) return false;
   /* Never block a walk frame with autosave. */
   try{ if(houseQuiet()) return false; }catch(e){} /* feet ok — flat drip 20260921f */
-  if(saveQueued || saveBusy) return false;
+  if(saveQueued || saveBlocking()) return false;
   saveQueued = true;
   setTimeout(() => {
     saveQueued = false;
@@ -31913,11 +31915,21 @@ function saveCommit(payloadObj, explicit){
       return false;
     }
     saveCount++;
-    const wrote = writeSaveKey(SAVE_KEY, payload);
-    writeSaveKey(SAVE_BACKUP_KEY, payload);
-    writeSaveKey(SAVE_BEST_KEY, payload);
+    /* 20261013q: a long career no longer fits three times in the browser's storage (about 5M characters).
+       The main copy goes first and wins: if it does not fit, the older spare copies make room for it. */
+    let wrote = writeSaveKey(SAVE_KEY, payload);
+    if(!wrote){ try{ localStorage.removeItem(SAVE_BEST_KEY); }catch(e){} wrote = writeSaveKey(SAVE_KEY, payload); }
+    if(!wrote){ try{ localStorage.removeItem(SAVE_BACKUP_KEY); }catch(e){} wrote = writeSaveKey(SAVE_KEY, payload); }
+    if(wrote){
+      writeSaveKey(SAVE_BACKUP_KEY, payload);
+      writeSaveKey(SAVE_BEST_KEY, payload);
+    }
     if(!wrote){
       saveBusy = false;
+      if(explicit || !saveCommit._warned){
+        saveCommit._warned = true;
+        try{ note("The career did not fit in this browser's storage and was NOT saved. Export it from the Career panel.", true); }catch(e){}
+      }
       return false;
     }
     G.savedAt = hhmm();
@@ -31944,12 +31956,12 @@ function saveIdle(fn){
   setTimeout(() => { try{ fn(); }catch(e){} }, 0);
 }
 function save(explicit, sync){
-  if(saveBusy) return false;
+  if(saveBlocking()) return false;
   /* Autosave never runs mid-walk / door fade. Explicit still yields. */
   if(!explicit && !sync){
     try{ if(houseQuiet()) return false; }catch(e){} /* feet ok — flat drip 20260921f */
   }
-  saveBusy = true;
+  saveBusy = true; saveStartedAt = Date.now();
   try{
     const base = saveCaptureBase();
     const memSrc = (G.members || []).slice();
@@ -31977,7 +31989,7 @@ function save(explicit, sync){
           saveBusy = false;
           return;
         }
-        let n = 5;
+        let n = 40;
         while(n > 0 && bi < buckets.length){
           const b = buckets[bi];
           if(ii >= b.src.length){ bi++; ii = 0; continue; }
@@ -33625,7 +33637,7 @@ function kickFrame(){
   if(_frameArmed) return;
   /* Do not kick into a double-tick storm during save / room build / door fade. */
   try{
-    if(typeof saveBusy !== "undefined" && saveBusy) return;
+    if(typeof saveBlocking === "function" && saveBlocking()) return;
     if(typeof _buildingRoom !== "undefined" && _buildingRoom) return;
     if(houseQuiet() && G.moving) return;
   }catch(e){}
@@ -35163,7 +35175,7 @@ setInterval(() => {
 setInterval(() => {
   try{
     if(typeof document !== "undefined" && document.hidden) return;
-    if(typeof saveBusy !== "undefined" && saveBusy) return;
+    if(typeof saveBlocking === "function" && saveBlocking()) return;
     if(typeof _buildingRoom !== "undefined" && _buildingRoom) return;
     try{ if(houseQuiet() && G.moving) return; }catch(e){}
     if(performance.now() - (_lastDrawn || 0) > 2200) kickFrame();

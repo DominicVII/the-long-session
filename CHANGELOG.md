@@ -4,12 +4,14 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
-## No more "undefined" and "null" in the day's text
+## A long career keeps saving; no more "undefined" and "null"
 
 `20261013q` (on `20261013p`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
 
 - **Statehouse bills have a title:** they were stored as `t` while the Governor's desk, the diary, the wire and the veto read `title`, so a Governor saw "vetoed the undefined", "The sponsors of the undefined" and "trims the cost of the undefined". New statehouse bills carry `title`, and older saves are filled in on load.
 - **Officeholders and envoys have a cause:** they were created with `cause = null`, so "Hear them out" said "It's about null" and the journal "Took a meeting about null". They now carry "the business of the office", and older saves are filled in on load.
+- **The save no longer stops at a long career:** the career is written three times (main, backup, best) and a day-88 career is about 2.5M characters, so three copies no longer fit in the browser's storage (about 5M characters). The main copy was written first and its failure was ignored, so once the older spare copies filled the space every autosave failed silently and the game resumed at the last day that had fitted. The main copy now wins: if it does not fit, the spares make room for it, and if it still cannot be stored the game says so instead of staying quiet.
+- **A slow autosave cannot hold the clock:** the tick waits while a save runs, and a save took one idle callback per five people (134 people at day 88). Saves now take forty per step, and a save that has run for six seconds stops blocking the tick and the next save.
 - Found in a day-88 career save. Stamp: meta + STAMP + `ONUM_BUILD` -> `20261013q`.
 
 ## Answer them and you are in the conversation
