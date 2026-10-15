@@ -4,6 +4,14 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## The governor is the governor
+
+`20261013r` (on `20261013q`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- **Wrong governor listed:** when you took the governorship, the previous governor became "former" and handed over the office, but the state's own record still named her as governor, so the news, mail and officeholder lists kept calling her the Governor of your state. While you hold the chair, the state's governor is you. When you leave it, a new governor is named.
+- Your state no longer mails you pleas from "the governor", issues statements in your name, or founds a breakaway movement led by you.
+- Stamp: meta + STAMP + `ONUM_BUILD` -> `20261013r`.
+
 ## Saves that always fit, and who holds power
 
 `20261013q` (on `20261013p`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.

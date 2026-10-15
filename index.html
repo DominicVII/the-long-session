@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261013q">
+<meta name="onum-build" content="20261013r">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261013q";
+  var STAMP = "20261013r";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -9383,7 +9383,12 @@ function scPerson(key, name, title, home){
 }
 function scLeaders(){
   const S = scEnsure();
-  Object.keys(S.st).forEach(n => { const s = S.st[n]; if(!s.gov){ s.gov = newName(n); } s.govId = (scPerson("gov:" + n, s.gov, "Governor of " + n, n) || {}).id; });
+  Object.keys(S.st).forEach(n => { const s = S.st[n];
+    /* 20261013r: while you hold the governorship, the state's governor is you, not whoever held it before */
+    let mine = false; try{ mine = !!(G.you && heldOffice() === "gov" && n === G.you.state); }catch(e){}
+    if(mine){ s.gov = G.you.name; s.govId = null; s.youGov = true; return; }
+    if(s.youGov){ s.youGov = false; s.gov = newName(n); }
+    if(!s.gov){ s.gov = newName(n); } s.govId = (scPerson("gov:" + n, s.gov, "Governor of " + n, n) || {}).id; });
   WORLD_POWERS.forEach(p => { const a = S.na[p.k]; const r = rng(seedOf("lead:" + p.k));
     if(!a.leader){ a.leader = foreignName(r, p.k); a.leaderT = drawn(["Premier","Chancellor","President","First Minister","Regent"], r); a.envoy = foreignName(r, p.k);
       try{ const e = window.onumForeignEnvoy && window.onumForeignEnvoy(p); if(e && e.name) a.envoy = e.name; }catch(e){} }
@@ -9401,6 +9406,7 @@ function scPolPub(ch){
 /* a plea from a state reaches your desk; answering it is being heard */
 function scPlea(n, s){
   const st = (G.states || []).find(x => x.n === n); if(!st) return;
+  if(s.youGov) return;
   const what = s.griev > 60 ? "the federal government keeps deciding things for " + n + " without asking" : st.unrest > 55 ? "the streets are restless and the capital has not noticed" : "the roads, the courts and the money all run to the capital";
   try{ pushMail({name:s.gov, id:s.govId}, "A letter from " + n, "Governor " + s.gov + " writes: " + what + ". \"We are asking to be heard before people stop asking.\"", {kind:"plea", options:[
     {t:"Hear them out (30m)", run(){ s.heard += 1; s.griev = Math.max(0, s.griev - 12); s.streak = 0; try{ spend(30, 2); }catch(e){} scLog(n + " says the capital listened, for once.", n); }},
@@ -9425,7 +9431,7 @@ function scDay(){
     /* their own business */
     const r = Math.random();
     if(r < .025){ const o = pick((G.states || []).filter(x => x !== st && !S.st[x.n].gone)); if(o){ scLog(st.n + " and " + o.n + " sign a trade compact on " + pick(["grain","rail freight","timber","river shipping","power lines"]) + ".", st.n); st.ind = clamp((st.ind || 0) + 1, 0, 100); o.ind = clamp((o.ind || 0) + 1, 0, 100); } }
-    else if(r < .045){ scLog("Governor " + s.gov + " of " + st.n + " says publicly: \"" + pick(["We will do it our way, and show the capital how.","The Union is a promise, not a leash.","Ask our farmers what the last bill cost them.","We are loyal. We are not silent."]) + "\"", st.n); scVox(s.govId, pick(["Our way works. Come and see.","The capital should visit more often.","We kept our word. Did they?"])); }
+    else if(r < .045 && !s.youGov){ scLog("Governor " + s.gov + " of " + st.n + " says publicly: \"" + pick(["We will do it our way, and show the capital how.","The Union is a promise, not a leash.","Ask our farmers what the last bill cost them.","We are loyal. We are not silent."]) + "\"", st.n); scVox(s.govId, pick(["Our way works. Come and see.","The capital should visit more often.","We kept our word. Did they?"])); }
     else if(r < .06 && s.griev > 40){ st.unrest = clamp((st.unrest || 0) + 3, 0, 100); scLog("Protest in " + st.n + ": " + pick(["farmers block the state road","dockworkers march on the statehouse","a crowd outside the federal building"]) + ".", st.n); }
     else if(r < .066){ const o = pick((G.states || []).filter(x => x !== st && !S.st[x.n].gone)); if(o){ S.st[o.n].prov += 2; scLog(st.n + "'s legislature passes a resolution mocking " + o.n + ". " + o.n + " is not laughing.", o.n); } }
     else if(r < .07){ /* a mistake: someone bails them out or exploits it */
@@ -9463,7 +9469,7 @@ function scSecession(){
   (G.states || []).forEach(st => {
     const s = S.st[st.n]; if(!s || s.gone) return;
     let pol = S.polities.find(p => p.memberStates.indexOf(st.n) >= 0 && (p.status === "tension" || p.status === "war"));
-    if(s.streak >= 12 && !pol){
+    if(s.streak >= 12 && !pol && !s.youGov){
       const nb = S.polities.find(p => p.status === "tension" && (G.states || []).some(x => p.memberStates.indexOf(x.n) >= 0 && Math.abs((x.col || 0) - (st.col || 0)) + Math.abs((x.row || 0) - (st.row || 0)) <= 1));
       if(nb){ nb.memberStates.push(st.n); scPolPub(nb); scLog(st.n + " joins " + nb.name + "'s movement.", st.n); return; }
       pol = {id:"pol" + (S.polities.length + 1), name:pick(SC_NEW) + " " + st.n, govType:s.style === "pious" ? "theocratic council" : s.style === "boss rule" ? "strongman" : s.style === "populist" ? "people's assembly" : "provisional republic",
