@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261015g">
+<meta name="onum-build" content="20261015h">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261015g";
+  var STAMP = "20261015h";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -10356,7 +10356,8 @@ function pbOpen(){
       if(d.pbapp){ w.remove(); pbAppGo(d.pbapp); return; }
       if(d.pbt){ PB.tab = d.pbt; pbRender(); return; }
       if(d.pbdm){ w.remove(); try{ dmToggle(true, isNaN(+d.pbdm) ? d.pbdm : +d.pbdm); }catch(e){} return; }
-      if(d.pbcall){ const c = pbContacts().find(x => String(x.id) === d.pbcall); PB.call = {id:c ? c.id : d.pbcall, name:c ? c.name : "Caller", lines:[{w:c ? c.name : "Caller", t:"Hello, this is " + (c ? c.name : "me") + "."}]}; PB.tab = "calls"; pbRender(); return; }
+      if(d.pbcall){ try{ const who = byId(isNaN(+d.pbcall) ? d.pbcall : +d.pbcall); if(who && who.traits && who !== G.you){ const st = timeStance(who, G.you, 10); if(st.mode !== "free"){ PB.call = {id:who.id, name:who.name, lines:[{w:who.name, t:(st.mode === "fee" ? "I cannot talk on the telephone. " + st.why + " Come and see me and we will see." : st.why + " Ring another time.")}]}; PB.tab = "calls"; pbRender(); return; } } }catch(e){}
+        const c = pbContacts().find(x => String(x.id) === d.pbcall); PB.call = {id:c ? c.id : d.pbcall, name:c ? c.name : "Caller", lines:[{w:c ? c.name : "Caller", t:"Hello, this is " + (c ? c.name : "me") + "."}]}; PB.tab = "calls"; pbRender(); return; }
       if(d.pbhang){ PB.log = PB.log || []; if(PB.call) PB.log.push("Called " + PB.call.name + " · day " + G.day); PB.call = null; pbRender(); return; }
       if(d.pbsay){ const i = document.getElementById("pbSay"), txt = i && i.value.trim(), c = PB.call; if(!txt || !c) return; c.lines.push({w:"You", t:txt}); pbRender();
         if(String(c.id).indexOf("rl:") === 0){ const rv = realmVoice(String(c.id).split(":")[1], c, txt); setTimeout(() => { c.lines.push({w:c.name, t:rv}); if(PB.call === c) pbRender(); }, 500); return; }
@@ -30633,6 +30634,93 @@ function purseCard(){
     const out = purseDoOpt(y, actor, o, Object.assign({key:a.key}, PURSE_ITEMS[a.key] || {t:a.item, price:20, show:1}), a.r); el("pcSay").textContent = out; y.saw.splice(+i, 1); purseChip(); }));
   return null;
 }
+/* ── time belongs to whoever has it: anyone may be busy, may refuse, or may charge for it, and so may you ── */
+const TIME_WHY = {
+  work:["I have the till until six.", "The clerks are waiting on me; ten minutes is ten minutes they stand there.", "I am in the middle of something I cannot leave."],
+  guarded:["My time is my own, and I have already given it away today.", "I do not hand out my afternoons.", "Not now. I decide what I do with my hours."],
+  sore:["After the way it went last time? Not today.", "I have not forgotten what you did. Another day.", "I would rather not, and I would rather you did not ask twice."],
+  tired:["I have had no sleep to speak of. Come back when I am a person.", "I am done in. Tomorrow.", "Give me an hour and ask again."],
+  principle:["I will talk to you when I have something to say, and not before.", "My time is not for sale, and I do not give it away to be polite."]
+};
+function timeStance(g, asker, mins){
+  mins = mins || 10; const key = "d" + G.day + "h" + Math.floor((G.minute || 0) / 90) + ":" + (asker === G.you ? "y" : asker.id);
+  if(g._tm && g._tm.k === key) return g._tm.r;
+  const W = purseWill(g), t = purseTr(g), rel = asker === G.you ? ((g.rel && g.rel.warmth) || 0) : 0, h = Math.floor((G.minute || 0) / 60);
+  const rr = rng(seedOf("tm:" + (g.id != null ? g.id : g.name) + key)), ro = rr();
+  let r = {mode:"free"};
+  const working = g.kind === "civ" && h >= 9 && h < 17, tired = (g === G.you ? G.you.energy : 60) < 25;
+  const pr = clamp(W.guarded / 170 + (rel < -10 ? 0.25 : 0) - (rel > 20 ? 0.3 : 0) - (asker === G.you ? ((G.you.standing || 50) - 50) / 400 : 0) + (working ? 0.18 : 0) + (tired ? 0.3 : 0), 0, 0.7);
+  if(ro < pr){
+    const principled = (t.conviction || 50) > 76 && ro < pr * 0.5;
+    const cause = tired ? "tired" : rel < -10 ? "sore" : working ? "work" : principled ? "principle" : "guarded";
+    const bank = TIME_WHY[cause], why = bank[Math.floor(rr() * bank.length)];
+    const wage = (typeof purseSalary === "function" ? purseSalary(g) : 30), fee = Math.max(3, Math.round((8 + wage / 4) * mins / 30));
+    const trader = g.kind === "civ" && W.guarded >= 40, payable = trader && !principled && cause !== "sore";
+    r = {mode:payable ? "fee" : "refuse", why, fee, principled, cause};
+  }
+  g._tm = {k:key, r}; return r;
+}
+function timeAfter(m, how, st){
+  const y = G.you, P = purseOf(y);
+  if(how === "pay"){ if(P.cash < st.fee) return false; P.cash -= st.fee; purseOf(m).cash += st.fee; purseLog(y, "Paid " + m.name + " for their time", -st.fee); purseChip(); }
+  if(how === "insist"){ try{ if(m.rel) ripple(m, -3, "They would not take no for an answer about my time.", 3, false); }catch(e){} }
+  m._timeOk = true; m._tm = null; walkNow(); setTimeout(() => { try{ G.running = true; openTalk(m); }catch(e){ console.warn(e); } }, 60); return true;
+}
+function timeCard(m, st){
+  const y = G.you, P = purseOf(y), insistOk = chance(0.55);
+  const ans = st.mode === "fee" ? "Ten minutes of my time is ten minutes of not earning. It is ƒ " + st.fee + "." : st.why;
+  const body = '<p style="margin:6px 0">“' + pcEsc(st.why) + (st.mode === "fee" ? " " + pcEsc(ans) : "") + '”</p><div class="muted" style="font-size:12px">Their time is theirs. ' + pcEsc(m.name) + ' is allowed to say no, and to put a price on it.</div>' +
+    '<div class="card__actions" style="flex-wrap:wrap">' +
+      (st.mode === "fee" ? '<button type="button" class="btn" id="tmPay"' + (P.cash < st.fee ? ' disabled' : '') + '>Pay ƒ ' + st.fee + ' for ten minutes</button>' : (!st.principled ? '<button type="button" class="btn btn--ghost" id="tmOffer"' + (P.cash < 8 ? ' disabled' : '') + '>Offer ƒ 8 for ten minutes</button>' : '')) +
+      '<button type="button" class="btn btn--ghost" id="tmInsist">Insist</button><button type="button" class="btn btn--ghost" id="tmLeave">Leave them to it</button></div><div class="dream" id="tmSay"></div>';
+  govCardOpen("Their time", m.name, "", body, null);
+  const done = () => card.querySelectorAll("button").forEach(b => { if(b.id !== "gcClose") b.disabled = true; });
+  const say = t => { el("tmSay").textContent = t; done(); };
+  const pay = el("tmPay"); if(pay) pay.addEventListener("click", () => timeAfter(m, "pay", st));
+  const off = el("tmOffer"); if(off) off.addEventListener("click", () => { if(chance(0.65)){ st.fee = 8; timeAfter(m, "pay", st); } else say(m.name + ": “Keep your money. It is not about the money.”"); });
+  el("tmInsist").addEventListener("click", () => { if(insistOk) timeAfter(m, "insist", st); else { try{ if(m.rel) ripple(m, -4, "I said no and they pushed, and I said no again.", 4, true); }catch(e){} say(m.name + " turns away. You pushed, and it cost you."); } });
+  el("tmLeave").addEventListener("click", () => { walkNow(); });
+  return null;
+}
+/* and your time is yours: when somebody wants a word with you, you may give it, put it off, or name a price */
+function timeAskCard(m){
+  const y = G.you, fee = Math.max(4, Math.round(8 + purseSalary(y) / 4)), t = purseTr(m), canPay = purseOf(m).cash >= fee;
+  const body = '<p style="margin:6px 0">“' + pcEsc((m.wantsWord && m.wantsWord.line) || "Have you got a minute?") + '”</p><div class="muted" style="font-size:12px">Your time is yours. ' + pcEsc(m.name) + ' is asking for ten minutes.</div>' +
+    '<div class="card__actions" style="flex-wrap:wrap"><button type="button" class="btn" id="taGive">Give them ten minutes</button><button type="button" class="btn btn--ghost" id="taLater">Not now</button><button type="button" class="btn btn--ghost" id="taFee"' + (canPay ? '' : ' disabled') + '>Charge ƒ ' + fee + ' for it</button></div><div class="dream" id="taSay"></div>';
+  govCardOpen("Someone wants a word", m.name, "", body, null);
+  const done = () => card.querySelectorAll("button").forEach(b => { if(b.id !== "gcClose") b.disabled = true; });
+  el("taGive").addEventListener("click", () => { m._timeOk = true; walkNow(); setTimeout(() => { try{ G.running = true; openTalk(m); }catch(e){} }, 60); });
+  el("taLater").addEventListener("click", () => { m.wantsWord = null; m.lastHail = G.t; try{ if(m.rel) ripple(m, (t.vanity || 40) > 60 ? -3 : -1, "I asked for a minute and they said not now.", 1, false); }catch(e){} el("taSay").textContent = m.name + " nods and goes. They will ask again, or not."; done(); });
+  el("taFee").addEventListener("click", () => { const ok = (t.conviction || 50) < 72 && chance(0.6); if(ok){ purseOf(m).cash -= fee; purseOf(y).cash += fee; purseLog(y, m.name + " paid for your time", fee); purseChip(); el("taSay").textContent = m.name + " pays ƒ " + fee + ", a little stiffly, and you give them the ten minutes."; done(); setTimeout(() => { m._timeOk = true; walkNow(); setTimeout(() => { try{ G.running = true; openTalk(m); }catch(e){} }, 60); }, 900); }
+    else { try{ if(m.rel) ripple(m, -4, "I asked for ten minutes and they put a price on it.", 4, true); }catch(e){} m.wantsWord = null; m.lastHail = G.t; el("taSay").textContent = m.name + " will not pay to be heard, and says so on the way out."; done(); } });
+  return null;
+}
+{ const _openTalk2 = openTalk;
+  openTalk = function(m){
+    try{ if(m && m !== G.you && G.running && !m._timeOk && !TALK.open && m.kind !== "envoy" && m.traits){
+      if(m.wantsWord){ timeAskCard(m); return; }
+      const st = timeStance(m, G.you, 10); if(st.mode !== "free"){ timeCard(m, st); return; } } }catch(e){ console.warn("time", e); }
+    if(m) m._timeOk = false;
+    return _openTalk2.apply(this, arguments);
+  };
+}
+/* ── your aide: the highest-influence member of your party (or your administration) sits in every meeting and argues your line when you do not ── */
+function aideFor(room){
+  const y = G.you, pool = []; let k = null; try{ k = heldOffice(); }catch(e){}
+  const rec = (o, extra) => pool.push(Object.assign({name:o.name, role:o.role, infl:o.infl != null ? o.infl : 40 + seedOf("inf:" + o.name) % 50, pos:o.pos, party:y.party, temper:o.temper || 40, bg:o.bg, official:true}, extra || {}));
+  try{
+    if((k === "gov") && (room === "govoffice" || room === "press" || room === "delegation")){ const S = (G.states || []).find(x => x.n === y.state); govStaff(S); Object.keys(S.cab).forEach(kk => rec(S.cab[kk])); }
+    else if(k === "pres" && (room === "exec" || room === "press" || room === "delegation")){ const st = presStaff(); Object.keys(st).forEach(kk => rec(st[kk])); }
+    else if(k === "senate" && room === "delegation"){ const st = senStaff(); Object.keys(st).forEach(kk => rec(st[kk])); }
+    else if(room === "court"){ const st = benchClerks(); Object.keys(st).forEach(kk => rec(st[kk])); }
+  }catch(e){}
+  if(!pool.length){
+    let ms = (G.members || []).filter(m => m && !m.gone && !m.machine && m.kind === "member" && m !== y && m.traits);
+    const same = ms.filter(m => m.party === y.party); if(same.length) ms = same;
+    ms.forEach(m => pool.push({name:m.name, role:(m.post ? postTitle(m.post) + ", " : "") + "member for " + m.state, infl:m.influence || 20, pos:m.pos, party:m.party, temper:m.traits.temper, bg:m.bg, m}));
+  }
+  pool.sort((a, b) => b.infl - a.infl); const a = pool[0]; if(a){ a.sn = surname(a.name); } return a || null;
+}
 function amendText(S){ const A = (S && S.amend) || []; return A.length ? " Amendments agreed at open hours, to be attached: " + A.map(a => a.title + " (" + a.from + ")").join("; ") + "." : ""; }
 function amendApply(S){ const A = (S && S.amend) || []; if(!A.length) return ""; const y = G.you; S.unrest = clamp(S.unrest - A.length, 0, 100); y.approval = clamp(y.approval + A.length, 0, 100); S.amend = []; return " The amendments from open hours were attached: " + A.map(a => a.title).join(", ") + "."; }
 function govBrief(S){
@@ -37724,10 +37812,11 @@ try{
     caucus:[], senate:[]
   };
   const civ = function(role, want, st){ let n = "Pat Doe"; try{ n = newName(st || G.you.state); }catch(e){} return {m:null, name:n, role, want, party:null, state:st || G.you.state, temper:rnd(20, 80), conv:rnd(20, 80), vanity:rnd(10, 70), warmth:rnd(-10, 15), case:(function(){ try{ return caseFile(role, want, st || G.you.state, n); }catch(e){ return null; } })()}; }
+  let _aideM = null;
   const buildCast = function(room, M){
     const y = G.you; let here = [];
-    try{ here = hereNow().filter(m => m && m.name && m !== y && !m.machine && !m.gone && m.kind === "member"); }catch(e){}
-    let pool = (G.members || []).filter(m => m && !m.gone && !m.machine && m.kind === "member" && m !== y);
+    try{ here = hereNow().filter(m => m && m.name && m !== y && m !== _aideM && !m.machine && !m.gone && m.kind === "member"); }catch(e){}
+    let pool = (G.members || []).filter(m => m && !m.gone && !m.machine && m.kind === "member" && m !== y && m !== _aideM);
     const pref = {committee:m => m.cmte === y.committee, caucus:m => m.party === y.party, govoffice:m => m.state === y.state, senate:m => m.house === "senate" || true}[room] || (() => true);
     const want = {govoffice:2, court:1, exec:2, committee:4, caucus:4, senate:4, press:1}[room] || 3;
     const picked = here.filter(pref).slice(0, want);
@@ -37906,6 +37995,7 @@ try{
       add("silent", "Stay silent and watch", null, 0, "You learn who is loud. No cost.");
       return A;
     }
+    if(S.x.aide) add("aide", "Have " + S.x.aide.sn + " argue your side", null, 0.05, S.x.aide.name + ", your highest-influence " + (S.x.aide.official ? "administration aide" : "party member") + ", argues your line in their own words while you stay seated.");
     if(step === "vote" || step === "ruling"){
       const t = S.x.tally();
       add("rule", (S.D.kind === "vote" ? "Call the vote on your line" : "Rule with your line") + " (" + t.yes + " with you)", null, t.yes >= t.no ? 0.1 : 0.5, "Wins big if the room is with you; backfires if it is not.");
@@ -37929,10 +38019,32 @@ try{
     return A.slice(0, 7);
   }
   const STAT = {settle:[{standing:1, influence:1}, {}], question:[{standing:2, influence:1, heat:-3}, {standing:-2, heat:5}], object:[{influence:2}, {standing:-1, influence:-1}], side:[{standing:1}, {}], amend:[{standing:2, approval:1}, {standing:-1}],
-    cut:[{influence:2, heat:4}, {standing:-2, heat:8}], whisper:[{pledge:1, funds:-2}, {funds:-2, standing:-2}], yield:[{standing:1}, {}], silent:[{}, {}], limits:[{standing:1}, {}], openfloor:[{approval:1}, {}],
+    cut:[{influence:2, heat:4}, {standing:-2, heat:8}], whisper:[{pledge:1, funds:-2}, {funds:-2, standing:-2}], yield:[{standing:1}, {}], silent:[{}, {}], aide:[{standing:1}, {}], limits:[{standing:1}, {}], openfloor:[{approval:1}, {}],
     rule:[{standing:2, influence:2}, {standing:-3}], rulecomp:[{standing:1, approval:1}, {}], room:[{}, {}]};
-  const SCORE = {question:2, settle:1, object:1, side:1, amend:2, cut:1, whisper:2, yield:1, silent:0, limits:1, openfloor:1, rule:2, rulecomp:1, room:0};
+  const SCORE = {question:2, settle:1, object:1, side:1, amend:2, cut:1, whisper:2, yield:1, silent:0, aide:1, limits:1, openfloor:1, rule:2, rulecomp:1, room:0};
   const shift = function(S, p, d, why){ if(!p || p.gone) return; const o = p.stance; p.stance = cl(Math.round(p.stance + d * (1 - p.conv / 260)), 0, 100); p.moved += p.stance - o; if(p.stance !== o) p.hist.push((p.stance > o ? "+" : "") + (p.stance - o) + " " + why); }
+  /* the aide argues your side, in their own words, to whoever is not yet with you */
+  const aideSpeak = function(S, n){
+    const A = S.x.aide; if(!A) return [];
+    const C = S.x.cast.filter(p => !p.gone), out = [], M = S.x.M, y = G.you;
+    const tg = C.filter(p => side(p) <= 0).sort((a, b) => a.stance - b.stance);
+    const delta = Math.max(2, Math.min(8, Math.round(A.infl / 100 * 7)));
+    for(let i = 0; i < (n || 1); i++){
+      const t = tg[i] || C[0]; if(!t) break;
+      let reason = "";
+      try{ const b = M.bill; if(b && b.pos){ const ax = AXES.slice().sort((x, z) => Math.abs(b.pos[z.k] || 0) - Math.abs(b.pos[x.k] || 0))[0], dir = (b.pos[ax.k] || 0) > 0 ? 1 : -1, yAye = alignment(y, b) >= 0, bank = DK_READ[ax.k] && DK_READ[ax.k][dir] && DK_READ[ax.k][dir][yAye ? "for" : "against"]; if(bank) reason = bank[Math.floor(Math.random() * bank.length)]; } }catch(e){}
+      if(t.case && t.case.settleShort){ const text2 = (i === 0 ? one(["The chair will forgive me; I speak for the Governor. ", "Let me put the Governor's case, since it is not being put. "]) : "And to " + t.sn + " directly: ") + "The Governor does not doubt " + t.case.short + ". The question is how: " + t.case.settleShort + " gets " + t.sn + " most of what they came for, and the rest has a date. " + capS(t.case.stakeShort || "") + ", which is why it should not be left.";
+        shift(S, t, Math.round(delta * 1.2), "argued by " + A.sn); C.filter(o => o !== t && side(o) === 0).forEach(o => shift(S, o, 2, A.sn + " argued your line"));
+        out.push({p:null, who:A.name + " (for you)", text:text2, to:t.id, tag:"support", gloss:A.name + " argues your line in their own words. They are your highest-influence " + (A.official ? "administration aide" : "party member") + "."}); continue; }
+      if(!reason) reason = one(["the cost is known and the delay costs more", "the people who asked for this have waited long enough", "the alternative is to do nothing, and nothing has a price too", "it is a fair settlement, and fair is rarer than perfect"]);
+      const own = A.pos && M.bill && M.bill.pos ? (alignment({pos:A.pos}, M.bill) >= 0) === (alignment(y, M.bill) >= 0) : true;
+      const text = (i === 0 ? one(["The chair will forgive me; I speak for " + (function(){ try{ return youAddress(); }catch(e){ return "the member"; } })() + ". ", "Allow me to say what my principal has said to me. ", "Let me put the case, since it is not being put. "]) : "And to " + t.sn + " directly: ") + (own ? "I believe it myself: " : "I would not always have chosen it, but the line is clear and here is the best of it: ") + reason + ".";
+      const f = A.party && t.party === A.party ? 1.3 : 1, d = Math.round(delta * f * (Math.random() < Math.max(0, (A.temper - 70) / 120) ? -0.3 : 1));
+      shift(S, t, d, "argued by " + A.sn); C.filter(o => o !== t && side(o) === 0).forEach(o => shift(S, o, 2, A.sn + " argued your line"));
+      out.push({p:null, who:A.name + " (for you)", text, to:t.id, tag:"support", gloss:A.name + " argues your line in their own words. They are your highest-influence " + (A.official ? "administration aide" : "party member") + "."});
+    }
+    return out;
+  };
   const doMove = function(S, mv){
     const C = S.x.cast.filter(p => !p.gone), t = mv.tgt != null ? S.x.cast[mv.tgt] : null, y = G.you, said = [];
     let p = 1 - mv.risk + (S.prep ? 0.15 : 0) + ((y.standing || 50) - 50) / 250 - S.rush * 0.08;
@@ -37945,7 +38057,8 @@ try{
     switch(mv.k){
       case "limits": you("Three minutes each. The chair will hold you to it."); C.forEach(o => { if(o.temper > 60) shift(S, o, -4, "bristled at the time limit"); }); S.x.brisk = 1; break;
       case "openfloor": you("Everyone will be heard. Take the time you need."); C.forEach(o => shift(S, o, 3, "glad to be heard")); break;
-      case "silent": you("(You say nothing and watch the room.)"); { const lean = S.x.tally(); C.forEach(o => shift(S, o, (lean.yes >= lean.no ? 2 : -3), "the room argued on without you")); } break;
+      case "silent": you("(You say nothing and watch the room.)"); if(S.x.aide){ aideSpeak(S, 1).forEach(l => said.push(l)); } else { const lean = S.x.tally(); C.forEach(o => shift(S, o, (lean.yes >= lean.no ? 2 : -3), "the room argued on without you")); } break;
+      case "aide": you("(You nod to " + S.x.aide.sn + ".)"); aideSpeak(S, 2).forEach(l => said.push(l)); break;
       case "question": if(t.case){
           const asked = t.asked || (t.asked = []), keys = ["cost", "when", "why", "tried", "who", "stake"], key = keys.find(k => asked.indexOf(k) < 0) || "cost";
           asked.push(key);
@@ -37989,9 +38102,10 @@ try{
         break;
       case "yield": you("I yield my time to " + t.sn + ".");
         shift(S, t, 6, "you gave them the floor"); C.filter(o => o !== t).forEach(o => shift(S, o, side(t) > 0 ? 4 : -2, t.sn + " argued your case"));
-        said.push(argue(S, t, S.x.M)); break;
+        said.push(argue(S, t, S.x.M)); if(S.x.aide) aideSpeak(S, 1).forEach(l => said.push(l)); break;
       case "rule": case "rulecomp": case "room": S.x.final = mv.k; you(mv.k === "rule" ? (S.D.kind === "vote" ? "Call the roll." : "Then I rule for " + S.x.M.q + ".") : mv.k === "rulecomp" ? "On the compromise, then: " + S.x.M.comp + "." : "The room has spoken. I'll go with it."); S.x.finalOk = ok; break;
     }
+    if(S.x.aide && mv.k !== "aide" && mv.k !== "silent" && mv.k !== "yield" && Math.random() < 0.3 && S.D.steps[S.i] !== "gavel") aideSpeak(S, 1).forEach(l => said.push(l));
     const r = sitApply(ok ? STAT[mv.k][0] : STAT[mv.k][1]);
     S.score += ok ? SCORE[mv.k] : -1;
     S.tally.push({step:S.D.steps[S.i], pick:mv.t, ok, r, k:mv.k, who:t ? t.sn : null});
@@ -38056,7 +38170,8 @@ try{
     const M = matterFor(room);
     const watch = !!G._sitWatch; G._sitWatch = false;
     const S = SIT.on = {room, D, i:0, li:0, lines:[], cast:{}, score:0, rush:0, prep, watch, t0:performance.now(), m0:G.minute || 0, tally:[], picked:false, key:key || KEY[room] || D.key};
-    S.x = {M, cast:buildCast(room, M), lines:[], queue:[], qi:0, at0:(() => { try{ return hhmm(); }catch(e){ return ""; } })(), amended:false, lastSpeaker:null, moves:null, said:[]};
+    const aide = watch ? null : aideFor(room); _aideM = aide && aide.m ? aide.m : null;
+    S.x = {M, aide, cast:buildCast(room, M), lines:[], queue:[], qi:0, at0:(() => { try{ return hhmm(); }catch(e){ return ""; } })(), amended:false, lastSpeaker:null, moves:null, said:[]};
     S.x.tally = () => { const C = S.x.cast.filter(p => !p.gone); return {yes:C.filter(p => p.stance >= 55).length, no:C.filter(p => p.stance <= 45).length, mid:C.filter(p => p.stance > 45 && p.stance < 55).length, avg:C.reduce((a, p) => a + p.stance, 0) / Math.max(1, C.length)}; };
     S.cast = {a:(S.x.cast[0] || {}).name, b:(S.x.cast[1] || {}).name, c:(S.x.cast[2] || {}).name, ppl:S.x.cast.map(p => p.m).filter(Boolean)};
     try{ if(!watch){ kMark(S.key); kMarkChamber(); } }catch(e){}
@@ -38072,6 +38187,7 @@ try{
     S.picked = false; S.res = ""; S.x.moves = null; S.x.said = [];
     if(S.x.silenced != null && st !== "question") S.x.silenced = null;
     let q = exchange(S, st);
+    if(S.i === 0 && S.x.aide) q.unshift({p:null, who:S.x.aide.name + " (your aide)", text:"I will be at your shoulder, " + (function(){ try{ return youAddress(); }catch(e){ return "sir"; } })() + ". If you cannot take the floor, I will make your case.", to:null, tag:"support", gloss:S.x.aide.name + " is the highest-influence " + (S.x.aide.official ? "person in your administration" : "member of your party") + ", and speaks for your line whenever you are not speaking."});
     if(S.x.silenced != null) q = q.filter(l => !l.p || l.p.id !== S.x.silenced);
     if(S.x.brisk && q.length > 3) q = q.slice(0, 3 + (Math.random() < 0.5 ? 1 : 0));
     S.x.queue = q.length ? q : [chairLine(S, "Order.")];
@@ -38225,6 +38341,7 @@ try{
     card.innerHTML = '<div class="eyebrow">' + esc(S.D.title) + ' · step ' + (S.i + 1) + ' of ' + S.D.steps.length + (S.prep ? ' · you read the file' : '') + ' · pace ' + esc((CLr() && CLr().pace) || "normal") + '</div>' +
       '<h1>' + SIT_STEP_T[st] + '</h1><div class="sit__prog">' + prog + '</div>' +
       '<p class="sx-q"><b>The question:</b> ' + esc(S.x.M.q) + ' · <span class="sx-c">' + t.yes + (S.watch ? ' for it · ' : ' with you · ') + t.mid + ' undecided · ' + t.no + ' against</span>' + (S.watch ? ' · <i>you are in the gallery</i>' : '') + (S.x.amended ? ' · <i>compromise on the table</i>' : '') + '</p>' +
+      (S.x.aide ? '<p class="sx-q"><b>Your aide:</b> ' + esc(S.x.aide.name) + ' <small>' + esc(S.x.aide.role || "") + ' \u00b7 influence ' + Math.round(S.x.aide.infl) + '</small> \u2014 speaks for your line when you do not.</p>' : '') +
       '<div class="sx-grid"><div class="sx-cast">' + S.x.cast.map(p => meter(p, S)).join("") + '</div><div class="sit__lines sx-lines">' + lines + '</div></div>' +
       (S.res ? '<p class="dream">' + esc(S.res) + '</p>' : '') + (st === "adjourn" && S.out ? '<p class="dream">' + esc(S.out) + '</p>' + recap(S) : '') +
       (done && st !== "adjourn" && !S.picked && !S.watch ? '<p class="sx-hint">Your move. Hover a choice to see what it does; it shifts the meters live.</p>' : '') +

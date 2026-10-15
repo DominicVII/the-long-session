@@ -4,6 +4,14 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## Their time is theirs, and your aide speaks for you
+
+`20261015h` (on `20261015g`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- **Time can be refused or charged for, by anyone:** when you go to talk to someone, they may be busy, tired, sore at you, guarded about their afternoons, or simply principled, and may say no in their own words. A shopkeeper or clerk may name a price for ten minutes (ƒ, from your purse, paid into theirs); you can pay, offer a little, insist (and pay for it in warmth if it works), or leave them to it. People who hold their time on principle will not take money for it. The same applies on the phone.
+- **Your time is yours too:** when someone crosses the room to ask for a word, you may give them ten minutes, put them off (with a small cost to how they feel about you), or charge for it (they may pay, or take offence). Same rules for you and for them.
+- **An aide in every meeting:** the highest-influence member of your party sits at your shoulder in open hours, the Senate, committees, the caucus, press conferences, delegations and every other sitting. In your administration (Governor, President, the bench) it is your highest-influence staff member or senior clerk. They argue your line, in their own words and from the case at hand, whenever you are silent or yield, you can ask them to speak for you as a move, and they sometimes chip in on their own. A hot-tempered aide can backfire. The aide is shown at the top of the sitting, with their influence.
+
 ## The purse: one money for everyone
 
 `20261015g` (on `20261015f`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
