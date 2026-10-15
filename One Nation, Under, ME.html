@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261015a">
+<meta name="onum-build" content="20261015b">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261015a";
+  var STAMP = "20261015b";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -9578,10 +9578,97 @@ function dkAmend(it){
   try{ feed("Your amendment trims the cost of the " + it.title + "."); }catch(e){}
   return "Amendment offered: the appropriation is cut by a third. Fiscal hawks soften; the sponsor sulks.";
 }
+/* ── what the shifts mean, in full, and how different people read the same text ── */
+const DK_AXIS = {
+  econ:{n:"Public / Market", scale:"At −100 the state owns, plans and pays for nearly everything; at +100 private firms and prices decide nearly everything.",
+    lo:{w:"Public", does:"keeps services and industries in public hands: public works paid from the treasury, price ceilings on bread and rent, state ownership or licensing of utilities, a bigger payroll of public employees",
+      gain:"wage earners, tenants, towns that depend on a public road, ferry or water main, and anyone who was priced out by a private monopoly", lose:"investors, large employers, and firms that profit from contracts the state would now keep for itself",
+      state:"Public choices tend to lower unrest first and industry later: the road is built before the factory pays for it."},
+    hi:{w:"Market", does:"cuts tariffs and licences, deregulates, lowers business taxes, and hands services to private contractors so prices, not ministries, decide who gets what",
+      gain:"employers, exporters, merchants and anyone who wants fewer forms between them and a deal", lose:"wage earners in thin labour markets, small towns the contractors will not serve, and people who relied on a price ceiling",
+      state:"Market choices tend to raise industry quickly and unrest slowly: output climbs, and the counties that do not share in it get angry later."}},
+  lib:{n:"Order / Liberty", scale:"At −100 the state may search, license, register and restrain to keep order; at +100 the person is presumed free unless a court says otherwise.",
+    lo:{w:"Order", does:"adds licensing, registration, curfews, search powers, and penalties for assembly or speech the authorities call disorderly",
+      gain:"anyone afraid of the street: shopkeepers, the constabulary, and people who have been robbed or threatened", lose:"organizers, the press, minorities, and any dissenter whose meeting needs a permit",
+      state:"More order lowers street trouble at once and builds resentment slowly, which comes out at the next election or the next riot."},
+    hi:{w:"Liberty", does:"limits searches and registration, repeals licences, protects assembly, press and worship, and makes the state prove its case in front of a judge",
+      gain:"the press, dissenters, minorities, worshippers outside the main rite, and anyone who has been stopped without a reason", lose:"the constabulary, anyone who wants a firm hand on disorder, and those who fear what unlicensed meetings plan",
+      state:"More liberty raises noise first and trust later; the streets are louder and the courts are busier."}},
+  def:{n:"Dove / Hawk", scale:"At −100 the Republic prefers treaties, arms limits and aid; at +100 it prefers ships, garrisons and a visible readiness to use them.",
+    lo:{w:"Dove", does:"reduces fleet and garrison funding, favours treaties, arms limits and aid to neighbours, and spends the savings at home",
+      gain:"taxpayers, the peace churches, families whose sons would be sent, and neighbours who would rather trade", lose:"the shipyards, the veterans' league, border counties that live on the garrison, and anyone who believes weakness is invited",
+      state:"Doves tend to save money and invite testing; if a neighbour such as the Reach or the Horn League reads it as weakness, the frontier gets more dangerous."},
+    hi:{w:"Hawk", does:"funds ships and garrisons, sets forward bases and levies, and tells neighbours in advance what the Republic will not tolerate",
+      gain:"the shipyards, the veterans' league, frontier towns, and anyone who wants a neighbour to think twice", lose:"taxpayers, the peace churches, and families whose sons would be called up",
+      state:"Hawks tend to cost more and deter more; a neighbour that sees a new base on its strait or frontier may answer with its own."}},
+  wel:{n:"Thrift / Provision", scale:"At −100 the state spends little and asks people to rely on family, parish and wages; at +100 it provides pensions, hospitals, relief and schooling as of right.",
+    lo:{w:"Thrift", does:"balances the budget, tests who qualifies for relief, trims pensions and hospital grants, and lowers the taxes that paid for them",
+      gain:"taxpayers, savers, and employers who pay the levies", lose:"the old, the sick, the unemployed, and the parishes whose charity would be asked to cover what the state stopped paying",
+      state:"Thrift lowers the bill now and raises hardship later; the counties with weak parishes feel it first."},
+    hi:{w:"Provision", does:"pays pensions and arrears, funds county hospitals and school meals, and raises taxes or borrows to do it",
+      gain:"the old, the sick, the poor, hospitals and parishes, and the widow whose pension letter came back unopened", lose:"taxpayers and savers, and anyone who thinks the money should be earned rather than given",
+      state:"Provision lowers hardship and unrest and raises the bill; if the treasury runs short, the cost comes back as a levy or a cut elsewhere."}}
+};
+function dkStr(v){ const a = Math.abs(v); return a < 8 ? "barely" : a < 20 ? "mildly" : a < 40 ? "clearly" : "strongly"; }
+function dkPos(it){ return it.pos || (it.sb ? {[it.sb.axis || "econ"]:(it.sb.dir || 1) * 40} : null); }
+function dkShiftsHTML(it){
+  const pos = dkPos(it); if(!pos) return "";
+  const b = dkBillRef(it) || {}, soft = b.soft ? 0.6 : 1;
+  const rows = AXES.map(a => {
+    const v = Math.round((pos[a.k] || 0) * soft), X = DK_AXIS[a.k]; if(!X) return "";
+    if(Math.abs(v) < 8) return '<div style="margin:8px 0"><b>' + pcEsc(X.n) + ': ' + (v > 0 ? "+" : "") + v + '.</b> <span class="muted">The bill barely touches this. ' + pcEsc(X.scale) + '</span></div>';
+    const P = v > 0 ? X.hi : X.lo, Q = v > 0 ? X.lo : X.hi;
+    return '<div style="margin:10px 0;padding-top:8px;border-top:1px solid var(--line-soft)"><b>' + pcEsc(X.n) + ': ' + (v > 0 ? "+" : "") + v + '</b> — ' + dkStr(v) + ' toward <b>' + pcEsc(P.w) + '</b>.' +
+      '<div class="muted" style="font-size:12px;margin:2px 0">' + pcEsc(X.scale) + '</div>' +
+      '<div><b>What that means in this bill.</b> Pushing toward ' + pcEsc(P.w.toLowerCase()) + ' means it ' + pcEsc(P.does) + '.</div>' +
+      '<div><b>Who gains.</b> ' + pcEsc(cap(P.gain)) + '.</div><div><b>Who loses.</b> ' + pcEsc(cap(P.lose)) + '.</div>' +
+      '<div><b>Why it reaches you and your state.</b> ' + pcEsc(P.state) + ' The opposite pole, ' + pcEsc(Q.w.toLowerCase()) + ', would have done the reverse.</div></div>';
+  }).join("");
+  return '<div class="eyebrow" style="margin-top:10px">What the shifts mean</div><div class="muted" style="font-size:12px">Each axis runs from −100 to +100. The number is how far this text pushes the country along it; the words say what that pushing is made of.</div>' + rows;
+}
+/* how a person actually reads it: their own belief on the axis it touches most, their life, and their own temper */
+const DK_READ = {
+  econ:{1:{for:["it lets the people who build things keep more of what they build", "it takes the state's hand off honest business"], against:["it gives the market what the public used to hold", "it will leave the towns the contractors do not serve with nothing"]},
+        "-1":{for:["it keeps the roads, water and bread in public hands where somebody can be held to account", "a price the state sets cannot be raised by a stranger"], against:["it puts the state in the business of running things it will run badly", "it spends public money on what a private firm would do cheaper"]}},
+  lib:{1:{for:["a person should be presumed free until a judge says otherwise", "every licence is a favour somebody can withdraw"], against:["it takes the brake off people who should not be unwatched", "the street needs a firm hand more than it needs another right"]},
+       "-1":{for:["a country that cannot keep order cannot keep anything else", "people want to walk home safely more than they want a debate"], against:["it hands the authorities powers they will not give back", "order bought with other people's freedom is rent, not ownership"]}},
+  def:{1:{for:["a neighbour thinks twice about a country with ships", "the frontier has to be visibly defended"], against:["it spends the Republic's sons and savings on a quarrel it could settle at a table", "a new base invites the answer it is meant to prevent"]},
+       "-1":{for:["every guinea on a fleet is a guinea not spent on a school", "treaties have kept more peace than garrisons"], against:["it tells every neighbour the Republic will not fight, and they will test that", "the frontier towns will pay for this with their own safety"]}},
+  wel:{1:{for:["a pension owed is a pension paid, whatever the ledger says", "a country that cannot look after its old and sick has no business calling itself a country"], against:["it spends what the Republic has not earned", "it will crowd out the parishes and the families that do this better"]},
+       "-1":{for:["the budget has to balance or the next generation pays", "relief should go to those who need it, not those who ask"], against:["it cuts what the old and sick rely on to save a sum nobody will miss", "the parish cannot carry what the state drops"]}}
+};
+function dkReadersHTML(it){
+  try{
+    const pos = dkPos(it); if(!pos) return "";
+    const bill = {pos:{econ:pos.econ || 0, lib:pos.lib || 0, def:pos.def || 0, wel:pos.wel || 0}, title:it.title, id:"dk:" + it.title};
+    const pool = (G.members || []).filter(m => m && !m.gone && m.pos && m.kind === "member");
+    const r = rng(seedOf("readers:" + it.title)), picked = [], used = {};
+    pool.slice().sort(() => r() - 0.5).forEach(m => { if(picked.length >= 6) return; if(used[m.bg] || used[m.name]) return; used[m.bg] = used[m.name] = 1; picked.push(m); });
+    const rows = picked.map(m => {
+      let sc = 0; try{ sc = alignment(m, bill); }catch(e){ sc = alignmentRaw(m, bill); }
+      const gaps = AXES.map(a => ({a, g:Math.abs((m.pos[a.k] || 0) - (bill.pos[a.k] || 0)), w:Math.abs(bill.pos[a.k] || 0), dir:(bill.pos[a.k] || 0) > 0 ? 1 : -1})).filter(x => x.w >= 8);
+      let dom = null, stance = sc > 8 ? "for" : sc < -8 ? "against" : "undecided";
+      if(gaps.length){ dom = stance === "for" ? gaps.slice().sort((x, y2) => x.g - y2.g)[0] : gaps.slice().sort((x, y2) => y2.g - x.g)[0]; }
+      const rd = dom && DK_READ[dom.a.k] && DK_READ[dom.a.k][dom.dir], why = rd ? rd[stance === "undecided" ? (sc >= 0 ? "for" : "against") : stance] : null;
+      const rr = rng(seedOf("rd:" + m.id + it.title)), pickW = why ? why[Math.floor(rr() * why.length)] : "nothing in it touches what they care about";
+      const cr = creedOf(m.creed), og = originOf(m.origin), t = m.traits || {};
+      const life = [cap(m.bg) + " from " + m.state + ", of " + cr.t,
+        og.grievance ? "their people carry the grievance " + og.grievance : "",
+        (t.conviction || 0) > 70 ? "not a person who is moved easily" : (t.loyalty || 0) > 72 ? "inclined to follow the party line when it is close" : (t.ambition || 0) > 75 ? "counting what this does for the next race" : (t.discretion || 0) > 75 ? "keeps their own counsel until the roll" : ""].filter(Boolean);
+      const verdict = stance === "for" ? "leans aye" : stance === "against" ? "leans nay" : "undecided";
+      return '<div style="margin:8px 0;padding:6px 8px;border-left:3px solid ' + (stance === "for" ? "#2f6b3a" : stance === "against" ? "#8a2f36" : "#888") + ';background:rgba(128,128,128,.07)"><b>' + pcEsc(m.name) + '</b> <span class="muted">(' + pcEsc(m.party) + ') · ' + verdict + '</span>' +
+        '<div style="font-size:13px">' + (stance === "undecided" ? "Torn: " : stance === "for" ? "Reads it as a good thing: " : "Reads it as a bad thing: ") + pcEsc(pickW) + (dom ? ' (on ' + pcEsc(dom.a.n) + ', where they sit at ' + Math.round(m.pos[dom.a.k] || 0) + ' and the bill at ' + Math.round(bill.pos[dom.a.k] || 0) + ')' : '') + '.</div>' +
+        '<div class="muted" style="font-size:12px">' + pcEsc(life.join("; ")) + '.</div></div>';
+    }).join("");
+    let you = "";
+    try{ const y = G.you, yp = y && y.pos; if(yp){ const sc = alignment({pos:yp}, bill); const parts = AXES.filter(a => Math.abs(bill.pos[a.k] || 0) >= 8).map(a => pcEsc(DK_AXIS[a.k].n) + ": you " + Math.round(yp[a.k] || 0) + ", the bill " + Math.round(bill.pos[a.k] || 0)); you = '<div style="margin:8px 0;padding:6px 8px;border-left:3px solid #c9a24a;background:rgba(201,162,74,.1)"><b>You</b> — by your own answers, this text sits ' + (sc > 8 ? "close to" : sc < -8 ? "far from" : "somewhere between") + ' where you stand. <span class="muted">(' + parts.join("; ") + ')</span><div class="muted" style="font-size:12px">That is only your own record. Read the clauses above, weigh who gains and who loses, and decide it for yourself.</div></div>'; } }catch(e){}
+    return '<div class="eyebrow" style="margin-top:10px">How different people read the same text</div><div class="muted" style="font-size:12px">Nobody here was told what to think of it. Each of them reads it through their own beliefs, their own trade and place, and their own temper, so they agree only where those happen to point the same way.</div>' + you + rows;
+  }catch(e){ return ""; }
+}
 function dkExtraHTML(it){
-  return '<div class="eyebrow" style="margin-top:8px">Cost and effects</div><div class="muted">' + pcEsc(dkCostLine(it)) + '</div><ul style="margin:4px 0 0 18px">' + dkEffects(it).map(e => '<li>' + pcEsc(e) + '</li>').join("") + '</ul>' +
+  return dkShiftsHTML(it) + '<div class="eyebrow" style="margin-top:8px">Cost and effects</div><div class="muted">' + pcEsc(dkCostLine(it)) + '</div><ul style="margin:4px 0 0 18px">' + dkEffects(it).map(e => '<li>' + pcEsc(e) + '</li>').join("") + '</ul>' +
     '<div class="eyebrow" style="margin-top:8px">Every chamber</div>' + dkChambers(it) +
-    '<div class="eyebrow" style="margin-top:8px">Who is for and against, and why</div>' + dkStakeholders(it).map(r => '<div class="whip__row"><span class="whip__n">' + pcEsc(r[0]) + '</span><span class="whip__w">' + pcEsc(r[1]) + (r[2] ? ' — ' + pcEsc(r[2]) : '') + '</span></div>').join("");
+    '<div class="eyebrow" style="margin-top:8px">Who is for and against, and why</div>' + dkStakeholders(it).map(r => '<div class="whip__row"><span class="whip__n">' + pcEsc(r[0]) + '</span><span class="whip__w">' + pcEsc(r[1]) + (r[2] ? ' — ' + pcEsc(r[2]) : '') + '</span></div>').join("") + dkReadersHTML(it);
 }
 function dkWire(root, it, sayEl, rerender){
   const said = r => { dkWire._last = r; const s2 = card.querySelector(".dk-say") || el("dkSay") || sayEl; if(s2) s2.textContent = r; };

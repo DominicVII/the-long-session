@@ -4,6 +4,13 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## Bills, read to the last word
+
+`20261015b` (on `20261015a`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- **What the shifts mean:** opening a bill now explains every axis in full (Public / Market, Order / Liberty, Dove / Hawk, Thrift / Provision): what the scale is, what the bill actually does at that end, who gains, who loses, and why it reaches your state.
+- **Different readers, different readings:** a panel of members each reads the same text through their own positions, trade, place, creed, grievance and temper, so they agree only where their beliefs and lives happen to point the same way. Your own record is shown beside it, labelled as only your record.
+
 ## The neighbours, the phone, the newspaper
 
 `20261015a` (on `20261013w`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
