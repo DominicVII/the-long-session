@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261015k">
+<meta name="onum-build" content="20261015l">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261015k";
+  var STAMP = "20261015l";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -31021,32 +31021,60 @@ const KIN_JOBS = {
 };
 const KIN_PARTY = ["FED", "COM", "IND", null];
 const KIN_OFFICES = ["Representative", "Senator", "Governor", "judge of the state bench", "county sheriff", "mayor"];
+const KIN_FIRST = {
+  M:["Aaron","Abel","Adrian","Alasdair","Amos","Andre","Anton","Arlo","Augustin","Barnaby","Bram","Callum","Caleb","Casimir","Cyrus","Daniel","Desmond","Diego","Dirk","Edmund","Elias","Emeka","Emil","Ewan","Felix","Finn","Gideon","Gerrit","Hamish","Hector","Hendrik","Hugo","Isaac","Jasper","Joost","Kasper","Lachlan","Leif","Lucien","Magnus","Marcus","Matthias","Nathaniel","Niall","Oliver","Osric","Owen","Pieter","Rafael","Rufus","Samuel","Silas","Soren","Tobias","Tomas","Vincent","Willem","Yusuf","Zachary"],
+  F:["Agnes","Amara","Anneliese","Astrid","Beatrix","Brigid","Catriona","Celestine","Clara","Cordelia","Delia","Delphine","Eleanor","Elena","Elsa","Esther","Eunice","Faith","Femke","Fiona","Freya","Greta","Hannah","Heleen","Imke","Ines","Ingrid","Isabel","Johanna","Juno","Katrijn","Liesbeth","Lotte","Maeve","Margaret","Marisol","Marta","Mercy","Mirembe","Moira","Nadia","Nell","Noor","Ottoline","Priya","Prudence","Rosa","Saskia","Siobhan","Solveig","Thea","Verity","Wren","Zainab","Zoe","Abigail","Beatrice","Dorothea","Edith","Harriet"]
+};
 function kinArt(o){ return o === "Governor" ? "Governor" : /^[AEIOU]/i.test(o) ? "an " + o : "a " + o; }
+function kinPro(sex){ return sex === "F" ? {he:"she", him:"her", his:"her"} : {he:"he", him:"him", his:"his"}; }
+function kinSexOf(p){
+  if(p.ksex) return p.ksex; if(p.sex === "M" || p.sex === "F"){ p.ksex = p.sex; return p.ksex; }
+  const fn = String(p.name || "").split(" ")[0]; let sx = KIN_FIRST.M.indexOf(fn) >= 0 ? "M" : KIN_FIRST.F.indexOf(fn) >= 0 ? "F" : null;
+  if(!sx){ const MX = /^(Baptiste|Etienne|Pierre|Jesse|Elie|Noe|Luke|Mathieu|Tobiah|Jonah|Josue|Ezekiel|Elijah|Micah|Isaiah|Joshua|Levi|Zebulon|Ambrose|Barnabas)$/; sx = MX.test(fn) ? "M" : (/(a|e|i|ie|ine|elle|beth|eth|ith|yn|ey|ee|ia)$/i.test(fn) && !/^(Jose|Jean|Rene|Andre|Luke)$/.test(fn)) ? "F" : "M"; }
+  p.ksex = sx; return sx;
+}
 function kinAge(p){ if(p.age) return p.age; const r = seedOf("age:" + (p.id != null ? p.id : p.name)); return p === G.you ? 38 : p.kind === "member" ? 30 + (p.terms || 1) * 3 + (r % 14) : 20 + (r % 55); }
-function kinName(p, last){ let n = ""; try{ n = wallSafeMint(() => newName(p.state || (G.you && G.you.state))); }catch(e){} if(!n) n = "Alex Doe"; return last ? n.split(" ")[0] + " " + last : n; }
+function kinName(p, last, sex){
+  let ln = last; if(!ln){ let n = ""; try{ n = wallSafeMint(() => newName(p.state || (G.you && G.you.state))); }catch(e){} ln = String(n || "Doe").split(" ").slice(1).join(" ") || "Doe"; }
+  const pool = KIN_FIRST[sex || (Math.random() < 0.5 ? "M" : "F")]; return pool[Math.floor(Math.random() * pool.length)] + " " + ln;
+}
 function kinEnsure(p){
-  if(p.kin) return p.kin;
-  const r = rng(seedOf("kin:" + (p.id != null ? p.id : p.name) + ":" + (G.country || ""))), age = kinAge(p), t = purseTr ? purseTr(p) : {loyalty:50}, sn = surname(p.name || "Doe");
+  if(p.kin && p.kin.v === 2) return p.kin;
+  if(p !== G.you && !(G.fam && G.fam.p && p.id != null && G.fam.p[p.id])){ try{ famEnsure(); }catch(e){} }
+  const r = rng(seedOf("kin:" + (p.id != null ? p.id : p.name) + ":" + (G.country || ""))), age = kinAge(p), t = purseTr ? purseTr(p) : {loyalty:50}, sn = surname(p.name || "Doe"), sx = kinSexOf(p), opp = sx === "M" ? "F" : "M";
   const pickJob = () => { const ks = Object.keys(KIN_JOBS); return ks[Math.floor(r() * ks.length)]; };
-  const K = {age, spouse:null, kids:[], parents:[], siblings:[], inlaws:null, dynasty:null, wealth:null, events:[], made:G.day || 0};
+  const K = {v:2, sex:sx, age, spouse:null, kids:[], parents:[], siblings:[], inlaws:null, dynasty:null, wealth:null, events:[], made:G.day || 0};
   const m = r(), marry = clamp(0.35 + (age - 22) / 70 + ((t.loyalty || 50) - 50) / 300, 0.1, 0.8);
   K.marital = age < 24 ? "single" : m < marry ? "married" : m < marry + 0.1 ? "divorced" : m < marry + 0.15 && age > 55 ? "widowed" : "single";
-  if(K.marital === "married" || K.marital === "widowed" || K.marital === "divorced"){
+  if(K.marital !== "single"){
     const job = pickJob(), pty = KIN_PARTY[Math.floor(r() * 4)];
-    K.spouse = {name:kinName(p), job, party:pty, supportive:Math.round((r() * 2 - 0.7) * 100) / 100, alive:K.marital !== "widowed", health:r() < 0.1 ? "ill" : "well", ex:K.marital === "divorced"};
+    K.spouse = {name:kinName(p, sn === "x" ? null : (r() < 0.6 ? sn : null), opp), sex:opp, job, party:pty, supportive:Math.round((r() * 2 - 0.7) * 100) / 100, alive:K.marital !== "widowed", health:r() < 0.1 ? "ill" : "well", ex:K.marital === "divorced"};
     if(K.marital !== "married") K.spouse.supportive = 0;
   }
   const nKids = K.marital === "single" && r() > 0.2 ? 0 : Math.min(4, Math.floor(r() * (1 + Math.max(0, (age - 22) / 11))));
-  for(let i = 0; i < nKids; i++){ const ka = Math.max(0, Math.min(age - 20, Math.floor(r() * (age - 20)))); K.kids.push({name:kinName(p, sn), age:ka, state:ka < 6 ? "small" : ka < 17 ? "school" : "grown", ill:r() < 0.07, job:ka >= 17 ? pickJob() : null}); }
-  [["parent", 0], ["parent", 1]].forEach(([role], pi) => { const pa = age + 22 + Math.floor(r() * 14), alive = r() > clamp((pa - 60) / 40, 0, 0.92); K.parents.push({role, name:kinName(p, pi === 1 ? sn : null), age:pa, alive, need:alive ? (pa > 78 && r() < 0.5 ? "frail" : pa > 70 && r() < 0.2 ? "ill" : "none") : "none", job:pickJob()}); });
+  for(let i = 0; i < nKids; i++){ const ka = Math.max(0, Math.min(age - 20, Math.floor(r() * (age - 20)))), ks = r() < 0.5 ? "M" : "F"; K.kids.push({name:kinName(p, sn, ks), sex:ks, age:ka, state:ka < 6 ? "small" : ka < 17 ? "school" : "grown", ill:r() < 0.07, job:ka >= 17 ? pickJob() : null}); }
+  [["mother", "F"], ["father", "M"]].forEach(([role, ps]) => { const pa = age + 22 + Math.floor(r() * 14), alive = r() > clamp((pa - 60) / 40, 0, 0.92); K.parents.push({role, sex:ps, name:kinName(p, role === "father" ? sn : null, ps), age:pa, alive, need:alive ? (pa > 78 && r() < 0.5 ? "frail" : pa > 70 && r() < 0.2 ? "ill" : "none") : "none", job:pickJob()}); });
   const nSib = Math.floor(r() * 4);
-  for(let i = 0; i < nSib; i++){ const tie = r() < 0.15 ? "estranged" : r() < 0.25 ? "rival" : "close", off = r() < 0.05; K.siblings.push({name:kinName(p, sn), job:pickJob(), tie, party:KIN_PARTY[Math.floor(r() * 4)], office:off ? KIN_OFFICES[Math.floor(r() * KIN_OFFICES.length)] : null, debt:r() < 0.12}); }
+  for(let i = 0; i < nSib; i++){ const tie = r() < 0.15 ? "estranged" : r() < 0.25 ? "rival" : "close", off = r() < 0.05, ss = r() < 0.5 ? "M" : "F"; K.siblings.push({name:kinName(p, sn, ss), sex:ss, role:ss === "M" ? "brother" : "sister", job:pickJob(), tie, party:KIN_PARTY[Math.floor(r() * 4)], office:off ? KIN_OFFICES[Math.floor(r() * KIN_OFFICES.length)] : null, debt:r() < 0.12}); }
   K.wealth = r() < 0.08 ? "old money" : r() < 0.3 ? "comfortable" : r() < 0.72 ? "modest" : "struggling";
-  if(r() < (p.house ? 0.8 : 0.16)){ const who = ["parent", "grandparent", "uncle", "aunt", "cousin"][Math.floor(r() * 5)], off = KIN_OFFICES[Math.floor(r() * 3)]; K.dynasty = {who, office:off, years:5 + Math.floor(r() * 30), strength:Math.round(30 + r() * 60)}; }
-  K.inlaws = K.spouse && K.spouse.alive !== false ? {name:sn === "x" ? "" : kinName(p), tie:r() < 0.2 ? "difficult" : "warm"} : null;
+  if(r() < (p.house ? 0.8 : 0.16)){ const who = ["father", "mother", "uncle", "aunt", "grandfather", "grandmother", "cousin"][Math.floor(r() * 7)], off = KIN_OFFICES[Math.floor(r() * 3)]; K.dynasty = {who, office:off, years:5 + Math.floor(r() * 30), strength:Math.round(30 + r() * 60)}; }
+  K.inlaws = K.spouse && K.spouse.alive !== false && !K.spouse.ex ? {tie:r() < 0.2 ? "difficult" : "warm"} : null;
+  /* where the older family record already names these people, they are the same people: keep the names, give them sexes, and keep both records in step */
+  try{ const fr = G.fam && G.fam.p && p.id != null ? G.fam.p[p.id] : null;
+    if(fr){
+      const fix = (full, sex, lastKeep) => { const parts = String(full || "").split(" "), fn = parts[0], ln = parts.slice(1).join(" "); if(KIN_FIRST[sex].indexOf(fn) >= 0) return full; const pool = KIN_FIRST[sex]; return pool[seedOf("kf:" + full + sex) % pool.length] + (ln ? " " + ln : ""); };
+      const JM = {"pastor's assistant":"pastor", "shop owner":"shopkeeper"};
+      if(fr.spouse){ fr.spouse.name = fix(fr.spouse.name, opp); K.marital = K.marital === "single" || K.marital === "divorced" ? "married" : K.marital; K.spouse = Object.assign(K.spouse || {supportive:Math.round((r() * 2 - 0.7) * 100) / 100, alive:true, health:"well", party:KIN_PARTY[Math.floor(r() * 4)]}, {name:fr.spouse.name, sex:opp, job:KIN_JOBS[fr.spouse.job] ? fr.spouse.job : (JM[fr.spouse.job] || "clerk"), ex:false}); }
+      else { K.spouse = null; if(K.marital === "married") K.marital = "single"; }
+      if(fr.kids && fr.kids.length){ K.kids = fr.kids.map((k, i) => { const ks = seedOf("ks:" + p.id + ":" + i) % 2 ? "M" : "F"; k.name = fix(k.name + " " + sn, ks).split(" ")[0]; const age = k.age || 0; return {name:k.name + " " + sn, sex:ks, age, state:age < 6 ? "small" : age < 17 ? "school" : "grown", ill:false, job:age >= 17 ? "clerk" : null}; }); } else if(!fr.spouse) K.kids = [];
+      if(fr.parents && fr.parents.length){ fr.parents.forEach((pa, i) => { const ps = i === 0 ? "F" : "M"; pa.name = fix(pa.name, ps); const t0 = K.parents[i]; if(t0){ t0.name = pa.name; t0.alive = !!pa.alive; if(!pa.alive) t0.need = "none"; } }); }
+      else K.parents.forEach(x => { x.alive = false; x.need = "none"; });
+      if(fr.sibs){ K.siblings = fr.sibs.map((sb, i) => { const ss = seedOf("ss:" + p.id + ":" + i) % 2 ? "M" : "F"; sb.name = fix(sb.name, ss); return Object.assign({name:sb.name, sex:ss, role:ss === "M" ? "brother" : "sister", job:"clerk", tie:"close", party:null, office:null, debt:false}, K.siblings[i] ? {job:K.siblings[i].job, tie:K.siblings[i].tie, party:K.siblings[i].party, office:K.siblings[i].office, debt:K.siblings[i].debt} : {}); }); }
+    } }catch(e){ console.warn("kin adopt", e); }
   p.kin = K; return K;
 }
-function kinPeople(p){ const K = kinEnsure(p), a = []; if(K.spouse && K.spouse.alive !== false && !K.spouse.ex) a.push(Object.assign({rel:"spouse", w:6}, K.spouse)); K.kids.forEach(k => a.push(Object.assign({rel:"child", w:4}, k, {job:k.job || "student"}))); K.parents.filter(x => x.alive).forEach(x => a.push(Object.assign({rel:x.role, w:3}, x))); K.siblings.forEach(x => a.push(Object.assign({rel:"sibling", w:x.tie === "close" ? 2.5 : 1}, x))); return a; }
+const KIN_SP = {M:"husband", F:"wife"};
+function kinPeople(p){ const K = kinEnsure(p), a = []; if(K.spouse && K.spouse.alive !== false && !K.spouse.ex) a.push(Object.assign({rel:KIN_SP[K.spouse.sex] || "spouse", w:6}, K.spouse)); K.kids.forEach(k => a.push(Object.assign({}, k, {rel:k.sex === "F" ? "daughter" : "son", w:4, job:k.job || "student"}))); K.parents.filter(x => x.alive).forEach(x => a.push(Object.assign({}, x, {rel:x.role, w:3}))); K.siblings.forEach(x => a.push(Object.assign({}, x, {rel:x.role, w:x.tie === "close" ? 2.5 : 1}))); return a; }
 function kinSway(p, bill){
   try{
     if(!p || p === G.you || !bill || !bill.pos) return 0; const K = kinEnsure(p); let v = 0;
@@ -31058,19 +31086,19 @@ function kinSway(p, bill){
     v = clamp(v, -12, 12); K._sw[ck] = v; return v;
   }catch(e){ return 0; }
 }
-function kinNote(f){ return f.rel === "spouse" ? "their spouse " + f.name + ", a " + f.job : f.rel === "child" ? "their " + (f.age < 18 ? "child " : "grown child ") + f.name + (f.age ? " (" + f.age + ")" : "") : f.rel === "sibling" ? "their " + f.tie + " sibling " + f.name + ", a " + f.job : "their " + f.rel + " " + f.name + (f.need && f.need !== "none" ? " (" + f.need + ")" : ""); }
+function kinNote(f){ return "their " + f.rel + " " + f.name + (f.job && f.rel !== "son" && f.rel !== "daughter" ? ", " + kinArt(f.job) : f.age && f.age < 18 ? " (" + f.age + ")" : "") + (f.need && f.need !== "none" ? " (" + f.need + ")" : ""); }
 function kinTensions(p){
-  const K = kinEnsure(p), out = [], b = G.bill && !G.bill.done ? G.bill : null;
-  if(K.spouse && K.marital === "married" && K.spouse.party && p.party && K.spouse.party !== p.party) out.push(K.spouse.name + " votes " + (K.spouse.party === "FED" ? "Federalist" : K.spouse.party === "COM" ? "Commonwealth" : "independent") + " and says so at dinner.");
-  if(K.spouse && K.marital === "married" && K.spouse.supportive < -0.2) out.push(K.spouse.name + " has said plainly that they do not want the life this job brings.");
-  K.siblings.forEach(x => { if(x.tie === "estranged") out.push("They have not spoken to " + x.name + " in years."); if(x.tie === "rival") out.push(x.name + " resents how far they have come."); if(x.debt) out.push(x.name + " owes money to people it is unwise to owe."); if(x.office) out.push(x.name + " is " + kinArt(x.office) + (x.party && p.party && x.party !== p.party ? ", in the other party" : "") + "."); });
+  const K = kinEnsure(p), out = [], b = G.bill && !G.bill.done ? G.bill : null, sp = K.spouse, pr = sp ? kinPro(sp.sex) : null, spw = sp ? KIN_SP[sp.sex] : "";
+  if(sp && K.marital === "married" && sp.party && p.party && sp.party !== p.party) out.push("Their " + spw + " " + sp.name + " votes " + (sp.party === "FED" ? "Federalist" : sp.party === "COM" ? "Commonwealth" : "independent") + " and says so at dinner.");
+  if(sp && K.marital === "married" && sp.supportive < -0.2) out.push("Their " + spw + " " + sp.name + " has said plainly that " + pr.he + " does not want the life this job brings.");
+  K.siblings.forEach(x => { const px = kinPro(x.sex); if(x.tie === "estranged") out.push("They have not spoken to their " + x.role + " " + x.name + " in years."); if(x.tie === "rival") out.push("Their " + x.role + " " + x.name + " resents how far " + px.he + " has come."); if(x.debt) out.push("Their " + x.role + " " + x.name + " owes money to people it is unwise to owe."); if(x.office) out.push("Their " + x.role + " " + x.name + " is " + kinArt(x.office) + (x.party && p.party && x.party !== p.party ? ", in the other party" : "") + "."); });
   const par = K.parents.filter(x => x.alive && x.need !== "none")[0]; if(par) out.push("Their " + par.role + " " + par.name + " is " + par.need + ", and somebody has to be there.");
-  if(K.kids.some(x => x.ill)) out.push("A child is unwell, and nothing else matters on those days.");
+  const ik = K.kids.find(x => x.ill); if(ik) out.push("Their " + (ik.sex === "F" ? "daughter " : "son ") + ik.name.split(" ")[0] + " is unwell, and nothing else matters on those days.");
   if(K.kids.some(x => x.state === "small")) out.push("Young children at home, and sleep is a rumour.");
   if(K.wealth === "struggling") out.push("Money is short at home, whatever the job pays on paper.");
-  if(K.inlaws && K.inlaws.tie === "difficult") out.push("The in-laws think they married down.");
+  if(K.inlaws && K.inlaws.tie === "difficult") out.push("Their " + (sp && sp.sex === "F" ? "wife's" : "husband's") + " family thinks they married down.");
   if(!K.spouse && !K.kids.length && !K.parents.some(x => x.alive) && !K.siblings.length) out.push("No family left to speak of: nobody to come home to, and nobody to tell them to stop.");
-  if(b){ kinPeople(p).forEach(f => { const J = KIN_JOBS[f.job]; if(!J || f.rel === "child" && f.age < 17) return; let dot = 0; AXES.forEach(a => { dot += Math.sign(b.pos[a.k] || 0) * ((J.pos && J.pos[a.k]) || 0) * Math.min(1, Math.abs(b.pos[a.k] || 0) / 40); }); if(dot < -12) out.push("The " + b.title + " cuts against " + kinNote(f) + "."); else if(dot > 16 && f.w >= 2.5) out.push("The " + b.title + " would help " + kinNote(f) + "."); }); }
+  if(b){ kinPeople(p).forEach(f => { const J = KIN_JOBS[f.job]; if(!J || (f.rel === "son" || f.rel === "daughter") && f.age < 17) return; let dot = 0; AXES.forEach(a => { dot += Math.sign(b.pos[a.k] || 0) * ((J.pos && J.pos[a.k]) || 0) * Math.min(1, Math.abs(b.pos[a.k] || 0) / 40); }); if(dot < -12) out.push("The " + b.title + " cuts against " + kinNote(f) + "."); else if(dot > 16 && f.w >= 2.5) out.push("The " + b.title + " would help " + kinNote(f) + "."); }); }
   return out;
 }
 function kinRunScore(p){
@@ -31085,23 +31113,23 @@ function kinRunScore(p){
   return {score:Math.round(clamp(sc, 5, 95)), notes:n};
 }
 function kinSummary(p){
-  const K = kinEnsure(p), bits = [];
-  bits.push(K.marital === "married" && K.spouse ? "Married to " + K.spouse.name + ", a " + K.spouse.job + "." : K.marital === "widowed" ? "A widow" + (K.spouse ? "(er) of " + K.spouse.name : "") + "." : K.marital === "divorced" ? "Divorced from " + (K.spouse ? K.spouse.name : "a former spouse") + "." : "Unmarried.");
-  if(K.kids.length) bits.push(K.kids.length + " child" + (K.kids.length > 1 ? "ren" : "") + ": " + K.kids.map(k => k.name.split(" ")[0] + " (" + k.age + (k.ill ? ", unwell" : "") + ")").join(", ") + "."); else bits.push("No children.");
-  const par = K.parents.filter(x => x.alive); bits.push(par.length ? "Parents living: " + par.map(x => x.name.split(" ")[0] + (x.need !== "none" ? " (" + x.need + ")" : "")).join(", ") + "." : "Both parents gone.");
-  if(K.siblings.length) bits.push(K.siblings.length + " sibling" + (K.siblings.length > 1 ? "s" : "") + ": " + K.siblings.map(x => x.name.split(" ")[0] + " (" + x.job + ", " + x.tie + ")").join(", ") + "."); else bits.push("An only child.");
-  bits.push("The family is " + K.wealth + "." + (K.dynasty ? " Political name: " + K.dynasty.who + " was " + kinArt(K.dynasty.office) + "." : ""));
+  const K = kinEnsure(p), bits = [], sp = K.spouse, spw = sp ? KIN_SP[sp.sex] : "";
+  bits.push(K.marital === "married" && sp ? (K.sex === "M" ? "Married to " : "Married to ") + sp.name + ", " + kinArt(sp.job) + "." : K.marital === "widowed" ? (K.sex === "F" ? "A widow" : "A widower") + (sp ? ", after " + sp.name : "") + "." : K.marital === "divorced" ? "Divorced from " + (sp ? sp.name : "a former spouse") + "." : "Unmarried.");
+  if(K.kids.length) bits.push(K.kids.length + " child" + (K.kids.length > 1 ? "ren" : "") + ": " + K.kids.map(k => k.name.split(" ")[0] + " (" + (k.sex === "F" ? "daughter" : "son") + ", " + k.age + (k.ill ? ", unwell" : "") + ")").join(", ") + "."); else bits.push("No children.");
+  const par = K.parents.filter(x => x.alive); bits.push(par.length ? "Living: " + par.map(x => "their " + x.role + " " + x.name.split(" ")[0] + (x.need !== "none" ? " (" + x.need + ")" : "")).join(", ") + "." : "Both parents gone.");
+  if(K.siblings.length) bits.push(K.siblings.map(x => "a " + x.role + ", " + x.name.split(" ")[0] + " (" + x.job + ", " + x.tie + ")").join("; ") + "."); else bits.push("An only child.");
+  bits.push("The family is " + K.wealth + "." + (K.dynasty ? " Political name: " + (K.sex === "M" || true ? "their " : "their ") + K.dynasty.who + " was " + kinArt(K.dynasty.office) + "." : ""));
   return bits.join(" ");
 }
 function kinLine(p){
-  const K = kinEnsure(p), par = K.parents.filter(x => x.alive && x.need !== "none")[0], ill = K.kids.find(x => x.ill), small = K.kids.find(x => x.state === "small"), sch = K.kids.find(x => x.state === "school");
+  const K = kinEnsure(p), par = K.parents.filter(x => x.alive && x.need !== "none")[0], ill = K.kids.find(x => x.ill), small = K.kids.find(x => x.state === "small"), sch = K.kids.find(x => x.state === "school"), sp = K.spouse;
   const L = [];
   if(par) L.push("My " + par.role + " is " + par.need + " again. I will not say I am coping; I am turning up.");
   if(ill) L.push(ill.name.split(" ")[0] + " has not been well, and I have not been much use to anyone this week.");
   if(small) L.push(small.name.split(" ")[0] + " is " + small.age + " and has decided sleep is optional. So I am awake for both of us.");
-  if(sch) L.push(sch.name.split(" ")[0] + " came home with a school report and an opinion about it.");
-  if(K.spouse && K.marital === "married") L.push(K.spouse.supportive > 0.3 ? K.spouse.name + " says I should stay in it, and means it, which helps." : K.spouse.supportive < -0.2 ? K.spouse.name + " asked me last night how much longer. I gave a bad answer." : K.spouse.name + " is a " + K.spouse.job + ". It is not a job that cares about the House.");
-  K.siblings.forEach(x => { if(x.tie === "estranged") L.push("I have a brother or sister, " + x.name.split(" ")[0] + ", I do not speak to. Funny how often it comes up here."); if(x.office) L.push(x.name.split(" ")[0] + " is " + kinArt(x.office) + ". We are not in competition. People assume otherwise."); });
+  if(sch) L.push("My " + (sch.sex === "F" ? "daughter" : "son") + " " + sch.name.split(" ")[0] + " came home with a school report and an opinion about it.");
+  if(sp && K.marital === "married"){ const w = KIN_SP[sp.sex], pr = kinPro(sp.sex); L.push(sp.supportive > 0.3 ? "My " + w + " says I should stay in it, and means it, which helps." : sp.supportive < -0.2 ? "My " + w + " asked me last night how much longer. I gave a bad answer." : "My " + w + " is " + kinArt(sp.job) + ". It is not a job that cares about the House."); }
+  K.siblings.forEach(x => { if(x.tie === "estranged") L.push("I have a " + x.role + ", " + x.name.split(" ")[0] + ", I do not speak to. Funny how often it comes up here."); if(x.office) L.push("My " + x.role + " " + x.name.split(" ")[0] + " is " + kinArt(x.office) + ". We are not in competition. People assume otherwise."); });
   if(K.dynasty && p.kind === "member") L.push("My " + K.dynasty.who + " was " + kinArt(K.dynasty.office) + ". People still say the name before they say mine.");
   if(K.wealth === "struggling") L.push("Money is tight at home. I do not say so in the corridor.");
   if(!L.length) L.push(K.marital === "single" && !K.kids.length ? "I go home to nobody, which is its own kind of freedom and its own kind of weather." : "Home is quiet this week, which I take as a good sign.");
@@ -31114,12 +31142,12 @@ function kinDay(){
     for(let i = 0; i < 6; i++){
       const p = pool[Math.floor(Math.random() * pool.length)], K = kinEnsure(p), r = Math.random(); let msg = null, w = 1;
       const par = K.parents.find(x => x.alive && x.age > 68);
-      if(par && r < 0.02 + (par.need !== "none" ? 0.03 : 0)){ par.alive = false; par.need = "none"; msg = surname(p.name) + "'s " + par.role + " " + par.name.split(" ")[0] + " has died. The funeral is on Thursday."; w = 4; }
-      else if(r < 0.035 && K.marital === "married" && K.age < 44 && K.kids.length < 4){ K.kids.push({name:kinName(p, surname(p.name)), age:0, state:"small", ill:false, job:null}); msg = surname(p.name) + " and " + (K.spouse ? K.spouse.name.split(" ")[0] : "their partner") + " have had a child."; w = 3; }
-      else if(r < 0.045 && K.marital === "single" && K.age > 24 && K.age < 55){ K.marital = "married"; K.spouse = {name:kinName(p), job:Object.keys(KIN_JOBS)[Math.floor(Math.random() * 15)], party:KIN_PARTY[Math.floor(Math.random() * 4)], supportive:0.5, alive:true, health:"well"}; msg = surname(p.name) + " has married " + K.spouse.name + "."; w = 3; }
+      if(par && r < 0.02 + (par.need !== "none" ? 0.03 : 0)){ par.alive = false; par.need = "none"; msg = surname(p.name) + "'s " + par.role + ", " + par.name.split(" ")[0] + ", has died. The funeral is on Thursday."; w = 4; }
+      else if(r < 0.035 && K.marital === "married" && K.age < 44 && K.kids.length < 4){ const ks = Math.random() < 0.5 ? "M" : "F"; K.kids.push({name:kinName(p, surname(p.name), ks), sex:ks, age:0, state:"small", ill:false, job:null}); msg = surname(p.name) + " and " + (K.spouse ? K.spouse.name.split(" ")[0] : "their partner") + " have had a " + (ks === "F" ? "daughter" : "son") + "."; w = 3; }
+      else if(r < 0.045 && K.marital === "single" && K.age > 24 && K.age < 55){ K.marital = "married"; const os = kinSexOf(p) === "M" ? "F" : "M"; K.spouse = {name:kinName(p, null, os), sex:os, job:Object.keys(KIN_JOBS)[Math.floor(Math.random() * 15)], party:KIN_PARTY[Math.floor(Math.random() * 4)], supportive:0.5, alive:true, health:"well"}; msg = surname(p.name) + " has married " + K.spouse.name + "."; w = 3; }
       else if(r < 0.052 && K.marital === "married" && K.spouse && K.spouse.supportive < 0){ K.marital = "divorced"; K.spouse.ex = true; msg = surname(p.name) + "'s marriage has ended. Nobody is saying why."; w = -3; }
-      else if(r < 0.06 && K.kids.length){ const k = K.kids[Math.floor(Math.random() * K.kids.length)]; k.ill = !k.ill; if(k.ill){ msg = surname(p.name) + "'s child " + k.name.split(" ")[0] + " is ill."; w = -2; } }
-      else if(r < 0.066 && K.siblings.length){ const sb = K.siblings[Math.floor(Math.random() * K.siblings.length)]; if(!sb.debt){ sb.debt = true; msg = surname(p.name) + "'s " + (sb.job) + " sibling " + sb.name.split(" ")[0] + " is said to be in trouble with money."; w = -2; } }
+      else if(r < 0.06 && K.kids.length){ const k = K.kids[Math.floor(Math.random() * K.kids.length)]; k.ill = !k.ill; if(k.ill){ msg = surname(p.name) + "'s " + (k.sex === "F" ? "daughter " : "son ") + k.name.split(" ")[0] + " is ill."; w = -2; } }
+      else if(r < 0.066 && K.siblings.length){ const sb = K.siblings[Math.floor(Math.random() * K.siblings.length)]; if(!sb.debt){ sb.debt = true; msg = surname(p.name) + "'s " + sb.role + " " + sb.name.split(" ")[0] + " is said to be in trouble with money."; w = -2; } }
       if(msg){ K._sw = null; K.events.unshift({d:G.day, t:msg}); if(K.events.length > 6) K.events.length = 6;
         try{ if(p.kind === "member" && p.mem) remember(p, "Family: " + msg, Math.abs(w) * 2, true); }catch(e){}
         if(p.kind === "member" && (p.post || (p.known || 0) >= 1 || p.met)){ G.reactNews = (G.reactNews || []).concat([{t:msg, d:G.day}]).slice(-12); try{ feed(msg); }catch(e){} } }
@@ -31148,6 +31176,128 @@ function kinBrowse(){
   govCardOpen("Who is behind them", "The families", "Spouses, children, parents and siblings nobody sees: what they carry, and what it does to a vote or a run. Offhand, but kept.", body, null);
   return null;
 }
+/* ═════════════════════════════════════════════════════════
+   TALKING, MADE READABLE
+   The menu is grouped by what you are trying to do, each choice says in plain words what it
+   does, every line somebody says gets a "what they meant" (what it is, what is underneath,
+   what you could do next), and a short card says who they are to you, where they stand, what
+   they want and what is happening at home: what you know, and what you still have to ask.
+   ═════════════════════════════════════════════════════════ */
+const TALK_CATS = [
+  ["Find out", "Learn something without asking for anything.", /^(ask how|ask where|ask what|ask after|ask about|let them talk|hear them out|take the case)/i],
+  ["Get closer", "Build goodwill. Nothing is at stake.", /^(talk shop|just talk|introduce yourself|say you understand|make amends|move along)/i],
+  ["Persuade", "Ask for something. It can work and it can cost you.", /^(ask for their vote|ask them to cross|threaten|call in|offer a favor|back them|share credit|make the case)/i],
+  ["Press and public", "Things you do for the cameras, the donors and the town.", /^(give a quote|background briefing|plant a story|raise money|hold a town hall|nothing today)/i]
+];
+const TALK_DESC = [
+  [/^ask how they'll vote/i, "Find out which way they lean on today's bill. No pressure."],
+  [/^ask where they really stand/i, "Ask for their honest position and the reason behind it."],
+  [/^ask what they need/i, "Ask what they want right now. People tell you more when asked plainly."],
+  [/^ask after their family/i, "Ask about home. It shows you what pulls on them, and most people warm to being asked."],
+  [/^ask what has been on their mind/i, "Open question. They steer; you learn what is bothering them."],
+  [/^ask about their faith/i, "Their creed shapes what they will and will not do. Handle with care."],
+  [/^let them talk/i, "Say nothing and listen. Often the cheapest way to learn."],
+  [/^talk shop/i, "Chat about work and where they come from. A little goodwill, and a glimpse of their politics."],
+  [/^just talk/i, "Small talk. A little goodwill; costs fifteen minutes."],
+  [/^say you understand/i, "Acknowledge what they just told you. It lands better after something personal or a complaint."],
+  [/^introduce yourself/i, "Reopen the door. Costs time, no risk."],
+  [/^ask for their vote/i, "Ask them to commit. Works if they like you and the bill suits them. Pushed too hard, they dig in."],
+  [/^ask them to cross the aisle/i, "Ask them to vote against their own side. A big ask; needs trust."],
+  [/^threaten a primary/i, "Warn that you will back someone against them. It can frighten them into line, and they will remember it."],
+  [/^call in the favor/i, "Spend a debt they owe you. It works, and the debt is gone."],
+  [/^offer a favor/i, "Give them something now so they owe you later."],
+  [/^back them for a post/i, "Support them for a committee seat or office. A big gift; they will not forget it."],
+  [/^share credit/i, "Give them part of the credit for the bill. Costs you glory, buys loyalty."],
+  [/^make amends/i, "Repair something you did. Shows you can be wrong."],
+  [/^make the case for yourself/i, "Ask them to back your return. Needs some history between you."],
+  [/^give a quote/i, "Say something on the record. Good for approval if it lands; the wrong word can follow you."],
+  [/^background briefing/i, "Talk off the record to shape a story without your name on it."],
+  [/^plant a story/i, "Feed them something to publish. Powerful, and it can be traced back to you."],
+  [/^raise money/i, "Ask for donations to the war chest. Money comes with strings."],
+  [/^hold a town hall/i, "Meet the district in public. Builds approval; some of them will shout."],
+  [/^take the case/i, "Take up this person's problem. It costs time and wins real gratitude."],
+  [/^(leave it|walk away|move along|say nothing and leave)/i, "End the conversation."]
+];
+function talkDesc(label){ const t = String(label || "").trim(); const h = TALK_DESC.find(x => x[0].test(t)); return h ? h[1] : ""; }
+function talkCat(label){ const t = String(label || "").trim(); const h = TALK_CATS.find(x => x[2].test(t)); return h ? h[0] : "More"; }
+function gistOf(text){
+  let t = String(text || "").replace(/\s+/g, " ").trim(); t = t.replace(/^(look|well|listen|plainly then|so|yes|of course)[,.]\s*/i, "");
+  const m = t.match(/^[^.!?]{12,}[.!?]/); let g = m ? m[0] : t; if(g.length > 150) g = g.slice(0, 147).replace(/\s+\S*$/, "") + "…"; return g;
+}
+function meaningOf(m, text){
+  const t = String(text || "").toLowerCase(), tr = m.traits || {}, rel = (m.rel && m.rel.warmth) || 0, trust = (m.rel && m.rel.trust) || 50, out = {type:"", plain:"", under:[], next:[]};
+  const has = re => re.test(t);
+  if(has(/\b(no\.|no,|not today|i can'?t|i won'?t|not a chance|out of the question|i'd rather not)\b/)){ out.type = "A refusal"; out.plain = "They are saying no."; out.next = ["Back off and talk about something else", "Ask what they need from you"]; }
+  else if(has(/\b(think about it|not now|come back|another day|we'?ll see|not yet|maybe|i'?ll see)\b/)){ out.type = "A polite delay"; out.plain = "Not a yes and not a no. They want a reason, or a reason to trust you."; out.next = ["Ask what they need from you", "Ask where they really stand"]; }
+  else if(has(/\b(you have it|all right|count me|i'?m with you|glad to|you can count|aye\b|put me down)\b/)){ out.type = "Agreement"; out.plain = "They are agreeing."; out.next = ["Thank them and move on", "Ask after their family"]; }
+  else if(has(/\b(my (mother|father|wife|husband|son|daughter|brother|sister|parent|child|uncle|aunt|cousin|grandfather|grandmother)|people still say the name|school report|funeral|the baby|home is|sleep)\b/)){ out.type = "Something personal"; out.plain = "They are telling you something about home."; out.next = ["Say you understand", "Ask after their family"]; }
+  else if(has(/\b(tired|sick of|can'?t stand|resent|unfair|disgrace|ridiculous|nobody (asks|listens)|funny how)\b/)){ out.type = "A grievance"; out.plain = "They are complaining about something that matters to them."; out.next = ["Say you understand", "Let them talk"]; }
+  else if(has(/\b(i came up|my district|that number is the whole job|i built|i won|never hidden)\b/)){ out.type = "Telling you who they are"; out.plain = "They are explaining where they come from, which is how they will decide things."; out.next = ["Talk shop", "Ask where they really stand"]; }
+  else if(has(/\?\s*$/) || has(/^(who|what|why|how|do you|will you|have you|are you)\b/)){ out.type = "A question for you"; out.plain = "They are testing you or asking for something."; out.next = ["Answer plainly", "Ask what they need from you"]; }
+  else if(has(/(can'?t name|no word for|there is a word|i keep|something i can'?t|reach(ing)? for)/)){ out.type = "Reaching for something they cannot say"; out.plain = "They are circling something they have no name for yet. It is not a trick."; out.next = ["Let them talk", "Say you understand"]; }
+  else { out.type = "Ordinary conversation"; out.plain = "Nothing is being asked. They are feeling you out."; out.next = ["Talk shop", "Ask what they need from you"]; }
+  if(rel < -20) out.under.push("They do not trust you yet, so anything you ask will be read as pressure."); else if(rel > 25) out.under.push("They like you, so a no here is about the issue, not about you.");
+  if((tr.conviction || 50) > 72) out.under.push("They decide on principle, not on favours."); if((tr.ambition || 50) > 72) out.under.push("They are weighing what this does for their own career.");
+  if((tr.vanity || 40) > 72) out.under.push("Being noticed matters to them."); if((tr.loyalty || 50) > 72) out.under.push("The party line counts for a lot with them."); if((tr.temper || 40) > 72) out.under.push("Pushing will make it worse.");
+  if((tr.discretion || 50) > 72) out.under.push("They hold things back; what they do not say may matter more.");
+  try{ const b = G.bill && !G.bill.done ? G.bill : null; if(b && m.kind === "member" && (m.known || 0) >= 2){ const v = memberVote(m, b); out.under.push("On the " + b.title + " they lean " + (v > 0 ? "aye" : "no") + "."); } }catch(e){}
+  try{ if(m.kinKnown || /home|family|mother|father|wife|husband|son|daughter|brother|sister/.test(t)){ const T = kinTensions(m)[0]; if(T) out.under.push("At home: " + T); } }catch(e){}
+  out.under = out.under.slice(0, 3); return out;
+}
+function renderMean(m, text){
+  try{
+    if(!m || !TALK.open || TALK.m !== m || !text) return; const box = el("tkSay"); if(!box) return;
+    let d = el("tkMean"); if(!d){ d = document.createElement("details"); d.id = "tkMean"; d.className = "tkm"; box.parentNode.insertBefore(d, box.nextSibling); d.addEventListener("toggle", () => { try{ G.talkExplainOpen = d.open; }catch(e){} }); }
+    const M = meaningOf(m, text); TALK.lastMean = M; d.open = G.talkExplainOpen !== false;
+    d.innerHTML = '<summary>What they meant</summary><p><b>' + pcEsc(M.type) + '.</b> ' + pcEsc(M.plain) + '</p><p><i>In short:</i> “' + pcEsc(gistOf(text)) + '”</p>' + (M.under.length ? '<p><b>Underneath.</b> ' + M.under.map(pcEsc).join(" ") + '</p>' : '') + '<p><b>You could:</b> ' + M.next.map(pcEsc).join(" · ") + '</p>';
+  }catch(e){ console.warn("mean", e); }
+}
+function talkBrief(m){
+  try{
+    const rel = (m.rel && m.rel.warmth) || 0, trust = (m.rel && m.rel.trust) || 50, fam = (familiarity ? familiarity(m) : 0), b = G.bill && !G.bill.done ? G.bill : null;
+    const warm = rel > 30 ? "warm" : rel > 8 ? "friendly" : rel > -8 ? "neutral" : rel > -30 ? "cool" : "hostile", tr = trust > 66 ? "trusts you" : trust > 40 ? "trusts you a little" : "does not trust you yet";
+    const rows = [["To you", warm + ", and " + tr + (m.rel && m.rel.debtFromYou ? "; owes you a favour" : "")]];
+    if(m.kind === "member"){
+      rows.push(["Where they stand", b ? ((m.known || 0) >= 2 ? "leans " + (memberVote(m, b) > 0 ? "aye" : "no") + " on the " + b.title : "unknown on the " + b.title + ". Try “Ask how they’ll vote”") : "no bill is live"]);
+      const want = m.wantKnown ? ((m.intent && m.intent.t) || "nothing in particular") : null; rows.push(["What they want", want || "you have not asked yet — try “Ask what they need from you”"]);
+      const K = kinEnsure(m); rows.push(["At home", m.kinKnown ? kinSummary(m) : "unknown — try “Ask after their family”"]);
+      if(fam > 0.5 || canRead(m)) rows.push(["Temperament", traitWords(m)]);
+    } else if(m.kind === "civ"){ rows.push(["What they came for", (m.cause || "a problem") + (m.role ? " (" + m.role + ")" : "")]); rows.push(["At home", m.kinKnown ? kinSummary(m) : "unknown — try “Ask after their family”"]); }
+    else if(m.kind === "press") rows.push(["Outlet", (m.role || "reporter") + ", " + (m.outlet || "")]);
+    return '<dl class="tkb">' + rows.map(r => '<dt>' + pcEsc(r[0]) + '</dt><dd>' + pcEsc(r[1]) + '</dd>').join("") + '</dl>';
+  }catch(e){ return ""; }
+}
+function talkRevamp(m){
+  try{
+    const th = el("tkThink"); if(th && m && m.kind !== "envoy"){ let bf = el("tkBrief"); if(!bf){ bf = document.createElement("div"); bf.id = "tkBrief"; th.parentNode.insertBefore(bf, th); } bf.innerHTML = '<div class="tkb__h">Who you are talking to</div>' + talkBrief(m); }
+    const box = el("tkActs"); if(!box || box.dataset.regrouped === "1") { if(!box) return; }
+    const btns = [...box.querySelectorAll(":scope > button")]; if(!btns.length) return;
+    const groups = {}; const order = ["Find out", "Get closer", "Persuade", "Press and public", "More", "Leave"];
+    btns.forEach(b => { const label = b.firstChild ? (b.childNodes[0].textContent || "") : ""; const cat = b.classList.contains("talk__btn--exit") ? "Leave" : talkCat(label); (groups[cat] = groups[cat] || []).push([b, label]); const d = talkDesc(label); if(d && !b.querySelector(".tkd")){ const sm = document.createElement("small"); sm.className = "tkd"; sm.textContent = d; b.appendChild(sm); b.title = d; } if(b.classList.contains("talk__btn--risk") && !b.querySelector(".tkr")){ const rk = document.createElement("span"); rk.className = "tkr"; rk.textContent = "risky"; b.insertBefore(rk, b.firstChild); } });
+    box.innerHTML = ""; box.classList.add("tkgroups");
+    order.forEach(c => { const g = groups[c]; if(!g) return; const sec = document.createElement("div"); sec.className = "tkg"; const desc = (TALK_CATS.find(x => x[0] === c) || [])[1] || (c === "More" ? "Other things you can do here." : ""); sec.innerHTML = '<div class="tkg__h">' + pcEsc(c) + (desc ? ' <span>' + pcEsc(desc) + '</span>' : '') + '</div>'; const row = document.createElement("div"); row.className = "tkg__row"; g.forEach(([b]) => row.appendChild(b)); sec.appendChild(row); box.appendChild(sec); });
+  }catch(e){ console.warn("revamp", e); }
+}
+function talkExtraActs(m){
+  const A = [], you = G.you;
+  if(TALK.thread && (TALK.beat === 0 || TALK.beat === 1)) return A;
+  if(m.kind === "member" && G.bill && !G.bill.done) A.push({t:"Ask where they really stand", c:"10m", run(){ spend(10, 2); m.known = 2; setSay(huddleSay ? huddleSay(m, false) : "I am where I am.", fx("", "you know their reason now")); }});
+  A.push({t:"Ask what they need from you", c:"10m", run(){ spend(10, 2); m.wantKnown = true; const w = (m.intent && m.intent.t) || ""; setSay(w ? "Since you ask: " + w.replace(/^to /i, "I want to ") + "." : "Nothing I would trouble you with. But thank you for asking.", fx("+1 warmth", "you know what they want")); try{ if(m.rel) ripple(m, 1, "They asked what I needed instead of what they wanted.", 1, false); }catch(e){} }});
+  A.push({t:"Ask after their family", c:"10m", run(){ spend(10, 2); m.kinKnown = true; const T = kinTensions(m); setSay(kinLine(m), fx(T.length ? "+2 warmth" : "+1 warmth", "you know what is happening at home")); try{ if(m.rel) ripple(m, T.length ? 2 : 1, "They asked after my family, and meant it.", 2, false); }catch(e){} }});
+  if(TALK.lastMean && /personal|grievance|refusal|delay/i.test(TALK.lastMean.type)) A.push({t:"Say you understand", c:"5m", run(){ spend(5, 1); const t = purseTr(m), d = 1 + ((t.loyalty || 50) > 60 ? 1 : 0) + ((t.vanity || 40) > 60 ? 1 : 0); setSay(pick(["That helps more than I expected.", "I did not think you would say that.", "Thank you. Most people do not."]), fx("+" + d + " warmth", "")); try{ if(m.rel) ripple(m, d, "They understood what I was carrying and said so.", 2, false); }catch(e){} }});
+  return A;
+}
+{ const _renderTalk = renderTalk, _actionsFor = actionsFor, _setSay = setSay;
+  actionsFor = function(m){ const A = _actionsFor.apply(this, arguments); try{ if(m && m !== G.you && m.kind !== "envoy" && !(G.you && G.you.out)){ const ex = talkExtraActs(m); if(ex.length){ const ix = A.findIndex(a => a.exit); if(ix < 0) return A.concat(ex); A.splice(ix, 0, ...ex); } } }catch(e){} return A; };
+  renderTalk = function(){ const r = _renderTalk.apply(this, arguments); try{ talkRevamp(TALK.m); }catch(e){} return r; };
+  { const _am = appendMsg; appendMsg = function(kind, text, who){ const r = _am.apply(this, arguments); try{ if(kind === "them" && TALK.open && TALK.m && who && who === surname(TALK.m.name) && text && !/^You step into/.test(text)) renderMean(TALK.m, text); }catch(e){} return r; }; }
+  setSay = function(t, n){ const r = _setSay.apply(this, arguments); try{ if(TALK.open && TALK.m && t && !/^“/.test(String(t))) renderMean(TALK.m, t); }catch(e){} return r; };
+}
+{ const st = document.createElement("style"); st.textContent = ".tkm{margin:6px 0 10px;border-left:3px solid #6b9a7a;padding:4px 10px;font-size:13px;line-height:1.4;background:rgba(107,154,122,.08);max-width:72ch}.tkm summary{cursor:pointer;font:600 10px Archivo,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3,#888)}.tkm p{margin:4px 0}" +
+  "#tkBrief{margin:0 0 8px;max-width:72ch}.tkb__h{font:600 9px Archivo,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3,#888);margin-bottom:2px}.tkb{display:grid;grid-template-columns:max-content 1fr;gap:2px 10px;margin:0;font-size:12.5px;line-height:1.35}.tkb dt{color:var(--ink-3,#888);font-weight:600}.tkb dd{margin:0}" +
+  ".tkgroups{display:block !important}.tkg{margin:6px 0}.tkg__h{font:700 10px Archivo,sans-serif;letter-spacing:.14em;text-transform:uppercase;margin-bottom:3px}.tkg__h span{font-weight:400;letter-spacing:0;text-transform:none;color:var(--ink-3,#888);font-size:11px}.tkg__row{display:flex;flex-wrap:wrap;gap:6px}" +
+  ".talk__btn{flex-wrap:wrap}.talk__btn .tkd{flex:1 1 100%;font:400 11px/1.3 Archivo,system-ui,sans-serif;color:var(--ink-3,#888);margin-top:1px}.talk__btn .tkr{font:700 8.5px Archivo,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:var(--bad,#b33);border:1px solid currentColor;padding:0 4px;border-radius:2px}";
+  document.head.appendChild(st); }
 function amendText(S){ const A = (S && S.amend) || []; return A.length ? " Amendments agreed at open hours, to be attached: " + A.map(a => a.title + " (" + a.from + ")").join("; ") + "." : ""; }
 function amendApply(S){ const A = (S && S.amend) || []; if(!A.length) return ""; const y = G.you; S.unrest = clamp(S.unrest - A.length, 0, 100); y.approval = clamp(y.approval + A.length, 0, 100); S.amend = []; return " The amendments from open hours were attached: " + A.map(a => a.title).join(", ") + "."; }
 function govBrief(S){

@@ -4,6 +4,16 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## Conversation made readable; families with men and women
+
+`20261015l` (on `20261015k`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- **The menu is grouped by what you are trying to do:** Find out, Get closer, Persuade, Press and public, and Leave, each with a one-line description. Every choice says in plain words what it does and what it risks, and risky ones are marked.
+- **"What they meant" under everything someone says:** what kind of statement it is (a refusal, a polite delay, agreement, something personal, a grievance, a question, someone telling you who they are), what it means in plain words, a one-line gist, what is underneath it (their temperament, how they feel about you, where they stand on the live bill, what is happening at home), and what you could do next. It can be folded away and stays folded.
+- **"Who you are talking to" card:** how they feel about you, where they stand on the bill, what they want, what is happening at home, and their temperament, each with an honest 'unknown, try asking' until you have found out.
+- **New things to say, simply:** Ask where they really stand (with their reason), Ask what they need from you, Ask after their family, and Say you understand (appears after something personal, a grievance or a refusal). They fill in the card as you learn.
+- **Families are men and women:** husbands and wives, mothers and fathers, sons and daughters, brothers and sisters, aunts and uncles. The family system now uses the existing family records for members (same spouse, children, parents, siblings), gives them sexes and keeps the two in step. Lines and the Families card use the right words.
+
 ## Kin: the families nobody sees
 
 `20261015k` (on `20261015j`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
