@@ -4,6 +4,15 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## The neighbours, the phone, the newspaper
+
+`20261015a` (on `20261013w`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- **The republics are run by someone:** the Union map now explains how each neighbour is governed (form, head of government, the powers behind it, the people you can ring) and what they want, what they would give and what they refuse. Actions mirror the states: ring the envoy, send aid, open trade talks, press them on a point, or summon a delegation.
+- **The phone has the office in it:** a new Apps tab holds the war chest, powers of office, the schedule, the docket, the government, the paper, notebook, rivals, career, the map and settings. Foreign officials are under Abroad in Contacts and answer in their own voice. The phone no longer clips off the left edge on a narrow screen.
+- **The Ledger is a newspaper:** masthead, a lead, the Federal Standard and the Commonwealth Courier each spinning the day their own way, the Kerk & Chapel Review, independent letters, and small headlines from other papers. There is a Ledger button on the toolbar.
+- **Precedent** collapses repeats ("held the caucus to the line ×6"). The wire line reads "You read about a delegation…".
+
 ## Petitioners with cases; delegations you can negotiate with
 
 `20261013w` (on `20261013v`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
