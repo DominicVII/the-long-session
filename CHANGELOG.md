@@ -4,6 +4,16 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## The forms of government, and how they are remembered
+
+`20261013u` (on `20261013t`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- **A timeline of eras:** the Record tab's "The Republic" page lists every form the state has taken, in order: the dates, how long each lasted, the country's name at the time, popularity and stability when it ended, and whether officers ended it. A coloured bar shows the eras in proportion. It counts the changes, names the longest era, and says when the state has returned to a form it had before.
+- **Remembered differently by each state:** for every era the page names the states that look back on it with pride and the ones that are ashamed of it. A state's government style, its faith, its grievance and its unrest all shape this, and the Consular era is judged by faith, since the Rite is a Latin heresy. Very short eras are "too brief to be remembered either way".
+- **Older saves:** the eras are rebuilt from the news log, so existing careers get their history.
+- **The Government card** adds a short history line.
+- Stamp: meta + STAMP + `ONUM_BUILD` -> `20261013u`.
+
 ## Standing is measured at your own level
 
 `20261013t` (on `20261013s`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.

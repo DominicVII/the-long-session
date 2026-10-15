@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261013t">
+<meta name="onum-build" content="20261013u">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261013t";
+  var STAMP = "20261013u";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -6865,7 +6865,10 @@ function govDay(){
   st.tick++;
   if(st.tick % 7 === 0){ try{ regimeCheck(null); }catch(e){} }
   if(G.regime && G.regime.form !== st.last){
-    const from = st.last; st.last = G.regime.form; st.changed = G.day;
+    const from = st.last;
+    try{ const E = govEras(); const cur = E[E.length - 1]; if(cur && cur.to == null){ cur.to = G.day; cur.pop = govPopularity(); cur.stab = govStability(); cur.coup = !!(st.coupDay && G.day - st.coupDay < 40); }
+      E.push({form:G.regime.form, from:G.day, to:null, name:(G.country && G.country.name) || ""}); }catch(e){}
+    st.last = G.regime.form; st.changed = G.day;
     govNews("The form of the state has changed: " + (REGIMES[from] ? REGIMES[from].t : from) + " to " + REGIMES[st.last].t + ". The opposition is already calling it " + govNick("rivals") + ".");
     try{ TEX.flag = flagTexture(G.country.flag); }catch(e){}
   }
@@ -6889,6 +6892,88 @@ function govBloc(){
   if(G.gov && G.gov.coupDay && G.day - G.gov.coupDay < 120) t = "The officers' directorate (" + partyName(maj) + " tolerated)";
   return t;
 }
+/* ── 20261013u · the forms of government, in order, and how they are remembered ── */
+function regimeKeyByTitle(t){
+  t = String(t || "").trim();
+  for(const k in REGIMES) if(REGIMES[k].t === t) return k;
+  return null;
+}
+/* the eras of the state: [{form, from, to|null, name, pop, stab}] rebuilt from the news log for older saves */
+function govEras(){
+  const st = govState();
+  if(Array.isArray(st.eras) && st.eras.length) return st.eras;
+  const cur = (G.regime && G.regime.form) || "republic";
+  const ch = [];
+  (st.news || []).forEach(n => { const m = /form of the state has changed: (.+?) to (.+?)\./.exec(n.t || ""); if(m){ const a = regimeKeyByTitle(m[1]), b = regimeKeyByTitle(m[2]); if(a && b) ch.push({d:n.d, a, b}); } });
+  const eras = [];
+  if(ch.length){
+    eras.push({form:ch[0].a, from:1, to:ch[0].d});
+    ch.forEach((c, i) => eras.push({form:c.b, from:c.d, to:i + 1 < ch.length ? ch[i + 1].d : null}));
+    if(eras[eras.length - 1].form !== cur){ eras[eras.length - 1].to = G.day; eras.push({form:cur, from:G.day, to:null}); }
+  } else eras.push({form:cur, from:1, to:null});
+  return (st.eras = eras);
+}
+/* a form's standing in memory before the particulars (-1 shameful .. +1 glorious) */
+const GOV_VALENCE = {republic:0.25, democracy:0.35, conservative:-0.05, commonwealth:0.05, national:-0.45, monarchy:-0.15, empire:-0.55, consular:0.1, theocratic:-0.2, junta:-0.8, mob:-0.6, machine:-0.5, oligarchy:-0.4};
+/* what each kind of state is inclined to be proud of */
+const GOV_TASTE = {
+  "pious":{consular:0.5, theocratic:0.6, conservative:0.25, democracy:-0.15, commonwealth:-0.2},
+  "populist":{democracy:0.35, commonwealth:0.4, national:0.15, oligarchy:-0.4, conservative:-0.25},
+  "boss rule":{machine:0.5, conservative:0.2, oligarchy:0.3, democracy:-0.2},
+  "old-family":{conservative:0.5, monarchy:0.45, oligarchy:0.4, commonwealth:-0.4, democracy:-0.2},
+  "reformist":{democracy:0.35, republic:0.2, commonwealth:0.25, national:-0.3},
+  "technocratic":{republic:0.2, commonwealth:0.15, national:0.1, mob:-0.4},
+  "consensus":{republic:0.3, democracy:0.2, junta:-0.3}
+};
+function govRemember(e){
+  const f = e.form, base = GOV_VALENCE[f] != null ? GOV_VALENCE[f] : 0;
+  const pop = e.pop == null ? 50 : e.pop, stab = e.stab == null ? 55 : e.stab;
+  const out = {proud:[], ashamed:[], divided:[]};
+  let S = {}; try{ S = scEnsure().st; }catch(x){}
+  (G.states || []).forEach(st => {
+    const taste = ((GOV_TASTE[(S[st.n] || {}).style] || {})[f]) || 0;
+    const r = rng(seedOf("remember:" + f + ":" + e.from + ":" + st.n));
+    const faith = (f === "consular" || f === "theocratic") ? (({latin:0.25, consul:0.5, kerk:-0.35, circle:-0.25})[st.creed] || 0) : 0;   /* the Rite is a Latin heresy: other faiths remember it differently */
+    const griev = ((S[st.n] || {}).griev || 0) / 250;               /* a state that felt ignored remembers the capital's eras harshly */
+    const v = base * 0.45 + taste * 1.3 + faith + (pop - 50) / 110 + (stab - 50) / 140 - (st.unrest || 0) / 380 - griev + (r() - 0.5) * 0.7;
+    (v > 0.22 ? out.proud : v < -0.12 ? out.ashamed : out.divided).push(st.n);
+  });
+  return out;
+}
+function govHistoryHTML(){
+  try{
+    const E = govEras(), now = G.day || 1;
+    const dur = e => Math.max(1, (e.to == null ? now : e.to) - e.from);
+    const total = E.reduce((a, e) => a + dur(e), 0) || 1;
+    const seen = {};
+    const colour = f => { const v = GOV_VALENCE[f] != null ? GOV_VALENCE[f] : 0; return v > 0.15 ? "#4f8a6d" : v < -0.15 ? "#8a3b3b" : "#8a7f4a"; };
+    const bar = '<div style="display:flex;height:14px;border-radius:3px;overflow:hidden;margin:6px 0 10px;border:1px solid var(--line)">' +
+      E.map(e => '<span title="' + pcEsc((REGIMES[e.form] || {t:e.form}).t) + '" style="flex:' + dur(e) + ';background:' + colour(e.form) + ';border-right:1px solid rgba(255,255,255,.5)"></span>').join("") + '</div>';
+    const rows = E.map(e => {
+      const R = REGIMES[e.form] || {t:e.form, d:""};
+      seen[e.form] = (seen[e.form] || 0) + 1;
+      const nth = seen[e.form] > 1 ? " (for the " + ordinal(seen[e.form]) + " time)" : "";
+      const mem = govRemember(e);
+      const list = a => a.length ? listify(a.slice(0, 4).map(pcEsc)) + (a.length > 4 ? " and " + (a.length - 4) + " more" : "") : "";
+      let tell;
+      if(dur(e) < 15) tell = "Too brief to be remembered either way; most states barely noticed it. ";
+      else if(mem.proud.length >= mem.ashamed.length * 1.6 && mem.proud.length >= 3) tell = "Remembered with pride in most of the country. " ;
+      else if(mem.ashamed.length >= mem.proud.length * 1.6 && mem.ashamed.length >= 3) tell = "A chapter most of the country would rather not discuss. ";
+      else tell = "The country is divided about it. ";
+      return '<p class="tip__q"><b>' + pcEsc(R.t) + nth + '</b> — day ' + e.from + (e.to == null ? ' to now' : ' to ' + e.to) + ' (' + dur(e) + ' days)' +
+        (e.name ? ' · ' + pcEsc(e.name) : '') + (e.coup ? ' · ended by officers' : '') + '<br><span class="muted">' + pcEsc(R.d) + '</span><br>' +
+        (e.pop != null ? 'At its end: popularity ' + e.pop + ', stability ' + e.stab + '. ' : e.to == null ? 'Popularity ' + govPopularity() + ', stability ' + govStability() + ' so far. ' : '') +
+        tell + (mem.proud.length ? 'Proud: ' + list(mem.proud) + '. ' : '') + (mem.ashamed.length ? 'Ashamed: ' + list(mem.ashamed) + '.' : '') + '</p>';
+    }).join("");
+    const changes = Math.max(0, E.length - 1);
+    const longest = E.slice().sort((a, b) => dur(b) - dur(a))[0];
+    const repeats = Object.keys(seen).filter(k => seen[k] > 1).map(k => (REGIMES[k] || {t:k}).t + " " + seen[k] + " times");
+    return '<div class="ency__h">The forms of government</div>' +
+      '<p class="muted">The form of the state has changed ' + changes + (changes === 1 ? " time" : " times") + ' in ' + total + ' days. ' +
+        'The longest era was the ' + pcEsc((REGIMES[longest.form] || {t:longest.form}).t) + ' (' + dur(longest) + ' days).' +
+        (repeats.length ? ' It has returned to: ' + pcEsc(repeats.join(", ")) + '.' : '') + ' Green eras are ones people look back on kindly, red ones with less comfort; each state remembers them its own way.</p>' + bar + rows;
+  }catch(e){ return ""; }
+}
 /* the HOI4-style card */
 function govCard(){
   const f = (G.regime && G.regime.form) || "republic", R = REGIMES[f] || REGIMES.republic;
@@ -6909,6 +6994,9 @@ function govCard(){
     '<p><strong>Ruling bloc.</strong> ' + govBloc() + '</p>' +
     '<p><strong>Popularity</strong> ' + bar(govPopularity()) + '<br><strong>Stability</strong> ' + bar(s.stab) + '</p>' +
     (drift ? '<p><strong>Drift.</strong> Talk of the state turning toward: ' + drift + '. Nothing is settled.</p>' : '<p><strong>Drift.</strong> The form is holding.</p>') +
+    (function(){ try{ const E = govEras(); if(E.length < 2) return ""; const pv = E[E.length - 2], m = govRemember(pv), RR = REGIMES[pv.form] || {t:pv.form};
+      return '<p><strong>History.</strong> The form of the state has changed ' + (E.length - 1) + ' time' + (E.length > 2 ? 's' : '') + '. Before this it was a ' + pcEsc(RR.t) + ' (' + Math.max(1, (pv.to || G.day) - pv.from) + ' days)' +
+        (m.proud.length || m.ashamed.length ? ': ' + (m.proud.length ? m.proud.length + ' states remember it with pride' : '') + (m.proud.length && m.ashamed.length ? ', ' : '') + (m.ashamed.length ? m.ashamed.length + ' with shame' : '') : '') + '. The Record tab has the whole timeline.</p>'; }catch(e){ return ""; } })() +
     '<div class="card__actions"><button type="button" class="btn" id="govClose">Back</button></div>';
   veil.hidden = false;
   el("govClose").addEventListener("click", () => { veil.hidden = true; G.running = true; });
@@ -21321,7 +21409,7 @@ function bookRepublic(){
       '<p class="tip__f">' + (seats.FED || 0) + ' Federalist, ' + (seats.COM || 0) + ' Commonwealth, ' +
         (seats.IND || 0) + ' independent' + (seats.OWN ? ", " + seats.OWN + " for your own party" : "") + '.</p>' +
     '</div>' +
-    greatnessHTML() +
+    greatnessHTML() + govHistoryHTML() +
     (G.amended && G.amended.length
       ? '<div class="ency__h">Amendments</div>' +
         G.amended.map(a => '<p class="tip__q">' + (a.t || a) + '</p>').join("")
