@@ -4,6 +4,18 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## Kin: the families nobody sees
+
+`20261015k` (on `20261015j`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- **Everyone has people, or has none.** Every member, townsperson and you are given a family offhand and kept: spouse (with a trade, a party and how they feel about the job), children (small, schooling, grown, sometimes unwell), parents (alive, frail or ill), siblings (close, rival or estranged, some in debt, some in office), in-laws, old money or a short purse, and sometimes a political name that carries. They are never in the room.
+- **It moves votes.** A relative's trade pulls on how someone reads a bill (a spouse who owns the mill, a sibling who is a union steward, a mother who needs care push toward or away from provision, a family on old money toward the market, a struggling one toward the public). It adds to the existing reading of a bill, so two members of one party can split because of who they go home to.
+- **It decides who can run.** A name that carries, money, a supportive spouse, no one to look after: higher. A frail parent, a sick child, small children, a spouse who does not want it, a sibling's debts: lower. This feeds into how well members do at the polls and into who becomes your rival. Before you stand yourself, a Home card shows what your family thinks and lets you talk it over with your spouse for an evening; the answer changes your result.
+- **It shows up in talk.** When you talk to someone they may mention home, in their own words (a frail mother, a child's school report, an estranged sibling). The live-chat dossier includes their family and its strains.
+- **Life goes on in other people's houses:** births, weddings, divorces, deaths and illness happen to people each day; the ones involving people you know show up in the feed and the Ledger, and are remembered by the person.
+- **It touches the purse.** A spouse's pay, children's costs and a parent's care change what each person has left each day, you included.
+- A new Apps entry, The families, lists who is behind you and behind the members you know, with their strains and how able they are to run.
+
 ## The situation room for governors and Congress's levers
 
 `20261015j` (on `20261015i`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
