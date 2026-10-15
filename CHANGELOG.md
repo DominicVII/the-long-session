@@ -4,6 +4,16 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## Petitioners with cases; delegations you can negotiate with
+
+`20261013w` (on `20261013v`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- **Petitioners have facts:** a petitioner now arrives with a real case (road, school, water main, special-election ballots, widow's pension): the cost, how long it has gone on, who it touches, what they have tried, what happens if the state waits, and what they would settle for. Their opening is three sentences of that, not a mood phrase.
+- **They answer you:** "Ask X about the road" and "Ask X what they would settle for" are real questions with real answers, rotating through cost / when / why / what they tried / who / what's at stake. Type your own question in the talk box and it is answered from their case (sympathy, a promise, a refusal, a compromise all land differently; a promise is remembered).
+- **They answer each other:** petitioners rebut one another on the facts (the same budget pays for both), and your secretary reads out how much was asked against how much the state has.
+- **Delegations:** the diary offers "Receive them: an audience, and negotiate". Three people from the realm (the consul-general with the main ask, a trade counsellor, a military attaché with the one condition they will not cross) speak, question each other and answer you. What you settle moves relations with the realm, influence and the state's industry. "Sign a letter of intent (no audience)" is still there as the quick way.
+- Open hours no longer print a repeated introduction or "I am the county clerk" twice.
+
 ## The district is a place people walk through
 
 `20261013v` (on `20261013u`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
