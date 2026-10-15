@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261013p">
+<meta name="onum-build" content="20261013q">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261013p";
+  var STAMP = "20261013q";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -31256,6 +31256,28 @@ function refreshJournal(){
       '<div class="entry'+(e.big?" is-big":"")+'"><div class="entry__d">Day '+e.d+'</div>' +
       '<div class="entry__t">'+e.t+'</div></div>').join("") : '<p class="muted">Nothing written down yet.</p>');
 }
+/* 20261013q · who holds what, so the offices are never a guess */
+function powerMapHTML(){
+  try{
+    const y = G.you, f = (G.regime && G.regime.form) || "republic";
+    const R = (typeof REGIMES !== "undefined" && REGIMES[f]) || {t:f};
+    const x = G.exec, spk = (G.members || []).find(m => m && !m.gone && m.post === "speaker");
+    const maj = majorityParty();
+    const row = (k, v) => '<div class="whip__row"><span class="whip__n">' + pcEsc(k) + '</span><span class="whip__w">' + v + '</span></div>';
+    const you = inHouse() ? "Representative for " + y.state + " " + y.dist : officeTitle() + ", " + officeSeat();
+    const exec = x ? pcEsc(x.name) + " (" + pcEsc(partyName(x.party)) + "), " + pcEsc(execTitle()) + (x.you ? " — that is you" : "") : "none";
+    let bloc = ""; try{ bloc = govBloc(); }catch(e){}
+    const own = y.party === "OWN" ? "A party of your own. It is separate from the two large blocs, so having it does not make you head of the nation." : "";
+    return '<div class="eyebrow" style="margin-top:12px">Who holds power</div>' +
+      row("You", pcEsc(you)) +
+      row("Your party", pcEsc(partyName(y.party)) + (own ? '<br><span class="muted">' + pcEsc(own) + '</span>' : "")) +
+      row("The nation's executive", exec) +
+      row("The form of the state", pcEsc(R.t || f) + (G.country ? " — " + pcEsc(G.country.name) : "")) +
+      (bloc ? row("Ruling bloc", bloc) : "") +
+      row("The House", pcEsc(partyName(maj)) + " holds the majority" + (spk ? "; the Speaker is " + pcEsc(spk.name) : "")) +
+      '<p class="muted" style="margin-top:8px">A governor runs one state: its budget, its laws, its statehouse. The nation has its own executive, elected separately, and the House and Senate write the national laws. A party is not an office: a party can be large, or be yours, without you leading the country. People call you by the office you hold, which here is <b>' + pcEsc(youAddress()) + '</b>.</p>';
+  }catch(e){ return ""; }
+}
 function refreshCareer(){
   const you = G.you;
   const rows = G.career.map(c2 => '<div class="careerline"><b>Term '+c2.term+'</b><span>'+c2.post+' — '+c2.note+'</span></div>').join("");
@@ -31265,7 +31287,7 @@ function refreshCareer(){
   el("paneCareer").innerHTML =
     '<div class="eyebrow">Service record</div><div class="h-serif">' + you.name + '</div>' +
     '<p class="muted">' + (inHouse() ? (you.post?postTitle(you.post):"Member of the House") + " for " + you.state + " " + you.dist : officeTitle() + " · " + officeSeat()) +
-      " · " + partyName(you.party) + (inHouse() ? " · " + committeeOf(you.committee).t : "") + '</p>' +
+      " · " + partyName(you.party) + (inHouse() ? " · " + committeeOf(you.committee).t : "") + '</p>' + powerMapHTML() +
     '<div class="card__actions" style="margin:10px 0 14px">' +
       '<button class="btn btn--ghost" type="button" id="saveExport">Export career save</button>' +
       '<button class="btn btn--ghost" type="button" id="saveImport">Import career save</button>' +
@@ -31838,6 +31860,28 @@ function pickNewestSave(){
 function writeSaveKey(key, raw){
   try{ localStorage.setItem(key, raw); return true; }catch(e){ return false; }
 }
+/* ── 20261013q · saves that always fit ──────────────────────
+   Browser storage holds about 5 MB. A late career is 2.5 MB, and the game
+   wrote three copies of it, so once a save passed ~1.7 MB the newest write
+   failed in silence and the old copy kept coming back (day 88 again). Numbers
+   are rounded to four places, space is freed when a write does not fit, and a
+   failure is said out loud. */
+function saveRound(k, v){ return (typeof v === "number" && isFinite(v) && v % 1 !== 0) ? Math.round(v * 10000) / 10000 : v; }
+function storeCareer(payload){
+  let ok = writeSaveKey(SAVE_KEY, payload);
+  if(!ok){
+    for(const k of [SAVE_BEST_KEY, SAVE_BACKUP_KEY]){
+      try{ localStorage.removeItem(k); }catch(e){}
+      ok = writeSaveKey(SAVE_KEY, payload);
+      if(ok) break;
+    }
+  }
+  if(ok){
+    writeSaveKey(SAVE_BACKUP_KEY, payload);                         /* a second copy, if it fits */
+    if(payload.length < 1600000) writeSaveKey(SAVE_BEST_KEY, payload);
+  }
+  return ok;
+}
 function wipeCareerSaves(){
   [SAVE_KEY, SAVE_BACKUP_KEY, SAVE_BEST_KEY].forEach(k => {
     try{ localStorage.removeItem(k); }catch(e){}
@@ -31904,7 +31948,7 @@ function saveCaptureBase(){
 }
 function saveCommit(payloadObj, explicit){
   try{
-    const payload = JSON.stringify(payloadObj);
+    const payload = JSON.stringify(payloadObj, saveRound);
     /* Never write a shorter career over a longer one. That is how day 10
        became day 5 — a torn primary, an old backup, or the shared store. */
     const newest = pickNewestSave();
@@ -31913,13 +31957,18 @@ function saveCommit(payloadObj, explicit){
       return false;
     }
     saveCount++;
-    const wrote = writeSaveKey(SAVE_KEY, payload);
-    writeSaveKey(SAVE_BACKUP_KEY, payload);
-    writeSaveKey(SAVE_BEST_KEY, payload);
+    const wrote = storeCareer(payload);
     if(!wrote){
       saveBusy = false;
+      G._saveFails = (G._saveFails || 0) + 1;
+      const t = Date.now();
+      if(!G._saveWarnAt || t - G._saveWarnAt > 120000){
+        G._saveWarnAt = t;
+        try{ note("The game could not save: this browser's storage is full. Career, then Export career save, keeps your day.", true); }catch(e){}
+      }
       return false;
     }
+    G._saveFails = 0;
     G.savedAt = hhmm();
     if(explicit) note("Saved.", false);
     try{
@@ -32099,9 +32148,7 @@ function importCareerSave(file){
       const d = JSON.parse(String(reader.result || ""));
       if(!d || !d.you || !Array.isArray(d.members) || !d.members.length)
         throw new Error("That file is not a valid career save.");
-      localStorage.setItem(SAVE_KEY, JSON.stringify(d));
-      try{ localStorage.setItem(SAVE_BACKUP_KEY, JSON.stringify(d)); }catch(e){}
-      try{ localStorage.setItem(SAVE_BEST_KEY, JSON.stringify(d)); }catch(e){}
+      if(!storeCareer(JSON.stringify(d, saveRound))) throw new Error("This browser has no room for that career save. Clear other site data for this page and try again.");
       location.reload();
     }catch(e){ note((e && e.message) || "Could not import that career save.", true); }
   };
@@ -37845,6 +37892,7 @@ try{
     } else L.push(base);
     const rl = regionLine(m); if(rl) L.push(rl);
     try{ if(m.rel) L.push("Relationship with " + G.you.name + ": warmth " + Math.round(m.rel.warmth) + ", trust " + Math.round(m.rel.trust) + " (never say these numbers)."); }catch(e){}
+    try{ L.push("You are speaking to " + G.you.name + ", who holds the office of " + officeTitle() + " (" + officeSeat() + "). Address them as " + youAddress() + ". Do not call them by any other office; in particular they are not the head of the nation unless their office above says so."); }catch(e){}
     L.push(canon());
     try{ const md = typeof window.onumMind === "function" ? window.onumMind(m.id) : (window.ONUM_MINDS || {})[m.id];
       if(md && typeof md === "object"){ const fm = v => (typeof v === "string" ? v : JSON.stringify(v)).slice(0, 400);

@@ -4,6 +4,16 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## Saves that always fit, and who holds power
+
+`20261013q` (on `20261013p`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- **Stuck on a day (day 88):** browser storage holds about 5 MB and a late career is 2.3 MB. The game wrote three copies, so once storage was full every new save failed in silence and the old copy came back on each load. Reproduced with a full-storage test: the old build could not save and reloaded the old day; the new build saves.
+- **Saving now:** numbers are rounded to four places (about 20% smaller); a write that does not fit frees the extra copies and retries; the second copy is kept only if it fits; Import uses the same safe writer. If saving still fails, the game says so and points to Career, then Export career save.
+- **Who holds power:** the Career tab lists who holds what (you and your office, your party, the nation's executive, the form of the state, the ruling bloc, the House majority and Speaker) and explains in plain words how a governor, a party and the national executive differ.
+- **What people call you:** the live-talk prompt names the office you hold and says not to call you by another, which stops "Mr President" for a Governor.
+- Stamp: meta + STAMP + `ONUM_BUILD` -> `20261013q`.
+
 ## Answer them and you are in the conversation
 
 `20261013p` (on `20261013o`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
