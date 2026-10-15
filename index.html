@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261015b">
+<meta name="onum-build" content="20261015c">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261015b";
+  var STAMP = "20261015c";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -952,6 +952,7 @@ body.boot-menu .shell{grid-template-rows:minmax(0,1fr)}
           <button type="button" id="uiOpenBtn" title="House panels on phone (H). Pad: RB. Independent.">Panels</button>
           <button type="button" id="uiMapBtn" title="Travel">Map</button>
           <button type="button" id="uiWalkOut" title="Leave this room without wiping the sitting">Walk out</button>
+          <button type="button" id="uiGalleryBtn" title="Sit in and watch a sitting">Gallery</button>
           <button type="button" id="uiPaperBtn" title="Read the Capitol Ledger">Ledger</button>
           <button type="button" id="uiSettingsBtn" title="Pause and settings (Esc)">⚙ Settings</button>
         </div>
@@ -8464,10 +8465,10 @@ function dkItems(){
       const s = dkStateLean(S, it) * (v === "aye" ? 1 : -1); it.b.senateVote = v; y.approval = clamp(y.approval + (s > 0 ? 2 : -2), 0, 100);
       (G.members || []).filter(m => m.party === y.party && m.rel).forEach(m => m.rel.warmth = clamp(m.rel.warmth + (partyLine(it.b)[y.party] === (v === "aye" ? 1 : -1) ? 1 : -2), -100, 100));
       feed("Senator " + surname(y.name) + " votes " + v + " on the " + it.title + "."); return "Recorded " + v + ". " + (s > 0 ? y.state + " approves." : y.state + " will not forget it."); }})); out.push(it); } }
-  if(k === "gov" && S && S.bill){ const b = S.bill; const it = {kind:"state bill", title:b.title, line:"Passed by the legislature of " + y.state + ".", sponsor:"the " + y.state + " majority leader", sb:b, body:"The " + y.state + " legislature"};
+  if(k === "gov" && S && S.bill){ const b = S.bill; const it = {kind:"state bill", title:b.title, line:"Passed by the legislature of " + y.state + "." + amendText(S), sponsor:"the " + y.state + " majority leader", sb:b, body:"The " + y.state + " legislature"};
     it.by = dkStatehouse(S, it);
     it.acts = [{t:"Sign it", run(){ S.ind = clamp(S.ind + (b.ind || 0), 0, 100); S.unrest = clamp(S.unrest + (b.unrest || 0), 0, 100); S.lean = clamp(Math.round(S.lean + b.dir * 3), -100, 100); S.bill = null;
-        y.approval = clamp(y.approval + (dkStateLean(S, it) > 0 ? 3 : -2), 0, 100); try{ kMark("gdesk"); }catch(e){} feed("Governor " + surname(y.name) + " signed the " + b.title + ".", "good"); return "Signed at the desk, with the sponsors behind you."; }},
+        y.approval = clamp(y.approval + (dkStateLean(S, it) > 0 ? 3 : -2), 0, 100); try{ kMark("gdesk"); }catch(e){} feed("Governor " + surname(y.name) + " signed the " + b.title + ".", "good"); return "Signed at the desk, with the sponsors behind you." + amendApply(S); }},
       {t:"Veto it", run(){ S.bill = null; S.unrest = clamp(S.unrest + 2, 0, 100); y.approval = clamp(y.approval + (dkStateLean(S, it) < 0 ? 3 : -2), 0, 100); try{ kMark("gdesk"); }catch(e){} feed("Governor " + surname(y.name) + " vetoed the " + b.title + ".", "bad"); return "Vetoed. The majority leader will not return your calls this week."; }}];
     out.push(it); }
   if(k === "bench"){ (G.cases || []).filter(c => !c.done).slice(0, 3).forEach(c => {
@@ -10285,6 +10286,7 @@ function pbApps(){
     ["docket", "The docket", "What is before you today, with the full text."],
     ["gov", "The government", "Who runs the nation, and who stands behind them."],
     ["paper", "This morning's paper", "The Ledger."],
+    ["watch", "Sit in the gallery", "Watch a chamber or a hearing from the gallery. No vote, no floor."],
     ["notebook", "Notebook", "What you wrote down."],
     ["rival", "Rivals", "Who wants your seat."],
     ["career", "Career and record", "Standing, eras, precedent."],
@@ -10293,8 +10295,20 @@ function pbApps(){
   ];
   return L.filter(a => a[0] !== "docket" || (k && k !== "house"));
 }
+function watchCard(){
+  const D = (window.NEPTUNE_SITTINGS && window.NEPTUNE_SITTINGS.defs) || {};
+  const ks = Object.keys(D).filter(k => k !== "delegation" && ROOMS[k]);
+  G.running = false;
+  card.innerHTML = '<div class="eyebrow">The gallery</div><h1>Sit in and watch</h1><p class="dream">You may sit in the gallery of any chamber or hearing. You have no vote and no floor; the room moves on its own, and you learn who is persuaded by whom. It costs only the time.</p>' +
+    ks.map(k => '<div class="whip__row"><span class="whip__n">' + pcEsc(D[k].title) + '</span><span class="whip__w">' + pcEsc((ROOMS[k] && ROOMS[k].t) || k) + ' \u00b7 ' + D[k].min + ' minutes</span><span class="whip__b"><button type="button" class="btn btn--ghost whip__go" data-watch="' + k + '">Take a seat</button></span></div>').join("") +
+    '<div class="card__actions"><button type="button" class="btn" id="wcClose">Close</button></div>';
+  veil.hidden = false;
+  el("wcClose").addEventListener("click", () => walkNow());
+  card.querySelectorAll("[data-watch]").forEach(b => b.addEventListener("click", () => { const k = b.getAttribute("data-watch"); veil.hidden = true; G._sitWatch = true;
+    if(G.room !== k){ try{ goTo(k); }catch(e){} setTimeout(() => { try{ G._sitWatch = true; sitStart(k); }catch(e){ console.warn(e); } }, 500); } else sitStart(k); }));
+}
 function pbAppGo(id){
-  const go = {chest:() => chestCard(), office:() => officeCard(), sched:() => scheduleCard(), docket:() => dkCard(0), gov:() => govCard(), paper:() => paperCard(),
+  const go = {watch:() => watchCard(), chest:() => chestCard(), office:() => officeCard(), sched:() => scheduleCard(), docket:() => dkCard(0), gov:() => govCard(), paper:() => paperCard(),
     notebook:() => notebookCard(), rival:() => rivalCard(),
     career:() => { try{ showPane("paneCareer"); document.body.classList.add("ui-open"); }catch(e){} },
     union:() => { try{ mapToggle(true); }catch(e){} },
@@ -29146,9 +29160,9 @@ function rolePowers(){
     P.push({t:"Veto the statehouse bill", off:!(S && S.bill), d:S && S.bill ? S.bill.title : "Nothing on your desk from the statehouse.", run(){
       const t = S.bill.title; S.bill = null; S.unrest = clamp(S.unrest + 2, 0, 100); y.approval = clamp(y.approval + rint(-3, 4), 0, 100);
       feed("Governor " + surname(y.name) + " vetoed the " + t + ".", "bad"); return "Vetoed. The statehouse will try again next session."; }});
-    P.push({t:"Appoint a state judge", off:once("appt"), d:"A friend on the state bench. A member of your party will owe you.", run(){
-      mark("appt"); const m = pick(G.members.filter(x => x.party === y.party && !x.machine && !x.gone)); if(m) ripple(m, 8, "The governor put my sister-in-law on the state bench.", 6, true);
-      return "You appointed a judge. " + (m ? m.name + " sends flowers." : ""); }});
+    P.push({t:"Appoint a state judge", off:once("appt"), d:"Three named candidates, each with their own views and backers.", run(){ appointCard("judge"); return null; }});
+    P.push({t:"Appoint an agency head", off:once("appt2"), d:"Roads, schools, the constabulary or health: a named person who will advise you from their own view.", run(){
+      const k = ["roads", "schools", "police", "health"][Math.floor((G.day || 0) % 4)]; appointCard(k); return null; }});
     P.push({t:"Defy the federal mandate", off:!(G.billKinds && G.billKinds.statefed) || y.defied === G.term, d:"Refuse the money and the rule. Home cheers; the Union sends lawyers.", run(){
       y.defied = G.term; if(S) S.unrest = clamp(S.unrest + 6, 0, 100); y.approval = clamp(y.approval + 6, 0, 100); y.standing = clamp(y.standing - 4, 0, 100);
       G.cases = G.cases || []; G.cases.push({t:"the Union v. " + y.state, state:y.state, day:G.day, voted:[]});
@@ -29163,10 +29177,7 @@ function rolePowers(){
       last.vetoed = true; y.standing = clamp(y.standing - 3, 0, 100); y.influence = clamp(y.influence + 3, 0, 100);
       feed(execTitle() + " " + surname(y.name) + " vetoed the " + last.title + ".", "bad"); return "Vetoed. The House can override with two thirds, if it can find them."; }});
     if(last) P.push({t:"Sign: " + last.title, d:"Make it law with your name on it.", run(){ last.signed = true; y.approval = clamp(y.approval + 2, 0, 100); return "Signed, with eleven pens."; }});
-    P.push({t:"Appoint a cabinet secretary", off:once("cab"), d:"A member leaves nothing behind but gratitude.", run(){
-      mark("cab"); const m = pick(G.members.filter(x => x.party === y.party && !x.machine && !x.gone && !x.cabinet)); if(!m) return "Nobody left to appoint.";
-      m.cabinet = pick(["Treasury", "State", "War", "Interior", "Labour"]); ripple(m, 12, "Named to the cabinet. I owe this one.", 10, true);
-      feed(m.name + " named Secretary of " + m.cabinet + ".", "good"); return m.name + " takes " + m.cabinet + "."; }});
+    P.push({t:"Appoint a cabinet secretary", off:once("cab"), d:"Three named candidates; the Senate will have its say.", run(){ appointCard("cab"); return null; }});
     P.push({t:"Send foreign aid on your own authority", off:once("aid"), d:"Money abroad, a realm warmer, a district colder.", run(){
       mark("aid"); const r = pick(realmEnsure()); G.realmRel = G.realmRel || {}; G.realmRel[r.k] = clamp((G.realmRel[r.k] || 0) + 12, -100, 100);
       y.approval = clamp(y.approval - 2, 0, 100); if(G.money) G.money.index = Math.round((G.money.index - 0.5) * 10) / 10;
@@ -29825,10 +29836,10 @@ function docketFor(k){
   const S = (G.states || []).find(s => s.n === y.state);
   const D = {
     gov:[
-      {h:8,  key:"gbrief", t:"Morning briefing", d:"Your secretary reads the state: roads, prisons, the treasury, the weather.", run:() => govBrief(S)},
+      {h:8,  key:"gbrief", t:"Morning briefing", d:"Your secretary reads the state: roads, prisons, the treasury, the weather.", run:() => govBrief2(S)},
       {h:10, key:"kgv",    t:"Open hours at the State House", d:"Citizens, mayors and county clerks, one at a time.", sit:"govoffice"},
       {h:13, key:"gdesk",  t:"The statehouse desk", d:S && S.bill ? "On your desk: the " + S.bill.title + ". Sign it or veto it." : "Bills sent over from the legislature.", run:() => govDesk(S)},
-      {h:15, key:"gbud",   t:"Agencies and the budget", d:"One department gets the money this week.", run:() => govBudget(S)},
+      {h:15, key:"gbud",   t:"Agencies and the budget", d:"One department gets the money this week.", run:() => govBudget2(S)},
       {h:17, key:"gpress", t:"Press availability", d:"The capitol reporters, on the record.", run:() => officePress("the State House steps")}
     ],
     senate:[
@@ -29877,6 +29888,147 @@ function docketRun(d){
   if(r) note(r, true);
   refreshPanels();
 }
+/* ── the governor's staff, agency heads and appointees: real people with views, not a click ── */
+const GOV_ROLES = {
+  chief:{t:"Chief of staff", ax:"lib"}, treasurer:{t:"State treasurer", ax:"econ"}, safety:{t:"Commissioner of public safety", ax:"lib"}, press:{t:"Press secretary", ax:"wel"}
+};
+const GOV_AGENCIES = {
+  roads:{t:"Roads and bridges", head:"Director of public works", ax:"econ", effect:[-1, 3, 1], ask:[14, 30], why:"the bottom road, the bridge on the river road, and the culverts nobody has inspected"},
+  schools:{t:"Schools", head:"Superintendent of schools", ax:"wel", effect:[-3, 1, 2], ask:[12, 26], why:"three teachers where the state cheque was late, and a roof that is not a roof"},
+  police:{t:"The constabulary", head:"Chief of the state constabulary", ax:"lib", effect:[-4, 0, -1], ask:[10, 24], why:"men on the corners, a second radio net, and the overtime nobody budgeted"},
+  health:{t:"Hospitals and the poor", head:"Commissioner of health", ax:"wel", effect:[-2, -1, 3], ask:[12, 28], why:"the maternity floor, the county hospitals' arrears, and the poor-relief rolls"}
+};
+function mkOfficial(key, S, roleTitle){
+  const r = rng(seedOf("off:" + key + ":" + ((G.you && G.you.name) || "")));
+  const bg = BACKGROUNDS[Math.floor(r() * BACKGROUNDS.length)], cr = CREEDS[Math.floor(r() * CREEDS.length)], og = ORIGINS[Math.floor(r() * ORIGINS.length)];
+  const pos = {}; AXES.forEach(a => { pos[a.k] = clamp(Math.round((bg.pos[a.k] || 0) + (cr.pos[a.k] || 0) * 0.5 + (og.pos[a.k] || 0) * 0.5 + (r() - 0.5) * 36), -100, 100); });
+  let name = ""; try{ name = wallSafeMint(() => newName(S ? S.n : null)); }catch(e){}
+  if(!name) name = "A. Official";
+  return {name, role:roleTitle, bg:bg.t, creed:cr.k, origin:og.k, pos, temper:Math.round(25 + r() * 60), warm:0, since:G.day};
+}
+function govStaff(S){
+  if(!S) return {};
+  S.cab = S.cab || {}; S.agency = S.agency || {};
+  Object.keys(GOV_ROLES).forEach(k => { if(!S.cab[k]) S.cab[k] = mkOfficial("cab:" + k + ":" + S.n, S, GOV_ROLES[k].t); });
+  Object.keys(GOV_AGENCIES).forEach(k => { if(!S.agency[k]) S.agency[k] = mkOfficial("ag:" + k + ":" + S.n, S, GOV_AGENCIES[k].head); });
+  return S;
+}
+function viewWords(pos){
+  const top = AXES.map(a => ({a, v:pos[a.k] || 0})).filter(x => Math.abs(x.v) >= 14).sort((x, y) => Math.abs(y.v) - Math.abs(x.v)).slice(0, 2);
+  if(!top.length) return "has no strong line on anything, which is itself a position";
+  return "leans " + top.map(x => (x.v > 0 ? x.a.hi : x.a.lo)).join(" and ") + (Math.abs(top[0].v) > 45 ? ", firmly" : "");
+}
+function officialHTML(o, extra){
+  const cr = creedOf(o.creed);
+  return '<b>' + pcEsc(o.name) + '</b> <span class="muted">· ' + pcEsc(o.role) + '</span><div class="muted" style="font-size:12px">' + pcEsc(cap(o.bg)) + ', of ' + pcEsc(cr.t) + '. ' + pcEsc(cap(viewWords(o.pos))) + '.' + (extra ? " " + extra : "") + '</div>';
+}
+function govCardOpen(eyebrow, title, intro, body, closeKey){
+  G.running = false;
+  card.innerHTML = '<div class="eyebrow">' + pcEsc(eyebrow) + '</div><h1>' + pcEsc(title) + '</h1>' + (intro ? '<p class="dream">' + pcEsc(intro) + '</p>' : '') + body +
+    '<div id="gcSay" class="dream"></div><div class="card__actions"><button type="button" class="btn" id="gcClose">Close</button></div>';
+  veil.hidden = false;
+  el("gcClose").addEventListener("click", () => { if(closeKey){ try{ kMark(closeKey); }catch(e){} } walkNow(); try{ refreshPanels(); }catch(e){} });
+}
+function advisorLine(o, S, topic){
+  const p = o.pos, tilt = a => p[a] || 0;
+  const hot = (S.unrest || 0) > 55, calm = (S.unrest || 0) < 30, ind = Math.round(S.ind || 0);
+  const towns = (function(){ try{ return (townsOf(S.n) || []).map(t => t.name); }catch(e){ return []; } })();
+  const town = towns.length ? towns[Math.floor(seedOf("t:" + o.name + G.day) % towns.length)] : "the county seat";
+  if(topic === "chief"){
+    const b = S.bill, dir = b ? b.dir * (b.axis === "econ" ? 1 : 1) : 0;
+    const bl = b ? "The legislature has sent over the " + b.title + ". " + (tilt(b.axis || "econ") * dir > 12 ? "I would sign it: it is where I stand, and where most of the majority stands." : tilt(b.axis || "econ") * dir < -12 ? "I would not sign it; it cuts against what I believe, and I would rather tell you than pretend." : "I can argue it either way, so I will let you hear the arguments first.") : "Nothing has come over from the legislature, which gives us a clear desk.";
+    return "Morning, " + youAddress() + ". " + bl + " Your approval is at " + Math.round(G.you.approval) + ". " + (G.you.approval < 45 ? "That is low enough that I would take a public question today." : "That is comfortable, so do not spend it on anything small.");
+  }
+  if(topic === "treasurer"){
+    const avail = govAvail(S);
+    const lean = tilt("econ") > 20 ? "I would rather leave it in the private economy: bank some, cut a levy next session, and let the contractors bid." : tilt("econ") < -20 ? "I would spend it where the counties can see it, on works the state owns, and keep the contractors honest." : tilt("wel") > 20 ? "I would keep a reserve for hardship before anything else." : "I would rather not tell you what to do with it before you have heard the departments.";
+    return "The state has " + curF(avail) + " unallocated this week. Industry stands at " + ind + ". " + lean;
+  }
+  if(topic === "safety"){
+    const lean = tilt("lib") < -20 ? "I want the constables visible, and I want curfews in " + town + " considered before somebody is hurt." : tilt("lib") > 20 ? "I would stand the patrols down in " + town + " and let the mayor and the clergy keep the peace; a constable on every corner makes a crowd." : "I will watch " + town + " and tell you the moment it changes.";
+    return (hot ? "Unrest is high: crowds outside two county courthouses, and " + town + " is the worst of it. " : calm ? "The counties are quiet. " : "The counties are restless, not yet angry. ") + lean;
+  }
+  const t = G.world && G.world.foe ? (WORLD_POWERS.find(x => x.k === G.world.foe) || {}).t : null;
+  return "The Standard is running the day your way and the Courier is asking who pays. " + (t ? "The wire says " + t + " is the story abroad, and a reporter will ask you about it." : "Nothing abroad to ask about.") + " " + (tilt("wel") > 20 ? "I would answer any question about the poor first. People believe that of you." : tilt("wel") < -20 ? "I would answer any question about the budget first. The papers will not forgive vagueness." : "Whatever you decide to say, say it once, plainly.");
+}
+function govAvail(S){ return Math.round((18 + (S.ind || 50) * 0.28 + (seedOf("av:" + S.n + ":" + G.day) % 10)) ) * 1000; }
+function govBrief2(S){
+  if(!S){ return "The secretary reads the day's file. Nothing in it is on fire."; }
+  govStaff(S);
+  const y = G.you, did = {};
+  const adv = ["chief", "treasurer", "safety", "press"].map(k => ({k, o:S.cab[k], line:advisorLine(S.cab[k], S, k)}));
+  const acts = {
+    chief:[{t:"Take the public question", d:"Approval, if it lands", run(){ y.approval = clamp(y.approval + (chance(0.6) ? 2 : -1), 0, 100); return "You take a question on the steps and the Courier gets its answer."; }}, {t:"Keep a clear desk", d:"Nothing spent", run(){ return "You keep the day clear and the papers wait."; }}],
+    treasurer:[{t:"Bank part of it", d:"Industry steady, hardship waits", run(){ S.ind = clamp(S.ind + 1, 0, 100); return "A quarter goes into the reserve."; }}, {t:"Release it to the counties", d:"Unrest down, treasury thinner", run(){ S.unrest = clamp(S.unrest - 2, 0, 100); return "The counties are told the cheques are coming."; }}],
+    safety:[{t:"More patrols", d:"Order now, resentment later", run(){ S.unrest = clamp(S.unrest - 3, 0, 100); y.approval = clamp(y.approval - 1, 0, 100); return "Constables on the corners of the worst streets."; }}, {t:"Stand the patrols down", d:"Quieter streets, louder papers", run(){ S.unrest = clamp(S.unrest + (chance(0.5) ? 2 : -2), 0, 100); y.approval = clamp(y.approval + 1, 0, 100); return "The patrols come off; the mayors are asked to keep the peace."; }}],
+    press:[{t:"Lead with the poor", d:"Approval at home", run(){ y.approval = clamp(y.approval + 2, 0, 100); return "You lead with the maternity floor and the Courier prints it."; }}, {t:"Lead with the budget", d:"Standing with the Standard", run(){ y.standing = clamp(y.standing + 1, 0, 100); return "You lead with the balance sheet."; }}]
+  };
+  const body = adv.map(a => '<div style="margin:10px 0;padding:8px 10px;border-left:3px solid var(--line-soft)">' + officialHTML(a.o) + '<p style="margin:6px 0">“' + pcEsc(a.line) + '”</p>' +
+    '<div class="card__actions" style="flex-wrap:wrap">' + acts[a.k].map((x, j) => '<button type="button" class="btn btn--ghost" data-adv="' + a.k + ':' + j + '" title="' + pcEsc(x.d) + '">' + pcEsc(x.t) + '</button>').join("") +
+    '<button type="button" class="btn btn--ghost" data-why="' + a.k + '">Ask why</button></div><div class="dream" id="adv_' + a.k + '"></div></div>').join("");
+  govCardOpen("Morning briefing · " + (y.state || ""), "Your advisors, in their own words", "Each of them has their own line, and none of them is you. Act on one or none.", body, "gbrief");
+  card.querySelectorAll("[data-why]").forEach(b => b.addEventListener("click", () => { const k = b.getAttribute("data-why"), o = S.cab[k], cr = creedOf(o.creed), og = originOf(o.origin);
+    el("adv_" + k).textContent = "“I am " + o.bg + ", of " + cr.t + ", and my people carry the grievance " + og.grievance + ". That is why I read it the way I do. Another adviser will read it differently, and you should let them.”"; }));
+  card.querySelectorAll("[data-adv]").forEach(b => b.addEventListener("click", () => { const [k, j] = b.getAttribute("data-adv").split(":"); if(did[k]) return; did[k] = 1; spend(10, 1);
+    const r = acts[k][+j].run(); el("adv_" + k).textContent = r; S.cab[k].warm = (S.cab[k].warm || 0) + 1; try{ tlog("You", r, "you"); }catch(e){} }));
+  return null;
+}
+/* the budget: four agency heads, each with their own case and their own view */
+function govBudget2(S){
+  if(!S){ return "Nothing on the budget today."; }
+  govStaff(S);
+  const y = G.you, avail = govAvail(S), W = {};
+  const reqs = Object.keys(GOV_AGENCIES).map(k => { const A = GOV_AGENCIES[k], o = S.agency[k], r = rng(seedOf("req:" + k + ":" + S.n + ":" + G.day)); const ask = Math.round((A.ask[0] + r() * (A.ask[1] - A.ask[0]))) * 1000; return {k, A, o, ask}; });
+  const pitch = q => { const t = q.o.pos[q.A.ax] || 0, A = q.A; const X = DK_AXIS[A.ax], lean = Math.abs(t) > 20 ? "My own bent is toward " + (t > 0 ? X.hi.w : X.lo.w).toLowerCase() + ", and you should weigh my case knowing it; " + (t > 0 ? "I will still argue that " : "I will argue that ") + A.t.toLowerCase() + " cannot wait." : "I will not pretend I have a doctrine; I have a list.";
+    return "We need " + curF(q.ask) + " for " + A.why + ". " + lean + " If you cannot do it all, half buys the first of it and I will come back in the spring."; };
+  const body = '<p class="muted">Unallocated this week: <b>' + curF(avail) + '</b>. The four requests come to ' + curF(reqs.reduce((a, q) => a + q.ask, 0)) + '. You can fund one in full, or half of one and keep the rest.</p>' +
+    reqs.map(q => '<div style="margin:10px 0;padding:8px 10px;border-left:3px solid var(--line-soft)">' + officialHTML(q.o) + '<p style="margin:6px 0">“' + pcEsc(pitch(q)) + '”</p><div class="muted" style="font-size:12px">' + pcEsc(q.A.t) + ': unrest ' + (q.A.effect[0] > 0 ? "+" : "") + q.A.effect[0] + ', industry ' + (q.A.effect[1] > 0 ? "+" : "") + q.A.effect[1] + ', approval ' + (q.A.effect[2] > 0 ? "+" : "") + q.A.effect[2] + ' at full funding.</div>' +
+      '<div class="card__actions" style="flex-wrap:wrap"><button type="button" class="btn btn--ghost" data-bud="' + q.k + ':1"' + (q.ask > avail ? ' disabled title="More than the state has this week"' : '') + '>Fund in full ' + curF(q.ask) + '</button><button type="button" class="btn btn--ghost" data-bud="' + q.k + ':0.5">Half ' + curF(Math.round(q.ask / 2000) * 1000) + '</button><button type="button" class="btn btn--ghost" data-bud="' + q.k + ':0">Refuse</button></div></div>').join("");
+  govCardOpen("Agencies and the budget", "This week's money", "Four people who run four departments, each sure theirs is the one that cannot wait.", body, null);
+  card.querySelectorAll("[data-bud]").forEach(b => b.addEventListener("click", () => { const [k, f] = b.getAttribute("data-bud").split(":"), q = reqs.find(x => x.k === k), frac = +f; if(!q || W.done) return; W.done = 1; spend(30, 3);
+    const e = q.A.effect; S.unrest = clamp(S.unrest + Math.round(e[0] * frac), 0, 100); S.ind = clamp(S.ind + Math.round(e[1] * frac), 0, 100); y.approval = clamp(y.approval + Math.round(e[2] * frac), 0, 100);
+    q.o.warm = (q.o.warm || 0) + (frac >= 1 ? 3 : frac > 0 ? 1 : -3);
+    const react = reqs.map(x => { if(x.k === k) return x.o.name + (frac >= 1 ? ": “Thank you. You will see it on the first of the month.”" : frac > 0 ? ": “Half is a start. I will be back in the spring.”" : ": “I will put it in writing that you refused me.”"); x.o.warm = x.o.warm || 0; return x.o.name + ": “" + (frac > 0 ? "Noted. We will make do." : "At least you were even-handed.") + "”"; }).join("\n");
+    el("gcSay").style.whiteSpace = "pre-line"; el("gcSay").textContent = (frac > 0 ? "You fund " + q.A.t.toLowerCase() + (frac < 1 ? " by half" : "") + ". " : "You refuse " + q.A.t.toLowerCase() + ". ") + "\n" + react;
+    card.querySelectorAll("[data-bud]").forEach(x => x.disabled = true); try{ kMark("gbud"); }catch(e){}
+    feed("Governor " + surname(y.name) + (frac > 0 ? " funded " + q.A.t.toLowerCase() + "." : " refused the " + q.A.t.toLowerCase() + " request."), frac > 0 ? "good" : "bad"); }));
+  return null;
+}
+/* appointments: named people with views, who backs them, and the cost */
+const APPT = {
+  judge:{t:"a state judge", post:"Judge of the state bench", ax:"lib", ctx:"A seat on the state bench has fallen open. The bench rules on what the statehouse writes."},
+  roads:{t:"a director of public works", post:GOV_AGENCIES.roads.head, ax:"econ", ctx:"The roads are a quarrel about whether the state builds or the market bids."},
+  schools:{t:"a superintendent of schools", post:GOV_AGENCIES.schools.head, ax:"wel", ctx:"The schools are a quarrel about how much the state provides."},
+  police:{t:"a chief of the constabulary", post:GOV_AGENCIES.police.head, ax:"lib", ctx:"The constabulary is a quarrel about order and liberty."},
+  health:{t:"a commissioner of health", post:GOV_AGENCIES.health.head, ax:"wel", ctx:"The hospitals are a quarrel about thrift and provision."},
+  cab:{t:"a cabinet secretary", post:"Secretary", ax:"econ", ctx:"A cabinet post has fallen open. The Senate will have to confirm whoever you name."}
+};
+function appointCard(kind){
+  const y = G.you, S = (G.states || []).find(s => s.n === y.state), P = APPT[kind]; if(!P) return null;
+  const cands = [0, 1, 2].map(i => { const o = mkOfficial("appt:" + kind + ":" + G.day + ":" + i, S, P.post);
+    if(i === 0) o.pos[P.ax] = clamp(o.pos[P.ax] + 40, -100, 100); if(i === 1) o.pos[P.ax] = clamp(o.pos[P.ax] - 40, -100, 100);
+    const backers = AXES.filter(a => Math.abs(o.pos[a.k]) > 25).sort((a, b) => Math.abs(o.pos[b.k]) - Math.abs(o.pos[a.k]))[0];
+    const stake = backers ? (DK_STAKE[backers.k] || []).filter(x => x[1] * (o.pos[backers.k] || 0) > 0).map(x => x[0]) : [];
+    const foes = backers ? (DK_STAKE[backers.k] || []).filter(x => x[1] * (o.pos[backers.k] || 0) < 0).map(x => x[0]) : [];
+    const odds = Math.round(clamp(60 + (y.standing - 50) / 2 + (S && S.lean ? (o.pos.econ - S.lean) * -0.1 : 0) + (i === 1 ? -6 : 0), 20, 95));
+    return {o, backers:stake, foes, odds}; });
+  const body = cands.map((c, i) => '<div style="margin:10px 0;padding:8px 10px;border-left:3px solid var(--line-soft)">' + officialHTML(c.o) +
+    '<p style="margin:6px 0;font-size:13px"><b>Who backs them:</b> ' + pcEsc(c.backers.length ? listify(c.backers) : "no organised group") + '. <b>Who objects:</b> ' + pcEsc(c.foes.length ? listify(c.foes) : "nobody in particular") + '. <b>Chance it is confirmed without a fight:</b> about ' + c.odds + '%.</p>' +
+    '<div class="card__actions" style="flex-wrap:wrap"><button type="button" class="btn btn--ghost" data-q="' + i + '">Interview</button><button type="button" class="btn" data-ap="' + i + '">Appoint ' + pcEsc(surname(c.o.name)) + '</button></div><div class="dream" id="aq_' + i + '"></div></div>').join("");
+  govCardOpen("Appointments", "Who will be " + P.t + "?", P.ctx + " Three people have put their names forward.", body, null);
+  card.querySelectorAll("[data-q]").forEach(b => b.addEventListener("click", () => { const c = cands[+b.getAttribute("data-q")], a = AXES.find(x => x.k === P.ax), v = c.o.pos[P.ax] || 0;
+    el("aq_" + b.getAttribute("data-q")).textContent = "“" + (Math.abs(v) < 14 ? "On " + a.n.toLowerCase() + " I follow the evidence and the room. I would rather tell you that than a doctrine." : v > 0 ? "I would push toward " + a.hi + ": a state that " + DK_AXIS[P.ax].hi.does + "." : "I would push toward " + a.lo + ": a state that " + DK_AXIS[P.ax].lo.does + ".") + " I will do what you ask, and I will say so in public if I disagree.”"; }));
+  card.querySelectorAll("[data-ap]").forEach(b => b.addEventListener("click", () => { const c = cands[+b.getAttribute("data-ap")]; if(card.querySelector("[data-done]")) return;
+    const ok = chance(c.odds / 100); spend(40, 4);
+    if(kind === "cab" && ok){ const m = pick(G.members.filter(x => x.party === y.party && !x.machine && !x.gone && !x.cabinet)); if(m){ m.cabinet = pick(["Treasury", "State", "War", "Interior", "Labour"]); c.o.name = m.name; ripple(m, 12, "Named to the cabinet. I owe this one.", 10, true); } }
+    if(ok){ if(S && (GOV_AGENCIES[kind])){ govStaff(S); S.agency[kind] = c.o; } if(kind === "judge"){ y.approval = clamp(y.approval + ((c.o.pos.lib || 0) > 0 ? 1 : 0), 0, 100); } y.standing = clamp(y.standing + 1, 0, 100); try{ y.used = y.used || {}; y.used[kind === "judge" ? "appt" : kind === "cab" ? "cab" : "appt2"] = G.day; }catch(e){} }
+    const msg = ok ? c.o.name + " is confirmed as " + P.post.toLowerCase() + ". " + cap(viewWords(c.o.pos)) + "; you will hear it in how they advise you." : "The legislature balks at " + c.o.name + ". The name is withdrawn and the seat stays open.";
+    el("gcSay").textContent = msg; feed(msg, ok ? "good" : "bad"); card.querySelectorAll("[data-ap]").forEach(x => { x.disabled = true; x.setAttribute("data-done", "1"); }); }));
+  return null;
+}
+const CASE_BILL = {road:"the Rural Road and Culvert Act", school:"the Schoolhouse and Teachers Act", water:"the Municipal Water Compliance Act", plant:"the Local Industry Retention Act", ballots:"the Special Elections (Mail Ballot) Act", pension:"the Widows' Pension Notice Act"};
+function amendText(S){ const A = (S && S.amend) || []; return A.length ? " Amendments agreed at open hours, to be attached: " + A.map(a => a.title + " (" + a.from + ")").join("; ") + "." : ""; }
+function amendApply(S){ const A = (S && S.amend) || []; if(!A.length) return ""; const y = G.you; S.unrest = clamp(S.unrest - A.length, 0, 100); y.approval = clamp(y.approval + A.length, 0, 100); S.amend = []; return " The amendments from open hours were attached: " + A.map(a => a.title).join(", ") + "."; }
 function govBrief(S){
   spend(20, 3);
   if(!S) return "The secretary reads the day's file. Nothing in it is on fire.";
@@ -29887,14 +30039,14 @@ function govBrief(S){
 function govDesk(S){
   if(!S || !S.bill){ spend(10, 1); return "Nothing came over from the statehouse today. You read the files of two pardons and sign neither."; }
   const y = G.you, b = S.bill;
-  choiceCard("The statehouse desk", "the " + b.title, "Passed by the legislature of " + y.state + ". Your signature makes it law; your veto sends it back.", [
+  choiceCard("The statehouse desk", "the " + b.title, "Passed by the legislature of " + y.state + ". Your signature makes it law; your veto sends it back." + amendText(S), [
     {t:"Sign it", d:"Law today. It moves industry and the mood the way it was written to.", run(){
       S.ind = clamp(S.ind + b.ind, 0, 100); S.unrest = clamp(S.unrest + b.unrest, 0, 100);
       S.lean = clamp(Math.round(S.lean + b.dir*3), -100, 100); S.bill = null;
       const fit = (b.dir > 0 ? 1 : -1) * (b.axis === "econ" ? S.lean : b.axis === "lib" ? -S.lean*0.4 : S.lean*0.3);
       y.approval = clamp(y.approval + (fit > 0 ? 3 : -2), 0, 100);
       feed("Governor " + surname(y.name) + " signed the " + b.title + ".", "good");
-      return "Signed at the desk, with the bill's sponsors standing behind you."; }},
+      return "Signed at the desk, with the bill's sponsors standing behind you." + amendApply(S); }},
     {t:"Veto it", d:"Back to the legislature. They may try again next session.", run(){
       S.bill = null; S.unrest = clamp(S.unrest + 2, 0, 100); y.approval = clamp(y.approval + rint(-3, 4), 0, 100);
       feed("Governor " + surname(y.name) + " vetoed the " + b.title + ".", "bad");
@@ -33435,6 +33587,8 @@ loadSettings();
   if(walkBtn) walkBtn.addEventListener("click", () => { try{ walkOutNow(); }catch(e){} });
   const ub = el("unBare");
   if(ub) ub.addEventListener("click", () => openPanels());
+  const galBtn = el("uiGalleryBtn");
+  if(galBtn) galBtn.addEventListener("click", () => { try{ if(G.you && veil.hidden) watchCard(); }catch(e){ console.warn(e); } });
   const paperBtn = el("uiPaperBtn");
   if(paperBtn) paperBtn.addEventListener("click", () => { try{ if(G.you && veil.hidden) paperCard(); }catch(e){ console.warn(e); } });
   const settingsBtn = el("uiSettingsBtn");
@@ -37062,7 +37216,7 @@ try{
       p.introduced = true;
       const op = p.case.open.slice(), rm = /^I am the ([^.,]*)\.\s*/i.exec(op[0]);
       if(rm && String(p.role).toLowerCase().indexOf(rm[1].toLowerCase()) === 0) op[0] = op[0].slice(rm[0].length).replace(/^./, c => c.toUpperCase());
-      const intro = "I'm " + p.name + ", " + p.role + ". ";
+      const intro = "I'm " + p.name + ", " + p.role + ". "; if(CASE_BILL[p.case.kind] && S.room === "govoffice") op.push("I would like it written into law as " + CASE_BILL[p.case.kind] + ", and I will come to the committee and say so.");
       return L(p, (S.x.M.greet ? one(S.x.M.greet) : one(["Governor, ", "Ma'am, sir, ", "Thank you for seeing me. "])) + intro + op.join(" "), null, "position",
         "A petitioner with a real case. They are asking for: " + p.case.ask + " It would cost " + p.case.costText + ". They would settle for: " + p.case.settle); }
     return L(p, (S.x.M.greet ? one(S.x.M.greet) : one(["Governor, ", "Ma'am, sir, ", "Thank you for seeing me. "])) + "I'm " + p.name + ", " + p.role + ". " + p.want[0].toUpperCase() + p.want.slice(1) + ". " + one(["I've written four times.", "We need an answer this month.", "I don't want a letter. I want a date."]), null, "position",
@@ -37290,11 +37444,12 @@ try{
     G.sitPrep = G.sitPrep || {};
     const prep = G.sitPrep[room] === G.day;
     const M = matterFor(room);
-    const S = SIT.on = {room, D, i:0, li:0, lines:[], cast:{}, score:0, rush:0, prep, t0:performance.now(), m0:G.minute || 0, tally:[], picked:false, key:key || KEY[room] || D.key};
+    const watch = !!G._sitWatch; G._sitWatch = false;
+    const S = SIT.on = {room, D, i:0, li:0, lines:[], cast:{}, score:0, rush:0, prep, watch, t0:performance.now(), m0:G.minute || 0, tally:[], picked:false, key:key || KEY[room] || D.key};
     S.x = {M, cast:buildCast(room, M), lines:[], queue:[], qi:0, at0:(() => { try{ return hhmm(); }catch(e){ return ""; } })(), amended:false, lastSpeaker:null, moves:null, said:[]};
     S.x.tally = () => { const C = S.x.cast.filter(p => !p.gone); return {yes:C.filter(p => p.stance >= 55).length, no:C.filter(p => p.stance <= 45).length, mid:C.filter(p => p.stance > 45 && p.stance < 55).length, avg:C.reduce((a, p) => a + p.stance, 0) / Math.max(1, C.length)}; };
     S.cast = {a:(S.x.cast[0] || {}).name, b:(S.x.cast[1] || {}).name, c:(S.x.cast[2] || {}).name, ppl:S.x.cast.map(p => p.m).filter(Boolean)};
-    try{ kMark(S.key); kMarkChamber(); }catch(e){}
+    try{ if(!watch){ kMark(S.key); kMarkChamber(); } }catch(e){}
     G.running = false;
     bring(S);
     try{ veil.classList.add("sitx"); }catch(e){}
@@ -37342,13 +37497,24 @@ try{
     const S = SIT.on; if(!S || !S.x) return;
     if(S.li < S.x.queue.length){ beat(); return; }
     const st = S.D.steps[S.i];
+    if(S.watch && st !== "adjourn" && !S.picked){ S.picked = true; drift(S, st); S.tally.push({step:st, pick:"You watched from the gallery", ok:true, k:"watch"}); }
     if(st !== "adjourn" && !S.picked) return;
     if(st === "vote" || st === "ruling") outcome();
     S.i++;
     if(S.i >= S.D.steps.length){ end(false); return; }
     step();
   }
+  /* the gallery: nobody asks you; the room moves on its own, by who said what to whom */
+  const drift = function(S, st){
+    const C = S.x.cast.filter(p => !p.gone); if(!C.length) return;
+    (S.x.said || []).forEach(l => { if(!l.p || l.to == null || l.to === "you" || !S.x.cast[l.to]) return; const t = S.x.cast[l.to];
+      if(l.tag === "support" || l.tag === "position") shift(S, t, 2 + Math.floor(Math.random() * 3), "heard " + l.p.sn); else if(l.tag === "oppose" || l.tag === "threat") shift(S, t, -(2 + Math.floor(Math.random() * 3)), "was pushed by " + l.p.sn); });
+    for(let i = 0; i < 2; i++){ const p = C[Math.floor(Math.random() * C.length)]; shift(S, p, (Math.random() < 0.5 ? -1 : 1) * (2 + Math.floor(Math.random() * 4)), "thought on it between speeches"); }
+  };
   const outcome = function(){
+    const S0 = SIT.on;
+    if(S0 && S0.watch){ const t0 = S0.x.tally(), carried0 = t0.avg >= 50 || t0.yes > t0.no, M0 = S0.x.M;
+      S0.x.verdict = "From the gallery you watched the room decide: " + (carried0 ? (M0.yes || "it carried") : (M0.no || "it failed")) + ", " + t0.yes + " to " + t0.no + "."; S0.out = "You watched. " + S0.x.verdict + " Nothing here was yours to vote."; S0.x.good = true; return; }
     const S = SIT.on, y = G.you, t = S.x.tally(), M = S.x.M, fin = S.x.final || "room";
     const carried = t.avg >= 50 || t.yes > t.no;
     let verdict, good;
@@ -37370,7 +37536,7 @@ try{
   }
   const recap = function(S){
     const C = S.x.cast, T = {gavel:"Called to order", open:"Openings", question:"Questions", motion:"Motions", deliberate:"Deliberation", vote:"The vote", ruling:"The ruling"};
-    const rows = S.tally.map(x => '<li><b>' + esc(T[x.step] || x.step) + ':</b> ' + esc(x.pick) + ' — ' + (x.ok ? "it landed" : "it went badly") + (x.moved ? '. ' + esc(x.moved) : '') + '</li>').join("");
+    const rows = S.tally.map(x => '<li><b>' + esc(T[x.step] || x.step) + ':</b> ' + esc(x.pick) + (x.k === "watch" ? "" : ' — ' + (x.ok ? "it landed" : "it went badly")) + (x.moved ? '. ' + esc(x.moved) : '') + '</li>').join("");
     const why = C.filter(p => Math.abs(p.stance - p.start) >= 6).map(p => '<li><b>' + esc(p.sn) + '</b> ' + p.start + ' → ' + p.stance + ': ' + esc(p.hist.slice(-2).join("; ")) + '</li>').join("");
     return '<div class="sx-recap"><h3>What happened</h3><p>' + esc(S.x.verdict || "") + (S.x.amended ? " The compromise was on the table." : "") + (S.rush ? " You rushed it, and the room noticed." : "") + '</p><ul>' + rows + '</ul>' +
       (why ? '<h3>Who moved, and why</h3><ul>' + why + '</ul>' : '<p>Nobody really moved. Minds were made up before the gavel.</p>') + (S.x.extra ? '<h3>What it means at home</h3><p>' + esc(S.x.extra) + '</p>' : '') + '</div>';
@@ -37378,7 +37544,8 @@ try{
   const end = function(walked){
     const S = SIT.on; if(!S) return;
     clearTimeout(SIT.timer);
-    if(walked){ sitApply({standing:-3, influence:-1}); try{ tlog("", "You walked out of the sitting.", "sit"); }catch(e){} S.x.cast.forEach(p => { if(p.m && p.m.rel) p.m.rel.warmth = clamp((p.m.rel.warmth || 0) - 2, -100, 100); }); }
+    if(S.watch){ /* a visitor's gallery seat costs nothing and changes nobody's opinion of you */ }
+    else if(walked){ sitApply({standing:-3, influence:-1}); try{ tlog("", "You walked out of the sitting.", "sit"); }catch(e){} S.x.cast.forEach(p => { if(p.m && p.m.rel) p.m.rel.warmth = clamp((p.m.rel.warmth || 0) - 2, -100, 100); }); }
     else S.x.cast.forEach(p => { if(p.m && p.m.rel){ p.m.rel.warmth = clamp((p.m.rel.warmth || 0) + Math.round((p.stance - p.start) / 10), -100, 100); } });
     SIT.log.push({room:S.room, ms:Math.round(performance.now() - S.t0), gameMin:(G.minute || 0) - S.m0, steps:S.i, walked:!!walked, score:S.score, live:true});
     saveLog(S, walked ? "You walked out" : (S.out || "Sat through"));
@@ -37439,18 +37606,19 @@ try{
     const lines = shown.map((l, i) => '<div class="sit__l sx-l sx-' + l.tag + (i === lastI ? ' is-new' : '') + '"><b>' + esc(l.who || S.D.chair) + (l.to != null && l.to !== "you" && S.x.cast[l.to] ? ' <small>→ ' + esc(S.x.cast[l.to].sn) + '</small>' : l.to === "you" ? ' <small>→ you</small>' : '') + '</b> ' + esc(l.text) +
       (l.gloss ? (i === lastI ? '<div class="sx-g"><span>What they meant:</span> ' + esc(l.gloss) + '</div>' : '<details class="sx-gd"><summary>What they meant</summary>' + esc(l.gloss) + '</details>') : '') + '</div>').join("");
     let acts = "";
-    if(done && st !== "adjourn" && !S.picked){
+    if(S.watch && done && st !== "adjourn"){ acts = '<button type="button" class="btn" id="sitGo">' + (S.i === S.D.steps.length - 1 ? "Rise" : "Watch the next step") + '</button>'; }
+    else if(done && st !== "adjourn" && !S.picked){
       S.x.moves = S.x.moves || movesFor(S, st);
       acts = '<div class="sx-moves">' + S.x.moves.map((m, i) => '<button type="button" class="btn' + (i ? ' btn--ghost' : '') + '" data-sit="' + i + '" title="' + esc(m.why) + '">' + esc(m.t) + (m.risk >= 0.3 ? ' <small>(risky)</small>' : '') + '<br><small class="sx-why">' + esc(m.why) + '</small></button>').join("") + '</div>';
     } else acts = '<button type="button" class="btn" id="sitGo">' + (done ? (S.i === S.D.steps.length - 1 ? "Rise" : "Next step") : "Continue") + '</button>';
     const t = S.x.tally();
     card.innerHTML = '<div class="eyebrow">' + esc(S.D.title) + ' · step ' + (S.i + 1) + ' of ' + S.D.steps.length + (S.prep ? ' · you read the file' : '') + ' · pace ' + esc((CLr() && CLr().pace) || "normal") + '</div>' +
       '<h1>' + SIT_STEP_T[st] + '</h1><div class="sit__prog">' + prog + '</div>' +
-      '<p class="sx-q"><b>The question:</b> ' + esc(S.x.M.q) + ' · <span class="sx-c">' + t.yes + ' with you · ' + t.mid + ' undecided · ' + t.no + ' against</span>' + (S.x.amended ? ' · <i>compromise on the table</i>' : '') + '</p>' +
+      '<p class="sx-q"><b>The question:</b> ' + esc(S.x.M.q) + ' · <span class="sx-c">' + t.yes + (S.watch ? ' for it · ' : ' with you · ') + t.mid + ' undecided · ' + t.no + ' against</span>' + (S.watch ? ' · <i>you are in the gallery</i>' : '') + (S.x.amended ? ' · <i>compromise on the table</i>' : '') + '</p>' +
       '<div class="sx-grid"><div class="sx-cast">' + S.x.cast.map(p => meter(p, S)).join("") + '</div><div class="sit__lines sx-lines">' + lines + '</div></div>' +
       (S.res ? '<p class="dream">' + esc(S.res) + '</p>' : '') + (st === "adjourn" && S.out ? '<p class="dream">' + esc(S.out) + '</p>' + recap(S) : '') +
-      (done && st !== "adjourn" && !S.picked ? '<p class="sx-hint">Your move. Hover a choice to see what it does; it shifts the meters live.</p>' : '') +
-      (done && st !== "adjourn" && !S.picked && (typeof window.onumLiveTalk === "function" || (window.onumLiveTalk && typeof window.onumLiveTalk.reply === "function")) ? '<form class="sx-talk lt-sit" id="sxTalk"><input id="sxTalkIn" maxlength="240" placeholder="Or say something in your own words…" autocomplete="off"><button type="button" class="btn btn--ghost" id="sxTalkGo">Say it</button></form>' : '') +
+      (done && st !== "adjourn" && !S.picked && !S.watch ? '<p class="sx-hint">Your move. Hover a choice to see what it does; it shifts the meters live.</p>' : '') +
+      (done && st !== "adjourn" && !S.picked && !S.watch && (typeof window.onumLiveTalk === "function" || (window.onumLiveTalk && typeof window.onumLiveTalk.reply === "function")) ? '<form class="sx-talk lt-sit" id="sxTalk"><input id="sxTalkIn" maxlength="240" placeholder="Or say something in your own words…" autocomplete="off"><button type="button" class="btn btn--ghost" id="sxTalkGo">Say it</button></form>' : '') +
       '<div class="card__actions">' + acts + ((function(){ try{ return pcCanOpen(); }catch(e){ return false; } })() ? '<button type="button" class="btn btn--ghost" id="sitPC">My computer</button>' : '') + '<button type="button" class="btn btn--ghost" id="sitOut">Walk out</button></div>';
     veil.hidden = false;
     const spc = el("sitPC"); if(spc) spc.addEventListener("click", () => { veil.hidden = true; if(!pcOpen()) veil.hidden = false; });
@@ -37480,6 +37648,7 @@ try{
   sitDraw = guard("draw", function(){ if(PC.open) return; return live() ? draw() : O.sitDraw(); }, () => O.sitDraw());
   /* closing the computer puts the sitting back where it was */
   { const _pcClose = pcClose; pcClose = function(){ _pcClose.apply(this, arguments); try{ if(SIT.on && SIT.on.x){ veil.hidden = false; sitDraw(); } }catch(e){} }; }
+  SX.defs = SIT_DEF;
   SX.cur = () => SIT.on && SIT.on.x ? SIT.on.x.cast.map(p => p.m).filter(Boolean) : [];
   SX.start = (room, key) => sitStart(key ? room + ":" + key : room);
 
@@ -38507,6 +38676,7 @@ try{
     deferred.forEach(p => { if(st) st.unrest = bound((st.unrest || 0) + 1); });
     let over = ""; const B = S.x.budget;
     if(B && spend > B.avail){ y.approval = bound((y.approval || 0) - 2); over = " Together they come to " + curF(spend) + " against " + curF(B.avail) + " unallocated, so the treasurer will be writing to you."; }
+    try{ const st2 = st; if(st2){ st2.amend = st2.amend || []; C.forEach(p => { if(p.stance >= 60 || p.promised){ const t0 = CASE_BILL[p.case.kind]; if(t0 && !st2.amend.some(a => a.kind === p.case.kind)){ st2.amend.push({kind:p.case.kind, title:t0, from:p.name, text:(p.stance >= 75 && !p.promised ? p.case.ask : p.case.settle), day:G.day}); feed(p.name + "'s " + p.case.short + " will be attached to the next bill from the legislature as an amendment.", "good"); } } }); st2.amend = st2.amend.slice(-6); } }catch(e){}
     try{ C.forEach(p => { if(p.promised) feed("You promised " + p.sn + ": " + p.case.settleShort + ". They will hold you to it.", "good"); }); }catch(e){}
     return (granted.length ? "Granted: " + granted.map(p => p.case.short + " (" + p.case.costText + ")").join(", ") + "." : "Nothing was granted today.") + (deferred.length ? " Put off: " + deferred.map(p => p.case.short).join(", ") + "." : "") + over;
   };

@@ -4,6 +4,16 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## The governor's staff, the gallery
+
+`20261015c` (on `20261015b`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- **Morning briefing, in their own words:** the governor's chief of staff, treasurer, public-safety commissioner and press secretary each speak from their own background and views (they are different people with different lines, and each can be asked why). Act on one, or none.
+- **Agencies and the budget:** four named department heads each make their own case with their own request, their own view and what funding does; fund one in full, half, or refuse, and they answer in their own words.
+- **Appointments are people:** judges, agency heads and cabinet secretaries come as three named candidates, each with a background, views, who backs and who objects, a chance of confirmation, and an interview. Who you appoint then advises you from their own view.
+- **Open hours write bills:** petitioners now ask for their case to be written into law; those you grant or settle become amendments attached to the next bill from the legislature (shown on the desk, and applied when you sign).
+- **Sit in the gallery:** a new Gallery button on the toolbar and an Apps entry on the phone: watch any chamber or hearing without a vote or a floor; the room moves on its own according to who said what to whom.
+
 ## Bills, read to the last word
 
 `20261015b` (on `20261015a`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
