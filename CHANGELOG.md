@@ -4,6 +4,15 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## The district is a place people walk through
+
+`20261013v` (on `20261013u`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- **The clutter:** the other states' governors, counterparts, envoys and party leaders are civilians in the data, and the daily routine sent every civilian to the district (or the East Steps on session days). About 80 officials who live elsewhere piled into your district. They now stay where they live, and existing saves are swept on load. Nobody is removed: they remain reachable by phone, mail and diary.
+- **Standing around:** at midday the "lunch break" made everyone stay exactly where they stood. In the district a break is now a walk: along the sidewalk, across the road, a few metres at a time.
+- **Walking:** residents stroll for a block or cross the road when idle, wait less between walks, and move at a street pace (about 1.5x the indoor pace) in the district and on the East Steps.
+- Stamp: meta + STAMP + `ONUM_BUILD` -> `20261013v`.
+
 ## The forms of government, and how they are remembered
 
 `20261013u` (on `20261013t`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
