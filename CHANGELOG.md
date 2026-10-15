@@ -4,6 +4,15 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## Vox you can post from, a huddle you can join, the Senator's day
+
+`20261015d` (on `20261015c`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- **Vox:** a composer sits at the top of the Vox pane and the phone's Vox tab, so you can post straight from it. Every post by someone else now has Like, Dislike and Reply; a like or dislike counts toward the post and moves that person's feeling about you a little. It stays one reaction per post, and the pane no longer redraws while you are typing.
+- **Walk up to people mid-conversation:** if you talk to someone who was just speaking with someone else, you step into their conversation: you see what they had been saying, the other person stays and speaks to you in their own words (from their own view of the bill), and answers again after you reply.
+- **The Senator's day has depth:** a staff meeting (chief of staff, legislative director, state director, each with their own views); a confirmation hearing with a named nominee, their record, backers and objectors, three questions you can put and a rejection or a fight; a treaty with articles, who backs and who objects, the envoy's and the opposition's own words, and ratify / ratify with a reservation / hold / reject; and calls from home with real constituent cases you can raise in committee, promise a letter to, or refuse.
+- Docket cards no longer inject themselves over the new office cards.
+
 ## The governor's staff, the gallery
 
 `20261015c` (on `20261015b`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.

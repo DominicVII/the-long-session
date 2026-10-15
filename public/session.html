@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261015c">
+<meta name="onum-build" content="20261015d">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261015c";
+  var STAMP = "20261015d";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -9710,7 +9710,7 @@ function dkInject(){
   try{
     if(!card || veil.hidden) return;
     if(typeof SIT !== "undefined" && SIT.on) return;           /* 20261013s: open hours and other sittings are not about a bill's text */
-    if(card.querySelector(".dk-inline") || el("dkSay")) return;
+    if(card.querySelector(".dk-inline") || el("dkSay") || el("gcSay")) return;
     const btns = [...card.querySelectorAll("button")];
     if(btns.length < 2) return;
     if(/Capitol Ledger|Today's paper/i.test((card.querySelector(".eyebrow") || {}).textContent || "")) return;
@@ -16394,6 +16394,37 @@ function voxDaily(){
   you.approval = clamp(you.approval + clamp((you.followers - 2600)/9000, -1.2, 1.2), 0, 100);
   G.members.forEach(m => { if(!m.gone) m.followers = Math.round(m.followers * (0.997 + Math.random()*0.008)); });
 }
+function voxComposerHTML(){
+  return '<div class="voxq" style="margin:0 0 12px"><textarea class="voxq__t" maxlength="2000" rows="2" placeholder="Say it on Vox. No script; they will answer in kind." style="width:100%;box-sizing:border-box;font:13px system-ui;padding:6px 8px;border-radius:6px"></textarea>' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px"><span class="muted voxq__c" style="font-size:11px">2000</span><button type="button" class="btn voxq__b">Post it</button></div></div>';
+}
+function voxReact(id, v){
+  const p = ((G.vox && G.vox.posts) || []).find(x => x.id === id); if(!p || p.mine || p.my) return false;
+  p.my = v; if(v > 0) p.backs = (p.backs || 0) + 1; else p.hits = (p.hits || 0) + 1;
+  const a = byId(p.by);
+  if(a && a.rel){ try{ ripple(a, v > 0 ? 2 : -2, v > 0 ? "They backed what I put on Vox." : "They came out against what I put on Vox.", v > 0 ? 1 : -1, false); }catch(e){} }
+  try{ G.you.likes = (G.you.likes || 0) + (v > 0 ? 1 : 0); }catch(e){}
+  return true;
+}
+document.addEventListener("click", ev => {
+  try{
+    const t = ev.target && ev.target.closest ? ev.target.closest("[data-vlike],[data-vdis],[data-vre],.voxq__b") : null; if(!t || !G.you) return;
+    const root = t.closest("#paneVox") || card;
+    const redraw = () => { if(t.closest("#paneVox")) refreshVox(); else if(typeof phoneCard === "function" && !veil.hidden) phoneCard(); };
+    if(t.matches(".voxq__b")){
+      const ta = t.closest(".voxq").querySelector("textarea"), text = ta.value.trim(); if(!text) return;
+      spend(rint(10, 18), 2);
+      const r = voxYouPost(null, null, text);
+      note("You posted: \u201c" + text.slice(0, 90) + (text.length > 90 ? "\u2026" : "") + "\u201d", r.post.k === "attack");
+      feed("It " + r.post.reach + ": " + (r.dF >= 0 ? "+" : "\u2212") + followerLabel(Math.abs(r.dF)) + " \u00b7 " + r.post.backs + " backing, " + r.post.hits + " against.");
+      ta.value = ""; redraw(); return;
+    }
+    if(t.hasAttribute("data-vre")){ const p = G.vox.posts.find(x => x.id === +t.getAttribute("data-vre")), a = p && byId(p.by), ta = root.querySelector(".voxq__t"); if(ta && a){ ta.value = handleOf(a) + " "; ta.focus(); } return; }
+    const v = t.hasAttribute("data-vlike") ? 1 : -1, id = +t.getAttribute(v > 0 ? "data-vlike" : "data-vdis");
+    if(voxReact(id, v)){ spend(1, 0); redraw(); }
+  }catch(e){ console.warn("vox ui", e); }
+}, true);
+document.addEventListener("input", ev => { const ta = ev.target; if(ta && ta.classList && ta.classList.contains("voxq__t")){ const c = ta.closest(".voxq").querySelector(".voxq__c"); if(c) c.textContent = 2000 - ta.value.length; } });
 function voxRows(limit){
   voxInit();
   const you = G.you;
@@ -16415,6 +16446,9 @@ function voxRows(limit){
         ((p.typed || voxReducedMotion()) ? voxMarkup(p.t) : '') + '</div>' +
       '<div class="vox__f"><span>' + p.backs + ' backing</span><span>' + p.hits + ' against</span>' +
         (voices ? '<span>' + voices + '</span>' : '') + '</div>' +
+      (p.mine ? '' : '<div class="vox__f" style="gap:8px"><button type="button" class="cl-btn" data-vlike="' + p.id + '"' + (p.my ? ' disabled' : '') + (p.my > 0 ? ' style="background:#2f6b3a;color:#fff"' : '') + '>\u25b2 Like</button>' +
+        '<button type="button" class="cl-btn" data-vdis="' + p.id + '"' + (p.my ? ' disabled' : '') + (p.my < 0 ? ' style="background:#8a2f36;color:#fff"' : '') + '>\u25bc Dislike</button>' +
+        '<button type="button" class="cl-btn" data-vre="' + p.id + '">Reply</button></div>') +
     '</div>';
   }).join("");
 }
@@ -16422,11 +16456,14 @@ function refreshVox(){
   const box = el("paneVox");
   if(!box) return;
   voxInit();
+  { const ae = document.activeElement; if(ae && ae.classList && ae.classList.contains("voxq__t") && box.contains(ae)) return; }
+  const keep = (box.querySelector(".voxq__t") || {}).value || "";
   setHTML(box,
-    '<div class="eyebrow">Vox · unchained</div>' +
+    '<div class="eyebrow">Vox · unchained</div>' + voxComposerHTML() +
     '<p class="muted" style="margin:6px 0 10px">You have <strong>' + followerLabel(G.you.followers) +
       '</strong> following you. Individuals type freely; the machine types it out. No script, no fix.</p>' +
     (voxRows(26) || '<p class="muted">Nobody has said anything yet.</p>'));
+  try{ const t0 = box.querySelector(".voxq__t"); if(t0 && keep) t0.value = keep; }catch(e){}
   try{ voxTypePosts(box); }catch(e){}
 }
 
@@ -16589,7 +16626,7 @@ function phoneCard(){
   } else if(phoneTab === "panels"){
     body = phoneBillHtml();
   } else if(phoneTab === "vox"){
-    body = '<div class="phone__scroll">' + (voxRows(14) || '<p class="muted">Nothing yet.</p>') + '</div>';
+    body = voxComposerHTML() + '<div class="phone__scroll">' + (voxRows(14) || '<p class="muted">Nothing yet.</p>') + '</div>';
   } else if(phoneTab === "post"){
     body = '<div class="voxwrite">' +
         '<textarea id="voxText" maxlength="2000" rows="3" placeholder="Say anything. No script. They will answer in kind."></textarea>' +
@@ -22113,6 +22150,7 @@ function speakAt(p, text){
 /* people talking to each other, out loud, where you happen to be standing */
 function overhear(a, b, lineA, lineB){
   if(!a || !b) return;
+  try{ const h = {a:a.id, b:b.id, lines:[[a.name, lineA]], t:G.t}; a._huddle = b._huddle = h; if(lineB) setTimeout(() => { h.lines.push([b.name, lineB]); h.t = G.t; }, 2300); }catch(e){}
   a.say = lineA; a.sayT = 4.6; a.sayTo = b.id; a.faceId = b.id; a.faceUntil = G.t + 5;
   speakAt(a, lineA);
   if(lineB) setTimeout(() => {
@@ -24843,6 +24881,39 @@ function wireHome(){
   if(!w || !home || w.parentNode === home.parentNode && w.previousSibling === home) return;
   w.classList.remove("wire--in");
   if(home && home.parentNode) home.parentNode.insertBefore(w, home.nextSibling);
+}
+/* walking up to two people mid-sentence puts you in their conversation: you hear what they were saying, and the other one stays and answers too */
+function huddleSay(o, first){
+  try{
+    const b = G.bill && !G.bill.done ? G.bill : null;
+    if(b && o.pos && b.pos){
+      const ax = AXES.slice().sort((x, y) => Math.abs(b.pos[y.k] || 0) - Math.abs(b.pos[x.k] || 0))[0], dir = (b.pos[ax.k] || 0) > 0 ? 1 : -1, aye = memberVote(o, b) > 0;
+      const bank = DK_READ[ax.k] && DK_READ[ax.k][dir] && DK_READ[ax.k][dir][aye ? "for" : "against"];
+      if(bank){ const r = rng(seedOf("hd:" + o.id + ":" + (TALK.huddle ? TALK.huddle.said : 0) + b.title)); return (first ? "Since you are here, I will say it to your face. " : "And since you ask: ") + "I am " + (aye ? "with" : "against") + " the " + b.title.split(" ").slice(0, 3).join(" ") + ", because " + bank[Math.floor(r() * bank.length)] + "."; }
+    }
+    return (first ? "Since you are here: " : "") + cap(String(convHook(o) || "I have been wondering what you make of all this.").trim());
+  }catch(e){ return "Since you are here, I would like to hear what you think."; }
+}
+{ const _openTalk = openTalk, _appendMsg = appendMsg, _closeTalk = closeTalk;
+  openTalk = function(m){
+    TALK.huddle = null;
+    try{ const h = m && m._huddle; if(h && G.running && G.t - h.t < 30){ const oid = h.a === m.id ? h.b : h.a, o = byId(oid);
+      if(o && !o.gone && o.room === m.room && Math.hypot(o.x - m.x, o.z - m.z) < 4.5) TALK.huddle = {o, h, said:0}; } }catch(e){}
+    const r = _openTalk.apply(this, arguments);
+    try{ const H = TALK.huddle; if(H && TALK.open){
+      const L = H.h.lines.slice(0, 2).map(x => x[0] + ": \u201c" + x[1] + "\u201d").join("  ");
+      _appendMsg("them", "You step into the conversation between " + m.name + " and " + H.o.name + ". They had been saying: " + L, "In the room");
+      setTimeout(() => { if(TALK.open && TALK.huddle === H){ _appendMsg("them", huddleSay(H.o, true), surname(H.o.name)); H.said++; } }, 1800);
+      try{ const meta = el("tkMeta"); if(meta) meta.textContent += " \u00b7 with " + surname(H.o.name); }catch(e){}
+    } }catch(e){}
+    return r;
+  };
+  appendMsg = function(kind){
+    const r = _appendMsg.apply(this, arguments);
+    try{ const H = TALK.huddle; if(kind === "you" && H && TALK.open && H.said < 3){ H.said++; setTimeout(() => { if(TALK.open && TALK.huddle === H) _appendMsg("them", huddleSay(H.o, false), surname(H.o.name)); }, 1700); } }catch(e){}
+    return r;
+  };
+  closeTalk = function(){ TALK.huddle = null; return _closeTalk.apply(this, arguments); };
 }
 function closeTalk(){
   const who = TALK.m;
@@ -29125,14 +29196,7 @@ function rolePowers(){
   }
   if(k === "senate"){
     P.push({t:"Hold a confirmation hearing", off:once("conf"), d:"A nominee for the bench. Confirm, or make a fight of it.", run(){ mark("conf"); confirmCard(); return null; }});
-    P.push({t:"Ratify a treaty", off:once("treaty"), d:"A treaty with a realm abroad. Two thirds of the Senate, and you.", run(){
-      mark("treaty");
-      const r = pick(realmEnsure()); G.realmRel = G.realmRel || {};
-      const ok = chance(0.55 + (y.standing - 50) / 200);
-      G.realmRel[r.k] = clamp((G.realmRel[r.k] || 0) + (ok ? 15 : -6), -100, 100);
-      feed((ok ? "The Senate ratified the treaty with " : "The treaty with ") + r.t + (ok ? "." : " fell short of two thirds."), ok ? "good" : "bad");
-      y.standing = clamp(y.standing + (ok ? 3 : -2), 0, 100);
-      return ok ? "Ratified. " + senateColleague() + " shook your hand in the cloakroom." : "Short by four. " + senateColleague() + " voted no and will not say why."; }});
+    P.push({t:"Ratify a treaty", off:once("treaty"), d:"A treaty with a realm abroad: read the terms, hear both sides. Two thirds of the Senate, and you.", run(){ mark("treaty"); treatyCard(); return null; }});
     P.push({t:"Filibuster the bill", off:!live || b.filibustered, d:"Talk until it dies or they give way. It costs you influence; home will judge.", run(){
       b.filibustered = true; b.voteDay += 3; y.influence = clamp(y.influence - 6, 0, 100);
       const fit = districtFit(b); y.approval = clamp(y.approval + (fit < 0 ? 4 : -4), 0, 100);
@@ -29224,7 +29288,110 @@ function benchRule(c, forUnion){
   G.you.standing = clamp(G.you.standing + 1, 0, 100);
   return forUnion ? "The act stands. " + c.state + " will comply, slowly." : "The mandate falls. " + c.state + " keeps its money and its schools.";
 }
+/* ── the Senator's working day: a staff that speaks, a nominee who answers, a treaty with terms, callers with cases ── */
+const SEN_ROLES = {chief:"Chief of staff", legdir:"Legislative director", state:"State director"};
+function senStaff(){
+  const y = G.you; G.senStaff = G.senStaff || {}; const S = {n:y.state};
+  Object.keys(SEN_ROLES).forEach(k => { if(!G.senStaff[k]) G.senStaff[k] = mkOfficial("sen:" + k + ":" + y.name, S, SEN_ROLES[k]); });
+  return G.senStaff;
+}
+function senBrief(){
+  const y = G.you, st = senStaff(), S = (G.states || []).find(x => x.n === y.state) || {unrest:30, lean:0, n:y.state}, b = G.bill && !G.bill.done ? G.bill : null;
+  const done = {};
+  const lean = b ? dkStateLean(S, {pos:b.pos}) : 0;
+  const rel = (G.realmRel || {}), realm = WORLD_POWERS.slice().sort((a, c) => (rel[a.k] || 0) - (rel[c.k] || 0))[0];
+  const towns = (function(){ try{ return (townsOf(y.state) || []).map(t => t.name); }catch(e){ return []; } })(), town = towns.length ? towns[(G.day || 0) % towns.length] : "the county seat";
+  const say = {
+    chief:"Morning, Senator. " + (b ? "The " + b.title + " is on the calendar. " + y.state + " leans " + (lean > 12 ? "toward it" : lean < -12 ? "against it" : "both ways on it") + ", so " + (lean > 12 ? "voting aye is the easy vote and I would take it." : lean < -12 ? "an aye will have to be explained at home, and I would want the explanation ready first." : "you can afford to listen to the floor first.") : "Nothing is on the calendar, which gives us a day to do the work nobody sees.") + " Your standing is " + Math.round(y.standing) + (y.standing < 45 ? "; I would build it before you spend it." : "; spend a little of it."),
+    legdir:"On the Senate's business: a confirmation hearing in committee, and a treaty with " + (realm ? realm.t : "a neighbour") + " that is " + realmRelLabel(rel[realm ? realm.k : ""] || 0) + " towards us. " + ((st.legdir.pos.def || 0) > 20 ? "I would read the treaty hard: we give away more than we are told." : (st.legdir.pos.def || 0) < -20 ? "I would want that treaty ratified. A paper peace is cheaper than a garrison." : "I have read both and I will tell you what is in them when you ask.") + " The two-thirds rule means one absent senator can sink it.",
+    state:"From home: " + (S.unrest > 55 ? "unrest is high, and " + town + " is the worst of it; they want to hear from you by name." : S.unrest > 35 ? town + " is restless but not angry." : "it is quiet; " + town + " asked whether you had forgotten them.") + " " + ((st.state.pos.wel || 0) > 20 ? "Two callers are waiting about pensions and relief, and I would take those first." : (st.state.pos.econ || 0) > 20 ? "The chamber of commerce wants an hour; I would give them one." : "I would take the callers in the order they rang.")
+  };
+  const acts = {
+    chief:[{t:"Plan to vote with " + y.state, d:"Approval if it holds", run(){ y.approval = clamp(y.approval + 1, 0, 100); return "The chief of staff writes the explanation for home before the vote."; }}, {t:"Hold your vote until the floor speaks", d:"Nothing spent", run(){ return "You keep the vote open."; }}],
+    legdir:[{t:"Have the treaty read to you tonight", d:"+1 standing in committee", run(){ y.standing = clamp(y.standing + 1, 0, 100); return "A summary and the full text are on your desk by evening."; }}, {t:"Ask for the opposition's reading too", d:"A fairer hearing", run(){ y.influence = clamp(y.influence + 1, 0, 100); return "The director sends for the other side's memorandum."; }}],
+    state:[{t:"Take the callers first", d:"Approval at home", run(){ y.approval = clamp(y.approval + 2, 0, 100); return "You tell the state director to book the afternoon for home."; }}, {t:"Send word that you'll write", d:"Small, safe", run(){ y.approval = clamp(y.approval + 1, 0, 100); return "A letter goes out under your name by evening."; }}]
+  };
+  const body = Object.keys(SEN_ROLES).map(k => '<div style="margin:10px 0;padding:8px 10px;border-left:3px solid var(--line-soft)">' + officialHTML(st[k]) + '<p style="margin:6px 0">“' + pcEsc(say[k]) + '”</p>' +
+    '<div class="card__actions" style="flex-wrap:wrap">' + acts[k].map((x, j) => '<button type="button" class="btn btn--ghost" data-sa="' + k + ':' + j + '" title="' + pcEsc(x.d) + '">' + pcEsc(x.t) + '</button>').join("") + '<button type="button" class="btn btn--ghost" data-sw="' + k + '">Ask why</button></div><div class="dream" id="sa_' + k + '"></div></div>').join("");
+  govCardOpen("Staff meeting · " + (y.state || ""), "Your staff, in their own words", "Three people who work for you, each with a view of their own.", body, "sbrief");
+  card.querySelectorAll("[data-sw]").forEach(b => b.addEventListener("click", () => { const k = b.getAttribute("data-sw"), o = st[k], cr = creedOf(o.creed), og = originOf(o.origin);
+    el("sa_" + k).textContent = "“I am " + o.bg + ", of " + cr.t + ", and my people carry the grievance " + og.grievance + ". It colours how I read the room, Senator, so weigh me knowing it.”"; }));
+  card.querySelectorAll("[data-sa]").forEach(b => b.addEventListener("click", () => { const [k, j] = b.getAttribute("data-sa").split(":"); if(done[k]) return; done[k] = 1; spend(10, 1); el("sa_" + k).textContent = acts[k][+j].run(); }));
+  return null;
+}
 function confirmCard(){
+  const y = G.you, nom = mkOfficial("nom:" + G.day + ":" + y.name, {n:pick(STATES)}, "Nominee to the federal bench");
+  const fit = alignment(y, {pos:nom.pos}), asked = {};
+  let grill = 0;
+  const ax = AXES.slice().sort((a, c) => Math.abs(nom.pos[c.k]) - Math.abs(nom.pos[a.k]))[0], v = nom.pos[ax.k] || 0, X = DK_AXIS[ax.k], side = v > 0 ? X.hi : X.lo;
+  const witness = (G.members || []).filter(m => m && !m.gone && m.kind === "member" && m.pos).sort(() => Math.random() - 0.5).slice(0, 2);
+  const wFor = witness[0], wAg = witness[1];
+  const q = {
+    record:{t:"Ask about their record", say:"“I was " + nom.bg + " before this. On " + ax.n.toLowerCase() + " I have always leaned " + side.w.toLowerCase() + ": I would read the law as a state that " + side.does + ". I will not apologise for it and I will not pretend I have no view.”", d:fit > 0 ? 2 : -1},
+    precedent:{t:"Ask how they treat precedent", say:"“Precedent binds me until I can show why it should not. I am " + (nom.temper > 60 ? "stubborn, and I will say so." : "careful, and I will say so.") + " I have overruled my own earlier opinion twice, and I wrote both reasons down.”", d:nom.temper > 60 ? -1 : 2},
+    backers:{t:"Ask who recommended them", say:"“" + (wFor ? wFor.name + " (" + wFor.party + ") put my name forward, and I have been honest with " + (wAg ? wAg.name : "the minority") + " that I will not be anyone's vote.”" : "“Nobody you would know, Senator.”"), d:1}
+  };
+  const body = '<div style="margin:8px 0">' + officialHTML(nom, "By your own answers, they read the law " + (fit > 8 ? "much as you do" : fit < -8 ? "the other way from you" : "somewhere near you") + ".") + '</div>' +
+    '<p class="muted" style="font-size:13px"><b>Who backs them:</b> ' + pcEsc(wFor ? wFor.name + " (" + wFor.party + "), who has known them for years" : "a short list of former colleagues") + '. <b>Who objects:</b> ' + pcEsc(wAg ? wAg.name + " (" + wAg.party + "), who thinks they will legislate from the bench" : "nobody in particular") + '. ' + pcEsc(senateColleague()) + ' wants a quick vote.</p>' +
+    '<div class="card__actions" style="flex-wrap:wrap">' + Object.keys(q).map(k => '<button type="button" class="btn btn--ghost" data-cq="' + k + '">' + pcEsc(q[k].t) + '</button>').join("") + '</div><div id="cqSay" class="dream" style="white-space:pre-line"></div>' +
+    '<div class="card__actions" style="flex-wrap:wrap"><button type="button" class="btn" id="cfYes">Confirm</button><button type="button" class="btn btn--ghost" id="cfNo">Reject</button><button type="button" class="btn btn--ghost" id="cfFight">Make a fight of it</button></div>';
+  govCardOpen("Senate Judiciary · confirmation", nom.name, "Nominated to the bench. They will answer anything you ask them, in their own way.", body, null);
+  card.querySelectorAll("[data-cq]").forEach(b => b.addEventListener("click", () => { const k = b.getAttribute("data-cq"); if(asked[k]) return; asked[k] = 1; spend(10, 1); grill += q[k].d; el("cqSay").textContent += (el("cqSay").textContent ? "\n" : "") + nom.name + ": " + q[k].say; }));
+  let fin = false;
+  const done = (how) => { if(fin) return; fin = true;
+    const odds = clamp(0.5 + fit / 200 + grill * 0.06, 0.1, 0.92);
+    let msg = "";
+    if(how === "yes"){ G.court = G.court || []; if(G.court.length) G.court[rint(0, G.court.length - 1)] = {name:nom.name, by:"the Senate", pos:nom.pos}; y.standing = clamp(y.standing + 1, 0, 100); msg = nom.name + " is confirmed to the bench."; }
+    else if(how === "no"){ y.standing = clamp(y.standing + (fit < 0 ? 2 : -2), 0, 100); msg = "The committee rejects " + nom.name + ". " + senateColleague() + " is not pleased."; }
+    else { const won = chance(1 - odds); y.standing = clamp(y.standing + (won ? 4 : -3), 0, 100); if(!won){ G.court = G.court || []; if(G.court.length) G.court[rint(0, G.court.length - 1)] = {name:nom.name, by:"the Senate", pos:nom.pos}; } msg = won ? nom.name + "'s nomination is withdrawn after a week of hearings." : nom.name + " is confirmed over your objection."; }
+    el("cqSay").textContent += "\n" + msg; feed(msg, "good"); card.querySelectorAll("#cfYes,#cfNo,#cfFight,[data-cq]").forEach(x => x.disabled = true); };
+  el("cfYes").addEventListener("click", () => done("yes")); el("cfNo").addEventListener("click", () => done("no")); el("cfFight").addEventListener("click", () => done("fight"));
+  return null;
+}
+function treatyCard(){
+  const y = G.you, rs = realmEnsure(), rel = G.realmRel = G.realmRel || {};
+  const r = rs[(G.day || 0) % rs.length], D = DLG[r.k] || {ask:r.want, give:"goodwill", red:"being asked for too much"}, g = REALM_GOV[r.k] || {}, folk = realmFolk(r.k), head = folk.find(f => f.id === "head"), env = folk[0];
+  const sens = (G.members || []).filter(m => m && !m.gone && m.kind === "member" && m.pos), sen = sens.sort(() => Math.random() - 0.5).slice(0, 2);
+  const opp = sen.find(m => (m.pos.def || 0) > 10) || sen[0], sup = sen.find(m => m !== opp) || sen[1];
+  const sec = (a, b) => '<p style="margin:6px 0"><b>' + a + '</b> ' + b + '</p>';
+  const body = '<p class="muted">' + pcEsc(cap(r.t)) + ' is ' + realmRelLabel(rel[r.k] || 0) + ' towards the Union (' + (rel[r.k] || 0) + '). ' + pcEsc(g.d || "") + '</p>' +
+    sec("Article I — what they ask.", pcEsc(cap(D.ask)) + ".") + sec("Article II — what they give.", pcEsc(cap(D.give)) + ".") +
+    sec("Article III — the line they will not cross.", "The Union will not do, and " + pcEsc(r.t) + " will not be asked for, " + pcEsc(D.red) + ".") +
+    sec("Article IV — duration.", "Six years, renewable, with an exit clause on ninety days' notice.") +
+    sec("Who backs it.", pcEsc(sup ? sup.name + " (" + sup.party + "), who thinks " + D.give + " is worth the price" : "the trade committee") + ".") +
+    sec("Who objects.", pcEsc(opp ? opp.name + " (" + opp.party + "), who thinks the Union gives " + D.ask + " and gets a promise" : "the hawks") + ". " + pcEsc(g.powers ? cap(g.powers[0][0]) + " will be watching how the Senate votes." : "") ) +
+    '<div class="card__actions" style="flex-wrap:wrap"><button type="button" class="btn btn--ghost" data-tr="env">Hear ' + pcEsc(env.name) + '</button><button type="button" class="btn btn--ghost" data-tr="opp">Hear the objection</button></div><div id="trSay" class="dream" style="white-space:pre-line"></div>' +
+    '<div class="card__actions" style="flex-wrap:wrap"><button type="button" class="btn" data-trv="yes">Ratify</button><button type="button" class="btn btn--ghost" data-trv="res">Ratify with a reservation</button><button type="button" class="btn btn--ghost" data-trv="hold">Hold it in committee</button><button type="button" class="btn btn--ghost" data-trv="no">Reject</button></div>';
+  govCardOpen("Treaties and foreign business", "A treaty with " + r.t, "Advice and consent: two thirds of the Senate, and you in the room.", body, null);
+  card.querySelectorAll("[data-tr]").forEach(b => b.addEventListener("click", () => { const k = b.getAttribute("data-tr");
+    el("trSay").textContent += (el("trSay").textContent ? "\n" : "") + (k === "env" ? env.name + " (" + env.title + "): “" + realmVoice(r.k, {}, "what do you want") + " We will not accept " + D.red + ", and I say so before the vote rather than after it.”" : (opp ? opp.name + ": “" + "We would be giving " + D.ask + " to a government that is " + realmRelLabel(rel[r.k] || 0) + " to us, and taking its word for " + D.give + ". I will vote no unless the text says what happens if it does not keep it.”" : "No objection was heard.")); }));
+  let fin = false;
+  card.querySelectorAll("[data-trv]").forEach(b => b.addEventListener("click", () => { if(fin) return; fin = true; const k = b.getAttribute("data-trv"); spend(30, 3);
+    const base = 0.5 + (y.standing - 50) / 200 + (rel[r.k] || 0) / 300; let msg = "";
+    if(k === "yes" || k === "res"){ const ok = chance(clamp(base + (k === "res" ? 0.15 : 0), 0.1, 0.95)); rel[r.k] = clamp((rel[r.k] || 0) + (ok ? (k === "res" ? 8 : 15) : -6), -100, 100); y.standing = clamp(y.standing + (ok ? 3 : -2), 0, 100);
+      msg = ok ? "The Senate ratifies the treaty with " + r.t + (k === "res" ? ", with your reservation on " + D.red : "") + ". " + senateColleague() + " shakes your hand in the cloakroom." : "The treaty with " + r.t + " falls short of two thirds."; }
+    else if(k === "hold"){ rel[r.k] = clamp((rel[r.k] || 0) - 2, -100, 100); msg = "You hold it in committee. " + r.t + " will say you are stalling."; }
+    else { rel[r.k] = clamp((rel[r.k] || 0) - 8, -100, 100); y.standing = clamp(y.standing + 1, 0, 100); msg = "You vote it down. " + (env ? env.name : "Their envoy") + " asks for a meeting."; }
+    el("trSay").textContent += "\n" + msg; feed(msg, "good"); card.querySelectorAll("[data-trv],[data-tr]").forEach(x => x.disabled = true); }));
+  return null;
+}
+function senCalls(){
+  const y = G.you, S = (G.states || []).find(x => x.n === y.state), done = {};
+  const wants = [["dairy farmer", "the co-op road washed out in spring and is still out"], ["widow", "a pension letter that came back unopened"], ["county clerk", "ballots for the special election that never came"], ["mayor", "the water main the state required, which the town cannot pay for"]];
+  const calls = wants.slice().sort(() => Math.random() - 0.5).slice(0, 3).map(w => { const name = newName(y.state); return {name, role:w[0], c:caseFile(w[0], w[1], S, name)}; }).filter(x => x.c);
+  const body = calls.map((x, i) => '<div style="margin:10px 0;padding:8px 10px;border-left:3px solid var(--line-soft)"><b>' + pcEsc(x.name) + '</b> <span class="muted">· ' + pcEsc(x.role) + ' · ' + pcEsc(y.state) + '</span><p style="margin:6px 0">“' + pcEsc(x.c.open.join(" ")) + '”</p>' +
+    '<div class="muted" style="font-size:12px">It would cost ' + pcEsc(x.c.costText) + '. They would settle for ' + pcEsc(x.c.settle) + '</div>' +
+    '<div class="card__actions" style="flex-wrap:wrap"><button type="button" class="btn btn--ghost" data-cl="' + i + ':1">Raise it in committee (4 influence)</button><button type="button" class="btn btn--ghost" data-cl="' + i + ':2">Promise a letter to the agency</button><button type="button" class="btn btn--ghost" data-cl="' + i + ':3">Say it is for the state</button></div><div class="dream" id="cl_' + i + '"></div></div>').join("");
+  govCardOpen("Calls from " + y.state, "People who voted for you", "Three callers, each with something the Senate might do and something it cannot.", body, "scalls");
+  card.querySelectorAll("[data-cl]").forEach(b => b.addEventListener("click", () => { const [i, k] = b.getAttribute("data-cl").split(":"); if(done[i]) return; done[i] = 1; spend(15, 2);
+    let r = ""; const x = calls[+i];
+    if(k === "1"){ if(y.influence < 4){ r = "You are short of influence; you promise to write instead."; y.approval = clamp(y.approval + 1, 0, 100); } else { y.influence -= 4; y.approval = clamp(y.approval + 3, 0, 100); y.standing = clamp(y.standing + 1, 0, 100); r = x.name + ": “Then someone is finally listening.” You will raise " + x.c.short + " in committee."; feed("You raised " + x.c.short + " in committee.", "good"); } }
+    else if(k === "2"){ y.approval = clamp(y.approval + 1, 0, 100); r = x.name + ": “A letter is a start. Put a date on it.”"; }
+    else { y.approval = clamp(y.approval - 1, 0, 100); r = x.name + ": “Then who do I ring? I have rung everyone.”"; }
+    el("cl_" + i).textContent = r; card.querySelectorAll('[data-cl^="' + i + ':"]').forEach(z => z.disabled = true); }));
+  return null;
+}
+function confirmCard_old(){
   const nom = {name:newName(pick(STATES)), pos:{econ:rint(-60, 60), lib:rint(-60, 60), def:0, wel:0}};
   const fit = alignment(G.you, {pos:nom.pos});
   card.innerHTML = '<div class="eyebrow">Senate Judiciary · confirmation</div><h1>' + nom.name + '</h1>' +
@@ -29843,10 +30010,11 @@ function docketFor(k){
       {h:17, key:"gpress", t:"Press availability", d:"The capitol reporters, on the record.", run:() => officePress("the State House steps")}
     ],
     senate:[
-      {h:9,  key:"conf",   t:"Committee: a confirmation hearing", d:"A nominee for the bench, under oath.", run:() => { kMark("conf"); confirmCard(); return null; }},
+      {h:8,  key:"sbrief", t:"Staff meeting", d:"Your chief of staff, legislative director and state director, in their own words.", run:() => senBrief()},
+      {h:9,  key:"conf",   t:"Committee: a confirmation hearing", d:"A nominee for the bench, under oath. Question them, then decide.", run:() => { kMark("conf"); confirmCard(); return null; }},
       {h:11, key:"ksen",   t:"The Senate sits", d:"The journal, the question, the roll.", sit:"senate"},
-      {h:14, key:"treaty", t:"Treaties and foreign business", d:"Advice and consent, two thirds.", power:"Ratify a treaty"},
-      {h:16, key:"scalls", t:"Calls from " + y.state, d:"Mayors, the statehouse, people who voted for you.", run:() => officeCalls()}
+      {h:14, key:"treaty", t:"Treaties and foreign business", d:"A treaty with a neighbour: read the terms, hear both sides, then advise and consent.", run:() => { kMark("treaty"); treatyCard(); return null; }},
+      {h:16, key:"scalls", t:"Calls from " + y.state, d:"Three constituents with real problems; what you promise is remembered.", run:() => senCalls()}
     ],
     bench:[
       {h:9,  key:"bconf",  t:"Conference with the other justices", d:"The docket, argued in private.", run:() => benchConference()},
