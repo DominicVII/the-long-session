@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261015h">
+<meta name="onum-build" content="20261015i">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261015h";
+  var STAMP = "20261015i";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -8257,6 +8257,7 @@ function realmGovHTML(p){
         act("trade", "Open trade talks", "20 from the war chest. A little industry, a little warmth.", !(G.you && (G.you.funds || 0) >= 20)) +
         act("press", "Press them on " + (D.ask ? "a point" : "a demand"), "4 influence. A warm neighbour may give way; a cold one will not.", infl < 4) +
         act("aud", "Summon a delegation", "An audience at your desk, with all three of them in the room.") +
+        (G.you && (function(){ try{ return heldOffice() === "pres"; }catch(e){ return false; } })() ? act("war", "Take it further", "Sanctions, convoys, covert help, a blockade, war: what the law allows you, and what it asks of Congress.") : "") +
       '</div></div>';
   }catch(e){ return ""; }
 }
@@ -8265,6 +8266,7 @@ function realmDo(k, a){
   G.realmRel = G.realmRel || {}; const was = G.realmRel[k] || 0, d = DLG[k] || {};
   const bump = n => { G.realmRel[k] = clamp(was + n, -100, 100); };
   if(a === "aid" || a === "trade" || a === "press") reactEmit("foreign", {k, verb:a});
+  if(a === "war"){ try{ mapToggle(false); }catch(x){} setTimeout(() => { try{ warCard(k); }catch(e){ console.warn(e); } }, 60); return; }
   if(a === "call"){ const e = realmFolk(k)[0]; PB.call = {id:"rl:" + k + ":" + e.id, name:e.name, lines:[{w:e.name, t:"This is " + e.name + ", " + e.title + " of " + p.t + ". I will be brief; what do you wish to raise?"}]}; PB.tab = "calls"; try{ mapToggle(false); }catch(x){} try{ pbOpen(); }catch(x){} return; }
   if(a === "aud"){ if(G.room !== homeRoom()){ note("Go to your own chair first: " + (ROOMS[homeRoom()] ? ROOMS[homeRoom()].t : "your office") + ". A delegation is received there.", true); return; } try{ mapToggle(false); }catch(x){} G._dlgRealm = k; setTimeout(() => { try{ sitStart("delegation"); }catch(e){ console.warn(e); } }, 60); return; }
   if(a === "aid"){ if(y.influence < 6) return; y.influence -= 6; spend(30, 3); bump(9); if(G.world && G.world.foe === k) G.world.heat = clamp((G.world.heat || 0) - 4, 0, 100); feed("You send aid to " + p.t + ". " + (REALM_GOV[k] ? cap(REALM_GOV[k].powers[0][0]) + " take note." : ""), "good"); note("Aid goes to " + p.t + ". Relations: " + was + " to " + G.realmRel[k] + ".", true); return; }
@@ -8353,7 +8355,7 @@ setTimeout(function wrapUnion(){
       if(anchor && anchor.parentNode === P) P.insertBefore(d, anchor.nextSibling); else P.appendChild(d);
       d.querySelectorAll("[data-qmode]").forEach(b => b.onclick = () => { MAP.mode = b.getAttribute("data-qmode"); refreshUnion(); });
       d.querySelectorAll("[data-qplace]").forEach(b => b.onclick = () => { MAP.sel = b.getAttribute("data-qplace"); refreshUnion(); });
-      P.querySelectorAll("[data-rl]").forEach(b => b.onclick = () => { const [k, a] = b.getAttribute("data-rl").split(":"); try{ realmDo(k, a); }catch(e){ console.warn(e); } if(a !== "call" && a !== "aud") refreshUnion(); });
+      P.querySelectorAll("[data-rl]").forEach(b => b.onclick = () => { const [k, a] = b.getAttribute("data-rl").split(":"); try{ realmDo(k, a); }catch(e){ console.warn(e); } if(a !== "call" && a !== "aud" && a !== "war") refreshUnion(); });
       d.querySelectorAll("[data-trip]").forEach(b => b.onclick = () => { try{ tripGo(b.getAttribute("data-trip")); }catch(e){ console.warn(e); } refreshUnion(); });
     }catch(e){ console.warn("q map", e); }
     return r;
@@ -27263,6 +27265,7 @@ function nextDay(late){
     try{ riteYouDay(); }catch(e){}
     try{ govDay(); }catch(e){}
     try{ reactDay(); }catch(e){}
+    try{ warDay(); }catch(e){}
     try{ purseDay(); }catch(e){}
     try{ cultDay(); }catch(e){}
     try{ caDay(); }catch(e){}
@@ -30190,6 +30193,7 @@ function docketFor(k){
     ],
     pres:[
       {h:8,  key:"kex",    t:"The morning briefing", d:"The overnight file: states, realms, the treasury.", sit:"exec"},
+      {h:9,  key:"pwar",   t:"The situation room", d:"A neighbour holds the bread. Sanctions, convoys, a blockade, war: as far as the law lets you, and with Congress if it does not.", run:() => { kMark("pwar"); warCard(); return null; }},
       {h:11, key:"pacts",  t:"Acts awaiting signature", d:"Sign or veto what the House and Senate send.", run:() => presActs()},
       {h:14, key:"cab",    t:"Cabinet", d:"Appoint, or hear the secretaries out.", power:"Appoint a cabinet secretary"},
       {h:16, key:"aid",    t:"Calls with foreign capitals", d:"Three heads of government on the line, in their own words. Aid, trade or a warning.", run:() => presForeign()},
@@ -30385,6 +30389,7 @@ function reactFrac(pos, title){
   let n = 0; mem.forEach(m => { try{ if(alignment(m, bill) > 0) n++; }catch(e){} }); return mem.length ? n / mem.length : 0.5;
 }
 function reactResolve(e){
+  if(/^war/.test(e.kind)){ warReact(e); return; }
   const y = G.you, d = e.data, opp = pty => pty === "FED" ? "COM" : "FED";
   if(e.kind === "actVetoed"){
     const act = (G.lastActs || []).find(a => a.title === d.title), fr = reactFrac(d.pos, d.title), sp = reactHolder("speaker");
@@ -30720,6 +30725,143 @@ function aideFor(room){
     ms.forEach(m => pool.push({name:m.name, role:(m.post ? postTitle(m.post) + ", " : "") + "member for " + m.state, infl:m.influence || 20, pos:m.pos, party:m.party, temper:m.traits.temper, bg:m.bg, m}));
   }
   pool.sort((a, b) => b.infl - a.infl); const a = pool[0]; if(a){ a.sn = surname(a.name); } return a || null;
+}
+/* ═════════════════════════════════════════════════════════
+   THE SITUATION ROOM · what a leader may do about a neighbour
+   Sanctions, convoys, covert help, a blockade, a strike, the levy, war. What you may do
+   alone depends on the form of the state, on what your predecessors settled, and on what
+   Congress has authorised. Where it does not allow you, you may ask Congress, or act first and
+   answer for it afterwards. Nobody is told what to think of it: states, neighbours, the
+   chambers and the courts each read it from where they stand, and the verdict comes later.
+   ═════════════════════════════════════════════════════════ */
+const WAR_ACTS = [
+  {k:"protest",   t:"Lodge a formal protest",             tier:1, hawk:5,  eff:{}, rel:-3,  heat:1,  press:2,  infl:1, d:"Words on paper. Cheap, and noticed."},
+  {k:"recall",    t:"Recall our ambassador",              tier:1, hawk:12, eff:{}, rel:-7,  heat:2,  press:4,  infl:2, d:"The chair at their capital goes empty."},
+  {k:"alt",       t:"Buy grain from their rivals instead",tier:1, hawk:-4, eff:{grain:-0.5}, rel:-2, heat:0, press:6, bread:-0.04, infl:2, d:"Costs a little warmth with the Reach; costs nothing in blood. A rival is pleased."},
+  {k:"sanctions", t:"Impose sanctions on their trade",    tier:2, hawk:25, eff:{trade:1}, rel:-12, heat:3, press:14, bread:0.06, infl:3, d:"Squeezes them, and us: our own bread may rise before theirs does."},
+  {k:"escort",    t:"Escort the grain convoys with the fleet", tier:2, hawk:30, eff:{navy:0.6}, rel:-6, heat:4, press:8, bread:-0.05, infl:3, d:"The ships go with the carts. Somebody may fire on them."},
+  {k:"covert",    t:"Quietly fund their opposition",      tier:2, hawk:35, eff:{border:0.3}, rel:-3, heat:2, press:10, risk:0.35, infl:4, d:"If it is found out, it is war by other means and everybody will say so."},
+  {k:"blockade",  t:"Blockade their ports",               tier:3, hawk:60, eff:{navy:1, trade:1}, rel:-25, heat:10, press:30, bread:0.05, dead:20, infl:6, d:"Cuts them off. Neutral ships will have views."},
+  {k:"strike",    t:"Seize the grain depots at the border", tier:3, hawk:70, eff:{border:1}, rel:-30, heat:14, press:34, bread:-0.1, dead:60, infl:7, d:"Takes the bread by force. Men will die and they will say who started it."},
+  {k:"mobilize",  t:"Call the levy",                      tier:3, hawk:50, eff:{border:0.7}, rel:-10, heat:8, press:12, unrest:3, infl:5, d:"Readiness up, and every household with a son has an opinion."},
+  {k:"war",       t:"Declare war",                        tier:4, hawk:90, eff:{navy:1, trade:1, border:1}, rel:-50, heat:25, press:55, dead:200, infl:10, d:"The whole of the state goes to it. There is no taking it back."}
+];
+const REALM_INT = {reach:{grain:1, trade:0.8, border:0.8, navy:0.2}, horn:{navy:1, trade:0.7, border:0.3}, pale:{trade:0.5, border:0.6, grain:0.6}, marches:{border:1, trade:0.4, navy:0.1}, isles:{navy:0.8, trade:0.6}, rift:{border:0.5, trade:0.3}};
+const REALM_RIVAL = {reach:"pale", pale:"reach", horn:"isles", isles:"horn", marches:"rift", rift:"marches"};
+function warLatitude(){
+  const form = (G.regime && G.regime.form) || "republic", base = {empire:3, monarchy:3, national:2, conservative:1, commonwealth:1, republic:1, democracy:0}[form] || 1;
+  let p = 0; try{ p = powerPrecedents(); }catch(e){} return {form, lat:base + Math.floor(p / 3), base, p};
+}
+function warAuthorised(a){
+  const L = warLatitude(), auth = G.warAuth && G.warAuth.until >= G.day && G.warAuth.tier >= a.tier;
+  if(a.tier === 1) return {ok:"yes", why:"Statements and trade diplomacy are yours alone."};
+  if(L.lat >= a.tier) return {ok:"yes", why:"As " + (REGIMES[L.form] || {t:"a state"}).t + ", with " + L.p + " settled precedent" + (L.p === 1 ? "" : "s") + " behind you, this is within the executive's own power."};
+  if(auth) return {ok:"yes", why:"Congress authorised action of this kind (until day " + G.warAuth.until + ")."};
+  return {ok:"vote", why:"Under a " + (REGIMES[L.form] || {t:"state"}).t + " with " + L.p + " precedent" + (L.p === 1 ? "" : "s") + ", this needs Congress. You may ask it, or act first and answer for it."};
+}
+function warStateBacking(S, a, tk){
+  const cr = (function(){ try{ return creedOf(S.creed); }catch(e){ return {pos:{}}; } })(), w = worldEnsure();
+  let v = 50 + ((S.lean || 0) * 0.3 + ((cr.pos && cr.pos.def) || 0)) * (a.hawk / 40);
+  if(tk === "reach" && a.tier >= 2) v += (w.bread - 1) * 35;
+  if(a.eff.trade && (S.ind || 50) > 70) v -= 10;
+  if(a.tier >= 3 && (S.unrest || 0) > 55) v -= 8;
+  return clamp(Math.round(v), 5, 95);
+}
+function warRealmView(rk, a, tk){
+  const I = REALM_INT[rk] || {}, rel = (G.realmRel || {})[rk] || 0; let s = 0, worst = null, wv = 0;
+  Object.keys(a.eff).forEach(e => { const c = (I[e] || 0) * a.eff[e]; s -= c * 0.8; if(c > wv){ wv = c; worst = e; } });
+  if(REALM_RIVAL[tk] === rk) s += 0.6; if(REALM_RIVAL[rk] === tk) s += 0.15; s += rel / 250; if(a.tier >= 3) s -= 0.25;
+  s = clamp(s, -1, 1); const p = WORLD_POWERS.find(x => x.k === rk), head = realmFolk(rk).find(f => f.id === "head");
+  const why = s > 0.25 ? (REALM_RIVAL[tk] === rk ? "has its own account to settle with " + (WORLD_POWERS.find(x => x.k === tk) || {}).t : "reads it as long overdue") : s < -0.25 ? ({navy:"does not want warships near its coast", trade:"lives by the trade this would stop", border:"does not want soldiers moving along a frontier", grain:"would be next on the grain list"}[worst] || "fears where it leads") : "will watch and say nothing yet";
+  return {k:rk, t:p.t, s, head:head ? head.name : "", why};
+}
+function warPlan(a, tk){
+  const mem = reactFrac({econ:a.eff.trade ? (a.hawk > 40 ? 10 : 0) : 0, lib:0, def:a.hawk, wel:0}, "war:" + a.k);
+  const rows = (G.states || []).map(S => ({n:S.n, b:warStateBacking(S, a, tk), pop:S.pop || 1})), tot = rows.reduce((x, r) => x + r.pop, 0) || 1, nat = rows.reduce((x, r) => x + r.b * r.pop, 0) / tot;
+  rows.sort((x, z) => z.b - x.b);
+  const views = WORLD_POWERS.filter(p => p.k !== tk).map(p => warRealmView(p.k, a, tk));
+  return {congress:mem, states:rows, nat:Math.round(nat), views};
+}
+function warApply(a, tk, how){
+  const y = G.you, w = worldEnsure(), rel = G.realmRel = G.realmRel || {}, tgt = WORLD_POWERS.find(p => p.k === tk), msg = [];
+  y.influence = clamp(y.influence - a.infl, 0, 100); spend(60, 6);
+  rel[tk] = clamp((rel[tk] || 0) + a.rel, -100, 100); w.heat = clamp((w.heat || 0) + a.heat, 0, 100);
+  if(a.bread) w.bread = clamp((w.bread || 1) + a.bread, 0.7, 2.6);
+  if(a.dead) w.dead = (w.dead || 0) + a.dead;
+  if(a.unrest) (G.states || []).forEach(S => { S.unrest = clamp((S.unrest || 0) + a.unrest, 0, 100); });
+  if(a.risk && chance(a.risk)){ rel[tk] = clamp(rel[tk] - 15, -100, 100); w.heat = clamp(w.heat + 6, 0, 100); msg.push("Your hand in it is found out. " + tgt.t + " says so in public."); }
+  G.conflict = G.conflict || {k:tk, pressure:0, started:G.day, acts:[], due:G.day + 5 + Math.floor(Math.random() * 3), backing:50};
+  if(G.conflict.k !== tk){ G.conflict = {k:tk, pressure:0, started:G.day, acts:[], due:G.day + 5 + Math.floor(Math.random() * 3), backing:50}; }
+  G.conflict.pressure += a.press; G.conflict.acts.push({k:a.k, d:G.day, how}); G.conflict.due = Math.max(G.conflict.due, G.day + 3);
+  if(a.k === "war") G.conflict.war = true;
+  return msg.join(" ");
+}
+function warCard(tk){
+  const y = G.you, w = worldEnsure(), foe = WORLD_POWERS.find(p => p.k === (tk || w.foe || "reach")) || WORLD_POWERS[0], rel = (G.realmRel || {})[foe.k] || 0, L = warLatitude();
+  const D = DLG[foe.k] || {}, folk = realmFolk(foe.k), head = folk.find(f => f.id === "head");
+  const picked = {};
+  const hdr = '<p class="muted" style="font-size:13px">' + pcEsc(cap(foe.t)) + ' is ' + realmRelLabel(rel) + ' towards the Union (' + rel + '); heat ' + Math.round(w.heat || 0) + '. Bread stands at ' + (w.bread || 1).toFixed(2) + (w.ration ? ', and the northern towns are rationed' : '') + '. ' + pcEsc(cap((WORLD_WARS.find(x => x.k === w.war) || {t:""}).t)) + '.</p>' +
+    '<p class="muted" style="font-size:12px"><b>The law as it stands.</b> The Union is a ' + pcEsc((REGIMES[L.form] || {t:"state"}).t) + '; ' + L.p + ' power precedent' + (L.p === 1 ? '' : 's') + ' have been set, so the executive may act alone up to ' + (L.lat >= 4 ? 'a declaration of war' : L.lat === 3 ? 'force at the border and the ports' : L.lat === 2 ? 'sanctions, convoys and covert help' : L.lat === 1 ? 'sanctions and convoys' : 'statements and trade diplomacy') + '. ' + (G.warAuth && G.warAuth.until >= G.day ? 'Congress has authorised action up to tier ' + G.warAuth.tier + ' until day ' + G.warAuth.until + '.' : 'Congress has authorised nothing.') + '</p>' +
+    (G.conflict && G.conflict.k === foe.k ? '<p class="muted" style="font-size:12px"><b>Under way.</b> Pressure ' + Math.round(G.conflict.pressure) + ' against ' + pcEsc(foe.t) + '; ' + G.conflict.acts.length + ' measure' + (G.conflict.acts.length === 1 ? '' : 's') + ' taken. The verdict comes on about day ' + G.conflict.due + '.</p>' : '');
+  const rows = WAR_ACTS.map((a, i) => { const au = warAuthorised(a), pl = warPlan(a, foe.k), top = pl.states.slice(0, 2), low = pl.states.slice(-2).reverse(), v = pl.views.slice().sort((x, z) => z.s - x.s);
+    const btns = au.ok === "yes" ? '<button type="button" class="btn" data-wa="' + i + ':do">Do it</button>' : '<button type="button" class="btn btn--ghost" data-wa="' + i + ':ask">Ask Congress (two days)</button><button type="button" class="btn btn--ghost" data-wa="' + i + ':pre">Act anyway, and answer for it</button>';
+    return '<details style="margin:8px 0;border-left:3px solid var(--line-soft);padding:4px 10px"><summary><b>' + pcEsc(a.t) + '</b> <span class="muted">tier ' + a.tier + ' · ' + (au.ok === "yes" ? 'yours to do' : 'needs Congress') + '</span></summary>' +
+      '<p style="margin:4px 0;font-size:13px">' + pcEsc(a.d) + '</p><p class="muted" style="font-size:12px">' + pcEsc(au.why) + '</p>' +
+      '<p style="font-size:12px;margin:4px 0"><b>How it reads at home.</b> The House: about ' + Math.round(pl.congress * 100) + '% read it favourably. The country: ' + pl.nat + '% back it. ' + pcEsc(top[0].n) + ' (' + top[0].b + '%) and ' + pcEsc(top[1].n) + ' (' + top[1].b + '%) back it most; ' + pcEsc(low[0].n) + ' (' + low[0].b + '%) and ' + pcEsc(low[1].n) + ' (' + low[1].b + '%) least.</p>' +
+      '<p style="font-size:12px;margin:4px 0"><b>How the neighbours read it.</b> ' + v.map(x => pcEsc(x.t) + (x.head ? ' (' + pcEsc(x.head) + ')' : '') + ' ' + (x.s > 0.25 ? 'leans with you: ' : x.s < -0.25 ? 'objects: ' : 'is waiting: ') + pcEsc(x.why)).join('; ') + '.</p>' +
+      '<div class="card__actions" style="flex-wrap:wrap">' + btns + '</div></details>'; }).join("");
+  govCardOpen("The situation room", "The " + cap(foe.t.replace(/^the /, "")) + " question", "", hdr + '<p class="muted" style="font-size:12px">' + pcEsc(head ? head.name : "Their head of government") + ' wants ' + pcEsc(D.ask || foe.want) + ' and will not accept ' + pcEsc(D.red || "being pushed") + '. Nothing here is a button that wins.</p>' + rows + '<div id="waSay" class="dream" style="white-space:pre-line"></div>', null);
+  card.querySelectorAll("[data-wa]").forEach(b => b.addEventListener("click", () => { const [i, how] = b.getAttribute("data-wa").split(":"), a = WAR_ACTS[+i]; if(picked.done) return;
+    if(y.influence < a.infl){ el("waSay").textContent = "You are short of influence for this (" + a.infl + ")."; return; }
+    picked.done = 1; let out = "";
+    if(how === "ask"){ y.influence = clamp(y.influence - 1, 0, 100); reactEmit("warVote", {k:foe.k, act:a.k}, 2); out = "You send the request to the House and Senate. They will answer in two days."; }
+    else { const extra = warApply(a, foe.k, how); out = (how === "pre" ? "You act first. " : "") + a.t + ". " + (extra ? extra + " " : "") + "The verdict will not be in for days.";
+      reactEmit(how === "pre" ? "warPreempt" : "warNote", {k:foe.k, act:a.k}, 1); try{ feed("The President: " + a.t.toLowerCase() + " (" + foe.t + ").", a.tier >= 3 ? "bad" : ""); }catch(e){} }
+    el("waSay").textContent = out; card.querySelectorAll("[data-wa]").forEach(z => z.disabled = true); }));
+  return null;
+}
+function warReact(e){
+  const d = e.data, a = WAR_ACTS.find(x => x.k === d.act), y = G.you, tgt = WORLD_POWERS.find(p => p.k === d.k); if(!a || !tgt) return;
+  G.realmRel = G.realmRel || {};
+  const pl = warPlan(a, d.k), sp = reactHolder("speaker"), mn = reactHolder("minority"), arm = reactHolder("armed");
+  const head = realmFolk(d.k).find(f => f.id === "head");
+  if(e.kind === "warVote"){
+    const ok = chance(clamp((pl.congress - 0.35) * 1.8, 0.05, 0.95));
+    if(ok){ G.warAuth = {tier:a.tier, until:G.day + 30, k:d.k}; reactSay(sp, "Congress has authorised action against " + tgt.t + " up to tier " + a.tier + " (" + a.t.toLowerCase() + "). The authorisation runs thirty days. It is yours to use or not."); }
+    else reactSay(mn || sp, "Congress has declined to authorise action against " + tgt.t + " (" + a.t.toLowerCase() + "). " + (pl.congress < 0.4 ? "The peace members found the numbers." : "It fell short by a handful, and the whips are counting who stayed away.")); return; }
+  if(e.kind === "warPreempt"){
+    const fine = pl.congress > 0.6, L = warLatitude();
+    if(fine){ reactSay(sp, "Congress votes a retroactive authorisation for the President's " + a.t.toLowerCase() + " against " + tgt.t + ". It does not like being asked afterwards, and says so."); G.warAuth = {tier:a.tier, until:G.day + 30, k:d.k}; }
+    else { y.standing = clamp(y.standing - 3, 0, 100); G.cases = G.cases || []; G.cases.push({t:"the House v. the President (the " + tgt.t.replace(/^the /, "") + " action)", state:"", day:G.day, voted:[]}); reactSay(mn || sp, "The House censures the President for acting against " + tgt.t + " (" + a.t.toLowerCase() + ") without authority, and the question goes to the bench."); }
+    try{ setPrecedent("acted against " + tgt.t + " before Congress had voted", "that the executive may " + a.t.toLowerCase() + " first and answer afterwards", true); }catch(e2){}
+    warReact({kind:"warNote", data:d}); return; }
+  /* warNote: the states, the neighbours and the target each answer from where they stand */
+  const hi = pl.states[0], lo = pl.states[pl.states.length - 1];
+  reactSay(null, hi.n + " (" + hi.b + "%) backs the " + a.t.toLowerCase() + "; " + lo.n + " (" + lo.b + "%) does not. " + (pl.nat > 60 ? "The country leans with you." : pl.nat < 42 ? "The country does not." : "The country is divided."), true);
+  pl.views.sort((x, z) => Math.abs(z.s) - Math.abs(x.s)).slice(0, 2).forEach(v => { reactSay(null, cap(v.t) + (v.head ? " (" + v.head + ")" : "") + (v.s > 0.25 ? " backs you quietly: it " : v.s < -0.25 ? " objects: it " : " is waiting: it ") + v.why + ".", true); G.realmRel[v.k] = clamp(((G.realmRel || {})[v.k] || 0) + Math.round(v.s * 6), -100, 100); });
+  reactSay(null, cap(tgt.t) + (head ? " (" + head.name + ")" : "") + " answers the " + a.t.toLowerCase() + ": " + (a.tier >= 3 ? "it calls it an act of war and mobilises its frontier guard." : a.tier === 2 ? "it protests, and quietly raises the price of what it still sells." : "it lodges a protest of its own and says it will remember.")); 
+  if(arm && a.tier >= 3) reactSay(arm, "Armed Services Chair " + surname(arm.name) + ": the committee will want the plan, the cost and the exit before another measure is taken.", false);
+  (G.states || []).forEach(S => { const b = warStateBacking(S, a, d.k); S.unrest = clamp((S.unrest || 0) + (b < 40 ? 2 : b > 65 ? -1 : 0), 0, 100); });
+  y.approval = clamp(y.approval + Math.round((pl.nat - 50) / 12), 0, 100);
+}
+function warDay(){
+  const C = G.conflict; if(!C) return;
+  const w = worldEnsure(), tgt = WORLD_POWERS.find(p => p.k === C.k); if(!tgt) { G.conflict = null; return; }
+  w.heat = clamp(w.heat + (C.war ? 1.2 : 0.3), 0, 100); if(C.war) w.dead = (w.dead || 0) + 8 + Math.floor(Math.random() * 20);
+  if(G.day < C.due) return;
+  const y = G.you, rel = G.realmRel = G.realmRel || {}, last = WAR_ACTS.find(a => a.k === (C.acts[C.acts.length - 1] || {}).k) || WAR_ACTS[0], pl = warPlan(last, C.k);
+  const allies = pl.views.filter(v => v.s > 0.25).length - pl.views.filter(v => v.s < -0.25).length;
+  const resist = 28 + Math.max(0, (rel[C.k] || 0) < -40 ? 6 : 0), score = C.pressure + pl.nat * 0.35 + allies * 4 + (Math.random() - 0.5) * 26 - resist;
+  const sp = reactHolder("speaker"), mn = reactHolder("minority");
+  let result;
+  if(score > 18){ result = "concession"; w.bread = clamp(w.bread - 0.2, 0.7, 2.6); w.heat = clamp(w.heat - 15, 0, 100); w.ration = false; y.approval = clamp(y.approval + 4, 0, 100); y.standing = clamp(y.standing + 3, 0, 100); rel[C.k] = clamp((rel[C.k] || 0) + 4, -100, 100);
+    reactSay(sp, cap(tgt.t) + " gives way: the grain moves, the price of bread falls, and the pressure was enough. " + (C.war ? "The war ends on terms." : "Nobody had to fire a shot."), true); }
+  else if(score > 2){ result = "stalemate"; w.heat = clamp(w.heat + 3, 0, 100); y.approval = clamp(y.approval - 2, 0, 100);
+    reactSay(mn || sp, "Nothing is decided with " + tgt.t + ". The measures taken have cost something and settled little, and the bread has not got cheaper.", true); }
+  else { result = "backfire"; w.bread = clamp(w.bread + 0.15, 0.7, 2.6); w.dead = (w.dead || 0) + 30; y.approval = clamp(y.approval - 5, 0, 100); y.standing = clamp(y.standing - 3, 0, 100); (G.states || []).forEach(S => { if(warStateBacking(S, last, C.k) < 50) S.unrest = clamp((S.unrest || 0) + 3, 0, 100); });
+    reactSay(mn || sp, cap(tgt.t) + " did not give way, and the pressure came back on us: bread is dearer, there are dead to explain, and the states that never backed it are saying so.", true); }
+  C.result = result; C.until = G.day; G.conflictLog = (G.conflictLog || []).concat([{k:C.k, d:G.day, result, acts:C.acts.length}]).slice(-6);
+  G.conflict = null;
 }
 function amendText(S){ const A = (S && S.amend) || []; return A.length ? " Amendments agreed at open hours, to be attached: " + A.map(a => a.title + " (" + a.from + ")").join("; ") + "." : ""; }
 function amendApply(S){ const A = (S && S.amend) || []; if(!A.length) return ""; const y = G.you; S.unrest = clamp(S.unrest - A.length, 0, 100); y.approval = clamp(y.approval + A.length, 0, 100); S.amend = []; return " The amendments from open hours were attached: " + A.map(a => a.title).join(", ") + "."; }
@@ -33446,7 +33588,7 @@ function saveCaptureBase(){
     withWhom:G.withWhom, ties:G.ties, rite:G.rite, gov:G.gov, placed:G.placed, panel:null, court:G.court, own:G.own, parties:G.parties,
     termLength:G.termLength, country:G.country,
     greatest:G.greatest, blasphemy:G.blasphemy, loreNote:G.loreNote, greatnessOpen:G.greatnessOpen,
-    relics:G.relics, relicSpots:G.relicSpots, consularLore:G.consularLore, bind:G.bind, sens:G.sens, invertY:!!G.invertY, voiceVol:G.voiceVol, goals:G.goals, whip:G.whip || null, billQueue:G.billQueue || [], faith:G.faith || null, life:G.life || null, ach:G.ach || {}, law:G.law || null, ladder:G.ladder || [], cases:G.cases || [], lastActs:G.lastActs || [], wx:G.wx || null, town:G.town || null, rivals:G.rivals || [], rivalNext:G.rivalNext || 0, daylog:(G.daylog || []).slice(-120), paperRead:G.paperRead || 0, seedL:G.seedL || 0, mHints:G.mHints || {}, tlog:(G.tlog || []).slice(-500), ag:G.ag || null, sitPrep:G.sitPrep || {}, echoes:G.echoes || [], billKinds:G.billKinds || {}, realmRel:G.realmRel || {}, react:G.react || [], reactNews:G.reactNews || [], senStaff:G.senStaff || null, presStaff:G.presStaff || null, listened:G.listened || 0,
+    relics:G.relics, relicSpots:G.relicSpots, consularLore:G.consularLore, bind:G.bind, sens:G.sens, invertY:!!G.invertY, voiceVol:G.voiceVol, goals:G.goals, whip:G.whip || null, billQueue:G.billQueue || [], faith:G.faith || null, life:G.life || null, ach:G.ach || {}, law:G.law || null, ladder:G.ladder || [], cases:G.cases || [], lastActs:G.lastActs || [], wx:G.wx || null, town:G.town || null, rivals:G.rivals || [], rivalNext:G.rivalNext || 0, daylog:(G.daylog || []).slice(-120), paperRead:G.paperRead || 0, seedL:G.seedL || 0, mHints:G.mHints || {}, tlog:(G.tlog || []).slice(-500), ag:G.ag || null, sitPrep:G.sitPrep || {}, echoes:G.echoes || [], billKinds:G.billKinds || {}, realmRel:G.realmRel || {}, conflict:G.conflict || null, conflictLog:G.conflictLog || [], warAuth:G.warAuth || null, react:G.react || [], reactNews:G.reactNews || [], senStaff:G.senStaff || null, presStaff:G.presStaff || null, listened:G.listened || 0,
     world:G.world, sc:G.sc || null, ph:G.ph || null,  sbox:G.sbox || null, dist:G.dist || null, fam:G.fam || null, loreBookSeeded:!!G.loreBookSeeded, saidHash:G.saidHash || [], dm:G.dm || null, lore:G.lore || null, trip:G.trip || null,
     pendingNight:!!G.pendingNight,
     cam:{x:cam.x, z:cam.z, yaw:cam.yaw, pitch:cam.pitch},

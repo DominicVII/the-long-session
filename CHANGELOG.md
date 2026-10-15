@@ -4,6 +4,15 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## The situation room: what a leader may do about a neighbour
+
+`20261015i` (on `20261015h`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- **Leaders can act on a quarrel, not just talk:** as President you get a situation room (on the daily docket, and as a 'Take it further' button on a neighbour's page on the map). With the Reach holding the bread, the options run from a formal protest, recalling your ambassador and buying grain from their rivals, through sanctions, escorting the convoys and quietly funding their opposition, to a blockade, seizing the grain depots, calling the levy and declaring war. Every option says plainly what it does, who gains, who loses and what the risk is.
+- **The law decides what you may do alone:** the form of the state (an empire or monarchy lets the executive do more; a mass democracy lets it do less) and the power precedents already set raise or lower how far you may go without Congress. Past that line you can ask Congress (it answers in two days, and an authorisation lasts thirty days), or act first and answer for it: Congress may vote a retroactive authorisation, or censure you and send the question to the bench. Acting first sets a precedent that makes the next time easier, and pushes the state toward a different form.
+- **Nobody is told what to think of it:** before you choose, you can see how the House reads it, how every state backs it from its own temper (creeds, industry, bread prices, unrest), and how each neighbour reads it from its own interests and rivalries: a rival of the Reach may back you quietly, the Horn League may object to warships, the Free Marches to soldiers on a frontier. After you act, the chambers, the states, the neighbours and the target each answer the next morning.
+- **And the time comes:** measures build pressure. After a few days it resolves: the target concedes and bread gets cheaper, nothing is settled, or it backfires with dearer bread, dead to explain and the states that never backed it saying so. It depends on the pressure you applied, how the country backed it, who stood with you and who against, and a good deal of luck.
+
 ## Their time is theirs, and your aide speaks for you
 
 `20261015h` (on `20261015g`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
