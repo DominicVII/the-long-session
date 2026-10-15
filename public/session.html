@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261013r">
+<meta name="onum-build" content="20261013s">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261013r";
+  var STAMP = "20261013s";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -7444,12 +7444,39 @@ function poseGuard(){
   const gdt = Math.min(1, (now - (poseGuard._t || now)) / 1000);
   poseGuard._t = now;
   /* parked in a doorway (not walking, so doorYield never sees them): same 10 s rule */
+  /* 20261013s: posted staff and anyone flagged as seated got a pass here, and two people could stand on the
+     very same spot. Anyone in a doorway for 3 s is put clear (and their saved standing spot with them); two
+     people standing on top of each other for 2.5 s are moved apart. */
+  const stand = [];
   for(const p of hereNow()){
-    if(!p || p.sitting || p.gone || p === G.you) continue;
+    if(!p || p.gone || p === G.you || p.x == null) continue;
     const dp = doorZone(p.room, p.x, p.z);
-    if(!dp){ p._parkT = 0; continue; }
+    if(!dp){ p._parkT = 0; if(!p.sitting) stand.push(p); continue; }
     p._parkT = (p._parkT || 0) + gdt;
-    if(p._parkT > 3){ p._parkT = 0; p._doorT = 4; try{ doorYield(p, 0, p.x, p.z); }catch(e){} }
+    if(p._parkT > 3){
+      p._parkT = 0; p._doorT = 4;
+      try{ doorYield(p, 0, p.x, p.z); }catch(e){}
+      try{ const c = doorClearPoint(p, dp); if(c){
+        if(p.kStand && doorZone(p.room, p.kStand[0], p.kStand[1])) p.kStand = [c.x, c.z];
+        if(p.sitting && !p.seatIdx && p.seatIdx !== 0){ p.x = c.x; p.z = c.z; p.tx = c.x; p.tz = c.z; if(p.mesh){ p.mesh.position.x = c.x; p.mesh.position.z = c.z; } }
+      } }catch(e){}
+    }
+    if(!p.sitting) stand.push(p);
+  }
+  for(let i = 0; i < stand.length; i++){
+    const a = stand[i]; let hit = false;
+    for(let j = i + 1; j < stand.length; j++){
+      const b = stand[j];
+      if(a.room !== b.room || Math.hypot(a.x - b.x, a.z - b.z) >= 0.32) continue;
+      hit = true; b._ovT = (b._ovT || 0) + gdt;
+      if(b._ovT > 2.5){
+        b._ovT = 0;
+        try{ const bx = roomBox(b.room), cz = (bx.d0 + bx.d1) / 2, vx = -b.x, vz = cz - b.z, L = Math.hypot(vx, vz) || 1;
+          b.x = clamp(b.x + vx / L * 0.7 + 0.15, -bx.hw, bx.hw); b.z = clamp(b.z + vz / L * 0.7, bx.d0, bx.d1);
+          b.tx = b.x; b.tz = b.z; if(b.mesh){ b.mesh.position.x = b.x; b.mesh.position.z = b.z; } }catch(e){}
+      }
+    }
+    if(!hit) a._ovT = 0;
   }
   for(const p of hereNow()){
     const ms = p.mesh;
@@ -8072,7 +8099,7 @@ function mapLore(place){
     const ch = (G.rite && G.rite.chapels && G.rite.chapels[place]) || 0;
     const r = rng(seedOf("lore:" + place));
     return '<h2 style="margin:0 0 4px">' + pcEsc(place) + (G.you && G.you.state === place ? (heldOffice() === "gov" ? ' · home · you govern it' : ' · home') : '') + '</h2>' +
-      '<p><i>' + pcEsc(def.note || "") + '</i></p>' +
+      '<p><i>' + pcEsc(def.note || "") + '</i></p>' + stateGovHTML(place) +
       '<p><b>History.</b> Remembered for ' + pcEsc(drawn(B.hist, r)) + ' and ' + pcEsc(drawn(B.hist, r)) + '.</p>' +
       '<p><b>Culture.</b> ' + pcEsc(cap(drawn(B.custom, r))) + '; ' + pcEsc(drawn(B.food, r)) + '; people say "' + pcEsc(drawn(B.phrase, r)) + '". Sacred: ' + pcEsc(drawn(B.sacred, r)) + '.</p>' +
       '<p><b>Faith.</b> Mostly ' + pcEsc(st.creed || def.creed || "mixed") + '.' + (ch ? ' Consular Rite chapels: ' + ch + '.' : ' No Consular chapel yet.') + ' God is the Most High; Christ is King.</p>' +
@@ -9206,7 +9233,7 @@ function dkPowHTML(it){
 })();
 /* every decision card: the docket inline, collapsed to one line until opened */
 function dkInlineHTML(it){
-  return '<details open class="dk-inline" style="border:1px solid rgba(0,0,0,.15);border-radius:8px;padding:6px 10px;margin:0 0 10px;background:rgba(255,255,255,.55);text-align:left">' +
+  return '<details class="dk-inline" style="border:1px solid rgba(0,0,0,.15);border-radius:8px;padding:6px 10px;margin:0 0 10px;background:rgba(255,255,255,.55);text-align:left">' +
     '<summary style="cursor:pointer;font:600 13px system-ui">Docket: ' + pcEsc(it.title) + ' · clauses, cost, every chamber, your state, your powers ▾</summary>' +
     '<p class="muted" style="margin:6px 0">' + pcEsc(it.line || "") + ' Sponsor: ' + pcEsc(it.sponsor || "") + '.</p>' +
     '<ol style="margin:4px 0 0 18px;font-size:13px">' + dkClauseHTML(it) + '</ol>' + dkExtraHTML(it) +
@@ -9217,6 +9244,7 @@ function dkInlineHTML(it){
 function dkInject(){
   try{
     if(!card || veil.hidden) return;
+    if(typeof SIT !== "undefined" && SIT.on) return;           /* 20261013s: open hours and other sittings are not about a bill's text */
     if(card.querySelector(".dk-inline") || el("dkSay")) return;
     const btns = [...card.querySelectorAll("button")];
     if(btns.length < 2) return;
@@ -9225,6 +9253,7 @@ function dkInject(){
     const it = dkFind(card.textContent); if(!it) return;
     const w = document.createElement("div"); w.innerHTML = dkInlineHTML(it);
     const node = w.firstChild;
+    node.open = card.textContent.indexOf(it.title) >= 0;      /* open where the card is about this bill, folded elsewhere */
     const h1 = card.querySelector("h1, .eyebrow"); if(h1 && h1.nextSibling) h1.parentNode.insertBefore(node, h1.nextSibling); else card.insertBefore(node, card.firstChild);
     const reopen = () => { const was = node.open; const n2 = document.createElement("div"); n2.innerHTML = dkInlineHTML(it); const nn = n2.firstChild; nn.open = was; node.replaceWith(nn); dkWire(nn, it, nn.querySelector(".dk-say"), null); };
     dkWire(node, it, node.querySelector(".dk-say"), reopen);
@@ -22348,6 +22377,7 @@ function renderMap(sel){
       '<text x="' + (s.col*cw + cw/2) + '" y="' + (s.row*ch + ch/2 + 9) + '" text-anchor="middle" ' +
         'font-family="JetBrains Mono,monospace" font-size="9.5" fill="var(--ink-2)">' + s.seats + ' seats</text>' +
       '<circle cx="' + (s.col*cw + cw/2) + '" cy="' + (s.row*ch + ch/2 + 22) + '" r="3.4" fill="' + unrestColor(s.unrest) + '"></circle>' +
+      '<text x="' + (s.col*cw + cw/2) + '" y="' + (s.row*ch + ch/2 + 38) + '" text-anchor="middle" font-family="Archivo,sans-serif" font-size="8.5" font-style="italic" fill="var(--ink-3)">' + (function(){ try{ return stateGovInfo(s.n).g.short; }catch(e){ return ""; } })() + '</text>' +
       (del.length ? '<text x="' + (s.col*cw + cw/2 + 11) + '" y="' + (s.row*ch + ch/2 + 26) + '" ' +
         'font-family="JetBrains Mono,monospace" font-size="8.5" fill="var(--ink-3)">' + del.length + '</text>' : '') +
     '</g>';
@@ -31190,6 +31220,43 @@ function refreshRisks(){
     (donors || '<p class="muted">Nobody has given you anything, which is its own problem.</p>') +
     (cases ? '<div class="eyebrow" style="margin-top:18px">Casework outstanding</div>' + cases : '');
 }
+/* ── 20261013s · how each state is governed, who leads it, and who you know there ── */
+const GOV_STYLE = {
+  "consensus":{t:"Consensus government", short:"consensus", d:"Ruled by bargaining among the leading parties and families. Slow and steady, and hard to hurry."},
+  "boss rule":{t:"Boss rule", short:"boss rule", d:"One boss and a machine control the jobs, contracts and votes. Loyalty is the currency."},
+  "reformist":{t:"Reform government", short:"reform", d:"A coalition committed to changing how the state is run. Ambitious, and often at odds with old interests."},
+  "pious":{t:"Clerical government", short:"clerical", d:"The churches have a strong say in law and schooling. Moral questions come before budgets."},
+  "technocratic":{t:"Technocratic government", short:"technocrat", d:"Run by engineers, economists and officials who answer to figures more than to crowds."},
+  "populist":{t:"Populist government", short:"populist", d:"Governs in the name of the people against the capital and the old elites. Loud, popular and volatile."},
+  "old-family":{t:"Old-family rule", short:"old family", d:"A few long-established families hold the offices in turn. Stable for those inside the circle."}
+};
+function stateGovInfo(n){
+  let r = null; try{ r = scEnsure().st[n]; }catch(e){}
+  const g = (r && GOV_STYLE[r.style]) || {t:"Elected government", short:"elected", d:"The state is run by its elected governor and legislature."};
+  return {rec:r, g};
+}
+function stateGovHTML(n){
+  try{
+    const {rec, g} = stateGovInfo(n);
+    const mine = !!((rec && rec.youGov) || (G.you && heldOffice() === "gov" && n === G.you.state));
+    let pol = null; try{ pol = (scEnsure().polities || []).find(p => (p.memberStates || []).indexOf(n) >= 0) || null; }catch(e){}
+    const reps = (G.members || []).filter(m => m && !m.gone && m.state === n);
+    const kn = reps.filter(m => (m.known || 0) >= 1 || m.met);
+    let oh = []; try{ oh = (OH.list || []).filter(o => o && o.ohK === "sen:" + n); }catch(e){}
+    const seatsN = ((G.states || []).find(x => x.n === n) || {}).seats || 0;
+    const land = (G.civ || []).filter(c => c && !c.gone && c.state === n && !c.formerOf && c.name).sort((a, b) => (b.met ? 1 : 0) - (a.met ? 1 : 0));
+    const knownLand = land.filter(c => c.met);
+    const line = (k, v) => '<p class="muted" style="margin:4px 0"><strong>' + k + '</strong> ' + v + '</p>';
+    return '<div style="border-top:1px solid var(--line-soft);margin-top:10px;padding-top:10px"><div class="eyebrow">How ' + pcEsc(n) + ' is governed</div>' +
+      line(pcEsc(g.t) + '.', pcEsc(g.d)) +
+      (pol ? line("Breakaway movement.", pcEsc(pol.name) + " (" + pcEsc(pol.govType || "movement") + ", " + pcEsc(pol.status) + ")") : '') +
+      line("Leader.", rec ? (mine ? "You, as Governor." : "Governor " + pcEsc(rec.gov || "unnamed") + ".") : "Not yet known.") +
+      line("Officials.", (oh.length ? listify(oh.map(o => pcEsc(o.name) + " (" + pcEsc(o.role || "official") + ")")) + ". " : "") +
+        (reps.length ? "In the House: " + listify(reps.slice(0, 6).map(m => pcEsc(m.name) + " (" + m.party + ")")) + (reps.length > 6 ? ", and " + (reps.length - 6) + " more" : "") + "." : "None of its " + seatsN + " House seats are held by people you deal with yet.")) +
+      line("People of the land.", knownLand.length ? "You know " + listify(knownLand.slice(0, 6).map(c => pcEsc(c.name) + (c.role ? " (" + pcEsc(c.role) + ")" : ""))) + "." : (land.length ? "You do not know anyone from here yet. " + land.length + " live here and can be met." : "Nobody from here is known to you yet.")) +
+      '</div>';
+  }catch(e){ return ""; }
+}
 function refreshUnion(){
   const sel = G.mapSel || G.you.state;
   const s = stateOf(sel);
@@ -31209,7 +31276,7 @@ function refreshUnion(){
   const del = s ? stateDelegation(s.n) : [];
   el("paneUnion").innerHTML =
     '<div class="eyebrow">The Union · ' + G.states.length + ' states · ' + G.seats + ' seats</div>' +
-    '<p class="muted" style="margin:6px 0 10px">Colour is the state\'s lean; the dot is unrest. ' +
+    '<p class="muted" style="margin:6px 0 10px">Colour is the state\'s lean; the dot is unrest; the small word is how it is governed. ' +
       'Click a state to read it.</p>' +
     renderMap(sel) +
     (s ? '<div class="billbox" style="margin-top:14px">' +
@@ -31223,6 +31290,7 @@ function refreshUnion(){
       '<p class="muted">Population ' + s.pop.toFixed(1) + 'm · leans <strong>' +
         (s.lean > 8 ? "Federalist" : s.lean < -8 ? "Commonwealth" : "neither way") + '</strong> by ' +
         Math.abs(s.lean) + '.</p>' +
+      stateGovHTML(s.n) +
       (del.length ? '<p class="muted"><strong>Delegation you know:</strong> ' +
         listify(del.map(m => m.name + " (" + m.party + ")")) + '.</p>'
         : '<p class="muted">You know nobody from this delegation.</p>') +
@@ -36713,6 +36781,7 @@ try{
       '<div class="sx-w"><small>wants ' + esc(p.want) + '</small><small>' + (p.stance >= 55 ? "with you" : p.stance <= 45 ? "against" : "undecided") + (d ? ' <em>' + (d > 0 ? "+" : "") + d + '</em>' : '') + '</small></div></div>';
   }
   const draw = function(){
+    if(PC.open) return;                                        /* your computer is up: the sitting waits behind it */
     const S = SIT.on; if(!S || !S.x) return;
     const st = S.D.steps[S.i], done = S.li >= S.x.queue.length;
     const prog = S.D.steps.map((s, i) => '<span class="sit__dot' + (i < S.i ? ' is-done' : i === S.i ? ' is-now' : '') + '">' + SIT_STEP_T[s] + '</span>').join("");
@@ -36732,8 +36801,9 @@ try{
       (S.res ? '<p class="dream">' + esc(S.res) + '</p>' : '') + (st === "adjourn" && S.out ? '<p class="dream">' + esc(S.out) + '</p>' + recap(S) : '') +
       (done && st !== "adjourn" && !S.picked ? '<p class="sx-hint">Your move. Hover a choice to see what it does; it shifts the meters live.</p>' : '') +
       (done && st !== "adjourn" && !S.picked && (typeof window.onumLiveTalk === "function" || (window.onumLiveTalk && typeof window.onumLiveTalk.reply === "function")) ? '<form class="sx-talk lt-sit" id="sxTalk"><input id="sxTalkIn" maxlength="240" placeholder="Or say something in your own words…" autocomplete="off"><button type="button" class="btn btn--ghost" id="sxTalkGo">Say it</button></form>' : '') +
-      '<div class="card__actions">' + acts + '<button type="button" class="btn btn--ghost" id="sitOut">Walk out</button></div>';
+      '<div class="card__actions">' + acts + ((function(){ try{ return pcCanOpen(); }catch(e){ return false; } })() ? '<button type="button" class="btn btn--ghost" id="sitPC">My computer</button>' : '') + '<button type="button" class="btn btn--ghost" id="sitOut">Walk out</button></div>';
     veil.hidden = false;
+    const spc = el("sitPC"); if(spc) spc.addEventListener("click", () => { veil.hidden = true; if(!pcOpen()) veil.hidden = false; });
     const g = el("sitGo"); if(g) g.addEventListener("click", sitNext);
     el("sitOut").addEventListener("click", () => sitEnd(true));
     card.querySelectorAll("[data-sit]").forEach(b => b.addEventListener("click", () => sitPick(+b.getAttribute("data-sit"))));
@@ -36752,12 +36822,14 @@ try{
     if(SX.disabled || !start(room, key)) return O.sitStart(room);
   }, function(room){ return O.sitStart(String(room).split(":")[0]); });
   sitStep = guard("step", function(){ return live() ? step() : O.sitStep(); }, () => O.sitStep());
-  sitBeat = guard("beat", function(){ return live() ? beat() : O.sitBeat(); }, () => O.sitBeat());
+  sitBeat = guard("beat", function(){ if(PC.open && live()){ clearTimeout(SIT.timer); SIT.timer = setTimeout(sitBeat, 700); return; } return live() ? beat() : O.sitBeat(); }, () => O.sitBeat());
   sitPick = guard("pick", function(i){ return live() ? pick(i) : O.sitPick(i); }, i => O.sitPick(i));
   sitNext = guard("next", function(){ return live() ? next() : O.sitNext(); }, () => O.sitNext());
   sitOutcome = guard("outcome", function(){ return live() ? outcome() : O.sitOutcome(); }, () => O.sitOutcome());
   sitEnd = guard("end", function(w){ return live() ? end(w) : O.sitEnd(w); }, w => O.sitEnd(w));
-  sitDraw = guard("draw", function(){ return live() ? draw() : O.sitDraw(); }, () => O.sitDraw());
+  sitDraw = guard("draw", function(){ if(PC.open) return; return live() ? draw() : O.sitDraw(); }, () => O.sitDraw());
+  /* closing the computer puts the sitting back where it was */
+  { const _pcClose = pcClose; pcClose = function(){ _pcClose.apply(this, arguments); try{ if(SIT.on && SIT.on.x){ veil.hidden = false; sitDraw(); } }catch(e){} }; }
   SX.cur = () => SIT.on && SIT.on.x ? SIT.on.x.cast.map(p => p.m).filter(Boolean) : [];
   SX.start = (room, key) => sitStart(key ? room + ":" + key : room);
 

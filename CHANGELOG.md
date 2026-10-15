@@ -4,6 +4,16 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## Open hours, your computer, states, doors
+
+`20261013s` (on `20261013r`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- **Open hours no longer open the bill:** the inline docket attached to every card with decision-like wording, including sittings, and since `20261013l` it started open. It no longer attaches to a sitting at all, and it opens only on cards that name the bill.
+- **My computer in a sitting:** sittings have a "My computer" button (when you have a desk there). The sitting waits behind the screen and comes back, unchanged, when you close it.
+- **Union and the desk map show how states are governed:** each tile on the Union map carries a small word for its government (consensus, boss rule, reform, clerical, technocrat, populist, old family). Selecting a state shows how it is governed and what that means, its leader (you, if you are its Governor), its officials, the House members from it, and the people of the land you know. The desk computer's state page shows the same.
+- **Doors:** anyone parked in a doorway for 3 seconds is moved clear, including posted staff and anyone flagged as seated, and their saved standing spot moves with them. Two people standing on the same spot for 2.5 seconds are moved apart.
+- Stamp: meta + STAMP + `ONUM_BUILD` -> `20261013s`.
+
 ## The governor is the governor
 
 `20261013r` (on `20261013q`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
