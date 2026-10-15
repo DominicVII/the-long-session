@@ -4,6 +4,15 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## The situation room for governors and Congress's levers
+
+`20261015j` (on `20261015i`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- **Governors get their own situation room:** a docket item and map button. With the Reach holding the bread, a governor can write to the President and Congress, send a trade mission, open the state grain reserve, cap the price of bread, refuse Reach goods at state ports, send the militia with the grain carts, sign a grain compact with a neighbour, or call the militia out to the border depots. Measures that are the state's own business are the governor's to take. Anything that reaches the Union's trade, treaty or soldier powers needs the President's consent: ask for it, ask your own legislature, or act first and let the Union's attorney answer (a suit goes to the bench).
+- **Everyone reads it their own way:** your own state's backing, other states, the neighbours and the Union each judge a governor's measures from their own interests, and the neighbours and the Union answer the next morning. After a few days it resolves: grain moves and you take the credit, nothing is settled, or it backfires on the state's bread, mills and unrest.
+- **The Congress's levers (Senate, party leaders and committee chairs):** move an authorisation up to a chosen tier, move a bill restraining the executive (it strikes the last precedent of acting first), call hearings, or pass sanctions by statute. Others vote on it by their own lights, two days later.
+- The situation room is also under Apps for any office that has a lever, and as 'Take it further' on a neighbour's page on the map.
+
 ## The situation room: what a leader may do about a neighbour
 
 `20261015i` (on `20261015h`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.

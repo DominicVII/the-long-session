@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261015i">
+<meta name="onum-build" content="20261015j">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261015i";
+  var STAMP = "20261015j";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -8257,7 +8257,7 @@ function realmGovHTML(p){
         act("trade", "Open trade talks", "20 from the war chest. A little industry, a little warmth.", !(G.you && (G.you.funds || 0) >= 20)) +
         act("press", "Press them on " + (D.ask ? "a point" : "a demand"), "4 influence. A warm neighbour may give way; a cold one will not.", infl < 4) +
         act("aud", "Summon a delegation", "An audience at your desk, with all three of them in the room.") +
-        (G.you && (function(){ try{ return heldOffice() === "pres"; }catch(e){ return false; } })() ? act("war", "Take it further", "Sanctions, convoys, covert help, a blockade, war: what the law allows you, and what it asks of Congress.") : "") +
+        (G.you && warRoleCan() ? act("war", "Take it further", "What your office may do about it, what it must ask others for, and who answers.") : "") +
       '</div></div>';
   }catch(e){ return ""; }
 }
@@ -8266,7 +8266,7 @@ function realmDo(k, a){
   G.realmRel = G.realmRel || {}; const was = G.realmRel[k] || 0, d = DLG[k] || {};
   const bump = n => { G.realmRel[k] = clamp(was + n, -100, 100); };
   if(a === "aid" || a === "trade" || a === "press") reactEmit("foreign", {k, verb:a});
-  if(a === "war"){ try{ mapToggle(false); }catch(x){} setTimeout(() => { try{ warCard(k); }catch(e){ console.warn(e); } }, 60); return; }
+  if(a === "war"){ try{ mapToggle(false); }catch(x){} setTimeout(() => { try{ warRoleOpen(k); }catch(e){ console.warn(e); } }, 60); return; }
   if(a === "call"){ const e = realmFolk(k)[0]; PB.call = {id:"rl:" + k + ":" + e.id, name:e.name, lines:[{w:e.name, t:"This is " + e.name + ", " + e.title + " of " + p.t + ". I will be brief; what do you wish to raise?"}]}; PB.tab = "calls"; try{ mapToggle(false); }catch(x){} try{ pbOpen(); }catch(x){} return; }
   if(a === "aud"){ if(G.room !== homeRoom()){ note("Go to your own chair first: " + (ROOMS[homeRoom()] ? ROOMS[homeRoom()].t : "your office") + ". A delegation is received there.", true); return; } try{ mapToggle(false); }catch(x){} G._dlgRealm = k; setTimeout(() => { try{ sitStart("delegation"); }catch(e){ console.warn(e); } }, 60); return; }
   if(a === "aid"){ if(y.influence < 6) return; y.influence -= 6; spend(30, 3); bump(9); if(G.world && G.world.foe === k) G.world.heat = clamp((G.world.heat || 0) - 4, 0, 100); feed("You send aid to " + p.t + ". " + (REALM_GOV[k] ? cap(REALM_GOV[k].powers[0][0]) + " take note." : ""), "good"); note("Aid goes to " + p.t + ". Relations: " + was + " to " + G.realmRel[k] + ".", true); return; }
@@ -10291,6 +10291,7 @@ function pbApps(){
     ["docket", "The docket", "What is before you today, with the full text."],
     ["gov", "The government", "Who runs the nation, and who stands behind them."],
     ["paper", "This morning's paper", "The Ledger."],
+    ["war", "The situation room", "A neighbour holds the bread: what your office may do, what it must ask others for, and who answers."],
     ["watch", "Sit in the gallery", "Watch a chamber or a hearing from the gallery. No vote, no floor."],
     ["notebook", "Notebook", "What you wrote down."],
     ["rival", "Rivals", "Who wants your seat."],
@@ -10298,7 +10299,7 @@ function pbApps(){
     ["union", "The Union map", "States and neighbouring republics."],
     ["settings", "Settings (pause)", "Speed, graphics, audio, controls."]
   ];
-  return L.filter(a => a[0] !== "docket" || (k && k !== "house"));
+  return L.filter(a => (a[0] !== "docket" || (k && k !== "house")) && (a[0] !== "war" || warRoleCan()));
 }
 function watchCard(){
   const D = (window.NEPTUNE_SITTINGS && window.NEPTUNE_SITTINGS.defs) || {};
@@ -10313,7 +10314,7 @@ function watchCard(){
     if(G.room !== k){ try{ goTo(k); }catch(e){} setTimeout(() => { try{ G._sitWatch = true; sitStart(k); }catch(e){ console.warn(e); } }, 500); } else sitStart(k); }));
 }
 function pbAppGo(id){
-  const go = {purse:() => purseCard(), watch:() => watchCard(), chest:() => chestCard(), office:() => officeCard(), sched:() => scheduleCard(), docket:() => dkCard(0), gov:() => govCard(), paper:() => paperCard(),
+  const go = {war:() => warRoleOpen(), purse:() => purseCard(), watch:() => watchCard(), chest:() => chestCard(), office:() => officeCard(), sched:() => scheduleCard(), docket:() => dkCard(0), gov:() => govCard(), paper:() => paperCard(),
     notebook:() => notebookCard(), rival:() => rivalCard(),
     career:() => { try{ showPane("paneCareer"); document.body.classList.add("ui-open"); }catch(e){} },
     union:() => { try{ mapToggle(true); }catch(e){} },
@@ -27266,6 +27267,7 @@ function nextDay(late){
     try{ govDay(); }catch(e){}
     try{ reactDay(); }catch(e){}
     try{ warDay(); }catch(e){}
+    try{ govWarDay(); }catch(e){}
     try{ purseDay(); }catch(e){}
     try{ cultDay(); }catch(e){}
     try{ caDay(); }catch(e){}
@@ -30175,10 +30177,12 @@ function docketFor(k){
       {h:8,  key:"gbrief", t:"Morning briefing", d:"Your secretary reads the state: roads, prisons, the treasury, the weather.", run:() => govBrief2(S)},
       {h:10, key:"kgv",    t:"Open hours at the State House", d:"Citizens, mayors and county clerks, one at a time.", sit:"govoffice"},
       {h:13, key:"gdesk",  t:"The statehouse desk", d:S && S.bill ? "On your desk: the " + S.bill.title + ". Sign it or veto it." : "Bills sent over from the legislature.", run:() => govDesk(S)},
+      {h:12, key:"gwar",   t:"The bread question", d:"A neighbour holds the grain. What the state may do itself, what it needs the Union's consent for, and who answers.", run:() => { kMark("gwar"); govWarCard(); return null; }},
       {h:15, key:"gbud",   t:"Agencies and the budget", d:"One department gets the money this week.", run:() => govBudget2(S)},
       {h:17, key:"gpress", t:"Press availability", d:"The capitol reporters, on the record.", run:() => officePress("the State House steps")}
     ],
     senate:[
+      {h:13, key:"swar",   t:"The situation abroad", d:"The Reach holds the bread. Authorise, restrain, hold hearings or pass sanctions: the Senate's own levers.", run:() => { kMark("swar"); legWarCard(); return null; }},
       {h:8,  key:"sbrief", t:"Staff meeting", d:"Your chief of staff, legislative director and state director, in their own words.", run:() => senBrief()},
       {h:9,  key:"conf",   t:"Committee: a confirmation hearing", d:"A nominee for the bench, under oath. Question them, then decide.", run:() => { kMark("conf"); confirmCard(); return null; }},
       {h:11, key:"ksen",   t:"The Senate sits", d:"The journal, the question, the roll.", sit:"senate"},
@@ -30390,6 +30394,8 @@ function reactFrac(pos, title){
 }
 function reactResolve(e){
   if(/^war/.test(e.kind)){ warReact(e); return; }
+  if(/^gw/.test(e.kind)){ govWarReact(e); return; }
+  if(e.kind === "lwVote"){ legWarReact(e); return; }
   const y = G.you, d = e.data, opp = pty => pty === "FED" ? "COM" : "FED";
   if(e.kind === "actVetoed"){
     const act = (G.lastActs || []).find(a => a.title === d.title), fr = reactFrac(d.pos, d.title), sp = reactHolder("speaker");
@@ -30863,6 +30869,136 @@ function warDay(){
   C.result = result; C.until = G.day; G.conflictLog = (G.conflictLog || []).concat([{k:C.k, d:G.day, result, acts:C.acts.length}]).slice(-6);
   G.conflict = null;
 }
+/* ── the same question from a Governor's chair and from the Congress's: what each may do about a neighbour, and who answers ── */
+const GOV_ACTS = [
+  {k:"letter",  t:"Write to the President and Congress about the bread", tier:1, hawk:0, eff:{}, rel:0, heat:0, press:2, infl:1, fed:true, d:"Puts it on record, and on their desks. Cheap, and sometimes answered."},
+  {k:"mission", t:"Send a state trade mission to the Pale and the Marches", tier:1, hawk:-5, eff:{grain:-0.5}, rel:-2, heat:0, press:6, bread:-0.03, infl:2, d:"Buys grain somewhere else. A rival of the Reach is pleased."},
+  {k:"reserve", t:"Open the state grain reserve", tier:1, hawk:0, eff:{}, rel:0, heat:0, press:3, unrestS:-3, indS:-1, infl:1, d:"Calms the counties now and empties the cellar for later."},
+  {k:"ceiling", t:"Cap the price of bread in the state", tier:2, hawk:5, eff:{}, rel:0, heat:0, press:4, unrestS:-4, indS:-2, infl:2, d:"Quiet streets now; the bakers and the carters will tell you what it costs."},
+  {k:"boycott", t:"Refuse Reach goods at state ports and in state contracts", tier:2, hawk:25, eff:{trade:1}, rel:-6, heat:2, press:8, infl:3, fed:true, d:"The Union holds the trade power. Expect a letter from the Union's attorney."},
+  {k:"escort",  t:"Send the state militia with the grain carts", tier:2, hawk:30, eff:{border:0.4}, rel:-4, heat:3, press:7, bread:-0.03, infl:3, d:"Your own men on the road. The Reach will notice who they answer to."},
+  {k:"compact", t:"Sign a grain compact with a neighbour, state to state", tier:3, hawk:40, eff:{grain:-0.6, trade:0.5}, rel:-8, heat:3, press:12, bread:-0.06, infl:5, fed:true, d:"A treaty in all but name. The Union reserves treaties to itself."},
+  {k:"militia", t:"Call out the state militia to the border depots", tier:3, hawk:65, eff:{border:1}, rel:-20, heat:10, press:18, unrestS:3, dead:15, infl:6, fed:true, d:"The state's soldiers at the frontier. Every household with a son has a view."}
+];
+function govWarLat(S){
+  const U = warLatitude(), prec = (S && S.warPrec) || 0;
+  return {lat:Math.max(0, 1 + Math.floor(prec / 2) - (U.lat >= 3 ? 1 : 0) + (S && (S.lean || 0) > 30 ? 0 : 0)), prec, U};
+}
+function govWarAuthorised(a, S){
+  const L = govWarLat(S), c = S && S.warConsent && S.warConsent.until >= G.day && S.warConsent.tier >= a.tier, lg = S && S.warLeg && S.warLeg.until >= G.day && S.warLeg.tier >= a.tier;
+  if(a.tier === 1) return {ok:"yes", why:"Within a governor's own power."};
+  if(L.lat >= a.tier && !a.fed) return {ok:"yes", why:"The state's own power, with " + L.prec + " precedent" + (L.prec === 1 ? "" : "s") + " of its own behind you."};
+  if(a.fed && !(c)) return {ok:"vote", why:"This reaches the Union's reserved power over trade, war or treaties. You may ask the President for consent, or act first and let the Union's attorney answer."};
+  if(!lg && a.tier >= 2) return {ok:"vote", why:"The legislature has not backed this. You may ask it (two days), or act first."};
+  return {ok:"yes", why:"The legislature and the Union have both allowed it." };
+}
+function govWarPlan(a, S, tk){
+  const bs = warStateBacking(S, a, tk), leg = clamp((bs - 40) / 40, 0.05, 0.95), ex = G.exec && !G.exec.you ? G.exec : null;
+  const fed = !a.fed ? 0.8 : ex ? clamp(0.5 + alignment(ex, {pos:{econ:0, lib:0, def:a.hawk, wel:0}, title:a.k}) / 120, 0.1, 0.9) : 0.5;
+  const rows = (G.states || []).filter(x => x.n !== S.n).map(x => ({n:x.n, b:warStateBacking(x, a, tk)})).sort((p, q) => q.b - p.b);
+  const views = WORLD_POWERS.filter(p => p.k !== tk).map(p => warRealmView(p.k, a, tk));
+  return {leg, fed, home:bs, rows, views};
+}
+function govWarApply(a, S, tk, how){
+  const y = G.you, w = worldEnsure(), rel = G.realmRel = G.realmRel || {}, tgt = WORLD_POWERS.find(p => p.k === tk), msg = [];
+  y.influence = clamp(y.influence - a.infl, 0, 100); spend(60, 5);
+  rel[tk] = clamp((rel[tk] || 0) + a.rel, -100, 100); w.heat = clamp((w.heat || 0) + a.heat * 0.5, 0, 100);
+  if(a.bread) w.bread = clamp((w.bread || 1) + a.bread * 0.4, 0.7, 2.6);
+  if(a.dead) w.dead = (w.dead || 0) + a.dead;
+  S.unrest = clamp((S.unrest || 0) + (a.unrestS || 0), 0, 100); S.ind = clamp((S.ind || 0) + (a.indS || 0), 0, 100);
+  S.conflict = S.conflict && S.conflict.k === tk ? S.conflict : {k:tk, pressure:0, started:G.day, acts:[], due:G.day + 6};
+  S.conflict.pressure += a.press; S.conflict.acts.push({k:a.k, d:G.day, how}); S.conflict.due = Math.max(S.conflict.due, G.day + 3);
+  if(how === "pre" || (a.fed && how !== "consent")){ S.warPrec = (S.warPrec || 0) + 1; }
+  return msg.join(" ");
+}
+function govWarCard(tk){
+  const y = G.you, S = (G.states || []).find(x => x.n === y.state); if(!S){ return null; }
+  const w = worldEnsure(), foe = WORLD_POWERS.find(p => p.k === (tk || w.foe || "reach")) || WORLD_POWERS[0], rel = (G.realmRel || {})[foe.k] || 0, L = govWarLat(S), picked = {};
+  const D = DLG[foe.k] || {}, head = realmFolk(foe.k).find(f => f.id === "head");
+  const hdr = '<p class="muted" style="font-size:13px">' + pcEsc(cap(foe.t)) + ' is ' + realmRelLabel(rel) + ' towards the Union (' + rel + '). Bread stands at ' + (w.bread || 1).toFixed(2) + ' across the Union; in ' + pcEsc(S.n) + ' unrest is ' + Math.round(S.unrest || 0) + ' and industry ' + Math.round(S.ind || 0) + '.</p>' +
+    '<p class="muted" style="font-size:12px"><b>What a governor may do.</b> You may act on your own for the state’s own business (' + L.prec + ' precedent' + (L.prec === 1 ? '' : 's') + ' of acting first stand to ' + pcEsc(S.n) + '). Anything that reaches trade with a foreign country, treaties or the Union’s soldiers belongs to the Union: you can ask the President for consent, ask your own legislature, or act first and let the Union’s attorney answer. ' + (S.warConsent && S.warConsent.until >= G.day ? 'The President has consented up to tier ' + S.warConsent.tier + ' until day ' + S.warConsent.until + '. ' : '') + (S.warLeg && S.warLeg.until >= G.day ? 'Your legislature has backed action up to tier ' + S.warLeg.tier + '.' : '') + '</p>' +
+    (S.conflict && S.conflict.k === foe.k ? '<p class="muted" style="font-size:12px"><b>Under way.</b> Pressure ' + Math.round(S.conflict.pressure) + '; the verdict comes on about day ' + S.conflict.due + '.</p>' : '');
+  const rows = GOV_ACTS.map((a, i) => { const au = govWarAuthorised(a, S), pl = govWarPlan(a, S, foe.k), v = pl.views.slice().sort((x, z) => z.s - x.s);
+    const btns = au.ok === "yes" ? '<button type="button" class="btn" data-ga="' + i + ':do">Do it</button>' : (a.fed ? '<button type="button" class="btn btn--ghost" data-ga="' + i + ':consent">Ask the President to consent</button>' : '<button type="button" class="btn btn--ghost" data-ga="' + i + ':leg">Ask the legislature (two days)</button>') + '<button type="button" class="btn btn--ghost" data-ga="' + i + ':pre">Act first, and answer for it</button>';
+    return '<details style="margin:8px 0;border-left:3px solid var(--line-soft);padding:4px 10px"><summary><b>' + pcEsc(a.t) + '</b> <span class="muted">tier ' + a.tier + ' · ' + (au.ok === "yes" ? 'yours to do' : 'needs backing') + '</span></summary>' +
+      '<p style="margin:4px 0;font-size:13px">' + pcEsc(a.d) + '</p><p class="muted" style="font-size:12px">' + pcEsc(au.why) + '</p>' +
+      '<p style="font-size:12px;margin:4px 0"><b>How it reads.</b> At home, ' + pl.home + '% of ' + pcEsc(S.n) + ' back it, and about ' + Math.round(pl.leg * 100) + '% of your legislature. ' + (a.fed ? 'The Union is ' + (pl.fed > 0.6 ? 'likely to let it stand' : pl.fed < 0.4 ? 'likely to sue' : 'undecided') + '. ' : '') + 'Elsewhere, ' + pcEsc(pl.rows[0].n) + ' (' + pl.rows[0].b + '%) would back it and ' + pcEsc(pl.rows[pl.rows.length - 1].n) + ' (' + pl.rows[pl.rows.length - 1].b + '%) would not.</p>' +
+      '<p style="font-size:12px;margin:4px 0"><b>The neighbours.</b> ' + v.map(x => pcEsc(x.t) + ' ' + (x.s > 0.25 ? 'leans with you: ' : x.s < -0.25 ? 'objects: ' : 'is waiting: ') + pcEsc(x.why)).join('; ') + '.</p><div class="card__actions" style="flex-wrap:wrap">' + btns + '</div></details>'; }).join("");
+  govCardOpen("The state’s answer", "The " + cap(foe.t.replace(/^the /, "")) + " question, from " + S.n, "", hdr + '<p class="muted" style="font-size:12px">' + pcEsc(head ? head.name : "Their head of government") + ' wants ' + pcEsc(D.ask || foe.want) + '. A governor’s measures are smaller than a President’s, and so is what they can settle.</p>' + rows + '<div id="gwSay" class="dream" style="white-space:pre-line"></div>', null);
+  card.querySelectorAll("[data-ga]").forEach(b => b.addEventListener("click", () => { const [i, how] = b.getAttribute("data-ga").split(":"), a = GOV_ACTS[+i]; if(picked.done) return;
+    if(y.influence < a.infl){ el("gwSay").textContent = "You are short of influence for this (" + a.infl + ")."; return; }
+    picked.done = 1; let out = "";
+    if(how === "consent"){ y.influence = clamp(y.influence - 1, 0, 100); reactEmit("gwConsent", {k:foe.k, act:a.k, state:S.n}, 2); out = "You write to the White House asking consent. They will answer in two days."; }
+    else if(how === "leg"){ y.influence = clamp(y.influence - 1, 0, 100); reactEmit("gwLeg", {k:foe.k, act:a.k, state:S.n}, 2); out = "You send it to the legislature. They will vote in two days."; }
+    else { const extra = govWarApply(a, S, foe.k, how); out = (how === "pre" ? "You act first. " : "") + a.t + ". " + (extra ? extra + " " : "") + "The verdict will not be in for days."; reactEmit(how === "pre" || (a.fed && how === "do") ? "gwPre" : "gwNote", {k:foe.k, act:a.k, state:S.n}, 1); try{ feed("Governor " + surname(y.name) + ": " + a.t.toLowerCase() + ".", a.tier >= 3 ? "bad" : ""); }catch(e){} }
+    el("gwSay").textContent = out; card.querySelectorAll("[data-ga]").forEach(z => z.disabled = true); }));
+  return null;
+}
+function govWarReact(e){
+  const d = e.data, a = GOV_ACTS.find(x => x.k === d.act), y = G.you, S = (G.states || []).find(x => x.n === d.state), tgt = WORLD_POWERS.find(p => p.k === d.k); if(!a || !S || !tgt) return;
+  G.realmRel = G.realmRel || {}; const pl = govWarPlan(a, S, d.k), ex = G.exec && !G.exec.you ? G.exec : null, sp = reactHolder("speaker"), rep = (G.members || []).find(m => m && !m.gone && m.state === d.state && m.kind === "member");
+  if(e.kind === "gwConsent"){
+    const ok = chance(pl.fed);
+    if(ok){ S.warConsent = {tier:a.tier, until:G.day + 30}; reactSay(null, "The President consents to " + d.state + "'s \u201c" + a.t.toLowerCase() + "\u201d, for thirty days and on the Union's own terms. The consent is yours to use or not."); }
+    else reactSay(null, "The White House declines to consent to " + d.state + "'s \u201c" + a.t.toLowerCase() + "\u201d. " + (ex ? "The President says foreign affairs are the Union's business." : "")); return; }
+  if(e.kind === "gwLeg"){
+    const ok = chance(pl.leg);
+    if(ok){ S.warLeg = {tier:a.tier, until:G.day + 30}; reactSay(rep, "The " + d.state + " legislature backs the governor on \u201c" + a.t.toLowerCase() + "\u201d, for thirty days. The members from the bread counties spoke longest."); }
+    else reactSay(rep, "The " + d.state + " legislature refuses the governor on \u201c" + a.t.toLowerCase() + "\u201d. " + (pl.home < 45 ? "The peace members and the mill towns found the numbers." : "It fell short, and the whips are counting who stayed away.")); return; }
+  if(e.kind === "gwPre"){
+    const suit = a.fed && chance(1 - pl.fed + 0.15);
+    if(suit){ G.cases = G.cases || []; G.cases.push({t:"the Union v. " + d.state + " (the " + tgt.t.replace(/^the /, "") + " measures)", state:d.state, day:G.day, voted:[]}); y.standing = clamp(y.standing - 2, 0, 100); reactSay(null, "The Union's attorney files against " + d.state + " over \u201c" + a.t.toLowerCase() + "\u201d. The state has made foreign policy, and the bench will say whether it may."); }
+    else reactSay(null, "The White House says nothing about " + d.state + "'s \u201c" + a.t.toLowerCase() + "\u201d, which is a kind of answer."); }
+  reactSay(null, cap(tgt.t) + " " + (a.tier >= 3 ? "protests to the Union that a state has put soldiers on its frontier." : a.tier === 2 ? "notes the state's measures and quietly raises what it charges." : "takes note of " + d.state + "."));
+  pl.views.sort((x, z) => Math.abs(z.s) - Math.abs(x.s)).slice(0, 2).forEach(v => { reactSay(null, cap(v.t) + (v.s > 0.25 ? " leans with " + d.state + ": it " : v.s < -0.25 ? " objects: it " : " is waiting: it ") + v.why + ".", true); G.realmRel[v.k] = clamp((G.realmRel[v.k] || 0) + Math.round(v.s * 4), -100, 100); });
+  if(rep) reactSay(rep, "Representative " + surname(rep.name) + ": " + d.state + " has taken its own course on the " + tgt.t.replace(/^the /, "") + ", and Congress will hear about it.", false);
+  y.approval = clamp(y.approval + Math.round((pl.home - 50) / 10), 0, 100); S.unrest = clamp(S.unrest + (pl.home < 40 ? 2 : pl.home > 65 ? -1 : 0), 0, 100);
+}
+function govWarDay(){
+  (G.states || []).forEach(S => { const C = S.conflict; if(!C || G.day < C.due) return;
+    const tgt = WORLD_POWERS.find(p => p.k === C.k), y = G.you, w = worldEnsure(), mine = G.you && S.n === G.you.state; if(!tgt){ S.conflict = null; return; }
+    const last = GOV_ACTS.find(a => a.k === (C.acts[C.acts.length - 1] || {}).k) || GOV_ACTS[0], pl = govWarPlan(last, S, C.k), allies = pl.views.filter(v => v.s > 0.25).length - pl.views.filter(v => v.s < -0.25).length;
+    const score = C.pressure + pl.home * 0.3 + allies * 4 + (Math.random() - 0.5) * 24 - 22; let res;
+    if(score > 12){ res = "good"; S.unrest = clamp(S.unrest - 3, 0, 100); S.ind = clamp(S.ind + 1, 0, 100); if(mine){ y.approval = clamp(y.approval + 4, 0, 100); y.standing = clamp(y.standing + 2, 0, 100); } reactSay(null, S.n + "'s measures work: grain moves again, bread is cheaper in the counties, and the governor takes the credit.", true); }
+    else if(score > 0){ res = "mixed"; if(mine) y.approval = clamp(y.approval - 1, 0, 100); reactSay(null, "Nothing is settled in " + S.n + ". The measures cost something and bought little.", true); }
+    else { res = "bad"; S.unrest = clamp(S.unrest + 3, 0, 100); S.ind = clamp(S.ind - 2, 0, 100); if(mine){ y.approval = clamp(y.approval - 4, 0, 100); y.standing = clamp(y.standing - 2, 0, 100); } reactSay(null, S.n + "'s measures backfire: bread is dearer, the mills are idle, and the opposition says it told you so.", true); }
+    S.conflictLog = (S.conflictLog || []).concat([{d:G.day, res}]).slice(-4); S.conflict = null; });
+}
+/* ── the legislature's levers: authorise, restrain, investigate, legislate ── */
+function legWarCard(tk){
+  const y = G.you, w = worldEnsure(), foe = WORLD_POWERS.find(p => p.k === (tk || w.foe || "reach")) || WORLD_POWERS[0], L = warLatitude(), k = roleKey(), picked = {};
+  const pw = (G.history || []).filter(h => h.power).length;
+  const opts = [
+    {k:"auth", t:"Move an authorisation", d:"Authorise action against " + foe.t + " up to a tier for thirty days, so the President need not act first.", tiers:true},
+    {k:"restrain", t:"Move a bill restraining the executive", d:"Cut back what the President may do alone: the last precedent of acting first is struck from the record (there are " + pw + ").", off:pw < 1},
+    {k:"hearing", t:"Call hearings on the " + foe.t.replace(/^the /, "") + " question", d:"Put the Secretaries under oath. It changes nobody's mind, and everyone's file."},
+    {k:"sanctions", t:"Pass sanctions by statute", d:"Congress's own sanctions on " + foe.t + ", independent of the executive. Needs a majority."}
+  ];
+  const mk = o => '<div style="margin:8px 0;padding:6px 10px;border-left:3px solid var(--line-soft)"><b>' + pcEsc(o.t) + '</b><div class="muted" style="font-size:12px">' + pcEsc(o.d) + '</div><div class="card__actions" style="flex-wrap:wrap">' + (o.tiers ? [1, 2, 3, 4].map(t => '<button type="button" class="btn btn--ghost" data-lw="' + o.k + ':' + t + '">Up to tier ' + t + '</button>').join("") : '<button type="button" class="btn btn--ghost" data-lw="' + o.k + ':0"' + (o.off ? ' disabled' : '') + '>Do it</button>') + '</div></div>';
+  govCardOpen("Congress's levers", "The " + cap(foe.t.replace(/^the /, "")) + " question, from the " + (k === "senate" ? "Senate" : "House"), "", '<p class="muted" style="font-size:12px">The executive may act alone up to tier ' + L.lat + ' under the ' + pcEsc((REGIMES[L.form] || {t:"state"}).t) + ', with ' + L.p + ' precedent' + (L.p === 1 ? '' : 's') + '. ' + (G.warAuth && G.warAuth.until >= G.day ? 'Congress has authorised up to tier ' + G.warAuth.tier + ' until day ' + G.warAuth.until + '.' : 'Congress has authorised nothing.') + ' Whatever you move, others will vote on it by their own lights.</p>' + opts.map(mk).join("") + '<div id="lwSay" class="dream"></div>', null);
+  card.querySelectorAll("[data-lw]").forEach(b => b.addEventListener("click", () => { if(picked.done) return; picked.done = 1; const [o, t] = b.getAttribute("data-lw").split(":"); spend(40, 4); y.influence = clamp(y.influence - 2, 0, 100);
+    if(o === "auth") reactEmit("lwVote", {k:foe.k, tier:+t, kind:"auth"}, 2); else if(o === "sanctions") reactEmit("lwVote", {k:foe.k, tier:2, kind:"sanctions"}, 2); else if(o === "restrain") reactEmit("lwVote", {k:foe.k, tier:0, kind:"restrain"}, 2);
+    else { y.standing = clamp(y.standing + 1, 0, 100); reactEmit("lwVote", {k:foe.k, tier:0, kind:"hearing"}, 1); }
+    el("lwSay").textContent = "Moved. The vote or the hearing is in " + (o === "hearing" ? "a day" : "two days") + "."; card.querySelectorAll("[data-lw]").forEach(z => z.disabled = true); }));
+  return null;
+}
+function legWarReact(e){
+  const d = e.data, tgt = WORLD_POWERS.find(p => p.k === d.k), y = G.you, sp = reactHolder("speaker"), mn = reactHolder("minority"); if(!tgt) return;
+  const a = WAR_ACTS.find(x => x.tier === Math.max(1, d.tier)) || WAR_ACTS[0], pl = warPlan(a, d.k);
+  if(d.kind === "hearing"){ reactSay(mn || sp, "The committee hears the Secretaries on " + tgt.t + ". The executive's plan is laid on the record; nobody is persuaded and everybody takes notes.", true); y.influence = clamp(y.influence + 2, 0, 100); return; }
+  if(d.kind === "restrain"){ const ok = chance(clamp(1 - pl.congress + 0.1, 0.1, 0.8)); if(ok){ const H = (G.history || []).filter(h => h.power); if(H.length) H[H.length - 1].power = false; reactSay(sp, "Congress passes the war powers bill: the last precedent of the executive acting first is struck from the record, and the President must ask next time."); } else reactSay(mn || sp, "The war powers bill fails. The executive keeps what it has taken."); return; }
+  const ok = chance(clamp((pl.congress - 0.3) * 1.8, 0.05, 0.95));
+  if(d.kind === "sanctions"){ if(ok){ const act = WAR_ACTS.find(x => x.k === "sanctions"); warApply(Object.assign({}, act, {infl:0}), d.k, "statute"); reactSay(sp, "Congress passes sanctions on " + tgt.t + " by statute. They bind the executive and the courts, and the bread price will tell us what they cost."); } else reactSay(mn || sp, "The sanctions bill on " + tgt.t + " fails in the Senate."); return; }
+  if(ok){ G.warAuth = {tier:d.tier, until:G.day + 30, k:d.k}; reactSay(sp, "Congress authorises action against " + tgt.t + " up to tier " + d.tier + " for thirty days. The President may now act without asking."); }
+  else reactSay(mn || sp, "Congress declines to authorise action against " + tgt.t + " up to tier " + d.tier + ".");
+}
+function warRoleOpen(tk){
+  let k = null; try{ k = roleKey(); }catch(e){}
+  if(k === "pres") return warCard(tk); if(k === "gov") return govWarCard(tk);
+  if(k === "senate" || k === "leader" || k === "chair") return legWarCard(tk);
+  note("A seat in the House has no lever here; ask your party's leadership.", false); return null;
+}
+function warRoleCan(){ let k = null; try{ k = roleKey(); }catch(e){} return k === "pres" || k === "gov" || k === "senate" || k === "leader" || k === "chair"; }
 function amendText(S){ const A = (S && S.amend) || []; return A.length ? " Amendments agreed at open hours, to be attached: " + A.map(a => a.title + " (" + a.from + ")").join("; ") + "." : ""; }
 function amendApply(S){ const A = (S && S.amend) || []; if(!A.length) return ""; const y = G.you; S.unrest = clamp(S.unrest - A.length, 0, 100); y.approval = clamp(y.approval + A.length, 0, 100); S.amend = []; return " The amendments from open hours were attached: " + A.map(a => a.title).join(", ") + "."; }
 function govBrief(S){
