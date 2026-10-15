@@ -4,6 +4,14 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## No more "undefined" and "null" in the day's text
+
+`20261013q` (on `20261013p`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- **Statehouse bills have a title:** they were stored as `t` while the Governor's desk, the diary, the wire and the veto read `title`, so a Governor saw "vetoed the undefined", "The sponsors of the undefined" and "trims the cost of the undefined". New statehouse bills carry `title`, and older saves are filled in on load.
+- **Officeholders and envoys have a cause:** they were created with `cause = null`, so "Hear them out" said "It's about null" and the journal "Took a meeting about null". They now carry "the business of the office", and older saves are filled in on load.
+- Found in a day-88 career save. Stamp: meta + STAMP + `ONUM_BUILD` -> `20261013q`.
+
 ## Answer them and you are in the conversation
 
 `20261013p` (on `20261013o`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
