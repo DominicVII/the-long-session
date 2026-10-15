@@ -4,6 +4,15 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## Standing is measured at your own level
+
+`20261013t` (on `20261013s`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- **Standing in the building:** the Career tab ranked everyone, you included, by House measures (influence, money, margin, seniority, gavel) against House members, whatever office you held. A Governor is now ranked among governors, a Senator among senators, a Justice among justices, and the executive among the other states' party leaders. The measures are approval, elections won and bills carried, taken from the same counterparts the game already keeps for your level. Each row shows its figures. The House board is unchanged for House members.
+- **The morning Standings line** uses the same ranking.
+- **Career record:** roll calls cast, votes against the line and votes against your conscience are House measures, so outside the House they give way to your office and your House record.
+- Stamp: meta + STAMP + `ONUM_BUILD` -> `20261013t`.
+
 ## Open hours, your computer, states, doors
 
 `20261013s` (on `20261013r`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.

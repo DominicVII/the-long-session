@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261013s">
+<meta name="onum-build" content="20261013t">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261013s";
+  var STAMP = "20261013t";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -16784,6 +16784,26 @@ function youScore(){
   return y.influence*1.4 + y.funds*0.5 + y.margin*0.6 + y.terms*1.6 +
          (y.post ? (POSTS.find(p=>p.k===y.post)||{weight:20}).weight*0.35 : 0) - (y.out ? 40 : 0);
 }
+/* 20261013t · standing is measured against your own level: governors against governors, senators against senators */
+function officeBoard(){
+  try{
+    const y = G.you; if(!y || y.out || inHouse()) return null;
+    const k = heldOffice();
+    const lab = {gov:["Standing among governors", "the governors of the other states"], senate:["Standing in the Senate", "the other senators"],
+                 bench:["Standing on the bench", "the other justices"], pres:["Standing among the nation's leaders", "the leaders of the other states' parties"]}[k];
+    if(!lab) return null;
+    let cp = {}; try{ cp = cpEnsure() || {}; }catch(e){}
+    const score = (appr, wins, bills) => appr * 0.6 + wins * 10 + bills * 4;
+    const rows = Object.keys(cp).map(n => { const c = cp[n], r = c.rec || {};
+      return {name:c.name, party:c.party, post:(c.title || "") + " of " + n, note:"approval " + Math.round(r.approval || 0) + " · " + (r.wins || 0) + " elections won · " + (r.bills || 0) + " bills carried",
+        s:score(r.approval || 40, r.wins || 0, r.bills || 0), you:false}; });
+    const wins = Math.max(1, officeTermsOf(k) || 1), bills = Math.min(6, Math.round(((y.record && y.record.bills) || 0) / 5));
+    rows.push({name:y.name, party:y.party, post:officeTitle(), note:"approval " + Math.round(y.approval) + " · " + wins + " elections won in this office · " + bills + " bills carried",
+      s:score(y.approval, wins, bills), you:true});
+    rows.sort((a, b) => b.s - a.s);
+    return {title:lab[0], blurb:"Measured against " + lab[1] + ": approval, elections won and bills carried.", rows};
+  }catch(e){ return null; }
+}
 function leaderboard(){
   const rows = G.members.map(m => ({name:m.name, party:m.party, s:standingScore(m),
     post:m.post ? postTitle(m.post) : null, you:false}));
@@ -22099,10 +22119,10 @@ function makeHeadlines(){
         b.title.split(" ").slice(0,2).join(" ")]);
     }
   }
-  const board = leaderboard();
-  const rank = board.findIndex(r => r.you) + 1;
-  H.push(["Standings", "You sit " + rank + " of " + board.length + " in the building; " +
-    board[0].name + " leads"]);
+  { const ob = officeBoard();
+    if(ob) H.push(["Standings", "You rank " + (ob.rows.findIndex(r => r.you) + 1) + " of " + ob.rows.length + " " + ob.title.replace(/^Standing (among|in|on) /, "among ") + "; " + ob.rows[0].name + " leads"]);
+    else { const board = leaderboard(); const rank = board.findIndex(r => r.you) + 1;
+      H.push(["Standings", "You sit " + rank + " of " + board.length + " in the building; " + board[0].name + " leads"]); } }
   H.push(["Mood", "National mood " + (G.mood>0?"+":"") + Math.round(G.mood) +
     (G.mood > 8 ? ", running Federalist" : G.mood < -8 ? ", running Commonwealth" : ", flat")]);
   const hot = (G.states||[]).slice().sort((a,c)=>c.unrest-a.unrest)[0];
@@ -31367,13 +31387,26 @@ function refreshCareer(){
       '<button class="btn btn--ghost" type="button" id="saveImport">Import career save</button>' +
       '<input type="file" id="saveImportFile" accept="application/json,.json" hidden></div>' +
     '<div class="careerline"><b>Terms</b><span>'+you.terms+'</span></div>' +
-    '<div class="careerline"><b>Roll calls</b><span>'+you.record.votes.length+' cast, '+you.record.bills+' on the winning side</span></div>' +
-    '<div class="careerline"><b>Party</b><span>'+you.record.partyBreaks+' votes against the line</span></div>' +
-    '<div class="careerline"><b>Conscience</b><span>'+you.record.conscience+' votes against your own position</span></div>' +
+    (inHouse() || you.out ?
+      '<div class="careerline"><b>Roll calls</b><span>'+you.record.votes.length+' cast, '+you.record.bills+' on the winning side</span></div>' +
+      '<div class="careerline"><b>Party</b><span>'+you.record.partyBreaks+' votes against the line</span></div>' +
+      '<div class="careerline"><b>Conscience</b><span>'+you.record.conscience+' votes against your own position</span></div>'
+    : '<div class="careerline"><b>Office</b><span>' + pcEsc(officeTitle()) + ', ' + pcEsc(officeSeat()) + '</span></div>' +
+      '<div class="careerline"><b>House record</b><span>' + (you.record.votes.length) + ' roll calls cast before you left it</span></div>') +
     '<div class="careerline"><b>Elections</b><span>'+you.record.won+' won, '+you.record.lost+' lost</span></div>' +
     (rows ? '<h2 class="h-serif" style="font-size:17px;margin-top:16px">Offices held</h2>' + rows : '') +
     (votes ? '<h2 class="h-serif" style="font-size:17px;margin-top:16px">Recent votes</h2>' + votes : '') +
     (function(){
+      const ob = officeBoard();
+      if(ob){
+        const rk = ob.rows.findIndex(r => r.you) + 1;
+        return '<h2 class="h-serif" style="font-size:17px;margin-top:18px">' + pcEsc(ob.title) + '</h2>' +
+          '<p class="muted" style="margin:0 0 8px">You are <strong>' + rk + '</strong> of ' + ob.rows.length + '. ' + pcEsc(ob.blurb) + '</p>' +
+          ob.rows.slice(0, 10).map((r, i) => '<div class="careerline"' + (r.you ? ' style="background:var(--surface)"' : '') + '><b>' + (i + 1) + '</b><span>' + pcEsc(r.name) +
+            ' <span class="chip chip--' + (r.party === "FED" ? "fed" : r.party === "COM" ? "com" : "ind") + '">' + pcEsc(r.party || "") + '</span> <span class="muted">— ' + pcEsc(r.post) + '</span>' +
+            (r.you ? ' <strong>— you</strong>' : '') + '<br><span class="muted" style="font-size:12px">' + pcEsc(r.note) + '</span></span></div>').join("") +
+          (rk > 10 ? '<div class="careerline"><b>' + rk + '</b><span><strong>' + pcEsc(G.you.name) + ' — you</strong></span></div>' : '');
+      }
       const board = leaderboard();
       const rank = board.findIndex(r => r.you) + 1;
       return '<h2 class="h-serif" style="font-size:17px;margin-top:18px">Standing in the building</h2>' +
