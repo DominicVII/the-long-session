@@ -4,6 +4,17 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## The country is one organism, and there is a clock
+
+`20261016d` (on `20261016c`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- Every town has its own mayor, needs (bread, roads, schools, water, order) and treasury, and acts on its own through the day: pays for things itself, levies, or petitions its state.
+- States answer petitions out of their own treasury or send them up; Congress passes relief acts once enough towns in enough states ask; the President signs or vetoes; the Court rules. All of it runs by the hour whether or not you are in the room.
+- If you are governor, the petitions are yours to answer, and the acting governor declines them after ten days if you do not. Senators can raise a stuck petition; a President can release aid.
+- New app 'The nation, from the ground up', a petitions card on the governor's book, a town section in the Ledger, and open-hours petitioners are now the real town petitions.
+- A small clock with weekday and day sits on screen so you never need the phone or to leave immersive mode.
+- Richer private offices for every role.
+
 ## Richer rooms: the Senate, the Court, the Executive wing, the State House
 
 `20261016c` (on `20261016b`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
