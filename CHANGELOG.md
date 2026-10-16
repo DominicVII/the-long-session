@@ -4,6 +4,16 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## Room by room, schedule by schedule, person by person
+
+`20261016b` (on `20261016a`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- **Room by room:** the Senate chamber gets a treaty table, a roll-call board and a press gallery; the Court gets a conference table, the Clerk's desk and the Marshal's desk; the Executive wing a situation table, a bank of telephones, a cabinet table and a signing tray; the State House a briefing table, a waiting bench, a bread board and a ledger shelf. Each is built into the room and has something to do at it, and each has a calendar board of the day.
+- **Schedule by schedule:** every item in a role's working day has its own place (the confirmation hearing in committee, treaties and the situation abroad in the Senate, conference and petitions in the Court, the situation room at the Executive's table, open hours on the waiting bench). Choosing an item from the schedule walks you there and then starts it; the furniture does the same. The calendar board lists the day by hour, where each item happens, and whether it is done.
+- **Person by person:** the people who work in these rooms (the Secretary of the Senate, the Senators, the Justices, the Clerk and Marshal of the Court, the Chief of Staff and aide, the Governor's secretary and counsel) are each somebody: a manner (the stickler, the fixer, the old hand, the gossip, the cautious lawyer, the litigator and so on), a story, a want, a way of putting things, a family, and something particular they can tell you or do for you (rule advice, the room's mood, the strongest petitions, who is on today's list, what the state could be sued over). They tell you more as you get to know them, and favours need some rapport.
+- **Their own day:** they are in by eight, away from the desk at lunch, and home after six.
+- **Immersion:** walking into one of these rooms gives you the scene for the hour (who is at their post, what is happening, what is on your calendar); the room has its own ambient life through the day (the gavel, the cryer, the telephones, the waiting bench, the light, the clock striking), and the people at their posts say things in their own voice.
+
 ## Every chair has an office, and a first morning
 
 `20261016a` (on `20261015l`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.

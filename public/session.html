@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261016a">
+<meta name="onum-build" content="20261016b">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261016a";
+  var STAMP = "20261016b";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -3151,7 +3151,9 @@ function routineRoom(m, hour, t){
     if(typeof isTaylorDay === "function" && isTaylorDay()) return chance(.72) ? "corridor" : "cloak";
     if(hour === 7 || hour === 12 || hour === 18) return chance(.78) ? "corridor" : "cloak";
   }
-  if(m.kind === "civ" && m.chamber && ROOMS[m.chamber]) return m.chamber;
+  if(m.kind === "civ" && m.chamber && ROOMS[m.chamber]){
+    /* their day is their own: in at eight, lunch away from the desk, home after six */
+    if(hour < 8 || hour >= 18) return "away"; if(hour === 12 || hour === 13) return chance(.6) ? (chance(.5) ? "corridor" : "district") : m.chamber; return m.chamber; }
   if(m.kind === "civ" && m.hh) return m.room || "away";
   if(m.kind === "civ") return (t === "session") ? "steps" : "district";
   if(m.kind === "press"){
@@ -29765,75 +29767,98 @@ function kEnsurePeople(){
   });
   if(added){ _allCache = null; }
 }
+/* ── person by person: each of the people who work in these rooms is somebody. A name, a manner, a story, a want, a way of putting things, something particular they can do for you, and a day of their own ── */
+const K_ARCH = {
+  senclerk:[["the stickler","quotes the rule number before the rule"], ["the fixer","knows three ways round every rule"], ["the old hand","remembers what used to happen"]],
+  courtclerk:[["the sceptic","thinks every petition is overstated"], ["the champion of the small filer","reads the handwritten ones first"], ["the keeper of the calendar","lives and dies by deadlines"]],
+  marshal:[["the bulwark","treats order as a courtesy and enforces it like one"], ["the gossip","knows who was in the building and why"], ["the veteran","served, and has views on everyone who did not"]],
+  chief:[["the gatekeeper","decides who gets fifteen minutes"], ["the fixer","settles it before it reaches the desk"], ["the loyalist","speaks for the Executive and means it"]],
+  aide:[["the early riser","has read everything twice by seven"], ["the diplomat","phrases every bad thing well"], ["the cynic","has seen this file before"]],
+  gsec:[["the keeper of the waiting bench","knows every petitioner's mother"], ["the efficient one","runs the list by the minute"], ["the soft touch","lets the long ones run over"]],
+  gcounsel:[["the cautious lawyer","tells you what can go wrong first"], ["the litigator","would rather be sued than wait"], ["the constitutionalist","reads the Charter aloud when nervous"]],
+  senator:[["the committee man","trades in markups"], ["the speaker","lives for the floor"], ["the quiet vote","says little and counts everything"]],
+  justice:[["the textualist","starts with the words"], ["the pragmatist","asks what happens next"], ["the dissenter","enjoys being the only one"]]
+};
+const K_STORY = {
+  senclerk:["came up as a page at fourteen and never left", "was the clerk who read the roll the night the vote tied", "has outlasted nine majority leaders and keeps the notes"],
+  courtclerk:["filed the first petition of a famous case by hand", "once lost a filing in a flood and has never lost one since", "grew up in a house with a law library and no car"],
+  marshal:["served in the border guard before this", "was a bailiff in a county court for twenty years", "lost an election once and says it was the best thing that happened"],
+  chief:["ran three campaigns before this, and won two", "was a county clerk who got noticed", "has been in the building longer than the Executive has"],
+  aide:["wrote the speeches nobody remembers", "reads the cables before the Secretary does", "joined out of university and is still surprised"],
+  gsec:["has kept the Governor's door through three administrations", "was a schoolteacher before this", "knows where every county road floods"],
+  gcounsel:["litigated for the state before taking the job", "argued a case in front of the bench and lost by one vote", "keeps a copy of the Charter in a coat pocket"],
+  senator:["came up through the statehouse", "was a judge before standing", "never planned any of this and is good at it anyway"],
+  justice:["was a prosecutor, then a professor, then here", "wrote the dissent people quote", "still reads every brief themselves"]
+};
+const K_WANT = ["a quiet retirement and a pension that holds", "to see one rule changed before they go", "to be thanked once, in public", "a seat of their own one day", "to be left alone to do the job properly", "to be proved right about something"];
+const K_WORK = {
+  senclerk:"I keep the journal, the calendar and the rules. When a Senator asks 'is that in order?', I am the answer. It matters to you because a motion that is out of order loses the room before it is heard.",
+  courtclerk:"I take the petitions, keep the docket and the deadlines. Who is heard, and when, passes through this desk. It matters to you because a case that is never filed is never decided, and one filed late is filed for nothing.",
+  marshal:"I keep order in the Court and in the building around it: who comes in, who stays, who is asked to leave. It matters to you because nobody argues well in a room that does not feel safe.",
+  chief:"I run the Executive's day: who sees the Executive, for how long, and with what in their hands. It matters to you because fifteen minutes in this wing can be worth a year of letters.",
+  aide:"I read the overnight file and put it in front of the Executive in the order it should be read. It matters to you because what leads the file is what leads the day.",
+  gsec:"I keep the Governor's calendar and the list of who comes in on open hours. It matters to you because nobody gets heard who is not on my list, and most people on it have waited weeks.",
+  gcounsel:"I advise the Governor on what the state may do and what it may be sued for. It matters to you because a measure that wins at home and loses in the federal court is the worst of both.",
+  senator:"I sit, I vote, and I count. It matters to you because the Senate is two votes per state and every one of them has a reason.",
+  justice:"I read the briefs, argue it in conference and write or join an opinion. It matters to you because five of us decide what the law means for everyone else."
+};
+function kMeta(c){
+  if(c.kmeta) return c.kmeta; const r = rng(seedOf("km:" + (c.kslot || c.id) + ":" + c.name)), A = K_ARCH[c.krole] || [["steady", "does the job"]], a = A[Math.floor(r() * A.length)], S = K_STORY[c.krole] || ["has been here a while"];
+  c.kmeta = {arch:a[0], quirk:a[1], years:3 + Math.floor(r() * 27), story:S[Math.floor(r() * S.length)], want:K_WANT[Math.floor(r() * K_WANT.length)]}; c.rapport = c.rapport || 0; return c.kmeta;
+}
+function kVoice(c, text){ const m = kMeta(c); const pre = {"the stickler":"Section and subsection, then. ", "the fixer":"Between us: ", "the old hand":"In my time, ", "the sceptic":"Frankly, ", "the bulwark":"Plainly: ", "the gossip":"You did not hear this from me, but ", "the gatekeeper":"Short version: ", "the cynic":"I have seen this one. ", "the diplomat":"If I may put it kindly: ", "the cautious lawyer":"First, what can go wrong: ", "the litigator":"Let them sue. ", "the constitutionalist":"As the Charter has it, ", "the speaker":"Let me say this loudly: ", "the quiet vote":"(low) ", "the dissenter":"I may be the only one, but ", "the pragmatist":"What happens next is "}[m.arch] || ""; return pre + text; }
+function kGossip(c){
+  const b = G.bill && !G.bill.done ? G.bill : null, rn = (G.reactNews || []).slice(-3), hot = (G.states || []).slice().sort((x, z) => (z.unrest || 0) - (x.unrest || 0))[0], L = [];
+  if(rn.length) L.push("The talk is: " + rn[rn.length - 1].t);
+  if(b){ try{ const t = tallyBill(b, true); L.push("The " + b.title + " is " + (t.aye > t.no ? "ahead" : "behind") + ", " + t.aye + " to " + t.no + ", and the undecided are not telling anyone."); }catch(e){} }
+  if(hot) L.push(hot.n + " is the state everyone is watching: unrest is " + Math.round(hot.unrest || 0) + ".");
+  try{ const w = worldEnsure(); L.push("Bread is at " + (w.bread || 1).toFixed(2) + " and " + worldFoe().t + " is the name on every tongue."); }catch(e){}
+  if(G.conflict) L.push("There is a measure against " + ((WORLD_POWERS.find(p => p.k === G.conflict.k) || {}).t || "a neighbour") + " under way, and people are taking sides.");
+  return L[Math.floor(Math.random() * L.length)] || "Nothing worth repeating.";
+}
 function kChamberActs(c){
-  const you = G.you, b = G.bill, live = b && !b.done;
-  const A = [];
-  const once = "k" + c.kslot;
-  const done = c.kday === G.day;
-  const mark = () => { c.kday = G.day; };
-  if(c.krole === "senator"){
-    A.push({t:"Compare notes on the bill", c:"20m", off:done || !live, run(){
-      spend(20, 4); mark();
-      const yes = alignment(c, b) > 0;
-      if(kHolds("senate")) you.influence = clamp(you.influence + 1, 0, 100);
-      setSay(yes ? "If " + b.title + " reaches us I am a yes. Do not tell the whip I said it this early."
-                 : "If " + b.title + " reaches us I will vote no, and I will say why on the floor.",
-        fx(kHolds("senate") ? "+1 influence" : "a Senate count", ""));
-      note(c.name + " told you where the Senate leans on " + b.title + ".");
-    }});
-  } else if(c.krole === "senclerk"){
-    A.push({t:"Read the Senate calendar", c:"10m", run(){
-      spend(10, 1);
-      const acts = (G.lastActs || []).slice(0, 3).map(x => x && (x.title || x.t || x)).filter(Boolean);
-      setSay(acts.length ? "The journal has " + listify(acts) + " on it. The rest is confirmations and morning business."
-                         : "Nothing on the journal but morning business and a quorum call. A quiet day is a good day here.", "");
-    }});
-  } else if(c.krole === "justice" || c.krole === "marshal"){
-    A.push({t:"Pay your respects", c:"10m", off:done, run(){
-      spend(10, 1); mark();
-      const party = (G.cases || []).some(x => x && !x.done && x.state === you.state);
-      if(!party) you.standing = clamp(you.standing + 1, 0, 100);
-      setSay(party ? "The Justice nods and says nothing at all. Your state has a matter pending."
-                   : "A short word about the weather and the long view. Nobody in here hurries.",
-        fx(party ? "" : "+1 standing", ""));
-    }});
-  } else if(c.krole === "courtclerk" || c.krole === "gcounsel"){
-    A.push({t:"Ask about the docket", c:"10m", run(){
-      spend(10, 1);
-      const open = (G.cases || []).filter(x => x && !x.done && (c.krole === "courtclerk" || x.state === you.state));
-      setSay(open.length ? "On the docket: " + listify(open.slice(0, 3).map(x => x.t)) + "."
-                         : "Nothing pending. Write a law somebody hates and that will change.", "");
-    }});
+  const you = G.you, b = G.bill, live = b && !b.done, M = kMeta(c), A = [], done = c.kday === G.day, mark = () => { c.kday = G.day; };
+  const intro = {t:"Ask about their work", c:"5m", run(){ spend(5, 1); c.met = true; setSay(kVoice(c, K_WORK[c.krole] || "I do my job."), fx("", "you understand what they do")); }};
+  const heard = {t:"Ask what they have heard", c:"5m", run(){ spend(5, 1); setSay(kVoice(c, kGossip(c)), ""); }};
+  const about = {t:"Ask about them", c:"10m", run(){ spend(10, 1); c.met = true; c.rapport = Math.min(4, (c.rapport || 0) + 1); let fam = ""; try{ fam = " " + kinSummary(c); }catch(e){} setSay("I am " + M.arch + ": someone who " + M.quirk + ". " + cap(M.story) + ". " + M.years + " years at it, now, and what I would like is " + M.want + "." + fam, fx("+ rapport", "they tell you something real")); try{ if(c.rel) ripple(c, 2, "They asked about me and listened.", 2, false); }catch(e){} }};
+  A.push(intro);
+  /* the thing each of them can tell you or do for you */
+  if(c.krole === "senclerk"){
+    A.push({t:"Ask if a move would be in order", c:"10m", run(){ spend(10, 1); c.met = true; setSay(kVoice(c, b ? "On the " + b.title + ": you may hold the floor (it slips the vote three days and costs you six influence), offer a reservation or a compromise before the vote (it moves the middle), or move to table (it needs a majority and loses you the sponsor). Cloture takes three fifths. Anything else is a speech." : "Nothing is before us, so nothing is out of order, which is the best condition the Senate is ever in."), ""); }});
+    A.push({t:"Ask for the calendar", c:"10m", run(){ spend(10, 1); const acts = (G.lastActs || []).slice(0, 3).map(x => x && (x.title || x.t || x)).filter(Boolean); setSay(kVoice(c, acts.length ? "The journal has " + listify(acts) + ". The rest is confirmations and morning business." : "Morning business and a quorum call. A quiet day is a good day here."), ""); }});
+    A.push({t:"Ask a favour: put your item early on the calendar", c:"15m", off:done, run(){ if((c.rapport || 0) < 1){ setSay(kVoice(c, "Ask me again when we have talked properly. I do not move the calendar for strangers."), ""); return; } spend(15, 2); mark(); you.influence = clamp(you.influence + 2, 0, 100); setSay(kVoice(c, "It is on the list before the morning business. That is all I am doing, and all I will say I did."), fx("+2 influence", "")); }});
+  } else if(c.krole === "marshal"){
+    A.push({t:"Ask how the room feels", c:"5m", run(){ spend(5, 1); let warm = 0, sore = 0, n = 0; try{ hereNow().forEach(p => { if(!p || p === G.you || !p.traits) return; n++; const l = presentOf(p).label; if(/warm|animated|easy|delight/.test(l)) warm++; else if(/cold|closed|short|angry/.test(l)) sore++; }); }catch(e){} setSay(kVoice(c, n ? "Of the " + n + " in here, " + warm + " look easy and " + sore + " look sore; the rest are composed, which is what I would be too." : "Nobody is in but us. It is the best the room ever looks."), ""); }});
+    A.push({t:"Ask who has been in the building", c:"10m", run(){ spend(10, 1); const m = pick((G.members || []).filter(x => x && !x.gone && x.kind === "member")); setSay(kVoice(c, m ? surname(m.name) + " was in before eight, alone, and left with a folder under the arm. I do not ask. I note." : "A quiet morning."), ""); }});
+    A.push({t:"Ask a favour: a word with someone", c:"15m", off:done, run(){ if((c.rapport || 0) < 1){ setSay(kVoice(c, "I do not arrange meetings for people I have only just met."), ""); return; } spend(15, 2); mark(); const m = pick((G.members || []).filter(x => x && !x.gone && x.kind === "member" && !x.met)); if(m){ m.met = true; try{ if(m.rel) ripple(m, 2, "The Marshal said somebody wanted to meet me. They did.", 2, false); }catch(e){} } setSay(kVoice(c, m ? "I have told " + m.name + " you would welcome a word. They will find you." : "I could not think of anyone you have not met."), fx(m ? "you are introduced" : "", "")); }});
+  } else if(c.krole === "courtclerk"){
+    A.push({t:"Ask about the docket", c:"10m", run(){ spend(10, 1); const open = (G.cases || []).filter(x => x && !x.done); setSay(kVoice(c, open.length ? "On the docket: " + listify(open.slice(0, 3).map(x => x.t)) + "." : "Nothing pending. Write a law somebody hates and that will change."), ""); }});
+    A.push({t:"Ask which petitions are strongest", c:"10m", run(){ spend(10, 1); setSay(kVoice(c, "The ones that get four votes are the ones where two courts below have said opposite things about the same words. The ones that do not are the ones where the petitioner is angry and the record is thin. Read the first kind first."), ""); }});
+    A.push({t:"Ask a favour: an early look at the petitions", c:"15m", off:done, run(){ if((c.rapport || 0) < 1){ setSay(kVoice(c, "The petitions go out when they go out. We have not spoken enough for me to do otherwise."), ""); return; } spend(15, 2); mark(); you.influence = clamp(you.influence + 1, 0, 100); setSay(kVoice(c, "Three are on top of the pile, and the second is the one I would hear. That is all I should say."), fx("+1 influence", "")); }});
+  } else if(c.krole === "justice"){
+    A.push({t:"Ask for their view on the case before the Court", c:"10m", run(){ spend(10, 2); c.met = true; const cs = benchCase(); if(!cs){ setSay(kVoice(c, "Nothing is ripe. We talk about the long view and the coffee."), ""); return; } const side = justiceLean({name:c.name, pos:c.pos}, cs) > 0, lab = cs.dual != null ? ["for the House", "for the member"] : ["for the Union", "for the state"]; setSay(kVoice(c, justiceWhy({name:c.name, pos:c.pos}, cs, side) + " So I lean " + (side ? lab[0] : lab[1]) + ", for now, and I may be talked out of it."), ""); }});
+    A.push({t:"Share a coffee", c:"15m", off:done, run(){ spend(15, 1); mark(); c.rapport = Math.min(4, (c.rapport || 0) + 1); you.standing = clamp(you.standing + 1, 0, 100); setSay(kVoice(c, "Nobody talks shop over coffee in this building, which is why it is the only place anyone says anything true."), fx("+1 standing", "")); }});
+  } else if(c.krole === "senator"){
+    A.push({t:"Ask where they stand on the bill", c:"10m", off:!live, run(){ spend(10, 2); c.met = true; setSay(kVoice(c, huddleSay(c, false)), fx(kHolds("senate") ? "+1 influence" : "", "")); if(kHolds("senate")) you.influence = clamp(you.influence + 1, 0, 100); }});
+    A.push({t:"Ask what they would trade for it", c:"15m", off:done || !live, run(){ spend(15, 3); mark(); setSay(kVoice(c, (alignment(c, b) > 0 ? "I am with you already; I would not trade for something I believe. " : "It would take a change to section four and a vote from you on mine. ") + "That is how it is done."), ""); }});
   } else if(c.krole === "chief"){
-    A.push({t:"Ask for time with the Executive", c:"30m", off:done || (G.exec && G.exec.you), run(){
-      spend(30, 6); mark();
-      const same = G.exec && G.exec.party === you.party;
-      you.influence = clamp(you.influence + (same ? 3 : 1), 0, 100);
-      setSay(same ? "Fifteen minutes, door closed. The Executive asked about your district by name."
-                  : "Five minutes in the doorway. Polite, short, and on the record.",
-        fx("+" + (same ? 3 : 1) + " influence", "30 minutes"));
-      note("Met with the Executive's office.");
-    }});
+    A.push({t:"Ask where the Executive stands", c:"10m", run(){ spend(10, 1); const ex = G.exec; setSay(kVoice(c, b && ex && !ex.you ? "On the " + b.title + ", the Executive is " + (alignment(ex, b) > 0 ? "inclined to sign" : alignment(ex, b) < -18 ? "inclined to veto" : "reading it") + ". " + (ex.vetoes || 0) + " vetoes so far this term." : "Nothing before us the Executive has a view on."), ""); }});
+    A.push({t:"Ask for time with the Executive", c:"30m", off:done || (G.exec && G.exec.you), run(){ if((c.rapport || 0) < 1 && G.exec && G.exec.party !== you.party){ setSay(kVoice(c, "Five minutes in the doorway, and that is generous. Come back when we know each other."), ""); } spend(30, 6); mark(); const same = G.exec && G.exec.party === you.party; you.influence = clamp(you.influence + (same ? 3 : 1), 0, 100); setSay(kVoice(c, same ? "Fifteen minutes, door closed. The Executive asked about your district by name." : "Five minutes in the doorway. Polite, short, and on the record."), fx("+" + (same ? 3 : 1) + " influence", "30 minutes")); }});
   } else if(c.krole === "aide"){
-    A.push({t:"Ask what the Executive is reading", c:"10m", run(){
-      spend(10, 1);
-      const S = (G.states || []).slice().sort((a, b2) => (b2.unrest || 0) - (a.unrest || 0))[0];
-      setSay("The morning file leads with " + (S ? S.n + ", where the mood is sour" : "the realms") +
-        (G.exec ? ". " + (G.exec.vetoes || 0) + " vetoes so far this term." : "."), "");
-    }});
+    A.push({t:"Ask what the Executive is reading", c:"10m", run(){ spend(10, 1); const S = (G.states || []).slice().sort((x, z) => (z.unrest || 0) - (x.unrest || 0))[0]; setSay(kVoice(c, "The morning file leads with " + (S ? S.n + ", where the mood is sour" : "the realms") + (G.exec ? ". " + (G.exec.vetoes || 0) + " vetoes so far this term." : ".")), ""); }});
+    A.push({t:"Ask a favour: a copy of the overnight file", c:"15m", off:done, run(){ if((c.rapport || 0) < 1){ setSay(kVoice(c, "It is not mine to copy. Ask me again when I know you."), ""); return; } spend(15, 1); mark(); you.influence = clamp(you.influence + 1, 0, 100); setSay(kVoice(c, "Here. It never left this room, and you did not read it."), fx("+1 influence", "")); }});
   } else if(c.krole === "gsec"){
-    A.push({t:"Ask the Governor's office for help at home", c:"30m", off:done || kHolds("govoffice"), run(){
-      spend(30, 5); mark();
-      you.approval = clamp(you.approval + 2, 0, 100);
-      setSay("A road crew, a letter and a ribbon cutting. The State House keeps its promises when they are small.", fx("+2 approval", "30 minutes"));
-    }});
+    A.push({t:"Ask who is on today's list", c:"5m", run(){ spend(5, 1); const names = ["a dairy farmer", "a school board chair", "a mayor", "a county clerk", "a widow", "a union steward"].sort(() => Math.random() - 0.5).slice(0, 3); setSay(kVoice(c, "On today's list: " + listify(names) + ". Each has been waiting; none will be short, and one of them will cry."), ""); }});
+    A.push({t:"Ask the Governor's office for help at home", c:"30m", off:done || kHolds("govoffice"), run(){ spend(30, 5); mark(); you.approval = clamp(you.approval + 2, 0, 100); setSay(kVoice(c, "A road crew, a letter and a ribbon cutting. The State House keeps its promises when they are small."), fx("+2 approval", "30 minutes")); }});
+  } else if(c.krole === "gcounsel"){
+    A.push({t:"Ask what the state could be sued over", c:"10m", run(){ spend(10, 2); const S = (G.states || []).find(x => x.n === (you.state)) || null, foe = worldFoe(); let risk = []; try{ if(S) GOV_ACTS.filter(a => a.fed).forEach(a => { const pl = govWarPlan(a, S, foe.k); risk.push(a.t.toLowerCase() + " (about " + Math.round((1 - pl.fed) * 100) + "% a suit)"); }); }catch(e){} setSay(kVoice(c, risk.length ? "If you act first on the " + foe.t.replace(/^the /, "") + " question, the exposed ones are: " + listify(risk) + ". The state's own business is safe." : "Nothing the state does today is likely to be sued."), ""); }});
+    A.push({t:"Ask about the cases pending", c:"10m", run(){ spend(10, 1); const open = (G.cases || []).filter(x => x && !x.done && x.state === you.state); setSay(kVoice(c, open.length ? "Pending against " + you.state + ": " + listify(open.slice(0, 3).map(x => x.t)) + "." : "Nothing pending. Write a law somebody hates and that will change."), ""); }});
   }
-  if(/^(gcounsel|gsec|chief|senclerk|courtclerk)$/.test(c.krole || "") && kHolds(c.chamber))
-    A.unshift({t:"Go over the diary", c:"5m", run(){ spend(5, 0); setSay("Here is the day as it stands. Tell me what you will take and what you will not.", ""); scheduleCard(); }});
+  A.push(heard, about);
+  if(/^(gcounsel|gsec|chief|senclerk|courtclerk)$/.test(c.krole || "") && kHolds(c.chamber)) A.unshift({t:"Go over the diary", c:"5m", run(){ spend(5, 0); setSay(kVoice(c, "Here is the day as it stands. Tell me what you will take and what you will not."), ""); scheduleCard(); }});
   A.push({t:"Leave them to it", c:"0m", run(){ setSay("You nod and let them get back to " + c.cause + ".", ""); }});
   return A;
 }
-
 /* ── the desks: yours if the office is yours ─────────────── */
 /* ══════════════════════════════════════════════════════════
    20261012a · SIT-DOWN SCENES AS PROCEDURE
@@ -30222,10 +30247,13 @@ function docketNext(){
   if(m >= 19*60) return null;
   return docketToday().find(d => !kOnceToday(d.key) && m >= d.h*60 - 60) || null;
 }
-function docketRun(d){
+const DK_ROOM = {conf:"committee", treaty:"senate", swar:"senate", sbrief:"office", scalls:"office", bconf:"court", bcert:"court", bopin:"office", pwar:"exec", cab:"exec", aid:"exec", pacts:"exec", gbrief:"govoffice", gwar:"govoffice", gdesk:"govoffice", gbud:"govoffice"};
+function docketAfter(d, want){ let n = 0; const t = setInterval(() => { n++; if(G.room === want && !G.moving && G.running !== false){ clearInterval(t); try{ docketRun(d); }catch(e){} } else if(n > 16) clearInterval(t); }, 500); }
+function docketRun(d, here){
   if(!d || kOnceToday(d.key)) return;
-  { const sr = d.sit ? String(d.sit).split(":")[0] : null, chamber = sr && ["senate", "court", "committee", "caucus", "floor"].indexOf(sr) >= 0 ? sr : null, dest = chamber || homeRoom();
-    if(G.room !== dest && !(chamber ? false : G.room === homeRoom())){ goTo(dest); return; } }
+  if(!here){ const sr = d.sit ? String(d.sit).split(":")[0] : null, chamber = sr && ["senate", "court", "committee", "caucus", "floor"].indexOf(sr) >= 0 ? sr : null, want = chamber || DK_ROOM[d.key] || null;
+    if(want){ if(G.room !== want){ goTo(want); try{ feed("You walk to " + (ROOMS[want] ? ROOMS[want].t : want) + " for " + d.t.toLowerCase() + "."); }catch(e){} docketAfter(d, want); return; } }
+    else if(G.room !== homeRoom() && !inMyWorkRoom()){ goTo(homeRoom()); docketAfter(d, homeRoom()); return; } }
   if(d.sit){ sitStart(d.sit); return; }
   if(d.power){
     const p = rolePowers().find(x => x.t.indexOf(d.power) === 0);
@@ -31363,6 +31391,130 @@ function firstDayCard(k, go){
     return _dp.apply(this, arguments);
   };
 }
+/* ── room by room, schedule by schedule: each item of a working day has a place to be done, with furniture to find it by ── */
+function kCalText(){
+  try{ const D = docketToday().slice().sort((x, z) => x.h - z.h), m = G.minute || 0; if(!D.length) return "Nothing is scheduled for your chair today.";
+    return D.map(d => { const st = kOnceToday(d.key) ? "done" : m < d.h * 60 - 60 ? "later" : m >= 19 * 60 ? "missed" : "now", where = (function(){ const sr = d.sit ? String(d.sit).split(":")[0] : null; const r = (sr && ROOMS[sr] && ["senate", "court", "committee", "caucus", "floor"].indexOf(sr) >= 0 ? sr : DK_ROOM[d.key]) || homeRoom(); return ROOMS[r] ? ROOMS[r].t : r; })();
+      return (d.h > 12 ? d.h - 12 : d.h) + ":00 " + (d.h >= 12 ? "pm" : "am") + " · " + d.t + " (" + where + ") — " + st; }).join("\n"); }catch(e){ return "The calendar is blank."; }
+}
+function kDk(key, here){ const d = docketToday().find(x => x.key === key); if(!d){ note("That is not on your schedule today."); return; } try{ closeTalk(); }catch(e){} docketRun(d, !!here); }
+function kRoleAct(roles, t, c, key, off){ return {t, c, off:off || (key && kOnceToday(key)), run(){ let k = null; try{ k = roleKey(); }catch(e){} if(roles.indexOf(k) < 0){ setSay("That is the work of someone else's chair. You can watch, and you can ask.", ""); return; } kDk(key, true); }}; }
+const KCAL = (id, x, z) => ({id, label:"Today's calendar", sub:"What your chair has on, and where each item is done", x, z, r:1.8, acts:() => [{t:"Read today's calendar", c:"1m", run(){ setSay(kCalText(), ""); }}]});
+function buildHigherExtras(id, wood, leather, brass, paper){
+  const R = ROOMS[id], d = R.d, hw = R.w / 2, map = matCol(0xc9d6c0, .9), cloth = matCol(0x2f4a66, .9), board = matCol(0x3a2f26, .8);
+  const cal = (x, z, ry) => { addBox(board, x, 1.6, z, 0.08, 0.9, 1.0, 0, true); try{ propPlaque(x + (ry > 0 ? 0.05 : -0.05), 1.6, z, ry, "TODAY", "the calendar", 0.8, 0.12); }catch(e){} };
+  if(id === "senate"){
+    propDesk(wood, wood, hw - 2.0, 3.4, 1.6, 0.8, 0, 0.76); propPapers(hw - 2.2, 0.78, 3.4, 3); propChair(wood, leather, hw - 2.0, 2.7, 0);         /* the treaty table */
+    try{ propPlaque(hw - 2.0, 1.3, 3.9, Math.PI, "TREATIES", "Advice and consent", 0.9, 0.12); }catch(e){}
+    addBox(board, hw - 0.5, 1.5, 9.4, 0.08, 1.4, 1.5, 0, true); try{ propPlaque(hw - 0.55, 1.6, 9.4, -Math.PI / 2, "THE TALLY", "ayes and noes", 1.0, 0.14); }catch(e){}   /* roll-call board */
+    addBox(wood, hw - 1.0, 0.5, 6.6, 0.5, 1.0, 1.8, 0, true); try{ propPlaque(hw - 1.0, 1.25, 6.6, -Math.PI / 2, "PRESS GALLERY", "", 0.9, 0.12); }catch(e){}
+    cal(-hw + 0.3, 2.4, Math.PI / 2);
+  } else if(id === "court"){
+    propDesk(wood, wood, -4.7, 6.2, 2.2, 0.9, Math.PI / 2, 0.76); [5.5, 6.2, 6.9].forEach(z => propChair(wood, leather, -4.0, z, -Math.PI / 2)); propPapers(-4.7, 0.78, 6.2, 4);   /* the conference table */
+    try{ propPlaque(-5.3, 1.5, 6.2, Math.PI / 2, "CONFERENCE", "Justices only", 0.9, 0.12); }catch(e){}
+    propDesk(wood, wood, -4.4, 8.4, 1.4, 0.7, 0, 0.8); propPapers(-4.4, 0.82, 8.4, 3); try{ propPlaque(-4.4, 1.35, 8.1, 0, "CLERK", "petitions & docket", 0.8, 0.12); }catch(e){}
+    propDesk(wood, wood, 4.4, 8.4, 1.4, 0.7, 0, 0.8); try{ propPlaque(4.4, 1.35, 8.1, 0, "MARSHAL", "order in the court", 0.8, 0.12); }catch(e){}
+    cal(hw - 0.3, 3.6, -Math.PI / 2);
+  } else if(id === "exec"){
+    addBox(wood, 3.0, 0.4, 6.6, 1.7, 0.8, 1.1, 0, true); addBox(map, 3.0, 0.82, 6.6, 1.55, 0.03, 0.95, 0, true); [-0.55, 0, 0.55].forEach(o => addBox(cloth, 3.0 + o, 0.85, 6.6, 0.18, 0.03, 0.18, 0, true));   /* the situation table */
+    try{ propPlaque(3.0, 1.45, 7.35, Math.PI, "SITUATION", "maps, ports, frontiers", 1.1, 0.14); }catch(e){}
+    addBox(board, 0.9, 0.84, 9.1, 0.5, 0.06, 0.36, 0, true); addBox(matCol(0x1d1f26, .5), 1.2, 0.9, 9.0, 0.2, 0.1, 0.2, 0, true);                                  /* the telephones */
+    try{ propPlaque(0.9, 1.25, 9.5, Math.PI, "TELEPHONES", "foreign capitals", 0.9, 0.12); }catch(e){}
+    cal(hw - 0.3, 2.4, -Math.PI / 2);
+  } else if(id === "govoffice"){
+    addBox(wood, -2.6, 0.38, 5.6, 1.4, 0.76, 0.9, 0, true); propPapers(-2.6, 0.78, 5.6, 3); [-3.2, -2.0].forEach(x => propChair(wood, leather, x, 6.4, Math.PI));   /* the briefing table */
+    try{ propPlaque(-2.6, 1.3, 5.1, 0, "BRIEFING", "morning, 8:00", 0.9, 0.12); }catch(e){}
+    addBox(board, hw - 0.4, 1.5, 5.0, 0.08, 1.3, 1.4, 0, true); try{ propPlaque(hw - 0.45, 1.6, 5.0, -Math.PI / 2, "THE BREAD QUESTION", "prices, ports, grain", 1.2, 0.14); }catch(e){}
+    cal(-hw + 0.3, 6.2, Math.PI / 2);
+  }
+}
+function kRoomProps(){
+  const P = (room, o) => { if(PROPS[room] && !PROPS[room].some(p => p.id === o.id)) PROPS[room].push(o); };
+  P("senate", {id:"scal", ...KCAL("scal", -6.4, 2.4)});
+  P("senate", {id:"streaty", label:"The treaty table", sub:"The dossier on whatever the executive has asked us to consent to", x:5.0, z:3.4, r:2.0, acts:() => [kRoleAct(["senate"], "Read the treaty and decide", "30m", "treaty"), {t:"Read what the Senate has said about treaties", c:"5m", run(){ setSay("Consent needs two thirds. Reservations lower the price and the risk: they say 'yes, but not that clause'. Rejecting costs you warmth with the other nation and wins you the hawks.", ""); }}]});
+  P("senate", {id:"stally", label:"The roll-call board", sub:"Who is for, who is against, and who is somewhere else", x:6.2, z:9.4, r:2.2, acts:() => [{t:"Read the tally", c:"5m", run(){ const b = G.bill; setSay(b && !b.done ? "The " + b.title + ": " + (function(){ try{ const t = tallyBill(b, true); return t.aye + " ayes, " + t.no + " noes projected, roll call day " + b.voteDay; }catch(e){ return "the count is in pencil"; } })() + "." : "No question is before the Senate.", ""); }}, kRoleAct(["senate"], "Work the situation abroad (move an authorisation, hearings, sanctions)", "20m", "swar")]});
+  P("senate", {id:"spress", label:"The press gallery", sub:"Three reporters and a view of everybody's good side", x:6.0, z:6.6, r:2.0, acts:() => [{t:"Give a quote from the floor", c:"15m", run(){ try{ closeTalk(); }catch(e){} try{ setSay(officePress("the Senate steps"), ""); }catch(e){} }}]});
+  P("court", {id:"ccal", ...KCAL("ccal", 5.3, 3.6)});
+  P("court", {id:"cconf", label:"The conference table", sub:"Where five justices argue it before anyone writes a word", x:-4.7, z:6.2, r:2.2, acts:() => [kRoleAct(["bench"], "Go into conference", "40m", "bconf"), {t:"Sit and listen to the room", c:"5m", run(){ setSay("The table is bare but for water, pencils and the day's one case. Nobody takes notes in conference; the clerks are not allowed in.", ""); }}]});
+  P("court", {id:"cclerk", label:"The Clerk of the Court", sub:"Petitions, the docket and the filing deadlines", x:-4.4, z:8.4, r:2.0, acts:() => [kRoleAct(["bench"], "Take up the petitions for review", "20m", "bcert"), kRoleAct(["bench"], "Write the opinion at the bench", "60m", "bopin")]});
+  P("court", {id:"cmarshal", label:"The Marshal's desk", sub:"Order in the court, the cryer, and who is in the gallery", x:4.4, z:8.4, r:2.0, acts:() => [kRoleAct(["bench"], "Call the Court to order for oral argument", "90m", "kct")]});
+  P("exec", {id:"xcal", ...KCAL("xcal", 4.9, 2.4)});
+  P("exec", {id:"xsit", label:"The situation table", sub:"Charts of the ports, the frontiers and the bread price", x:3.0, z:6.6, r:2.2, acts:() => [kRoleAct(["pres"], "Take the situation room", "40m", "pwar"), {t:"Study the chart", c:"5m", run(){ try{ const w = worldEnsure(), f = worldFoe(); setSay("The rival this term is " + f.t + ", heat " + Math.round(w.heat || 0) + ". Bread stands at " + (w.bread || 1).toFixed(2) + (w.ration ? ", and the northern towns are rationed." : ".") + " " + (G.conflict ? "A measure is already under way against " + ((WORLD_POWERS.find(p => p.k === G.conflict.k) || {}).t || "them") + "." : "Nothing is under way."), ""); }catch(e){ setSay("The chart is blank.", ""); } }}]});
+  P("exec", {id:"xphone", label:"The telephones", sub:"Direct lines to the foreign capitals", x:0.9, z:9.0, r:1.8, acts:() => [kRoleAct(["pres"], "Take the calls with foreign capitals", "40m", "aid")]});
+  P("exec", {id:"xcab", label:"The cabinet table", sub:"Four secretaries, a lot of coffee, and no agreement", x:0, z:4.4, r:2.4, acts:() => [kRoleAct(["pres"], "Hear the cabinet and appoint", "40m", "cab"), kRoleAct(["pres"], "The morning briefing", "45m", "kex")]});
+  P("exec", {id:"xacts", label:"The signing tray", sub:"Acts waiting on a pen", x:-0.7, z:9.0, r:1.8, acts:() => [kRoleAct(["pres"], "Sign or veto what Congress sent", "20m", "pacts")]});
+  P("govoffice", {id:"gcal", ...KCAL("gcal", -4.6, 6.2)});
+  P("govoffice", {id:"gbrief", label:"The briefing table", sub:"Your advisors, with the day's file", x:-2.6, z:5.6, r:2.2, acts:() => [kRoleAct(["gov"], "Take the morning briefing", "30m", "gbrief")]});
+  P("govoffice", {id:"gwait", label:"The waiting bench", sub:"Citizens, mayors and county clerks, in order", x:-4.2, z:3.2, r:2.2, acts:() => [kRoleAct(["gov"], "Open the doors: open hours", "60m", "kgv"), {t:"Glance down the bench", c:"1m", run(){ setSay("A farmer in his good coat, a woman with a folder held like a shield, and the mayor of somewhere small who has clearly practised.", ""); }}]});
+  P("govoffice", {id:"gbread", label:"The bread board", sub:"The price of bread, county by county, and what the neighbours are doing", x:4.0, z:5.0, r:2.2, acts:() => [kRoleAct(["gov"], "Take up the bread question", "30m", "gwar")]});
+  P("govoffice", {id:"gbook", label:"The ledger shelf", sub:"The budget, the appointments book and the agencies' letters", x:4.0, z:7.2, r:2.0, acts:() => [kRoleAct(["gov"], "Agencies and the budget", "40m", "gbud"), kRoleAct(["gov"], "The statehouse desk: sign or veto", "20m", "gdesk")]});
+}
+try{ kRoomProps(); }catch(e){ console.warn("room props", e); }
+/* ── immersion: each room has a day of its own. You walk into a scene, the clock strikes, somebody at their post says something in their own voice, and what is going on depends on the hour ── */
+const K_AMB = {
+  senate:[
+    {h:[8,10], t:"The chamber is half lit. Pages move down the aisles setting out the day's calendar, one folder per desk."},
+    {h:[9,12], t:"Murmur from the cloakroom door: senators drifting in, coats over arms, already arguing."},
+    {h:[10,17], t:"The presiding officer's gavel taps once, and the room finds its seats."},
+    {h:[11,13], t:"The clerk's voice rises over the noise, reading the journal in the flat tone of a man who has read it for forty years."},
+    {h:[12,15], t:"A senator is on the floor. Two rows are listening; the rest are counting."},
+    {h:[13,18], t:"In the gallery, a school party is being told to stop whispering. They have not."},
+    {h:[15,19], t:"Light slants through the high windows and lays the shadow of the rostrum across the carpet."},
+    {h:[17,21], t:"The chamber empties by degrees. A page collects the folders nobody opened."}],
+  court:[
+    {h:[8,10], t:"The Marshal checks the doors, the water jugs and the cushion on the highest chair, in that order."},
+    {h:[9,12], t:"Somewhere behind the bench a door closes softly and does not open again. Conference."},
+    {h:[10,16], t:"The cryer's voice carries from the doorway: 'All persons having business before this Court.'"},
+    {h:[11,17], t:"Counsel shuffle papers at the tables. A lawyer rereads a page for the fifth time and crosses a sentence out."},
+    {h:[13,16], t:"A clerk walks the length of the room on tiptoe, which makes more noise than walking."},
+    {h:[15,19], t:"The high windows go amber. The five tall chairs behind the bench look like they are waiting for someone."},
+    {h:[17,21], t:"The Court is quiet. The only sound is a clerk turning pages in the next room."}],
+  exec:[
+    {h:[7,10], t:"A telephone rings in the outer office and is answered before the second ring."},
+    {h:[8,12], t:"Aides cross the room with folders held to their chests, not meeting anyone's eyes."},
+    {h:[9,14], t:"The map table is covered in markers; someone has moved the pin on the frontier since yesterday."},
+    {h:[11,17], t:"The cabinet table has four coffee cups, three half-drunk, and no agreement on anything."},
+    {h:[14,18], t:"A cable comes in from a foreign capital. It is read, folded, and carried through the inner door."},
+    {h:[16,20], t:"Through the windows, the lamplighters are working along the south lawn."},
+    {h:[18,22], t:"The wing winds down. One light stays on, at your desk."}],
+  govoffice:[
+    {h:[7,10], t:"The Governor's secretary is already at the door with a list in her hand and a pencil behind her ear."},
+    {h:[9,12], t:"On the waiting bench a farmer in his good coat sits very straight, holding his hat on his knee."},
+    {h:[10,15], t:"Voices rise and fall in the outer room as the line moves up. Somebody is practising a speech under their breath."},
+    {h:[11,16], t:"A county map hangs unevenly on the wall, with pins in the places where the road floods."},
+    {h:[13,17], t:"The statehouse messenger comes in with a satchel of bills and goes out without being thanked."},
+    {h:[15,19], t:"Outside the window, the flag cracks in the wind from the river."},
+    {h:[17,21], t:"The State House empties. A cleaner starts at the far end of the corridor, humming."}],
+  office:[
+    {h:[8,10], t:"Somebody is already running a vacuum two floors down; the whole building hums with it."},
+    {h:[9,12], t:"The telephone in the outer room rings and rings and is finally answered by an intern with her mouth full."},
+    {h:[12,14], t:"Lunch trays are carried past the door. Nobody in this building eats at a table."},
+    {h:[14,18], t:"The afternoon light puts a bar of gold across the desk and the pile of letters on it."},
+    {h:[18,22], t:"The corridor outside goes quiet. A last set of footsteps passes, and then none."}]
+};
+const K_STAFFTALK = {senclerk:["Order in the chamber, please.", "The journal will be read.", "Thank you, Senators."], courtclerk:["Filed, with the stamp.", "That petition came in late and nobody has noticed yet.", "The docket has moved."], marshal:["Keep to the rail, please.", "Quiet in the gallery.", "All rise."], chief:["The Executive is waiting.", "Three minutes. Tops.", "Not that door."], aide:["It is in the file.", "Page two, please.", "That came in overnight."], gsec:["Next, please.", "The Governor will see you now.", "Hold your place, you are fourth."], gcounsel:["I would not say that out loud.", "That will be litigated.", "Put it in writing."], senator:["Is that really the language?", "I will have to see the count.", "We are not there yet."], justice:["The question is narrower than they think.", "I want to read it again.", "Not on this record."]};
+function kHourLine(room, h){ const L = (K_AMB[room] || []).filter(x => h >= x.h[0] && h < x.h[1]); return L.length ? L[Math.floor(Math.random() * L.length)].t : null; }
+function kStaffHere(){ try{ return (G.civ || []).filter(c => c && c.krole && c.room === G.room && !c.gone); }catch(e){ return []; } }
+function kScene(room){
+  try{
+    if(!K_AMB[room] || !G.you) return; const h = Math.floor((G.minute || 0) / 60), key = room + ":" + G.day + ":" + h; if(kScene._k === key) return; kScene._k = key;
+    const line = kHourLine(room, h), st = kStaffHere().slice(0, 3), who = st.length ? " " + st.map(c => c.role + " " + surname(c.name)).join(", ") + (st.length > 1 ? " are" : " is") + " at " + (st.length > 1 ? "their posts" : "their post") + "." : "";
+    const hint = (function(){ try{ const d = docketToday().find(x => !kOnceToday(x.key) && (G.minute || 0) >= x.h * 60 - 60); return d ? " On your calendar: " + d.t.toLowerCase() + "." : ""; }catch(e){ return ""; } })();
+    if(line) feed(line + who + hint);
+  }catch(e){}
+}
+let _kAmbAt = 0, _kChime = "";
+function kAmbient(){
+  try{
+    if(!G.running || !G.you || typeof TALK === "undefined" || TALK.open || (SIT && SIT.on) || !K_AMB[G.room]) return; const now = performance.now(); if(now < _kAmbAt) return; _kAmbAt = now + 26000 + Math.random() * 22000;
+    const h = Math.floor((G.minute || 0) / 60), ck = G.room + ":" + G.day + ":" + h;
+    if(_kChime !== ck && (G.minute || 0) % 60 < 20){ _kChime = ck; const words = ["one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"]; feed("The clock strikes " + words[((h + 11) % 12)] + "."); return; }
+    const staff = kStaffHere(), r = Math.random();
+    if(staff.length && r < 0.5){ const c = staff[Math.floor(Math.random() * staff.length)], bank = K_STAFFTALK[c.krole] || ["..."], line = bank[Math.floor(Math.random() * bank.length)]; c.say = line; c.sayT = 4; try{ speakAt(c, line); }catch(e){} return; }
+    const t = kHourLine(G.room, h); if(t) feed(t);
+  }catch(e){}
+}
+{ const _er = enterRoom; enterRoom = function(dest, from){ const r = _er.apply(this, arguments); try{ kScene(dest); }catch(e){} return r; }; }
 function amendText(S){ const A = (S && S.amend) || []; return A.length ? " Amendments agreed at open hours, to be attached: " + A.map(a => a.title + " (" + a.from + ")").join("; ") + "." : ""; }
 function amendApply(S){ const A = (S && S.amend) || []; if(!A.length) return ""; const y = G.you; S.unrest = clamp(S.unrest - A.length, 0, 100); y.approval = clamp(y.approval + A.length, 0, 100); S.amend = []; return " The amendments from open hours were attached: " + A.map(a => a.title).join(", ") + "."; }
 function govBrief(S){
@@ -31983,6 +32135,7 @@ function buildHigherRoom(id, o){
     addBox(stone, sx, 3.48, 0.45, 2.4, 0.28, 0.85, 0, true);                /* pediment block */
     try{ propPlaque(sx, 3.22, 1.085, 0, "State House", (G.you && G.you.state) || "The State", 1.3, 0.22); }catch(e){}
   }
+  try{ if(["senate", "court", "exec", "govoffice"].indexOf(id) >= 0) buildHigherExtras(id, wood, leather, brass, paper); }catch(e){ if(window.console) console.warn("higher extras", id, e); }
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -35568,6 +35721,7 @@ function drainHouseOne(w, dt){
   } else if(lane === 9){
     try{ confabulate(w); }catch(e){}
     try{ purseLive(w); }catch(e){}
+    try{ kAmbient(); }catch(e){}
   } else if(lane === 10){
     try{ tieTick(w); }catch(e){}
   } else if(lane === 11){
