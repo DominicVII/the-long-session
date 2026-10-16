@@ -4,6 +4,13 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## Street life on the High Street, and better cars
+
+`20261016o` (on `20261016n`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- Cafe tables with striped umbrellas outside Vaughn's and Cafe Zeven; bicycles chained at the kerb; newspaper vending boxes; street-name blades at the crossings.
+- Cars now have door lines and handles, mirrors, hubcaps, tail lights and headlights, a grille, a number plate, a roof panel and a raked windscreen.
+
 ## The House Floor, finished
 
 `20261016n` (on `20261016m`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
