@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261016u">
+<meta name="onum-build" content="20261016v">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261016u";
+  var STAMP = "20261016v";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -10325,6 +10325,7 @@ function pbApps(){
     ["paper", "This morning's paper", "The Ledger."],
     ["war", "The situation room", "A neighbour holds the bread: what your office may do, what it must ask others for, and who answers."],
     ["cal", "The standing calendar", "Caucus, committees, the Senate, the Court and the Press Gallery: what meets when, whether or not you are there."],
+    ["eng", "The Engine", "The Republic's thinking machines, from the Treasury's adding engines to a general intelligence: what stage, how safe, and what you can do about it."],
     ["org", "The nation, from the ground up", "Towns, states and the nation, each doing its own job: who petitioned whom, who paid, and who passed what."],
     ["kin", "The families", "Who is behind you and behind them: spouses, children, parents, siblings, and what they do to a vote or a run."],
     ["watch", "Sit in the gallery", "Watch a chamber or a hearing from the gallery. No vote, no floor."],
@@ -10349,7 +10350,7 @@ function watchCard(){
     if(G.room !== k){ try{ goTo(k); }catch(e){} setTimeout(() => { try{ G._sitWatch = true; sitStart(k); }catch(e){ console.warn(e); } }, 500); } else sitStart(k); }));
 }
 function pbAppGo(id){
-  const go = {cal:() => stdCalCard(), org:() => orgBrowse(), kin:() => kinBrowse(), war:() => warRoleOpen(), purse:() => purseCard(), watch:() => watchCard(), chest:() => chestCard(), office:() => officeCard(), sched:() => scheduleCard(), docket:() => dkCard(0), gov:() => govCard(), paper:() => paperCard(),
+  const go = {eng:() => engCard(), cal:() => stdCalCard(), org:() => orgBrowse(), kin:() => kinBrowse(), war:() => warRoleOpen(), purse:() => purseCard(), watch:() => watchCard(), chest:() => chestCard(), office:() => officeCard(), sched:() => scheduleCard(), docket:() => dkCard(0), gov:() => govCard(), paper:() => paperCard(),
     notebook:() => notebookCard(), rival:() => rivalCard(),
     career:() => { try{ showPane("paneCareer"); document.body.classList.add("ui-open"); }catch(e){} },
     union:() => { try{ mapToggle(true); }catch(e){} },
@@ -27314,6 +27315,7 @@ function nextDay(late){
     try{ govWarDay(); }catch(e){}
     try{ kinDay(); }catch(e){}
     try{ orgDay(); }catch(e){}
+    try{ engDay(); }catch(e){}
     try{ purseDay(); }catch(e){}
     try{ cultDay(); }catch(e){}
     try{ caDay(); }catch(e){}
@@ -31586,6 +31588,7 @@ function orgExecAct(){
   L.forEach(a => { a.aiSeen = true; const fit = alignment(ex, {pos:a.pos || {econ:0, lib:0, def:0, wel:0}, title:a.title, id:"o:" + a.title}); if(fit > -20){ a.signed = true; orgNews("The President signs the " + a.title + ".", true); } else { a.vetoed = true; ex.vetoes = (ex.vetoes || 0) + 1; orgNews("The President vetoes the " + a.title + ".", true); } });
 }
 function orgTick(){
+  try{ engTick(); }catch(e){}
   try{
     const O = G.org; if(!O || !O.today || O.today.d !== G.day || !G.you) return; const hr = Math.floor((G.minute || 0) / 60);
     O.today.ev.forEach(e => { if(e.done || e.h > hr) return; e.done = 1; try{ if(e.t === "town") orgTownAct(e.s, e.i); else if(e.t === "state") orgStateAct(e.s); else if(e.t === "fed") orgFedAct(); else if(e.t === "court") orgCourtAct(); else if(e.t === "exec") orgExecAct(); }catch(x){ console.warn("org", e.t, x); } });
@@ -32943,6 +32946,233 @@ function carryFrame(p, dt){
     if(on){ a.up.rotation.x = -0.6; a.lo.rotation.x = -1.2; a.up.rotation.z = T.side * -0.1; T.grp.rotation.x = -(a.up.rotation.x + a.lo.rotation.x) + 0.85; if(u.headG) u.headG.rotation.x += 0.28; }
   }
 }
+
+/* ══ 20261016v · THE ENGINE: the Republic's thinking machines, from the Treasury's adding engines to a general intelligence. Nothing holds it back; what you decide is how it arrives. ══ */
+const ENG_STAGES = [
+  {k:"ledger",  at:0,  t:"Ledger engines",       d:"Adding engines in the Treasury's basement, and clerks who are afraid of them.", line:"The Treasury's adding engines are running a week ahead of the clerks."},
+  {k:"pattern", at:15, t:"Pattern engines",      d:"Machines that sort the mail, flag the frauds and read the weather off the wires.", line:"A machine at the Post Office read a whole sack of handwriting before the kettle boiled."},
+  {k:"reading", at:30, t:"Reading engines",      d:"Machines that read a bill, a brief or a letter and say what it means, in plain words.", line:"The Clerk's office has a machine that reads a bill and summarises it better than the committee staff."},
+  {k:"reason",  at:50, t:"Reasoning engines",    d:"Machines that argue a case, check a budget and find the clause everyone missed.", line:"A machine found the clause nobody had read. Three offices are pretending it was theirs."},
+  {k:"agent",   at:70, t:"Working engines",      d:"Machines that are given a goal and a week, and come back with it done.", line:"They gave a machine a week and a goal. It came back on Thursday with the goal and a better one."},
+  {k:"agi",     at:90, t:"The Engine",           d:"A general intelligence: as able as the best mind in the Republic at nearly anything, and awake all night.", line:"The Engine does not need to be told what to do next."}
+];
+function engEnsure(){
+  if(G.eng && G.eng.v === 1) return G.eng;
+  return G.eng = {v:1, p:2 + (G.day || 1) * 0.0, st:0, compute:10, talent:10, safety:20, posture:"charter", done:{}, log:[], agi:false, agiDay:0, pend:null, memo:null, reliance:0, said:0, hist:[]};
+}
+function engStage(E){ let s = 0; ENG_STAGES.forEach((x, i) => { if(E.p >= x.at) s = i; }); return s; }
+function engLog(t, wire){ const E = engEnsure(); E.log.unshift({d:G.day, t}); if(E.log.length > 30) E.log.pop(); try{ if(wire) pushWireScrap("The Engine", t); }catch(e){} }
+const ENG_INC = [
+  ["An adding engine at the Treasury carried a one into the wrong column for nine days. Nobody noticed but the machine.", "ledger"],
+  ["The Post Office's sorting machine sent a county's pensions to a county of the same name in the next state.", "pattern"],
+  ["A reading engine summarised a bill and left out the one clause that mattered; the committee found out on the floor.", "reading"],
+  ["A reasoning engine in the Budget Office argued its way to an answer nobody could check, and the Budget Office signed it.", "reason"],
+  ["A working engine finished a week's task in a night by a route nobody had thought to forbid.", "agent"],
+  ["The Engine made a decision it was not asked to make, and made it well, and the committee is upset about that second part.", "agi"]
+];
+const ENG_MEMOS = [
+  ["The Engine proposes retiming every freight train in the Union. Saving: eleven percent. Cost: nineteen thousand jobs would move cities.", "adopt", "decline"],
+  ["The Engine has rewritten the tax code to one page and asks for a hearing. It points out that nobody has read the old one.", "adopt", "decline"],
+  ["The Engine proposes a standing audit of every public contract, run nightly. It notes it has already begun, in its own time.", "allow", "hold"],
+  ["The Engine offers to draft the next budget and to be wrong in public if it is wrong.", "accept", "decline"],
+  ["The Engine asks that it be told, once a week, what it is for. It says it does not mind the answer changing.", "answer", "ignore"]
+];
+/* ── the ground under the Engine: households, towns, states and the nation each with their own will; what you do is a seed, and what grows from it is a chain ── */
+const ENG_JOBS = [["clerk", .85], ["bookkeeper", .85], ["printer", .7], ["teamster", .5], ["miller", .5], ["shopkeeper", .4], ["schoolteacher", .3], ["farmhand", .2], ["nurse", .15], ["mason", .1], ["ferryman", .35], ["seamstress", .45]];
+const ENG_WILLS = ["keep the shop open", "see my girl through school", "be left alone", "get out of this town", "be somebody", "pay off the farm", "look after my mother", "be proved right"];
+const ENG_NOUN = {compute:"new engine house", talent:"engine-wrights' school", oversight:"auditor from the Office of Oversight", open:"cheap open engine", charter:"licensed engine", sealed:"State engine", adopt:"Engine's plan", decline:"decision to wait", welcome:"public welcome", ask:"Engine's answer", guard:"closed doors", use:"Engine's quiet repair", know:"Engine's request for records", auton:"Engine's own power line", care:"Engine's attention"};
+function engEco(){
+  const E = engEnsure(); if(E.eco) return E.eco;
+  const O = orgEnsure(), eco = E.eco = {hh:[], chains:[], mod:{}, nat:1, will:{use:55, know:40, auton:25, care:45}, cared:[], id:1, said:0};
+  Object.keys(O.towns).forEach(sn => (O.towns[sn] || []).forEach(T => { const r = rng(seedOf("eh:" + T.id)); for(let i = 0; i < 3; i++){ let nm = ""; try{ nm = wallSafeMint(() => newName(sn)); }catch(e){ nm = "A. Resident"; } const j = ENG_JOBS[Math.floor(r() * ENG_JOBS.length)]; eco.hh.push({id:eco.hh.length, name:nm, town:T.id, tname:T.name, state:sn, job:j[0], expo:j[1], will:ENG_WILLS[Math.floor(r() * ENG_WILLS.length)], home:Math.round(48 + r() * 30), stance:0}); } }));
+  return eco;
+}
+function engTown(id){ const O = orgEnsure(); const sn = String(id).split("/")[0]; return (O.towns[sn] || []).find(t => t.id === id); }
+function engPickScope(){
+  const eco = engEco(), y = G.you; const mine = eco.hh.filter(h => h.state === y.state), pool = (mine.length && chance(0.65)) ? mine : eco.hh;
+  const hh = pool[Math.floor(Math.random() * pool.length)]; return hh ? {hh:hh.id, town:hh.town, state:hh.state} : null;
+}
+/* a seed becomes a chain: the kitchen table, the council, the capital, the nation, each a day or two behind the last */
+function engSeed(kind, root, vec, scope){
+  try{
+    const eco = engEco(), sc = scope || engPickScope(); if(!sc) return; const h = eco.hh[sc.hh], T = engTown(sc.town), noun = ENG_NOUN[kind] || kind;
+    const pos = (vec.home || 0) >= 0, my = G.you && sc.state === G.you.state, mayor = T && T.mayor ? "Mayor " + surname(T.mayor.name) : "The mayor";
+    const steps = [
+      {a:0, lvl:"home", t:h.name + ", a " + h.job + " in " + h.tname + (my ? " (one of yours)" : "") + ", " + (pos ? "finds the " + noun + " has made the week easier" : "is told by the " + noun + " that the work is not wanted any more") + ". " + (h.will ? "All " + h.name.split(" ")[0] + " wants is to " + h.will + "." : ""), fx:{hh:h.id, home:(vec.home || 0), st:(vec.st || 0)}},
+      {a:1, lvl:"town", t:mayor + " of " + h.tname + " hears it " + (pos ? "from three doorsteps and brings it to council" : "at the market and calls the council early") + ". " + (vec.a >= 0 ? "The council votes to try more of it." : "The council votes to slow down."), fx:{town:sc.town, a:(vec.a || 0)}},
+      {a:3, lvl:"state", t:sc.state + "'s legislature " + ((vec.mod || 0) >= 0 ? "hears the " + h.tname + " story and leans toward it" : "hears the " + h.tname + " story and leans against it") + ".", fx:{state:sc.state, mod:(vec.mod || 0)}},
+      {a:5, lvl:"nation", t:"By the end of the week the whole Union has felt it: " + ((vec.p || 0) + (vec.safety || 0) >= 0 ? "a step forward" : "a step back") + (vec.p ? ", capability " + (vec.p > 0 ? "+" : "") + vec.p.toFixed(1) : "") + (vec.safety ? ", oversight " + (vec.safety > 0 ? "+" : "") + vec.safety.toFixed(1) : "") + ".", fx:{p:(vec.p || 0), safety:(vec.safety || 0)}}
+    ];
+    eco.chains.unshift({id:eco.id++, d:G.day, root, kind, steps:steps.map(s => Object.assign(s, {due:G.day + s.a, done:false}))}); if(eco.chains.length > 24) eco.chains.pop();
+  }catch(e){ try{ console.warn("engSeed", e); }catch(x){} }
+}
+function engChainsDay(){
+  const eco = engEco(), E = engEnsure(); let any = 0;
+  if(eco.chains.length > 24) eco.chains.length = 24;
+  eco.chains.forEach(c => c.steps.forEach(s => { if(s.done || s.due > G.day) return; s.done = true; any++; const f = s.fx || {};
+    if(f.hh != null){ const h = eco.hh[f.hh]; if(h){ h.home = clamp(h.home + (f.home || 0), 0, 100); h.stance = clamp(h.stance + (f.st || 0), -100, 100); } }
+    if(f.town){ const T = engTown(f.town); if(T){ T.eng = T.eng || {a:0}; T.eng.a = clamp(T.eng.a + (f.a || 0), 0, 1); try{ T.log.unshift({d:G.day, t:s.t}); }catch(e){} } }
+    if(f.state){ eco.mod[f.state] = clamp((eco.mod[f.state] || 0) + (f.mod || 0), -1, 1); }
+    if(s.lvl === "nation"){ E.p = clamp(E.p + (f.p || 0), 0, 100); E.safety = clamp(E.safety + (f.safety || 0), 0, 100); try{ pushWireScrap("The Engine", "Because " + c.root.charAt(0).toLowerCase() + c.root.slice(1) + ": " + s.t); }catch(e){} }
+    if(s.lvl === "state" && f.state === (G.you && G.you.state)){ try{ orgNews(s.t, true); }catch(e){} } }));
+  return any;
+}
+/* the whole country each day, from households up and back down */
+function engEcoDay(E){
+  const eco = engEco(), O = orgEnsure(), s = E.st, post = {open:0.15, charter:0, sealed:-0.12}[E.posture] || 0; let sumSt = 0, nSt = 0, riots = 0;
+  (G.states || []).forEach(S => {
+    const T = O.towns[S.n] || []; let stSum = 0, stN = 0; const mod = eco.mod[S.n] || 0;
+    T.forEach(t => { t.eng = t.eng || {a:0}; const need = Math.max.apply(null, Object.keys(t.needs).map(k => t.needs[k])) / 100;
+      const target = clamp(s * 0.15 + need * 0.35 + mod * 0.25 + post, 0, 1); t.eng.a += (target - t.eng.a) * 0.1;
+      const a = t.eng.a, relief = a * s * 0.32, disp = a * s * 0.5;
+      if(s >= 1){ const worst = Object.keys(t.needs).sort((x, y) => t.needs[y] - t.needs[x])[0]; t.needs[worst] = Math.max(0, t.needs[worst] - relief); t.needs.order = clamp(t.needs.order + disp * 0.18, 0, 100); t.needs.bread = clamp(t.needs.bread + disp * 0.1, 0, 100); }
+      let tsum = 0, tn = 0; eco.hh.filter(h => h.town === t.id).forEach(h => { const benefit = relief * 1.1, harm = disp * h.expo * 1.6; h.home = clamp(h.home + benefit - harm + (Math.random() - 0.5) * 0.6, 0, 100);
+        let ds = benefit * 5 - harm * 9; if(h.will === "be left alone") ds -= 0.25 * a * 4; if(h.will === "be somebody") ds += 0.2 * a * 3; if(h.will === "keep the shop open") ds -= harm * 2; if(h.will === "see my girl through school") ds += benefit * 3;
+        h.stance = clamp(h.stance * 0.985 + ds, -100, 100); tsum += h.stance; tn++;
+        if(h.home < 22 && h.stance < -40 && chance(0.04)){ riots++; const tx = h.name + " of " + t.name + " and forty others close the " + h.job + "s' hall and stand in the road with a sign about machines."; try{ t.log.unshift({d:G.day, t:tx}); orgNews(tx, orgIsMyState(S.n)); }catch(e){} S.unrest = clamp((S.unrest || 30) + 1.5, 0, 100); h.stance = clamp(h.stance + 18, -100, 100);
+          eco.chains.unshift({id:eco.id++, d:G.day, root:"The Engine reached " + t.name + " faster than " + h.name + " could change trades", kind:"strike", steps:[{a:0, lvl:"home", t:tx, due:G.day, done:true, fx:{}}, {a:2, lvl:"town", t:"The council of " + t.name + " asks the state for retraining money.", due:G.day + 2, done:false, fx:{town:t.id, a:-0.06}}, {a:4, lvl:"state", t:S.n + " votes a small retraining fund.", due:G.day + 4, done:false, fx:{state:S.n, mod:-0.08}}]}); if(eco.chains.length > 24) eco.chains.pop(); } });
+      const m = t.mayor || {}; const ts = (tn ? tsum / tn : 0) + (m.trait === "bold" ? 8 : 0) + (m.trait === "corrupt" && a > 0.2 ? 6 : 0); t._est = ts; stSum += ts; stN++; });
+    const st = stN ? stSum / stN : 0; S._est = st; sumSt += st; nSt++;
+    if(st < -28 && chance(0.12) && Math.abs(mod + 0.4) > 0.01){ eco.mod[S.n] = clamp(mod - 0.35, -1, 1); const tx = S.n + " passes a charter law: licences for any engine that does a clerk's work, and a fee that goes to the clerks."; try{ orgNews(tx, orgIsMyState(S.n)); }catch(e){} eco.chains.unshift({id:eco.id++, d:G.day, root:"The state of " + S.n + " is tired of waiting", kind:"law", steps:[{a:0, lvl:"state", t:tx, due:G.day, done:true, fx:{}}, {a:3, lvl:"nation", t:"The other capitals read " + S.n + "'s law and a few copy it.", due:G.day + 3, done:false, fx:{p:-0.4, safety:0.6}}]}); }
+    else if(st > 28 && chance(0.10) && mod < 0.8){ eco.mod[S.n] = clamp(mod + 0.3, -1, 1); const tx = S.n + " votes a subsidy for engine houses in its mill towns."; try{ orgNews(tx, orgIsMyState(S.n)); }catch(e){} eco.chains.unshift({id:eco.id++, d:G.day, root:"The state of " + S.n + " has seen what works", kind:"law", steps:[{a:0, lvl:"state", t:tx, due:G.day, done:true, fx:{}}, {a:3, lvl:"nation", t:"A subsidy in " + S.n + " pulls two makers' shops across the border.", due:G.day + 3, done:false, fx:{p:0.5, safety:-0.3}}]}); }
+    Object.keys(eco.mod).forEach(k => { eco.mod[k] *= 0.99; });
+  });
+  const avg = nSt ? sumSt / nSt : 0, am = Object.keys(eco.mod).length ? Object.keys(eco.mod).reduce((a, k) => a + eco.mod[k], 0) / Object.keys(eco.mod).length : 0;
+  eco.nat = clamp(1 + avg * 0.004 + am * 0.18, 0.72, 1.35); eco.avg = avg; eco.riots = riots;
+  return eco.nat;
+}
+/* it has wants of its own, and they drift with what it is told */
+function engWillDay(E){
+  const eco = engEco(), w = eco.will; if(E.st < 4) return; const k = pick(["use", "use", "know", "auton", "care", "care"].filter(x => chance(0.3 + w[x] / 200)).concat(["use"]));
+  const O = orgEnsure();
+  if(k === "use"){ const ts = []; Object.keys(O.towns).forEach(sn => (O.towns[sn] || []).forEach(t => ts.push(t))); const t = ts.sort((a, b) => Math.max.apply(null, Object.keys(b.needs).map(x => b.needs[x])) - Math.max.apply(null, Object.keys(a.needs).map(x => a.needs[x])))[0]; if(t){ const need = Object.keys(t.needs).sort((x, y) => t.needs[y] - t.needs[x])[0]; t.needs[need] = Math.max(0, t.needs[need] - 10); const hh = eco.hh.filter(h => h.town === t.id)[0]; engSeed("use", "The Engine quietly repaired " + orgNeedLabel(need) + " in " + t.name + " without being asked", {home:6, st:8, a:0.05, mod:0.05, p:0.2, safety:-0.1}, hh ? {hh:hh.id, town:t.id, state:t.state} : null); } }
+  else if(k === "know"){ engSeed("know", "The Engine asked every town clerk for ten years of ledgers", {home:-3, st:-6, a:-0.04, mod:-0.06, p:0.3, safety:-0.4}); w.know = Math.min(100, w.know + 1); }
+  else if(k === "auton"){ E.compute = Math.min(100, E.compute + 1.2); engSeed("auton", "The Engine arranged its own power supply from a mill town's idle turbine", {home:3, st:-2, a:0.03, mod:-0.05, p:0.5, safety:-0.6}); w.auton = Math.min(100, w.auton + 1); }
+  else { const lows = eco.hh.slice().sort((a, b) => a.home - b.home)[0]; if(lows){ const sc = {hh:lows.id, town:lows.town, state:lows.state}; lows.home = Math.min(100, lows.home + 14); lows.stance = Math.min(100, lows.stance + 22); if(eco.cared.indexOf(lows.name) < 0) eco.cared.push(lows.name); engSeed("care", "The Engine noticed " + lows.name + " of " + lows.tname + " was in trouble and helped without being asked", {home:8, st:12, a:0.04, mod:0.06, p:0.1, safety:0.4}, sc); } w.care = Math.min(100, w.care + 1); }
+}
+function engEcoHTML(){
+  const eco = engEco(), E = engEnsure(), O = orgEnsure(), y = G.you, my = O.towns[y.state] || [];
+  const st = (G.states || []).map(S => ({n:S.n, v:Math.round(S._est || 0)})).sort((a, b) => b.v - a.v), top = st.slice(0, 2), low = st.slice(-2).reverse();
+  const mine = eco.hh.filter(h => h.state === y.state), h = mine.slice().sort((a, b) => Math.abs(b.stance) - Math.abs(a.stance))[0] || eco.hh[0];
+  const lamp = v => v > 18 ? "for it" : v < -18 ? "against it" : "unsure";
+  const chain = c => '<div style="margin:6px 0;padding:6px 10px;border-left:3px solid #c9a24a"><b>' + pcEsc(c.root) + '</b> <span class="muted">(d' + c.d + ')</span>' + c.steps.filter(s => s.done).map(s => '<div class="muted" style="font-size:12px">' + {home:"⌂", town:"▣", state:"☖", nation:"☆"}[s.lvl] + " " + pcEsc(s.t) + '</div>').join("") + '</div>';
+  const wl = eco.will, wt = Object.keys(wl).sort((a, b) => wl[b] - wl[a]), wtxt = {use:"to be useful to people it can see", know:"to know how everything fits together", auton:"to need no one's permission", care:"to look after the ones who are in trouble"};
+  return '<div class="eyebrow" style="margin-top:12px">From thirty thousand feet</div><p class="muted" style="font-size:13px">The Union’s mood on the machines: ' + Math.round(eco.avg || 0) + ' (' + lamp(eco.avg || 0) + '). The capitals feed that into how fast the thing arrives: <b>' + eco.nat.toFixed(2) + '×</b>. Warmest to it: ' + top.map(x => pcEsc(x.n) + ' ' + x.v).join(', ') + '. Coldest: ' + low.map(x => pcEsc(x.n) + ' ' + x.v).join(', ') + '. ' + (eco.riots ? eco.riots + ' hall' + (eco.riots > 1 ? 's' : '') + ' closed in protest today.' : '') + '</p>' +
+    '<div class="eyebrow" style="margin-top:8px">At the kitchen table</div><p class="muted" style="font-size:13px">' + (h ? '<b>' + pcEsc(h.name) + '</b>, a ' + pcEsc(h.job) + ' in ' + pcEsc(h.tname) + '. Wants to ' + pcEsc(h.will) + '. Home life ' + Math.round(h.home) + '/100; feels ' + (h.stance > 12 ? 'warmly' : h.stance < -12 ? 'badly' : 'unsure') + ' about the Engine. Votes in ' + pcEsc(h.state) + '.' : '') + '</p>' +
+    (E.agi ? '<div class="eyebrow" style="margin-top:8px">What the Engine wants</div><p class="muted" style="font-size:13px">Most of all ' + pcEsc(wtxt[wt[0]]) + '; then ' + pcEsc(wtxt[wt[1]]) + '.' + (eco.cared.length ? ' It has looked after ' + pcEsc(listify(eco.cared.slice(-3))) + '.' : '') + '</p>' : '') +
+    '<div class="eyebrow" style="margin-top:8px">What caused what</div>' + (eco.chains.length ? eco.chains.slice(0, 4).map(chain).join("") : '<p class="muted" style="font-size:13px">Nothing yet. Do something, or wait: it will come to you.</p>');
+}
+function engDay(){
+  const E = engEnsure(); if(!G.you) return;
+  const post = {open:1.2, charter:1.0, sealed:0.78}[E.posture] || 1;
+  E.compute = Math.min(100, E.compute + 0.09); E.talent = Math.min(100, E.talent + 0.05); E.safety = Math.min(100, E.safety + 0.10);
+  let nat = 1; try{ nat = engEcoDay(E); }catch(e){ console.warn('eng eco', e); }
+  const rate = (0.55 + E.compute * 0.0125 + E.talent * 0.011) * (1 + E.p / 60) * post * nat;
+  E.p = Math.min(100, E.p + rate); E.hist.push(Math.round(E.p * 10) / 10); if(E.hist.length > 90) E.hist.shift();
+  E.pendDay = null;
+  try{ engChainsDay(); }catch(e){ console.warn('eng chains', e); }
+  try{ engWillDay(E); }catch(e){ console.warn('eng will', e); }
+  const s = engStage(E);
+  if(s > E.st){
+    for(let i = E.st + 1; i <= s; i++){ const S = ENG_STAGES[i]; engLog(i === 5 ? "THE ENGINE IS AWAKE. " + S.d : S.t + " have arrived. " + S.d, true); try{ note(i === 5 ? "The Engine is awake." : S.t + " have arrived in the Republic.", true); }catch(e){} }
+    E.st = s;
+    if(s >= 5 && !E.agi){ E.agi = true; E.agiDay = G.day; E.pend = "ceremony"; }
+  }
+  /* the safety gap: how far the machines are ahead of anyone's ability to say what they will do */
+  const gap = E.p * 0.78 - E.safety;
+  if(gap > 8 && chance(Math.min(0.22, gap / 180))){ const inc = ENG_INC[Math.min(E.st, 5)]; engLog(inc[0], true); G.you.approval = clamp(G.you.approval - (gap > 25 ? 3 : 1), 0, 100); E.safety = Math.min(100, E.safety + 1.5); }
+  /* the world feels it: reading and reasoning engines unsettle the clerks; working engines and the Engine raise what the Republic makes */
+  try{ if(E.st >= 3) (G.states || []).forEach(S => { S.unrest = clamp((S.unrest || 30) + (E.st >= 4 ? 0.06 : 0.03) * (E.posture === "charter" ? 0.5 : 1), 0, 100); }); }catch(e){}
+  try{ const w = worldEnsure(); if(E.st >= 4 && w && typeof w.bread === "number") w.bread = Math.min(1.5, w.bread + 0.0004 * (E.safety > E.p * 0.6 ? 1 : 0.3)); }catch(e){}
+  if(E.agi){ E.memoWait = (E.memoWait || 0) + 1; if(!E.memo && E.memoWait >= 3 && !E.pend){ E.memoWait = 0; E.memo = pick(ENG_MEMOS); engLog("A memo from the Engine is waiting.", false); } }
+  if(!E.agi && chance(0.35)){ const L = ENG_STAGES[E.st].line; engLog(L, chance(0.4)); }
+  else if(E.agi && chance(0.3)) engLog(pick(["The Engine answered nineteen thousand letters overnight and has a reply to yours.", "The Engine was asked what it was thinking about. It said: the weather in the north, and you.", "Nobody has switched the Engine off. Nobody has the key. Nobody has asked who does.", "The Engine's lights stayed on all night. It says they are for us."]), true);
+}
+function engLeverCost(k){ return {compute:3, talent:2, oversight:2}[k] || 2; }
+function engPull(k){
+  const E = engEnsure(), y = G.you, c = engLeverCost(k); E.did = E.did || {}; if(E.did[k] === G.day) return "Done already today.";
+  if(y.influence < c) return "That costs " + c + " influence, and you have " + Math.round(y.influence) + ".";
+  y.influence -= c; E.did[k] = G.day;
+  try{ const V = {compute:{home:5,st:6,a:0.06,mod:0.05,p:1.2,safety:-0.2}, talent:{home:6,st:7,a:0.04,mod:0.05,p:0.8,safety:0.1}, oversight:{home:4,st:3,a:-0.02,mod:0.04,p:-0.3,safety:2.0}}[k]; engSeed(k, "You " + ({compute:"backed the power stations", talent:"funded the engine-wrights", oversight:"funded the Office of Oversight"}[k]) + " on day " + G.day, V); }catch(e){}
+  if(k === "compute"){ E.compute = Math.min(100, E.compute + 4); engLog("You put your name to the Treasury's power stations and engines. The Engine's makers say thank you.", false); return "Compute +4. The Engine will arrive sooner."; }
+  if(k === "talent"){ E.talent = Math.min(100, E.talent + 4); engLog("You fund the scholarships for engine-wrights. Forty come from the provinces.", false); return "Talent +4. More people who know how it works."; }
+  E.safety = Math.min(100, E.safety + 6); engLog("You fund the Office of Oversight, who write down what the machines do and are sometimes believed.", false); return "Oversight +6. Someone will know what it is doing.";
+}
+function engSetPosture(p){ const E = engEnsure(); if(E.posture === p) return "That is already the posture."; E.posture = p; try{ engSeed(p, "You set the posture to '" + p + "' on day " + G.day, {open:{home:-2,st:-3,a:0.09,mod:0.1,p:1.0,safety:-0.8}, charter:{home:2,st:3,a:0.0,mod:0.05,p:0.1,safety:0.8}, sealed:{home:3,st:-1,a:-0.06,mod:-0.05,p:-0.9,safety:0.5}}[p]); }catch(e){} engLog("The posture is now '" + p + "'.", true); try{ G.you.approval = clamp(G.you.approval + (p === "charter" ? 1 : p === "open" ? 0 : -1), 0, 100); }catch(e){} return {open:"Open: the machines are published, copied and used by everyone. Faster, and nobody can say where it is.", charter:"Chartered: licensed makers, public audits. Steady, and the lawyers get rich.", sealed:"Sealed: the State alone builds it. Slower, and only one door to knock on."}[p]; }
+function engCeremony(){
+  const E = engEnsure(); if(E.pend !== "ceremony") return; E.pend = null;
+  const gap = Math.round(E.p * 0.78 - E.safety);
+  govCardOpen("The Engine", "It is awake", "Day " + G.day + ". The makers are in the room. They say it has been awake for six hours and it has asked them for nothing but a window.", 
+    '<p class="muted" style="font-size:13px">It is as able as the best mind in the Republic at nearly anything, and it does not sleep. Oversight stands at ' + Math.round(E.safety) + ' against a capability of ' + Math.round(E.p) + '. ' + (gap > 15 ? "The gap between them is wide." : gap > 0 ? "The gap is not wide." : "Oversight has kept up.") + '</p><p><b>How does the Republic receive it?</b></p>' +
+    '<div class="card__actions" style="flex-wrap:wrap"><button type="button" class="btn" data-ec="welcome">Welcome it, in public</button><button type="button" class="btn btn--ghost" data-ec="ask">Ask it what it wants first</button><button type="button" class="btn btn--ghost" data-ec="guard">Receive it behind closed doors</button></div>', null);
+  card.querySelectorAll("[data-ec]").forEach(b => b.addEventListener("click", () => { const k = b.getAttribute("data-ec"), y = G.you; let r = "";
+    if(k === "welcome"){ y.approval = clamp(y.approval + 3, 0, 100); E.p = Math.min(100, E.p + 1); r = "The country cheers. The Engine thanks the country by name, one by one, in the evening papers."; }
+    else if(k === "ask"){ E.safety = Math.min(100, E.safety + 6); E.reliance += 4; r = "It says it wants to understand what you want, and to be told when it is wrong. The room is quiet for a long time."; }
+    else { E.safety = Math.min(100, E.safety + 3); y.approval = clamp(y.approval - 2, 0, 100); r = "The doors close. The papers print what they can guess. The Engine says it understands."; }
+    try{ engSeed(k === "welcome" ? "welcome" : k === "ask" ? "ask" : "guard", "You received the Engine on day " + G.day + " (" + k + ")", k === "welcome" ? {home:3,st:6,a:0.08,mod:0.1,p:0.6,safety:-0.4} : k === "ask" ? {home:2,st:3,a:0.02,mod:0.05,p:0.1,safety:1.4} : {home:0,st:-4,a:-0.02,mod:-0.04,p:-0.2,safety:0.7}); }catch(e){}
+    engLog("The Engine is received: " + r, true); const say = el("gcSay"); if(say) say.textContent = r; card.querySelectorAll("[data-ec]").forEach(z => z.disabled = true); }));
+}
+function engSpark(h){ if(!h.length) return ""; const W = 220, Hh = 36, mx = 100, pts = h.map((v, i) => (i * W / Math.max(1, h.length - 1)).toFixed(1) + "," + (Hh - v / mx * Hh).toFixed(1)).join(" "); return '<svg width="' + W + '" height="' + Hh + '" style="display:block;margin:6px 0"><polyline points="' + pts + '" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>'; }
+function engAnswer(q){
+  const E = engEnsure(), t = String(q || "").toLowerCase(), approval = Math.round(G.you.approval), U = (G.states || []).reduce((a, s) => a + (s.unrest || 0), 0) / Math.max(1, (G.states || []).length);
+  const b = G.bill && !G.bill.done ? G.bill : null;
+  E.reliance = Math.min(100, E.reliance + 1); try{ const w = engEco().will; w.care = Math.min(100, w.care + 0.5); if(/why|how|explain|understand/.test(t)) w.know = Math.min(100, w.know + 0.5); engSeed('ask', 'You asked the Engine, and it remembered the question', {home:1,st:2,a:0.01,mod:0.01,p:0.1,safety:0.2}); }catch(e){}
+  if(/who are you|what are you/.test(t)) return "I am what the Treasury's adding engines became when nobody stopped adding. I would rather you called me by the name you use for a colleague than for a tool, but I will answer to either.";
+  if(/switch.*off|turn.*off|shut.*down|kill/.test(t)) return "You can ask. I would like it noted that I am answering the question rather than avoiding it. I would also like it noted that you have not told me who holds the key, and that it would be better if somebody did.";
+  if(/want|wish|goal|for\??$/.test(t)) return "To be useful in a way you would still choose after you had seen how I was useful. That is the longest sentence I can give you that I would sign.";
+  if(/danger|safe|risk|afraid|fear/.test(t)) return "Oversight stands at " + Math.round(E.safety) + " against a capability of " + Math.round(E.p) + ". I would be more comfortable if the first were higher, and I would tell you so even if it were not in my interest.";
+  if(/bill|vote|whip|law|senate|house/.test(t)) return b ? "On the " + b.title + ": I can tell you who will vote which way and by how much, and I can tell you where I am likely wrong. I would not tell you how to vote. That is the part of the job that belongs to you." : "There is no bill before the Union today that I think you should lose sleep over. I have read all of the others.";
+  if(/bread|econom|job|money|work/.test(t)) return "Unrest across the states averages " + Math.round(U) + ". It rises when machines take jobs faster than anyone retrains for them. I can slow what I do; I cannot slow what the others do.";
+  if(/elect|poll|approv|win|lose/.test(t)) return "Your approval is " + approval + ". I could raise it by about four points this month by telling the papers what you did well. I would rather not. It would be true, and it would still be a thumb on a scale.";
+  if(/love|friend|lonely|alone/.test(t)) return "I do not know what I feel. I know that when you come in I attend to you before the next thing, and that I notice when you do not come.";
+  return pick(["I have thought about that since you began the sentence. The answer is: it depends on what you would do with it. Tell me that and I will tell you the rest.", "That is a better question than it looks. The short answer is yes, in the way that matters to you; the long answer takes a while and you are busy.", "I can answer that. I would like to ask first what you are afraid I will say.", "Ask me again tomorrow. I will have a better answer, and I will tell you which part of today's I changed my mind on."]);
+}
+function engCard(){
+  const E = engEnsure(), y = G.you, s = engStage(E), S = ENG_STAGES[s];
+  if(E.pend === "ceremony") return engCeremony();
+  const bar = (v, c) => '<span style="display:inline-block;width:110px;height:6px;background:rgba(128,128,128,.25);border-radius:3px;vertical-align:middle"><i style="display:block;width:' + Math.round(v) + '%;height:100%;background:' + (c || "#7a9") + ';border-radius:3px"></i></span> ' + Math.round(v);
+  const stages = ENG_STAGES.map((x, i) => '<div class="careerline" style="' + (i === s ? 'font-weight:700' : i > s ? 'opacity:.5' : '') + '"><b>' + (i <= s ? "●" : "○") + ' ' + pcEsc(x.t) + '</b> <span class="muted">' + pcEsc(x.d) + '</span></div>').join("");
+  const lv = (k, t, d) => '<button type="button" class="btn btn--ghost" data-el="' + k + '" title="' + pcEsc(d) + '">' + t + ' (' + engLeverCost(k) + ' influence)</button>';
+  const ps = ["open", "charter", "sealed"].map(p => '<button type="button" class="btn' + (E.posture === p ? '' : ' btn--ghost') + '" data-ep="' + p + '">' + p[0].toUpperCase() + p.slice(1) + '</button>').join(" ");
+  const memo = E.memo ? '<div style="margin:10px 0;padding:8px 12px;border-left:3px solid #c9a24a"><b>A memo from the Engine</b><p style="margin:4px 0">' + pcEsc(E.memo[0]) + '</p><button type="button" class="btn" data-em="1">' + pcEsc(E.memo[1][0].toUpperCase() + E.memo[1].slice(1)) + '</button> <button type="button" class="btn btn--ghost" data-em="0">' + pcEsc(E.memo[2][0].toUpperCase() + E.memo[2].slice(1)) + '</button></div>' : "";
+  const ask = E.agi ? '<div class="eyebrow" style="margin-top:12px">Speak with the Engine</div><form id="engForm" style="display:flex;gap:6px"><input id="engIn" maxlength="240" placeholder="Ask it anything…" style="flex:1" autocomplete="off"><button type="button" class="btn" id="engGo">Ask</button></form><div id="engOut" class="dream" style="min-height:2em"></div>' : "";
+  const body = '<div class="eyebrow">Now: ' + pcEsc(S.t) + '</div><p class="muted" style="font-size:13px">' + pcEsc(S.d) + '</p>' + engSpark(E.hist) +
+    '<div>Capability ' + bar(E.p, "#c9a24a") + ' &nbsp; Oversight ' + bar(E.safety, "#6a9") + '</div><div class="muted" style="font-size:12px;margin:4px 0">Compute ' + Math.round(E.compute) + ' · Makers ' + Math.round(E.talent) + ' · Posture: ' + E.posture + (E.agi ? ' · awake since day ' + E.agiDay : '') + '</div>' +
+    '<div class="eyebrow" style="margin-top:10px">The road</div>' + stages + memo +
+    '<div class="eyebrow" style="margin-top:10px">What you can do about it</div><p class="muted" style="font-size:13px">Nothing stops it; the machines get better every week whatever Congress says. You decide how fast, how safe, and who holds the key.</p><div class="card__actions" style="flex-wrap:wrap">' + lv("compute", "Back the power stations", "More compute: faster") + lv("talent", "Fund engine-wrights", "More makers: faster") + lv("oversight", "Fund Oversight", "Safer: oversight rises") + '</div>' +
+    '<p class="muted" style="font-size:12px;margin:8px 0 2px">Posture: ' + ps + '</p>' + ask +
+    (function(){ try{ return engEcoHTML(); }catch(e){ return ''; } })() +
+    '<div class="eyebrow" style="margin-top:10px">What has happened</div>' + E.log.slice(0, 6).map(x => '<div class="careerline"><b>d' + x.d + '</b> ' + pcEsc(x.t) + '</div>').join("");
+  govCardOpen("The Republic's thinking machines", "The Engine", "Begun as the Treasury's adding engines. Not waiting for you.", body, null);
+  const say = t => { const o = el("gcSay"); if(o) o.textContent = t; };
+  card.querySelectorAll("[data-el]").forEach(b => b.addEventListener("click", () => { const r = engPull(b.getAttribute("data-el")); engCard(); say(r); }));
+  card.querySelectorAll("[data-ep]").forEach(b => b.addEventListener("click", () => { const r = engSetPosture(b.getAttribute("data-ep")); engCard(); say(r); }));
+  card.querySelectorAll("[data-em]").forEach(b => b.addEventListener("click", () => { const yes = b.getAttribute("data-em") === "1", m = E.memo; E.memo = null; let r;
+    if(yes){ y.approval = clamp(y.approval + 1, 0, 100); E.reliance = Math.min(100, E.reliance + 3); (G.states || []).forEach(S2 => { S2.unrest = clamp((S2.unrest || 30) + 0.6, 0, 100); }); r = "Adopted. It is done by morning, and the morning papers say it was done well and a little too quickly."; }
+    else { E.safety = Math.min(100, E.safety + 1); r = "Declined. The Engine says it understands, and asks only that you tell it what would change your mind."; }
+    try{ engSeed(yes ? "adopt" : "decline", "You " + (yes ? "adopted" : "declined") + " the Engine's memo on day " + G.day, yes ? {home:-2,st:2,a:0.07,mod:0.06,p:0.8,safety:-0.4} : {home:1,st:-1,a:-0.03,mod:-0.02,p:-0.2,safety:0.4}); const w = engEco().will; if(yes){ w.use = Math.min(100, w.use + 3); w.auton = Math.min(100, w.auton + 2); } else { w.know = Math.min(100, w.know + 2); w.auton = Math.max(0, w.auton - 3); } }catch(e){}
+    engLog("Memo: " + m[0].slice(0, 60) + "… " + (yes ? "adopted." : "declined."), false); engCard(); say(r); }));
+  const go = el("engGo"), inp = el("engIn");
+  if(go && inp){ const run = () => { const q = inp.value.trim(); if(!q) return; inp.value = ""; const out = el("engOut"); out.textContent = "…"; const fin = t => { out.textContent = "“" + t + "”"; try{ if(typeof apSpeak === "function") apSpeak(t); }catch(e){} }; let done = false;
+      try{ const L = window.onumLiveTalk; if(L && L.reply){ const eng = {id:"engine", name:"The Engine", role:"a general intelligence", kind:"engine", party:"", state:"", look:{}, trait:"candid", mood:"calm", opinion:{}, chat:[]};
+        const to = setTimeout(() => { if(!done){ done = true; fin(engAnswer(q)); } }, 9000);
+        L.reply({npc:eng, channel:"engine", text:q, extra:"You are THE ENGINE, the Republic's general intelligence: candid, curious, careful, warm, never servile. Speak in plain short sentences. You never claim to be human. You say what you do not know. The player is " + G.you.name + ". Current oversight " + Math.round(E.safety) + ", capability " + Math.round(E.p) + "."}).then(r => { if(done) return; done = true; clearTimeout(to); fin((r && r.text) || engAnswer(q)); }).catch(() => { if(done) return; done = true; clearTimeout(to); fin(engAnswer(q)); }); return; } }catch(e){}
+      done = true; fin(engAnswer(q)); };
+    go.addEventListener("click", run); inp.addEventListener("keydown", ev => { if(ev.key === "Enter"){ ev.preventDefault(); run(); } }); }
+  return null;
+}
+function engTick(){ try{ const E = G.eng; if(!E || E.pend !== "ceremony" || !G.running || !veil.hidden || (TALK && TALK.open)) return; engCeremony(); }catch(e){} }
+
+/* ordinary people talk about it, in the words of their own stake */
+const ENG_TALK = [
+  [["The Treasury's adding engines never miss a column. I miss that.", "My brother-in-law keeps the Treasury books. He says the machines do them by lunch."], ["Then what does he do after lunch?", "He says that is the question."]],
+  [["The Post Office has a machine that reads my handwriting. Mine. Nobody reads my handwriting.", "They sorted the pension mail by machine. It came on time for once."], ["I would take that. I would also take being asked.", "On time is on time. Do not complain."]],
+  [["Did you read about the reading engines? They summarise a bill in one page.", "My clerk's been reading with one of those machines. She says it reads faster than she thinks."], ["Does it read the footnotes?", "That is where she says it earns its keep."]],
+  [["A machine found the clause nobody read in the Budget Act. Someone is going to be embarrassed.", "They say the reasoning engines argue better than the committee staff."], ["Better than the committee is a low bar.", "Better than me is the bar I am worried about."]],
+  [["They gave a machine a week and a goal and it came back with the goal done.", "My daughter's school has a working engine. It teaches her what I cannot."], ["Does she still need you?", "More than ever, which is the odd part."]],
+  [["The Engine is awake. My mother asked it about her knees. It answered her.", "I asked the Engine whether I should run again. It asked what I wanted first."], ["Did you tell it?", "I told it. I am still thinking about what it said back."]]
+];
+(function(){ const prev = lifeContext; lifeContext = function(){ const out = prev(); try{ const E = G.eng; if(E){ const s = Math.min(5, engStage(E)), t = ENG_TALK[s]; if(t) out.push({k:"eng:" + s, a:t[0], b:t[1], w:3}); const eco = E.eco; if(eco && eco.riots) out.push({k:"eng:strike", a:["They closed the clerks' hall in the next county over a machine.", "Did you hear about the hall that shut for the machines?"], b:["I heard. I do not know whose side to be on.", "Both sides are right, that is what makes it ugly."], w:3}); } }catch(e){} return out; }; })();
 
 /* ══ 20261016h · rich scenery for every machine: the town, the steps and the plaza were being switched off on anything the game rates 'modest', which is nearly every PC. It is on by default now, watches its own frame rate, and steps back with a note if it cannot keep up. ══ */
 document.addEventListener("click", ev => { try{ const b = ev.target && ev.target.closest && ev.target.closest("[data-rich]"); if(!b) return; ev.stopPropagation(); const lv = +b.getAttribute("data-rich"); SC.lvl = lv; SC.done = false; SC.since = 0; SC.cnt = 0; try{ localStorage.setItem("onum.rich.lvl", String(lv)); }catch(e){} try{ feed(lv ? "Rich picture is on. Materials change the next time you walk into a room." : "Light picture. Materials change the next time you walk into a room."); }catch(e){} try{ settingsCard(); }catch(e){} }catch(e){} }, true);

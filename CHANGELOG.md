@@ -4,6 +4,16 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## The Engine: the Republic's march to a general intelligence
+
+`20261016v` (on `20261016u`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- New Apps entry 'The Engine': six stages from the Treasury's adding engines to a general intelligence, which nothing in the Republic can stop; you choose how fast, how safe and who holds the key (back power stations, fund engine-wrights, fund Oversight, set the posture open / chartered / sealed).
+- It is built from the ground up, not a bar: 177 households (a job, a will, a home life), every town's adoption and displacement, each state's mood and its laws (charters, subsidies), the nation's pace; strikes, protests and incident reports come out of that.
+- Everything you do is a seed with a chain behind it: the kitchen table, the council, the capital, the nation, each a day or two behind; the card shows what caused what, the Union's mood at thirty thousand feet and one household at the kitchen table.
+- Once awake the Engine has wants of its own (be useful, know everything, need no permission, look after people in trouble) that drift with what you tell it and decide what it quietly does; memos from it, a ceremony for its waking, and a place to speak with it (live if your local model is running, otherwise in its own words).
+- People in the corridors and on the street talk about it, in the words of their own stake, stage by stage.
+
 ## The gate walls and the Capitol door
 
 `20261016u` (on `20261016t`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
