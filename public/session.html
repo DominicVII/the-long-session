@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261015l">
+<meta name="onum-build" content="20261016a">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261015l";
+  var STAMP = "20261016a";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -3225,7 +3225,7 @@ function ensureLivedIn(){
       }
     });
   }catch(e){}
-  const want = ({office:2, corridor:4, floor:5, cloak:3, caucus:4, committee:3, press:2, steps:2, district:2, staff:1})[G.room] || 2;
+  const want = ({office:2, corridor:4, floor:5, cloak:3, caucus:4, committee:3, press:2, steps:2, district:2, staff:1, senate:6, court:4, exec:4, govoffice:4})[G.room] || 2;
   const here = everyone().filter(m => m && m.room === G.room && !m.gone && !m.away);
   if(here.length >= want) return;
   const pool = everyone().filter(m => m && !m.gone && !m.away && !m.ohK && !livesElsewhere(m) && m.room !== G.room && TALK.m !== m && visiting() !== m);
@@ -7403,6 +7403,7 @@ function kAmenities(id, w, d, h, hw){
   G._amen = {id, S};
 }
 function kAmenProps(id){
+  if(K_AMEN_ROOMS.indexOf(id) >= 0 && !kAmenMine(id)){ try{ if(kChamberRoom() === id){ const DP0 = deskProp(id), SB0 = sbProp(id); return (DP0 ? [DP0] : []).concat(SB0 ? [SB0] : []); } }catch(e){} return []; }
   if(K_AMEN_ROOMS.indexOf(id) < 0 || !kAmenMine(id)) return [];
   const S = (G._amen && G._amen.id === id && G._amen.S) || kAmenSpots(id);
   const DP = deskProp(id);
@@ -7830,7 +7831,7 @@ function deskSeatFor(room){
   const d = (ROOMS[room] && ROOMS[room].d) || 12;
   return {x:p.x, z:Math.min(d - 0.5, p.z + 0.85), face:Math.PI};
 }
-function myDeskRoom(){ try{ return G.room === "office" || (homeRoom() === G.room && !!DESK_OF[G.room]); }catch(e){ return false; } }
+function myDeskRoom(){ try{ return G.room === "office" || ((homeRoom() === G.room || kChamberRoom() === G.room) && !!DESK_OF[G.room]); }catch(e){ return false; } }
 function atMyDesk(){
   if(!G.you || !G.you.sitting || !myDeskRoom()) return false;
   const s = deskSeatFor(G.room); return !!s && Math.hypot(cam.x - s.x, cam.z - s.z) < 0.85;
@@ -13399,6 +13400,7 @@ function buildRoomInner(id, skipShell){
 
   try{ placeRoomFlags(id, w, d, h, hw); }catch(e){ if(window.console) console.warn("flags", e); }
   try{ kAmenities(id, w, d, h, hw); }catch(e){ if(window.console) console.warn("amenities", e); }
+  try{ kOfficeRole(id, w, d, h, hw); }catch(e){ if(window.console) console.warn("office role", e); }
 
   /* portraits of predecessors — propFrame (rabbet + flush wall contact) */
   if(R.style === "wood"){
@@ -27782,7 +27784,7 @@ function goalsEnsure(){
     if(!L.length) L.push({k:"docket", t:"Work " + nd + " items on today's docket", need:nd, room:hr});
     const EX = ROLE_EXTRA[heldOffice()] || [];
     if(EX.length){ const x = EX[(G.day + seedOf(G.you.name || "")) % EX.length]; L.push({k:"dk", key:x.key, t:x.t, need:1, room:hr}); }
-    L.push({k:"room", room:hr, kc:true, t:"Keep your hours in " + ROOMS[hr].t.replace(/^The /, "the "), need:1});
+    { const wr = K_ROOM_OF[heldOffice()] || hr; L.push({k:"room", room:wr, kc:true, t:"Keep your hours in " + ROOMS[wr].t.replace(/^The /, "the "), need:1}); }
     L.push(unread ? {k:"mail", t:"Clear your inbox", need:1} : {k:"room", room:"district", t:"Go home to " + G.you.state, need:1});
     G.goals = {day:G.day, list:L.map(g => Object.assign({have:0, done:false}, g)), talked:[], seen:{}, rollcall:false, all:false, pledged0:[], co0:0, whipped:[]};
     return G.goals;
@@ -30154,7 +30156,9 @@ function officeSeat(){
   if(k === "pres") return "the Union";
   return y.state + " " + y.dist;
 }
-function homeRoom(){ const k = heldOffice(); return (k && K_ROOM_OF[k]) || "office"; }
+const K_HOME_OF = {pres:"exec", gov:"govoffice"};
+function homeRoom(){ const k = heldOffice(); return (k && K_HOME_OF[k]) || "office"; }
+function inMyWorkRoom(){ try{ return G.room === homeRoom() || G.room === kChamberRoom(); }catch(e){ return false; } }
 /* what people call you to your face: the chair you hold, or the highest you held */
 function youAddress(){
   const y = G.you; if(!y) return "Representative";
@@ -30220,7 +30224,8 @@ function docketNext(){
 }
 function docketRun(d){
   if(!d || kOnceToday(d.key)) return;
-  if(G.room !== homeRoom()){ goTo(homeRoom()); return; }
+  { const sr = d.sit ? String(d.sit).split(":")[0] : null, chamber = sr && ["senate", "court", "committee", "caucus", "floor"].indexOf(sr) >= 0 ? sr : null, dest = chamber || homeRoom();
+    if(G.room !== dest && !(chamber ? false : G.room === homeRoom())){ goTo(dest); return; } }
   if(d.sit){ sitStart(d.sit); return; }
   if(d.power){
     const p = rolePowers().find(x => x.t.indexOf(d.power) === 0);
@@ -31298,6 +31303,66 @@ function talkExtraActs(m){
   ".tkgroups{display:block !important}.tkg{margin:6px 0}.tkg__h{font:700 10px Archivo,sans-serif;letter-spacing:.14em;text-transform:uppercase;margin-bottom:3px}.tkg__h span{font-weight:400;letter-spacing:0;text-transform:none;color:var(--ink-3,#888);font-size:11px}.tkg__row{display:flex;flex-wrap:wrap;gap:6px}" +
   ".talk__btn{flex-wrap:wrap}.talk__btn .tkd{flex:1 1 100%;font:400 11px/1.3 Archivo,system-ui,sans-serif;color:var(--ink-3,#888);margin-top:1px}.talk__btn .tkr{font:700 8.5px Archivo,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:var(--bad,#b33);border:1px solid currentColor;padding:0 4px;border-radius:2px}";
   document.head.appendChild(st); }
+/* ── your own office in the Cannon Building (the one off the Statuary Corridor): a Senator, a Justice, a leader or a chair works here and goes out to the chamber. Only the President and a Governor work in a wing of their own. ── */
+function officeRoleKind(){ let k = null; try{ k = roleKey(); }catch(e){} return k === "senate" ? "senate" : k === "bench" ? "bench" : (k === "leader" || k === "chair") ? "lead" : k === "house" ? "house" : null; }
+const OFFICE_ROLE_T = {
+  senate:{plate:"SENATOR", table:"Your staff table", tsub:"Chief of staff, legislative director, state director", mail:"The constituents' mail", msub:"Bags from home, and a wall of state maps"},
+  bench:{plate:"JUSTICE", table:"Your clerks' table", tsub:"Three clerks, a pile of briefs, and a kettle", mail:"The briefs and the petitions", msub:"Everything the Court has been asked to hear"},
+  lead:{plate:"LEADERSHIP", table:"The whip table", tsub:"Lists, a count in pencil, and a telephone that never stops", mail:"The leadership mail", msub:"Requests, threats and thank-yous"},
+  house:{plate:"REPRESENTATIVE", table:"Your staffers' table", tsub:"An intern, a scheduler and last week's coffee", mail:"The district mail", msub:"Letters from home"}
+};
+function officeRoleSpots(){ return {table:{x:2.9, z:5.0}, mail:{x:3.7, z:8.2}}; }
+function kOfficeRole(id, w, d, h, hw){
+  if(id !== "office") return; const rk = officeRoleKind(); if(!rk) return; const T = OFFICE_ROLE_T[rk], S = officeRoleSpots();
+  const wood = matCol(0x5a3b24, .7), cloth = matCol(0x2f4a66, .9), paper = matCol(0xe9e4d8, .95), brass = matCol(0xb08a2e, .4, .8);
+  addBox(wood, S.table.x, 0.38, S.table.z, 1.5, 0.76, 0.8, 0, true); addBox(paper, S.table.x - 0.3, 0.8, S.table.z, 0.35, 0.03, 0.28, 0.2, true); addBox(paper, S.table.x + 0.3, 0.8, S.table.z + 0.1, 0.3, 0.03, 0.25, -0.1, true);
+  addBox(cloth, S.table.x - 0.45, 0.28, S.table.z + 0.75, 0.42, 0.56, 0.42, 0, true); addBox(cloth, S.table.x + 0.45, 0.28, S.table.z + 0.75, 0.42, 0.56, 0.42, 0, true);
+  addBox(wood, S.mail.x, 0.5, S.mail.z, 0.7, 1.0, 0.5, 0, true); addBox(paper, S.mail.x, 1.04, S.mail.z, 0.5, 0.08, 0.34, 0, true);
+  try{ propPlaque(S.table.x, 1.5, S.table.z - 0.45, 0, T.table.toUpperCase().slice(0, 22), "Press E", 0.9, 0.14); }catch(e){}
+  try{ propPlaque(S.mail.x, 1.45, S.mail.z - 0.3, 0, T.mail.toUpperCase().slice(0, 22), "Press E", 0.9, 0.14); }catch(e){}
+  try{ propPlaque(hw - 0.06, 2.0, 3.0, -Math.PI / 2, T.plate, officeSeat ? officeSeat() : "", 0.9, 0.18); }catch(e){}
+}
+function officeRoleProps(){
+  const rk = officeRoleKind(); if(!rk) return []; const T = OFFICE_ROLE_T[rk], S = officeRoleSpots(), P = [];
+  const toChamber = {senate:["senate", "Walk to the Senate chamber"], bench:["court", "Walk to the Court"], lead:["floor", "Walk to the House floor"], house:["floor", "Walk to the House floor"]}[rk];
+  const walk = {t:toChamber[1], c:"walk", run(){ try{ closeTalk(); }catch(e){} G.you.sitting = false; goTo(toChamber[0]); }};
+  const tacts = [];
+  if(rk === "senate"){ tacts.push({t:"Hold the staff meeting", c:"30m", off:kOnceToday("sbrief"), run(){ closeTalk(); senBrief(); }}); tacts.push({t:"Go through the docket with your staff", c:"15m", run(){ closeTalk(); dkCard(0); }}); }
+  if(rk === "bench"){ tacts.push({t:"Go over the case with your clerks", c:"40m", off:kOnceToday("bconf"), run(){ closeTalk(); benchConf2(); }}); tacts.push({t:"Read the petitions for review", c:"15m", off:kOnceToday("bcert"), run(){ closeTalk(); benchCert(); }}); }
+  if(rk === "lead" || rk === "house"){ tacts.push({t:"Count the votes", c:"15m", off:!(G.bill && !G.bill.done), run(){ closeTalk(); whipCard(); }}); tacts.push({t:"Check on your rivals", c:"10m", run(){ closeTalk(); rivalCard(); }}); tacts.push({t:"Look at the families", c:"10m", run(){ closeTalk(); kinBrowse(); }}); }
+  tacts.push(walk);
+  P.push({id:"roleTable", label:T.table, sub:T.tsub, x:S.table.x, z:S.table.z, r:2.0, acts:() => tacts});
+  const macts = [];
+  if(rk === "senate") macts.push({t:"Take the calls from home", c:"40m", off:kOnceToday("scalls"), run(){ closeTalk(); senCalls(); }});
+  if(rk === "bench") macts.push({t:"Draft the opinion", c:"60m", off:kOnceToday("bopin"), run(){ closeTalk(); benchOpinion(); }});
+  if(rk === "lead" || rk === "house") macts.push({t:"Read the mail", c:"20m", run(){ closeTalk(); try{ pcOpen(); }catch(e){ note("Sit at your desk and wake the computer."); } }});
+  macts.push({t:"Read this morning's Ledger", c:"10m", run(){ closeTalk(); paperCard(); }});
+  P.push({id:"roleMail", label:T.mail, sub:T.msub, x:S.mail.x, z:S.mail.z, r:1.8, acts:() => macts});
+  return P;
+}
+setTimeout(() => { try{ const base = PROPS.office; if(base && !base._role){ base._role = true; const arr = base.slice(); Object.defineProperty(PROPS, "office", {configurable:true, enumerable:true, get(){ return arr.concat(officeRoleProps()); }, set(v){ arr.length = 0; (v || []).forEach(x => arr.push(x)); }}); } }catch(e){ console.warn("office role props", e); } }, 0);
+/* ── the first morning in a new chair: where you work, who works for you, what the day is made of, and what changed from the House ── */
+const FIRST_DAY = {
+  senate:{h:"Your first morning as a Senator", where:"Your office is in the Cannon Building, off the Statuary Corridor: the same room you worked in before, now with a staff table and the constituents' mail. The Senate chamber is down the corridor; walk there when it sits.", day:["8:00 staff meeting at your table","9:00 a confirmation hearing in committee","11:00 the Senate sits (you are one of two for your state)","2:00 treaties and foreign business","4:00 calls from home"], changed:"There is no whip count to work: you are one of a hundred, you vote on confirmations and treaties as well as bills, and you can hold the floor. Your state answers to you directly, and so does its Governor.", lean:"Your staff speak for themselves; the Senate's rules are different and slower; and your aide at every meeting is the highest-ranking member of your party."},
+  bench:{h:"Your first morning as a Justice", where:"Your chambers are your office in the Cannon Building, with a clerks' table and the briefs. The Court sits down the corridor, and you will go there for oral argument.", day:["9:00 conference with the other justices","10:00 oral argument","1:00 petitions for review: what the Court will hear","2:00 write the opinion"], changed:"You no longer campaign or whip. Three votes make an opinion the Court's; a dissent is still printed. Everyone else answers what you rule the next morning.", lean:"Your clerks read the case before you do; the other justices argue it in their own words, and you may press them."},
+  gov:{h:"Your first morning as Governor", where:"You work in the State House, not the Capitol. The House on the Hill is a different building with a different set of rules, and its members no longer take your orders (or your votes).", day:["8:00 morning briefing from your advisors","10:00 open hours: citizens, mayors and county clerks","12:00 the situation: what the state may do about its neighbours","1:00 the statehouse desk","3:00 agencies and the budget","5:00 press availability"], changed:"You sign and veto, appoint, budget and pardon. Your state is your whole constituency, and you answer to it. There are no roll calls for you; there is a legislature that sends you what it has passed.", lean:"Your advisors, agency heads and appointees are people with views of their own; and when a neighbour holds your bread, you act within what the state may do and ask the Union for the rest."},
+  pres:{h:"Your first morning as the executive", where:"You work in the Executive wing. Congress sends you acts; the courts rule on what you do; and every state, every neighbour and every cabinet member has a view.", day:["8:00 the cabinet briefing","9:00 the situation room","11:00 acts awaiting signature","2:00 cabinet and appointments","4:00 calls with foreign capitals","5:00 the press room"], changed:"You are the one people look to. Everything you sign, veto, say or order is answered the next morning by the other branches, the states and the neighbours; the law decides how far you may go alone.", lean:"Your cabinet secretaries speak in their own words; and the form of the state and the precedents you set decide what you may do without asking."}
+};
+function firstDayCard(k, go){
+  const F = FIRST_DAY[k]; if(!F){ go(); return; }
+  const body = '<p>' + pcEsc(F.where) + '</p><div class="eyebrow">What the day is made of</div><ul style="margin:4px 0 0 18px">' + F.day.map(x => '<li>' + pcEsc(x) + '</li>').join("") + '</ul>' +
+    '<div class="eyebrow" style="margin-top:10px">What is different from the House</div><p>' + pcEsc(F.changed) + '</p><p class="muted" style="font-size:13px">' + pcEsc(F.lean) + '</p>' +
+    '<p class="muted" style="font-size:12px">Find things in the Apps tab on your phone (purse, families, situation room, gallery), the Ledger button, and M for the map. Everyone, including you, has a purse, a family and their own time.</p>' +
+    '<div class="card__actions"><button type="button" class="btn" id="fdGo">Begin</button></div>';
+  govCardOpen("A new chair", F.h, "", body, null);
+  el("fdGo").addEventListener("click", () => { walkNow(); setTimeout(go, 40); });
+}
+{ const _dp = dayPlanCard;
+  dayPlanCard = function(){
+    try{ const k = heldOffice(), y = G.you; y.firstDay = y.firstDay || {}; if(k && k !== "house" && FIRST_DAY[k] && !y.firstDay[k]){ y.firstDay[k] = G.day; const a = arguments, self = this; firstDayCard(k, () => _dp.apply(self, a)); return; } }catch(e){ console.warn("first day", e); }
+    return _dp.apply(this, arguments);
+  };
+}
 function amendText(S){ const A = (S && S.amend) || []; return A.length ? " Amendments agreed at open hours, to be attached: " + A.map(a => a.title + " (" + a.from + ")").join("; ") + "." : ""; }
 function amendApply(S){ const A = (S && S.amend) || []; if(!A.length) return ""; const y = G.you; S.unrest = clamp(S.unrest - A.length, 0, 100); y.approval = clamp(y.approval + A.length, 0, 100); S.amend = []; return " The amendments from open hours were attached: " + A.map(a => a.title).join(", ") + "."; }
 function govBrief(S){
@@ -31385,7 +31450,7 @@ function choiceCard(eyebrow, title, text, opts, key, mins){
 function refreshOfficePane(){
   const y = G.you, k = heldOffice(), pane = el("paneFloor");
   if(!pane) return;
-  const D = docketToday(), m = G.minute || 0, here = G.room === homeRoom();
+  const D = docketToday(), m = G.minute || 0, here = inMyWorkRoom();
   const rows = D.map((d, i) => {
     const done = kOnceToday(d.key);
     const when = (d.h > 12 ? d.h - 12 : d.h) + ":00 " + (d.h >= 12 ? "pm" : "am");

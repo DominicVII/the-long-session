@@ -4,6 +4,16 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## Every chair has an office, and a first morning
+
+`20261016a` (on `20261015l`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- **Your own office, unless you are an executive:** a Senator, a Justice, a leader or a chair works in their own office in the Cannon Building, off the Statuary Corridor, the one you started in. Only the President (the Executive wing) and a Governor (the State House) work in a wing of their own. The chamber (Senate, Court, floor) is where you go to sit, and your desk and computer still work there.
+- **The office is furnished for the chair you hold:** a staff table (the Senator's staff meeting, the docket; the Justice's clerks and petitions for review; the leader's whip count and rivals), the mail (constituents' calls for a Senator, the briefs and opinions for a Justice), a nameplate with your title, and a way to walk to your chamber.
+- **The docket walks you where it belongs:** a Senate sitting or oral argument takes you to the chamber; briefings, calls and opinions stay in your office. Daily goals say 'keep your hours in the Senate' or 'the Court'.
+- **Busier rooms:** the Senate chamber, the Court, the Executive wing and the State House now draw a living crowd.
+- **A first morning in every new chair:** the first time you wake in a new office, a card says where you work, what the day is made of, what is different from the House, and where to find things.
+
 ## Conversation made readable; families with men and women
 
 `20261015l` (on `20261015k`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
