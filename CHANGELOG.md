@@ -4,6 +4,12 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## The Senate no longer freezes on older saves
+
+`20261017f` (on `20261017e`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- FIXED: on a long career (your day-112 save), walking into the Senate could freeze the page. Some townspeople in older saves had never been given an inner life; the first time one came into view, the three routines that build it kept asking each other to build it first, round and round, until the page locked. A person already being built is now not built again. Checked on your save: the Senate loads and the page stays responsive.
+
 ## The rival
 
 `20261017e` (on `20261017d`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
