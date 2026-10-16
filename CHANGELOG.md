@@ -4,6 +4,13 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## Weather that follows you, on every PC
+
+`20261016p` (on `20261016o`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- Rain and snow now fall on modest machines too (they were switched off), and the curtain of weather travels with you down the whole High Street instead of stopping at the old room's edge, twice as dense.
+- On rain, snow, fog and storm days the sky, mountains and skyline go grey and flat instead of staying summer blue.
+
 ## Street life on the High Street, and better cars
 
 `20261016o` (on `20261016n`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.

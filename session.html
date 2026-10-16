@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261016o">
+<meta name="onum-build" content="20261016p">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261016o";
+  var STAMP = "20261016p";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -31921,7 +31921,7 @@ function vTime(){
   let gl = 1; try{ gl = wxGloom(); }catch(e){}
   let snow = false; try{ const w = wxToday(); snow = !!(w && w.cover > 0 && w.s === "winter"); }catch(e){}
   const night = 1 - day, t = new THREE.Color();
-  const tint = k => { t.setRGB(lerp(0.07, 1, day) * (1 + gold * 0.28), lerp(0.09, 1, day) * (1 - gold * 0.16), lerp(0.18, 1, day) * (1 - gold * 0.34)); t.multiplyScalar(lerp(1, gl, 0.85) * (k || 1)); return t; };
+  const tint = k => { t.setRGB(lerp(0.07, 1, day) * (1 + gold * 0.28), lerp(0.09, 1, day) * (1 - gold * 0.16), lerp(0.18, 1, day) * (1 - gold * 0.34)); t.multiplyScalar(lerp(1, gl, 0.85) * (k || 1)); if(gl < 1){ const lu = (t.r + t.g + t.b) / 3, sa = clamp(1 - (1 - gl) * 3, 0.05, 1); t.r = lu + (t.r - lu) * sa; t.g = lu + (t.g - lu) * sa; t.b = lu + (t.b - lu) * sa; } return t; };
   if(VST.dome) VST.dome.material.color.copy(tint(1.02));
   const ang = clamp((h - 6) / 12, -0.3, 1.3) * Math.PI, el = Math.sin(ang);
   if(VST.sun){ VST.sun.userData.rel = new THREE.Vector3(-Math.cos(ang) * 78 * VST.K, (Math.max(el, -0.2) * 72 + 4) * VST.K, 64 * VST.K); VST.sun.material.opacity = clamp(el * 3, 0, 1) * lerp(1, 0.28, 1 - gl); VST.sun.material.color.setRGB(1, lerp(1, 0.72, gold), lerp(1, 0.5, gold)); VST.sun.scale.setScalar(lerp(46, 70, gold) * VST.K); }
@@ -33507,17 +33507,17 @@ function wxClear(){
 function wxBuild(R){
   wxClear();
   const w = wxToday();
-  if(!R || !R.open || MODEST || G.gfx === "simple") return;
+  if(!R || !R.open || (MODEST && !sceneryRich()) || G.gfx === "simple") return;
   const rainy = w.k === "rain" || w.k === "storm", snowy = w.k === "snow";
   if(!rainy && !snowy) return;
-  const n = (G.gfx === "balanced" || (typeof crowdSafe !== "undefined" && crowdSafe)) ? (snowy ? 260 : 220) : (snowy ? 520 : (w.k === "storm" ? 900 : 650));
-  const hw = R.w / 2 + 1, d = R.d + 1;
+  const n = ((G.gfx === "balanced" || (typeof crowdSafe !== "undefined" && crowdSafe)) ? (snowy ? 260 : 220) : (snowy ? 520 : (w.k === "storm" ? 900 : 650))) * 2;
+  const hw = 14, d = 28, zc = -14;                          /* a curtain of weather that travels with you */
   const grp = new THREE.Group();
   let geo, mat;
   if(rainy){
     const p = new Float32Array(n * 6);
     for(let i = 0; i < n; i++){
-      const x = (Math.random() * 2 - 1) * hw, y = Math.random() * wxH, z = Math.random() * d - 0.5;
+      const x = (Math.random() * 2 - 1) * hw, y = Math.random() * wxH, z = Math.random() * d + zc;
       p.set([x, y, z, x + 0.035, y + 0.55, z], i * 6);
     }
     geo = new THREE.BufferGeometry(); geo.setAttribute("position", new THREE.BufferAttribute(p, 3));
@@ -33528,7 +33528,7 @@ function wxBuild(R){
     for(let k = 0; k < 2; k++){ const o = new THREE.LineSegments(geo, mat2); o.position.set(0.37, k * wxH + 0.9, 0.53); o.frustumCulled = false; grp.add(o); }
   } else {
     const p = new Float32Array(n * 3);
-    for(let i = 0; i < n; i++) p.set([(Math.random() * 2 - 1) * hw, Math.random() * wxH, Math.random() * d - 0.5], i * 3);
+    for(let i = 0; i < n; i++) p.set([(Math.random() * 2 - 1) * hw, Math.random() * wxH, Math.random() * d + zc], i * 3);
     geo = new THREE.BufferGeometry(); geo.setAttribute("position", new THREE.BufferAttribute(p, 3));
     mat = new THREE.PointsMaterial({color:0xffffff, size:0.07, transparent:true, opacity:0.85, depthWrite:false});
     for(let k = 0; k < 2; k++){ const o = new THREE.Points(geo, mat); o.position.y = k * wxH; o.frustumCulled = false; grp.add(o); }
@@ -33541,7 +33541,7 @@ function wxFrame(dt){
   wxT += Math.min(0.05, dt || 0.016);
   const sp = wxObj.userData.speed;
   wxObj.position.y = -((wxT * sp) % wxH);
-  if(wxObj.userData.snow) wxObj.position.x = Math.sin(wxT * 0.6) * 0.35;
+  wxObj.position.x = cam.x + (wxObj.userData.snow ? Math.sin(wxT * 0.6) * 0.35 : 0); wxObj.position.z = cam.z;
 }
 /* the town changes with the season: canopies, and snow on the walks */
 const L_CANOPY = 0x3a6a32;
