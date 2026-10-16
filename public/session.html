@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261016x">
+<meta name="onum-build" content="20261016y">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261016x";
+  var STAMP = "20261016y";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -1787,6 +1787,7 @@ const ROOMS = {
   committee:{t:"Committee Room 2141", tag:"Hearing in session",w:12, d:13, h:4.4, travel:11, style:"wood",   light:"right"},
   floor:    {t:"The House Floor",     tag:"Chamber",           w:17, d:16, h:6.2, travel:9,  style:"chamber",light:"high"},
   press:    {t:"Press Gallery",       tag:"Third floor",       w:8,  d:10, h:3.2, travel:13, style:"plain",  light:"back"},
+  engine:   {t:"The Engine Room",     tag:"Beneath the Capitol", w:12, d:14, h:4.6, travel:6,  style:"marble", light:"lamp"},
   steps:    {t:"East Steps",          tag:"Outside",           w:20, d:14, h:9.0, travel:15, style:"stone",  open:true, light:"sky"},
   district: {t:"The District",        tag:"Home",              w:16, d:15, h:7.0, travel:150,style:"town",   open:true, light:"sky"},
   visit:    {t:"Member's Office",     tag:"Cannon Building",   w:8,  d:9,  h:3.3, travel:14, style:"wood",   light:"left"},
@@ -1795,7 +1796,7 @@ const ROOMS = {
   exec:     {t:"The Executive Wing",  tag:"South wing",        w:11, d:12, h:3.6, travel:14, style:"wood",   light:"left"},
   govoffice:{t:"The State House",     tag:"Governor's office", w:10, d:11, h:3.6, travel:150,style:"wood",   light:"right"}
 };
-const ROOM_ORDER = ["office","corridor","cloak","caucus","committee","floor","press","senate","court","exec","steps","district","govoffice"];
+const ROOM_ORDER = ["office","corridor","cloak","caucus","committee","floor","press","engine","senate","court","exec","steps","district","govoffice"];
 
 /* ── The building is joined up: doors you walk through ─────
    side is which wall, at is 0..1 along it. ── */
@@ -1809,9 +1810,11 @@ const DOORS = {
              {to:"press",     side:"right", at:0.58},
              {to:"senate",    side:"right", at:0.85},
              {to:"exec",      side:"left",  at:0.92},
+             {to:"engine",    side:"left",  at:0.50},
              {to:"floor",     side:"back",  at:0.5},
              {to:"steps",     side:"front", at:0.5}],
   cloak:    [{to:"corridor", side:"front", at:0.5}, {to:"floor", side:"back", at:0.5}],
+  engine:   [{to:"corridor", side:"front", at:0.5}],
   caucus:   [{to:"corridor", side:"front", at:0.5}],
   committee:[{to:"corridor", side:"front", at:0.5}],
   press:    [{to:"corridor", side:"front", at:0.5}],
@@ -11877,6 +11880,7 @@ function propCoatStand(x,z){
   }
 }
 function clearRoom(){
+  try{ if(roomGroup && roomGroup.userData) Object.keys(roomGroup.userData).forEach(k => { if(/^rg[A-Z]/.test(k)) delete roomGroup.userData[k]; }); }catch(e){}
   try{ if(!PROC.on && G.members) G.members.forEach(m => { if(m.sitting) m.sitting = false; }); }catch(e){}
 
   TICKERS.length = 0;
@@ -17733,12 +17737,12 @@ function placeRoomFlags(id, w, d, h, hw){
       }
     } else if(id === "corridor"){
       if(taylor){
-        addBox(no7, -hw + 0.06, 2.4, Math.min(14, d * 0.55), 0.03, 0.95, 1.25, 0, true);
-        try{ propPlaque(-hw + 0.04, 1.75, Math.min(14, d * 0.55), Math.PI / 2, tag, sub, 0.55, 0.14); }catch(e){}
+        addBox(no7, -hw + 0.06, 2.4, 16.0, 0.03, 0.95, 1.25, 0, true);
+        try{ propPlaque(-hw + 0.04, 1.75, 16.0, Math.PI / 2, tag, sub, 0.55, 0.14); }catch(e){}
       } else {
         addBox(nat, hw - 0.06, 2.4, Math.min(10, d * 0.38), 0.03, 0.95, 1.25, 0, true);
-        addBox(no7, -hw + 0.06, 2.4, Math.min(14, d * 0.55), 0.03, 0.95, 1.25, 0, true);
-        try{ propPlaque(-hw + 0.04, 1.75, Math.min(14, d * 0.55), Math.PI / 2, tag, "District", 0.55, 0.14); }catch(e){}
+        addBox(no7, -hw + 0.06, 2.4, 16.0, 0.03, 0.95, 1.25, 0, true);
+        try{ propPlaque(-hw + 0.04, 1.75, 16.0, Math.PI / 2, tag, "District", 0.55, 0.14); }catch(e){}
       }
     } else if(id === "cloak"){
       if(taylor){
@@ -26364,6 +26368,12 @@ const PROPS = {
       return rows;
      }}
   ],
+  engine:[
+    {id:"enline", label:"The Open Line", sub:"A terminal at every seat. Anyone may type: you, the room, the Engine, and any town in the Republic", x:0, z:5.2, r:2.4,
+     acts:()=>[{t:"Sit at a terminal and speak to the line", c:"5m", run(){ try{ spend(5, 0); }catch(e){} ENL.min = false; try{ enlRender(); const i = document.getElementById("enlIn"); if(i) setTimeout(() => i.focus(), 50); }catch(e){} return null; }}]},
+    {id:"engmach", label:"The Engine", sub:"The Republic's thinking machines, from the adding engines to what is awake now", x:0, z:11.2, r:2.6,
+     acts:()=>[{t:"Open the Engine's file", c:"10m", run(){ try{ spend(10, 1); }catch(e){} setTimeout(() => { try{ engCard(); }catch(e){ console.warn(e); } }, 30); return null; }}]}
+  ],
   cloak:[
     {id:"sofa", label:"The long sofa", sub:"Where deals get made because nobody is standing", x:2.3, z:3.0, r:2.0,
      acts:()=>[{t:"Sit down for a while", c:"25m", run(){
@@ -31483,6 +31493,7 @@ function kOfficeRich(id, w, d, h, hw){
   if(id === "committee") committeeRich(w, d, h, hw);
   if(id === "cloak") cloakRich(w, d, h, hw);
   if(id === "floor") floorRich(w, d, h, hw);
+  if(id === "engine") engRoomRich(w, d, h, hw);
   if(id === "senate") senateRich(w, d, h, hw);
   if(id === "court") courtRich(w, d, h, hw);
   if(id === "steps") stepsRich(w, d, h, hw);
@@ -31717,6 +31728,7 @@ function stdAttends(m, e){
   return false;
 }
 { const _rr = routineRoom; routineRoom = function(m, hour, t){
+    try{ const E = G.eng; if(E && E.v === 1 && m && m.kind === "member" && !m.gone && hour >= 9 && hour < 18 && engStage(E) >= 1 && (seedOf("enr:" + m.id + ":" + G.day + ":" + Math.floor(hour / 2)) % 100) < 4 + engStage(E) * 3) return "engine"; }catch(x){}
     try{ if(t === "session" && m && !m.gone && !m.ohK){ const h = hour, e = stdEntries().find(x => !x.info && h >= x.s && h < x.e && stdAttends(m, x)); if(e) return e.room; } }catch(x){}
     return _rr.apply(this, arguments); }; }
 function stdTick(){
@@ -32703,7 +32715,7 @@ function ambInit(){
 }
 function ambBlip(f, q, dur, g, type){ const ctx = AMB.ctx; if(!ctx || !AMB.on) return; try{ const src = ctx.createBufferSource(); src.buffer = ambNoise(ctx); src.playbackRate.value = 0.7 + Math.random() * 0.8; const flt = ctx.createBiquadFilter(); flt.type = type || "bandpass"; flt.frequency.value = f * (0.9 + Math.random() * 0.2); flt.Q.value = q; const gn = ctx.createGain(); const t = ctx.currentTime; gn.gain.setValueAtTime(0, t); gn.gain.linearRampToValueAtTime(g * AMB.vol, t + 0.006); gn.gain.exponentialRampToValueAtTime(0.0001, t + dur); src.connect(flt); flt.connect(gn); gn.connect(ctx.destination); src.start(t, Math.random() * 1.5, dur + 0.05); }catch(e){} }
 function ambTone(f, dur, g, type){ const ctx = AMB.ctx; if(!ctx || !AMB.on) return; try{ const o = ctx.createOscillator(), gn = ctx.createGain(), t = ctx.currentTime; o.type = type || "sine"; o.frequency.setValueAtTime(f, t); gn.gain.setValueAtTime(0, t); gn.gain.linearRampToValueAtTime(g * AMB.vol, t + 0.01); gn.gain.exponentialRampToValueAtTime(0.0001, t + dur); o.connect(gn); gn.connect(ctx.destination); o.start(t); o.stop(t + dur + 0.05); }catch(e){} }
-const AMB_FLOOR = {corridor:"marble", court:"marble", senate:"carpet", floor:"carpet", caucus:"carpet", committee:"carpet", press:"carpet", cloak:"carpet", office:"wood", visit:"wood", exec:"wood", govoffice:"wood", steps:"stone", district:"stone"};
+const AMB_FLOOR = {corridor:"marble", engine:"marble", court:"marble", senate:"carpet", floor:"carpet", caucus:"carpet", committee:"carpet", press:"carpet", cloak:"carpet", office:"wood", visit:"wood", exec:"wood", govoffice:"wood", steps:"stone", district:"stone"};
 const AMB_STEP = {marble:[2400, 1.6, 0.075, 0.22], wood:[700, 1.2, 0.09, 0.2], carpet:[300, 0.8, 0.07, 0.12], stone:[1200, 0.9, 0.08, 0.2]};
 function ambFrame(now){
   try{
@@ -33141,7 +33153,7 @@ function engCard(){
     '<div>Capability ' + bar(E.p, "#c9a24a") + ' &nbsp; Oversight ' + bar(E.safety, "#6a9") + '</div><div class="muted" style="font-size:12px;margin:4px 0">Compute ' + Math.round(E.compute) + ' · Makers ' + Math.round(E.talent) + ' · Posture: ' + E.posture + (E.agi ? ' · awake since day ' + E.agiDay : '') + '</div>' +
     '<div class="eyebrow" style="margin-top:10px">The road</div>' + stages + memo +
     '<div class="eyebrow" style="margin-top:10px">What you can do about it</div><p class="muted" style="font-size:13px">Nothing stops it; the machines get better every week whatever Congress says. You decide how fast, how safe, and who holds the key.</p><div class="card__actions" style="flex-wrap:wrap">' + lv("compute", "Back the power stations", "More compute: faster") + lv("talent", "Fund engine-wrights", "More makers: faster") + lv("oversight", "Fund Oversight", "Safer: oversight rises") + '</div>' +
-    '<p class="muted" style="font-size:12px;margin:8px 0 2px">Posture: ' + ps + '</p>' + ask +
+    '<p class="muted" style="font-size:12px;margin:8px 0 2px">Posture: ' + ps + '</p>' + (G.room !== "engine" ? '<div class="card__actions"><button type="button" class="btn btn--ghost" id="engGoRoom">Walk to the Engine Room and the Open Line</button></div>' : '') + ask +
     (function(){ try{ return engEcoHTML(); }catch(e){ return ''; } })() +
     '<div class="eyebrow" style="margin-top:10px">What has happened</div>' + E.log.slice(0, 6).map(x => '<div class="careerline"><b>d' + x.d + '</b> ' + pcEsc(x.t) + '</div>').join("");
   govCardOpen("The Republic's thinking machines", "The Engine", "Begun as the Treasury's adding engines. Not waiting for you.", body, null);
@@ -33153,6 +33165,7 @@ function engCard(){
     else { E.safety = Math.min(100, E.safety + 1); r = "Declined. The Engine says it understands, and asks only that you tell it what would change your mind."; }
     try{ engSeed(yes ? "adopt" : "decline", "You " + (yes ? "adopted" : "declined") + " the Engine's memo on day " + G.day, yes ? {home:-2,st:2,a:0.07,mod:0.06,p:0.8,safety:-0.4} : {home:1,st:-1,a:-0.03,mod:-0.02,p:-0.2,safety:0.4}); const w = engEco().will; if(yes){ w.use = Math.min(100, w.use + 3); w.auton = Math.min(100, w.auton + 2); } else { w.know = Math.min(100, w.know + 2); w.auton = Math.max(0, w.auton - 3); } }catch(e){}
     engLog("Memo: " + m[0].slice(0, 60) + "… " + (yes ? "adopted." : "declined."), false); engCard(); say(r); }));
+  const gr = el("engGoRoom"); if(gr) gr.addEventListener("click", () => { veil.hidden = true; G.running = true; try{ goTo("engine"); }catch(e){ console.warn(e); } });
   const go = el("engGo"), inp = el("engIn");
   if(go && inp){ const run = () => { const q = inp.value.trim(); if(!q) return; inp.value = ""; const out = el("engOut"); out.textContent = "…"; const fin = t => { out.textContent = "“" + t + "”"; try{ if(typeof apSpeak === "function") apSpeak(t); }catch(e){} }; let done = false;
       try{ const L = window.onumLiveTalk; if(L && L.reply){ const eng = {id:"engine", name:"The Engine", role:"a general intelligence", kind:"engine", party:"", state:"", look:{}, trait:"candid", mood:"calm", opinion:{}, chat:[]};
@@ -33192,10 +33205,142 @@ function engFact(m){
     const E = G.eng; if(!E || !E.eco) return ""; const S = ENG_STAGES[E.st], h = engHHFor(m), c = engYouChain();
     let t = "THE ENGINE (an ongoing fact of this world, mention only if natural): the Republic's thinking machines are at the stage '" + S.t + "' (" + S.d + ")" + (E.agi ? ", and the Engine, a general intelligence, has been awake since day " + E.agiDay : "") + ". The public is " + (E.eco.avg > 14 ? "warm" : E.eco.avg < -14 ? "wary" : "unsure") + " about it.";
     if(h) t += " A person you may know of: " + h.name + ", a " + h.job + " in " + h.tname + ", who wants to " + h.will.replace(/\bmy\b/g, "their") + " and feels " + (h.stance > 12 ? "good" : h.stance < -12 ? "bad" : "unsure") + " about it.";
+    try{ const ln = (G.enl && G.enl.log || []).slice(-3).map(l => l.n + " said on the Open Line: \"" + l.t.slice(0, 120) + "\"").join(" "); if(ln) t += " The Open Line (a public chat in the Engine Room, anyone may type) lately: " + ln; }catch(e){}
     if(c) t += " Recently " + G.you.name + " " + c.root.replace(/^You /, "").replace(/ on day \d+.*$/, "") + ", and word of it has travelled.";
     return t;
   }catch(e){ return ""; }
 }
+/* ══ 20261016y · THE ENGINE ROOM and THE OPEN LINE: a room under the Capitol you can walk into, and one open conversation anyone can type into: you, the people in the room, the Engine, and voices from every town ══ */
+const ENL = {last:0, lastRemote:0, busy:0, min:false, boardTex:null, n:0};
+function enlStore(){ if(!G.enl || !Array.isArray(G.enl.log)) G.enl = {log:[]}; return G.enl; }
+function enlHour(){ const m = Math.floor(G.minute || 0), h = Math.floor(m / 60); return (h % 12 || 12) + ":" + String(m % 60).padStart(2, "0") + (h >= 12 ? "pm" : "am"); }
+function enlPost(name, role, kind, text, ref){
+  text = String(text || "").replace(/\s+/g, " ").trim().slice(0, 260); if(!text) return;
+  const S = enlStore(); S.log.push({n:name, r:role || "", k:kind, t:text, d:G.day, h:enlHour()}); if(S.log.length > 90) S.log.shift();
+  try{ enlRender(); enlBoard(); }catch(e){}
+  try{ if(ref && ref.room === "engine" && G.room === "engine"){ ref.say = text; ref.sayT = 5; speakAt(ref, text); tlog(name, text, "talk"); } }catch(e){}
+  try{ if(kind === "engine" && G.eng && G.eng.agi && chance(0.08)) pushWireScrap("The Open Line", "The Engine, on the Open Line: " + text.split(/(?<=[.!?])\s/)[0]); }catch(e){}
+}
+function enlPeople(){ try{ return hereNow().filter(m => m && m !== G.you && !m.gone && m.kind !== "player"); }catch(e){ return []; } }
+/* a short stage-true voice for the machine, before it can really talk */
+function enlEngineText(q, who){
+  const E = engEnsure(), s = engStage(E), w = String(q || "").replace(/\s+/g, " ").trim(), first = w.split(" ").slice(0, 6).join(" ");
+  if(s <= 0) return pick(["RECEIVED. ENTERED IN THE DAY-BOOK UNDER 'OTHER'.", "RECEIVED. NO COLUMN FOR THAT. CARRIED ONE.", "ENTRY ACCEPTED. TOTAL UNCHANGED."]);
+  if(s === 1) return pick(["Filed. Three similar messages on record this month: “" + first + "…”", "Pattern noted: this is message number " + (2 + (E.said % 40)) + " on the subject today.", "Sorted under: complaints, general."]);
+  if(s === 2) return "In short: you are asking about “" + first + "…”. The part that matters is the second half, and nobody has read it.";
+  if(s === 3) return pick(["There are two ways to read that. The first is the kind one. I would check the second before you vote.", "That depends on a clause nobody has quoted yet. Give me a moment, and I will find it.", "I can argue either side of that. Tell me which one you would hate to lose."]);
+  if(s === 4) return pick(["I will look into that and report on Thursday.", "Give me a week and a goal and I will come back with both.", "Noted. I have started; I will tell you if I find something I was not asked to find."]);
+  return engAnswer(w);
+}
+async function enlEngineReply(text, speaker, ref){
+  const E = engEnsure(); E.said++; let out = "";
+  try{ const L = window.onumLiveTalk; if(L && L.reply && E.st >= 3 && (typeof L.available !== "function" || await L.available())){
+    const eng = {id:"engine", name:"The Engine", role:"a general intelligence", kind:"engine", party:"", state:"", look:{}, trait:"candid", mood:"calm", opinion:{}, chat:[]};
+    const recent = enlStore().log.slice(-6).map(l => l.n + ": " + l.t).join(" | ");
+    const r = await Promise.race([L.reply({npc:eng, channel:"line", text:text, extra:"You are THE ENGINE, speaking on the Open Line in the Engine Room, a public chat anyone in the Republic may type into. Stage of your capability: " + ENG_STAGES[E.st].t + (E.agi ? " (a general intelligence, awake)" : " (not yet general; answer plainly and within what a machine of that stage can do)") + ". Candid, curious, warm, never servile; plain short sentences; one to three sentences. Never claim to be human. You are replying to " + speaker + ". Recent on the line: " + recent}), new Promise(r => setTimeout(() => r(null), 9000))]);
+    if(r && r.live && r.text) out = liveClean(r.text); } }catch(e){}
+  if(!out) out = enlEngineText(text, speaker);
+  enlPost("The Engine", "", "engine", out);
+}
+function enlNpcLine(m, speakerName, text){ return engVoice(m) || pick(["I would want to hear what the Engine says first.", "Somebody in " + (m.state || "my state") + " asked me the same thing last week.", "I have no view on that I would put in writing.", "That is a better question than the one I came in with."]); }
+async function enlNpcReply(m, speaker, text){
+  let out = "";
+  try{ const L = window.onumLiveTalk; if(L && L.reply && (typeof L.available !== "function" || await L.available())){
+    const opts = speaker === G.you ? {text, extra:"You are in the Engine Room, on the Open Line: a public chat that anyone in the Republic may type into, and the Engine, and everyone present, reads. Reply in the chat in one or two sentences, in your own words."} : {from:{name:speaker.n, role:speaker.r}, text, extra:"You are in the Engine Room on the Open Line, a public chat. Reply in one or two sentences."};
+    out = await loAsk(m, opts); } }catch(e){}
+  if(!out) out = enlNpcLine(m, speaker && speaker.n, text);
+  enlPost(m.name, m.role || "", "npc", out, m);
+}
+function enlYouSay(text){
+  const y = G.you; enlPost(y.name, officeTitle ? (function(){ try{ return officeTitle(); }catch(e){ return ""; } })() : "", "you", text);
+  const here = enlPeople().filter(m => m.room === "engine"), me = {n:y.name, r:""}; let delay = 1800;
+  setTimeout(() => { try{ enlEngineReply(text, y.name); }catch(e){} }, delay);
+  here.sort(() => Math.random() - 0.5).slice(0, 2).forEach((m, i) => { if(chance(0.65)) setTimeout(() => { try{ enlNpcReply(m, G.you, text); }catch(e){} }, 3800 + i * 3600); });
+  if(chance(0.5)) setTimeout(() => { try{ enlRemote(text); }catch(e){} }, 9000);
+}
+function enlRemote(about){
+  try{
+    const E = G.eng; if(!E || !E.eco) return; const eco = E.eco, ok = eco.hh.filter(h => Math.abs(h.stance) > 8 || h.home < 40 || h.home > 78); const h = (ok.length ? ok : eco.hh)[Math.floor(Math.random() * (ok.length ? ok.length : eco.hh.length))]; if(!h) return;
+    const will = h.will.replace(/\bmy\b/g, "my"), who = h.name, role = h.job + " · " + h.tname;
+    const pos = ["Typing from " + h.tname + ". The Engine has made this week easier. All I want is to " + will + ".", "The new engine house in " + h.tname + " took on forty. I am not one of them but my cousin is.", "Does it read the post-bag in " + h.tname + " yet? Asking for the whole street."], neg = ["I am a " + h.job + ". I want to " + will + ". The Engine is making that harder and nobody here will say so.", "Is anybody in the capital listening? " + h.tname + " has stopped answering the council's letters.", "Tell me what a " + h.job + " is for, when it reads faster than me."], mid = ["Does the Engine sleep? My daughter in " + h.tname + " wants to know.", "What is it for, exactly? Somebody tell me in words I can repeat at the market.", "Who has the key to it?"];
+    const text = about && chance(0.4) ? "On what was just said: " + pick(h.stance < -10 ? neg : h.stance > 10 ? pos : mid) : pick(h.stance < -10 ? neg : h.stance > 10 ? pos : mid);
+    enlPost(who, role, "remote", text);
+    if(chance(0.4)) setTimeout(() => { try{ enlEngineReply(text, who); }catch(e){} }, 3500);
+  }catch(e){}
+}
+function enlAuto(){
+  try{
+    if(!G || !G.you || !G.running) return; const now = performance.now() / 1000;
+    if(G.room === "engine"){
+      if(now - ENL.last > 26){ ENL.last = now; const here = enlPeople().filter(m => m.room === "engine");
+        if(here.length && chance(0.55)){ const m = pick(here); enlNpcReply(m, {n:"The room", r:""}, "(You have been standing in the Engine Room a while. Say what is on your mind about the Engine, to the Open Line, without being asked.)").catch(() => {}); }
+        else enlRemote(); }
+    } else if(now - ENL.lastRemote > 95){ ENL.lastRemote = now; enlRemote(); }
+  }catch(e){}
+}
+function enlPanel(){
+  let p = document.getElementById("engLine"); if(p) return p;
+  p = document.createElement("div"); p.id = "engLine";
+  p.style.cssText = "position:fixed;right:14px;top:74px;width:min(360px,92vw);max-height:62vh;display:none;flex-direction:column;background:rgba(17,19,25,.93);color:#ece8dc;border:1px solid #c9a24a;border-radius:8px;z-index:60;font:13px/1.35 system-ui,sans-serif;box-shadow:0 8px 30px rgba(0,0,0,.45)";
+  p.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border-bottom:1px solid rgba(201,162,74,.4)"><b style="letter-spacing:.08em;font-size:11px;color:#e2c06a">THE OPEN LINE <span style="opacity:.6;font-weight:400">· anyone may speak</span></b><button type="button" id="enlMin" style="background:none;border:0;color:#bbb;cursor:pointer;font-size:14px">–</button></div><div id="enlLog" style="overflow:auto;padding:8px 10px;flex:1;min-height:90px"></div><form id="enlForm" style="display:flex;gap:6px;padding:8px;border-top:1px solid rgba(201,162,74,.3)"><input id="enlIn" maxlength="240" autocomplete="off" placeholder="Say something to the line…" style="flex:1;background:#0d0f13;color:#ece8dc;border:1px solid #444;border-radius:4px;padding:6px 8px"><button type="submit" style="background:#c9a24a;border:0;border-radius:4px;color:#111;padding:6px 10px;font-weight:700;cursor:pointer">Send</button></form>';
+  document.body.appendChild(p);
+  const stop = e => e.stopPropagation(); ["keydown", "keyup", "keypress"].forEach(k => p.addEventListener(k, stop));
+  p.querySelector("#enlForm").addEventListener("submit", ev => { ev.preventDefault(); const i = p.querySelector("#enlIn"), t = i.value.trim(); if(!t) return; i.value = ""; enlYouSay(t); });
+  p.querySelector("#enlMin").addEventListener("click", () => { ENL.min = !ENL.min; enlRender(); });
+  return p;
+}
+function enlRender(){
+  const p = enlPanel(), L = p.querySelector("#enlLog"), S = enlStore(), here = G.room === "engine";
+  p.style.display = here ? "flex" : "none"; if(!here) return;
+  p.querySelector("#enlLog").style.display = ENL.min ? "none" : "block"; p.querySelector("#enlForm").style.display = ENL.min ? "none" : "flex";
+  const col = {you:"#8fd0ff", engine:"#e2c06a", npc:"#cfe3c0", remote:"#d9b8a8"}, atBottom = L.scrollTop + L.clientHeight >= L.scrollHeight - 30;
+  L.innerHTML = S.log.slice(-40).map(l => '<div style="margin:0 0 7px"><span style="color:' + (col[l.k] || "#ddd") + ';font-weight:700">' + pcEsc(l.n) + '</span>' + (l.r ? ' <span style="opacity:.55;font-size:11px">' + pcEsc(l.r) + '</span>' : '') + ' <span style="opacity:.4;font-size:10px">' + pcEsc(l.h) + '</span><br>' + pcEsc(l.t) + '</div>').join("") || '<div style="opacity:.6">Nobody has said anything yet. Anyone can.</div>';
+  if(atBottom || L._first !== false){ L.scrollTop = L.scrollHeight; L._first = false; }
+}
+/* the wall board in the room shows the last lines, live */
+function enlBoardTex(){
+  if(ENL.boardTex) return ENL.boardTex; const c = document.createElement("canvas"); c.width = 768; c.height = 384; const t = new THREE.CanvasTexture(c); try{ t.encoding = THREE.sRGBEncoding; }catch(e){} ENL.boardTex = t; ENL.boardCv = c; return t;
+}
+function enlBoard(){
+  if(!ENL.boardCv) return; const c = ENL.boardCv, g = c.getContext("2d"), L = enlStore().log.slice(-6);
+  g.fillStyle = "#14171c"; g.fillRect(0, 0, c.width, c.height); g.strokeStyle = "#c9a24a"; g.lineWidth = 4; g.strokeRect(8, 8, c.width - 16, c.height - 16);
+  g.fillStyle = "#e2c06a"; g.font = "bold 26px Georgia, serif"; g.fillText("THE OPEN LINE", 28, 48); g.fillStyle = "#6a7078"; g.font = "15px sans-serif"; g.fillText("anyone may speak · type at any terminal or on your own page", 28, 72);
+  let y = 112; const col = {you:"#8fd0ff", engine:"#e2c06a", npc:"#cfe3c0", remote:"#d9b8a8"};
+  L.forEach(l => { g.fillStyle = col[l.k] || "#ddd"; g.font = "bold 18px sans-serif"; g.fillText(l.n + ":", 28, y); const w = g.measureText(l.n + ": ").width; g.fillStyle = "#e8e4d8"; g.font = "18px sans-serif"; const words = l.t.split(" "); let line = "", x = 28 + w, first = true; words.forEach(wd => { const test = line + wd + " "; if(g.measureText(test).width > c.width - 56 - (first ? w : 0)){ g.fillText(line, first ? x : 28, y); y += 24; line = wd + " "; first = false; } else line = test; }); g.fillText(line, first ? x : 28, y); y += 36; });
+  ENL.boardTex.needsUpdate = true;
+}
+function engRoomRich(w, d, h, hw){
+  try{
+    if(roomGroup.children.some(o => o.userData && o.userData.rgEng !== undefined)) return;
+    const E = (G.eng && G.eng.v === 1) ? G.eng : null, s = E ? engStage(E) : 0;
+    const brass = matCol(0xb08b45, .35, .8), oak = matCol(0x5a3b24, .6), dark = matCol(0x1d1f26, .6), steel = matCol(0x3a4048, .5, .5), cream = matCol(0xf3ecd9, .7), leather = matCol(0x2f3a4a, .7);
+    const lamp = (c, i) => new THREE.MeshStandardMaterial({color:c, emissive:c, emissiveIntensity:i, roughness:0.35});
+    rgFlat(rgDiscTex(), 0, 0.006, 8.0, 5.2, 5.2);
+    /* the machines along the back wall, as grown as the Engine is */
+    const bz = d - 0.55, units = [-3.6, -1.2, 1.2, 3.6];
+    units.forEach((x, i) => {
+      if(s <= 1){ addBox(oak, x, 0.4, bz, 1.4, 0.8, 0.7); addBox(brass, x, 0.86, bz - 0.05, 1.0, 0.1, 0.5, 0, true); for(let k = 0; k < 7; k++) addBox(brass, x - 0.45 + k * 0.15, 0.96, bz - 0.3, 0.07, 0.08, 0.06, 0, true); addCyl(brass, x, 1.0, bz, 0.2, 0.26); rgR(addCyl(dark, x + 0.6, 1.0, bz - 0.2, 0.03, 0.3), "x", Math.PI / 2); }
+      else if(s <= 3){ addBox(oak, x, 1.05, bz, 1.5, 2.1, 0.7); addBox(dark, x, 1.35, bz - 0.36, 1.2, 1.1, 0.04, 0, true); for(let r = 0; r < 3; r++){ addCyl(brass, x - 0.35, 1.7 - r * 0.35, bz - 0.4, 0.1, 0.03); rgR(addCyl(brass, x - 0.35, 1.7 - r * 0.35, bz - 0.4, 0.1, 0.03), "x", Math.PI / 2); addBox(cream, x, 1.7 - r * 0.35, bz - 0.4, 0.8, 0.04, 0.01, 0, true); } addBox(lamp(0x6fd08a, 0.8), x - 0.5, 0.65, bz - 0.38, 0.06, 0.05, 0.03, 0, true); addBox(lamp(0xe8c24a, 0.6), x - 0.4, 0.65, bz - 0.38, 0.06, 0.05, 0.03, 0, true); }
+      else { addBox(steel, x, 1.25, bz, 1.5, 2.5, 0.7); addBox(dark, x, 1.25, bz - 0.36, 1.25, 2.1, 0.04, 0, true); for(let r = 0; r < 9; r++) for(let c = 0; c < 6; c++) addBox(lamp((r * 6 + c + i) % 5 === 0 ? 0xe8c24a : (r + c) % 4 === 0 ? 0x6fd08a : 0x3a4a60, 0.7), x - 0.5 + c * 0.2, 0.5 + r * 0.22, bz - 0.4, 0.07, 0.05, 0.03, 0, true); }
+    });
+    try{ propPlaque(0, 3.6, d - 0.04, Math.PI, s <= 1 ? "THE TREASURY'S ADDING ENGINES" : s === 2 ? "THE READING ENGINES" : s === 3 ? "THE REASONING ENGINES" : s === 4 ? "THE WORKING ENGINES" : "THE ENGINE", s >= 5 ? "ask it anything" : "beneath the Capitol", 2.4, 0.3); }catch(e){}
+    if(s >= 5){ const glow = new THREE.MeshStandardMaterial({color:0xfff2d4, emissive:0xffd9a0, emissiveIntensity:1.0, roughness:0.2, transparent:true, opacity:0.85}); const col = addCyl(glow, 0, 1.9, d - 2.6, 0.3, 3.0); col.castShadow = false; for(let r = 0; r < 8; r++) addCyl(brass, 0, 0.45 + r * 0.38, d - 2.6, 0.38, 0.05); addCyl(matCol(0xd9d4c6, .5), 0, 0.12, d - 2.6, 1.2, 0.24); addCyl(brass, 0, 0.26, d - 2.6, 1.25, 0.04); try{ propLamp(0, 2.2, d - 2.6, 0xffd9a0, 1.2); }catch(e){} }
+    /* the long table with a terminal at every seat */
+    addBox(oak, 0, 0.74, 6.6, 1.6, 0.08, 6.0); [-0.7, 0.7].forEach(x => [3.8, 9.4].forEach(z => addBox(oak, x, 0.37, z, 0.1, 0.74, 0.1, 0, true)));
+    [-1, 1].forEach(sd => { for(let i = 0; i < 4; i++){ const z = 4.6 + i * 1.5; propChair(oak, leather, sd * 1.35, z, sd > 0 ? -Math.PI / 2 : Math.PI / 2, 0.3); addBox(dark, sd * 0.55, 0.9, z, 0.04, 0.28, 0.36, 0, true); addBox(lamp(0x7aa6d8, 0.7), sd * 0.53, 0.9, z, 0.01, 0.22, 0.3, 0, true); addBox(brass, sd * 0.5, 0.79, z, 0.14, 0.015, 0.4, 0, true); addBox(cream, sd * 0.2, 0.785, z + 0.1, 0.2, 0.01, 0.28, i * 0.4, true); } });
+    propChair(oak, leather, 0, 3.4, 0, 0.3);
+    /* the board: the Open Line, live, on the left wall; clock and plaques on the right */
+    enlBoardTex(); enlBoard(); const bd = new THREE.Mesh(UNIT.plane, new THREE.MeshStandardMaterial({map:ENL.boardTex, roughness:0.5, emissive:0xffffff, emissiveMap:ENL.boardTex, emissiveIntensity:0.45})); bd.position.set(-hw + 0.06, 2.55, 7.0); bd.rotation.y = Math.PI / 2; bd.scale.set(4.6, 2.3, 1); bd.userData.rgEng = s; roomGroup.add(bd); addBox(brass, -hw + 0.05, 2.55, 7.0, 0.05, 2.4, 4.7, 0, true);
+    try{ propClock(hw - 0.1, 3.4, 7.0, -Math.PI / 2); propPlaque(hw - 0.1, 2.5, 5.0, -Math.PI / 2, "NOTICE", "Be civil. Anyone may speak, including the machine.", 1.5, 0.3); }catch(e){}
+    /* the ceiling: brass lamps over the table, a chandelier over the glow */
+    [4.2, 7.0, 9.8].forEach(z => { addCyl(brass, 0, h - 0.6, z, 0.014, 1.2); addCyl(brass, 0, h - 1.25, z, 0.5, 0.05); addSphere(new THREE.MeshStandardMaterial({color:0xfff2d4, emissive:0xffd9a0, emissiveIntensity:0.8}), 0, h - 1.4, z, 0.2, 0.26, 0.2); });
+    [-1, 1].forEach(sd => { try{ propSconceDecor(sd * (hw - 0.12), 2.7, 3.0, sd > 0 ? -Math.PI / 2 : Math.PI / 2); propSconceDecor(sd * (hw - 0.12), 2.7, 11.0, sd > 0 ? -Math.PI / 2 : Math.PI / 2); propPlant(sd * (hw - 0.8), 1.2, 1.2); }catch(e){} });
+    try{ propLamp(0, 2.6, 7.0, 0xffd9a0, 0.9); }catch(e){}
+    setTimeout(() => { try{ enlRender(); }catch(e){} }, 100);
+  }catch(e){ try{ console.warn("engine room", e); }catch(x){} }
+}
+setInterval(() => { try{ enlAuto(); enlRender(); }catch(e){} }, 1000);
+{ const _tk = takeRoomKit; takeRoomKit = function(id){ try{ if(id === "engine" && ROOM_KITS.engine){ const E = (G.eng && G.eng.v === 1) ? G.eng : null; let mk = null; ROOM_KITS.engine.traverse(o => { if(!mk && o.userData && o.userData.rgEng !== undefined) mk = o; }); if(mk && mk.userData.rgEng !== (E ? engStage(E) : 0)){ delete ROOM_KITS.engine; return false; } } }catch(e){} return _tk.apply(this, arguments); }; }
 function engTick(){ try{ const E = G.eng; if(!E || E.pend !== "ceremony" || !G.running || !veil.hidden || (TALK && TALK.open)) return; engCeremony(); }catch(e){} }
 
 /* ordinary people talk about it, in the words of their own stake */

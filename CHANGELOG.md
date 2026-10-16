@@ -4,6 +4,15 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## The Engine Room and the Open Line
+
+`20261016y` (on `20261016x`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- A real room off the Statuary Corridor (left wall, between the Cloakroom and the Caucus Room): The Engine Room, beneath the Capitol. The machines along its back wall are the Engine as it is today (brass adding engines, reading cabinets, banks of lamps, and once it is awake a glowing column), and the room is rebuilt when the stage changes. A long table with a terminal at every seat, a live wall board.
+- THE OPEN LINE: a public chat in that room that anyone can type into. You, the people standing in the room, the Engine, and households from every town in the country, all in one conversation; the Engine answers in the voice of its stage (a day-book clerk, a sorter, a summariser, an arguer, a worker, and finally itself); people in the room answer in their own words, live if your local model is running; voices from the towns speak up on their own, even when you are elsewhere. What was said is remembered for the live-talk model, so people elsewhere can bring it up.
+- Walk to it from the Engine card too. Members drift in and out during the day.
+- Fixed: rooms rebuilt after the building evicts them no longer lose their special furnishing flags.
+
 ## What people say about the Engine
 
 `20261016x` (on `20261016w`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
