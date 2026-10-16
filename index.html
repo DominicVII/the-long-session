@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261016e">
+<meta name="onum-build" content="20261016f">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261016e";
+  var STAMP = "20261016f";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -10307,6 +10307,7 @@ function pbApps(){
     ["gov", "The government", "Who runs the nation, and who stands behind them."],
     ["paper", "This morning's paper", "The Ledger."],
     ["war", "The situation room", "A neighbour holds the bread: what your office may do, what it must ask others for, and who answers."],
+    ["cal", "The standing calendar", "Caucus, committees, the Senate, the Court and the Press Gallery: what meets when, whether or not you are there."],
     ["org", "The nation, from the ground up", "Towns, states and the nation, each doing its own job: who petitioned whom, who paid, and who passed what."],
     ["kin", "The families", "Who is behind you and behind them: spouses, children, parents, siblings, and what they do to a vote or a run."],
     ["watch", "Sit in the gallery", "Watch a chamber or a hearing from the gallery. No vote, no floor."],
@@ -10331,7 +10332,7 @@ function watchCard(){
     if(G.room !== k){ try{ goTo(k); }catch(e){} setTimeout(() => { try{ G._sitWatch = true; sitStart(k); }catch(e){ console.warn(e); } }, 500); } else sitStart(k); }));
 }
 function pbAppGo(id){
-  const go = {org:() => orgBrowse(), kin:() => kinBrowse(), war:() => warRoleOpen(), purse:() => purseCard(), watch:() => watchCard(), chest:() => chestCard(), office:() => officeCard(), sched:() => scheduleCard(), docket:() => dkCard(0), gov:() => govCard(), paper:() => paperCard(),
+  const go = {cal:() => stdCalCard(), org:() => orgBrowse(), kin:() => kinBrowse(), war:() => warRoleOpen(), purse:() => purseCard(), watch:() => watchCard(), chest:() => chestCard(), office:() => officeCard(), sched:() => scheduleCard(), docket:() => dkCard(0), gov:() => govCard(), paper:() => paperCard(),
     notebook:() => notebookCard(), rival:() => rivalCard(),
     career:() => { try{ showPane("paneCareer"); document.body.classList.add("ui-open"); }catch(e){} },
     union:() => { try{ mapToggle(true); }catch(e){} },
@@ -29744,7 +29745,7 @@ function kMark(key){ const y = G.you; y.used = y.used || {}; y.used[key] = G.day
 
 /* ── the people who work in them ─────────────────────────── */
 const K_STAFF = {
-  senate:   [["senator","Senator","the Senate calendar"],["senator","Senator","the Senate calendar"],["senclerk","Secretary of the Senate","the Senate journal"]],
+  senate:   [["senator","Senator","the Senate calendar"],["senator","Senator","the Senate calendar"],["senclerk","Secretary of the Senate","the Senate journal"],["senator","Senator","the Senate calendar"],["senator","Senator","the Senate calendar"],["senator","Senator","the Senate calendar"],["senator","Senator","the Senate calendar"],["senator","Senator","the Senate calendar"],["senator","Senator","the Senate calendar"]],
   court:    [["justice","Justice","the docket"],["courtclerk","Clerk of the Court","the docket"],["marshal","Marshal of the Court","order in the room"]],
   exec:     [["chief","Chief of Staff","the Executive's day"],["aide","Executive aide","the morning briefing"]],
   govoffice:[["gsec","Governor's secretary","the Governor's calendar"],["gcounsel","Counsel to the Governor","the state's lawsuits"]]
@@ -29760,7 +29761,7 @@ function kEnsurePeople(){
         /* whoever won the Senate sits in it: the desk follows the election */
         if(spec[0] === "senator"){
           const won = (G.ladder || []).filter(x => x && x.won && x.to === "senate");
-          if(won[i] && have.name !== won[i].name){ have.name = won[i].name; have.met = false; }
+          if(i < 2 && won[i] && have.name !== won[i].name){ have.name = won[i].name; have.met = false; }
         }
         return;
       }
@@ -29770,7 +29771,8 @@ function kEnsurePeople(){
         c.chamber = room; c.room = room; c.caseOpen = false;
         if(spec[0] === "senator"){
           const won = (G.ladder || []).filter(x => x && x.won && x.to === "senate");
-          if(won[i]) c.name = won[i].name;
+          if(i < 2 && won[i]) c.name = won[i].name;
+          if(i >= 3){ const ss = (G.states || []).filter(x => x.n !== (G.you && G.you.state)), st = ss[(i * 7 + 3) % Math.max(1, ss.length)]; if(st){ c.state = st.n; try{ c.name = wallSafeMint(() => newName(st.n)); }catch(e){} } c.party = ["FED", "COM"][i % 2]; }
         }
         if(spec[0] === "justice" && G.court && G.court[0]) c.name = G.court[0].name;
         if(room === "govoffice" && G.you && G.you.state){ try{ c.state = G.you.state; }catch(e){} }
@@ -31643,6 +31645,138 @@ function nearGreet(){
   apSpeak(m, {t:l, k:"greet"}, null); apToast(m, {t:l, k:"greet"});
   try{ momentLog(m.name + " saw you come near and spoke first."); }catch(e){}
 }
+/* ══ 20261016f · a standing calendar (it meets whether or not you do), the rooms open to every office, and a Senate full of senators ══ */
+{ const _oa = outsideAllowed; outsideAllowed = function(id){ if(id === "caucus" || id === "committee") return true; return _oa.apply(this, arguments); }; }
+const STD = {last:-1, live:0, noted:{}, said:{}};
+const STD_TOPIC = {ways:["the revenue schedule", "the tariff on grain", "the bread subsidy"], judic:["the sentencing provisions", "the powers of the Marshal", "the appeal rules"], armed:["the border garrison", "the cost of the new cutters", "the veterans' pensions"], health:["the miners' relief fund", "the clinic grants", "the fever hospitals"]};
+function stdHost(kind, party, com){
+  const M = (G.members || []).filter(m => m && !m.gone && m.kind === "member");
+  if(kind === "caucus") return M.find(m => m.post === "whip" && m.party === party) || M.find(m => m.party === party) || null;
+  const c = M.find(m => m.post === com); if(c) return c;
+  return M.filter(m => m.cmte === com).sort((a, b) => ((b.influence || b.infl || 0) - (a.influence || a.infl || 0)))[0] || null;
+}
+function stdEntries(day){
+  day = day || G.day; const w = (day - 1) % 7, out = [];
+  if(w > 3) return out;
+  const party = w % 2 === 0 ? "FED" : "COM", pl = (function(){ try{ return partyLabel(party); }catch(e){ return party; } })();
+  out.push({id:"caucus", day, room:"caucus", s:9, e:10, kind:"caucus", party, title:pl + " conference", topic:"the line for the day"});
+  [[10, 12, w % 4], [14, 16, (w + 2) % 4]].forEach(a => { const c = COMMITTEES[a[2]], tp = STD_TOPIC[c.k] || ["the estimates"]; out.push({id:"cm" + a[0], day, room:"committee", s:a[0], e:a[1], kind:"hearing", com:c.k, title:c.t + " hearing", topic:tp[(day + a[0]) % tp.length]}); });
+  out.push({id:"brief", day, room:"press", s:13, e:14, kind:"brief", title:"The daily briefing", topic:"what the day has done to the count"});
+  out.push({id:"senate", day, room:"senate", s:11, e:13, kind:"sits", title:"The Senate sits", topic:"the calendar", info:true});
+  if(w === 1 || w === 3) out.push({id:"court", day, room:"court", s:10, e:12, kind:"argument", title:"The Court hears argument", topic:"the docket", info:true});
+  out.forEach(e => { e.key = day + ":" + e.id; e.host = null; });
+  return out;
+}
+function stdNowF(){ return (G.minute || 0) / 60; }
+function stdActive(room){ if(dayType() !== "session") return null; const h = stdNowF(); return stdEntries().find(e => e.room === room && h >= e.s && h < e.e) || null; }
+function stdAttends(m, e){
+  if(!m || m.gone || e.info) return false;
+  const roll = seedOf("att:" + m.id + ":" + e.key) % 100;
+  if(m.kind === "member"){
+    if(e.kind === "caucus") return m.party === e.party && roll < 88;
+    if(e.kind === "hearing") return (m.cmte === e.com || m.post === e.com) && roll < 86;
+    return false;
+  }
+  if(m.kind === "press") return (e.kind === "brief" && roll < 85) || (e.kind === "hearing" && roll < 30);
+  return false;
+}
+{ const _rr = routineRoom; routineRoom = function(m, hour, t){
+    try{ if(t === "session" && m && !m.gone && !m.ohK){ const h = hour, e = stdEntries().find(x => !x.info && h >= x.s && h < x.e && stdAttends(m, x)); if(e) return e.room; } }catch(x){}
+    return _rr.apply(this, arguments); }; }
+function stdTick(){
+  if(!G || !G.running || !G.you || PROC.on) return;
+  const mn = G.minute || 0, k = G.day * 2000 + Math.floor(mn / 5); if(STD.last === k) return; STD.last = k;
+  if(dayType() !== "session") return;
+  const ents = stdEntries().filter(e => !e.info); let moved_ = false;
+  const pool = (G.members || []).concat(G.press || []).filter(m => m && !m.gone);
+  ents.forEach(e => {
+    pool.forEach(m => {
+      if(TALK.m === m || visiting() === m) return;
+      const inWin = mn >= e.s * 60 + (seedOf("arr:" + m.id + e.key) % 22) && mn < e.e * 60;
+      if(inWin && m.room !== e.room && m._std !== e.key && stdAttends(m, e)){ m._std = e.key; m.room = e.room; try{ moved(); placeInRoom(m); }catch(x){} moved_ = true; }
+      else if(mn >= e.e * 60 && m._std === e.key){ m._std = null; if(m.room === e.room){ try{ const want = routineRoom(m, Math.floor(mn / 60), "session"); if(want !== m.room){ m.room = want; moved(); placeInRoom(m); moved_ = true; } }catch(x){} } }
+    });
+  });
+  if(moved_){ try{ _allCache = null; markRenderDirty(); }catch(x){} }
+}
+const STD_LINES = {
+  hearing:{open:["The committee will come to order. We are on {t}.", "We have a witness and two hours. {t}, and I will take it in order.", "Quiet, please. {t}. The clerk will read the notice."],
+    ask:["Can the witness say who bears the cost of {t}?", "I have a question about section four, and then I have another.", "For the record, my state was not consulted on {t}.", "The department's own figures say twice that. Which of us is wrong?", "I would like it in the minutes that I asked."],
+    ans:["That is a fair question, and I will have the numbers by Friday.", "The record will show what I said, and not what the member heard.", "I am not the witness to ask. Ask the clerk.", "Section four does not say that, and I will read it aloud if I must."]},
+  caucus:{open:["Doors shut. We leave this room with one line on {t}.", "Right. {t}, and then we go out and say the same thing.", "Phones down. I want to hear who is wobbling."],
+    ask:["If we blink on {t}, {s} pays for it at home.", "I did not come here to be told how to vote.", "Count me in if the carve-out stays, and out if it does not.", "Who is going to say it to the press? Not me.", "We held the line last week and got nothing for it."],
+    ans:["Then say so now, not on the floor.", "Nobody is asking you to like it. We are asking you to count.", "The whip will remember who held and who did not.", "Fine. Put it in writing and I will carry it."]},
+  brief:{open:["Thanks, all. A few minutes, and then I have a meeting.", "The count is moving. I will say what I can."],
+    ask:["Is it true {t} is in trouble?", "Who in the party has gone quiet?", "Does the Executive have a position yet?", "Can you confirm the numbers on the floor?"],
+    ans:["The office has no comment on a count that changes every hour.", "I will not characterise a private conversation.", "Ask again at four.", "That is a question for the whip, not for me."]}
+};
+function stdFill(t, e, m){ const b = G.bill && !G.bill.done ? G.bill.title : e.topic; return t.replace(/\{t\}/g, e.kind === "caucus" ? b : e.topic).replace(/\{s\}/g, (m && m.state) || "my state"); }
+function stdLive(){
+  if(!G || !G.running || TALK.open || SIT.on || G.t - STD.live < 20) return;
+  const e = stdActive(G.room); if(!e || e.info) return; STD.live = G.t;
+  const here = hereNow().filter(m => m && !m.gone && m !== G.you && m.traits && m.x != null && (m.kind === "member" || m.kind === "press"));
+  if(here.length < 2) return;
+  const B = STD_LINES[e.kind] || STD_LINES.brief, host = stdHost(e.kind, e.party, e.com);
+  if(!STD.said[e.key] && host && host.room === G.room){ STD.said[e.key] = 1; const l = stdFill(pick(B.open), e, host); host.say = l; host.sayT = 6; host.sayTo = "you"; host.faceUntil = G.t + 6; try{ speakAt(host, l); }catch(x){} try{ momentLog(host.name + " opened the " + e.title.toLowerCase() + "."); }catch(x){} return; }
+  const a = pick(here.filter(m => m !== host)) || here[0], b = pick(here.filter(m => m !== a)) || here[1];
+  try{ overhear(a, b, stdFill(pick(B.ask), e, a), stdFill(pick(B.ans), e, b)); }catch(x){}
+}
+{ const _er = enterRoom; enterRoom = function(dest, from){
+    const r = _er.apply(this, arguments);
+    try{ if(dest === "caucus" || dest === "committee" || dest === "press"){ nextFrameOrTimeout(() => { try{ stdEnterNote(dest); }catch(x){} }, 700); } }catch(x){}
+    return r; }; }
+function stdEnterNote(dest){
+  if(G.room !== dest) return;
+  const e = stdActive(dest), host = e ? stdHost(e.kind, e.party, e.com) : null;
+  if(e){
+    const n = hereNow().filter(m => m && m !== G.you && (m.kind === "member" || m.kind === "press")).length;
+    feed(e.title + " is in session (" + hourLabel(e.s) + " to " + hourLabel(e.e) + "), " + n + " in the room" + (host ? ", " + host.name + " presiding" : "") + ".");
+    if(host && host.room === dest && !TALK.open){ const l = pick(["Come in, take a seat. We are on " + (e.kind === "caucus" ? "the line for the day" : e.topic) + ".", "You are late, or early. Sit.", "Good, another vote in the room."]); host.say = l; host.sayT = 6; host.sayTo = "you"; host.faceUntil = G.t + 6; try{ speakAt(host, l); }catch(x){} }
+  } else {
+    const next = stdEntries().filter(x => x.room === dest && !x.info && x.s * 60 > (G.minute || 0))[0];
+    feed("Nothing is sitting in here now." + (next && dayType() === "session" ? " " + next.title + " is at " + hourLabel(next.s) + "." : " The standing calendar has it empty today."));
+  }
+}
+function stdCalCard(){
+  const today = dayType() === "session", ents = today ? stdEntries() : [], h = stdNowF();
+  let nxt = []; for(let d = G.day + 1; d <= G.day + 7 && nxt.length < 5; d++){ if(((d - 1) % 7) <= 3) nxt = nxt.concat(stdEntries(d).filter(x => !x.info).map(x => Object.assign({d}, x))).slice(0, 5); }
+  const row = e => { const live = h >= e.s && h < e.e, past = h >= e.e, host = stdHost(e.kind, e.party, e.com), n = live || !past ? (everyone().filter(m => m.room === e.room && !m.gone).length) : 0;
+    return '<div class="careerline" style="' + (past ? "opacity:.5" : "") + '"><b>' + pcEsc(hourLabel(e.s)) + '–' + pcEsc(hourLabel(e.e)) + '</b><span>' + pcEsc(e.title) + ' <span class="muted">· ' + pcEsc(ROOMS[e.room].t) + (host && !e.info ? ' · ' + pcEsc(host.name) + ' presiding' : '') + (live ? ' · <b>in session</b>, ' + n + ' there' : past ? ' · over' : '') + '</span> ' + (!past && ROOMS[e.room] && outsideAllowed(e.room) && G.room !== e.room ? '<button type="button" class="btn btn--ghost" data-scgo="' + e.room + '" style="padding:0 8px">Go</button>' : '') + '</span></div>'; };
+  const body = '<div class="eyebrow">Today · ' + pcEsc(dayLabel()) + '</div>' + (today ? ents.map(row).join("") : '<p class="muted">Nothing meets today. The calendar is Monday to Thursday; Friday is the district and the weekend is the weekend.</p>') +
+    (nxt.length ? '<div class="eyebrow" style="margin-top:10px">Next sitting days</div>' + nxt.map(x => '<div class="careerline"><b>day ' + x.d + ' · ' + pcEsc(hourLabel(x.s)) + '</b><span>' + pcEsc(x.title) + ' <span class="muted">· ' + pcEsc(ROOMS[x.room].t) + '</span></span></div>').join("") : "");
+  govCardOpen("The standing calendar", "It meets whether or not you do", "Caucus, the committees and the briefing keep to their hours. Members go where the calendar sends them. Walk in and it is already going.", body, null);
+  document.querySelectorAll("[data-scgo]").forEach(b => b.addEventListener("click", () => { const r = b.getAttribute("data-scgo"); try{ pcClose(); }catch(x){} try{ closeCard && closeCard(); }catch(x){} goTo(r); }));
+  return null;
+}
+setTimeout(() => { try{ const c = document.getElementById("kClock"); if(c && !c._stdWired){ c._stdWired = true; c.style.cursor = "pointer"; c.title = "The standing calendar"; c.addEventListener("click", () => { try{ if(G.running) stdCalCard(); }catch(x){} }); } }catch(x){} }, 2500);
+/* the dais and the lectern say what is on; a sitting in progress is joined, not started */
+setTimeout(() => { try{ [["committee", "dais"], ["caucus", "lectern"]].forEach(a => { const P = (PROPS[a[0]] || []).find(p => p.id === a[1]); if(!P || P._std) return; P._std = true; const a0 = P.acts; P.acts = function(){ let A = []; try{ A = a0.apply(this, arguments) || []; }catch(x){ A = []; } try{ const e = stdActive(a[0]); if(e && A[0]) A[0] = Object.assign({}, A[0], {t:"Join the " + e.title.toLowerCase() + ", already under way: " + e.topic}); }catch(x){} return A; }; }); }catch(x){} }, 3500);
+/* the Senate is a room of senators: the ones on the floor answer like anybody else */
+setTimeout(() => { try{ if(typeof K_STAFFTALK !== "undefined" && !K_STAFFTALK.senator) K_STAFFTALK.senator = ["Will the Senator yield?", "I have the floor, and I intend to use it.", "The Senator from home knows what I think of that.", "Order, order. The clerk will note the objection."]; }catch(x){} }, 0);
+{ const _kca = kChamberActs; kChamberActs = function(c){
+    const A = _kca.apply(this, arguments);
+    try{ if(c && c.krole === "senator"){
+      const you = G.you, b = G.bill && !G.bill.done ? G.bill : null, M = kMeta(c), done = c.kday === G.day;
+      const rn = () => 1 + Math.floor(Math.random() * 3);
+      const extra = [
+        {t:"Talk shop", c:"15m", run(){ spend(15, 3); c.met = true; c.rapport = Math.min(4, (c.rapport || 0) + 1); try{ ripple(c, 2 + rn(), "You made time for me.", 2); }catch(x){}
+          const ax = pick(AXES), v = (c.pos && c.pos[ax.k]) || 0; setSay(kVoice(c, pick([cap(M.story) + ".", (c.state || "My state") + " sends me here every six years and every six years it asks for the same three things.", "On " + ax.k + "? I am " + (v > 25 ? ax.hi : v < -25 ? ax.lo : "somewhere in the middle") + ", and I have never hidden it.", "The Senate is slower than anybody tells you, and more personal."])), fx("+ warmth", "")); }},
+        {t:"Ask for their vote on the " + (b ? b.title : "next measure"), c:"20m", off:!b || done, run(){ spend(20, 4); c.kday = G.day; c.met = true;
+          const p = clamp(0.3 + (b ? alignment(c, b) / 220 : 0) + (c.rapport || 0) * 0.1 + (((c.rel && c.rel.warmth) || 0) / 300), 0.05, 0.9), ok = Math.random() < p;
+          if(ok){ c.pledge = b && alignment(c, b) < -10 ? -1 : 1; c.pledgeDay = G.day; c.pledgeBill = b ? b.title : ""; try{ ripple(c, 3, "You asked and I said yes.", 3); }catch(x){} you.influence = clamp(you.influence + 1, 0, 100);
+            setSay(kVoice(c, c.pledge > 0 ? "You have my aye on the " + b.title + ". Remember who gave it." : "I will not stand in your way on the " + b.title + ". I will be absent when it is called."), fx("pledged", "")); }
+          else { try{ ripple(c, -1, "You asked for my vote and I could not give it.", -1); }catch(x){} setSay(kVoice(c, "I cannot, and I would rather say so here than on the floor. Come back with something I can take home."), fx("", "no")); } }},
+        {t:"Walk the corridor with them", c:"20m", off:done, run(){ spend(20, 3); c.kday = G.day; c.met = true; c.rapport = Math.min(4, (c.rapport || 0) + 1); try{ ripple(c, 3, "We walked the corridor together and it was almost pleasant.", 3); }catch(x){} you.standing = clamp(you.standing + 1, 0, 100);
+          const e = stdEntries().find(x => !x.info && (G.minute || 0) < x.e * 60); setSay(kVoice(c, "I am due at " + (e ? e.title.toLowerCase() + " at " + hourLabel(e.s) + ", and I will say what I think there if you come." : "nothing until tomorrow, so I can be seen with you.")), fx("+1 standing", "")); }}
+      ];
+      A.splice(1, 0, ...extra);
+    } }catch(x){}
+    return A; }; }
+/* senators you have talked to turn up in the Senate sitting: pledged ones lean your way, refused ones do not */
+setTimeout(() => { try{ const SXX = window.NEPTUNE_SITTINGS; if(!SXX) return; const prev = SXX.castFor.senate;
+  SXX.castFor.senate = (M, out) => { try{ if(prev) out = prev(M, out) || out; const sens = hereNow().filter(c => c && c.krole === "senator" && c.traits && c !== G.you).sort((a, b) => (b.pledge ? 1 : 0) - (a.pledge ? 1 : 0)).slice(0, 3);
+      sens.forEach(c => { if(out.some(p => p.m === c)) return; out.push({m:c, name:c.name, role:"Senator · " + (c.state || ""), party:c.party, state:c.state, temper:c.traits.temper, conv:c.traits.conviction, vanity:c.traits.vanity, warmth:(c.rel && c.rel.warmth) || 0, want:null, stance0:c.pledge && G.day - (c.pledgeDay || 0) < 6 ? (c.pledge > 0 ? 80 : 22) : undefined}); });
+    }catch(x){} return out; }; }catch(x){} }, 3000);
 function kCalText(){
   try{ const D = docketToday().slice().sort((x, z) => x.h - z.h), m = G.minute || 0; if(!D.length) return "Nothing is scheduled for your chair today.";
     return D.map(d => { const st = kOnceToday(d.key) ? "done" : m < d.h * 60 - 60 ? "later" : m >= 19 * 60 ? "missed" : "now", where = (function(){ const sr = d.sit ? String(d.sit).split(":")[0] : null; const r = (sr && ROOMS[sr] && ["senate", "court", "committee", "caucus", "floor"].indexOf(sr) >= 0 ? sr : DK_ROOM[d.key]) || homeRoom(); return ROOMS[r] ? ROOMS[r].t : r; })();
@@ -35978,6 +36112,8 @@ function drainHouseOne(w, dt){
     try{ kAmbient(); }catch(e){}
     try{ orgTick(); }catch(e){}
     try{ nearGreet(); }catch(e){}
+    try{ stdTick(); }catch(e){}
+    try{ stdLive(); }catch(e){}
   } else if(lane === 10){
     try{ tieTick(w); }catch(e){}
   } else if(lane === 11){
@@ -38911,7 +39047,7 @@ try{
 
   /* ── voices ── */
   const side = p => p.stance >= 60 ? 1 : p.stance <= 40 ? -1 : 0;
-  const call = function(p){ return p.m ? (p.m.house === "senate" ? "the Senator from " : "the member for ") + p.state : "the " + p.role.replace(/ \(witness\)/, ""); }
+  const call = function(p){ return p.m ? ((p.m.krole === "senator" || p.m.house === "senate") ? "the Senator from " : "the member for ") + p.state : "the " + p.role.replace(/ \(witness\)/, ""); }
   const L = function(p, text, to, tag, gloss){ return {p, who:p ? p.sn : null, text, to:to == null ? null : to, tag:tag || "position", gloss:gloss || ""}; }
   const chairLine = function(S, text, gloss){ let who = S.D.chair; try{ if(S.x) who = chairOf(S).label || who; }catch(e){} return {p:null, who, text, to:null, tag:"procedural", gloss:gloss || "The chair keeping order: who speaks, when, and for how long."}; }
   const argue = function(S, p, M){

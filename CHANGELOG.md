@@ -4,6 +4,16 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## A standing calendar, open caucus and committee rooms, and a Senate of senators
+
+`20261016f` (on `20261016e`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- The Caucus Room and Committee Room are now open to every office, Senators included, not just House members.
+- There is a standing calendar, Monday to Thursday, that runs whether or not you are there: the party conference at 9 (the two parties alternate days), a committee hearing 10 to 12 and another 2 to 4 (the committees rotate), the Press Gallery briefing at 1, the Senate at 11, and the Court hearing argument on Tuesdays and Thursdays. Members and the press go where it sends them, arriving over the first twenty minutes and leaving when it ends.
+- Walk in while one is on and it is already going: the person presiding greets you, the members talk to each other, and the dais and lectern say 'Join the hearing, already under way'. Walk in when nothing is on and you are told when the next one is.
+- New app 'The standing calendar' (also opens when you click the clock) shows today's meetings, who presides, how many are in the room, and a Go button.
+- The Senate chamber now holds eight senators (two from your state, six from elsewhere). They talk like anyone else: talk shop, ask for their vote on the bill, walk the corridor with them, as well as the old questions. Senators you have spoken to turn up in the Senate sitting, and a pledged one leans your way.
+
 ## They speak first, and the arguments keep going
 
 `20261016e` (on `20261016d`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
