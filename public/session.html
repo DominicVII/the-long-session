@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261016q">
+<meta name="onum-build" content="20261016r">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261016q";
+  var STAMP = "20261016r";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -31963,7 +31963,7 @@ function vFrame(now){
   try{
     if(!G || !G.running || document.hidden || !camera) return; VST.t = (now || 0) / 1000;
     const R = ROOMS[G.room]; if(!R) return;
-    sceneryGuard(now);
+    sceneryGuard(now); ambFrame(now);
     if(R.open){
       if(VST.shaftRoom) vBuildShafts(null);
       if(!VST.dome && G.gfx !== "simple" && now - _vLast > 1500){ _vLast = now; try{ vBuildOpen(R); }catch(e){} }
@@ -32656,6 +32656,52 @@ function floorRich(w, d, h, hw){
     [3.2, 8.0, 12.8].forEach(z => { addCyl(brass, 0, h - 0.9, z, 0.02, 1.8); addCyl(brass, 0, h - 1.85, z, 0.7, 0.06); for(let i = 0; i < 8; i++){ const a = i * Math.PI / 4; addCyl(brass, Math.cos(a) * 0.7, h - 1.95, z + Math.sin(a) * 0.7, 0.014, 0.24); addSphere(glowM, Math.cos(a) * 0.7, h - 2.15, z + Math.sin(a) * 0.7, 0.09, 0.12, 0.09); } addSphere(glowM, 0, h - 2.0, z, 0.2, 0.24, 0.2); });
   }catch(e){ try{ console.warn("floor rich", e); }catch(x){} }
 }
+/* ══ 20261016r · AMBIENT SOUND: the building has a sound. Room tone, the murmur of whoever is in the room, your own footsteps on marble, wood, carpet and stone, wind and traffic outside, rain, birds by day, the clock, the hour. Synthesised, no files; off in Settings. ══ */
+const AMB = {on:true, ctx:null, vol:0.55, L:{}, room:null, stepD:0, lastX:0, lastZ:0, hour:-1, birdT:0, tickT:0, nb:null};
+try{ const v = localStorage.getItem("onum.amb"); if(v === "0") AMB.on = false; }catch(e){}
+function ambNoise(ctx){ if(AMB.nb) return AMB.nb; const n = ctx.sampleRate * 2, b = ctx.createBuffer(1, n, ctx.sampleRate), d = b.getChannelData(0); let l = 0; for(let i = 0; i < n; i++){ const w = Math.random() * 2 - 1; l = (l + 0.02 * w) / 1.02; d[i] = l * 3.5 + w * 0.15; } return AMB.nb = b; }
+function ambInit(){
+  if(AMB.ctx || !AMB.on) return AMB.ctx; try{ const C = window.AudioContext || window.webkitAudioContext; if(!C) return null; const ctx = new C(); AMB.ctx = ctx;
+    const master = ctx.createGain(); master.gain.value = 0; master.connect(ctx.destination); AMB.master = master;
+    const layer = (type, f, q, extra) => { const src = ctx.createBufferSource(); src.buffer = ambNoise(ctx); src.loop = true; src.playbackRate.value = 0.8 + Math.random() * 0.4; const flt = ctx.createBiquadFilter(); flt.type = type; flt.frequency.value = f; flt.Q.value = q || 0.7; const g = ctx.createGain(); g.gain.value = 0; src.connect(flt); flt.connect(g); g.connect(master); src.start(); return {src, flt, g}; };
+    AMB.L.room = layer("lowpass", 260, 0.5); AMB.L.murmur = layer("bandpass", 520, 0.9); AMB.L.wind = layer("lowpass", 700, 0.4); AMB.L.traffic = layer("lowpass", 160, 0.8); AMB.L.rain = layer("highpass", 1800, 0.6);
+    /* the murmur breathes: a slow tremolo on its gain target */
+    AMB.lfo = 0; return ctx; }catch(e){ AMB.ctx = null; return null; }
+}
+function ambBlip(f, q, dur, g, type){ const ctx = AMB.ctx; if(!ctx || !AMB.on) return; try{ const src = ctx.createBufferSource(); src.buffer = ambNoise(ctx); src.playbackRate.value = 0.7 + Math.random() * 0.8; const flt = ctx.createBiquadFilter(); flt.type = type || "bandpass"; flt.frequency.value = f * (0.9 + Math.random() * 0.2); flt.Q.value = q; const gn = ctx.createGain(); const t = ctx.currentTime; gn.gain.setValueAtTime(0, t); gn.gain.linearRampToValueAtTime(g * AMB.vol, t + 0.006); gn.gain.exponentialRampToValueAtTime(0.0001, t + dur); src.connect(flt); flt.connect(gn); gn.connect(ctx.destination); src.start(t, Math.random() * 1.5, dur + 0.05); }catch(e){} }
+function ambTone(f, dur, g, type){ const ctx = AMB.ctx; if(!ctx || !AMB.on) return; try{ const o = ctx.createOscillator(), gn = ctx.createGain(), t = ctx.currentTime; o.type = type || "sine"; o.frequency.setValueAtTime(f, t); gn.gain.setValueAtTime(0, t); gn.gain.linearRampToValueAtTime(g * AMB.vol, t + 0.01); gn.gain.exponentialRampToValueAtTime(0.0001, t + dur); o.connect(gn); gn.connect(ctx.destination); o.start(t); o.stop(t + dur + 0.05); }catch(e){} }
+const AMB_FLOOR = {corridor:"marble", court:"marble", senate:"carpet", floor:"carpet", caucus:"carpet", committee:"carpet", press:"carpet", cloak:"carpet", office:"wood", visit:"wood", exec:"wood", govoffice:"wood", steps:"stone", district:"stone"};
+const AMB_STEP = {marble:[2400, 1.6, 0.075, 0.22], wood:[700, 1.2, 0.09, 0.2], carpet:[300, 0.8, 0.07, 0.12], stone:[1200, 0.9, 0.08, 0.2]};
+function ambFrame(now){
+  try{
+    if(!G || !G.running){ if(AMB.master && AMB.ctx) AMB.master.gain.value = 0; return; }
+    if(!AMB.ctx) return; const ctx = AMB.ctx; if(ctx.state === "suspended") ctx.resume().catch(() => {});
+    const R = ROOMS[G.room]; if(!R) return; const t = now / 1000;
+    /* footsteps by distance walked, in the pace of the walk */
+    const dx = cam.x - AMB.lastX, dz = cam.z - AMB.lastZ, dd = Math.hypot(dx, dz); AMB.lastX = cam.x; AMB.lastZ = cam.z;
+    if(dd < 1.5 && !document.hidden){ AMB.stepD += dd; const stride = 0.72; if(AMB.stepD > stride){ AMB.stepD = 0; const fl = AMB_FLOOR[G.room] || "wood", P = AMB_STEP[fl]; ambBlip(P[0], P[1], P[2], P[3] * (R.open ? 0.8 : 1), "bandpass"); setTimeout(() => ambBlip(P[0] * 0.5, 1.0, P[2] * 1.3, P[3] * 0.5, "lowpass"), 18); } }
+    if(now - (AMB._u || 0) < 350) return; AMB._u = now;
+    const open = !!R.open, h = (G.minute || 0) / 60, day = h > 6 && h < 20;
+    let wx = null; try{ wx = wxToday(); }catch(e){} const rainy = !!(wx && (wx.k === "rain" || wx.k === "storm")), windy = !!(wx && (wx.k === "wind" || wx.k === "storm" || wx.k === "snow"));
+    let crowd = 0; try{ crowd = hereNow().filter(m => m && m !== G.you && m.kind !== "civ" || (m && m.kind === "civ")).length; }catch(e){}
+    const roomLvl = open ? 0.0 : {corridor:0.05, senate:0.07, floor:0.08, court:0.05}[G.room] || 0.045;
+    const set = (L, v, f) => { try{ L.g.gain.setTargetAtTime(v * AMB.vol, ctx.currentTime, 0.6); if(f) L.flt.frequency.setTargetAtTime(f, ctx.currentTime, 0.6); }catch(e){} };
+    set(AMB.L.room, roomLvl, G.room === "corridor" || G.room === "court" ? 340 : 220);
+    const mur = Math.min(0.16, crowd * (open ? 0.012 : 0.02)) * (G.room === "floor" || G.room === "senate" || G.room === "caucus" ? 1.5 : 1) * (0.8 + 0.2 * Math.sin(t * 0.7)); set(AMB.L.murmur, mur, 480 + 140 * Math.sin(t * 0.31));
+    set(AMB.L.wind, open ? (windy ? 0.1 : 0.035) + 0.015 * Math.sin(t * 0.23) : 0, 500 + 400 * (0.5 + 0.5 * Math.sin(t * 0.17)));
+    set(AMB.L.traffic, open ? (G.room === "district" ? 0.07 : 0.035) : 0, 140 + 40 * Math.sin(t * 0.11));
+    set(AMB.L.rain, rainy ? (open ? 0.09 : 0.03) : 0, 1800);
+    AMB.master.gain.setTargetAtTime(AMB.on ? 1 : 0, ctx.currentTime, 0.4);
+    /* birds by day outdoors, a clock in the offices, a chime on the hour, a bell at noon */
+    if(open && day && !rainy && t > AMB.birdT){ AMB.birdT = t + 2 + Math.random() * 7; const f0 = 2400 + Math.random() * 1800, n = 2 + Math.floor(Math.random() * 3); for(let i = 0; i < n; i++) setTimeout(() => ambTone(f0 * (1 + (i % 2) * 0.18), 0.09, 0.025, "sine"), i * 110); }
+    if(!open && ["office", "visit", "exec", "govoffice", "committee", "caucus"].indexOf(G.room) >= 0 && t > AMB.tickT){ AMB.tickT = t + 1; ambBlip(3200, 3, 0.025, 0.035, "bandpass"); }
+    const hr = Math.floor(h); if(AMB.hour !== hr){ if(AMB.hour >= 0 && hr >= 7 && hr <= 20 && !(hr % 1)){ const nb = hr === 12 ? 3 : 1; for(let i = 0; i < nb; i++) setTimeout(() => { ambTone(392, 1.6, open ? 0.06 : 0.035, "sine"); ambTone(784, 1.2, open ? 0.025 : 0.014, "sine"); }, i * 1400); } AMB.hour = hr; }
+    /* a door: the room changed */
+    if(AMB.room !== G.room){ if(AMB.room) { ambBlip(180, 1.2, 0.16, 0.3, "lowpass"); setTimeout(() => ambBlip(900, 2, 0.05, 0.12), 90); } AMB.room = G.room; }
+  }catch(e){}
+}
+["pointerdown", "keydown", "touchstart"].forEach(ev => window.addEventListener(ev, () => { if(AMB.on && !AMB.ctx) ambInit(); }, {passive:true, once:false}));
+document.addEventListener("click", ev => { try{ const b = ev.target && ev.target.closest && ev.target.closest("[data-amb]"); if(!b) return; ev.stopPropagation(); AMB.on = b.getAttribute("data-amb") === "1"; try{ localStorage.setItem("onum.amb", AMB.on ? "1" : "0"); }catch(e){} if(AMB.on) ambInit(); else if(AMB.master) AMB.master.gain.value = 0; try{ settingsCard(); }catch(e){} }catch(e){} }, true);
 /* ══ 20261016h · rich scenery for every machine: the town, the steps and the plaza were being switched off on anything the game rates 'modest', which is nearly every PC. It is on by default now, watches its own frame rate, and steps back with a note if it cannot keep up. ══ */
 document.addEventListener("click", ev => { try{ const b = ev.target && ev.target.closest && ev.target.closest("[data-rich]"); if(!b) return; ev.stopPropagation(); const lv = +b.getAttribute("data-rich"); SC.lvl = lv; SC.done = false; SC.since = 0; SC.cnt = 0; try{ localStorage.setItem("onum.rich.lvl", String(lv)); }catch(e){} try{ feed(lv ? "Rich picture is on. Materials change the next time you walk into a room." : "Light picture. Materials change the next time you walk into a room."); }catch(e){} try{ settingsCard(); }catch(e){} }catch(e){} }, true);
 /* open air blew out to white on the pavements; bring it down a little */
@@ -36216,6 +36262,10 @@ function settingsCard(){
         '<button type="button" class="mk__opt' + (G.gfx==="best"?" is-on":"") + '" data-gfx="best">Best</button>' +
         '<button type="button" class="mk__opt' + (G.gfx==="balanced"?" is-on":"") + '" data-gfx="balanced">Balanced</button>' +
         '<button type="button" class="mk__opt' + (G.gfx==="simple"?" is-on":"") + '" data-gfx="simple">Simple</button>' +
+      '</div></div>' +
+      '<div class="mk__row"><i>Ambient sound</i><div class="mk__opts">' +
+        '<button type="button" class="mk__opt' + (AMB.on ? " is-on" : "") + '" data-amb="1">On</button>' +
+        '<button type="button" class="mk__opt' + (!AMB.on ? " is-on" : "") + '" data-amb="0">Off</button>' +
       '</div></div>' +
       '<div class="mk__row"><i>Scenery</i><div class="mk__opts">' +
         '<button type="button" class="mk__opt' + (SC.lvl === 2 ? " is-on" : "") + '" data-rich="2">Rich</button>' +

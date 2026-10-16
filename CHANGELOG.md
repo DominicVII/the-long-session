@@ -4,6 +4,13 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## The building has a sound
+
+`20261016r` (on `20261016q`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- Room tone, the murmur of whoever is in the room, your own footsteps (marble, wood, carpet, stone), wind and traffic outside, rain on wet days, birds by day, the office clock, an hour chime and a three-stroke noon bell.
+- All synthesised in the browser (no files). Starts on your first click or key; Settings → Ambient sound turns it off.
+
 ## A civic building at the end of the High Street
 
 `20261016q` (on `20261016p`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
