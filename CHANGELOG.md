@@ -4,6 +4,16 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## The Engine plans, and is checked
+
+`20261017a` (on `20261016z`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- From the Reading stage on the Engine can plan, within what it can actually see: 3 days ahead at mood, then 7 (and unrest), 10 (and capability), 14 (and oversight). Its eyesight improves with its stage, its compute and how open its data is.
+- Before it acts it rehearses on a copy of the world a few times, then tells you what it expects with a margin, against doing nothing. Memos show a forecast for each choice; your own levers and posture changes are forecast and tracked too.
+- When the days are up the real outcome is compared with the forecast: it held or it missed, and the Engine's track record moves. Sure and wrong costs you a point of approval; a long record lets you give it standing leave to start small plans itself.
+- The Engine files plans of its own every few days. You approve or veto them; unanswered ones lapse. Sensitive ones always need you.
+- Under the hood the rehearsal restores the world exactly after each run (checked) and costs about ten milliseconds.
+
 ## Nobody is all-knowing
 
 `20261016z` (on `20261016y`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.

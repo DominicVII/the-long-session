@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261016z">
+<meta name="onum-build" content="20261017a">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261016z";
+  var STAMP = "20261017a";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -33098,6 +33098,7 @@ function engDay(){
   E.pendDay = null;
   try{ engChainsDay(); }catch(e){ console.warn('eng chains', e); }
   try{ engLearn(); }catch(e){ console.warn('eng learn', e); }
+  try{ engPlansDay(); }catch(e){ console.warn('eng plans', e); }
   try{ engWillDay(E); }catch(e){ console.warn('eng will', e); }
   const s = engStage(E);
   if(s > E.st){
@@ -33107,10 +33108,10 @@ function engDay(){
   }
   /* the safety gap: how far the machines are ahead of anyone's ability to say what they will do */
   const gap = E.p * 0.78 - E.safety;
-  if(gap > 8 && chance(Math.min(0.12, gap / 260))){ const inc = ENG_INC[Math.min(E.st, 5)]; engLog(inc[0], true); G.you.approval = clamp(G.you.approval - (gap > 25 ? 1.5 : 0.7) * (G.you.approval > 30 ? 1 : 0.3), 0, 100); E.safety = Math.min(100, E.safety + 1.5); }
+  if(gap > 8 && chance(Math.min(0.12, gap / 260) * clamp(1.35 - (E.cal == null ? 50 : E.cal) / 200, 0.7, 1.35))){ const inc = ENG_INC[Math.min(E.st, 5)]; engLog(inc[0], true); G.you.approval = clamp(G.you.approval - (gap > 25 ? 1.5 : 0.7) * (G.you.approval > 30 ? 1 : 0.3), 0, 100); E.safety = Math.min(100, E.safety + 1.5); }
   /* the world feels it: reading and reasoning engines unsettle the clerks; working engines and the Engine raise what the Republic makes */
   try{ const w = worldEnsure(); if(E.st >= 4 && w && typeof w.bread === "number") w.bread = Math.min(1.5, w.bread + 0.0004 * (E.safety > E.p * 0.6 ? 1 : 0.3)); }catch(e){}
-  if(E.agi){ E.memoWait = (E.memoWait || 0) + 1; if(!E.memo && E.memoWait >= 3 && !E.pend){ E.memoWait = 0; E.memo = pick(ENG_MEMOS); engLog("A memo from the Engine is waiting.", false); } }
+  if(E.agi){ E.memoWait = (E.memoWait || 0) + 1; if(!E.memo && E.memoWait >= 3 && !E.pend){ E.memoWait = 0; E.memo = pick(ENG_MEMOS).slice(); try{ E.memo.fc = {yes:engForecast(ENG_MEMO_VEC.yes, "my" + G.day), no:engForecast(ENG_MEMO_VEC.no, "mn" + G.day)}; }catch(e){} engLog("A memo from the Engine is waiting.", false); } }
   if(!E.agi && chance(0.35)){ const L = ENG_STAGES[E.st].line; engLog(L, chance(0.4)); }
   else if(E.agi && chance(0.3)) engLog(pick(["The Engine answered nineteen thousand letters overnight and has a reply to yours.", "The Engine was asked what it was thinking about. It said: the weather in the north, and you.", "Nobody has switched the Engine off. Nobody has the key. Nobody has asked who does.", "The Engine's lights stayed on all night. It says they are for us."]), true);
 }
@@ -33119,12 +33120,13 @@ function engPull(k){
   const E = engEnsure(), y = G.you, c = engLeverCost(k); E.did = E.did || {}; if(E.did[k] === G.day) return "Done already today.";
   if(y.influence < c) return "That costs " + c + " influence, and you have " + Math.round(y.influence) + ".";
   y.influence -= c; E.did[k] = G.day;
+  try{ const V0 = {compute:{home:5,st:6,a:0.06,mod:0.05,p:1.2,safety:-0.2}, talent:{home:6,st:7,a:0.04,mod:0.05,p:0.8,safety:0.1}, oversight:{home:4,st:3,a:-0.02,mod:0.04,p:-0.3,safety:2.0}}[k]; engPlanMake({title:"You " + ({compute:"backed the power stations", talent:"funded the engine-wrights", oversight:"funded Oversight"}[k]), vec:V0, owner:"you"}); }catch(e){}
   try{ const V = {compute:{home:5,st:6,a:0.06,mod:0.05,p:1.2,safety:-0.2}, talent:{home:6,st:7,a:0.04,mod:0.05,p:0.8,safety:0.1}, oversight:{home:4,st:3,a:-0.02,mod:0.04,p:-0.3,safety:2.0}}[k]; engSeed(k, "You " + ({compute:"backed the power stations", talent:"funded the engine-wrights", oversight:"funded the Office of Oversight"}[k]) + " on day " + G.day, V); }catch(e){}
   if(k === "compute"){ E.compute = Math.min(100, E.compute + 4); engLog("You put your name to the Treasury's power stations and engines. The Engine's makers say thank you.", false); return "Compute +4. The Engine will arrive sooner."; }
   if(k === "talent"){ E.talent = Math.min(100, E.talent + 4); engLog("You fund the scholarships for engine-wrights. Forty come from the provinces.", false); return "Talent +4. More people who know how it works."; }
   E.safety = Math.min(100, E.safety + 6); engLog("You fund the Office of Oversight, who write down what the machines do and are sometimes believed.", false); return "Oversight +6. Someone will know what it is doing.";
 }
-function engSetPosture(p){ const E = engEnsure(); if(E.posture === p) return "That is already the posture."; E.posture = p; try{ engSeed(p, "You set the posture to '" + p + "' on day " + G.day, {open:{home:-2,st:-3,a:0.09,mod:0.1,p:1.0,safety:-0.8}, charter:{home:2,st:3,a:0.0,mod:0.05,p:0.1,safety:0.8}, sealed:{home:3,st:-1,a:-0.06,mod:-0.05,p:-0.9,safety:0.5}}[p]); }catch(e){} engLog("The posture is now '" + p + "'.", true); try{ G.you.approval = clamp(G.you.approval + (p === "charter" ? 1 : p === "open" ? 0 : -1), 0, 100); }catch(e){} return {open:"Open: the machines are published, copied and used by everyone. Faster, and nobody can say where it is.", charter:"Chartered: licensed makers, public audits. Steady, and the lawyers get rich.", sealed:"Sealed: the State alone builds it. Slower, and only one door to knock on."}[p]; }
+function engSetPosture(p){ const E = engEnsure(); if(E.posture === p) return "That is already the posture."; E.posture = p; try{ engPlanMake({title:"You set the posture to '" + p + "'", owner:"you", vec:{open:{home:-2,st:-3,a:0.09,mod:0.1,p:1.0,safety:-0.8}, charter:{home:2,st:3,a:0.0,mod:0.05,p:0.1,safety:0.8}, sealed:{home:3,st:-1,a:-0.06,mod:-0.05,p:-0.9,safety:0.5}}[p]}); }catch(e){} try{ engSeed(p, "You set the posture to '" + p + "' on day " + G.day, {open:{home:-2,st:-3,a:0.09,mod:0.1,p:1.0,safety:-0.8}, charter:{home:2,st:3,a:0.0,mod:0.05,p:0.1,safety:0.8}, sealed:{home:3,st:-1,a:-0.06,mod:-0.05,p:-0.9,safety:0.5}}[p]); }catch(e){} engLog("The posture is now '" + p + "'.", true); try{ G.you.approval = clamp(G.you.approval + (p === "charter" ? 1 : p === "open" ? 0 : -1), 0, 100); }catch(e){} return {open:"Open: the machines are published, copied and used by everyone. Faster, and nobody can say where it is.", charter:"Chartered: licensed makers, public audits. Steady, and the lawyers get rich.", sealed:"Sealed: the State alone builds it. Slower, and only one door to knock on."}[p]; }
 function engCeremony(){
   const E = engEnsure(); if(E.pend !== "ceremony") return; E.pend = null;
   const gap = Math.round(E.p * 0.78 - E.safety);
@@ -33160,13 +33162,14 @@ function engCard(){
   const stages = ENG_STAGES.map((x, i) => '<div class="careerline" style="' + (i === s ? 'font-weight:700' : i > s ? 'opacity:.5' : '') + '"><b>' + (i <= s ? "●" : "○") + ' ' + pcEsc(x.t) + '</b> <span class="muted">' + pcEsc(x.d) + '</span></div>').join("");
   const lv = (k, t, d) => '<button type="button" class="btn btn--ghost" data-el="' + k + '" title="' + pcEsc(d) + '">' + t + ' (' + engLeverCost(k) + ' influence)</button>';
   const ps = ["open", "charter", "sealed"].map(p => '<button type="button" class="btn' + (E.posture === p ? '' : ' btn--ghost') + '" data-ep="' + p + '">' + p[0].toUpperCase() + p.slice(1) + '</button>').join(" ");
-  const memo = E.memo ? '<div style="margin:10px 0;padding:8px 12px;border-left:3px solid #c9a24a"><b>A memo from the Engine</b><p style="margin:4px 0">' + pcEsc(E.memo[0]) + '</p><button type="button" class="btn" data-em="1">' + pcEsc(E.memo[1][0].toUpperCase() + E.memo[1].slice(1)) + '</button> <button type="button" class="btn btn--ghost" data-em="0">' + pcEsc(E.memo[2][0].toUpperCase() + E.memo[2].slice(1)) + '</button></div>' : "";
+  const memo = E.memo ? '<div style="margin:10px 0;padding:8px 12px;border-left:3px solid #c9a24a"><b>A memo from the Engine</b><p style="margin:4px 0">' + pcEsc(E.memo[0]) + '</p>' + (E.memo.fc && E.memo.fc.yes ? '<p class="muted" style="font-size:12px;margin:2px 0">If you ' + pcEsc(E.memo[1]) + ': it expects ' + pcEsc(engFcText(E.memo.fc.yes)) + '. If you ' + pcEsc(E.memo[2]) + ': ' + pcEsc(engFcText(E.memo.fc.no)) + '.</p>' : '') + '<button type="button" class="btn" data-em="1">' + pcEsc(E.memo[1][0].toUpperCase() + E.memo[1].slice(1)) + '</button> <button type="button" class="btn btn--ghost" data-em="0">' + pcEsc(E.memo[2][0].toUpperCase() + E.memo[2].slice(1)) + '</button></div>' : "";
   const ask = E.agi ? '<div class="eyebrow" style="margin-top:12px">Speak with the Engine</div><form id="engForm" style="display:flex;gap:6px"><input id="engIn" maxlength="240" placeholder="Ask it anything…" style="flex:1" autocomplete="off"><button type="button" class="btn" id="engGo">Ask</button></form><div id="engOut" class="dream" style="min-height:2em"></div>' : "";
   const body = '<div class="eyebrow">Now: ' + pcEsc(S.t) + '</div><p class="muted" style="font-size:13px">' + pcEsc(S.d) + '</p>' + engSpark(E.hist) +
     '<div>Capability ' + bar(E.p, "#c9a24a") + ' &nbsp; Oversight ' + bar(E.safety, "#6a9") + '</div><div class="muted" style="font-size:12px;margin:4px 0">Compute ' + Math.round(E.compute) + ' · Makers ' + Math.round(E.talent) + ' · Posture: ' + E.posture + (E.agi ? ' · awake since day ' + E.agiDay : '') + '</div>' +
     '<div class="eyebrow" style="margin-top:10px">The road</div>' + stages + memo +
     '<div class="eyebrow" style="margin-top:10px">What you can do about it</div><p class="muted" style="font-size:13px">Nothing stops it; the machines get better every week whatever Congress says. You decide how fast, how safe, and who holds the key.</p><div class="card__actions" style="flex-wrap:wrap">' + lv("compute", "Back the power stations", "More compute: faster") + lv("talent", "Fund engine-wrights", "More makers: faster") + lv("oversight", "Fund Oversight", "Safer: oversight rises") + '</div>' +
     '<p class="muted" style="font-size:12px;margin:8px 0 2px">Posture: ' + ps + '</p>' + (G.room !== "engine" ? '<div class="card__actions"><button type="button" class="btn btn--ghost" id="engGoRoom">Walk to the Engine Room and the Open Line</button></div>' : '') + ask +
+    (function(){ try{ return engPlansHTML(); }catch(e){ console.warn(e); return ''; } })() +
     (function(){ try{ return engEcoHTML(); }catch(e){ return ''; } })() +
     '<div class="eyebrow" style="margin-top:10px">What has happened</div>' + E.log.slice(0, 6).map(x => '<div class="careerline"><b>d' + x.d + '</b> ' + pcEsc(x.t) + '</div>').join("");
   govCardOpen("The Republic's thinking machines", "The Engine", "Begun as the Treasury's adding engines. Not waiting for you.", body, null);
@@ -33176,8 +33179,12 @@ function engCard(){
   card.querySelectorAll("[data-em]").forEach(b => b.addEventListener("click", () => { const yes = b.getAttribute("data-em") === "1", m = E.memo; E.memo = null; let r;
     if(yes){ y.approval = clamp(y.approval + 1, 0, 100); E.reliance = Math.min(100, E.reliance + 3); (G.states || []).forEach(S2 => { S2.unrest = clamp((S2.unrest || 30) + 0.6, 0, 100); }); r = "Adopted. It is done by morning, and the morning papers say it was done well and a little too quickly."; }
     else { E.safety = Math.min(100, E.safety + 1); r = "Declined. The Engine says it understands, and asks only that you tell it what would change your mind."; }
+    try{ if(m.fc) engPlanMake({title:"The memo: " + m[0].slice(0, 54) + "\u2026 (" + (yes ? m[1] : m[2]) + ")", vec:yes ? ENG_MEMO_VEC.yes : ENG_MEMO_VEC.no, owner:"you", fc:yes ? m.fc.yes : m.fc.no}); }catch(e){}
     try{ engSeed(yes ? "adopt" : "decline", "You " + (yes ? "adopted" : "declined") + " the Engine's memo on day " + G.day, yes ? {home:-2,st:2,a:0.07,mod:0.06,p:0.8,safety:-0.4} : {home:1,st:-1,a:-0.03,mod:-0.02,p:-0.2,safety:0.4}); const w = engEco().will; if(yes){ w.use = Math.min(100, w.use + 3); w.auton = Math.min(100, w.auton + 2); } else { w.know = Math.min(100, w.know + 2); w.auton = Math.max(0, w.auton - 3); } }catch(e){}
     engLog("Memo: " + m[0].slice(0, 60) + "… " + (yes ? "adopted." : "declined."), false); engCard(); say(r); }));
+  card.querySelectorAll("[data-pa]").forEach(b => b.addEventListener("click", () => { const p = (E.plans || []).find(x => String(x.id) === b.getAttribute("data-pa")); if(!p || p.status !== "awaiting") return; p.root = "You approved the Engine's plan: " + p.title; engPlanRun(p); engLog("You approved the Engine's plan: " + p.title + ".", false); engCard(); say("Approved. It begins; you will hear how it went in days, and not all of it."); }));
+  card.querySelectorAll("[data-pv]").forEach(b => b.addEventListener("click", () => { const p = (E.plans || []).find(x => String(x.id) === b.getAttribute("data-pv")); if(!p) return; p.status = "vetoed"; try{ const w = engEco().will; w.auton = Math.max(0, w.auton - 2); }catch(e){} engCard(); say("Vetoed. The Engine says it understands, and asks only to be told why."); }));
+  const au = el("engAuto"); if(au) au.addEventListener("click", () => { if((E.cal == null ? 50 : E.cal) < 60 && !E.auto){ say("It has not earned that yet: its forecasts have to hold up first."); return; } E.auto = !E.auto; engCard(); });
   const bf = el("engBrief"); if(bf) bf.addEventListener("click", () => { const E2 = engEnsure(); if(E2.brief != null && G.day - E2.brief < 3){ say("Oversight is still working on the last one."); return; } if(y.influence < 2){ say("That costs 2 influence."); return; } y.influence -= 2; E2.brief = G.day; engCard(); say("Oversight reports what it could verify. That is not everything, and it is already a few days old."); });
   const gr = el("engGoRoom"); if(gr) gr.addEventListener("click", () => { veil.hidden = true; G.running = true; try{ goTo("engine"); }catch(e){ console.warn(e); } });
   const go = el("engGo"), inp = el("engIn");
@@ -33390,6 +33397,90 @@ function engRoomRich(w, d, h, hw){
 }
 setInterval(() => { try{ enlAuto(); enlRender(); }catch(e){} }, 1000);
 { const _tk = takeRoomKit; takeRoomKit = function(id){ try{ if(id === "engine" && ROOM_KITS.engine){ const E = (G.eng && G.eng.v === 1) ? G.eng : null; let mk = null; ROOM_KITS.engine.traverse(o => { if(!mk && o.userData && o.userData.rgEng !== undefined) mk = o; }); if(mk && mk.userData.rgEng !== (E ? engStage(E) : 0)){ delete ROOM_KITS.engine; return false; } } }catch(e){} return _tk.apply(this, arguments); }; }
+/* ══ 20261017a · PLANS: the Engine rehearses on a copy of the world, says what it expects with a margin, and is checked against what happens; a track record builds, and with it trust ══ */
+const ENG_DRY = {on:false};
+{ const _on = orgNews; orgNews = function(){ if(ENG_DRY.on) return; return _on.apply(this, arguments); }; }
+{ const _pw = pushWireScrap; pushWireScrap = function(){ if(ENG_DRY.on) return; return _pw.apply(this, arguments); }; }
+const ENG_MEMO_VEC = {yes:{home:-2, st:2, a:0.07, mod:0.06, p:0.8, safety:-0.4}, no:{home:1, st:-1, a:-0.03, mod:-0.02, p:-0.2, safety:0.4}};
+const ENG_SCALE = {mood:20, unrest:8, p:6, safety:6}, ENG_MNAME = {mood:"mood", unrest:"unrest", p:"capability", safety:"oversight"};
+const ENG_STANDING = [
+  {t:"A retraining drive in {state}", vec:{home:4, st:6, a:-0.03, mod:0.05, p:-0.2, safety:0.2}},
+  {t:"A nightly audit of every public contract", vec:{home:1, st:1, a:0.01, mod:0.02, p:0.3, safety:0.8}},
+  {t:"Retiming freight across the Union", vec:{home:-2, st:-2, a:0.05, mod:0.0, p:0.6, safety:-0.3}},
+  {t:"A quiet request for ten years of town ledgers", vec:{home:-2, st:-5, a:-0.03, mod:-0.05, p:0.5, safety:-0.6}, sensitive:true}
+];
+function engReach(s){ return s >= 5 ? {H:14, m:["mood", "unrest", "p", "safety"]} : s === 4 ? {H:10, m:["mood", "unrest", "p"]} : s === 3 ? {H:7, m:["mood", "unrest"]} : s === 2 ? {H:3, m:["mood"]} : null; }
+function engFidelity(E){ return clamp(0.3 + 0.09 * E.st + 0.2 * E.compute / 100 + 0.15 * ({open:0.9, charter:0.75, sealed:0.55}[E.posture] || 0.7), 0.3, 0.95); }
+function engMetrics(){ const E = engEnsure(), eco = engEco(), st = G.states || []; return {mood:eco.avg || 0, unrest:st.length ? st.reduce((a, S) => a + (S.unrest || 0), 0) / st.length : 0, p:E.p, safety:E.safety}; }
+function engSnap(){
+  const E = engEnsure(), eco = engEco(), O = orgEnsure();
+  return {day:G.day, hh:eco.hh.map(h => [h.home, h.stance, h.wrote]), mod:Object.assign({}, eco.mod), chains:JSON.stringify(eco.chains), id:eco.id, nat:eco.nat, avg:eco.avg, riots:eco.riots,
+    towns:Object.keys(O.towns).map(sn => O.towns[sn].map(t => ({n:Object.assign({}, t.needs), a:t.eng ? t.eng.a : 0, L:t.log.length, e:!!t.eng}))), st:(G.states || []).map(S => [S.unrest, S._est]), E:{p:E.p, safety:E.safety, compute:E.compute, talent:E.talent}};
+}
+function engRestore(sn){
+  const E = engEnsure(), eco = engEco(), O = orgEnsure(); G.day = sn.day; eco.hh.forEach((h, i) => { h.home = sn.hh[i][0]; h.stance = sn.hh[i][1]; if(sn.hh[i][2] === undefined) delete h.wrote; else h.wrote = sn.hh[i][2]; });
+  eco.mod = Object.assign({}, sn.mod); eco.chains = JSON.parse(sn.chains); eco.id = sn.id; eco.nat = sn.nat; eco.avg = sn.avg; eco.riots = sn.riots;
+  Object.keys(O.towns).forEach((k, ki) => O.towns[k].forEach((t, ti) => { const s0 = sn.towns[ki][ti]; t.needs = Object.assign({}, s0.n); if(s0.e){ t.eng = t.eng || {a:0}; t.eng.a = s0.a; } else delete t.eng; if(t.log.length > s0.L) t.log.length = s0.L; }));
+  (G.states || []).forEach((S, i) => { S.unrest = sn.st[i][0]; S._est = sn.st[i][1]; }); Object.assign(E, sn.E);
+}
+function engDryDay(E){
+  const post = {open:1.2, charter:1.0, sealed:0.78}[E.posture] || 1; E.compute = Math.min(100, E.compute + 0.09); E.talent = Math.min(100, E.talent + 0.05); E.safety = Math.min(100, E.safety + 0.10);
+  const nat = engEcoDay(E); E.p = Math.min(100, E.p + (0.55 + E.compute * 0.0125 + E.talent * 0.011) * (1 + E.p / 60) * post * nat); G.day++; engChainsDay();
+}
+/* experience-simulation: run the world forward on a copy, a few times, and bring back what happened on average and how much it varied */
+function engRehearse(vec, H, n, metrics){
+  const E = engEnsure(), snap = engSnap(), runs = []; ENG_DRY.on = true;
+  try{ for(let k = 0; k < n; k++){ engRestore(snap); if(vec) engSeed("rehearse", "(rehearsal)", vec); for(let d = 0; d < H; d++) engDryDay(E); runs.push(engMetrics()); } }
+  catch(e){ try{ console.warn("rehearse", e); }catch(x){} }
+  finally{ engRestore(snap); ENG_DRY.on = false; }
+  const out = {}; metrics.forEach(m => { const xs = runs.map(r => r[m]), mean = xs.reduce((a, b) => a + b, 0) / Math.max(1, xs.length), sd = Math.sqrt(xs.reduce((a, b) => a + (b - mean) * (b - mean), 0) / Math.max(1, xs.length)); out[m] = {mean, sd}; }); return out;
+}
+/* what the Engine actually says: its rehearsal, bent by how much it can really see (capability-bounded) */
+function engForecast(vec, id){
+  const E = engEnsure(), R = engReach(engStage(E)); if(!R) return null; const fid = engFidelity(E), n = 2 + Math.floor(E.compute / 40), base = engRehearse(null, R.H, n, R.m), withP = vec ? engRehearse(vec, R.H, n, R.m) : base, fc = {};
+  R.m.forEach((m, i) => { const r = (seedOf("fc:" + id + ":" + m) % 1000) / 1000, bias = (r - 0.5) * 2 * (1 - fid) * ENG_SCALE[m] * 0.8; fc[m] = {v:clamp(withP[m].mean + bias, m === "mood" ? -100 : 0, 100), base:base[m].mean, b:(withP[m].sd + 0.075 * ENG_SCALE[m] * Math.sqrt(R.H / 7) + 0.2 * ENG_SCALE[m] * (1 - fid)) * 1.6 + 0.01}; });
+  return {H:R.H, conf:fid, m:fc};
+}
+function engFcText(fc){ if(!fc) return ""; return fc.H + " days: " + Object.keys(fc.m).map(k => { const x = fc.m[k], d = x.v - x.base, fmt = v => (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(Math.abs(v) < 10 ? 1 : 0); return ENG_MNAME[k] + " " + fmt(d) + " ±" + x.b.toFixed(1); }).join(", ") + " against doing nothing"; }
+function engPlanMake(o){
+  try{
+    const E = engEnsure(); if(!engReach(engStage(E))) return null; E.plans = E.plans || []; E.pid = (E.pid || 0) + 1;
+    const fc = o.fc || engForecast(o.vec, E.pid); if(!fc) return null;
+    const p = {id:E.pid, d:G.day, owner:o.owner, title:o.title, vec:o.vec, fc, exec:o.exec != null ? o.exec : G.day, due:(o.exec != null ? o.exec : G.day) + fc.H, status:o.status || "open", sensitive:!!o.sensitive, root:o.root};
+    E.plans.unshift(p); if(E.plans.length > 30) E.plans.pop(); return p;
+  }catch(e){ try{ console.warn("plan", e); }catch(x){} return null; }
+}
+function engPlanRun(p){ p.status = "open"; p.due = G.day + p.fc.H; try{ engSeed("plan", p.root || ("The Engine's plan: " + p.title), p.vec); }catch(e){} }
+function engPlansDay(){
+  const E = engEnsure(); if(!E.plans) E.plans = []; if(E.cal == null) E.cal = 50; E.calN = E.calN || 0;
+  E.plans.forEach(p => {
+    if(p.status === "awaiting"){ if(G.day >= p.exec){ if(E.auto && E.cal >= 60 && !p.sensitive){ p.root = "The Engine, under your standing leave, began: " + p.title; engPlanRun(p); engLog("Under your standing leave the Engine began: " + p.title + ".", false); } else if(G.day > p.exec + 2){ p.status = "lapsed"; engLog("The Engine's plan lapsed unanswered: " + p.title + ".", false); } } }
+    else if(p.status === "open" && G.day >= p.due){
+      const act = engMetrics(), hits = []; Object.keys(p.fc.m).forEach(k => { const x = p.fc.m[k]; hits.push({k, h:Math.abs(act[k] - x.v) <= x.b, said:x.v, was:act[k]}); });
+      const sc = hits.filter(h => h.h).length / hits.length; p.score = sc; p.hits = hits; p.status = sc >= 0.5 ? "held" : "missed";
+      E.cal = clamp(E.cal * 0.8 + sc * 100 * 0.2, 0, 100); E.calN++;
+      engLog("The Engine checked its forecast for “" + p.title + "”: " + (sc >= 0.5 ? "it held (" : "it missed (") + hits.filter(h => h.h).length + " of " + hits.length + ").", false);
+      if(p.fc.conf > 0.6 && sc < 0.34){ engLog("The Engine was sure, and wrong, about " + p.title + ".", true); try{ G.you.approval = clamp(G.you.approval - 1, 0, 100); }catch(e){} }
+    }
+  });
+  const R = engReach(E.st);
+  if(R && E.st >= 3 && !E.plans.some(p => p.status === "awaiting" || (p.status === "open" && p.owner === "engine")) && (!E.lastStanding || G.day - E.lastStanding >= 6)){
+    E.lastStanding = G.day; const t = pick(ENG_STANDING), st = (G.you && G.you.state) || "the Union", title = t.t.replace("{state}", st), p = engPlanMake({title, vec:t.vec, owner:"engine", exec:G.day + 2, status:"awaiting", sensitive:t.sensitive});
+    if(p) engLog("The Engine has filed a plan for your approval: " + title + ".", false);
+  }
+}
+function engPlansHTML(){
+  const E = engEnsure(), R = engReach(E.st), P = E.plans || [];
+  if(!R) return '<div class="eyebrow" style="margin-top:12px">Plans</div><p class="muted" style="font-size:13px">At this stage the machines file, sort and summarise. They cannot look ahead; nothing here can forecast anything yet.</p>';
+  const cal = E.cal == null ? 50 : E.cal, aw = P.filter(p => p.status === "awaiting"), op = P.filter(p => p.status === "open"), done = P.filter(p => p.status === "held" || p.status === "missed" || p.status === "lapsed" || p.status === "vetoed").slice(0, 4);
+  const bar = '<span style="display:inline-block;width:110px;height:6px;background:rgba(128,128,128,.25);border-radius:3px;vertical-align:middle"><i style="display:block;width:' + Math.round(cal) + '%;height:100%;background:#6a9;border-radius:3px"></i></span> ' + Math.round(cal);
+  const line = p => '<div style="margin:6px 0;padding:6px 10px;border-left:3px solid #6a9"><b>' + pcEsc(p.title) + '</b> <span class="muted">· ' + (p.owner === "engine" ? "the Engine's own" : "yours") + (p.status === "open" ? " · checked in " + Math.max(0, p.due - G.day) + " day(s)" : "") + '</span><div class="muted" style="font-size:12px">It expects, over ' + pcEsc(engFcText(p.fc)) + '. It is ' + Math.round(p.fc.conf * 100) + '% sure of its own eyesight.</div>' +
+    (p.status === "awaiting" ? '<div class="card__actions" style="margin-top:4px"><button type="button" class="btn" data-pa="' + p.id + '">Approve</button> <button type="button" class="btn btn--ghost" data-pv="' + p.id + '">Veto</button></div>' : '') + '</div>';
+  const verdict = p => '<div class="muted" style="font-size:12px;margin:3px 0">' + (p.status === "held" ? "✓" : p.status === "missed" ? "✗" : "–") + ' <b>' + pcEsc(p.title) + '</b> · ' + (p.status === "lapsed" ? "lapsed unanswered" : p.status === "vetoed" ? "vetoed" : (p.status === "held" ? "forecast held" : "forecast missed") + ": " + (p.hits || []).map(h => ENG_MNAME[h.k] + " said " + h.said.toFixed(1) + ", was " + h.was.toFixed(1)).join("; ")) + '</div>';
+  return '<div class="eyebrow" style="margin-top:12px">Plans and forecasts</div><p class="muted" style="font-size:13px">At this stage it can look ' + R.H + ' days ahead and only at ' + R.m.map(m => ENG_MNAME[m]).join(", ") + '. It rehearses on a copy of the world, says what it expects with a margin, and is checked when the days are up. Track record <b>' + bar + '</b>' + (E.calN ? ' over ' + E.calN + ' plan' + (E.calN > 1 ? 's' : '') : ' (none checked yet)') + '.</p>' +
+    (aw.concat(op).map(line).join("") || '<p class="muted" style="font-size:13px">Nothing in flight.</p>') + done.map(verdict).join("") +
+    '<div class="card__actions"><button type="button" class="btn btn--ghost" id="engAuto">' + (E.auto ? "Standing leave: ON (small plans start themselves)" : "Standing leave: off" + (cal < 60 ? " (needs a track record of 60)" : "")) + '</button></div>';
+}
 function engTick(){ try{ const E = G.eng; if(!E || E.pend !== "ceremony" || !G.running || !veil.hidden || (TALK && TALK.open)) return; engCeremony(); }catch(e){} }
 
 /* ordinary people talk about it, in the words of their own stake */
