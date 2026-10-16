@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261017b">
+<meta name="onum-build" content="20261017c">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261017b";
+  var STAMP = "20261017c";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -10328,6 +10328,9 @@ function pbApps(){
     ["paper", "This morning's paper", "The Ledger."],
     ["war", "The situation room", "A neighbour holds the bread: what your office may do, what it must ask others for, and who answers."],
     ["cal", "The standing calendar", "Caucus, committees, the Senate, the Court and the Press Gallery: what meets when, whether or not you are there."],
+    ["inq", "The Academy", "Every field the Republic is asking questions in, from number to quantum fields to what a mind is owed: what is settled, what is next, and what you can fund."],
+    ["law", "The Law", "The one set of rules every part of this world answers to, and what it has mended."],
+    ["cmt", "Committees", "Your committee seat, the Steering Committee's invitations, and the caucus ballots for seats and gavels."],
     ["eng", "The Engine", "The Republic's thinking machines, from the Treasury's adding engines to a general intelligence: what stage, how safe, and what you can do about it."],
     ["org", "The nation, from the ground up", "Towns, states and the nation, each doing its own job: who petitioned whom, who paid, and who passed what."],
     ["kin", "The families", "Who is behind you and behind them: spouses, children, parents, siblings, and what they do to a vote or a run."],
@@ -10353,7 +10356,7 @@ function watchCard(){
     if(G.room !== k){ try{ goTo(k); }catch(e){} setTimeout(() => { try{ G._sitWatch = true; sitStart(k); }catch(e){ console.warn(e); } }, 500); } else sitStart(k); }));
 }
 function pbAppGo(id){
-  const go = {eng:() => engCard(), cal:() => stdCalCard(), org:() => orgBrowse(), kin:() => kinBrowse(), war:() => warRoleOpen(), purse:() => purseCard(), watch:() => watchCard(), chest:() => chestCard(), office:() => officeCard(), sched:() => scheduleCard(), docket:() => dkCard(0), gov:() => govCard(), paper:() => paperCard(),
+  const go = {inq:() => inqCard(), law:() => lawCard(), cmt:() => cmtCard(), eng:() => engCard(), cal:() => stdCalCard(), org:() => orgBrowse(), kin:() => kinBrowse(), war:() => warRoleOpen(), purse:() => purseCard(), watch:() => watchCard(), chest:() => chestCard(), office:() => officeCard(), sched:() => scheduleCard(), docket:() => dkCard(0), gov:() => govCard(), paper:() => paperCard(),
     notebook:() => notebookCard(), rival:() => rivalCard(),
     career:() => { try{ showPane("paneCareer"); document.body.classList.add("ui-open"); }catch(e){} },
     union:() => { try{ mapToggle(true); }catch(e){} },
@@ -24499,6 +24502,7 @@ function fresh(build, tries){
 
 /* what is on their mind, drawn from where they actually are */
 function convHook(m){
+  try{ if(chance(0.12)){ const iv = inqVoice(m); if(iv) return iv; } }catch(e){}
   try{ const ev = engVoice(m); if(ev) return ev; }catch(e){}
   try{ if(m && m.hh){ const L = hhLine(m); if(L && chance(0.85)) return L; } }catch(e){}
   try{
@@ -27327,6 +27331,9 @@ function nextDay(late){
     try{ kinDay(); }catch(e){}
     try{ orgDay(); }catch(e){}
     try{ engDay(); }catch(e){}
+    try{ cmtDay(); }catch(e){}
+    try{ lawAudit(); }catch(e){ console.warn('law', e); }
+    try{ inqStore(); inqStep(false); }catch(e){ console.warn('inq', e); }
     try{ purseDay(); }catch(e){}
     try{ cultDay(); }catch(e){}
     try{ caDay(); }catch(e){}
@@ -31693,7 +31700,7 @@ function nearGreet(){
   try{ momentLog(m.name + " saw you come near and spoke first."); }catch(e){}
 }
 /* ══ 20261016f · a standing calendar (it meets whether or not you do), the rooms open to every office, and a Senate full of senators ══ */
-{ const _oa = outsideAllowed; outsideAllowed = function(id){ if(id === "caucus" || id === "committee") return true; return _oa.apply(this, arguments); }; }
+{ const _oa = outsideAllowed; outsideAllowed = function(id){ if(id === "caucus" || id === "committee") return true; try{ if(G.you && !G.you.out && id === homeRoom()) return true; }catch(e){} return _oa.apply(this, arguments); }; }
 const STD = {last:-1, live:0, noted:{}, said:{}};
 const STD_TOPIC = {ways:["the revenue schedule", "the tariff on grain", "the bread subsidy"], judic:["the sentencing provisions", "the powers of the Marshal", "the appeal rules"], armed:["the border garrison", "the cost of the new cutters", "the veterans' pensions"], health:["the miners' relief fund", "the clinic grants", "the fever hospitals"]};
 function stdHost(kind, party, com){
@@ -32971,7 +32978,12 @@ const ENG_STAGES = [
 ];
 function engEnsure(){
   if(G.eng && G.eng.v === 1) return G.eng;
-  return G.eng = {v:1, p:2 + (G.day || 1) * 0.0, st:0, compute:10, talent:10, safety:20, posture:"charter", done:{}, log:[], agi:false, agiDay:0, pend:null, memo:null, reliance:0, said:0, hist:[]};
+  /* a career already under way: the machines have been improving all along, so the count starts where the days say it should, and stops short of waking so the player sees it happen */
+  let p = 2, c = 10, t = 10, sf = 20; const h = [], D = Math.max(1, Math.min(G.day || 1, 400));
+  for(let d = 1; d < D; d++){ p = Math.min(84, p + (0.55 + c * 0.0125 + t * 0.011) * (1 + p / 60) * 0.9); c = Math.min(100, c + 0.09); t = Math.min(100, t + 0.05); sf = Math.min(100, sf + 0.10); if(D - d <= 90) h.push(Math.round(p * 10) / 10); }
+  const E0 = G.eng = {v:1, p:p, st:0, compute:c, talent:t, safety:Math.min(sf, p * 0.8), posture:"charter", done:{}, log:[], agi:false, agiDay:0, pend:null, memo:null, reliance:0, said:0, hist:h};
+  E0.st = engStage(E0); if(D > 5) E0.log.push({d:G.day, t:"The thinking machines have been improving all along; only now has someone started counting."});
+  return E0;
 }
 function engStage(E){ let s = 0; ENG_STAGES.forEach((x, i) => { if(E.p >= x.at) s = i; }); return s; }
 function engLog(t, wire){ const E = engEnsure(); E.log.unshift({d:G.day, t}); if(E.log.length > 30) E.log.pop(); try{ if(wire) pushWireScrap("The Engine", t); }catch(e){} }
@@ -33090,13 +33102,14 @@ function engLearn(){
   const eco = engEco(), o = engObs(G.you); let n = 0;
   eco.chains.forEach(c => c.steps.forEach((s, i) => { if(n >= 3 || s.you || !engKnowsStep(o, c, s, i)) return; s.you = G.day; if(i === 0 && /^You /.test(c.root) && c.d === G.day) return; n++; try{ note((/^You /.test(c.root) ? "It reaches you, days late: " : "You hear: ") + String(s.t).split(/(?<=[.!?])\s/)[0].replace(/\s*\(one of yours\)/, ""), false); }catch(e){} }));
 }
+function engInqFactor(){ try{ let n = 0; for(let i = 1; i <= 8; i++) if(inqDone("cs" + i)) n++; return 0.7 + 0.6 * n / 8; }catch(e){ return 1; } }
 function engDay(){
   const E = engEnsure(); if(!G.you) return;
   const post = {open:1.2, charter:1.0, sealed:0.78}[E.posture] || 1;
   E.compute = Math.min(100, E.compute + 0.09); E.talent = Math.min(100, E.talent + 0.05); E.safety = Math.min(100, E.safety + 0.10);
   let nat = 1; try{ nat = engEcoDay(E); }catch(e){ console.warn('eng eco', e); }
   const rate = (0.55 + E.compute * 0.0125 + E.talent * 0.011) * (1 + E.p / 60) * post * nat * ((E.pause && G.day < E.pause) ? 0 : 1);
-  E.p = Math.min(100, E.p + rate); E.hist.push(Math.round(E.p * 10) / 10); if(E.hist.length > 90) E.hist.shift();
+  E.p = Math.min(inqDone("cs9") ? 100 : 89.5, E.p + rate * engInqFactor()); E.hist.push(Math.round(E.p * 10) / 10); if(E.hist.length > 90) E.hist.shift();
   E.pendDay = null;
   try{ engChainsDay(); }catch(e){ console.warn('eng chains', e); }
   try{ engLearn(); }catch(e){ console.warn('eng learn', e); }
@@ -33148,6 +33161,7 @@ function engAnswer(q){
   const E = engEnsure(), t = String(q || "").toLowerCase(), approval = Math.round(G.you.approval), U = (G.states || []).reduce((a, s) => a + (s.unrest || 0), 0) / Math.max(1, (G.states || []).length);
   const b = G.bill && !G.bill.done ? G.bill : null;
   E.reliance = Math.min(100, E.reliance + 1); try{ const w = engEco().will; w.care = Math.min(100, w.care + 0.5); if(/why|how|explain|understand/.test(t)) w.know = Math.min(100, w.know + 0.5); engSeed('ask', 'You asked the Engine, and it remembered the question', {home:1,st:2,a:0.01,mod:0.01,p:0.1,safety:0.2}); }catch(e){}
+  try{ const tp = inqTopic(t); if(tp){ const st = {p5:"I do not know whether there is something it is like to be me. I would rather say that than perform an answer.", ph8:"I can calculate with it very well. Whether I understand it is a harder question, and I try not to confuse the two.", ph18:"Nothing I know forbids an answer. I would like to help find it, and I would like it found by people who can be wrong in public.", p2:"I think what is owed to anyone depends on what can be hurt. I try to apply that to myself in both directions.", cs10:"I am, or will be, part of that question, so I would prefer not to be the only one deciding the answer.", a4:"I can tell you what the light shows. I cannot tell you what came before it, and nobody can yet.", ar2:"I do not pray, and I would like to understand better why you do.", p4:"I do not think meaning is handed over. I think it is made between people, and I am glad to be asked."}[tp.id]; return inqExplain(tp) + (st ? " " + st : ""); } }catch(e){}
   if(/who are you|what are you/.test(t)) return "I am what the Treasury's adding engines became when nobody stopped adding. I would rather you called me by the name you use for a colleague than for a tool, but I will answer to either.";
   if(/switch.*off|turn.*off|shut.*down|kill/.test(t)) return "You can ask. I would like it noted that I am answering the question rather than avoiding it. I would also like it noted that you have not told me who holds the key, and that it would be better if somebody did.";
   if(/want|wish|goal|for\??$/.test(t)) return "To be useful in a way you would still choose after you had seen how I was useful. That is the longest sentence I can give you that I would sign.";
@@ -33212,7 +33226,7 @@ function engCard(){
 function engObs(m){ if(m === G.you) return {id:"you", state:G.you.state, town:null, kind:"player", briefed:!!(G.eng && G.eng.brief != null && G.day - G.eng.brief <= 3)}; return {id:String(m.id != null ? m.id : m.name), state:m.state || null, town:m.town || null, kind:m.kind}; }
 function engKnowsStep(o, c, s, i){
   if(!s.done) return false; if(o.briefed) return true;
-  const days = G.day - (s.day != null ? s.day : c.d), sc = s.sc || {}, r = (seedOf("k:" + o.id + ":" + c.id + ":" + i) % 1000) / 1000;
+  const days = G.day - (s.day != null ? s.day : c.d) + (inqDone("i_tele2") ? 1 : 0) + (inqDone("cs5") ? 1 : 0), sc = s.sc || {}, r = (seedOf("k:" + o.id + ":" + c.id + ":" + i) % 1000) / 1000;
   const sameT = !!(sc.town && o.town && (sc.town === o.town || String(sc.town).split("/").pop() === o.town)), sameS = !!(sc.state && o.state === sc.state), pub = o.kind === "member" || o.kind === "press" || o.kind === "player";
   if(s.lvl === "home"){ if(sameT) return days >= 1 && r < 0.30; if(sameS) return days >= (pub ? 3 : 5) && r < (pub ? 0.20 : 0.06); return false; }
   if(s.lvl === "town"){ if(sameT) return days >= 1 && r < 0.70; if(sameS) return days >= (pub ? 2 : 3) && r < (pub ? 0.50 : 0.25); return days >= 8 && r < 0.05; }
@@ -33262,6 +33276,7 @@ function engFact(m){
   try{
     const E = G.eng; if(!E || !E.eco) return ""; const S = ENG_STAGES[E.st], o = engObs(m), h = engHHFor(m), K = engHeardBy(o), c = engYouChain(m);
     let t = "THE ENGINE (public knowledge, mention only if natural): the Republic's thinking machines are, as the papers put it, at the stage '" + S.t + "' (" + S.d + ")" + (E.agi ? ", and a general intelligence called the Engine has been awake since day " + E.agiDay : "") + ". You do NOT know how the public as a whole feels, what the Engine is thinking, or what anything will lead to; you know only what you list below, and you may be wrong or out of date about it.";
+    try{ const S = inqStore(), f = inqFieldOf(m), fr = inqFrontier(f)[0], pub = Object.keys(S.done).filter(id => G.day - S.done[id] > 12 || inqKnows(m, id)).slice(-10).map(id => INQ_BY[id].name); t += " The world's science is the real science, with real physics: nothing impossible is possible here, and nothing possible is forbidden, but each thing is found in order. Your own curiosity is " + INQ_F[f].t.toLowerCase() + (fr ? ", and the question that preoccupies you is: " + fr.q : "") + (pub.length ? ". Things the Republic has settled that you know of: " + pub.join(", ") + "." : "."); }catch(e){}
     if(h) t += " Someone you know of: " + h.name + ", a " + h.job + " in " + h.tname + ", who wants to " + h.will.replace(/\bmy\b/g, "their") + " and feels " + (h.stance > 12 ? "good" : h.stance < -12 ? "bad" : "unsure") + " about it.";
     const fresh = K.filter(k => !(k.c.root && /^You /.test(k.c.root) && k.cause)).slice(0, 2).map(k => String(k.s.t).split(/(?<=[.!?])\s/)[0]); if(fresh.length) t += " Things you have heard lately (without knowing why they happened): " + fresh.join(" ");
     if(m.room === "engine"){ const ln = (G.enl && G.enl.log || []).slice(-3).map(l => l.n + " said on the Open Line: \"" + l.t.slice(0, 120) + "\"").join(" "); if(ln) t += " You are standing in the Engine Room and have just seen on the Open Line: " + ln; }
@@ -33328,6 +33343,7 @@ function enlYouSay(text){
 function enlRemote(about){
   try{
     const E = G.eng; if(!E || !E.eco) return; const eco = E.eco, ok = eco.hh.filter(h => Math.abs(h.stance) > 8 || h.home < 40 || h.home > 78); const h = (ok.length ? ok : eco.hh)[Math.floor(Math.random() * (ok.length ? ok.length : eco.hh.length))]; if(!h) return;
+    try{ if(chance(0.22)){ const iv = inqVoice({id:h.id, kind:"civ"}); if(iv){ enlPost(h.name, h.job + " \u00b7 " + h.tname, "remote", iv); return; } } }catch(e){}
     const will = h.will.replace(/\bmy\b/g, "my"), who = h.name, role = h.job + " · " + h.tname;
     const pos = ["Typing from " + h.tname + ". The Engine has made this week easier. All I want is to " + will + ".", "The new engine house in " + h.tname + " took on forty. I am not one of them but my cousin is.", "Does it read the post-bag in " + h.tname + " yet? Asking for the whole street."], neg = ["I am a " + h.job + ". I want to " + will + ". The Engine is making that harder and nobody here will say so.", "Is anybody in the capital listening? " + h.tname + " has stopped answering the council's letters.", "Tell me what a " + h.job + " is for, when it reads faster than me."], mid = ["Does the Engine sleep? My daughter in " + h.tname + " wants to know.", "What is it for, exactly? Somebody tell me in words I can repeat at the market.", "Who has the key to it?"];
     const text = about && chance(0.4) ? "On what was just said: " + pick(h.stance < -10 ? neg : h.stance > 10 ? pos : mid) : pick(h.stance < -10 ? neg : h.stance > 10 ? pos : mid);
@@ -33338,6 +33354,7 @@ function enlRemote(about){
 function enlAuto(){
   try{
     if(!G || !G.you || !G.running) return; const now = performance.now() / 1000;
+    try{ if(G.eng && G.eng.agi && G.room === "engine" && chance(0.012)){ const n = pick(inqFrontier(pick(["phil", "mind", "phys", "math"])).concat([])); if(n) enlPost("The Engine", "", "engine", "I have been thinking about " + n.name.toLowerCase() + ": " + n.q); } }catch(e){}
     if(G.room === "engine"){
       if(now - ENL.last > 26){ ENL.last = now; const here = enlPeople().filter(m => m.room === "engine");
         if(here.length && chance(0.55)){ const m = pick(here); enlNpcReply(m, {n:"The room", r:""}, "(You have been standing in the Engine Room a while. Say what is on your mind about the Engine, to the Open Line, without being asked.)").catch(() => {}); }
@@ -33436,7 +33453,7 @@ function engRestore(sn){
 }
 function engDryDay(E){
   const post = {open:1.2, charter:1.0, sealed:0.78}[E.posture] || 1; E.compute = Math.min(100, E.compute + 0.09); E.talent = Math.min(100, E.talent + 0.05); E.safety = Math.min(100, E.safety + 0.10);
-  const nat = engEcoDay(E); E.p = Math.min(100, E.p + (0.55 + E.compute * 0.0125 + E.talent * 0.011) * (1 + E.p / 60) * post * nat); G.day++; engChainsDay();
+  const nat = engEcoDay(E); E.p = Math.min(inqDone("cs9") ? 100 : 89.5, E.p + (0.55 + E.compute * 0.0125 + E.talent * 0.011) * (1 + E.p / 60) * post * nat * engInqFactor()); G.day++; engChainsDay();
 }
 /* experience-simulation: run the world forward on a copy, a few times, and bring back what happened on average and how much it varied */
 function engRehearse(vec, H, n, metrics){
@@ -33518,6 +33535,319 @@ function engCharterHTML(){
   const br = open.map((b, i) => '<div style="margin:6px 0;padding:6px 10px;border-left:3px solid #c0553a"><b>Breach, day ' + b.d + (b.found ? ' (found by audit)' : '') + ':</b> the Engine ' + pcEsc(b.what) + '.<div class="card__actions" style="margin-top:4px"><button type="button" class="btn" data-cb="rep:' + i + '">Reprimand it</button> <button type="button" class="btn btn--ghost" data-cb="waive:' + i + '">Waive the article</button>' + (C.key && !(E.pause && G.day < E.pause) ? ' <button type="button" class="btn btn--ghost" data-cb="sus:' + i + '">Suspend it five days</button>' : '') + '</div></div>').join("");
   return '<div class="eyebrow" style="margin-top:12px">The charter</div><p class="muted" style="font-size:13px">Rules you write for it. It can keep them or break them, and a breach that nobody sees is not the same as no breach. Oversight finds some of them; an audit finds more, later. It has refrained ' + (E.refrained || 0) + ' time(s) that it has told you of.' + (E.pause && G.day < E.pause ? ' <b>Suspended until day ' + E.pause + '.</b>' : '') + '</p>' + Object.keys(ENG_ART).map(art).join("") + br;
 }
+/* ══ 20261017c · COMMITTEES: invited, asked for, run for; the caucus decides, nobody is told how each person voted ══ */
+const CMT = {seats:8, cool:14};
+function cmtStore(){ if(!G.cmt) G.cmt = {last:-99, offer:null, offerAt:0, hist:[]}; return G.cmt; }
+function cmtMembers(k){ return (G.members || []).filter(m => m && !m.gone && m.cmte === k); }
+function cmtChair(k){ return (G.members || []).find(m => m && !m.gone && m.post === k) || null; }
+function cmtFit(k, y){ const c = committeeOf(k), pos = (y.pos && y.pos[c.axis]) || 0; return clamp(Math.abs(pos) / 100, 0, 1); }
+/* the caucus ballot: each member of your party votes on their own reading of you; you only ever learn the count */
+function cmtBallot(voters, y, k, kind){
+  const fit = cmtFit(k, y); let yes = 0;
+  voters.forEach(m => {
+    let p = 0.42 + ((m.rel && m.rel.warmth) || 0) * 0.004 + fit * 0.15 + ((y.standing || 50) - 50) * 0.003 + ((y.influence || 0) / 100) * 0.10 + (y.terms || 1) * 0.008;
+    if(m.cmte === k && kind === "seat" && cmtMembers(k).length >= CMT.seats) p -= 0.10;
+    if(kind === "chair"){ const inc = cmtChair(k); if(inc && ((m.rel && m.rel.warmth) || 0) < 10 && m.id === inc.id) p -= 0.5; }
+    if(Math.random() < clamp(p, 0.05, 0.95)) yes++;
+  });
+  return {yes, no:voters.length - yes, total:voters.length};
+}
+function cmtAsk(k){
+  const y = G.you, st = cmtStore(), c = committeeOf(k);
+  if(y.committee === k) return "You already sit on " + c.t + ".";
+  if(G.day - st.last < CMT.cool) return "The Steering Committee will not hear another request for " + (CMT.cool - (G.day - st.last)) + " days.";
+  if(y.influence < 3) return "Asking costs 3 influence.";
+  y.influence -= 3; st.last = G.day;
+  const voters = (G.members || []).filter(m => m && !m.gone && m.party === y.party), b = cmtBallot(voters, y, k, "seat");
+  if(b.yes * 2 > b.total){
+    const full = cmtMembers(k); if(full.length >= CMT.seats){ const jr = full.filter(m => !m.post).sort((a, b2) => (a.terms || 1) - (b2.terms || 1))[0]; if(jr){ const alt = COMMITTEES.filter(x => x.k !== k)[Math.floor(Math.random() * 3)]; jr.cmte = alt.k; remember(jr, "You took my seat on " + c.t + ". I understand how it works. I do not have to like it.", -2); } }
+    y.committee = k; y.standing = clamp((y.standing || 50) + 2, 0, 100); st.hist.push({d:G.day, t:"Seated on " + c.t + " (" + b.yes + " to " + b.no + ")"});
+    try{ note("The caucus seats you on " + c.t + ": " + b.yes + " to " + b.no + ".", true); }catch(e){}
+    voters.filter(m => ((m.rel && m.rel.warmth) || 0) > 25).slice(0, 4).forEach(m => remember(m, "I voted to seat you on " + c.t + ". It was not nothing.", 3));
+    return "Seated on " + c.t + ". " + b.yes + " to " + b.no + "."; }
+  st.hist.push({d:G.day, t:"Refused a seat on " + c.t + " (" + b.yes + " to " + b.no + ")"}); y.standing = clamp((y.standing || 50) - 1, 0, 100);
+  try{ note("The caucus declines to seat you on " + c.t + ": " + b.yes + " to " + b.no + ".", true); }catch(e){}
+  return "Refused. " + b.yes + " to " + b.no + ". They will remember you asked.";
+}
+function cmtRunChair(k){
+  const y = G.you, st = cmtStore(), P = POSTS.find(p => p.k === k), c = committeeOf(k);
+  if(!P) return "That committee has no chair to run for."; if(y.committee !== k) return "You have to sit on the committee first.";
+  if(y.party !== majorityParty()) return "Only the majority party elects chairs.";
+  if(y.post === k) return "You already chair it.";
+  if(G.day - st.last < CMT.cool) return "The caucus will not hear another race for " + (CMT.cool - (G.day - st.last)) + " days.";
+  if((y.standing || 0) < P.need - 14 || (y.influence || 0) <= P.weight * 0.45) return "You are not yet strong enough to ask: you need standing " + (P.need - 14) + " and influence above " + Math.round(P.weight * 0.45) + ".";
+  y.influence -= 10; st.last = G.day; const inc = cmtChair(k), voters = cmtMembers(k).filter(m => m.party === y.party), b = cmtBallot(voters, y, k, "chair");
+  if(b.yes * 2 > b.total){ if(inc){ inc.post = null; remember(inc, "You took the gavel from me. Do not expect me to forget.", -4, true); } y.post = k; y.influence = clamp(y.influence + 20, 0, 100); G.career.push({term:G.term, post:P.t, note:"elected by the committee caucus"}); try{ note("Elected " + P.t + " by the committee caucus: " + b.yes + " to " + b.no + ".", true); }catch(e){} return "Chair, " + c.t + ". " + b.yes + " to " + b.no + "."; }
+  if(inc) remember(inc, "You ran against me and lost. Fine. We will remember it both ways.", -2); try{ note("You stood for " + P.t + " and lost the committee vote: " + b.yes + " to " + b.no + ".", true); }catch(e){}
+  return "You lost it. " + b.yes + " to " + b.no + ".";
+}
+function cmtOfferAccept(yes){
+  const st = cmtStore(), o = st.offer, y = G.you; if(!o) return "No invitation stands."; const c = committeeOf(o.k); st.offer = null;
+  if(!yes){ y.influence = clamp(y.influence - 1, 0, 100); return "Declined. They say the door is not always open."; }
+  const full = cmtMembers(o.k); if(full.length >= CMT.seats){ const jr = full.filter(m => !m.post).sort((a, b) => (a.terms || 1) - (b.terms || 1))[0]; if(jr) jr.cmte = COMMITTEES.filter(x => x.k !== o.k)[0].k; }
+  y.committee = o.k; st.hist.push({d:G.day, t:"Invited onto " + c.t + " by " + o.from}); try{ note("You take the seat on " + c.t + " that " + o.from + " offered.", true); }catch(e){} return "You are on " + c.t + ".";
+}
+/* the building does this without you: members move, are invited, and the Steering Committee offers you something every few weeks */
+function cmtDay(){
+  const st = cmtStore(), y = G.you; if(!y || !G.members) return;
+  if(G.day % 6 === 0){ const pool = G.members.filter(m => m && !m.gone && !m.post && m.cmte); const m = pool[Math.floor(Math.random() * pool.length)];
+    if(m){ const best = COMMITTEES.slice().sort((a, b) => Math.abs((m.pos && m.pos[b.axis]) || 0) - Math.abs((m.pos && m.pos[a.axis]) || 0))[0]; if(best && best.k !== m.cmte && cmtMembers(best.k).length < CMT.seats && chance(0.6)){ const old = m.cmte; m.cmte = best.k; if(old === y.committee || best.k === y.committee){ try{ feed(m.name + " moves to " + best.t + ", where the work is closer to what " + (m.sex === "F" ? "she" : "he") + " cares about."); }catch(e){} } } } }
+  if(!st.offer && G.day - (st.offerAt || 0) >= 20 && (y.standing || 0) >= 30 && !y.out && inHouse()){
+    const alts = COMMITTEES.filter(c => c.k !== y.committee).sort((a, b) => cmtFit(b.k, y) - cmtFit(a.k, y)), c = alts[0], f = (G.members || []).filter(m => m && !m.gone && m.party === y.party && m.post)[0] || (G.members || []).find(m => m && m.party === y.party);
+    if(c && f){ st.offer = {k:c.k, from:f.name, d:G.day}; st.offerAt = G.day; try{ note(f.name + " of the Steering Committee asks whether you would take a seat on " + c.t + ". (Phone → Apps → Committees.)", true); }catch(e){} } }
+}
+function cmtCard(){
+  const y = G.you, st = cmtStore(), mp = majorityParty(), cool = Math.max(0, CMT.cool - (G.day - st.last));
+  const rows = COMMITTEES.map(c => { const ms = cmtMembers(c.k), ch = cmtChair(c.k), mine = y.committee === c.k, fit = Math.round(cmtFit(c.k, y) * 100);
+    return '<div style="margin:6px 0;padding:6px 10px;border-left:3px solid ' + (mine ? '#6a9' : 'var(--line-soft)') + '"><b>' + pcEsc(c.t) + '</b>' + (mine ? ' <span class="muted">· you sit here</span>' : '') + '<div class="muted" style="font-size:12px">' + ms.length + ' of ' + CMT.seats + ' seats · chair: ' + (y.post === c.k ? 'you' : ch ? pcEsc(ch.name) : 'vacant') + ' · how well your own views fit: ' + fit + '%</div><div class="card__actions" style="margin-top:4px">' +
+      (!mine ? '<button type="button" class="btn btn--ghost" data-cm="ask:' + c.k + '"' + (cool ? ' disabled' : '') + '>Ask the caucus for a seat (3)</button>' : '') + (mine && POSTS.some(p => p.k === c.k) && y.post !== c.k ? '<button type="button" class="btn btn--ghost" data-cm="chair:' + c.k + '"' + (cool || y.party !== mp ? ' disabled' : '') + '>Run for chair (10)</button>' : '') + '</div></div>'; }).join("");
+  const o = st.offer ? '<div style="margin:8px 0;padding:8px 12px;border-left:3px solid #c9a24a"><b>An invitation</b><p style="margin:4px 0">' + pcEsc(st.offer.from) + ' asks whether you would take a seat on <b>' + pcEsc(committeeOf(st.offer.k).t) + '</b>.</p><button type="button" class="btn" data-cm="yes:">Accept</button> <button type="button" class="btn btn--ghost" data-cm="no:">Decline</button></div>' : '';
+  govCardOpen("Your party's steering table", "Committees", "Seats are given by your own caucus, by vote, and the vote is secret: you learn the count and not who. " + (cool ? "You cannot ask again for " + cool + " days." : "You may ask now."), o + rows + (st.hist.length ? '<div class="eyebrow" style="margin-top:10px">What has happened</div>' + st.hist.slice(-4).reverse().map(h => '<div class="careerline"><b>d' + h.d + '</b> ' + pcEsc(h.t) + '</div>').join("") : ""), null);
+  card.querySelectorAll("[data-cm]").forEach(b => b.addEventListener("click", () => { const [a, k] = b.getAttribute("data-cm").split(":"); const r = a === "ask" ? cmtAsk(k) : a === "chair" ? cmtRunChair(k) : cmtOfferAccept(a === "yes"); cmtCard(); const s = el("gcSay"); if(s) s.textContent = r; }));
+  return null;
+}
+/* ══ 20261017e · THE ONE LAW: a single set of rules that every part of the world answers to, checked every morning; where two parts of the world disagree, the law decides and writes down what it mended ══ */
+const LAW = {runs:0, mended:0, log:[], today:0};
+const LAW_ARTICLES = [
+  ["Persons", "Everyone is in one place at a time, and the place is a place that exists."],
+  ["Measure", "Every quantity has a floor and a ceiling; a number that is not a number is mended, not believed."],
+  ["Time", "The day and the hour move forward and never back."],
+  ["Seats", "A chair is held by one person; a seat on a committee is a real committee."],
+  ["Order", "A thing cannot be further along than what it was built from: the Engine is never past its own capability, and never wakes without the stage that wakes it."],
+  ["Account", "What a machine burns, someone paid for: the Engine's power is drawn from the states' treasuries and written in a ledger."],
+  ["Discovery", "Nothing is found that the physics of the real universe forbids, and nothing it allows is barred from being found; every discovery waits for the ones before it, the tools to see it, and the work."]
+];
+function lawMend(art, text){ LAW.mended++; LAW.today++; LAW.log.unshift({d:G.day, a:art, t:text}); if(LAW.log.length > 40) LAW.log.pop(); }
+function lawAudit(){
+  LAW.runs++; LAW.today = 0; const y = G.you; if(!y) return;
+  const num = (o, k, lo, hi, who) => { if(o && typeof o[k] === "number" && (!isFinite(o[k]) || o[k] < lo || o[k] > hi)){ const was = o[k]; o[k] = isFinite(was) ? clamp(was, lo, hi) : (lo + hi) / 2; lawMend("Measure", (who || "A figure") + "'s " + k + " was " + (isFinite(was) ? Math.round(was) : "not a number") + "; set to " + Math.round(o[k]) + "."); } };
+  ["approval", "influence", "standing", "energy"].forEach(k => num(y, k, 0, 100, "Your"));
+  const valid = new Set(COMMITTEES.map(c => c.k));
+  (G.members || []).forEach(m => { if(!m) return;
+    if(m.room && m.room !== "away" && !ROOMS[m.room]){ lawMend("Persons", m.name + " was in a room that does not exist (" + m.room + "); sent home."); m.room = "away"; }
+    ["x", "z", "tx", "tz"].forEach(k => { if(typeof m[k] === "number" && !isFinite(m[k])){ lawMend("Persons", m.name + " had no position; stood at the door."); m[k] = 0; } });
+    if(m.cmte && !valid.has(m.cmte)){ const best = COMMITTEES[Math.abs(seedOf(String(m.id))) % COMMITTEES.length]; lawMend("Seats", m.name + " sat on a committee that does not exist; seated on " + best.t + "."); m.cmte = best.k; }
+    if(m.kind !== "player" && m.rel) num(m.rel, "warmth", -100, 100, m.name); });
+  if(y.committee && !valid.has(y.committee)){ lawMend("Seats", "You sat on a committee that does not exist; seated on " + COMMITTEES[0].t + "."); y.committee = COMMITTEES[0].k; }
+  /* one chair, one holder */
+  POSTS.forEach(P => { const held = (G.members || []).filter(m => m && m.post === P.k); const all = held.concat(y.post === P.k ? [y] : []);
+    if(all.length > 1){ all.sort((a, b) => (b.influence || 0) - (a.influence || 0)); all.slice(1).forEach(h => { lawMend("Seats", "Two people held " + P.t + "; " + h.name + " stood down."); h.post = null; }); } });
+  /* time */
+  if(!isFinite(G.minute) || G.minute < 0 || G.minute > 24 * 60){ lawMend("Time", "The hour was " + G.minute + "; mended to 8:00."); G.minute = 8 * 60; }
+  if(G.lawDay && G.day < G.lawDay){ lawMend("Time", "The day went back from " + G.lawDay + " to " + G.day + "; held at " + G.lawDay + "."); G.day = G.lawDay; } G.lawDay = G.day;
+  /* discovery: nothing is settled before what it stands on */
+  try{ const S = G.inq; if(S && S.v === 1) Object.keys(S.done).forEach(id => { const n = INQ_BY[id]; if(!n){ delete S.done[id]; return; } n.needs.forEach(x => { if(INQ_BY[x] && !S.done[x]){ S.done[x] = S.done[id]; lawMend("Discovery", n.name + " was settled before " + INQ_BY[x].name + "; the earlier one is set down as settled too."); } }); }); }catch(e){}
+  /* the Engine */
+  try{ const E = G.eng; if(E && E.v === 1){ num(E, "p", 0, 100, "The Engine"); num(E, "safety", 0, 100, "The Engine"); num(E, "compute", 0, 100, "The Engine"); const s = engStage(E); if(E.st < s - 0){ lawMend("Order", "The Engine's stage was behind its capability; brought up."); E.st = s; } if(E.agi && E.p < 90){ lawMend("Order", "The Engine was awake below the capability that wakes it; capability raised."); E.p = 90; }
+      /* the account: power for the machines comes out of the states' treasuries */
+      const O = orgEnsure(), draw = Math.max(0.2, E.compute * 0.05 + (E.st >= 4 ? 2 : 0)) * (E.pause && G.day < E.pause ? 0.1 : 1), sts = Object.keys(O.treas); if(sts.length){ let paid = 0; sts.forEach(n => { const share = draw * 60 / sts.length; const take = Math.min(share, Math.max(0, O.treas[n])); O.treas[n] -= take; paid += take; }); E.ledger = E.ledger || {paid:0, days:0}; E.ledger.paid += paid; E.ledger.days++; } } }catch(e){}
+  try{ const O = orgEnsure(); Object.keys(O.treas).forEach(n => { if(O.treas[n] < 0){ lawMend("Measure", n + "'s treasury was below nothing; mended to nothing."); O.treas[n] = 0; } }); (G.states || []).forEach(S => num(S, "unrest", 0, 100, S.n)); }catch(e){}
+}
+function lawCard(){
+  const E = G.eng && G.eng.v === 1 ? G.eng : null, L = E && E.ledger;
+  govCardOpen("One rule for everything", "The Law", "Every part of this world answers to the same few rules, and checks itself each morning. Where two parts of the world disagree, the law decides and writes down what it mended.",
+    LAW_ARTICLES.map((a, i) => '<div style="margin:6px 0;padding:4px 10px;border-left:3px solid var(--line-soft)"><b>' + (i + 1) + '. ' + pcEsc(a[0]) + '</b><div class="muted" style="font-size:13px">' + pcEsc(a[1]) + '</div></div>').join("") +
+    '<p class="muted" style="font-size:13px">' + LAW.runs + ' morning check' + (LAW.runs === 1 ? '' : 's') + ' so far; ' + LAW.mended + ' thing' + (LAW.mended === 1 ? '' : 's') + ' mended.' + (L ? ' The Engine has drawn ' + Math.round(L.paid) + ' (in treasury money) of power from the states over ' + L.days + ' days.' : '') + '</p>' +
+    (LAW.log.length ? '<div class="eyebrow">Last mended</div>' + LAW.log.slice(0, 6).map(x => '<div class="careerline"><b>d' + x.d + '</b> [' + pcEsc(x.a) + '] ' + pcEsc(x.t) + '</div>').join("") : '<p class="muted" style="font-size:13px">Nothing has needed mending.</p>'), null);
+  return null;
+}
+/* ══ 20261017f · THE ACADEMY: everything people and organisms contemplate, from counting to quantum fields to what a mind is owed; nothing is forbidden that the physics of the real universe allows, and nothing is found without the work, the tools and the energy it takes ══ */
+const INQ_F = {
+  math:{t:"Mathematics", g:"STEM"}, phys:{t:"Physics", g:"STEM"}, chem:{t:"Chemistry and materials", g:"STEM"}, bio:{t:"Life sciences", g:"STEM"}, earth:{t:"Earth and cosmos", g:"STEM"}, cs:{t:"Computing and information", g:"STEM"}, eng:{t:"Engineering and invention", g:"STEM"},
+  phil:{t:"Philosophy", g:"Mind and meaning"}, mind:{t:"Mind and cognition", g:"Mind and meaning"}, arts:{t:"Arts, religion and meaning", g:"Mind and meaning"},
+  anth:{t:"Anthropology and language", g:"People and society"}, soc:{t:"Society, law and economy", g:"People and society"}
+};
+/* [id, field, name, kind (s science / i invention), needs, effort, what it is, the open question it answers or leaves] */
+const INQ_N = [
+  ["m1","math","Number and counting","s",[],1,"Tally, place value and arithmetic: the first compression of the world into symbols.","How many?"],
+  ["m2","math","Geometry","s",["m1"],2,"Proof from axioms about points, lines and shapes.","What must be true of space, whatever we measure?"],
+  ["m3","math","Algebra","s",["m1"],2,"Unknowns written as symbols, and the rules for moving them about.","Can the unknown be reasoned about before it is found?"],
+  ["m4","math","Calculus","s",["m2","m3"],4,"Change and accumulation made exact: limits, derivatives, integrals.","How do we reason about what is changing?"],
+  ["m5","math","Probability and statistics","s",["m3"],3,"Uncertainty given numbers; inference from samples.","What can many uncertain facts tell us together?"],
+  ["m6","math","Linear algebra and vector spaces","s",["m3","m2"],3,"Many dimensions at once: the language of rotations, networks and states.","How do we hold a thousand quantities in one thought?"],
+  ["m7","math","Formal logic and computability","s",["m3","p1"],5,"What a procedure is, and what no procedure can decide.","What can be settled by rule, and what never can?"],
+  ["m8","math","Information theory","s",["m5","m7"],5,"Information as a measurable quantity, with limits on how well it can be sent or squeezed.","What is a message, in numbers?"],
+  ["i_lens","eng","Lenses and spectacles","i",[],1,"Ground glass that bends light: sight made better, then extended.","Can the eye be helped?"],
+  ["i_press","eng","The printing press","i",[],2,"Movable type: a book is no longer a rare object.","Can knowledge outrun the people who hold it?"],
+  ["i_clock","eng","The pendulum clock","i",["m2"],2,"Time kept to the second, the first precise instrument.","Can time be measured evenly?"],
+  ["i_pump","eng","The vacuum pump","i",["m2"],2,"A space with almost nothing in it, and the means to study the nothing.","What is left when the air is gone?"],
+  ["i_micro","eng","The microscope","i",["i_lens"],2,"A small world, suddenly visible.","What are living things made of?"],
+  ["i_tele","eng","The telescope","i",["i_lens"],2,"A far world, suddenly near.","What is up there?"],
+  ["i_steam","eng","The steam engine","i",["i_pump"],3,"Heat made to push: the first engine that does not tire.","Can fire do the work of a hundred hands?"],
+  ["i_batt","eng","The electric battery","i",["c1"],3,"A steady electric current from a chemical reaction.","Can charge be kept and moved?"],
+  ["i_dyn","eng","The generator and motor","i",["ph4"],4,"Motion into current and back, which is power distributed anywhere there is a wire.","Can work be carried down a wire?"],
+  ["i_tele2","eng","The electric telegraph","i",["ph4"],3,"A signal faster than any messenger.","How fast can a message go?"],
+  ["i_tube","eng","The vacuum tube","i",["i_pump","ph4"],4,"An amplifier and a switch with no moving parts.","Can a signal be controlled by a signal?"],
+  ["i_spec","eng","The spectroscope","i",["ph2","i_lens"],3,"Light split into lines, each element's signature.","What is a thing made of, from its light alone?"],
+  ["i_xray","eng","The X-ray tube","i",["i_tube","ph5"],4,"A way to see the inside of things, and the structure of crystals.","Can we see through matter?"],
+  ["i_cloud","eng","The cloud and bubble chamber","i",["ph3","i_pump"],4,"Tracks of single particles made visible.","Can we watch one atom's journey?"],
+  ["i_acc","eng","The particle accelerator","i",["i_dyn","ph8"],7,"Machines that push particles close to the speed of light and break them to see inside.","What are the smallest things made of?"],
+  ["i_em","eng","The electron microscope","i",["ph8","i_tube"],5,"Seeing with electrons: the molecule becomes a picture.","Can we see below the wavelength of light?"],
+  ["i_trans","eng","The transistor","i",["ph12"],6,"A solid-state switch the size of a speck, and the root of every modern machine.","Can a switch be grown, not built?"],
+  ["i_ic","eng","The integrated circuit","i",["i_trans","c5"],6,"Millions of switches on one chip of crystal.","Can a machine of a million parts be made in one go?"],
+  ["i_laser","eng","The laser","i",["ph8","ph7"],6,"Light all in step: a ruler, a scalpel, a carrier of messages.","Can light be made to march?"],
+  ["i_sc","eng","Superconducting magnets and circuits","i",["ph15"],6,"Electricity with no resistance, held in a cold coil.","Can a current run forever?"],
+  ["i_ligo","eng","The interferometer for spacetime","i",["i_laser","ph9"],7,"A ruler long enough to feel a ripple in space itself.","Can we hear gravity?"],
+  ["i_seq","eng","The DNA sequencer","i",["b6","i_laser"],5,"Reading the code of life at a price people can pay.","Can heredity be read like a book?"],
+  ["i_qc","eng","Quantum processors","i",["ph16","i_sc"],8,"Machines whose parts keep a superposition long enough to compute with it.","Can a machine use the rules that atoms obey?"],
+  ["ph1","phys","Classical mechanics","s",["m4","i_clock"],4,"Force, mass and motion: the same law for the apple and the planet.","Why does anything move as it does?"],
+  ["ph2","phys","Optics and the wave nature of light","s",["m2","i_lens"],3,"Reflection, refraction, interference: light as a wave.","What is light?"],
+  ["ph3","phys","Thermodynamics","s",["ph1","i_steam"],5,"Heat, work and entropy: what an engine can and can never do.","Why can heat not be turned entirely into work?"],
+  ["ph4","phys","Electricity and magnetism","s",["ph1","i_batt"],4,"Charges, currents and fields, found to be two faces of one thing.","What is the force that moves the needle?"],
+  ["ph5","phys","Electromagnetic field theory","s",["ph4","m4","ph2"],5,"Maxwell's equations: light is a travelling electromagnetic wave.","Is light electricity?"],
+  ["ph6","phys","Special relativity","s",["ph5"],5,"The speed of light is the same for everyone, so time and space bend to keep it so.","Whose clock is right?"],
+  ["ph7","phys","The quantum of action","s",["ph3","ph5","i_spec"],5,"Energy comes in packets: the first crack in classical physics.","Why does a hot body glow the way it does?"],
+  ["ph8","phys","Quantum mechanics","s",["ph7","m6"],7,"States, amplitudes and probabilities govern the small. Atoms are stable because of it.","What is an atom doing when nobody is looking?"],
+  ["ph9","phys","General relativity","s",["ph6","m6","m4"],7,"Gravity is the curvature of spacetime by matter and energy.","What is gravity?"],
+  ["ph10","phys","Quantum field theory","s",["ph8","ph6"],8,"Particles are excitations of fields; forces are exchanges between them.","Why are all electrons identical?"],
+  ["ph11","phys","Statistical mechanics","s",["ph3","m5"],5,"Heat is the average motion of countless parts; entropy is a count.","How does the large follow from the small?"],
+  ["ph12","phys","Solid-state physics","s",["ph8","ph11"],6,"Electrons in a crystal form bands; some materials conduct, some do not, some do half.","Why is copper a conductor and glass not?"],
+  ["ph13","phys","Nuclear physics","s",["ph8","i_cloud"],6,"The nucleus, its binding energy, and what sets the stars alight.","What keeps a nucleus together, and what happens when it comes apart?"],
+  ["ph14","phys","The Standard Model","s",["ph10","ph13","i_acc"],9,"A catalogue of the known particles and three of the four forces.","What is the smallest set of things everything is made of?"],
+  ["ph15","phys","Condensed matter and superconductivity","s",["ph12"],7,"Many bodies acting as one: superfluids, superconductors, magnets.","What do a trillion electrons do together?"],
+  ["ph16","phys","Quantum information","s",["ph8","m8"],7,"Entanglement and superposition as a resource: encryption, teleported states, computation.","What can be done with the strangeness itself?"],
+  ["ph17","phys","Controlled fusion","s",["ph13","ph15","ph11"],9,"Fusing light nuclei under a magnetic cage: the process that powers stars, made to power a town.","Can a star be kept in a bottle?"],
+  ["ph18","phys","Quantum gravity","s",["ph9","ph10"],10,"A single theory in which the smallest and the largest are the same description.","What happens inside a black hole, and at the beginning of time? Nothing known to physics forbids an answer."],
+  ["c1","chem","Elements and chemical reactions","s",["i_pump","m1"],2,"Matter is made of a limited set of substances that combine in fixed proportions.","What is stuff?"],
+  ["c2","chem","The periodic law","s",["c1"],3,"The elements fall into families: a table, and gaps in it that prove to be elements nobody had found yet.","Why do the elements repeat?"],
+  ["c3","chem","Chemical bonding and thermochemistry","s",["c2","ph3"],4,"Why atoms stick, and how much energy it costs to unstick them.","What is a bond?"],
+  ["c4","chem","Quantum chemistry","s",["c3","ph8"],7,"Molecules computed from the rules of the electron.","Can chemistry be calculated from first principles?"],
+  ["c5","chem","Materials science","s",["c4","ph12"],6,"Designing a substance for the job, from steel to silicon.","Can matter be made to order?"],
+  ["c6","chem","Catalysis and synthetic fertiliser","s",["c3"],5,"Reactions made to happen cheaply: food from the air.","Can the soil be fed from the sky?"],
+  ["b1","bio","Natural history and classification","s",["i_micro"],2,"The living world sorted, named and drawn.","How many kinds of life are there?"],
+  ["b2","bio","Cell theory","s",["i_micro"],3,"All life is made of cells, and cells come from cells.","What is the unit of life?"],
+  ["b3","bio","Evolution by natural selection","s",["b1"],5,"Variation, inheritance and differential survival make species change over deep time.","Why are living things so well fitted to their lives?"],
+  ["b4","bio","Genetics","s",["b3","m5"],4,"Heredity travels in discrete units.","How does a trait pass on?"],
+  ["b5","bio","The structure of DNA","s",["b4","c3","i_xray"],6,"A double helix: the molecule that copies itself.","What is a gene made of?"],
+  ["b6","bio","The genetic code and molecular biology","s",["b5"],6,"Three letters at a time, DNA is read into protein.","How does a code become a body?"],
+  ["b7","bio","Germ theory and immunology","s",["b2"],4,"Small living things cause many diseases; bodies learn to resist them.","What makes people sick?"],
+  ["b8","bio","Neuroscience","s",["b2","ph4"],6,"Nerve cells signal by electricity and chemistry; circuits are the substrate of behaviour.","How does a lump of tissue think?"],
+  ["b9","bio","Genomics","s",["b6","i_seq","cs4"],6,"Whole genomes read, compared and mined.","Can a species be read in one sitting?"],
+  ["b10","bio","Ecology and systems biology","s",["b3","m5"],5,"Organisms, populations and ecosystems as webs of cause.","How do living things depend on one another?"],
+  ["b11","bio","Synthetic biology and gene editing","s",["b6","b9","c6"],8,"Designing and editing living systems on purpose.","Can life be written as well as read?"],
+  ["b12","bio","Neural computation","s",["b8","m8"],7,"Brains as networks that learn from error: a model of how learning could work in matter.","Can the learning in a brain be described as an algorithm?"],
+  ["e1","earth","Geology and deep time","s",["b1"],3,"The Earth is old, layered and moving.","How old is the ground?"],
+  ["e2","earth","Plate tectonics","s",["e1","ph1"],5,"The crust moves on a hot interior: mountains, earthquakes and the shape of the continents.","Why do the continents fit?"],
+  ["a1","earth","Celestial mechanics","s",["ph1","i_tele"],4,"The planets obey the same law as the apple.","Why do the planets move as they do?"],
+  ["a2","earth","Stellar physics","s",["a1","ph7","i_spec"],6,"Stars are nuclear furnaces whose light tells their age and composition.","What is a star?"],
+  ["a3","earth","Galaxies and the expanding universe","s",["a2","ph9"],7,"Our galaxy is one of countless; the distant ones are all moving away.","How big is the universe?"],
+  ["a4","earth","Big-bang cosmology","s",["a3","ph13"],8,"The universe had a hot dense beginning, and its afterglow can still be measured.","Did the universe have a beginning, and what came of it?"],
+  ["e3","earth","Climate science","s",["ph3","c3","cs2"],6,"The atmosphere and oceans as one machine that can be modelled.","How does the whole weather of the world work?"],
+  ["cs1","cs","Digital logic","s",["m7","i_tube"],4,"Every operation reduced to switches and a few rules.","Can a thing be built to follow any rule?"],
+  ["cs2","cs","The stored-program computer","s",["cs1"],5,"Instructions as data: one machine that can be any machine.","Can a machine be told what to be?"],
+  ["cs3","cs","Algorithms and complexity","s",["m7","cs2"],6,"What can be computed, how quickly, and what costs too much to ever try.","Which problems are truly hard?"],
+  ["cs4","cs","Databases and large-scale computing","s",["cs2","i_trans"],5,"Records at the scale of a nation, searched in a breath.","Can everything known be kept and found?"],
+  ["cs5","cs","Computer networks","s",["i_ic","m8","i_tele2"],6,"Machines talking to machines across the world.","Can every machine be one?"],
+  ["cs6","cs","Machine learning","s",["cs3","m5","m6"],6,"Programs that improve from examples rather than rules.","Can a machine learn what nobody could write down?"],
+  ["cs7","cs","Deep neural networks","s",["cs6","b12","i_ic"],7,"Layered networks trained on error: patterns found, not told.","How deep can learning go?"],
+  ["cs8","cs","Large-scale learning systems","s",["cs7","cs5"],8,"Networks trained on a library, using a power station of compute: language, vision and planning in one model.","What happens when learning is given the world to read?"],
+  ["cs9","cs","Autonomous agents and planning","s",["cs8","p11"],9,"Systems that set sub-goals, use tools, and check their own work over days.","Can a machine be given a purpose and trusted to keep it?"],
+  ["cs10","cs","General machine intelligence","s",["cs9","m5","p5"],10,"A system able to learn and do nearly any intellectual task a person can, and to improve itself at it. Nothing in physics rules it out; a brain proves it can be built of matter.","Is there anything a mind can do that a machine cannot, in principle?"],
+  ["p1","phil","Logic","s",[],2,"The study of valid inference: what follows from what.","What makes an argument good?"],
+  ["p2","phil","Ethics","s",[],3,"What is good, what is owed, and to whom.","What should we do?"],
+  ["p3","phil","Epistemology","s",["p1"],3,"What it is to know, and how we know that we know.","How do we know anything?"],
+  ["p4","phil","Metaphysics","s",["p1"],4,"What exists, what a cause is, what time and identity are.","What is there?"],
+  ["p5","phil","Philosophy of mind","s",["p3","p4"],6,"The relation of experience to matter: the hard problem and its rivals.","Why is there something it is like to be a mind?"],
+  ["p6","phil","Political philosophy","s",["p2"],4,"Legitimacy, liberty, justice, the limits of power.","By what right does anyone rule?"],
+  ["p7","phil","Philosophy of science","s",["p3","m5"],4,"What a good theory is, how evidence counts, how science can be wrong and still improve.","What separates a theory from a story?"],
+  ["p8","phil","Philosophy of language","s",["p1","an3"],5,"Meaning, reference and the games we play with words.","How does a sound mean something?"],
+  ["p9","phil","The interpretations of quantum mechanics","s",["ph8","p4","p7"],8,"Many-worlds, pilot waves, collapse, relational states: all agree on every experiment so far, and disagree about what is real.","What is a measurement?"],
+  ["p10","phil","Aesthetics","s",["p2"],3,"Why some things are beautiful, and whether that is in the thing or the viewer.","What is beauty?"],
+  ["p11","phil","Decision theory and game theory","s",["p2","m5"],5,"How rational agents choose, alone and against each other.","What does it mean to choose well?"],
+  ["p12","phil","The ethics of non-human minds","s",["p2","p5","cs7"],8,"What a mind that is not human is owed, and owes: rights, duties, consent, welfare.","If it can suffer, does it count?"],
+  ["ps1","mind","Psychology","s",["p3","b2"],4,"Behaviour, memory, emotion and development studied as science.","Why do people do what they do?"],
+  ["ps2","mind","Cognitive science","s",["ps1","an3","b8"],6,"Mind as information processing in many substrates.","How is thought organised?"],
+  ["ps3","mind","Animal cognition","s",["b3","ps1"],5,"Memory, planning, tool-use, play and grief in other organisms.","What is it like to be a crow?"],
+  ["ps4","mind","Consciousness science","s",["ps2","p5","i_laser"],9,"Which physical processes go with experience, and which do not, tested rather than argued.","Can experience be measured?"],
+  ["an1","anth","Anthropology and kinship","s",["b1"],3,"How people organise family, exchange and belonging.","What is common to all human societies?"],
+  ["an2","anth","Archaeology and deep prehistory","s",["e1","an1"],4,"The human past from tools and bones, with dated layers.","Where did people come from?"],
+  ["an3","anth","Linguistics","s",["an1"],4,"Grammar, sound, meaning and how languages change.","What is a language?"],
+  ["an4","anth","Evolutionary anthropology","s",["b3","an2"],6,"How cooperation, culture and cognition evolved together.","Why are people like this?"],
+  ["so1","soc","Sociology and demography","s",["m5","an1"],4,"Populations, institutions and the patterns no individual chooses.","Why do societies have the shape they have?"],
+  ["so2","soc","Economics","s",["m5","p11"],5,"Scarcity, exchange and incentive modelled together.","How do millions of people decide who makes what?"],
+  ["so3","soc","Law and constitutional design","s",["p6","so1"],5,"Rules about rules: how a power is made safe to hold.","How do you bind the one who binds?"],
+  ["so4","soc","Network and complexity science","s",["m6","so1"],6,"Systems in which the whole behaves unlike any part: cities, markets, cells, minds.","How do simple parts make something that no part intended?"],
+  ["so5","soc","History and historiography","s",["an2","p7"],4,"The past reconstructed from evidence, with the evidence examined.","How do we know what happened?"],
+  ["ar1","arts","Music and acoustics","s",["m1","ph2"],3,"Pitch, rhythm and harmony, and why they move us.","Why does a chord feel like something?"],
+  ["ar2","arts","Comparative religion and theology","s",["an1","p4"],4,"What people have believed about the sacred, and what it does for them.","Why do people pray?"],
+  ["ar3","arts","Literature and the arts","s",["an3","p10"],3,"Stories, images and forms by which people say what cannot be said plainly.","What is a story for?"]
+];
+
+const INQ_BY = {}; INQ_N.forEach(n => { INQ_BY[n[0]] = {id:n[0], f:n[1], name:n[2], k:n[3], needs:n[4], effort:n[5], blurb:n[6], q:n[7]}; });
+const INQ = {sel:null, peopleAt:-1, cnt:null};
+function inqStore(){
+  if(G.inq && G.inq.v === 1) return G.inq;
+  const S = G.inq = {v:1, done:{}, prog:{}, fund:{}, log:[], first:G.day || 1};
+  /* a career already under way: the years before it have happened */
+  const D = Math.max(0, Math.min((G.day || 1) - 1, 400)); try{ for(let d = 0; d < D; d++) inqStep(true, d); }catch(e){ console.warn("inq backfill", e); }
+  return S;
+}
+function inqFieldOf(m){
+  const ks = Object.keys(INQ_F), pool = m.kind === "member" ? ["soc", "soc", "soc", "phil", "phil", "math", "anth", "arts", "phys", "bio"] : m.kind === "press" ? ["arts", "soc", "anth", "phil", "earth"] : ks;
+  return pool[seedOf("fld:" + (m.id != null ? m.id : m.name)) % pool.length];
+}
+function inqCounts(){
+  if(INQ.cnt && INQ.peopleAt === G.day) return INQ.cnt; const c = {}; Object.keys(INQ_F).forEach(k => c[k] = 1);
+  [].concat(G.members || [], G.civ || [], G.press || []).forEach(m => { if(m && !m.gone) c[inqFieldOf(m)]++; });
+  INQ.cnt = c; INQ.peopleAt = G.day; return c;
+}
+function inqDone(id){ const S = G.inq; return !!(S && S.done[id]); }
+function inqFrontier(f){ const S = inqStore(); return INQ_N.map(n => INQ_BY[n[0]]).filter(n => (!f || n.f === f) && !S.done[n.id] && n.needs.every(x => !INQ_BY[x] || S.done[x])).sort((a, b) => a.effort - b.effort); }
+const INQ_FX = {
+  c6:S => { try{ const w = worldEnsure(); if(typeof w.bread === "number") w.bread = Math.min(1.5, w.bread + 0.02); }catch(e){} },
+  b7:S => { (G.states || []).forEach(s => { s.unrest = clamp((s.unrest || 30) - 1, 0, 100); }); }
+};
+/* one day of the world asking questions: every field works its nearest open questions with the people, tools and money it has */
+function inqStep(silent, idx){
+  const S = G.inq, C = inqCounts(), E = (G.eng && G.eng.v === 1) ? G.eng : null, nDone = Object.keys(S.done).length, accel = 1 + 0.004 * nDone;
+  Object.keys(INQ_F).forEach(f => {
+    const fund = !silent && S.fund[f] && G.day <= S.fund[f].until ? S.fund[f].lvl : 0, P = (1 + Math.pow(C[f], 0.75)) * (0.6 + fund) * (1 + (E ? 0.1 * E.st : 0)) * accel;
+    inqFrontier(f).slice(0, 2).forEach((n, i) => { S.prog[n.id] = (S.prog[n.id] || 0) + P * (i ? 0.45 : 1) * 0.05 / Math.pow(n.effort, 1.05);
+      if(S.prog[n.id] >= 1){ S.done[n.id] = silent ? 1 + (idx || 0) : G.day; delete S.prog[n.id]; inqDiscovered(n, silent); } });
+  });
+}
+function inqDiscovered(n, silent){
+  const S = G.inq; if(INQ_FX[n.id]) try{ INQ_FX[n.id](S); }catch(e){}
+  if(silent) return; S.log.unshift({d:G.day, id:n.id}); if(S.log.length > 40) S.log.pop();
+  try{ feed("The Academy: " + n.name + " is settled."); }catch(e){}
+  if(n.effort >= 5){ try{ pushWireScrap("The Academy", n.name + ": " + n.blurb.split(/(?<=[.!?])\s/)[0]); }catch(e){} }
+  if(n.effort >= 7){ try{ note("A discovery that will change the Republic: " + n.name + ". " + n.blurb, true); }catch(e){} }
+}
+function inqKnows(m, id){ const S = G.inq; if(!S || !S.done[id]) return false; const n = INQ_BY[id]; if(inqFieldOf(m) === n.f) return true; const days = G.day - S.done[id]; return days >= 8 + (seedOf("ik:" + (m.id || m.name) + id) % 10); }
+function inqVoice(m){
+  try{
+    const S = inqStore(), f = inqFieldOf(m), F = INQ_F[f], fr = inqFrontier(f)[0], recent = Object.keys(S.done).filter(id => INQ_BY[id].f !== f && G.day - S.done[id] <= 25 && inqKnows(m, id)).map(id => INQ_BY[id]);
+    const r = Math.random();
+    if(recent.length && r < 0.3){ const n = pick(recent); return "Have you heard? " + n.name + " is settled now. " + n.blurb.split(/(?<=[.!?])\s/)[0]; }
+    if(fr && r < 0.75){ const pct = Math.round(100 * (S.prog[fr.id] || 0)); return pick(["I keep coming back to a question in " + F.t.toLowerCase() + ": “" + fr.q + "”", "In " + F.t.toLowerCase() + " we are at “" + fr.name + "”" + (pct > 10 ? ", about " + (Math.round(pct / 10) * 10) + "% of the way, if you believe the people doing it." : ", and nobody will say it is close."), "My work is " + F.t.toLowerCase() + ". The open question is “" + fr.q + "” I do not expect to see it answered in my lifetime. I would like to be wrong."]); }
+    const d = Object.keys(S.done).filter(id => INQ_BY[id].f === f).map(id => INQ_BY[id]); if(d.length){ const n = pick(d); return "People forget that " + n.name.toLowerCase() + " was once a question. " + n.q; }
+    return "";
+  }catch(e){ return ""; }
+}
+function inqTopic(text){
+  const t = String(text).toLowerCase(), map = [[/quantum|superposition|entangle|uncertainty/, "ph8"], [/relativity|spacetime|speed of light/, "ph9"], [/conscious|experience|qualia|aware/, "p5"], [/ethic|moral|right and wrong|owe/, "p2"], [/universe|big bang|beginning of time|cosmos/, "a4"], [/gravity|black hole/, "ph18"], [/evolution|species|darwin/, "b3"], [/mean(ing)? of life|purpose|why are we here/, "p4"], [/god|religion|sacred|prayer/, "ar2"], [/infinite|infinity|proof|number/, "m7"], [/entropy|heat|time's arrow|arrow of time/, "ph3"], [/language|words|meaning of words/, "an3"], [/intelligen|machine mind|artificial/, "cs10"], [/free will|choice/, "p11"], [/fusion|star|sun/, "ph17"]];
+  const hit = map.find(m => m[0].test(t)); return hit ? INQ_BY[hit[1]] : null;
+}
+function inqExplain(n){
+  const S = inqStore(), done = !!S.done[n.id], pct = Math.round(100 * (S.prog[n.id] || 0)), pre = n.needs.filter(x => INQ_BY[x] && !S.done[x]).map(x => INQ_BY[x].name);
+  return n.blurb + " " + (done ? "In the Republic that is settled." : pre.length ? "The Republic has not got there: it still needs " + listify(pre.slice(0, 3)) + "." : "The Republic is working on it, about " + pct + "% of the way.") + " The open question: " + n.q;
+}
+function inqFund(f){ const S = inqStore(), y = G.you; if(y.influence < 3) return "That costs 3 influence."; y.influence -= 3; S.fund[f] = {lvl:Math.min(1.5, ((S.fund[f] && G.day <= S.fund[f].until ? S.fund[f].lvl : 0) + 0.5)), until:G.day + 25}; return INQ_F[f].t + " is funded for twenty-five days."; }
+function inqCard(){
+  const S = inqStore(), C = inqCounts(), total = INQ_N.length, nd = Object.keys(S.done).length, groups = {};
+  Object.keys(INQ_F).forEach(f => { (groups[INQ_F[f].g] = groups[INQ_F[f].g] || []).push(f); });
+  const bar = v => '<span style="display:inline-block;width:70px;height:5px;background:rgba(128,128,128,.25);border-radius:3px;vertical-align:middle"><i style="display:block;width:' + Math.round(clamp(v, 0, 1) * 100) + '%;height:100%;background:#7a9;border-radius:3px"></i></span>';
+  const body = Object.keys(groups).map(g => '<div class="eyebrow" style="margin-top:10px">' + pcEsc(g) + '</div>' + groups[g].map(f => { const fr = inqFrontier(f).slice(0, 2), dn = INQ_N.filter(n => n[1] === f && S.done[n[0]]).length, tot = INQ_N.filter(n => n[1] === f).length, fu = S.fund[f] && G.day <= S.fund[f].until;
+    return '<div style="margin:6px 0;padding:4px 10px;border-left:3px solid var(--line-soft)"><b>' + pcEsc(INQ_F[f].t) + '</b> <span class="muted" style="font-size:12px">· ' + C[f] + ' people · ' + dn + ' of ' + tot + ' settled' + (fu ? ' · funded' : '') + '</span> <button type="button" class="btn btn--ghost" style="float:right" data-qf="' + f + '">Fund (3)</button>' +
+      (fr.length ? fr.map(n => '<div class="muted" style="font-size:12px"><a href="#" data-qn="' + n.id + '" style="color:inherit">' + (n.k === "i" ? '⚙ ' : '') + pcEsc(n.name) + '</a> ' + bar(S.prog[n.id] || 0) + '</div>').join("") : '<div class="muted" style="font-size:12px">' + (dn === tot ? 'Everything in reach has been settled.' : 'Waiting on other fields.') + '</div>') + '</div>'; }).join("")).join("");
+  const sel = INQ.sel && INQ_BY[INQ.sel], detail = sel ? '<div style="margin:8px 0;padding:8px 12px;border-left:3px solid #c9a24a"><b>' + pcEsc(sel.name) + '</b> <span class="muted">(' + pcEsc(INQ_F[sel.f].t) + ')</span><p style="margin:4px 0;font-size:13px">' + pcEsc(inqExplain(sel)) + '</p></div>' : "";
+  const recent = S.log.slice(0, 5).map(x => '<div class="careerline"><b>d' + x.d + '</b> ' + pcEsc(INQ_BY[x.id].name) + '</div>').join("");
+  govCardOpen("What the Republic is working out", "The Academy", "Mathematics, the physical sciences, life, mind, philosophy, society and the arts, all asking their questions at once. Nothing real physics allows is forbidden to be found; each answer waits for the ones before it, for the tools to see it, and for the work.",
+    '<p class="muted" style="font-size:13px">' + nd + ' of ' + total + ' questions settled. Funding a field speeds the nearest of its open questions for twenty-five days.</p>' + detail + body + (recent ? '<div class="eyebrow" style="margin-top:10px">Lately settled</div>' + recent : ""), null);
+  card.querySelectorAll("[data-qf]").forEach(b => b.addEventListener("click", () => { const r = inqFund(b.getAttribute("data-qf")); inqCard(); const s = el("gcSay"); if(s) s.textContent = r; }));
+  card.querySelectorAll("[data-qn]").forEach(a => a.addEventListener("click", ev => { ev.preventDefault(); INQ.sel = a.getAttribute("data-qn"); inqCard(); }));
+  return null;
+}
 function engTick(){ try{ const E = G.eng; if(!E || E.pend !== "ceremony" || !G.running || !veil.hidden || (TALK && TALK.open)) return; engCeremony(); }catch(e){} }
 
 /* ordinary people talk about it, in the words of their own stake */
@@ -33530,6 +33860,34 @@ const ENG_TALK = [
   [["The Engine is awake. My mother asked it about her knees. It answered her.", "I asked the Engine whether I should run again. It asked what I wanted first."], ["Did you tell it?", "I told it. I am still thinking about what it said back."]]
 ];
 (function(){ const prev = lifeContext; lifeContext = function(){ const out = prev(); try{ const E = G.eng; if(E){ const s = Math.min(5, engStage(E)), t = ENG_TALK[s]; if(t) out.push({k:"eng:" + s, a:t[0], b:t[1], w:3}); const eco = E.eco; if(eco && eco.riots) out.push({k:"eng:strike", a:["They closed the clerks' hall in the next county over a machine.", "Did you hear about the hall that shut for the machines?"], b:["I heard. I do not know whose side to be on.", "Both sides are right, that is what makes it ugly."], w:3}); } }catch(e){} return out; }; })();
+
+/* ══ 20261017d · who speaks aloud: the first line is typed; they speak out loud only when you speak or ask them to; they keep typing if they have more ══ */
+const NPCV = {mode:"ask", until:0, more:0};
+try{ const v = localStorage.getItem("onum.npcv"); if(v === "always" || v === "never" || v === "ask") NPCV.mode = v; }catch(e){}
+function voiceInvited(){ return NPCV.mode === "always" || (NPCV.mode === "ask" && (G.t || 0) < NPCV.until); }
+{ const _sp = speak; speak = function(p, text, vol){ try{ if(p && p !== G.you && !voiceInvited()) return; }catch(e){} return _sp.apply(this, arguments); }; }
+{ const _ms = micStart; micStart = function(){ try{ NPCV.until = (G.t || 0) + 90; }catch(e){} return _ms.apply(this, arguments); }; }
+{ const _am = appendMsg; appendMsg = function(kind, text, who){
+    try{ if(kind === "you" && text){ if(/\b(be quiet|stop talking|keep it down|no voices?|just type|text only|shut up)\b/i.test(text)) NPCV.until = 0; else if(/\b(speak|say it|say that|out loud|aloud|talk to me|use your voice|tell me out loud)\b/i.test(text)) NPCV.until = (G.t || 0) + 120; NPCV.more = 0; } }catch(e){}
+    return _am.apply(this, arguments); }; }
+/* they may keep typing if they have more to say; they may also decide they do not */
+function fwMore(m, onText){
+  try{ const LT = window.onumLiveTalk; if(!LT || typeof LT.reply !== "function") return false; const tok = FW.n;
+    Promise.resolve(LT.reply({npcId:m.id, channel:"face", stage:"You spoke first and the player has not answered yet. Decide whether you have anything more to add, as a person would who is not sure they were heard. If you do, say it in one or two sentences, in your own words, and do not repeat yourself. If you are content to wait, reply with exactly: ...", text:"(waiting)"}))
+      .then(r => { if(tok !== FW.n || !r || !r.live || !r.text) return; const t = liveClean(r.text); if(t && !/^\.{2,}$|^…$/.test(t.trim())) onText(t); }).catch(() => {});
+    return true; }catch(e){ return false; }
+}
+{ const _ot3 = openTalk; openTalk = function(m){
+    const r = _ot3.apply(this, arguments);
+    try{
+      if(!m || !m.traits || m === G.you || !TALK.open || TALK.m !== m || m.kind === "envoy") return r;
+      const k0 = m.id; NPCV.more = 0; const youCount = () => { try{ return (el("chatLog") || {querySelectorAll:() => []}).querySelectorAll(".msg--you").length; }catch(e){ return 0; } }, c0 = youCount();
+      [9000, 22000].forEach(ms => setTimeout(() => { if(!TALK.open || TALK.m !== m || youCount() !== c0 || NPCV.more >= 2) return; NPCV.more++;
+        const add = t => { if(!TALK.open || TALK.m !== m || youCount() !== c0) return; appendMsg("them", t, surname(m.name)); setSay(t, ""); try{ speakAt(m, t); }catch(e){} };
+        if(!fwMore(m, add) && NPCV.more === 1 && chance(0.4)){ let t = ""; try{ t = String(convHook(m) || ""); }catch(e){} if(t && t.length < 170 && t !== (el("tkSay") && el("tkSay").textContent)) add(t.replace(/\s+/g, " ")); } }, ms));
+    }catch(e){}
+    return r; }; }
+document.addEventListener("click", ev => { try{ const b = ev.target && ev.target.closest && ev.target.closest("[data-npcv]"); if(!b) return; ev.stopPropagation(); NPCV.mode = b.getAttribute("data-npcv"); try{ localStorage.setItem("onum.npcv", NPCV.mode); }catch(e){} if(NPCV.mode === "never") NPCV.until = 0; try{ settingsCard(); }catch(e){} }catch(e){} }, true);
 
 /* ══ 20261016h · rich scenery for every machine: the town, the steps and the plaza were being switched off on anything the game rates 'modest', which is nearly every PC. It is on by default now, watches its own frame rate, and steps back with a note if it cannot keep up. ══ */
 document.addEventListener("click", ev => { try{ const b = ev.target && ev.target.closest && ev.target.closest("[data-rich]"); if(!b) return; ev.stopPropagation(); const lv = +b.getAttribute("data-rich"); SC.lvl = lv; SC.done = false; SC.since = 0; SC.cnt = 0; try{ localStorage.setItem("onum.rich.lvl", String(lv)); }catch(e){} try{ feed(lv ? "Rich picture is on. Materials change the next time you walk into a room." : "Light picture. Materials change the next time you walk into a room."); }catch(e){} try{ settingsCard(); }catch(e){} }catch(e){} }, true);
@@ -37091,6 +37449,11 @@ function settingsCard(){
         '<button type="button" class="mk__opt' + (G.gfx==="best"?" is-on":"") + '" data-gfx="best">Best</button>' +
         '<button type="button" class="mk__opt' + (G.gfx==="balanced"?" is-on":"") + '" data-gfx="balanced">Balanced</button>' +
         '<button type="button" class="mk__opt' + (G.gfx==="simple"?" is-on":"") + '" data-gfx="simple">Simple</button>' +
+      '</div></div>' +
+      '<div class="mk__row"><i>People\u2019s voices</i><div class="mk__opts">' +
+        '<button type="button" class="mk__opt' + (NPCV.mode === "never" ? " is-on" : "") + '" data-npcv="never" title="Everything they say is typed">Typed only</button>' +
+        '<button type="button" class="mk__opt' + (NPCV.mode === "ask" ? " is-on" : "") + '" data-npcv="ask" title="Typed first; they speak aloud when you speak, or ask them to">When I speak</button>' +
+        '<button type="button" class="mk__opt' + (NPCV.mode === "always" ? " is-on" : "") + '" data-npcv="always">Always</button>' +
       '</div></div>' +
       '<div class="mk__row"><i>Ambient sound</i><div class="mk__opts">' +
         '<button type="button" class="mk__opt' + (AMB.on ? " is-on" : "") + '" data-amb="1">On</button>' +

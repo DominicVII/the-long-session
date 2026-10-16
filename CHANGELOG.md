@@ -4,6 +4,17 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## Your office, committees, typed-first talk, one law, and The Academy
+
+`20261017c` (on `20261017b`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- FIXED: a Senator (or anyone who holds a higher office) could not walk into their own office from the Statuary Corridor: the rule that shuts the House rooms to other offices shut the office too. The room that is your own office is always open to you now.
+- COMMITTEES: Apps -> Committees. Ask your own caucus for a seat (a secret ballot: you learn the count, never who), run for chair of the committee you sit on, and take or turn down the Steering Committee's invitations, which come every few weeks. Members move between committees on their own, for their own reasons.
+- TALK: the first line a person says to you is typed. They speak aloud only when you do (mic or Speak Aloud), when you ask them to, or if you set Settings -> People's voices to Always; say 'be quiet' or 'just type' and they stop. They stay where they are either way. If you do not answer they may add a line or two, typed, if they have more to say.
+- THE LAW: one set of rules the whole world answers to, checked every morning (one place at a time; numbers stay numbers; time moves forward; one holder per chair; the Engine never ahead of what it was built from; the power it burns is drawn from the states' treasuries). What it mends is listed in Apps -> The Law.
+- THE ACADEMY: 112 questions across mathematics, physics, chemistry, life, earth and cosmos, computing, engineering, philosophy, mind, anthropology, society and the arts, in real prerequisite order with the instruments that each one needs (lens, vacuum pump, transistor, laser, accelerator, quantum processors...). Real physics only: nothing it forbids is found, nothing it allows is barred, and each discovery waits for the ones before it. People contemplate their own fields and talk about them; the Engine ponders and answers (quantum mechanics, consciousness, ethics, the beginning of the universe). Fund a field for 25 days. The Engine cannot wake before the Republic has settled autonomous agents and planning, and computing discoveries speed it. Quantum computing, fusion and quantum gravity are on the map and nothing says they cannot be reached.
+- Your save (day 112) loads: the Engine, the Academy and committees start from where the days say they should.
+
 ## The Engine's charter
 
 `20261017b` (on `20261017a`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
