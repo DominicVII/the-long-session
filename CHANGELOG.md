@@ -4,6 +4,14 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## Storefronts that are storefronts, real statues, and people who know who is speaking
+
+`20261016j` (on `20261016i`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- Who is speaking: when a person speaks to you out loud, stops you in the street, greets you, or talks with someone else, the model they use is now told exactly who said what. Before, those moments were saved as if you had said them, so a person could think you were repeating what they had heard from somebody else. Now a person addressed by another person is told that speaker is not you, remembers it as 'X said to you', and nothing said between two non-players touches your relationship, your promises or your record. Stage moments (a greeting, a stop) are saved only as what they said. The model's [[effect]] tags no longer leak into the on-screen text, and greetings are kept to a sentence or two.
+- The High Street shops are the shops. The diner is at Vaughn's, the market at Bakkerij Taylor, the hardware at Van Dijk & Zonen, the newsstand in the square, the church is St. Willibrord's, and the campaign office is above the haberdasher's, with its own sign, further up the street. Every other shop does what its sign says (cafe, florist, tailor, watchmaker, bookseller, tobacconist). The old prop storefronts that stood in the road are gone.
+- Statues: the First Consul in the Statuary Corridor is now a bronze figure in a frock coat with lapels, buttons, epaulettes, a sash and medals, a raised right arm with a scroll, a bicorne under the left arm, a cloak, a face with a brow, nose and chin, on a moulded plinth with a name plate. The other corridor statues are marble figures with books and torches. The two statues on the East Steps are the same quality, an orator and a torch-bearer.
+
 ## A filled-in city, real gateways, people out of the walls, people who understand each other
 
 `20261016i` (on `20261016h`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
