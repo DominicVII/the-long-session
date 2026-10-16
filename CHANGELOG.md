@@ -4,6 +4,15 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## The sun keeps real hours
+
+`20261017i` (on `20261017h`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- **Sunrise and sunset follow the season.** The capital sits at about 41.5° north, and day length is worked out from the real sun's path, daylight-saving time included: about 7:35am to 4:50pm at midwinter, and 5:35am to 8:45pm at midsummer. The sky, the sun's height, the golden hour, window light, street lamps and the District's night all follow it, so a 6:30pm walk home is dark in December and still bright in June.
+- **The winter sun sits low and the summer sun high.** The sun's arc in the sky scales with the season's noon height.
+- **The clock shows today's sunrise and sunset.** Hover the clock to see them.
+- Lighting now recomputes the moment the day changes, not only when the minute does.
+
 ## Everything new is saved now
 
 `20261017h` (on `20261017g`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
