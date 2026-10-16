@@ -4,6 +4,16 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## Richer rooms: the Senate, the Court, the Executive wing, the State House
+
+`20261016c` (on `20261016b`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- **The Senate chamber:** two chandeliers, red drapes either side of the rostrum, marble busts, a side gallery with a brass rail and seats running down both walls, more flags, and a long aisle runner.
+- **The Court:** chandeliers over the well, red drapes behind the bench, a statue of Justice with her scales at either end of the bench, a jury box with its own seats, a witness stand, and law books stacked on the counsel tables.
+- **The Executive wing:** a chandelier, a globe, busts either side of the desk, two brass floor lamps, a large map of the Union with pins on the wall, telephones and papers on the desk, and a second rug under the cabinet table.
+- **The State House:** a chandelier, a grandfather clock, a globe, a bust, a county map with pins, curtains at the window, a newspaper table by the waiting bench, another state flag, and a bordered rug.
+- Other states' governors no longer wander into your office.
+
 ## Room by room, schedule by schedule, person by person
 
 `20261016b` (on `20261016a`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
