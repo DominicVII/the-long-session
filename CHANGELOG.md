@@ -4,6 +4,16 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## Rich scenery for every PC, and a town that changes with the year
+
+`20261016h` (on `20261016g`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- The Steps, the Capitol plaza and the home district were being drawn in a plain mode on any machine the game rates 'modest', which is nearly every PC. The full scenery (brick and clapboard streets with framed windows and signs, awnings, cars, lamps, flags, balustrades, statues, the Capitol and its dome) is now on by default for everyone. It watches its own frame rate for the first few seconds outdoors; if it cannot manage about 16 frames a second it switches itself to light, says so, and remembers. Settings now has a Scenery row, Rich or Light, to change it either way.
+- Trees: a new set. Round oaks with flared trunks and roots, tall poplars, and conifers, with a darker, richer green. They follow the season: fresh green and pink blossom in spring, deep green in summer, orange and gold in autumn, bare branches in winter, with snow on the conifers and branches on snow days.
+- Flowers: window boxes on a third of the windows in season, flower beds along the plaza and by the urns, with chrysanthemums in autumn and snow-dusted evergreens in winter.
+- Chimneys on the older houses, pigeons on the plaza, and paving joints across the plaza stone.
+- Open air was lit too hard, so pavements went white. It is brought down.
+
 ## A real sky, distant country, light through the windows, and everyday life
 
 `20261016g` (on `20261016f`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.

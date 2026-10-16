@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261016g">
+<meta name="onum-build" content="20261016h">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261016g";
+  var STAMP = "20261016h";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -31930,6 +31930,7 @@ function vFrame(now){
   try{
     if(!G || !G.running || document.hidden || !camera) return; VST.t = (now || 0) / 1000;
     const R = ROOMS[G.room]; if(!R) return;
+    sceneryGuard(now, !!R.open);
     if(R.open){
       if(VST.shaftRoom) vBuildShafts(null);
       if(!VST.dome && G.gfx !== "simple" && now - _vLast > 1500){ _vLast = now; try{ vBuildOpen(R); }catch(e){} }
@@ -31999,6 +32000,24 @@ function lifeTick(){
   let la = pick(c.a), lb = pick(c.b); try{ if(a.sent && a.sent.hunger > 0.78){ la = pick(["I have not eaten since breakfast and I am being civil about it.", "If there is a sandwich in this building I will vote for whoever has it."]); lb = pick(["Cloakroom. Twelve to one. Go.", "Here. Half. Do not tell anyone."]); } }catch(e){}
   try{ overhear(a, b, la, lb); }catch(e){}
 }
+/* ══ 20261016h · rich scenery for every machine: the town, the steps and the plaza were being switched off on anything the game rates 'modest', which is nearly every PC. It is on by default now, watches its own frame rate, and steps back with a note if it cannot keep up. ══ */
+const SC = {on:true, fail:false, n:0, sum:0, since:0, done:false};
+try{ const v = localStorage.getItem("onum.rich"); if(v === "0") SC.on = false; }catch(e){}
+function sceneryRich(){ return SC.on && !SC.fail; }
+function sceneryGuard(now, open){
+  try{
+    if(!MODEST || !open || !window.ONUM_TOWN_READY || SC.done || /[?&]rich=force/.test(location.search)){ SC.last = now; SC.n = 0; SC.sum = 0; if(!open) SC.since = 0; return; }
+    if(!SC.since) SC.since = now; if(now - SC.since < 2500){ SC.last = now; return; }
+    const dt = SC.last ? now - SC.last : 16; SC.last = now; if(dt > 400) return;
+    SC.n++; SC.sum += Math.min(dt, 120);
+    if(SC.n >= 110){ const avg = SC.sum / SC.n; SC.n = 0; SC.sum = 0;
+      if(avg > 62){ SC.fail = true; SC.done = true; try{ localStorage.setItem("onum.rich", "0"); }catch(e){} SC.on = false; try{ feed("The rich scenery was running at " + Math.round(1000 / avg) + " frames a second here, so it is switched to light. Settings, then Scenery, will turn it back on."); note("Rich scenery switched off: this machine could not keep up.", true); }catch(e){} }
+      else if(SC.cnt = (SC.cnt || 0) + 1, SC.cnt >= 3) SC.done = true; }
+  }catch(e){}
+}
+document.addEventListener("click", ev => { try{ const b = ev.target && ev.target.closest && ev.target.closest("[data-rich]"); if(!b) return; ev.stopPropagation(); const on = b.getAttribute("data-rich") === "1"; SC.on = on; SC.fail = false; SC.done = false; SC.since = 0; try{ localStorage.setItem("onum.rich", on ? "1" : "0"); }catch(e){} try{ feed(on ? "Rich scenery is on. It is built the next time you walk outside." : "Light scenery. It changes the next time you walk outside."); }catch(e){} try{ settingsCard(); }catch(e){} }catch(e){} }, true);
+/* open air blew out to white on the pavements; bring it down a little */
+{ const _ls = lightingSlow; lightingSlow = function(){ _ls.apply(this, arguments); try{ const R = ROOMS[G.room]; if(R && R.open){ if(renderer.toneMapping === THREE.NoToneMapping){ sun.intensity *= 0.66; hemi.intensity *= 0.78; } else { renderer.toneMappingExposure *= 0.88; hemi.intensity *= 0.92; } } }catch(e){} }; }
 function kCalText(){
   try{ const D = docketToday().slice().sort((x, z) => x.h - z.h), m = G.minute || 0; if(!D.length) return "Nothing is scheduled for your chair today.";
     return D.map(d => { const st = kOnceToday(d.key) ? "done" : m < d.h * 60 - 60 ? "later" : m >= 19 * 60 ? "missed" : "now", where = (function(){ const sr = d.sit ? String(d.sit).split(":")[0] : null; const r = (sr && ROOMS[sr] && ["senate", "court", "committee", "caucus", "floor"].indexOf(sr) >= 0 ? sr : DK_ROOM[d.key]) || homeRoom(); return ROOMS[r] ? ROOMS[r].t : r; })();
@@ -35556,6 +35575,10 @@ function settingsCard(){
         '<button type="button" class="mk__opt' + (G.gfx==="balanced"?" is-on":"") + '" data-gfx="balanced">Balanced</button>' +
         '<button type="button" class="mk__opt' + (G.gfx==="simple"?" is-on":"") + '" data-gfx="simple">Simple</button>' +
       '</div></div>' +
+      '<div class="mk__row"><i>Scenery</i><div class="mk__opts">' +
+        '<button type="button" class="mk__opt' + (sceneryRich() ? " is-on" : "") + '" data-rich="1">Rich</button>' +
+        '<button type="button" class="mk__opt' + (!sceneryRich() ? " is-on" : "") + '" data-rich="0">Light</button>' +
+      '</div></div>' + (SC.fail ? '<div class="mk__row"><i></i><span class="muted" style="font-size:10.5px">Rich scenery was running too slowly on this machine, so it was turned off.</span></div>' : "") +
       (crowdSafe && G.gfx !== "simple"
         ? '<div class="mk__row"><i></i><span class="muted" style="font-size:10.5px">' +
           'The room is full, so people are being drawn a little plainer for now. Shadows stay on. It goes back on its own.' +
@@ -39954,7 +39977,7 @@ try{
 try{
   const ND = window.NEPTUNE_DISTRICT = {version:2, on:!/[?&]nodistrict\b/.test(location.search), stats:{}, cache:new Map(), mats:null, warned:false, style:null};
   const ndWarn = (w, e) => { if(!ND.warned){ ND.warned = true; try{ console.warn("NEPTUNE-DISTRICT " + w, e); }catch(e2){} } };
-  const ndTier = () => { try{ return nmTier(); }catch(e){ return 1; } };
+  const ndTier = () => { try{ if(G.gfx === "simple") return 0; const t = nmTier(); if(t > 0) return t; return sceneryRich() ? 1 : 0; }catch(e){ return 1; } };
   const ndActive = id => { try{ return ND.on && (id === "steps" || id === "district") && ndTier() > 0 && G.gfx !== "simple"; }catch(e){ return false; } };
   const ndTaylor = () => { try{ return typeof isTaylorDay === "function" && isTaylorDay(); }catch(e){ return false; } };
   const ndNight = () => { let h = 12; try{ h = (((G.minute || 0) / 60) % 24 + 24) % 24; }catch(e){}
@@ -40103,6 +40126,20 @@ try{
     else { box(mat, cx, H + gh * 0.45, z0 - 0.12, bw * 0.46, gh * 0.9, 0.25, wc); [-1, 1].forEach(s => cyl("stone", cx + s * bw * 0.28, H + 0.35, z0 - 0.12, 0.32, 0.25, ST.trim, 8, 1, Math.PI / 2));
       box("stone", cx, H + gh * 0.92, z0 - 0.1, bw * 0.56, 0.14, 0.32, ST.trim); cyl("stone", cx, H + gh * 0.92 + 0.22, z0 - 0.1, 0.24, 0.12, ST.trim, 10, 0.2); }
     win(cx, H + gh * 0.35, z0 + 0.02, 0.5, 0.75, 0.03, 0.3 + r() * 0.7); };
+  /* flowers by the season: window boxes, urns and borders, so the place changes with the year */
+  const FLOW = {spring:[0xf2c230, 0xe8648a, 0xffffff, 0xb06ad0, 0xf08a3a], summer:[0xd8342c, 0xf27aa0, 0xffffff, 0xf2c230, 0xc04a9a], autumn:[0xc9601f, 0xd9a02a, 0x8a2f24, 0xb8793a], winter:[]};
+  const flowerCfg = () => { const se = seasonNow(); return {se, p:{spring:0.34, summer:0.46, autumn:0.28, winter:0}[se] || 0, pal:FLOW[se] || []}; };
+  const flowerBox = (x, y, z, fr, cfg) => { box("paint", x, y, z, 0.92, 0.17, 0.26, 0x5a3a24); box("paint", x, y + 0.07, z + 0.02, 0.86, 0.06, 0.2, 0x3b2a1c);
+    for(let i = 0; i < 6; i++){ const fx = x - 0.38 + i * 0.152 + (fr() - 0.5) * 0.04; ico("leaf", fx, y + 0.17, z, 0.1, 0.07, 0.1, 0x3a6a30); ico("leaf", fx + (fr() - 0.5) * 0.06, y + 0.25, z + (fr() - 0.5) * 0.06, 0.065, 0.065, 0.065, cfg.pal[(fr() * cfg.pal.length) | 0]); } };
+  const flowerBed = (x, z, y0, w, dd, seed) => { const fr = rngOf(seed || 5), cfg = flowerCfg(), n = Math.max(8, Math.round(w * dd * 9));
+    box("paint", x, y0 + 0.07, z, w, 0.14, dd, 0x3b2a1c);
+    for(let i = 0; i < n; i++){ const fx = x + (fr() - 0.5) * (w - 0.12), fz = z + (fr() - 0.5) * (dd - 0.12);
+      ico("leaf", fx, y0 + 0.2, fz, 0.13, 0.1, 0.13, cfg.se === "winter" ? 0x2f4a32 : 0x3a6a30);
+      if(cfg.pal.length) ico("leaf", fx, y0 + 0.3, fz, 0.07, 0.07, 0.07, cfg.pal[(fr() * cfg.pal.length) | 0]);
+      else if(snowNow()) ico("leaf", fx, y0 + 0.27, fz, 0.1, 0.04, 0.1, 0xe8eef2); } };
+  const chimney = (x, H, z, tall) => { box("paint", x, H + tall / 2, z, 0.62, tall, 0.62, 0x7b4034); box("stone", x, H + tall + 0.05, z, 0.84, 0.1, 0.84, 0xcfc6b2); box("paint", x, H + tall + 0.14, z, 0.5, 0.08, 0.5, 0x2a2a2a); };
+  const pigeon = (x, z, ry, hex) => { const y = 0.2; put("paint", T.ico, x, y, z, 0.2, 0.15, 0.3, hex, 0, ry, 0); put("paint", T.ico, x + Math.sin(ry) * 0.17, y + 0.1, z + Math.cos(ry) * 0.17, 0.09, 0.09, 0.09, hex); box("brass", x + Math.sin(ry) * 0.24, y + 0.1, z + Math.cos(ry) * 0.24, 0.03, 0.02, 0.05, 0xd8a44a, ry);
+    put("paint", T.ico, x - Math.sin(ry) * 0.2, y - 0.01, z - Math.cos(ry) * 0.2, 0.12, 0.05, 0.2, 0x555a60, 0, ry, 0); [-0.04, 0.04].forEach(o => cyl("paint", x + Math.cos(ry) * o, 0.06, z - Math.sin(ry) * o, 0.008, 0.12, 0xc86a6a, 4)); };
   const building = (x0, bw, floors, r, lod, flagHere, civic) => {
     const cx = x0 + bw / 2, gh = 3.5, fh = 2.9, H = gh + floors * fh + 0.7, wc = ST.cols[(r() * ST.cols.length) | 0], mat = ST.wall, D = 5.4;
     if(lod < 0){ box("paint", cx, H / 2, -D / 2, bw - 0.1, H, D, wc); box("paint", cx, 1.4, 0.02, bw - 0.6, 2.0, 0.04, 0x2a3036); return {cx, si:0}; }
@@ -40123,12 +40160,13 @@ try{
     box("stone", cx, 3.34, 0.14, bw, 0.14, 0.32, ST.trim);
     if(r() < 0.5){ const ac = [0x8a2f36, 0x2f4a6a, 0x2f6b45, 0xb07a2e, 0xe8e0cc][(r() * 5) | 0];
       box("paint", cx, 2.62, 0.55, bw - 0.5, 0.04, 1.08, ac, 0, 0.38); box("paint", cx, 2.34, 1.06, bw - 0.5, 0.2, 0.02, ac); }
-    const nW = Math.max(1, Math.floor((bw - 0.5) / 1.05)), shut = ST.top === "gable" || ST.top === "falsefront";
+    const FCFG = flowerCfg(), fr = rngOf(hashS(x0 + ":" + floors + ":" + bw)), nW = Math.max(1, Math.floor((bw - 0.5) / 1.05)), shut = ST.top === "gable" || ST.top === "falsefront";
     for(let f = 0; f < floors; f++){ const y0 = gh + f * fh, wy = y0 + 1.4;
       if(lod) box("stone", cx, y0 + 0.05, 0.05, bw - 0.2, 0.1, 0.1, ST.trim);
       for(let i = 0; i < nW; i++){ const wx = x0 + (bw / nW) * (i + 0.5);
         win(wx, wy, -0.03, 0.7, 1.5, 0.02, r() < 0.72 ? r() : 1.5);
         box("stone", wx, wy - 0.84, 0.07, 0.96, 0.07, 0.16, ST.trim);
+        if(lod && FCFG.p && fr() < FCFG.p) flowerBox(wx, wy - 0.97, 0.16, fr, FCFG);
         if(lod){
           box("paint", wx, wy + 0.77, 0.02, 0.86, 0.07, 0.06, WF); box("paint", wx, wy - 0.77, 0.02, 0.86, 0.07, 0.06, WF);
           box("paint", wx - 0.4, wy, 0.02, 0.07, 1.6, 0.06, WF); box("paint", wx + 0.4, wy, 0.02, 0.07, 1.6, 0.06, WF);
@@ -40139,6 +40177,7 @@ try{
     else if(ST.top === "falsefront" && civic == null){ box(mat, cx, H + 0.5, -0.12, bw, 1.4, 0.24, wc); box("stone", cx, H + 1.24, 0.0, bw + 0.1, 0.12, 0.34, ST.trim); }
     else if(ST.top === "parapet" && civic == null){ box(mat, cx, H + 0.2, -0.12, bw, 0.8, 0.26, wc); for(let i = 0; i < Math.floor(bw / 0.9); i++) cyl("paint", x0 + 0.45 + i * 0.9, H - 0.55, 0.15, 0.08, 0.5, 0x5a4030, 6, 1, Math.PI / 2); }
     else { box("stone", cx, H - 0.45, 0.2, bw + 0.08, 0.22, 0.46, ST.trim); if(lod) box("stone", cx, H - 0.62, 0.1, bw, 0.1, 0.22, 0xd2c8b2); box("stone", cx, H - 0.2, 0.0, bw, 0.5, 0.2, wc); }
+    if(civic == null && lod && fr() < 0.42) chimney(cx + (fr() - 0.5) * bw * 0.5, H - 0.4, -D * 0.72, ST.top === "gable" || ST.top === "falsefront" ? 3.4 : 1.6);
     if(flagHere){ const fy = gh + 1.2; along("brass", T.cyl(6, 1), [cx, fy, 0.05], [cx, fy + 0.9, 1.45], 0.025); quad("flag", cx, fy + 0.45, 1.05, 1.3, 0.82, Math.PI / 2); }
     return {cx, si};
   };
@@ -40148,17 +40187,37 @@ try{
       if(o.skip && o.skip(x, bw)){ x += bw; k++; continue; }
       const civ = o.civic && o.civic[k]; const b = building(x, bw, fl, r, o.lod ? o.lod(xm) : 1, o.flagEvery && (k % o.flagEvery === 1), civ ? civ.sign : null);
       out.push({x0:x, bw, cx:b.cx, si:b.si}); x += bw; k++; } return out; };
-  const tree = (x, z, th, cr, seed, y0) => { const r = rngOf(seed); y0 = y0 || 0;
-    put("paint", T.cyl(7, 0.55), x, y0 + th * 0.5, z, 0.22 + cr * 0.08, th, 0.22 + cr * 0.08, 0x4a3828);
-    const tops = [[x, y0 + th + cr * 0.55, z]];
-    for(let i = 0; i < 5; i++){ const a = i * 1.26 + r() * 0.6, t = 0.55 + r() * 0.35, L = cr * (0.75 + r() * 0.35), by = y0 + th * (0.62 + r() * 0.3);
-      const e = [x + Math.cos(a) * Math.sin(t) * L, by + Math.cos(t) * L, z + Math.sin(a) * Math.sin(t) * L];
-      along("paint", T.cyl(5, 0.5), [x, by, z], e, 0.035 + cr * 0.02, 0x4f3c2a); tops.push(e); }
-    const G3 = [0x2f5a28, 0x3a6a32, 0x264d22, 0x46723a, 0x335f2c];
+  const seasonNow = () => { try{ const w = wxToday(); return (w && w.s) || "summer"; }catch(e){ return "summer"; } };
+  const snowNow = () => { try{ const w = wxToday(); return !!(w && w.s === "winter" && w.cover > 0); }catch(e){ return false; } };
+  const dk = (a, f) => a.map(h => ((((h >> 16) & 255) * f) << 16) | ((((h >> 8) & 255) * f) << 8) | ((h & 255) * f));
+  const LEAF = {summer:dk([0x2c5a26, 0x356a2d, 0x24491f, 0x3f7234, 0x2f5f2a, 0x4a7a38], 0.7), spring:dk([0x5f9a3a, 0x74ad45, 0x4c8a35, 0x86b84f, 0x6aa43f, 0x57963a], 0.62), autumn:dk([0xb5541f, 0xd18a2a, 0x9a3a1c, 0xc9a030, 0x7a4a1a, 0x8a8a2a], 0.78), winter:dk([0x3a4a30, 0x445436], 0.8)};
+  const tree = (x, z, th, cr, seed, y0) => { const r = rngOf(seed); y0 = y0 || 0; const season = seasonNow(), snow = snowNow(), kind = r(); 
+    const conifer = kind < 0.24, poplar = !conifer && kind < 0.4, bark = [0x4a3828, 0x3e3024, 0x57402c, 0x2f2a26][(r() * 4) | 0];
+    if(conifer){
+      const h = th * 0.55 + cr * 3.1, rr = cr * 0.95, cols = [0x1f4a2e, 0x285a38, 0x1a4028, 0x2f6240];
+      put("paint", T.cyl(7, 0.6), x, y0 + th * 0.4, z, 0.2 + cr * 0.06, th * 0.8, 0.2 + cr * 0.06, bark);
+      const n = 5; for(let i = 0; i < n; i++){ const t = i / (n - 1), y = y0 + th * 0.35 + h * t * 0.9, rad = rr * (1.0 - t * 0.82);
+        put("leaf", T.cyl(8, 0.1), x, y + h / n * 0.5, z, rad * 2, h / n * 1.5, rad * 2, cols[(r() * 4) | 0], 0, r() * 3, 0);
+        if(snow) put("leaf", T.cyl(8, 0.1), x, y + h / n * 0.62, z, rad * 1.55, h / n * 0.8, rad * 1.55, 0xe8eef2, 0, r() * 3, 0); }
+      solidAt(x, z, 0.2, 0.2); return; }
+    const sx = poplar ? 0.62 : 1, sy = poplar ? 1.55 : 1;
+    /* flared trunk and roots */
+    put("paint", T.cyl(8, 0.62), x, y0 + th * 0.5, z, (0.2 + cr * 0.08) * 1.15, th, (0.2 + cr * 0.08) * 1.15, bark);
+    for(let i = 0; i < 4; i++){ const a = i * 1.57 + r() * 0.7; along("paint", T.cyl(5, 0.4), [x + Math.cos(a) * 0.05, y0 + 0.5, z + Math.sin(a) * 0.05], [x + Math.cos(a) * (0.32 + cr * 0.08), y0 + 0.02, z + Math.sin(a) * (0.32 + cr * 0.08)], 0.07 + cr * 0.015, bark); }
+    const tops = [[x, y0 + th + cr * 0.55 * sy, z]];
+    const nb = poplar ? 4 : 6; for(let i = 0; i < nb; i++){ const a = i * (6.28 / nb) + r() * 0.6, t = (poplar ? 0.25 : 0.55) + r() * 0.35, L = cr * sx * (0.75 + r() * 0.4), by = y0 + th * (0.55 + r() * 0.32);
+      const e = [x + Math.cos(a) * Math.sin(t) * L, by + Math.cos(t) * L * sy, z + Math.sin(a) * Math.sin(t) * L];
+      along("paint", T.cyl(5, 0.5), [x, by, z], e, 0.035 + cr * 0.02, bark); tops.push(e); }
+    const pal = LEAF[season] || LEAF.summer, bare = season === "winter";
+    if(bare){ tops.forEach(p => { for(let k = 0; k < 3; k++){ const a = r() * 6.28; along("paint", T.cyl(4, 0.3), [p[0], p[1] - cr * 0.3, p[2]], [p[0] + Math.cos(a) * cr * 0.4, p[1] + cr * (0.15 + r() * 0.35), p[2] + Math.sin(a) * cr * 0.4], 0.018, bark); if(snow) ico("leaf", p[0] + Math.cos(a) * cr * 0.2, p[1] + cr * 0.12, p[2] + Math.sin(a) * cr * 0.2, 0.15, 0.08, 0.15, 0xe8eef2); } }); solidAt(x, z, 0.2, 0.2); return; }
+    const blossom = season === "spring" && r() < 0.35, bl = [0xf0c4d4, 0xe8a8c0, 0xf6dce6];
+    const pick3 = () => blossom && r() < 0.6 ? bl[(r() * 3) | 0] : pal[(r() * pal.length) | 0];
     tops.forEach((p, i) => { const s = cr * (i ? 0.52 + r() * 0.2 : 0.72);
-      ico("leaf", p[0], p[1] + s * 0.1, p[2], s, s * 0.78, s, G3[(r() * 5) | 0]);
-      ico("leaf", p[0] + (r() - 0.5) * s, p[1] + s * 0.45, p[2] + (r() - 0.5) * s, s * 0.62, s * 0.5, s * 0.62, G3[(r() * 5) | 0]);
-      ico("leaf", p[0] + (r() - 0.5) * s * 1.2, p[1] - s * 0.3, p[2] + (r() - 0.5) * s * 1.2, s * 0.55, s * 0.42, s * 0.55, G3[(r() * 5) | 0]); });
+      /* darker underside, lighter crown: three clumps at different heights */
+      ico("leaf", p[0] + (r() - 0.5) * s * 1.2, p[1] - s * 0.42, p[2] + (r() - 0.5) * s * 1.2, s * 0.6 * sx, s * 0.44 * sy, s * 0.6 * sx, pal[0]);
+      ico("leaf", p[0], p[1] + s * 0.05, p[2], s * sx, s * 0.78 * sy, s, pick3());
+      ico("leaf", p[0] + (r() - 0.5) * s, p[1] + s * 0.5, p[2] + (r() - 0.5) * s, s * 0.64 * sx, s * 0.5 * sy, s * 0.64 * sx, pick3());
+      if(r() < 0.5) ico("leaf", p[0] + (r() - 0.5) * s * 1.5, p[1] + s * 0.1, p[2] + (r() - 0.5) * s * 1.5, s * 0.4, s * 0.32, s * 0.4, pick3()); });
     solidAt(x, z, 0.2, 0.2); };
   const lamp = (x, z, h, y0, two) => { y0 = y0 || 0; const ir = 0x1f2a24;
     cyl("paint", x, y0 + 0.2, z, 0.2, 0.4, ir, 8, 0.8); cyl("paint", x, y0 + 0.45, z, 0.12, 0.12, ir, 8);
@@ -40368,6 +40427,10 @@ try{
     urnPlanter(-6.6, 0.75); urnPlanter(6.6, 0.75); urnPlanter(-4.6, 4.3); urnPlanter(4.6, 4.3);
     urnPlanter(-8.6, 12.1, deckY); urnPlanter(8.6, 12.1, deckY);
     bin(-4.6, 2.35); bin(4.6, 2.35);
+    [[-6.6, 0.75], [6.6, 0.75], [-4.6, 4.3], [4.6, 4.3]].forEach((p, i) => flowerBed(p[0], p[1] - 0.9, 0, 1.1, 0.5, 300 + i));
+    [-1, 1].forEach(sg => { flowerBed(sg * 8.25, 5.55, 0, 3.0, 0.45, 320 + sg); flowerBed(sg * 8.25, 10.35, 0, 3.0, 0.45, 330 + sg); });
+    for(let i = 0; i < 7; i++){ const pr = rngOf(700 + i); pigeon(-2.4 + pr() * 4.8, 1.2 + pr() * 3.4, pr() * 6.28, [0x8a9096, 0x6a7078, 0xb8bcc0, 0x7a7a82][i % 4]); }
+    for(let i = -9; i <= 9; i++) box("stone", i * 0.9, 0.0435, 2.6, 0.012, 0.004, 4.5, 0xa9a396); for(let i = 0; i <= 10; i++) box("stone", 0, 0.0435, 0.4 + i * 0.45, w * 0.86, 0.004, 0.012, 0xa9a396);
     poles.push(flagpole(-7.8, 6.9, 9, 0)); poles.push(flagpole(7.8, 6.9, 9, 0));
     /* velvet ropes at the door */
     [-1.4, -0.6, 0.6, 1.4].forEach(x => bollard(x, 12.3, deckY));
@@ -40425,7 +40488,7 @@ try{
     pts.forEach((p, i) => { o.position.set(p[0], p[1], p[2]); o.rotation.set(0, -p[3], 0); o.updateMatrix(); im.setMatrixAt(i, o.matrix); im.setColorAt(i, colOf(pal[i % 3])); });
     im.castShadow = false; im.userData.ndDistrict = "bunting"; return im; };
   const geoFor = (id, tay, lowCap, style) => {
-    const M = mats(), key = id + "|" + tay + "|" + lowCap + "|" + !!M.flagsMod + "|" + style + (id === "town" ? "|" + ND._seed : "");
+    const M = mats(), key = id + "|" + tay + "|" + lowCap + "|" + !!M.flagsMod + "|" + style + "|" + seasonNow() + (snowNow() ? "s" : "") + (id === "town" ? "|" + ND._seed : "");
     let c = ND.cache.get(key); if(c) return c;
     tmpl(); BK = {}; signI = id === "steps" ? 3 : 0; ND._bunting = null; noFrame(); SOLIDS = []; POIS = []; LAMPS = []; ST = STYLES[style] || STYLES.brick_row;
     const t0 = performance.now(); let poles = [];
