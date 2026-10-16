@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261017f">
+<meta name="onum-build" content="20261017g">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261017f";
+  var STAMP = "20261017g";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -14423,7 +14423,7 @@ function wrapPi(a){
 function animatePerson(p, dt){
   animatePerson0(p, dt);
   p._animAt = performance.now(); if(p.mesh && p.mesh.userData) p.mesh.userData._posed = true;
-  try{ if(p.mesh && p.mesh.parent === peopleGroup){ peopleExtra(p, dt); carryFrame(p, dt); } }catch(e){}
+  try{ if(p.mesh && p.mesh.parent === peopleGroup){ peopleExtra(p, dt); carryFrame(p, dt); bodyFrame(p, dt); } }catch(e){}
 }
 function animatePerson0(p, dt){
   if(!p.mesh || p.mesh.parent !== peopleGroup) return;
@@ -24512,6 +24512,7 @@ function fresh(build, tries){
 
 /* what is on their mind, drawn from where they actually are */
 function convHook(m){
+  try{ const bv = bodyVoice(m); if(bv) return bv; }catch(e){}
   try{ if(chance(0.12)){ const iv = inqVoice(m); if(iv) return iv; } }catch(e){}
   try{ const ev = engVoice(m); if(ev) return ev; }catch(e){}
   try{ if(m && m.hh){ const L = hhLine(m); if(L && chance(0.85)) return L; } }catch(e){}
@@ -26389,6 +26390,8 @@ const PROPS = {
      acts:()=>[{t:"Open the Engine's file", c:"10m", run(){ try{ spend(10, 1); }catch(e){} setTimeout(() => { try{ engCard(); }catch(e){ console.warn(e); } }, 30); return null; }}]}
   ],
   cloak:[
+    {id:"dining", label:"The members' dining room", sub:"Soup, bread and whoever else could not wait", x:-2.4, z:6.6, r:2.0,
+     acts:()=>[{t:"Sit down and eat", c:"25m", run(){ spend(25, 0); bodyEat(G.you); const b = bodyOf(G.you); setSay("Soup, bread and a cup of something hot. Two members at the next table are arguing about the bill with their mouths full.", fx("+6 energy · fed", "25 minutes")); }}, {t:"Take something to eat at your desk", c:"5m", run(){ spend(5, 0); bodyEat(G.you); setSay("A roll and an apple in your coat pocket.", fx("fed", "5 minutes")); }}]},
     {id:"sofa", label:"The long sofa", sub:"Where deals get made because nobody is standing", x:2.3, z:3.0, r:2.0,
      acts:()=>[{t:"Sit down for a while", c:"25m", run(){
         spend(25, -22); setSay("Twenty-five minutes off your feet. The building keeps going.", fx("+22 energy","")); }}]},
@@ -31619,6 +31622,7 @@ function orgExecAct(){
 function orgTick(){
   try{ engTick(); }catch(e){}
   try{ airTick(); }catch(e){}
+  try{ bodyTick(); }catch(e){}
   try{
     const O = G.org; if(!O || !O.today || O.today.d !== G.day || !G.you) return; const hr = Math.floor((G.minute || 0) / 60);
     O.today.ev.forEach(e => { if(e.done || e.h > hr) return; e.done = 1; try{ if(e.t === "town") orgTownAct(e.s, e.i); else if(e.t === "state") orgStateAct(e.s); else if(e.t === "fed") orgFedAct(); else if(e.t === "court") orgCourtAct(); else if(e.t === "exec") orgExecAct(); }catch(x){ console.warn("org", e.t, x); } });
@@ -31746,6 +31750,7 @@ function stdAttends(m, e){
   return false;
 }
 { const _rr = routineRoom; routineRoom = function(m, hour, t){
+    try{ if(m && m.kind === "member" && !m.gone && t === "session" && hour >= 12 && hour < 14 && bodyOf(m).hunger > 0.75 && chance(0.55)) return "cloak"; }catch(x){}
     try{ const E = G.eng; if(E && E.v === 1 && m && m.kind === "member" && !m.gone && hour >= 9 && hour < 18 && engStage(E) >= 1 && (seedOf("enr:" + m.id + ":" + G.day + ":" + Math.floor(hour / 2)) % 100) < 4 + engStage(E) * 3) return "engine"; }catch(x){}
     try{ if(t === "session" && m && !m.gone && !m.ohK){ const h = hour, e = stdEntries().find(x => !x.info && h >= x.s && h < x.e && stdAttends(m, x)); if(e) return e.room; } }catch(x){}
     return _rr.apply(this, arguments); }; }
@@ -33603,7 +33608,8 @@ function cmtRunChair(k){
   if(y.post === k) return "You already chair it.";
   if(G.day - st.last < CMT.cool) return "The caucus will not hear another race for " + (CMT.cool - (G.day - st.last)) + " days.";
   if((y.standing || 0) < P.need - 14 || (y.influence || 0) <= P.weight * 0.45) return "You are not yet strong enough to ask: you need standing " + (P.need - 14) + " and influence above " + Math.round(P.weight * 0.45) + ".";
-  y.influence -= 10; st.last = G.day; const inc = cmtChair(k), voters = cmtMembers(k).filter(m => m.party === y.party), b = cmtBallot(voters, y, k, "chair");
+  y.influence -= 10; st.last = G.day; const inc = cmtChair(k), voters = cmtMembers(k).filter(m => m.party === y.party), b = voters.length ? cmtBallot(voters, y, k, "chair") : ((y.standing || 0) >= P.need ? {yes:1, no:0, total:1, lead:true} : {yes:0, no:1, total:1, lead:true});
+  if(b.lead){ const won = b.yes > 0; if(won){ if(inc){ inc.post = null; remember(inc, "The leadership gave you my gavel. I will not forget who asked.", -4, true); } y.post = k; y.influence = clamp(y.influence + 20, 0, 100); G.career.push({term:G.term, post:P.t, note:"named by the leadership"}); try{ note("No one else from your party sits on " + c.t + "; the leadership names you " + P.t + ".", true); }catch(e){} return "No one from your party sits on it to vote, so the leadership decided: " + P.t + "."; } return "No one from your party sits on it to vote, and the leadership will not hand you the gavel yet: you need standing " + P.need + "."; }
   if(b.yes * 2 > b.total){ if(inc){ inc.post = null; remember(inc, "You took the gavel from me. Do not expect me to forget.", -4, true); } y.post = k; y.influence = clamp(y.influence + 20, 0, 100); G.career.push({term:G.term, post:P.t, note:"elected by the committee caucus"}); try{ note("Elected " + P.t + " by the committee caucus: " + b.yes + " to " + b.no + ".", true); }catch(e){} return "Chair, " + c.t + ". " + b.yes + " to " + b.no + "."; }
   if(inc) remember(inc, "You ran against me and lost. Fine. We will remember it both ways.", -2); try{ note("You stood for " + P.t + " and lost the committee vote: " + b.yes + " to " + b.no + ".", true); }catch(e){}
   return "You lost it. " + b.yes + " to " + b.no + ".";
@@ -33642,17 +33648,18 @@ const LAW_ARTICLES = [
   ["Seats", "A chair is held by one person; a seat on a committee is a real committee."],
   ["Order", "A thing cannot be further along than what it was built from: the Engine is never past its own capability, and never wakes without the stage that wakes it."],
   ["Account", "What a machine burns, someone paid for: the Engine's power is drawn from the states' treasuries and written in a ledger."],
+  ["Bodies", "Nobody runs without food or sleep: people tire through the day, hunger between meals, eat when they can, and are sharper fed and rested than not."],
   ["Heat", "Warmth goes from warm to cold and never the other way without work: a room left alone becomes the weather, and every degree held against it is fuel burned and paid for by the treasuries."],
   ["Discovery", "Nothing is found that the physics of the real universe forbids, and nothing it allows is barred from being found; every discovery waits for the ones before it, the tools to see it, and the work."]
 ];
 function lawMend(art, text){ LAW.mended++; LAW.today++; LAW.log.unshift({d:G.day, a:art, t:text}); if(LAW.log.length > 40) LAW.log.pop(); }
 function lawAudit(){
   LAW.runs++; LAW.today = 0; const y = G.you; if(!y) return;
-  const num = (o, k, lo, hi, who) => { if(o && typeof o[k] === "number" && (!isFinite(o[k]) || o[k] < lo || o[k] > hi)){ const was = o[k]; o[k] = isFinite(was) ? clamp(was, lo, hi) : (lo + hi) / 2; lawMend("Measure", (who || "A figure") + "'s " + k + " was " + (isFinite(was) ? Math.round(was) : "not a number") + "; set to " + Math.round(o[k]) + "."); } };
+  const num = (o, k, lo, hi, who) => { if(o && typeof o[k] === "number" && (!isFinite(o[k]) || o[k] < lo || o[k] > hi)){ const was = o[k]; o[k] = isFinite(was) ? clamp(was, lo, hi) : (lo + hi) / 2; lawMend("Measure", (who === "Your" ? "Your " : (who || "A figure") + "'s ") + k + " was " + (isFinite(was) ? Math.round(was) : "not a number") + "; set to " + Math.round(o[k]) + "."); } };
   ["approval", "influence", "standing", "energy"].forEach(k => num(y, k, 0, 100, "Your"));
   const valid = new Set(COMMITTEES.map(c => c.k));
   (G.members || []).forEach(m => { if(!m) return;
-    if(m.room && m.room !== "away" && !ROOMS[m.room]){ lawMend("Persons", m.name + " was in a room that does not exist (" + m.room + "); sent home."); m.room = "away"; }
+    if(m.room !== undefined && m.room !== null && (typeof m.room !== "string" || m.room === "")){ lawMend("Persons", m.name + " was nowhere at all; sent home."); m.room = "away"; }   /* "away", "abroad", "delegation" and the rest are real places, even if they are not rooms you can walk into */
     ["x", "z", "tx", "tz"].forEach(k => { if(typeof m[k] === "number" && !isFinite(m[k])){ lawMend("Persons", m.name + " had no position; stood at the door."); m[k] = 0; } });
     if(m.cmte && !valid.has(m.cmte)){ const best = COMMITTEES[Math.abs(seedOf(String(m.id))) % COMMITTEES.length]; lawMend("Seats", m.name + " sat on a committee that does not exist; seated on " + best.t + "."); m.cmte = best.k; }
     if(m.kind !== "player" && m.rel) num(m.rel, "warmth", -100, 100, m.name); });
@@ -33817,8 +33824,9 @@ function inqFieldOf(m){
   return pool[seedOf("fld:" + (m.id != null ? m.id : m.name)) % pool.length];
 }
 function inqCounts(){
-  if(INQ.cnt && INQ.peopleAt === G.day) return INQ.cnt; const c = {}; Object.keys(INQ_F).forEach(k => c[k] = 1);
-  [].concat(G.members || [], G.civ || [], G.press || []).forEach(m => { if(m && !m.gone) c[inqFieldOf(m)]++; });
+  if(INQ.cnt && INQ.peopleAt === G.day) return INQ.cnt; const c = {}; Object.keys(INQ_F).forEach(k => c[k] = 14);   /* the Republic's universities and workshops, most of whom you never meet */
+  [].concat(G.members || [], G.civ || [], G.press || []).forEach(m => { if(m && !m.gone) c[inqFieldOf(m)] += 1 / 3; });
+  Object.keys(c).forEach(k => c[k] = Math.round(c[k]));
   INQ.cnt = c; INQ.peopleAt = G.day; return c;
 }
 function inqDone(id){ const S = G.inq; return !!(S && S.done[id]); }
@@ -33829,9 +33837,9 @@ const INQ_FX = {
 };
 /* one day of the world asking questions: every field works its nearest open questions with the people, tools and money it has */
 function inqStep(silent, idx){
-  const S = G.inq, C = inqCounts(), E = (G.eng && G.eng.v === 1) ? G.eng : null, nDone = Object.keys(S.done).length, accel = 1 + 0.004 * nDone;
+  const S = G.inq && G.inq.v === 1 ? G.inq : inqStore(), C = inqCounts(), E = (G.eng && G.eng.v === 1) ? G.eng : null, nDone = Object.keys(S.done).length, accel = 1 + 0.004 * nDone;
   Object.keys(INQ_F).forEach(f => {
-    const fund = !silent && S.fund[f] && G.day <= S.fund[f].until ? S.fund[f].lvl : 0, P = (1 + Math.pow(C[f], 0.75)) * (0.6 + fund) * (1 + (E ? 0.1 * E.st : 0)) * accel;
+    const fund = !silent && S.fund[f] && G.day <= S.fund[f].until ? S.fund[f].lvl : 0, P = (1 + Math.pow(C[f], 0.75)) * (0.6 + fund) * (1 + (E ? 0.1 * E.st : 0)) * accel * ((f === "cs" || f === "eng") && E ? 1 + Math.min(E.p, 90) / 45 : 1);   /* machines help build the next machines */
     inqFrontier(f).slice(0, 2).forEach((n, i) => { S.prog[n.id] = (S.prog[n.id] || 0) + P * (i ? 0.45 : 1) * 0.05 / Math.pow(n.effort, 1.05);
       if(S.prog[n.id] >= 1){ S.done[n.id] = silent ? 1 + (idx || 0) : G.day; delete S.prog[n.id]; inqDiscovered(n, silent); } });
   });
@@ -33963,6 +33971,54 @@ function advAct(a, i){
   if(a === "expel"){ ag.status = "expelled"; try{ y.approval = clamp(y.approval + (ag.by === A.k ? 2 : -1), 0, 100); G.realmRel = G.realmRel || {}; G.realmRel[A.k] = clamp((G.realmRel[A.k] || 0) - (ag.by === A.k ? 6 : 2), -100, 100); }catch(e){} A.sec = Math.min(100, A.sec + 4); return ag.by === A.k ? "Expelled in public. " + cap(A.name) + " denies everything and recalls nobody." : "Expelled. Nobody will say whose he was, and you named no one."; }
   return "";
 }
+/* ══ 20261017g · BODIES: nobody runs without food or sleep. People tire through the day and hunger between meals, eat when they can, and say so; so do you ══ */
+const BODY = {last:-1, warnAt:-999};
+function bodyNow(){ return (G.day || 1) * 1440 + (G.minute || 0); }
+function bodyWake(m){ const off = (seedOf("wake:" + (m.id != null ? m.id : m.name)) % 60) - 20; return (G.day || 1) * 1440 + 390 + off; }   /* up between six and seven */
+function bodyOf(m){
+  if(!m) return {hunger:0, tired:0};
+  const now = bodyNow(), h = (G.minute || 0) / 60, wake = bodyWake(m);
+  /* breakfast is assumed; after that, a meal is only had when one is eaten */
+  const breakfast = wake + 40, ate = Math.max(m.ate || 0, h >= 7.2 ? breakfast : breakfast - 1440 + 750);
+  const hunger = h < 7.2 && !(m.ate && now - m.ate < 600) ? 0.45 : clamp((now - ate) / 360, 0, 1.3);   /* before breakfast you are ready for it, not starving */
+  let tired = h < 6 ? 1.05 : clamp((now - wake) / (16 * 60), 0, 1.3);
+  try{ const A = G.air; if(A && m.room && typeof A.T[m.room] === "number"){ const off = Math.max(0, Math.abs(A.T[m.room] - 21) - 5); tired = Math.min(1.3, tired + off * 0.02); } }catch(e){}
+  if(hunger > 0.9) tired = Math.min(1.3, tired + 0.08);
+  return {hunger, tired, ate};
+}
+function bodyWord(b){ const w = []; if(b.hunger > 0.85) w.push("hungry"); else if(b.hunger > 0.6) w.push("peckish"); if(b.tired > 0.95) w.push("worn out"); else if(b.tired > 0.75) w.push("tired"); return w.join(" and ") || "fine"; }
+function bodyClock(abs){ const mn = ((abs % 1440) + 1440) % 1440, hh = Math.floor(mn / 60), mm = Math.floor(mn % 60); return (hh % 12 || 12) + ":" + String(mm).padStart(2, "0") + (hh >= 12 ? "pm" : "am"); }
+/* people eat where people eat: the members' dining room off the floor, the diner, their own kitchens */
+const BODY_EATS = {cloak:1, district:1, away:1, abroad:1, steps:0.4, press:0.5, office:0.3};
+function bodyTick(){
+  try{
+    if(!G || !G.running || !G.you) return; const now = bodyNow(); if(BODY.last >= 0 && now - BODY.last < 10) return; BODY.last = now;
+    const h = (G.minute || 0) / 60, meal = (h >= 11.6 && h < 14.2) || (h >= 18.3 && h < 20.8);
+    if(meal) everyone().forEach(m => { if(!m || m.gone || m === G.you) return; const p = BODY_EATS[m.room] || 0; if(!p) return; const b = bodyOf(m); if(b.hunger > 0.45 && Math.random() < p * 0.35){ m.ate = now; } });
+    /* you: your stomach and your eyelids keep the time even when you do not */
+    const y = G.you, b = bodyOf(y);
+    if(b.hunger > 1.0) y.energy = clamp((y.energy || 50) - 0.15, 0, 100);
+    if(now - BODY.warnAt > 150){ if(b.hunger > 1.0){ BODY.warnAt = now; try{ feed("You have not eaten since " + bodyClock(b.ate) + ". Your stomach says so."); }catch(e){} } else if(b.tired > 1.05){ BODY.warnAt = now; try{ feed("Your eyes are heavy. It has been a long day."); }catch(e){} } }
+    const c = el("kClock"); if(c){ const base = (c.title || "").split(" · you")[0]; c.title = base + " · you last ate at " + bodyClock(b.ate) + " and feel " + bodyWord(b); }
+  }catch(e){}
+}
+function bodyEat(who, what){ who.ate = bodyNow(); if(who === G.you){ G.you.energy = clamp((G.you.energy || 50) + 6, 0, 100); } return what; }
+/* their body speaks before their politics does, sometimes */
+function bodyVoice(m){
+  const b = bodyOf(m); if(b.hunger > 0.9 && chance(0.4)) return pick(["I have not eaten since " + bodyClock(b.ate) + ". Ask me after lunch and I will be kinder.", "Walk with me to the dining room. I can argue and eat at the same time.", "Forgive me, I am starving. What was it?"]);
+  if(b.tired > 0.95 && chance(0.35)) return pick(["I have been up since before six. Say it slowly.", "If I yawn, it is the hour and not you.", "I am too tired to pretend to agree with you. Go on."]);
+  return "";
+}
+function bodyFact(m){ try{ const b = bodyOf(m); if(b.hunger < 0.6 && b.tired < 0.75) return ""; return "YOUR BODY RIGHT NOW: you are " + bodyWord(b) + " (you last ate at " + bodyClock(b.ate) + "). Let it show a little in how you speak, the way it would in a real person; do not announce it."; }catch(e){ return ""; } }
+/* tired people yawn and stretch; nobody does it on cue */
+function bodyFrame(p, dt){
+  const u = p.mesh && p.mesh.userData; if(!u || !u.headG || p.sitting && !p.idle) return; if(Math.hypot(cam.x - p.x, cam.z - p.z) > 9) return;
+  u._yw = (u._yw || (4 + Math.random() * 20)) - dt;
+  if(u._yw <= 0){ const b = bodyOf(p); if(b.tired > 0.85 && !(p.say && p.sayT > 0) && !(TALK.open && TALK.m === p)){ u._yawn = 1.8; } u._yw = 12 + Math.random() * 30; }
+  if(u._yawn > 0){ u._yawn -= dt; const k = Math.sin(Math.max(0, u._yawn) / 1.8 * Math.PI); u.headG.rotation.x -= 0.28 * k; if(u.lowLip){ if(u._yl0 === undefined) u._yl0 = u.lowLip.position.y; u.lowLip.position.y = u._yl0 - k * (u.hu || 0.2) * 0.06; }
+    if(!p.sitting && u.armL && u.armR && k > 0.4){ u.armL.up.rotation.x = -2.2 * k; u.armR.up.rotation.x = -2.2 * k; u.armL.lo.rotation.x = -0.6 * k; u.armR.lo.rotation.x = -0.6 * k; } }
+}
+{ const _pb = purseBuy; purseBuy = function(p, key, opt){ const r = _pb.apply(this, arguments); try{ if(r && r.ok && (key === "lunch" || key === "round")) bodyEat(p); else if(r && r.ok && key === "coffee" && p === G.you) G.you.energy = clamp((G.you.energy || 50) + 1, 0, 100); }catch(e){} return r; }; }
 function engTick(){ try{ const E = G.eng; if(!E || E.pend !== "ceremony" || !G.running || !veil.hidden || (TALK && TALK.open)) return; engCeremony(); }catch(e){} }
 
 /* ordinary people talk about it, in the words of their own stake */
@@ -43193,6 +43249,7 @@ try{
     try{ L.push("WHO IS WHO: " + (G.you ? G.you.name : "the player") + " is the player's character. Other people also speak around you and to you; their lines are always marked with their own names or as 'not the player'. Never mistake what another person said for something the player said, and never repeat another person's words as though the player had just told them to you. Only a line that comes without a name label, in the user turn, is the player speaking."); }catch(e){}
     L.push(canon());
     try{ const ef = engFact(m); if(ef) L.push(ef); }catch(e){}
+    try{ const bf = bodyFact(m); if(bf) L.push(bf); }catch(e){}
     try{ const md = typeof window.onumMind === "function" ? window.onumMind(m.id) : (window.ONUM_MINDS || {})[m.id];
       if(md && typeof md === "object"){ const fm = v => (typeof v === "string" ? v : JSON.stringify(v)).slice(0, 400);
         const ks = ["goals","beliefs","plans","memory","family","job","wealth","mood"].filter(k => md[k] != null && md[k] !== "" && !(Array.isArray(md[k]) && !md[k].length));

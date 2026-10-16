@@ -4,6 +4,16 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## Bodies, and the Engine can wake in a new career
+
+`20261017g` (on `20261017f`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- BODIES: nobody runs without food or sleep. Everyone, you included, gets hungry between meals and tired through the day, on the clock. Members drift to the members' dining room at lunch when they are hungry; townspeople eat at home or the diner. Hungry and tired people say so ("I have not eaten since 7:35. Ask me after lunch and I will be kinder."), yawn and stretch, and the live-talk model is told how they feel so it shows a little in how they talk. You can eat in the members' dining room in the Cloakroom, or buy lunch at the diner; going hungry wears your energy down. The clock's tooltip tells you when you last ate. It is written into The Law as 'Bodies'.
+- FIXED: The Law treated people who were abroad on a trip as standing in a room that does not exist and sent them home. 'Abroad', 'away' and the rest are real places; it now only mends a person who is truly nowhere. (On your save it would have sent 158 people home.)
+- FIXED: in a brand-new career the Academy never got as far as autonomous agents, so the Engine could never wake. The Republic's universities now count even when you never meet their scholars, and machines help build the next machines in computing and engineering. Autonomous agents now arrive somewhere around day 150 to 190, sooner if you fund Computing.
+- FIXED: running for the chair of a committee where nobody from your party sits ended 'You lost it, 0 to 0'. The leadership decides instead, on your standing.
+- FIXED: The Law's notes read 'Your's approval'.
+
 ## The Senate no longer freezes on older saves
 
 `20261017f` (on `20261017e`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
