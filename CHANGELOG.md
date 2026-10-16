@@ -4,6 +4,13 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## The Senate rostrum and the Court's bench
+
+`20261016s` (on `20261016r`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- Senate: a panelled rostrum and clerks' desk with brass trim, the Presiding Officer's carved chair framed by two pilasters, a pediment and a gilt seal; gavel, mace and the Clerk's plate; AYE/NAY lamps over the door; public and press gallery benches with brass lamps and plaques; pitchers and spittoons.
+- Court: a raised-panel bench with a brass rail and a nameplate for every justice, the seal and the motto cut in gold over the bench, pilasters, a lectern with the three timing lights, counsel-table pitchers, lamps and briefs, and a brass bar rail with a gate.
+
 ## The building has a sound
 
 `20261016r` (on `20261016q`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
