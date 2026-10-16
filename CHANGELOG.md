@@ -4,6 +4,14 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## The Caucus Room, Committee Room and Cloakroom, furnished
+
+`20261016m` (on `20261016l`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- Caucus Room: a patterned carpet, a leadership dais with a long table and name cards, a tall party banner behind it, the whip's slate with the tally (aye, no, doubtful) and scribbled names, bookcases of bound journals, velvet curtains at the tall windows, chandeliers, sconces, and paper, ink wells and name tents on every desk.
+- Committee Room 2141: a green carpet, a panelled oak wall with pilasters behind the dais, a wall clock and the traffic-light timer that tells witnesses their time is up, nameplates, microphones, a gavel and sound block at the chair, a court reporter and a clerk at their own desks, camera tripods at the back, bookcases of bound hearings, curtains and pendant lamps.
+- Cloakroom: a carpet, a wall of pigeonholes with the members' mail, a stove with a mantel clock, a shoeshine chair, a card table with a game in progress, a newspaper rack, an umbrella stand, hat hooks and a chandelier.
+
 ## Every office carries its politics
 
 `20261016l` (on `20261016k`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
