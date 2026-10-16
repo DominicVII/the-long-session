@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261016w">
+<meta name="onum-build" content="20261016x">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261016w";
+  var STAMP = "20261016x";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -24495,6 +24495,7 @@ function fresh(build, tries){
 
 /* what is on their mind, drawn from where they actually are */
 function convHook(m){
+  try{ const ev = engVoice(m); if(ev) return ev; }catch(e){}
   try{ if(m && m.hh){ const L = hhLine(m); if(L && chance(0.85)) return L; } }catch(e){}
   try{
     const rv = lRivalOf(m);
@@ -33160,6 +33161,40 @@ function engCard(){
       done = true; fin(engAnswer(q)); };
     go.addEventListener("click", run); inp.addEventListener("keydown", ev => { if(ev.key === "Enter"){ ev.preventDefault(); run(); } }); }
   return null;
+}
+/* ── what people say to you about the Engine, from what has happened to the people they know ── */
+function engHHFor(m){
+  const eco = G.eng && G.eng.eco; if(!eco) return null; const st = m.state || (G.you && G.you.state);
+  const pool = eco.hh.filter(h => h.state === st && (!m.town || h.tname === m.town || h.town === m.town)), any = eco.hh.filter(h => h.state === st);
+  const L = (pool.length ? pool : any).slice().sort((a, b) => Math.abs(b.stance) - Math.abs(a.stance));
+  return L[Math.floor(Math.random() * Math.min(3, L.length))] || null;
+}
+function engYouChain(){
+  const eco = G.eng && G.eng.eco; if(!eco) return null;
+  return eco.chains.find(c => /^You /.test(c.root) && G.day - c.d <= 8 && c.steps.some(s => s.done && s.lvl !== "home")) || null;
+}
+function engVoice(m){
+  try{
+    const E = G.eng; if(!E || !E.eco || E.st < 1 || !m || m === G.you || m.kind === "press" && chance(0.5)) return "";
+    if(!chance(E.agi ? 0.4 : 0.28)) return "";
+    const eco = E.eco, h0 = engHHFor(m), h = h0 ? Object.assign({}, h0, {will:h0.will.replace(/\bmy\b/g, "their")}) : null, c = engYouChain(), first = h ? h.name.split(" ")[0] : "";
+    const gov = m.kind === "member";
+    if(c && chance(0.55)){ const root = c.root.replace(/^You /, "you ").replace(/ on day \d+.*$/, ""), last = c.steps.filter(s => s.done).slice(-1)[0];
+      return gov ? "Word is " + root + ". " + (last ? last.t.replace(/^By the end of the week the whole Union has felt it: /, "The capitals have noticed: ").split(/(?<=[.!?])\s/)[0] : "") : "They say " + root + ". " + (last ? last.t.split(/[.]/)[0] + "." : ""); }
+    if(h && h.stance > 14) return (gov ? "A " + h.job + " in " + h.tname + ", " + h.name + ", wrote to me. " : "A " + h.job + " I know, " + h.name + ", ") + (gov ? "She says the Engine has made things a little easier, and wants to " + h.will + "." : "says the Engine has made things a little easier. All " + first + " wants is to " + h.will + ".");
+    if(h && h.stance < -14) return (gov ? "I have a " + h.job + " in " + h.tname + " who will not stop writing about the machines. " : "You know " + h.name + ", the " + h.job + " in " + h.tname + "? ") + (gov ? first + " just wants to " + h.will + ", and says the Engine is making that harder." : "The Engine has made it harder for " + first + " to " + h.will + ".");
+    if(E.agi) return pick(["I asked the Engine whether I should take this meeting. It said yes, and told me why, and I do not like how well it knows me.", "Have you spoken to it yet? The Engine? I keep thinking I should, and I keep not.", "They say the Engine looked after somebody in " + (h ? h.tname : "the north") + " and nobody asked it to."]);
+    return pick([ENG_STAGES[E.st].line, "Have you seen what the machines are doing to the Treasury clerks?", "I do not know what to think about the engines. I know I am not supposed to say that."]);
+  }catch(e){ return ""; }
+}
+function engFact(m){
+  try{
+    const E = G.eng; if(!E || !E.eco) return ""; const S = ENG_STAGES[E.st], h = engHHFor(m), c = engYouChain();
+    let t = "THE ENGINE (an ongoing fact of this world, mention only if natural): the Republic's thinking machines are at the stage '" + S.t + "' (" + S.d + ")" + (E.agi ? ", and the Engine, a general intelligence, has been awake since day " + E.agiDay : "") + ". The public is " + (E.eco.avg > 14 ? "warm" : E.eco.avg < -14 ? "wary" : "unsure") + " about it.";
+    if(h) t += " A person you may know of: " + h.name + ", a " + h.job + " in " + h.tname + ", who wants to " + h.will.replace(/\bmy\b/g, "their") + " and feels " + (h.stance > 12 ? "good" : h.stance < -12 ? "bad" : "unsure") + " about it.";
+    if(c) t += " Recently " + G.you.name + " " + c.root.replace(/^You /, "").replace(/ on day \d+.*$/, "") + ", and word of it has travelled.";
+    return t;
+  }catch(e){ return ""; }
 }
 function engTick(){ try{ const E = G.eng; if(!E || E.pend !== "ceremony" || !G.running || !veil.hidden || (TALK && TALK.open)) return; engCeremony(); }catch(e){} }
 
@@ -42327,6 +42362,7 @@ try{
       else L.push("You are speaking to " + G.you.name + ", who holds the office of " + officeTitle() + " (" + officeSeat() + "). Address them as " + youAddress() + ". Do not call them by any other office; in particular they are not the head of the nation unless their office above says so."); }catch(e){}
     try{ L.push("WHO IS WHO: " + (G.you ? G.you.name : "the player") + " is the player's character. Other people also speak around you and to you; their lines are always marked with their own names or as 'not the player'. Never mistake what another person said for something the player said, and never repeat another person's words as though the player had just told them to you. Only a line that comes without a name label, in the user turn, is the player speaking."); }catch(e){}
     L.push(canon());
+    try{ const ef = engFact(m); if(ef) L.push(ef); }catch(e){}
     try{ const md = typeof window.onumMind === "function" ? window.onumMind(m.id) : (window.ONUM_MINDS || {})[m.id];
       if(md && typeof md === "object"){ const fm = v => (typeof v === "string" ? v : JSON.stringify(v)).slice(0, 400);
         const ks = ["goals","beliefs","plans","memory","family","job","wealth","mood"].filter(k => md[k] != null && md[k] !== "" && !(Array.isArray(md[k]) && !md[k].length));

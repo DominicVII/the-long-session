@@ -4,6 +4,14 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## What people say about the Engine
+
+`20261016x` (on `20261016w`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- People you meet now bring up the Engine from what has actually happened to someone they know: a printer in a mill town who feels worse off, a clerk who is grateful, a household the Engine itself looked after. Senators write it as constituent mail; townspeople say it as gossip.
+- If you did something about the Engine in the last week (backed power stations, funded Oversight, set the posture, took a memo), people tell you what it set off, in their words.
+- The same facts are given to the live-talk model, so anyone you chat with in your own words knows the Engine's stage, the public's mood, a household in their state, and what you recently did.
+
 ## The Engine finds its feet
 
 `20261016w` (on `20261016v`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
