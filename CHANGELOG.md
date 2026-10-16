@@ -4,6 +4,16 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## A filled-in city, real gateways, people out of the walls, people who understand each other
+
+`20261016i` (on `20261016h`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- The empty distance at the East Steps and in the District is filled: avenues of apartment blocks, offices and civic fronts with brick and limestone facades, cornices and windows that light up at night, double rows of street trees, and a tower and long civic front closing each avenue. The view distance is longer on modest machines when rich scenery is on.
+- The floating doors outdoors are gone. The street end in the District is now a stone gateway, 'The East Steps', with a pediment, lanterns and flanking walls; the Steps open onto a matching gateway, 'The District'. Walk through either and you cross over as before. The State House door is now the portico of a real limestone building with columns, steps, a flag and lanterns.
+- Rich picture for modest PCs now has three levels: Rich (the full people, scenery and a sharper picture), Smooth, and Light. It starts at Rich, steps itself down if the frame rate drops, and tells you. Settings, Scenery changes it by hand. Rich turns on what modest machines never got: blinking and moving eyes, brows that carry the mood, lips that shape words, nods while listening, breathing, weight shifting, counter-swinging shoulders and arms, ties and coat tails that swing, fingers, and skin, hair and cloth materials.
+- People no longer stand inside walls or storefronts: arrivals are moved out of anything solid, and anyone found inside one is stepped clear.
+- When a live language model is attached, people who talk to each other (in the corridors, at meetings, on the street) now say what they actually think in their own words and answer what the other actually said, up to three turns, instead of picking lines from a list. Without one, the old lines are used.
+
 ## Rich scenery for every PC, and a town that changes with the year
 
 `20261016h` (on `20261016g`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.

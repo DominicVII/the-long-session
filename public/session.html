@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261016h">
+<meta name="onum-build" content="20261016i">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261016h";
+  var STAMP = "20261016i";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -1885,6 +1885,23 @@ function modestMachine(){
   return false;
 }
 const MODEST = modestMachine();
+/* Rich level for machines the game rates modest: 2 = full people, scenery and a sharper picture; 1 = the same at the old sharpness; 0 = light. It starts at 2 and steps itself down if the frame rate says so. */
+const SC = {lvl:2, n:0, sum:0, since:0, done:false, cnt:0, last:0};
+try{ const v = localStorage.getItem("onum.rich.lvl"); if(v === "0" || v === "1" || v === "2") SC.lvl = +v; else if(localStorage.getItem("onum.rich") === "0") SC.lvl = 0; }catch(e){}
+function sceneryRich(){ return !MODEST || SC.lvl >= 1; }
+function sceneryGuard(now){
+  try{
+    if(!MODEST || SC.lvl < 1 || SC.done || /[?&]rich=force/.test(location.search) || (typeof PC !== "undefined" && PC.open)){ SC.last = now; SC.n = 0; SC.sum = 0; return; }
+    if(!SC.since) SC.since = now; if(now - SC.since < 2500){ SC.last = now; return; }
+    const dt = SC.last ? now - SC.last : 16; SC.last = now; if(dt > 400) return;
+    SC.n++; SC.sum += Math.min(dt, 120);
+    if(SC.n >= 110){ const avg = SC.sum / SC.n; SC.n = 0; SC.sum = 0;
+      if(avg > 62){ SC.lvl--; SC.since = 0; SC.cnt = 0; try{ localStorage.setItem("onum.rich.lvl", String(SC.lvl)); }catch(e){}
+        try{ feed(SC.lvl ? "This machine was running at " + Math.round(1000 / avg) + " frames a second, so the picture is eased to keep it smooth. Settings, then Scenery, will change it." : "The rich picture was too heavy here (" + Math.round(1000 / avg) + " frames a second), so it is switched to light. Settings, then Scenery, will turn it back on."); }catch(e){}
+        try{ note(SC.lvl ? "Picture eased to keep the game smooth." : "Rich picture switched off: this machine could not keep up.", true); }catch(e){} }
+      else if(++SC.cnt >= 3) SC.done = true; }
+  }catch(e){}
+}
 /* MODEST only throttles the frame loop (30 Hz draw stride). Visuals stay Best /
    fullDetail unless ?safe=1 or Settings → Simple. */
 /* Voices stay on. Modest used to mute the House so Edge would not lock —
@@ -4913,7 +4930,7 @@ function normalMapFrom(tex, strength){
    prefiltered (PMREM) into one environment map for reflections.
    ══════════════════════════════════════════════════════════ */
 const NM = {fam:{}, ready:false, street:[], signs:[], refl:[], solids:[], env:null, bytes:0, tex:0, wet:0, night:0, mats:0, skin:new Map()};
-function nmTier(){ try{ if(MODEST || G.gfx === "simple") return 0; return G.gfx === "balanced" ? 1 : 2; }catch(e){ return 0; } }
+function nmTier(){ try{ if(G.gfx === "simple") return 0; if(MODEST) return SC.lvl >= 1 ? 1 : 0; return G.gfx === "balanced" ? 1 : 2; }catch(e){ return 0; } }
 function nmSize(){ return nmTier() >= 2 ? 256 : 128; }
 function nmRand(seed){ let x = (seed >>> 0) || 1; return () => { x ^= x << 13; x ^= x >>> 17; x ^= x << 5; return (x >>> 0) / 4294967296; }; }
 /* tileable value noise, a few octaves */
@@ -5454,7 +5471,7 @@ function nmSpeakersNow(){
   return _nppSpeakers;
 }
 function peopleExtra(p, dt){
-  if(MODEST || !p || !p.mesh || !p.mesh.visible) return;
+  if((MODEST && SC.lvl < 1) || !p || !p.mesh || !p.mesh.visible) return;
   const u = p.mesh.userData; if(!u || !u.iris) return;
   const ddx = cam.x - p.x, ddz = cam.z - p.z, dist = Math.hypot(ddx, ddz);
   const near = dist < LOD_NEAR * 1.15;
@@ -14104,7 +14121,7 @@ function buildPerson(p){
     const hand = M(PG.sph, skin, lo, 0, -foreArm - H*0.028, 0, H*0.038*B, H*0.052, H*0.024*B);
     M(PG.sph, skin, lo, side*H*0.024*B, -foreArm - H*0.020, H*0.006,
       H*0.013*B, H*0.026, H*0.013*B, false);                       /* thumb */
-    const _fg = (G.gfx === "simple" || MODEST) ? null : nmFingers(M, lo, skin, side, foreArm, H, B);
+    const _fg = (G.gfx === "simple" || (MODEST && SC.lvl < 1)) ? null : nmFingers(M, lo, skin, side, foreArm, H, B);
     if(!_fg) M(PG.box, skin, lo, 0, -foreArm - H*0.058, 0,
       H*0.034*B, H*0.022, H*0.020*B, false);                       /* fingers, closed */
     return {up, lo, hand, fing:_fg};
@@ -14415,7 +14432,7 @@ function animatePerson0(p, dt){
   p.mesh.position.y = groundAt(p.z, p.room);
   p.mesh.rotation.y += wrapPi((p.facing || 0) - p.mesh.rotation.y) * k;
   p.mesh.visible = true;
-  if(MODEST){
+  if(MODEST && SC.lvl < 1){
     if(u.pelvis && u.legL && u.legR){
       const s = Math.sin(p.phase), A = 0.52 * (p._gw || 0);
       u.legL.up.rotation.x = s*A;
@@ -31862,6 +31879,7 @@ function vGrassTexture(){
   const t = new THREE.CanvasTexture(c); try{ t.encoding = THREE.sRGBEncoding; }catch(e){} t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(36, 36); try{ t.anisotropy = 4; }catch(e){} return VST.tex.grass = t;
 }
 function vClear(){
+  try{ cityClear(); gateClear(); }catch(e){}
   ["dome", "sun", "moon", "stars", "sky"].forEach(k => { const o = VST[k]; if(o && o.parent) o.parent.remove(o); VST[k] = null; });
   VST.rings.forEach(o => { if(o.parent) o.parent.remove(o); }); VST.rings = [];
 }
@@ -31881,6 +31899,8 @@ function vBuildOpen(R){
     const sk = new THREE.Mesh(new THREE.PlaneGeometry(74 * K, 9.2 * K), new THREE.MeshBasicMaterial({map:vSkylineTexture(), transparent:true, fog:false, depthWrite:false})); sk.renderOrder = -12; sk.frustumCulled = false; scene.add(sk); VST.sky = sk;
   }
   try{ if(horizonMesh && horizonMesh.material){ horizonMesh.material.map = vGrassTexture(); horizonMesh.material.needsUpdate = true; } }catch(e){}
+  try{ cityAttach(G.room); }catch(e){ try{ console.warn("city", e); }catch(x){} }
+  try{ gateAttach(G.room); }catch(e){ try{ console.warn("gate", e); }catch(x){} }
 }
 { const _bs = buildSky; buildSky = function(R){ _bs.apply(this, arguments); try{ if(R && R.open) vBuildOpen(R); else vClear(); }catch(e){ try{ console.warn("vista", e); }catch(x){} } }; }
 /* time of day: sky tint, sun and moon on their arcs, stars, ranges in haze */
@@ -31896,6 +31916,7 @@ function vTime(){
   const ma = ang + Math.PI, mel = Math.sin(ma);
   if(VST.moon){ VST.moon.userData.rel = new THREE.Vector3(-Math.cos(ma) * 78 * VST.K, (Math.max(mel, -0.2) * 72 + 4) * VST.K, 64 * VST.K); VST.moon.material.opacity = clamp(mel * 3, 0, 1) * clamp(night * 1.4, 0, 1) * gl; }
   if(VST.stars) VST.stars.material.opacity = clamp(night * 1.3 - 0.25, 0, 1) * gl;
+  cityNight(clamp(night * 1.25 - 0.15, 0, 1)); gateNight(clamp(night * 1.25 - 0.15, 0, 1));
   VST.rings.forEach(o => { const k = o.userData.kind; tint(k === "far" ? 1 : k === "mid" ? 0.95 : 0.9); const c = o.material.color; c.copy(t); if(snow){ c.r *= 1.5; c.g *= 1.55; c.b *= 1.7; } else if(gold > 0.05) c.lerp(new THREE.Color(1, 0.72, 0.55), gold * 0.25); });
   if(VST.sky){ tint(0.95); VST.sky.material.color.copy(t); }
 }
@@ -31930,11 +31951,12 @@ function vFrame(now){
   try{
     if(!G || !G.running || document.hidden || !camera) return; VST.t = (now || 0) / 1000;
     const R = ROOMS[G.room]; if(!R) return;
-    sceneryGuard(now, !!R.open);
+    sceneryGuard(now);
     if(R.open){
       if(VST.shaftRoom) vBuildShafts(null);
       if(!VST.dome && G.gfx !== "simple" && now - _vLast > 1500){ _vLast = now; try{ vBuildOpen(R); }catch(e){} }
       if(VST.dome){ if(now - (VST._tt || 0) > 400){ VST._tt = now; vTime(); } vFollow(); }
+      if(now - (VST._gh || 0) > 900){ VST._gh = now; gateHideRoom(G.room); }
     } else {
       if(VST.dome) vClear();
       if(VST.shaftRoom !== G.room) vBuildShafts(G.room);
@@ -32000,24 +32022,224 @@ function lifeTick(){
   let la = pick(c.a), lb = pick(c.b); try{ if(a.sent && a.sent.hunger > 0.78){ la = pick(["I have not eaten since breakfast and I am being civil about it.", "If there is a sandwich in this building I will vote for whoever has it."]); lb = pick(["Cloakroom. Twelve to one. Go.", "Here. Half. Do not tell anyone."]); } }catch(e){}
   try{ overhear(a, b, la, lb); }catch(e){}
 }
-/* ══ 20261016h · rich scenery for every machine: the town, the steps and the plaza were being switched off on anything the game rates 'modest', which is nearly every PC. It is on by default now, watches its own frame rate, and steps back with a note if it cannot keep up. ══ */
-const SC = {on:true, fail:false, n:0, sum:0, since:0, done:false};
-try{ const v = localStorage.getItem("onum.rich"); if(v === "0") SC.on = false; }catch(e){}
-function sceneryRich(){ return SC.on && !SC.fail; }
-function sceneryGuard(now, open){
-  try{
-    if(!MODEST || !open || !window.ONUM_TOWN_READY || SC.done || /[?&]rich=force/.test(location.search)){ SC.last = now; SC.n = 0; SC.sum = 0; if(!open) SC.since = 0; return; }
-    if(!SC.since) SC.since = now; if(now - SC.since < 2500){ SC.last = now; return; }
-    const dt = SC.last ? now - SC.last : 16; SC.last = now; if(dt > 400) return;
-    SC.n++; SC.sum += Math.min(dt, 120);
-    if(SC.n >= 110){ const avg = SC.sum / SC.n; SC.n = 0; SC.sum = 0;
-      if(avg > 62){ SC.fail = true; SC.done = true; try{ localStorage.setItem("onum.rich", "0"); }catch(e){} SC.on = false; try{ feed("The rich scenery was running at " + Math.round(1000 / avg) + " frames a second here, so it is switched to light. Settings, then Scenery, will turn it back on."); note("Rich scenery switched off: this machine could not keep up.", true); }catch(e){} }
-      else if(SC.cnt = (SC.cnt || 0) + 1, SC.cnt >= 3) SC.done = true; }
-  }catch(e){}
+/* ══ 20261016i · the city behind the city: blocks of buildings, avenues and trees fill the empty distance at the East Steps and in the District ══ */
+const CITY = {tex:{}, mats:null, cache:{}, grp:null, room:null};
+function cityTexture(pal){
+  const key = "a" + pal; if(CITY.tex[key]) return CITY.tex[key];
+  const S = 512, B = 128, c = vCanvas(S, S), g = c.getContext("2d"), r = vRng(500 + pal * 31);
+  const P = [{wall:[150, 78, 58], mort:[190, 180, 165], trim:[226, 218, 200], brick:1}, {wall:[214, 204, 182], mort:[200, 190, 170], trim:[240, 234, 220], brick:0}, {wall:[198, 150, 98], mort:[180, 140, 100], trim:[238, 226, 200], brick:0}, {wall:[150, 154, 156], mort:[120, 124, 126], trim:[214, 214, 210], brick:1}][pal % 4];
+  for(let by = 0; by < 4; by++) for(let bx = 0; bx < 4; bx++){
+    const x0 = bx * B, y0 = by * B, v = 0.88 + r() * 0.16;
+    g.fillStyle = "rgb(" + Math.round(P.wall[0] * v) + "," + Math.round(P.wall[1] * v) + "," + Math.round(P.wall[2] * v) + ")"; g.fillRect(x0, y0, B, B);
+    if(P.brick){ g.strokeStyle = "rgba(" + P.mort.join(",") + ",.35)"; g.lineWidth = 1; for(let y = 0; y < B; y += 8){ g.beginPath(); g.moveTo(x0, y0 + y); g.lineTo(x0 + B, y0 + y); g.stroke(); for(let x = (y / 8) % 2 ? 0 : 8; x < B; x += 16){ g.beginPath(); g.moveTo(x0 + x, y0 + y); g.lineTo(x0 + x, y0 + y + 8); g.stroke(); } } }
+    else { for(let i = 0; i < 120; i++){ g.fillStyle = "rgba(" + (r() < 0.5 ? "255,255,255" : "40,30,20") + "," + (0.03 + r() * 0.05) + ")"; g.fillRect(x0 + r() * B, y0 + r() * B, 2 + r() * 6, 2 + r() * 5); } }
+    /* the window bay: lintel, reveal, glass, mullions, sill */
+    const wx = x0 + 34, wy = y0 + 22, ww = 60, wh = 70;
+    g.fillStyle = "rgb(" + P.trim.join(",") + ")"; g.fillRect(wx - 7, wy - 9, ww + 14, 9); g.fillRect(wx - 6, wy + wh, ww + 12, 8);
+    g.fillStyle = "#2a3038"; g.fillRect(wx - 3, wy - 3, ww + 6, wh + 6);
+    const gl = g.createLinearGradient(wx, wy, wx + ww, wy + wh); gl.addColorStop(0, "#56708a"); gl.addColorStop(0.5, "#33485e"); gl.addColorStop(1, "#243546"); g.fillStyle = gl; g.fillRect(wx, wy, ww, wh);
+    g.fillStyle = "rgba(255,255,255,.18)"; g.fillRect(wx + 3, wy + 3, 14, wh - 6);
+    g.fillStyle = "rgb(" + P.trim.join(",") + ")"; g.fillRect(wx + ww / 2 - 2, wy, 4, wh); g.fillRect(wx, wy + wh * 0.42, ww, 4);
+    g.fillStyle = "rgba(0,0,0,.28)"; g.fillRect(x0, y0 + B - 5, B, 5);                 /* floor line shadow */
+  }
+  const t = vTex(c, 0); t.wrapS = t.wrapT = THREE.RepeatWrapping; return CITY.tex[key] = t;
 }
-document.addEventListener("click", ev => { try{ const b = ev.target && ev.target.closest && ev.target.closest("[data-rich]"); if(!b) return; ev.stopPropagation(); const on = b.getAttribute("data-rich") === "1"; SC.on = on; SC.fail = false; SC.done = false; SC.since = 0; try{ localStorage.setItem("onum.rich", on ? "1" : "0"); }catch(e){} try{ feed(on ? "Rich scenery is on. It is built the next time you walk outside." : "Light scenery. It changes the next time you walk outside."); }catch(e){} try{ settingsCard(); }catch(e){} }catch(e){} }, true);
+function cityGlow(){
+  if(CITY.tex.glow) return CITY.tex.glow; const S = 512, B = 128, c = vCanvas(S, S), g = c.getContext("2d"), r = vRng(808); g.fillStyle = "#000"; g.fillRect(0, 0, S, S);
+  for(let by = 0; by < 4; by++) for(let bx = 0; bx < 4; bx++){ if(r() < 0.42){ const a = 0.7 + r() * 0.3; g.fillStyle = "rgba(255," + Math.round(190 + r() * 40) + "," + Math.round(110 + r() * 50) + "," + a + ")"; g.fillRect(bx * B + 34, by * B + 22, 60, 70); } }
+  const t = vTex(c, 0); t.wrapS = t.wrapT = THREE.RepeatWrapping; return CITY.tex.glow = t;
+}
+function cityMats(){
+  if(CITY.mats) return CITY.mats; const m = {walls:[], roof:new THREE.MeshStandardMaterial({color:0x4a4a4c, roughness:0.95, vertexColors:true}), cornice:new THREE.MeshStandardMaterial({color:0xcfc8b8, roughness:0.9}), road:new THREE.MeshStandardMaterial({color:0x3b3f43, roughness:0.96}), walk:new THREE.MeshStandardMaterial({color:0x9b978c, roughness:0.95}), tree:new THREE.MeshStandardMaterial({vertexColors:true, roughness:0.92, flatShading:true})};
+  for(let i = 0; i < 4; i++){ const w = new THREE.MeshStandardMaterial({map:cityTexture(i), roughness:0.88, emissive:new THREE.Color(0xffb870), emissiveMap:cityGlow(), emissiveIntensity:0}); m.walls.push(w); }
+  return CITY.mats = m;
+}
+/* a tiny geometry accumulator so a whole district is a handful of draw calls */
+function cAcc(){ return {p:[], n:[], u:[], c:[], i:[]}; }
+function cQuad(a, P, nrm, uv, col){ const b = a.p.length / 3; P.forEach(v => a.p.push(v[0], v[1], v[2])); for(let k = 0; k < 4; k++){ a.n.push(nrm[0], nrm[1], nrm[2]); a.u.push(uv[k][0], uv[k][1]); if(col) a.c.push(col[0], col[1], col[2]); } a.i.push(b, b + 1, b + 2, b, b + 2, b + 3); }
+function cGeo(a){ if(!a.p.length) return null; const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(a.p, 3)); g.setAttribute("normal", new THREE.Float32BufferAttribute(a.n, 3)); g.setAttribute("uv", new THREE.Float32BufferAttribute(a.u, 2)); if(a.c.length) g.setAttribute("color", new THREE.Float32BufferAttribute(a.c, 3)); g.setIndex(a.i); g.computeBoundingSphere(); return g; }
+function cBlock(W, roof, cor, x0, z0, w, d, h, pal, face){
+  /* walls: u by width, v by height, one texture bay = 3.2 m by 3 m, atlas = 4 bays */
+  const U = len => len / 12.8, Vv = h / 12, x1 = x0 + w, z1 = z0 + d, a = W[pal];
+  cQuad(a, [[x0, 0, z1], [x1, 0, z1], [x1, h, z1], [x0, h, z1]], [0, 0, 1], [[0, 0], [U(w), 0], [U(w), Vv], [0, Vv]]);
+  cQuad(a, [[x1, 0, z0], [x0, 0, z0], [x0, h, z0], [x1, h, z0]], [0, 0, -1], [[0, 0], [U(w), 0], [U(w), Vv], [0, Vv]]);
+  cQuad(a, [[x1, 0, z1], [x1, 0, z0], [x1, h, z0], [x1, h, z1]], [1, 0, 0], [[0, 0], [U(d), 0], [U(d), Vv], [0, Vv]]);
+  cQuad(a, [[x0, 0, z0], [x0, 0, z1], [x0, h, z1], [x0, h, z0]], [-1, 0, 0], [[0, 0], [U(d), 0], [U(d), Vv], [0, Vv]]);
+  const g = 0.34 + ((x0 * 7 + z0 * 3) % 5) * 0.03; cQuad(roof, [[x0, h, z1], [x1, h, z1], [x1, h, z0], [x0, h, z0]], [0, 1, 0], [[0, 0], [1, 0], [1, 1], [0, 1]], [g, g, g + 0.02]);
+  /* cornice band and a parapet lip */
+  const c = 0.5; cQuad(cor, [[x0 - c, h - 0.7, z1 + c], [x1 + c, h - 0.7, z1 + c], [x1 + c, h, z1 + c], [x0 - c, h, z1 + c]], [0, 0, 1], [[0, 0], [1, 0], [1, 1], [0, 1]]);
+  cQuad(cor, [[x0 - c, h - 0.7, z0 - c], [x0 - c, h - 0.7, z1 + c], [x0 - c, h, z1 + c], [x0 - c, h, z0 - c]], [-1, 0, 0], [[0, 0], [1, 0], [1, 1], [0, 1]]);
+  cQuad(cor, [[x1 + c, h - 0.7, z1 + c], [x1 + c, h - 0.7, z0 - c], [x1 + c, h, z0 - c], [x1 + c, h, z1 + c]], [1, 0, 0], [[0, 0], [1, 0], [1, 1], [0, 1]]);
+}
+function cTree(a, x, z, r, h, hue){
+  const cols = [[0.17, 0.35, 0.15], [0.22, 0.42, 0.18], [0.14, 0.3, 0.13], [0.28, 0.46, 0.2]], tr = [0.28, 0.2, 0.14];
+  const ico = new THREE.IcosahedronGeometry(1, 1).toNonIndexed(), P = ico.attributes.position, N = ico.attributes.normal;
+  const put = (cx, cy, cz, sx, sy, sz, col) => { const b = a.p.length / 3; for(let i = 0; i < P.count; i++){ a.p.push(cx + P.getX(i) * sx, cy + P.getY(i) * sy, cz + P.getZ(i) * sz); a.n.push(N.getX(i), N.getY(i), N.getZ(i)); a.u.push(0, 0); a.c.push(col[0], col[1], col[2]); a.i.push(b + i); } };
+  const box = (cx, cy, cz, w, hh, d) => { const b = a.p.length / 3, hx = w / 2, hz = d / 2; [[-hx, 0, -hz], [hx, 0, -hz], [hx, 0, hz], [-hx, 0, hz], [-hx, hh, -hz], [hx, hh, -hz], [hx, hh, hz], [-hx, hh, hz]].forEach(v => { a.p.push(cx + v[0], cy + v[1], cz + v[2]); a.n.push(0, 1, 0); a.u.push(0, 0); a.c.push(tr[0], tr[1], tr[2]); }); [[0, 1, 5, 0, 5, 4], [1, 2, 6, 1, 6, 5], [2, 3, 7, 2, 7, 6], [3, 0, 4, 3, 4, 7]].forEach(f => f.forEach(k => a.i.push(b + k))); };
+  box(x, 0, z, 0.35, h * 0.55, 0.35);
+  const c = cols[(Math.abs(Math.floor(x * 3.1 + z * 1.7)) + hue) % 4]; put(x, h * 0.78, z, r, r * 0.85, r, c); put(x + r * 0.45, h * 0.62, z + r * 0.2, r * 0.62, r * 0.5, r * 0.62, [c[0] * 0.85, c[1] * 0.85, c[2] * 0.85]); put(x - r * 0.4, h * 0.95, z - r * 0.15, r * 0.6, r * 0.55, r * 0.6, [c[0] * 1.15, c[1] * 1.15, c[2] * 1.1]);
+}
+/* where the empty distance is: rooms are in their own frames; blocks stand outside the built town */
+const CITY_PLAN = {
+  steps:{zones:[{x0:-64, x1:64, z0:-62, z1:-13.5, gap:3.7, axis:"z"}], avenue:{x:0, z0:-13, z1:-62, w:7.4}},
+  district:{zones:[{x0:-64, x1:64, z0:36, z1:92, gap:3.9, axis:"z"}, {x0:-64, x1:64, z0:-92, z1:-34, gap:3.9, axis:"z"}], avenue:{x:0, z0:34, z1:92, w:7.8, z2:-34, z3:-92}}
+};
+function cityBuild(roomId){
+  if(CITY.cache[roomId]) return CITY.cache[roomId]; const plan = CITY_PLAN[roomId]; if(!plan) return null;
+  const M = cityMats(), W = [cAcc(), cAcc(), cAcc(), cAcc()], roof = cAcc(), cor = cAcc(), road = cAcc(), walk = cAcc(), tre = cAcc(), r = vRng(roomId === "steps" ? 4711 : 9173);
+  plan.zones.forEach(Z => {
+    for(let z = Z.z0; z < Z.z1 - 8;){
+      const d = 11 + r() * 8; if(z + d > Z.z1){ break; }
+      for(let side = -1; side <= 1; side += 2){
+        let x = Z.gap + 3.5 + r() * 2; const lim = Z.x1;
+        while(x < lim - 8){ const w = 9 + r() * 12, near = x < 16, h = (near ? 9 + r() * 10 : 14 + r() * 22) * (1 + Math.abs(z - (Z.z0 + Z.z1) / 2) / 260), pal = Math.floor(r() * 4), skip = r() < 0.1;
+          if(!skip){ const xa = side > 0 ? x : -x - w; cBlock(W, roof, cor, xa, z, w, d, h, pal); }
+          x += w + 0.8 + r() * 2.2; }
+      }
+      z += d + 3.5 + r() * 2.5;
+    }
+  });
+  /* the avenue: carriageway, pavements and a double row of street trees */
+  const av = plan.avenue, segs = av.z2 !== undefined ? [[av.z0, av.z1], [av.z2, av.z3]] : [[av.z0, av.z1]];
+  segs.forEach(([za, zb]) => { const lo = Math.min(za, zb), hi = Math.max(za, zb), hw = av.w / 2;
+    cQuad(road, [[-hw, 0.02, hi], [hw, 0.02, hi], [hw, 0.02, lo], [-hw, 0.02, lo]], [0, 1, 0], [[0, 0], [1, 0], [1, 1], [0, 1]]);
+    [-1, 1].forEach(s => { const xa = s * hw, xb = s * (hw + 3.2); cQuad(walk, [[Math.min(xa, xb), 0.06, hi], [Math.max(xa, xb), 0.06, hi], [Math.max(xa, xb), 0.06, lo], [Math.min(xa, xb), 0.06, lo]], [0, 1, 0], [[0, 0], [1, 0], [1, 1], [0, 1]]);
+      for(let z = lo + 4; z < hi - 2; z += 9 + r() * 4) cTree(tre, s * (hw + 1.6), z, 1.6 + r() * 0.8, 5.2 + r() * 1.6, Math.floor(r() * 4)); }); });
+  /* the end of the avenue is closed by something worth looking at: a long civic front with a drum and dome */
+  const zEnd = roomId === "steps" ? -63 : 94; cBlock(W, roof, cor, -28, roomId === "steps" ? zEnd - 12 : zEnd, 56, 12, 26, 1); cBlock(W, roof, cor, -4.5, roomId === "steps" ? zEnd - 9 : zEnd + 1, 9, 9, 46, 0);
+  const out = {W:W.map(cGeo), roof:cGeo(roof), cor:cGeo(cor), road:cGeo(road), walk:cGeo(walk), tre:cGeo(tre)}; CITY.cache[roomId] = out; return out;
+}
+function cityAttach(roomId){
+  cityClear(); const B = cityBuild(roomId); if(!B) return; const M = cityMats(), g = new THREE.Group(); g.name = "VISTA-CITY";
+  const add = (geo, mat, rec) => { if(!geo) return; const m = new THREE.Mesh(geo, mat); m.frustumCulled = true; m.castShadow = false; m.receiveShadow = !!rec; m.matrixAutoUpdate = false; g.add(m); };
+  B.W.forEach((geo, i) => add(geo, M.walls[i])); add(B.roof, M.roof); add(B.cor, M.cornice); add(B.road, M.road, true); add(B.walk, M.walk, true); add(B.tre, M.tree);
+  scene.add(g); CITY.grp = g; CITY.room = roomId;
+}
+function cityClear(){ if(CITY.grp){ if(CITY.grp.parent) CITY.grp.parent.remove(CITY.grp); CITY.grp = null; CITY.room = null; } }
+function cityNight(n){ try{ if(CITY.mats) CITY.mats.walls.forEach(w => { w.emissiveIntensity = n * 1.15; }); }catch(e){} }
+/* ══ 20261016i · gateways, not floating doors: the outdoor doors are now arches and a State House front, people are kept out of walls, and strangers talk through what they understand ══ */
+const GATE = {grp:null, room:null, tex:{}};
+function gatePlate(a, b){
+  const k = a + "|" + b; if(GATE.tex[k]) return GATE.tex[k]; const c = vCanvas(512, 128), g = c.getContext("2d");
+  g.fillStyle = "#1d2a22"; g.fillRect(0, 0, 512, 128); g.strokeStyle = "#c9a24a"; g.lineWidth = 4; g.strokeRect(8, 8, 496, 112);
+  g.fillStyle = "#e3c06a"; g.textAlign = "center"; g.textBaseline = "middle"; g.font = "bold 46px Georgia, 'Times New Roman', serif"; g.fillText(a, 256, 52); g.font = "italic 26px Georgia, serif"; g.fillStyle = "#cdb98a"; g.fillText(b, 256, 94);
+  const t = new THREE.CanvasTexture(c); try{ t.encoding = THREE.sRGBEncoding; }catch(e){} return GATE.tex[k] = t;
+}
+function gateAdd(g, mat, x, y, z, w, h, d, ry){ const m = new THREE.Mesh(UNIT.box, mat); m.position.set(x, y, z); m.scale.set(w, h, d); if(ry) m.rotation.y = ry; m.castShadow = false; m.receiveShadow = true; g.add(m); return m; }
+function gateArch(g, x, z, dirZ, gap, wingHalf, wallH, title, sub){
+  const stone = new THREE.MeshStandardMaterial({color:0xd8cfbb, roughness:0.9}), dark = new THREE.MeshStandardMaterial({color:0x2a2f33, roughness:0.6, metalness:0.4}), gold = new THREE.MeshStandardMaterial({color:0xb8964a, roughness:0.35, metalness:0.7}), shade = new THREE.MeshStandardMaterial({color:0xb9b09c, roughness:0.95});
+  const pierW = 1.15, pierH = 5.0, d = 1.1, ph = x, off = dirZ;                       /* dirZ: +1 when the viewer stands at +z of the gate */
+  [-1, 1].forEach(s => { const px = x + s * (gap / 2 + pierW / 2);
+    gateAdd(g, shade, px, 0.35, z, pierW + 0.3, 0.7, d + 0.3); gateAdd(g, stone, px, pierH / 2 + 0.35, z, pierW, pierH, d); gateAdd(g, stone, px, pierH + 0.5, z, pierW + 0.35, 0.28, d + 0.35);
+    for(let i = 0; i < 4; i++) gateAdd(g, shade, px, 1.2 + i * 1.0, z + off * (d / 2 + 0.01), pierW - 0.2, 0.06, 0.04);
+    /* a lantern on each pier */
+    const lm = new THREE.MeshStandardMaterial({color:0xfff2d4, emissive:0xffd9a0, emissiveIntensity:0.5, roughness:0.4}); gateAdd(g, dark, px, pierH + 0.78, z, 0.34, 0.1, 0.34); gateAdd(g, lm, px, pierH + 1.0, z, 0.26, 0.36, 0.26); gateAdd(g, dark, px, pierH + 1.25, z, 0.34, 0.08, 0.34); g.userData.lanterns = (g.userData.lanterns || []).concat([lm]); });
+  const span = gap + pierW * 2 + 0.3;
+  gateAdd(g, stone, x, pierH + 0.68, z, span, 0.9, d + 0.3);                           /* entablature */
+  gateAdd(g, shade, x, pierH + 1.24, z, span + 0.4, 0.2, d + 0.5);                     /* cornice */
+  gateAdd(g, gold, x, pierH + 0.2, z + off * (d / 2 + 0.05), gap * 0.12, 0.34, 0.1);    /* keystone */
+  const plate = new THREE.Mesh(new THREE.PlaneGeometry(Math.min(span - 0.5, 4.6), 1.15), new THREE.MeshStandardMaterial({map:gatePlate(title, sub), roughness:0.5, emissive:0xffffff, emissiveMap:gatePlate(title, sub), emissiveIntensity:0.0})); plate.position.set(x, pierH + 0.68, z + off * (d / 2 + 0.17)); if(off < 0) plate.rotation.y = Math.PI; g.add(plate);
+  /* pediment */
+  const sh = new THREE.Shape(); sh.moveTo(-span / 2 - 0.2, 0); sh.lineTo(span / 2 + 0.2, 0); sh.lineTo(0, 0.95); sh.lineTo(-span / 2 - 0.2, 0);
+  const ped = new THREE.Mesh(new THREE.ExtrudeGeometry(sh, {depth:d + 0.3, bevelEnabled:false}), stone); ped.position.set(x, pierH + 1.34, z - (d + 0.3) / 2); g.add(ped);
+  /* wings: a stone wall with piers and a capstone, out to the edge */
+  [-1, 1].forEach(s => { const x0 = x + s * (gap / 2 + pierW + 0.15), x1 = x + s * wingHalf, cx = (x0 + x1) / 2, w = Math.abs(x1 - x0); if(w < 0.3) return;
+    gateAdd(g, stone, cx, wallH / 2, z, w, wallH, d * 0.6); gateAdd(g, shade, cx, wallH + 0.09, z, w + 0.05, 0.18, d * 0.8); gateAdd(g, shade, cx, 0.15, z + off * (d * 0.3), w, 0.3, 0.14);
+    for(let px = Math.min(x0, x1) + 1.6; px < Math.max(x0, x1) - 0.8; px += 2.6) gateAdd(g, stone, px, wallH / 2, z + off * (d * 0.32), 0.5, wallH, 0.12); });
+}
+function gateStateHouse(g, x, z){
+  /* the front of the State House the door was floating in front of: a limestone block with a portico, steps and flags */
+  const W = [cAcc(), cAcc(), cAcc(), cAcc()], roof = cAcc(), cor = cAcc(), M = cityMats();
+  cBlock(W, roof, cor, x - 4.0, z - 3.6, 8.0, 3.55, 8.6, 1);
+  const mk = (a, mat) => { const geo = cGeo(a); if(!geo) return; const m = new THREE.Mesh(geo, mat); m.matrixAutoUpdate = false; g.add(m); };
+  W.forEach((a, i) => mk(a, M.walls[i])); mk(roof, M.roof); mk(cor, M.cornice);
+  const stone = new THREE.MeshStandardMaterial({color:0xe2dccd, roughness:0.88}), shade = new THREE.MeshStandardMaterial({color:0xb9b09c, roughness:0.95}), gold = new THREE.MeshStandardMaterial({color:0xb8964a, roughness:0.4, metalness:0.7});
+  [-1, 1].forEach(s => { const cx = x + s * 1.35; const col = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.32, 3.9, 16), stone); col.position.set(cx, 0.45 + 1.95, z + 0.28); g.add(col); gateAdd(g, shade, cx, 0.45 + 0.09, z + 0.28, 0.8, 0.18, 0.8); gateAdd(g, stone, cx, 0.45 + 3.95, z + 0.28, 0.85, 0.2, 0.85); });
+  gateAdd(g, stone, x, 4.78, z + 0.28, 3.6, 0.5, 0.95);
+  const sh = new THREE.Shape(); sh.moveTo(-1.9, 0); sh.lineTo(1.9, 0); sh.lineTo(0, 0.85); sh.lineTo(-1.9, 0); const ped = new THREE.Mesh(new THREE.ExtrudeGeometry(sh, {depth:0.9, bevelEnabled:false}), stone); ped.position.set(x, 5.03, z - 0.17); g.add(ped);
+  for(let i = 0; i < 3; i++) gateAdd(g, shade, x, 0.06 + i * 0.12, z + 1.0 - i * 0.1, 4.2 - i * 0.3, 0.12, 0.7);          /* steps */
+  const plate = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 0.8), new THREE.MeshStandardMaterial({map:gatePlate("THE STATE HOUSE", "Open hours"), roughness:0.5})); plate.position.set(x, 4.78, z + 0.77); g.add(plate);
+  /* flag on a staff, and brass lanterns either side of the door */
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 4.2, 6), gold); pole.position.set(x + 2.6, 2.2 + 3.4, z + 0.5); g.add(pole);
+  const flag = new THREE.Mesh(new THREE.PlaneGeometry(1.3, 0.8), new THREE.MeshStandardMaterial({color:0xb5432f, side:THREE.DoubleSide, roughness:0.8})); flag.position.set(x + 3.25, 7.3, z + 0.5); g.add(flag);
+  const lm = new THREE.MeshStandardMaterial({color:0xfff2d4, emissive:0xffd9a0, emissiveIntensity:0.5, roughness:0.4}); [-1, 1].forEach(s => { gateAdd(g, lm, x + s * 0.95, 2.6, z + 0.14, 0.18, 0.3, 0.18); }); g.userData.lanterns = (g.userData.lanterns || []).concat([lm]);
+}
+function gateHide(x0, x1, z0, z1){
+  try{ roomGroup.children.forEach(o => { if(o.userData.vDoorHid || !o.position) return; const p = o.position, sc = o.scale; if(p.x >= x0 && p.x <= x1 && p.z >= z0 && p.z <= z1 && p.y > 0.4 && p.y < 3.4 && (!sc || sc.x < 2.3)){ o.visible = false; o.userData.vDoorHid = 1; } }); }catch(e){}
+}
+function gateAttach(id){
+  gateClear(); const R = ROOMS[id]; if(!R || !R.open) return; const g = new THREE.Group(); g.name = "VISTA-GATES";
+  if(id === "district"){ const d = R.d; gateArch(g, 0, d - 0.55, -1, 4.2, 7.6, 3.2, "THE EAST STEPS", "The Capitol"); gateStateHouse(g, 4.096, 0); }
+  else if(id === "steps"){ gateArch(g, 0, 0.3, 1, 3.8, 9.7, 1.6, "THE DISTRICT", "Home"); }
+  scene.add(g); GATE.grp = g; GATE.room = id;
+}
+function gateHideRoom(id){ const R = ROOMS[id]; if(!R || !R.open) return; if(id === "district") gateHide(-1.3, 1.3, R.d - 0.6, R.d + 1); else if(id === "steps") gateHide(-1.1, 1.1, -0.3, 0.3); }
+function gateClear(){ if(GATE.grp){ if(GATE.grp.parent) GATE.grp.parent.remove(GATE.grp); GATE.grp = null; GATE.room = null; } }
+function gateNight(n){ try{ if(GATE.grp && GATE.grp.userData.lanterns) GATE.grp.userData.lanterns.forEach(m => { m.emissiveIntensity = 0.5 + n * 1.6; }); }catch(e){} }
+
+/* nobody stands in a wall: new arrivals are moved out of anything solid, and anyone found inside one is stepped clear */
+const VW = {room:null, at:-1, boxes:[]};
+function wallScan(){
+  const out = [], bb = new THREE.Box3(), R = ROOMS[G.room] || {w:10, d:10};
+  const visit = root => { if(!root) return; root.updateMatrixWorld(true); root.traverse(o => { if(!o.isMesh || !o.visible) return; let p = o.parent, nd = false; while(p){ if(p.name === "NEPTUNE-DISTRICT"){ nd = true; break; } p = p.parent; } if(nd) return;
+    bb.setFromObject(o); if(!isFinite(bb.min.x)) return; const w = bb.max.x - bb.min.x, d = bb.max.z - bb.min.z, h = bb.max.y - bb.min.y;
+    if(Math.max(w, d) <= 3.4 || h < 1.2 || bb.min.y > 0.7 || bb.max.y < 1.4) return; if(w > R.w * 0.75 && d > R.d * 0.6) return; if(w > R.w * 0.9 || d > R.d * 0.9) return;
+    out.push({x0:bb.min.x, x1:bb.max.x, z0:bb.min.z, z1:bb.max.z}); }); };
+  visit(roomGroup); visit(GATE.grp);
+  VW.boxes = out.slice(0, 300); VW.room = G.room; VW.at = PHYS.at;
+}
+function wallInside(m){
+  const x = m.x, z = m.z;
+  try{ if(m.room === G.room){ if(VW.room !== G.room || VW.at !== PHYS.at) wallScan(); for(const b of VW.boxes){ if(x > b.x0 - 0.1 && x < b.x1 + 0.1 && z > b.z0 - 0.1 && z < b.z1 + 0.1) return b; } } }catch(e){}
+  try{ if(PHYS.room === G.room && m.room === G.room) for(const b of PHYS.boxes){ if(x > b.x0 - 0.12 && x < b.x1 + 0.12 && z > b.z0 - 0.12 && z < b.z1 + 0.12 && (b.y1 === undefined || b.y1 > 0.5)) return {x0:b.x0, x1:b.x1, z0:b.z0, z1:b.z1}; } }catch(e){}
+  try{ if(typeof NM !== "undefined" && NM.solids && (m.room === "district" || m.room === "steps")) for(const s of NM.solids){ if(Math.abs(x - s.x) < s.hx + 0.2 && Math.abs(z - s.z) < s.hz + 0.2) return {x0:s.x - s.hx, x1:s.x + s.hx, z0:s.z - s.hz, z1:s.z + s.hz}; } }catch(e){}
+  return null;
+}
+function wallFix(m){
+  if(!m || m.sitting || m.gone || m.ohSeat || !ROOMS[m.room] || m.kind === "player") return;
+  for(let k = 0; k < 4; k++){ const r = wallInside(m); if(!r) return;
+    const L = m.x - r.x0, Rr = r.x1 - m.x, F = m.z - r.z0, B = r.z1 - m.z, mn = Math.min(L, Rr, F, B), out = 0.42;
+    if(mn === L) m.x = r.x0 - out; else if(mn === Rr) m.x = r.x1 + out; else if(mn === F) m.z = r.z0 - out; else m.z = r.z1 + out; }
+  try{ const rb = roomBox(m.room); m.x = clamp(m.x, -rb.hw, rb.hw); m.z = clamp(m.z, rb.d0 + 0.05, rb.d1); }catch(e){}
+  m.tx = m.x; m.tz = m.z;
+}
+{ const _pir = placeInRoom; placeInRoom = function(m){ _pir.apply(this, arguments); try{ wallFix(m); }catch(e){} }; }
+let _wfT = 0;
+function wallWatch(){ if(!G || !G.running || G.t - _wfT < 1.2) return; _wfT = G.t; try{ hereNow().forEach(m => { if(m && m !== G.you && !(TALK.open && TALK.m === m)) wallFix(m); }); }catch(e){} }
+
+/* strangers talking to each other, once the model is there to do it: each answers what the other actually said */
+const LO = {busy:false, last:-999};
+function loRoom(){ try{ return (ROOMS[G.room] || {}).t || "the room"; }catch(e){ return "the room"; } }
+function loAsk(who, text, seed){
+  const LT = window.onumLiveTalk; if(!LT || typeof LT.reply !== "function") return Promise.resolve(null);
+  return Promise.race([Promise.resolve(LT.reply({npcId:who.id, channel:"face", text})).then(r => (r && r.live && r.text) ? String(r.text).replace(/^["“]|["”]$/g, "").replace(/\s+/g, " ").slice(0, 280) : null), new Promise(r => setTimeout(() => r(null), 9000))]).catch(() => null);
+}
+async function loChain(a, b, seed){
+  const hint = String(seed || "").slice(0, 160), room = loRoom();
+  const t1 = await loAsk(a, "(You are in " + room + " with " + b.name + (b.role ? ", " + b.role : "") + ". They have not spoken to you; you turn to them. " + (hint ? "On your mind: " + hint + " " : "") + "Say what you actually think, in your own words, one or two sentences. You are not talking to the player.)");
+  if(!t1) return null;
+  const t2 = await loAsk(b, "(Not the player. " + a.name + (a.role ? ", " + a.role : "") + ", turns to you in " + room + " and says: \"" + t1 + "\" Answer them as yourself, in your own words, one or two sentences.)");
+  if(!t2) return [t1];
+  const t3 = Math.random() < 0.6 ? await loAsk(a, "(Not the player. " + b.name + " answers you: \"" + t2 + "\" Reply once, briefly, as yourself.)") : null;
+  return t3 ? [t1, t2, t3] : [t1, t2];
+}
+function loPlay(a, b, lines){
+  const h = {a:a.id, b:b.id, lines:[], t:G.t}; try{ a._huddle = b._huddle = h; }catch(e){}
+  lines.forEach((t, i) => setTimeout(() => { const who = i % 2 ? b : a, to = i % 2 ? a : b; if(!who || who.gone || who.room !== G.room && false) return;
+    try{ h.lines.push([who.name, t]); h.t = G.t; }catch(e){} who.say = t; who.sayT = 4.8; who.sayTo = to.id; who.faceId = to.id; who.faceUntil = G.t + 5; try{ speakAt(who, t); }catch(e){}
+    try{ if(a.room === G.room) tlog(who.name, t, "talk"); }catch(e){} }, i * 3300));
+}
+{ const _ov = overhear; overhear = function(a, b, la, lb){
+    try{ const LT = window.onumLiveTalk;
+      if(LT && typeof LT.reply === "function" && a && b && a !== G.you && b !== G.you && a.traits && b.traits && !LO.busy && G.t - LO.last > 18){
+        LO.busy = true; LO.last = G.t;
+        Promise.resolve(typeof LT.available === "function" ? LT.available() : true).then(ok => ok ? loChain(a, b, la) : null).then(lines => { LO.busy = false; if(lines && lines.length) loPlay(a, b, lines); else _ov.call(null, a, b, la, lb); }).catch(() => { LO.busy = false; try{ _ov.call(null, a, b, la, lb); }catch(e){} });
+        return; } }catch(e){ LO.busy = false; }
+    return _ov.apply(this, arguments); }; }
+/* ══ 20261016h · rich scenery for every machine: the town, the steps and the plaza were being switched off on anything the game rates 'modest', which is nearly every PC. It is on by default now, watches its own frame rate, and steps back with a note if it cannot keep up. ══ */
+document.addEventListener("click", ev => { try{ const b = ev.target && ev.target.closest && ev.target.closest("[data-rich]"); if(!b) return; ev.stopPropagation(); const lv = +b.getAttribute("data-rich"); SC.lvl = lv; SC.done = false; SC.since = 0; SC.cnt = 0; try{ localStorage.setItem("onum.rich.lvl", String(lv)); }catch(e){} try{ feed(lv ? "Rich picture is on. Materials change the next time you walk into a room." : "Light picture. Materials change the next time you walk into a room."); }catch(e){} try{ settingsCard(); }catch(e){} }catch(e){} }, true);
 /* open air blew out to white on the pavements; bring it down a little */
-{ const _ls = lightingSlow; lightingSlow = function(){ _ls.apply(this, arguments); try{ const R = ROOMS[G.room]; if(R && R.open){ if(renderer.toneMapping === THREE.NoToneMapping){ sun.intensity *= 0.66; hemi.intensity *= 0.78; } else { renderer.toneMappingExposure *= 0.88; hemi.intensity *= 0.92; } } }catch(e){} }; }
+{ const _ls = lightingSlow; lightingSlow = function(){ _ls.apply(this, arguments); try{ const R = ROOMS[G.room]; if(R && R.open){ if(MODEST && SC.lvl >= 2){ camera.far = 150; camera.updateProjectionMatrix(); if(scene.fog){ scene.fog.near = 30; scene.fog.far = 130; } } if(renderer.toneMapping === THREE.NoToneMapping){ sun.intensity *= 0.66; hemi.intensity *= 0.78; } else { renderer.toneMappingExposure *= 0.88; hemi.intensity *= 0.92; } } }catch(e){} }; }
 function kCalText(){
   try{ const D = docketToday().slice().sort((x, z) => x.h - z.h), m = G.minute || 0; if(!D.length) return "Nothing is scheduled for your chair today.";
     return D.map(d => { const st = kOnceToday(d.key) ? "done" : m < d.h * 60 - 60 ? "later" : m >= 19 * 60 ? "missed" : "now", where = (function(){ const sr = d.sit ? String(d.sit).split(":")[0] : null; const r = (sr && ROOMS[sr] && ["senate", "court", "committee", "caucus", "floor"].indexOf(sr) >= 0 ? sr : DK_ROOM[d.key]) || homeRoom(); return ROOMS[r] ? ROOMS[r].t : r; })();
@@ -35576,9 +35798,10 @@ function settingsCard(){
         '<button type="button" class="mk__opt' + (G.gfx==="simple"?" is-on":"") + '" data-gfx="simple">Simple</button>' +
       '</div></div>' +
       '<div class="mk__row"><i>Scenery</i><div class="mk__opts">' +
-        '<button type="button" class="mk__opt' + (sceneryRich() ? " is-on" : "") + '" data-rich="1">Rich</button>' +
-        '<button type="button" class="mk__opt' + (!sceneryRich() ? " is-on" : "") + '" data-rich="0">Light</button>' +
-      '</div></div>' + (SC.fail ? '<div class="mk__row"><i></i><span class="muted" style="font-size:10.5px">Rich scenery was running too slowly on this machine, so it was turned off.</span></div>' : "") +
+        '<button type="button" class="mk__opt' + (SC.lvl === 2 ? " is-on" : "") + '" data-rich="2">Rich</button>' +
+        '<button type="button" class="mk__opt' + (SC.lvl === 1 ? " is-on" : "") + '" data-rich="1">Smooth</button>' +
+        '<button type="button" class="mk__opt' + (SC.lvl === 0 ? " is-on" : "") + '" data-rich="0">Light</button>' +
+      '</div></div>' + (MODEST && SC.lvl < 2 ? '<div class="mk__row"><i></i><span class="muted" style="font-size:10.5px">' + (SC.lvl ? "Eased a step to keep the frame rate up." : "Light picture. It was switched on by hand or because the machine struggled.") + '</span></div>' : "") +
       (crowdSafe && G.gfx !== "simple"
         ? '<div class="mk__row"><i></i><span class="muted" style="font-size:10.5px">' +
           'The room is full, so people are being drawn a little plainer for now. Shadows stay on. It goes back on its own.' +
@@ -36360,6 +36583,7 @@ function drainHouseOne(w, dt){
     try{ stdTick(); }catch(e){}
     try{ stdLive(); }catch(e){}
     try{ lifeTick(); }catch(e){}
+    try{ wallWatch(); }catch(e){}
   } else if(lane === 10){
     try{ tieTick(w); }catch(e){}
   } else if(lane === 11){
