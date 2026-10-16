@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261017c">
+<meta name="onum-build" content="20261017d">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261017c";
+  var STAMP = "20261017d";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -10328,6 +10328,7 @@ function pbApps(){
     ["paper", "This morning's paper", "The Ledger."],
     ["war", "The situation room", "A neighbour holds the bread: what your office may do, what it must ask others for, and who answers."],
     ["cal", "The standing calendar", "Caucus, committees, the Senate, the Court and the Press Gallery: what meets when, whether or not you are there."],
+    ["hq", "Campaign office", "Walk up the high street to your campaign office, ten minutes, if the street is in the way."],
     ["inq", "The Academy", "Every field the Republic is asking questions in, from number to quantum fields to what a mind is owed: what is settled, what is next, and what you can fund."],
     ["law", "The Law", "The one set of rules every part of this world answers to, and what it has mended."],
     ["cmt", "Committees", "Your committee seat, the Steering Committee's invitations, and the caucus ballots for seats and gavels."],
@@ -10356,7 +10357,7 @@ function watchCard(){
     if(G.room !== k){ try{ goTo(k); }catch(e){} setTimeout(() => { try{ G._sitWatch = true; sitStart(k); }catch(e){ console.warn(e); } }, 500); } else sitStart(k); }));
 }
 function pbAppGo(id){
-  const go = {inq:() => inqCard(), law:() => lawCard(), cmt:() => cmtCard(), eng:() => engCard(), cal:() => stdCalCard(), org:() => orgBrowse(), kin:() => kinBrowse(), war:() => warRoleOpen(), purse:() => purseCard(), watch:() => watchCard(), chest:() => chestCard(), office:() => officeCard(), sched:() => scheduleCard(), docket:() => dkCard(0), gov:() => govCard(), paper:() => paperCard(),
+  const go = {hq:() => sfGoHQ(), inq:() => inqCard(), law:() => lawCard(), cmt:() => cmtCard(), eng:() => engCard(), cal:() => stdCalCard(), org:() => orgBrowse(), kin:() => kinBrowse(), war:() => warRoleOpen(), purse:() => purseCard(), watch:() => watchCard(), chest:() => chestCard(), office:() => officeCard(), sched:() => scheduleCard(), docket:() => dkCard(0), gov:() => govCard(), paper:() => paperCard(),
     notebook:() => notebookCard(), rival:() => rivalCard(),
     career:() => { try{ showPane("paneCareer"); document.body.classList.add("ui-open"); }catch(e){} },
     union:() => { try{ mapToggle(true); }catch(e){} },
@@ -31608,6 +31609,7 @@ function orgExecAct(){
 }
 function orgTick(){
   try{ engTick(); }catch(e){}
+  try{ airTick(); }catch(e){}
   try{
     const O = G.org; if(!O || !O.today || O.today.d !== G.day || !G.you) return; const hr = Math.floor((G.minute || 0) / 60);
     O.today.ev.forEach(e => { if(e.done || e.h > hr) return; e.done = 1; try{ if(e.t === "town") orgTownAct(e.s, e.i); else if(e.t === "state") orgStateAct(e.s); else if(e.t === "fed") orgFedAct(); else if(e.t === "court") orgCourtAct(); else if(e.t === "exec") orgExecAct(); }catch(x){ console.warn("org", e.t, x); } });
@@ -32308,6 +32310,14 @@ const SF = {done:"", signs:[]};
 const SF_KIND = {"VAUGHN'S DINER":"diner", "CAFE ZEVEN":"diner", "BAKKERIJ TAYLOR":"market", "FLORIST":"market", "TAILOR & CUTTER":"market", "HABERDASHERY":"market", "WATCHMAKER":"market", "BOOKSELLER":"newsstand", "THE NO7 LEDGER":"newsstand", "TOBACCONIST":"newsstand", "VAN DIJK & ZONEN":"hardware"};
 const SF_SUB = {diner:"Coffee, and everybody who votes", market:"Bread, cloth and the better end of the district", newsstand:"Papers, and books nobody asked for", hardware:"Hinges, nails and neighbours"};
 function sfTitle(n){ return String(n).toLowerCase().replace(/(^|[\s'&-])([a-z])/g, (m, a, b) => a + b.toUpperCase()).replace(/\bNo7\b/i, "No7"); }
+/* a prop you cannot reach is a prop that is not there: every interactive point must stand on open ground */
+function sfFree(p){
+  try{ const S = (typeof NM !== "undefined" && NM.solids) || []; for(let i = 0; i < S.length; i++){ const q = S[i]; if(Math.abs(p.x - q.x) < q.hx + 0.45 && Math.abs(p.z - q.z) < q.hz + 0.45) return false; } return true; }catch(e){ return true; }
+}
+function sfNearestFree(x, z){
+  const ring = [[0, 0], [-1.2, 0], [1.2, 0], [0, 1.2], [0, -1.2], [-2.4, 0], [2.4, 0], [0, 2.4], [0, -2.4], [-1.5, 1.5], [1.5, 1.5], [-1.5, -1.5], [1.5, -1.5], [-3.6, 0], [3.6, 0], [0, 3.6], [0, -3.6]];
+  for(const o of ring){ const c = {x:x + o[0], z:z + o[1]}; if(sfFree(c)) return c; } return null;
+}
 function sfApply(){
   try{
     const P = (window.ONUM_TOWN_POIS || []).filter(Boolean); if(!P.length || !PROPS.district) return;
@@ -32320,11 +32330,15 @@ function sfApply(){
     put("diner", one("VAUGHN'S DINER", -1), "The counter at Vaughn's", "Coffee, and everybody who votes");
     put("market", one("BAKKERIJ TAYLOR", 1), "Bakkerij Taylor", "Bread, flowers, cloth and the better end of the district");
     put("hardware", one("VAN DIJK & ZONEN", 1), "Van Dijk & Zonen", "Hinges, nails and neighbours");
-    put("hq", one("HABERDASHERY", 1), "Campaign office", "Above the haberdasher's: folding tables, a phone bank, a whiteboard");
+    { const hqNames = ["HABERDASHERY", "TAILOR & CUTTER", "WATCHMAKER", "TOBACCONIST", "BOOKSELLER", "ORANJE APOTHEEK", "DE GOUDEN KROON"]; let hp = null;
+      for(const nm of hqNames){ hp = one(nm, 1) || one(nm, -1); if(hp && sfFree(spot(hp))) break; hp = null; }
+      if(!hp){ hp = main.filter(p => !/^(VAUGHN|CAFE|BAKKERIJ|VAN DIJK|CONSULAR POST|THE NO7)/.test(p.name) && sfFree(spot(p))).sort((a, b) => Math.hypot(a.pos.x, a.pos.z - 14) - Math.hypot(b.pos.x, b.pos.z - 14))[0] || null; }
+      if(hp){ put("hq", hp, "Campaign office", "Above the " + sfTitle(hp.name).toLowerCase() + ": folding tables, a phone bank, a whiteboard"); } }
     const sqNews = P.find(p => p.kind === "newsstand" && /Square/i.test(p.name)); if(sqNews){ const pr = byId("newsstand"); if(pr){ const sp = spot(sqNews); pr.x = sp.x; pr.z = sp.z; pr.label = "The square newsstand"; take.newsstand = sqNews; } }
     const ch = P.find(p => p.kind === "church" && /Willibrord/i.test(p.name)); if(ch){ const pr = byId("church"); if(pr){ const sp = ch.stand && ch.stand[2] ? ch.stand[2] : spot(ch); pr.x = sp.x; pr.z = sp.z; pr.label = "St. Willibrord's"; pr.r = 2.6; take.church = ch; } }
     const legacy = {diner:"diner_1", church:"church_2", newsstand:"newsstand_2", hardware:"shop_25", market:"shop_26"};
     Object.keys(legacy).forEach(k => { const lp = P.find(p => p.id === legacy[k]), to = take[k]; if(lp && to){ lp.pos = Object.assign({}, to.pos); lp.door = Object.assign({}, to.door); lp.stand = (to.stand || []).map(s => Object.assign({}, s)); } });
+    try{ D.forEach(pr => { if(pr && typeof pr.x === "number" && !sfFree({x:pr.x, z:pr.z})){ const f = sfNearestFree(pr.x, pr.z); if(f){ pr.x = f.x; pr.z = f.z; } } }); }catch(e){}
     SF.signs = [];
     main.forEach(p => { const kind = SF_KIND[p.name]; if(!kind || used.has(p.id)) return; const id = "sf:" + p.id; if(byId(id)) return; const sp = spot(p);
       D.push({id, label:sfTitle(p.name), sub:SF_SUB[kind], x:sp.x, z:sp.z, r:2.2, acts:() => purseShopActs(kind)}); });
@@ -33615,6 +33629,7 @@ const LAW_ARTICLES = [
   ["Seats", "A chair is held by one person; a seat on a committee is a real committee."],
   ["Order", "A thing cannot be further along than what it was built from: the Engine is never past its own capability, and never wakes without the stage that wakes it."],
   ["Account", "What a machine burns, someone paid for: the Engine's power is drawn from the states' treasuries and written in a ledger."],
+  ["Heat", "Warmth goes from warm to cold and never the other way without work: a room left alone becomes the weather, and every degree held against it is fuel burned and paid for by the treasuries."],
   ["Discovery", "Nothing is found that the physics of the real universe forbids, and nothing it allows is barred from being found; every discovery waits for the ones before it, the tools to see it, and the work."]
 ];
 function lawMend(art, text){ LAW.mended++; LAW.today++; LAW.log.unshift({d:G.day, a:art, t:text}); if(LAW.log.length > 40) LAW.log.pop(); }
@@ -33647,6 +33662,7 @@ function lawCard(){
   const E = G.eng && G.eng.v === 1 ? G.eng : null, L = E && E.ledger;
   govCardOpen("One rule for everything", "The Law", "Every part of this world answers to the same few rules, and checks itself each morning. Where two parts of the world disagree, the law decides and writes down what it mended.",
     LAW_ARTICLES.map((a, i) => '<div style="margin:6px 0;padding:4px 10px;border-left:3px solid var(--line-soft)"><b>' + (i + 1) + '. ' + pcEsc(a[0]) + '</b><div class="muted" style="font-size:13px">' + pcEsc(a[1]) + '</div></div>').join("") +
+    (function(){ try{ const A = airStore(), T = A.T[G.room]; return '<p class="muted" style="font-size:13px">Here it is ' + (typeof T === "number" ? Math.round(T) : "?") + '\u00b0C against ' + Math.round(airOut()) + '\u00b0C outside. The buildings have burned ' + Math.round(A.fuel) + ' units of fuel, paid for by the states.</p>'; }catch(e){ return ''; } })() +
     '<p class="muted" style="font-size:13px">' + LAW.runs + ' morning check' + (LAW.runs === 1 ? '' : 's') + ' so far; ' + LAW.mended + ' thing' + (LAW.mended === 1 ? '' : 's') + ' mended.' + (L ? ' The Engine has drawn ' + Math.round(L.paid) + ' (in treasury money) of power from the states over ' + L.days + ' days.' : '') + '</p>' +
     (LAW.log.length ? '<div class="eyebrow">Last mended</div>' + LAW.log.slice(0, 6).map(x => '<div class="careerline"><b>d' + x.d + '</b> [' + pcEsc(x.a) + '] ' + pcEsc(x.t) + '</div>').join("") : '<p class="muted" style="font-size:13px">Nothing has needed mending.</p>'), null);
   return null;
@@ -33848,6 +33864,43 @@ function inqCard(){
   card.querySelectorAll("[data-qn]").forEach(a => a.addEventListener("click", ev => { ev.preventDefault(); INQ.sel = a.getAttribute("data-qn"); inqCard(); }));
   return null;
 }
+/* ══ 20261017d · HEAT: the second law in the building. Warmth goes from warm to cold and never the other way without work; a room left alone becomes the weather; every degree held against it is fuel burned and paid for ══ */
+const AIR = {last:null};
+function airStore(){ if(!G.air) G.air = {T:{}, fuel:0, held:0, warn:-9}; return G.air; }
+function airOut(){
+  let t = 15; try{ const w = wxToday(); t = (typeof w.t === "number" ? (w.t - 32) * 5 / 9 : 12); }catch(e){}
+  const h = (G.minute || 0) / 60; return t + 4 * Math.sin((h - 9) / 24 * 2 * Math.PI) - (wxGloomSafe() ? 0 : 0);
+}
+function wxGloomSafe(){ return false; }
+const AIR_K = {marble:0.010, wood:0.016, plain:0.020, chamber:0.008, stone:0.02};
+function airStep(mins){
+  const A = airStore(), out = airOut(), E = (G.eng && G.eng.v === 1) ? G.eng : null; let fuel = 0;
+  Object.keys(ROOMS).forEach(id => { const R = ROOMS[id]; if(!R) return; if(R.open){ A.T[id] = out; return; }
+    let T = (typeof A.T[id] === "number" && isFinite(A.T[id])) ? A.T[id] : 19, k = AIR_K[R.style] || 0.015, vol = R.w * R.d * R.h;
+    let people = 0; try{ people = id === G.room ? hereNow().length + 1 : 0; }catch(e){}
+    let gain = people * 0.0016 + (id === "engine" && E ? E.compute * 0.0006 + E.st * 0.01 : 0);
+    for(let i = 0; i < mins; i++){ T += (out - T) * k + gain; if(out < 14 && T < 20){ const q = Math.min(0.6, (20 - T) * 0.2); T += q; fuel += q * vol / 400; } else if(out > 26 && T > 25){ const q = Math.min(0.4, (T - 25) * 0.15); T -= q; fuel += q * vol / 600; } }
+    A.T[id] = T; });
+  A.fuel += fuel;
+  /* what is burned is paid for by the states, as the Law says */
+  try{ const O = orgEnsure(), sts = Object.keys(O.treas); if(sts.length && fuel > 0){ sts.forEach(n => { O.treas[n] = Math.max(0, O.treas[n] - fuel * 4 / sts.length); }); } }catch(e){}
+}
+function airTick(){
+  try{
+    if(!G || !G.running || !G.you) return; const A = airStore(), now = (G.day || 1) * 1440 + (G.minute || 0);
+    if(AIR.last == null){ AIR.last = now; Object.keys(ROOMS).forEach(id => { if(typeof A.T[id] !== "number") A.T[id] = ROOMS[id].open ? airOut() : 19; }); return; }
+    const d = Math.floor(now - AIR.last); if(d < 5) return; AIR.last = now; airStep(Math.min(d, 240));
+    const T = G.room && A.T[G.room], R = ROOMS[G.room]; if(typeof T !== "number") return;
+    const off = Math.max(0, Math.abs(T - 21) - 6); if(off > 0 && G.you){ G.you.energy = clamp((G.you.energy || 50) - off * 0.004 * Math.min(d, 30), 0, 100); }
+    const c = el("kClock"); if(c) c.title = "The standing calendar · " + Math.round(T) + "°C " + (R && R.open ? "outside" : "in here");
+    if(now - A.warn > 180){ if(T < 9){ A.warn = now; try{ feed(R && R.open ? "The cold gets into your coat." : "It is cold enough in here to see your breath."); }catch(e){} } else if(T > 29){ A.warn = now; try{ feed("The air is close and hot; people are loosening their collars."); }catch(e){} } }
+  }catch(e){}
+}
+/* getting to the campaign office is a walk up the high street; this is for when the street is in the way */
+function sfGoHQ(){
+  const go = () => { try{ const hq = (PROPS.district || []).find(p => p.id === "hq"); if(!hq) return; cam.x = hq.x - 1.2 * Math.sign(hq.x || 1); cam.z = hq.z - 1.0; cam.yaw = Math.sign(hq.x || 1) > 0 ? Math.PI / 2 : -Math.PI / 2; spend(10, 1); feed("You walk up the high street to the campaign office."); }catch(e){ console.warn(e); } };
+  if(G.room !== "district"){ try{ goTo("district"); }catch(e){} setTimeout(go, 1800); } else go();
+}
 function engTick(){ try{ const E = G.eng; if(!E || E.pend !== "ceremony" || !G.running || !veil.hidden || (TALK && TALK.open)) return; engCeremony(); }catch(e){} }
 
 /* ordinary people talk about it, in the words of their own stake */
@@ -33870,6 +33923,35 @@ function voiceInvited(){ return NPCV.mode === "always" || (NPCV.mode === "ask" &
 { const _am = appendMsg; appendMsg = function(kind, text, who){
     try{ if(kind === "you" && text){ if(/\b(be quiet|stop talking|keep it down|no voices?|just type|text only|shut up)\b/i.test(text)) NPCV.until = 0; else if(/\b(speak|say it|say that|out loud|aloud|talk to me|use your voice|tell me out loud)\b/i.test(text)) NPCV.until = (G.t || 0) + 120; NPCV.more = 0; } }catch(e){}
     return _am.apply(this, arguments); }; }
+/* ── you can always just say it: a line to type into, and a microphone, whoever you are talking to; the buttons are things you can do, not the only things you can say ── */
+let TKOWN_BUSY = false;
+function tkOwnMount(m){
+  const T = el("talk"); if(!T) return; let box = el("tkOwn");
+  if(!box){
+    box = document.createElement("div"); box.id = "tkOwn"; box.style.cssText = "display:flex;gap:6px;margin:8px 0 4px;align-items:center";
+    box.innerHTML = '<input id="tkOwnIn" type="text" maxlength="400" autocomplete="off" placeholder="Say it in your own words…" style="flex:1;min-width:0;padding:7px 9px;border:1px solid var(--line-soft,#555);border-radius:4px;background:rgba(0,0,0,.25);color:inherit"><button type="button" class="btn" id="tkOwnGo">Say it</button><button type="button" class="btn btn--ghost" id="tkOwnMic" title="Speak aloud (or hold V)">🎤</button>';
+    const anchor = el("tkNote") || el("tkActs"); if(anchor && anchor.parentNode) anchor.parentNode.insertBefore(box, anchor); else T.appendChild(box);
+    ["keydown", "keyup", "keypress"].forEach(k => box.addEventListener(k, e => e.stopPropagation()));
+    const send = () => { const i = el("tkOwnIn"), t = (i.value || "").trim(); if(!t || !TALK.open || !TALK.m) return; i.value = ""; tkOwnSay(TALK.m, t); };
+    el("tkOwnGo").addEventListener("click", send); el("tkOwnIn").addEventListener("keydown", e => { if(e.key === "Enter"){ e.preventDefault(); send(); } });
+    el("tkOwnMic").addEventListener("click", () => { try{ if(typeof listening !== "undefined" && listening){ micStop(); el("tkOwnMic").classList.remove("is-live"); } else { micStart(); el("tkOwnMic").classList.add("is-live"); } }catch(e){} });
+  }
+  box.hidden = false; try{ const c = el("chat"); if(c) c.hidden = false; }catch(e){}
+  setTimeout(() => { try{ if(TALK.open && TALK.m === m && !document.activeElement || document.activeElement === document.body) el("tkOwnIn").focus(); }catch(e){} }, 120);
+}
+async function tkOwnSay(m, text){
+  if(TKOWN_BUSY) return; TKOWN_BUSY = true;
+  try{
+    appendMsg("you", text); setSay("…", "");
+    let out = ""; const LT = window.onumLiveTalk;
+    try{ if(LT && typeof LT.reply === "function" && (typeof LT.available !== "function" || await LT.available())){ const r = await Promise.race([LT.reply({npcId:m.id, channel:"face", text}), new Promise(r => setTimeout(() => r(null), 25000))]); if(r && r.text) out = liveClean(r.text) || r.text; } }catch(e){}
+    if(!out){ try{ out = improvise(m, text); }catch(e){} }
+    if(!out) out = pick(["Go on.", "Mm.", "Say that again, slowly?"]);
+    try{ m.chat = m.chat || []; m.chat.push({role:"user", content:text}, {role:"assistant", content:out}); if(m.chat.length > 40) m.chat.splice(0, m.chat.length - 40); }catch(e){}
+    if(TALK.open && TALK.m === m){ appendMsg("them", out, surname(m.name)); setSay(out, ""); }
+    try{ speakAt(m, out); }catch(e){}
+  } finally { TKOWN_BUSY = false; }
+}
 /* they may keep typing if they have more to say; they may also decide they do not */
 function fwMore(m, onText){
   try{ const LT = window.onumLiveTalk; if(!LT || typeof LT.reply !== "function") return false; const tok = FW.n;
@@ -33881,6 +33963,7 @@ function fwMore(m, onText){
     const r = _ot3.apply(this, arguments);
     try{
       if(!m || !m.traits || m === G.you || !TALK.open || TALK.m !== m || m.kind === "envoy") return r;
+      try{ tkOwnMount(m); }catch(e){ console.warn('tkOwn', e); }
       const k0 = m.id; NPCV.more = 0; const youCount = () => { try{ return (el("chatLog") || {querySelectorAll:() => []}).querySelectorAll(".msg--you").length; }catch(e){ return 0; } }, c0 = youCount();
       [9000, 22000].forEach(ms => setTimeout(() => { if(!TALK.open || TALK.m !== m || youCount() !== c0 || NPCV.more >= 2) return; NPCV.more++;
         const add = t => { if(!TALK.open || TALK.m !== m || youCount() !== c0) return; appendMsg("them", t, surname(m.name)); setSay(t, ""); try{ speakAt(m, t); }catch(e){} };

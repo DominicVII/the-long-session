@@ -4,6 +4,15 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## Campaign office, heat, and your own words
+
+`20261017d` (on `20261017c`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- FIXED: the campaign office in the District. It was tied to one named shop; in some towns that shop is not on the walkable street, or its doorstep sits inside a wall, and the office became unreachable. It now picks the nearest suitable shopfront, checks it stands on open ground, and every shop point is moved out of any wall. Apps -> Campaign office walks you up the high street (ten minutes) if you cannot find it.
+- TALK IN YOUR OWN WORDS: whoever you are talking to, there is now a line to type in (and a microphone) right under what they said: say anything you like, and they answer in their own words, live if your model is running, otherwise from who they are. The buttons below it are things you can do, not the only things you can say.
+- HEAT, the second law of the building: warmth flows from warm to cold; a room left alone becomes the weather; every degree held against it is fuel, paid for by the states' treasuries (written into The Law). Cold and stuffy rooms tire you; people crowd a room warm; the Engine Room runs hot. The clock's tooltip shows how warm it is where you stand.
+- (Carries 20261017c: your office as a Senator, committees, voices only when you speak, The Law, The Academy.)
+
 ## Your office, committees, typed-first talk, one law, and The Academy
 
 `20261017c` (on `20261017b`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
