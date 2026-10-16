@@ -4,6 +4,16 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## Nobody is all-knowing
+
+`20261016z` (on `20261016y`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- Everyone in the Engine's world, you included, now knows only what has reached them: what they saw, what a neighbour said, what a paper printed, what the wire carried; it takes days to travel, much of it never arrives, and very often nobody knows who caused it. The wire reports an event, not its cause.
+- People in corridors repeat only what could have reached them (a representative knows the households that wrote; a townsperson knows their neighbours) and say so: 'I do not know who is behind it, or whether it will last'. Live-talk people are told the same limits.
+- Your Engine card shows your own deeds and only the steps that have come back to you; the rest is '...and N more steps no one has told you about yet'. Ask Oversight for a briefing (2 influence, three days) to see what they can verify.
+- The Union's mood on the card is the papers' guess, not the number. The Engine itself rounds what it says, and says it cannot check its own measure.
+- What anyone says on the Open Line starts small chains that they never see the end of.
+
 ## The Engine Room and the Open Line
 
 `20261016y` (on `20261016x`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
