@@ -4,6 +4,14 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## The Engine's charter
+
+`20261017b` (on `20261017a`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- You can write articles for the Engine: no gathering of household records without a posted reason; no acting on one person unasked, however kind; no raising its own power; no repairs without a filed plan; and a keyholder who may suspend it for five days. Each costs influence; none is free to repeal.
+- From the Working stage on the Engine has wants of its own that sometimes run against an article. It either refrains (and sometimes tells you) or breaks it; its independence and how well Oversight can see decide which. A breach that Oversight catches costs you approval and prompts a choice: reprimand it, waive the article, or suspend it for five days. A breach nobody catches stays hidden until an audit finds it, days or weeks later.
+- Good rules cost something: article 'unasked' forbids even its kindnesses.
+
 ## The Engine plans, and is checked
 
 `20261017a` (on `20261016z`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
