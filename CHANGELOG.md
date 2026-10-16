@@ -4,6 +4,15 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## The rival
+
+`20261017e` (on `20261017d`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- A foreign power from the existing map (your declared foe if you have one) wants what you are building. Once the Engine can read, it tries to copy from its makers, feed its data falsehoods, cut power to an engine house, or seed stories about the machines in a state. Its own machines grow, faster with what it steals, and it announces each stage abroad on the wire.
+- You only know what is caught or announced. Most of what it does is never seen. When an agent is caught, the papers he carries may name the rival, or name nobody. You can release him quietly or expel him loudly, which plays well at home if the papers were real, and badly abroad either way.
+- Poisoned data makes the Engine see worse: its forecasts drift and miss, and after a while it may say that it does not trust what it is being shown. An audit (2 influence) replaces what it can find and tells you how much was wrong; counter-intelligence (3) makes every attempt harder. Oversight, a sealed posture and a long charter all help; an open posture makes copying easy.
+- FIXED: a chain of consequences could push the Engine past the Academy's gate and wake it before the Republic had worked out how a machine plans. It now holds at the threshold, and the Law checks it every morning.
+
 ## Campaign office, heat, and your own words
 
 `20261017d` (on `20261017c`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
