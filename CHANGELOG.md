@@ -4,6 +4,12 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## A civic building at the end of the High Street
+
+`20261016q` (on `20261016p`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- The domed building closing the High Street now has a portico: stepped approach, twelve fluted columns on bases and capitals, an entablature and pediment, a double door, and tall lit windows in the wings.
+
 ## Weather that follows you, on every PC
 
 `20261016p` (on `20261016o`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
