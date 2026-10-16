@@ -4,6 +4,12 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## The House Floor, finished
+
+`20261016n` (on `20261016m`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- Galleries along both side walls (ledge, turned balustrade, brackets and posts, public benches), a roll-call board on each side wall with a grid of green, red and grey lamps and its AYE / NO / NOT VOTING count, the Bar of the House across the aisle with brass posts and a gate, the mace on its stand beside the rostrum, a brass clock over the Speaker, a star medallion in the carpet, marble pilasters between the windows, a gilt frieze and three pendant chandeliers.
+
 ## The Caucus Room, Committee Room and Cloakroom, furnished
 
 `20261016m` (on `20261016l`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.

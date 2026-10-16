@@ -17,11 +17,11 @@ One HTML body. Keep these **byte-identical**:
 | `session.html` | repo root |
 | `One Nation, Under, ME.html` | standalone name |
 
-**Build stamp (now): `20261016m`**
+**Build stamp (now): `20261016n`**
 
-- `<meta name="onum-build" content="20261016m">`
-- IIFE `STAMP = "20261016m"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
-- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261016m"`
+- `<meta name="onum-build" content="20261016n">`
+- IIFE `STAMP = "20261016n"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
+- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261016n"`
 - Wrapper iframe: `/session.html?v=${ONUM_BUILD}` in `src/routes/index.tsx`
 - **`20261005a`:** weekly MAX OPTIMIZE + design/max-fit. Keeps `20261001a` far-crowd freeze / kit reuse / 6ms bail and `20261001b` hard maps. Best uses `BasicShadowMap` (one sample). Deep crowd freeze (culled+far traverse `matrixAutoUpdate`). Shell fills big desks (`max-width:min(2560px,100%)`). Kit cap KEEP 6/8. Caesar/parting polish. Walk **0.68** / sprint **1.15**. Full meshes near.
 - **`20261011a`:** playable fixes. Corridor freeze (alignment/stakeIn infinite recursion) fixed; elections run again (card watchdog no longer kills the ballot); warmAhead actually runs (`let roomGroup`, kit lamp/ticker relink, no sky touch, explicit furnished flag); New career confirms before replacing a career and wipes only at the oath. Walk 0.68 / sprint 1.15 kept.
