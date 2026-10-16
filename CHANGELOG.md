@@ -4,6 +4,13 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## The Statuary Corridor and the Press Gallery, furnished
+
+`20261016k` (on `20261016j`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- Statuary Corridor: a proper runner (burgundy field, navy and gold border, a chain of medallions, a vine, tasselled ends) instead of the stretched pink rug, with floor medallions at each end; sconces between every pair of columns; three brass pendant lamps down the middle; benches and glazed display cases in the bays (with the first ballot box and a gavel); a grandfather clock, a water fountain, an umbrella stand, ferns at all four corners, radiators and a fire cabinet. The corridor statues are marble and bronze figures with plates.
+- Press Gallery: wall-to-wall navy carpet, a ceiling of light panels, a navy backdrop with the gallery's crest and motto, two flags, a lectern with microphones, an ON AIR lamp, camera daises with floodlight rigs, green leather desk tops with name plates, telephones, notebooks and lamps, a wire machine, a coffee urn, a clipping board and a clock.
+
 ## Storefronts that are storefronts, real statues, and people who know who is speaking
 
 `20261016j` (on `20261016i`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
