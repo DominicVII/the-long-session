@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261016k">
+<meta name="onum-build" content="20261016l">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261016k";
+  var STAMP = "20261016l";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -12860,7 +12860,7 @@ function buildRoomInner(id, skipShell){
     plantTree(6.35, 10.15, 2.5, 1.12);
     }
     /* How you are doing walks the street. High: flags and flowers. Low: boards and bills. */
-    try{
+    if(!richTownNow()) try{
       const pulse = townPulse();
       const last = (G.you && (G.you.name || "").split(" ").pop()) || "HOME";
       if(pulse > 0.58){
@@ -14684,9 +14684,9 @@ function updatePlates(focus){
     const toSelf = p.sayTo === "self" && p.sayT > 0 && p.say;
     const toOther = p.sayT > 0 && p.say && partner && partner.room === p.room;
     const spoken = !!(toYou || toOther);
-    const sub = p.kind==="press" ? p.outlet : p.kind==="civ" ? p.role
+    const sub = p.kind==="press" ? p.outlet : p.kind==="civ" ? (polPlate(p) || p.role)
               : (p.post ? postTitle(p.post) : partyLabel(p.party));
-    const col = partyColorHex(p.party || "IND");
+    const col = partyColorHex((p.pol && p.pol.nonpartisan) ? "IND" : (p.party || "IND"));
     const line = toYou ? "“" + p.say + "”"
                : toOther ? "to " + surname(partner.name) + ": “" + p.say + "”"
                : toSelf ? "“" + (String(p.say).length > 84 ? String(p.say).slice(0, 80).replace(/\s+\S*$/, "") + "…" : String(p.say)) + "”"
@@ -24977,7 +24977,8 @@ function setSay(t, n){ el("tkSay").textContent = t; el("tkNote").innerHTML = n |
   try{ if(t && TALK.m) tlog(TALK.m.name || "", t, "talk"); }catch(e){} }
 function chipFor(m){
   const c = m.party==="FED" ? "fed" : m.party==="COM" ? "com" : "ind";
-  const t = m.kind==="press" ? "Press" : m.kind==="envoy" ? "Envoy" : m.kind==="civ" ? "Public" : partyLabel(m.party);
+  let pp = null; try{ pp = m.kind === "civ" ? polEnsure(m) : null; }catch(e){}
+  const t = m.kind==="press" ? "Press" : m.kind==="envoy" ? "Envoy" : m.kind==="civ" ? (pp ? (pp.nonpartisan ? "Nonpartisan" : partyLabel(pp.party)) : "Public") : partyLabel(m.party);
   return '<span class="chip chip--'+c+'">'+t+'</span>';
 }
 function tiny(label, v, lo, hi, col){
@@ -25016,7 +25017,9 @@ function renderTalk(){
   } else if(m.kind === "press"){
     bits.push("<span>"+m.role+", "+m.outlet+"</span>", "<span>·</span><span>trusts you "+Math.round(m.trust)+"%</span>");
   } else {
-    bits.push("<span>"+m.role+" · "+m.cause+"</span>");
+    const pp2 = (function(){ try{ return polEnsure(m); }catch(e){ return null; } })();
+    if(pp2){ bits.push('<span class="pin pin--post">' + (POL_ROLE[m.krole] || pp2.title) + '</span>', "<span><span" + tipAttr("state", pp2.state) + ">" + pp2.state + "</span></span>", "<span>·</span><span>" + pp2.line + "</span>"); if(pp2.bg && m.krole === "senator") bits.push("<span>·</span><span>" + pp2.bg + "</span>"); }
+    else bits.push("<span>"+m.role+" · "+m.cause+"</span>");
   }
   const ears = listenerLine(m);
   if(ears) bits.push('<span>·</span>', ears);
@@ -31797,7 +31800,7 @@ setTimeout(() => { try{ if(typeof K_STAFFTALK !== "undefined" && !K_STAFFTALK.se
 /* senators you have talked to turn up in the Senate sitting: pledged ones lean your way, refused ones do not */
 setTimeout(() => { try{ const SXX = window.NEPTUNE_SITTINGS; if(!SXX) return; const prev = SXX.castFor.senate;
   SXX.castFor.senate = (M, out) => { try{ if(prev) out = prev(M, out) || out; const sens = hereNow().filter(c => c && c.krole === "senator" && c.traits && c !== G.you).sort((a, b) => (b.pledge ? 1 : 0) - (a.pledge ? 1 : 0)).slice(0, 3);
-      sens.forEach(c => { if(out.some(p => p.m === c)) return; out.push({m:c, name:c.name, role:"Senator · " + (c.state || ""), party:c.party, state:c.state, temper:c.traits.temper, conv:c.traits.conviction, vanity:c.traits.vanity, warmth:(c.rel && c.rel.warmth) || 0, want:null, stance0:c.pledge && G.day - (c.pledgeDay || 0) < 6 ? (c.pledge > 0 ? 80 : 22) : undefined}); });
+      sens.forEach(c => { if(out.some(p => p.m === c)) return; out.push({m:c, name:c.name, role:"Senator · " + (c.state || ""), party:(polEnsure(c) || {}).party || c.party, state:c.state, temper:c.traits.temper, conv:c.traits.conviction, vanity:c.traits.vanity, warmth:(c.rel && c.rel.warmth) || 0, want:null, stance0:c.pledge && G.day - (c.pledgeDay || 0) < 6 ? (c.pledge > 0 ? 80 : 22) : undefined}); });
     }catch(x){} return out; }; }catch(x){} }, 3000);
 /* ══ 20261016g · NEPTUNE-VISTA: a real sky (clouds, sun, moon, stars), distant ranges and a skyline, textured ground, light shafts indoors, a grade and vignette, and a HUD that gets out of the way ══ */
 const VST = {K:(MODEST ? 0.66 : 1), dome:null, sun:null, moon:null, stars:null, rings:[], sky:null, tex:{}, shafts:null, shaftRoom:null, t:0};
@@ -32473,6 +32476,24 @@ function pressRich(w, d, h, hw){
     for(let i = 0; i < 22; i++) addBox(oak, -hw + 0.03, 2.55, 0.8 + i * 0.4, 0.04, 0.9, 0.12, 0, true);
   }catch(e){ try{ console.warn("press rich", e); }catch(x){} }
 }
+/* ══ 20261016l · every office carries its politics: party, home state and a record, on the plate and in the talk panel, for senators, justices, executive staff and the governor's people as for House members ══ */
+const POL_BG = ["a former county prosecutor", "a farmer's son", "a union organiser", "a newspaper editor", "a lawyer from the capital", "a schoolteacher", "a former mayor", "a banker's daughter", "an army quartermaster", "a doctor with a clinic", "a shipping clerk who got noticed", "a judge's clerk"];
+const POL_ROLE = {senator:"Senator", justice:"Justice", senclerk:"Secretary of the Senate", courtclerk:"Clerk of the Court", marshal:"Marshal of the Court", chief:"Chief of Staff", aide:"Executive aide", gsec:"Governor's secretary", gcounsel:"Counsel to the Governor"};
+function polEnsure(c){
+  if(!c || !c.krole) return null; if(c.pol) return c.pol;
+  const r = rng(seedOf("pol:" + (c.kslot || c.id) + ":" + c.name)), k = c.krole, y = G.you || {}, states = (G.states || []).map(x => x.n);
+  const lean = n => { try{ const S = (G.states || []).find(x => x.n === n); return S && S.lean != null ? S.lean : 0; }catch(e){ return 0; } };
+  const byLean = n => lean(n) > 6 ? "FED" : lean(n) < -6 ? "COM" : (r() < 0.5 ? "FED" : "COM");
+  let party = c.party, state = c.state, title = POL_ROLE[k] || "Official", line = "", terms = 0, margin = 0, nonpartisan = false;
+  if(k === "senator"){ if(c.kslot && /:[01]$/.test(c.kslot) && y.state){ state = y.state; c.state = y.state; } state = state || y.state || states[0]; party = party || (c.kslot && /:[01]$/.test(c.kslot) ? (r() < 0.55 ? y.party || byLean(state) : byLean(state)) : byLean(state)); terms = 1 + Math.floor(r() * 4); margin = 3 + Math.floor(r() * 18); title = "Senator for " + state; line = "term " + terms + ", won by " + margin + "%"; }
+  else if(k === "justice"){ let ec = 0; try{ ec = (c.pos && c.pos.econ) || 0; }catch(e){} party = party || (ec > 12 ? "FED" : ec < -12 ? "COM" : "IND"); state = state || states[Math.floor(r() * states.length)]; terms = 6 + Math.floor(r() * 24); title = "Justice of the Court"; line = "on the bench " + terms + " years · tenure for life"; }
+  else if(k === "chief" || k === "aide"){ const ex = G.exec || {}; party = party || ex.party || y.party || "IND"; state = state || ex.state || states[Math.floor(r() * states.length)]; title = POL_ROLE[k]; line = "serves at the President's pleasure"; }
+  else if(k === "gsec" || k === "gcounsel"){ state = state || y.state || states[0]; let gp = null; try{ const st = scEnsure().st[state]; gp = st && st.gov && st.gov.party; }catch(e){} party = party || gp || (y.office === "gov" ? y.party : byLean(state)); title = POL_ROLE[k] + " of " + state; line = "appointed by the Governor"; }
+  else { nonpartisan = true; party = "IND"; state = state || y.state || states[0]; title = POL_ROLE[k] || "Officer"; line = "a career officer, nonpartisan"; }
+  c.party = party; if(!c.state) c.state = state;
+  return c.pol = {party, state, title, line, bg:POL_BG[Math.floor(r() * POL_BG.length)], nonpartisan, terms, margin};
+}
+function polPlate(c){ const P = polEnsure(c); if(!P) return null; return (POL_ROLE[c.krole] || P.title) + (P.nonpartisan ? " · nonpartisan" : " · " + partyLabel(P.party)) + " · " + P.state; }
 /* ══ 20261016h · rich scenery for every machine: the town, the steps and the plaza were being switched off on anything the game rates 'modest', which is nearly every PC. It is on by default now, watches its own frame rate, and steps back with a note if it cannot keep up. ══ */
 document.addEventListener("click", ev => { try{ const b = ev.target && ev.target.closest && ev.target.closest("[data-rich]"); if(!b) return; ev.stopPropagation(); const lv = +b.getAttribute("data-rich"); SC.lvl = lv; SC.done = false; SC.since = 0; SC.cnt = 0; try{ localStorage.setItem("onum.rich.lvl", String(lv)); }catch(e){} try{ feed(lv ? "Rich picture is on. Materials change the next time you walk into a room." : "Light picture. Materials change the next time you walk into a room."); }catch(e){} try{ settingsCard(); }catch(e){} }catch(e){} }, true);
 /* open air blew out to white on the pavements; bring it down a little */

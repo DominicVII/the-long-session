@@ -4,6 +4,14 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## Every office carries its politics
+
+`20261016l` (on `20261016k`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- Senators, justices' staff, the executive's people and the governor's people now show what House members show: a party, a home state and a record. On the nameplate: 'Senator · Federalist · Nieuw Oranje'. In the talk panel: a party chip, the office, the state and, for senators, their term count, winning margin and background ('term 2, won by 12% · a farmer's son'); executive staff take the President's party and serve at their pleasure; the governor's secretary and counsel take their governor's party and state; clerks and marshals read as nonpartisan career officers. The two senators on the floor for your state are from your state.
+- Senators in the Senate sitting carry their party into the debate.
+- The leftover 'KEEP/OUT' signboards from the old street are gone in the rich town.
+
 ## The Statuary Corridor and the Press Gallery, furnished
 
 `20261016k` (on `20261016j`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
