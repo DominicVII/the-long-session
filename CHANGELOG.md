@@ -4,6 +4,13 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## The gate walls and the Capitol door
+
+`20261016u` (on `20261016t`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- The two long walls either side of the District's arch (and the Steps' arch) are cut stone now: ashlar courses, blind arches, a hanging banner on each wing and ivy at the foot, not a flat white slab.
+- The Capitol door at the top of the East Steps: bronze double doors with eight raised panels and ring pulls, fluted pilasters with lanterns either side, a gold 'THE CAPITOL' frieze over it, a stone threshold and planters.
+
 ## People carry things
 
 `20261016t` (on `20261016s`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.

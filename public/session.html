@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261016t">
+<meta name="onum-build" content="20261016u">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261016t";
+  var STAMP = "20261016u";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -31482,6 +31482,7 @@ function kOfficeRich(id, w, d, h, hw){
   if(id === "floor") floorRich(w, d, h, hw);
   if(id === "senate") senateRich(w, d, h, hw);
   if(id === "court") courtRich(w, d, h, hw);
+  if(id === "steps") stepsRich(w, d, h, hw);
   if(id !== "office") return; const rk = officeRoleKind(); if(!rk) return;
   const wood = matCol(0x5a3b24, .7), dark = matCol(0x1d1f26, .6), gilt = matCol(0xb08b45, .35, .8), green = matCol(0x2f5a3a, .85), tan = matCol(0xc9b27c, .85), cream = matCol(0xf3ecd9, .7), steel = matCol(0x3a4048, .6), velvet = matCol(0x6b1d1d, .9);
   const lampFloor = (x, z) => { addCyl(dark, x, 0.8, z, 0.025, 1.6); addCyl(gilt, x, 0.03, z, 0.14, 0.06); try{ propLamp(x, 1.75, z, 0xffd9a0, 0.45); }catch(e){} };
@@ -32158,8 +32159,34 @@ function gateArch(g, x, z, dirZ, gap, wingHalf, wallH, title, sub){
   const ped = new THREE.Mesh(new THREE.ExtrudeGeometry(sh, {depth:d + 0.3, bevelEnabled:false}), stone); ped.position.set(x, pierH + 1.34, z - (d + 0.3) / 2); g.add(ped);
   /* wings: a stone wall with piers and a capstone, out to the edge */
   [-1, 1].forEach(s => { const x0 = x + s * (gap / 2 + pierW + 0.15), x1 = x + s * wingHalf, cx = (x0 + x1) / 2, w = Math.abs(x1 - x0); if(w < 0.3) return;
-    gateAdd(g, stone, cx, wallH / 2, z, w, wallH, d * 0.6); gateAdd(g, shade, cx, wallH + 0.09, z, w + 0.05, 0.18, d * 0.8); gateAdd(g, shade, cx, 0.15, z + off * (d * 0.3), w, 0.3, 0.14);
+    gateAdd(g, gateAshlarMat(w, wallH), cx, wallH / 2, z, w, wallH, d * 0.6); gateAdd(g, shade, cx, wallH + 0.09, z, w + 0.05, 0.18, d * 0.8); gateWallDress(g, cx, z + off * (d * 0.3 + 0.075), off, w, wallH, s); gateAdd(g, shade, cx, 0.15, z + off * (d * 0.3), w, 0.3, 0.14);
     for(let px = Math.min(x0, x1) + 1.6; px < Math.max(x0, x1) - 0.8; px += 2.6) gateAdd(g, stone, px, wallH / 2, z + off * (d * 0.32), 0.5, wallH, 0.12); });
+}
+/* the gate wings are cut stone, not a white slab: ashlar courses, blind arches, a banner, ivy at the foot */
+function gateAshlarTex(){
+  if(gateAshlarTex.t) return gateAshlarTex.t;
+  return gateAshlarTex.t = rgCanvasTex(256, 256, (g, w, h) => {
+    g.fillStyle = "#cfc4aa"; g.fillRect(0, 0, w, h);
+    const rows = 8, rh = h / rows;
+    for(let r = 0; r < rows; r++){ const off = (r % 2) * 32, bw = 64; for(let c = -1; c < 5; c++){ const x = c * bw + off, y = r * rh, sh = 0.86 + Math.random() * 0.16; g.fillStyle = "rgb(" + Math.round(207 * sh) + "," + Math.round(196 * sh) + "," + Math.round(170 * sh) + ")"; g.fillRect(x + 1.5, y + 1.5, bw - 3, rh - 3); g.fillStyle = "rgba(0,0,0,.07)"; g.fillRect(x + 1.5, y + rh - 5, bw - 3, 3.5); g.fillStyle = "rgba(255,255,255,.1)"; g.fillRect(x + 1.5, y + 1.5, bw - 3, 2); } }
+    for(let i = 0; i < 700; i++){ g.fillStyle = "rgba(" + (Math.random() < 0.5 ? "70,60,40" : "255,250,235") + "," + (Math.random() * 0.06) + ")"; g.fillRect(Math.random() * w, Math.random() * h, 1 + Math.random() * 3, 1 + Math.random() * 3); }
+    g.strokeStyle = "rgba(70,60,40,.35)"; g.lineWidth = 1.2; for(let r = 0; r <= rows; r++){ g.beginPath(); g.moveTo(0, r * rh); g.lineTo(w, r * rh); g.stroke(); }
+  }, null);
+}
+function gateAshlarMat(w, wallH){ const t = gateAshlarTex().clone(); t.needsUpdate = true; t.repeat.set(Math.max(1, w / 2.6), Math.max(1, wallH / 2.0)); return new THREE.MeshStandardMaterial({map:t, roughness:0.92}); }
+function gateWallDress(g, cx, zf, off, w, wallH, s){
+  const rot = off > 0 ? 0 : Math.PI, dark = new THREE.MeshStandardMaterial({color:0x6d6450, roughness:0.95}), stoneL = new THREE.MeshStandardMaterial({color:0xe8e1d0, roughness:0.85});
+  /* blind arches between the pilasters */
+  const n = Math.max(1, Math.floor((w - 1.0) / 3.0)), step = w / n;
+  for(let i = 0; i < n; i++){ const x = cx - w / 2 + step * (i + 0.5), ah = Math.min(2.1, wallH - 1.4), aw = Math.min(1.5, step - 1.1); if(aw < 0.5) continue;
+    gateAdd(g, dark, x, 0.4 + ah / 2, zf, aw, ah, 0.03); const arc = new THREE.Mesh(new THREE.CylinderGeometry(aw / 2, aw / 2, 0.03, 14, 1, false, 0, Math.PI), dark); arc.rotation.x = Math.PI / 2; arc.rotation.z = Math.PI / 2; arc.position.set(x, 0.4 + ah, zf); arc.rotation.set(Math.PI / 2, 0, Math.PI / 2); g.add(arc);
+    gateAdd(g, stoneL, x, 0.38, zf + off * 0.02, aw + 0.25, 0.08, 0.08); }
+  /* a banner hanging from the cornice near the arch end */
+  const bx = cx - s * (w / 2 - 1.0), bm = new THREE.MeshStandardMaterial({color:s < 0 ? 0x7a1f2b : 0x1f3a6b, roughness:0.85, side:THREE.DoubleSide});
+  gateAdd(g, bm, bx, wallH - 1.2, zf + off * 0.04, 0.7, 2.0, 0.02); gateAdd(g, new THREE.MeshStandardMaterial({color:0xc9a24a, roughness:0.4, metalness:0.6}), bx, wallH - 0.15, zf + off * 0.05, 0.9, 0.05, 0.05);
+  gateAdd(g, new THREE.MeshStandardMaterial({color:0xc9a24a, roughness:0.4, metalness:0.6}), bx, wallH - 1.2, zf + off * 0.055, 0.34, 0.34, 0.01);
+  /* ivy at the foot of the wall: dark green patches stepped up the stone */
+  const iv = [0x2f5a35, 0x3d6b3d, 0x264a2c]; for(let i = 0; i < Math.round(w * 2.2); i++){ const x = cx - w / 2 + 0.3 + Math.random() * (w - 0.6), hh = 0.3 + Math.random() * 0.9; gateAdd(g, new THREE.MeshStandardMaterial({color:iv[i % 3], roughness:1}), x, 0.15 + hh / 2, zf + off * 0.03, 0.25 + Math.random() * 0.5, hh, 0.02); }
 }
 function gateStateHouse(g, x, z){
   /* the front of the State House the door was floating in front of: a limestone block with a portico, steps and flags */
@@ -32743,6 +32770,39 @@ function rgFrieze(txt, sub){
   }, null);
 }
 function rgSign(tex, x, y, z, ry, w, h){ const m = new THREE.Mesh(UNIT.plane, new THREE.MeshStandardMaterial({map:tex, roughness:0.6, transparent:true})); m.position.set(x, y, z); m.rotation.y = ry || 0; m.scale.set(w, h, 1); roomGroup.add(m); return m; }
+function rgBronzeDoorTex(){
+  return rgCanvasTex(256, 512, (g, w, h) => {
+    const gr = g.createLinearGradient(0, 0, w, 0); gr.addColorStop(0, "#5a4326"); gr.addColorStop(0.5, "#7a5b32"); gr.addColorStop(1, "#4a3620"); g.fillStyle = gr; g.fillRect(0, 0, w, h);
+    for(let i = 0; i < 900; i++){ g.fillStyle = "rgba(" + (Math.random() < 0.4 ? "60,110,90" : "20,12,6") + "," + (Math.random() * 0.08) + ")"; g.fillRect(Math.random() * w, Math.random() * h, 1 + Math.random() * 4, 2 + Math.random() * 9); }
+    const half = w / 2;
+    for(let lf = 0; lf < 2; lf++){ const x0 = lf * half;
+      for(let r = 0; r < 4; r++){ const y = 18 + r * 122, hh = r === 3 ? 100 : 108;
+        g.fillStyle = "rgba(0,0,0,.45)"; g.fillRect(x0 + 12, y - 2, half - 22, hh + 4);
+        g.fillStyle = "#8a6a38"; g.fillRect(x0 + 15, y, half - 28, hh);
+        g.fillStyle = "rgba(255,230,160,.35)"; g.fillRect(x0 + 15, y, half - 28, 3); g.fillRect(x0 + 15, y, 3, hh);
+        g.fillStyle = "rgba(0,0,0,.35)"; g.fillRect(x0 + 15, y + hh - 3, half - 28, 3); g.fillRect(x0 + half - 16, y, 3, hh);
+        g.strokeStyle = "rgba(255,225,150,.45)"; g.lineWidth = 2; g.strokeRect(x0 + 28, y + 13, half - 54, hh - 26);
+        const cx = x0 + half / 2, cy = y + hh / 2; g.fillStyle = "#c9a24a"; g.beginPath(); g.arc(cx, cy, 15, 0, 6.3); g.fill(); g.fillStyle = "#6a4a22"; g.beginPath(); g.arc(cx, cy, 8, 0, 6.3); g.fill(); g.fillStyle = "#e2c06a"; for(let k = 0; k < 8; k++){ const a = k * Math.PI / 4; g.beginPath(); g.arc(cx + Math.cos(a) * 21, cy + Math.sin(a) * 21, 2.4, 0, 6.3); g.fill(); } }
+    }
+    g.fillStyle = "#2b1c0e"; g.fillRect(half - 2, 0, 4, h);
+    g.strokeStyle = "#d4aa55"; g.lineWidth = 3; g.beginPath(); g.arc(half - 22, 262, 18, 0, 6.3); g.stroke(); g.beginPath(); g.arc(half + 22, 262, 18, 0, 6.3); g.stroke();
+  }, null);
+}
+function stepsRich(w, d, h, hw){
+  try{
+    if(roomGroup.userData.rgSteps) return; roomGroup.userData.rgSteps = 1;
+    const deckY = 1.62, dh = 2.28, fz = d - 0.42 - 0.36, stone = matCol(0xd6cdb6, .9), brass = matCol(0xb08b45, .35, .8), dark = matCol(0x1d1f26, .6);
+    rgSign(rgBronzeDoorTex(), 0, deckY + dh / 2 + 0.01, fz - 0.135, Math.PI, 1.34, 2.26).material.transparent = false;
+    [-1, 1].forEach(sd => { const x = sd * 1.18, z = fz - 0.12;
+      addBox(stone, x, deckY + 0.14, z, 0.44, 0.28, 0.4); addBox(stone, x, deckY + 1.9, z, 0.32, 3.4, 0.28); addBox(stone, x, deckY + 3.7, z, 0.46, 0.18, 0.4); addBox(matCol(0xbfb69e, .9), x, deckY + 3.86, z, 0.52, 0.1, 0.46);
+      for(let k = -1; k <= 1; k++) addBox(matCol(0xb9b09c, .95), x + k * 0.09, deckY + 1.9, z - 0.15, 0.03, 3.3, 0.03, 0, true);
+      const lm = new THREE.MeshStandardMaterial({color:0xfff2d4, emissive:0xffd9a0, emissiveIntensity:0.6, roughness:0.4});
+      addBox(brass, x, deckY + 2.3, z - 0.26, 0.05, 0.05, 0.22, 0, true); addBox(dark, x, deckY + 2.22, z - 0.38, 0.18, 0.06, 0.18, 0, true); addBox(lm, x, deckY + 2.42, z - 0.38, 0.14, 0.28, 0.14, 0, true); addBox(dark, x, deckY + 2.62, z - 0.38, 0.22, 0.06, 0.22, 0, true); });
+    rgSign(rgFrieze("THE CAPITOL", "of the Republic"), 0, deckY + 4.45, fz - 0.1, Math.PI, 3.6, 0.62);
+    addBox(matCol(0xbfb69e, .92), 0, deckY + 0.03, fz - 0.55, 2.0, 0.06, 0.9);
+    [-0.6, 0.6].forEach(x => { addBox(matCol(0x3b6a4a, .9), x * 1.7, deckY + 0.28, fz - 0.9, 0.5, 0.5, 0.4, 0, true); });
+  }catch(e){ try{ console.warn("steps rich", e); }catch(x){} }
+}
 function senateRich(w, d, h, hw){
   try{
     if(roomGroup.userData.rgSenate) return; roomGroup.userData.rgSenate = 1;
