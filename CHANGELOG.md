@@ -4,6 +4,14 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## The Engine finds its feet
+
+`20261016w` (on `20261016v`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- Balanced over a simulated 150 days: the households first lose ground to the machines (mood sinks around the Reasoning stage), then adapt and retrain, and by the time the Engine has been awake a while the country is warmer to it, unless oversight was neglected.
+- Unrest in a state now follows how its households actually feel about the Engine, not a flat creep. Incident reports cost you approval in proportion to the oversight gap, and no longer crush it to zero.
+- Neglecting Oversight is the thing that costs you; funding it is what keeps the incidents rare.
+
 ## The Engine: the Republic's march to a general intelligence
 
 `20261016v` (on `20261016u`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
