@@ -4,6 +4,15 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## Everything new is saved now
+
+`20261017h` (on `20261017g`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- FIXED (important): none of the systems added in the last few days were being saved. The save writes a fixed list of fields, and the Engine, the Academy, the charter and plans, committees, the rival, heat, the Open Line and the Law's book were not on it, so every reload quietly started them over (the Engine re-backfilled from scratch each time). They are on it now. Checked by playing 25 days, saving, reloading the page and loading: everything came back the same.
+- FIXED: the Engine's rehearsals were writing invented events into the towns' logs and pushing real entries out; dry runs no longer write anything, and town logs are capped.
+- FIXED: a memo's forecast was lost on save (it was stored where the save drops it), so a decision made after a reload was never checked as a plan.
+- FIXED: after a reload, people who had greeted you in the previous session would not walk up and speak first for hours; session-clock stamps are cleared on load.
+
 ## Bodies, and the Engine can wake in a new career
 
 `20261017g` (on `20261017f`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
