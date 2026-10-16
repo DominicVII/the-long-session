@@ -4,6 +4,13 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## People carry things
+
+`20261016t` (on `20261016s`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- Folders, briefcases, a coffee (with the occasional sip), a notebook for the press, and a phone checked now and then; a furled umbrella for some on wet days outdoors. Members, press and the public each carry their own mix, decided by who they are, held in the free hand and swinging with the arm.
+- Verified headlessly (items sit in the hand, no page errors); how the raised-arm poses look in motion is not yet checked on a real GPU.
+
 ## The Senate rostrum and the Court's bench
 
 `20261016s` (on `20261016r`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261016s">
+<meta name="onum-build" content="20261016t">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261016s";
+  var STAMP = "20261016t";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -14414,7 +14414,7 @@ function wrapPi(a){
 function animatePerson(p, dt){
   animatePerson0(p, dt);
   p._animAt = performance.now(); if(p.mesh && p.mesh.userData) p.mesh.userData._posed = true;
-  try{ if(p.mesh && p.mesh.parent === peopleGroup) peopleExtra(p, dt); }catch(e){}
+  try{ if(p.mesh && p.mesh.parent === peopleGroup){ peopleExtra(p, dt); carryFrame(p, dt); } }catch(e){}
 }
 function animatePerson0(p, dt){
   if(!p.mesh || p.mesh.parent !== peopleGroup) return;
@@ -32812,6 +32812,76 @@ function courtRich(w, d, h, hw){
     for(let i = 0; i < 9; i++){ const x = -3.8 + i * 0.5; if(Math.abs(x) < 0.5) continue; addCyl(brass, x, 0.5, 2.9, 0.02, 0.98); }
     addBox(oak, -0.6, 0.55, 2.9, 0.04, 0.9, 0.06, 0, true); addBox(oak, 0.6, 0.55, 2.9, 0.04, 0.9, 0.06, 0, true);
   }catch(e){ try{ console.warn("court rich", e); }catch(x){} }
+}
+
+/* ══ 20261016t · THE THINGS PEOPLE CARRY: a folder, a briefcase, a coffee, a phone, a notebook, an umbrella on a wet day ══ */
+const CARRY = {wetAt:0, wet:false};
+function carryWet(){ const n = performance.now(); if(n - CARRY.wetAt < 1500) return CARRY.wet; CARRY.wetAt = n; try{ const k = (wxToday() || {}).k; CARRY.wet = k === "rain" || k === "storm" || k === "snow"; }catch(e){ CARRY.wet = false; } return CARRY.wet; }
+function carryKind(p){ if(p._ck) return p._ck;
+  const id = Math.abs(p.id | 0) || (String(p.id || p.name || "x").length * 37), k = p.kind, r = (id * 2654435761 >>> 0) % 100;
+  if(k === "press") return r < 70 ? "notebook" : (r < 85 ? "phone" : "cup");
+  if(k === "member") return r < 28 ? "folder" : r < 42 ? "briefcase" : r < 62 ? "cup" : r < 70 ? "phone" : "none";
+  return r < 18 ? "cup" : r < 32 ? "phone" : r < 44 ? "briefcase" : r < 56 ? "folder" : "none";
+}
+function carryBuild(p, u){
+  const kind = carryKind(p), id = Math.abs(p.id | 0) || 7, arm = (id % 2) ? u.armL : u.armR, side = arm === u.armL ? -1 : 1;
+  const T = {kind:kind, arm:arm, side:side, id:id, ph:(id % 13) * 1.7, grp:null, umb:null, brief:false};
+  if(!arm || !arm.hand) return T;
+  const hy = arm.hand.position.y, lo = arm.lo, mk = (geo, col, rough, mtl) => new THREE.Mesh(geo, matCol(col, rough == null ? .7 : rough, mtl || 0));
+  const put = (par, geo, col, x, y, z, sx, sy, sz, rough, mtl) => { const m = mk(geo, col, rough, mtl); m.position.set(x, par === g ? y - hy : y, z); m.scale.set(sx, sy, sz); par.add(m); return m; };
+  const g = new THREE.Group(); g.visible = false; g.position.y = hy; lo.add(g); T.grp = g;
+  if(kind === "folder"){
+    const c = [0xd8c48a, 0x2f4a66, 0x7a2a2a, 0xcfc7b0][id % 4];
+    put(g, UNIT.box, c, 0, hy - 0.11, 0.075, 0.022, 0.30, 0.23); put(g, UNIT.box, 0xf3ecd9, side * -0.002, hy - 0.115, 0.08, 0.026, 0.28, 0.21, .9);
+    put(g, UNIT.box, c, 0, hy - 0.11, 0.075, 0.03, 0.30, 0.23);
+  } else if(kind === "briefcase"){
+    const c = [0x3b2a1e, 0x1a1a1e, 0x5a3b24, 0x4a2b1e][id % 4]; T.brief = true;
+    put(g, UNIT.box, c, side * 0.03, hy - 0.22, 0, 0.085, 0.30, 0.42, .55); put(g, UNIT.box, 0xb08b45, side * 0.075, hy - 0.12, 0, 0.012, 0.03, 0.05, .3, .8);
+    put(g, UNIT.box, 0x111111, side * 0.03, hy - 0.04, 0, 0.012, 0.03, 0.16, .6); put(g, UNIT.box, 0x111111, side * 0.03, hy - 0.065, 0.07, 0.012, 0.05, 0.012); put(g, UNIT.box, 0x111111, side * 0.03, hy - 0.065, -0.07, 0.012, 0.05, 0.012);
+  } else if(kind === "notebook"){
+    put(g, UNIT.box, 0x1a1a1e, 0, hy - 0.03, 0.045, 0.016, 0.20, 0.14, .6); put(g, UNIT.box, 0xf3ecd9, side * -0.001, hy - 0.03, 0.045, 0.02, 0.19, 0.13, .9); put(g, UNIT.cyl, 0x9aa0a8, 0, hy + 0.04, 0.07, 0.008, 0.16, 0.008, .3, .8);
+  } else if(kind === "cup"){
+    put(g, UNIT.cyl, 0xf3f0e8, 0, hy + 0.01, 0.045, 0.07, 0.11, 0.07, .5); put(g, UNIT.cyl, 0x8a6a4a, 0, hy + 0.01, 0.045, 0.074, 0.05, 0.074, .8); put(g, UNIT.cyl, 0x2b2b30, 0, hy + 0.075, 0.045, 0.078, 0.014, 0.078, .5);
+  } else if(kind === "phone"){
+    put(g, UNIT.box, 0x1a1c20, 0, hy + 0.0, 0.04, 0.012, 0.15, 0.075, .35, .4); const s = put(g, UNIT.box, 0x2a3a50, 0, hy + 0.0, 0.04, 0.003, 0.135, 0.065, .2); s.material = new THREE.MeshStandardMaterial({color:0x7aa6d8, emissive:0x3a6aa8, emissiveIntensity:0.9, roughness:0.2}); s.position.x = side * 0.0075 * 1; s.position.y = 0;
+    T.screen = s;
+  }
+  /* the umbrella, furled, for the wet days; only some people have one */
+  if(id % 5 === 1 && kind !== "briefcase"){
+    const hand2 = arm.hand, u2 = new THREE.Group(); u2.visible = false; lo.add(u2); T.umb = u2;
+    put(u2, UNIT.cyl, 0x8a6a4a, 0, hy + 0.0, 0.0, 0.03, 0.10, 0.03, .5); put(u2, UNIT.cyl, 0x1c2230, 0, hy - 0.30, 0.0, 0.07, 0.44, 0.07, .8); put(u2, UNIT.cyl, 0x9aa0a8, 0, hy - 0.58, 0.0, 0.012, 0.14, 0.012, .3, .8); u2.position.z = 0.015; u2.rotation.x = -0.1;
+  }
+  return T;
+}
+function carryFrame(p, dt){
+  const m = p.mesh; if(!m) return; const u = m.userData; if(!u || !u.armR || !u.armL) return;
+  if((MODEST && SC.lvl < 1) || G.gfx === "simple") { if(u._cy && u._cy.grp){ u._cy.grp.visible = false; if(u._cy.umb) u._cy.umb.visible = false; } return; }
+  const dist = Math.hypot(cam.x - p.x, cam.z - p.z);
+  if(!u._cy){ if(dist > 22) return; try{ u._cy = carryBuild(p, u); }catch(e){ u._cy = {kind:"none"}; } }
+  const T = u._cy; if(!T.arm || !T.grp) return;
+  const seated = !!(p.sitting && !G.noSit && !G.plainSit), talking = TALK.open && TALK.m === p, speaking = talking || !!(p.say && p.sayT > 0);
+  const moving = Math.hypot((p.tx || p.x) - p.x, (p.tz || p.z) - p.z) > 0.25, t = G.t + T.ph;
+  let R = null; try{ R = ROOMS[G.room]; }catch(e){}
+  const wet = carryWet() && !!(R && R.open);
+  if(T.umb){ T.umb.visible = wet && dist < 26; }
+  const near = dist < 14;
+  const show = T.kind !== "none" && !seated && near && !(T.umb && wet);
+  T.grp.visible = show;
+  if(!show || !near) return;
+  const a = T.arm, k = T.kind;
+  if(k === "briefcase"){ a.up.rotation.x = a.up.rotation.x * 0.3 + 0.04; a.lo.rotation.x = -0.1; a.up.rotation.z += T.side * 0.02; }
+  else if(k === "folder" && !moving && !speaking){ a.up.rotation.x = -0.1; a.lo.rotation.x = -0.28; }
+  else if(k === "notebook" && !speaking){ a.up.rotation.x = -0.32; a.lo.rotation.x = -1.15; a.up.rotation.z = T.side * -0.14; T.grp.rotation.x = 0.35; }
+  else if(k === "cup" && !speaking){
+    const sip = (t % 16) < 2.2 ? Math.sin(((t % 16) / 2.2) * Math.PI) : 0;
+    a.up.rotation.x = -0.35 - sip * 0.5; a.lo.rotation.x = -1.35 - sip * 0.55; a.up.rotation.z = T.side * -0.12;
+    T.grp.rotation.x = -(a.up.rotation.x + a.lo.rotation.x);
+    if(sip > 0.1 && u.headG) u.headG.rotation.x -= sip * 0.12;
+  } else if(k === "phone"){
+    const on = (t % 26) < 8 && !speaking && !talking && !moving;
+    T.grp.visible = on;
+    if(on){ a.up.rotation.x = -0.6; a.lo.rotation.x = -1.2; a.up.rotation.z = T.side * -0.1; T.grp.rotation.x = -(a.up.rotation.x + a.lo.rotation.x) + 0.85; if(u.headG) u.headG.rotation.x += 0.28; }
+  }
 }
 
 /* ══ 20261016h · rich scenery for every machine: the town, the steps and the plaza were being switched off on anything the game rates 'modest', which is nearly every PC. It is on by default now, watches its own frame rate, and steps back with a note if it cannot keep up. ══ */
