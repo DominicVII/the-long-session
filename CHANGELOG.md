@@ -4,6 +4,18 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## A real sky, distant country, light through the windows, and everyday life
+
+`20261016g` (on `20261016f`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- Outdoor scenes (the Steps and the District) have a real sky: a painted gradient with drifting clouds, a sun and moon that cross it by the clock, stars at night, and dusk and snow tints. Three layers of distant mountains, hills and tree line ring the horizon, with a town skyline and the Capitol dome beyond the street, and the ground has a grass texture instead of a flat green plane.
+- Indoors, soft shafts of daylight slant through the windows in daytime and fade with cloud, dusk and night.
+- A vignette and a faint warm-and-cool grade sit over the whole picture.
+- The HUD fades back after a couple of seconds without input (and the 'NOW' hint disappears) and returns the moment you move the mouse or press a key, so the room is what you see.
+- Walking up to someone is calmer: they only speak first when you are standing still, and no more than once a minute.
+- Everyday life: people comment on the weather (rain, snow, frost, wind, heat, fog, storm), the hour (morning coffee, the noon bell and lunch, a long afternoon, the evening exodus), Friday, the bill, and being hungry, to each other where you can hear them.
+- Low-power machines get the same sky and ranges at two thirds the distance, so nothing is clipped by their shorter view.
+
 ## A standing calendar, open caucus and committee rooms, and a Senate of senators
 
 `20261016f` (on `20261016e`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.

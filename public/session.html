@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261016f">
+<meta name="onum-build" content="20261016g">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261016f";
+  var STAMP = "20261016g";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -31631,7 +31631,7 @@ function fwLive(m, why, onText){
 }
 /* closing in on someone is the same as speaking to them: they turn and open the conversation themselves */
 function nearGreet(){
-  if(!G || !G.running || TALK.open || SIT.on || AP.toast || G.t - FW.last < 20) return;
+  if(!G || !G.running || TALK.open || SIT.on || AP.toast || G.t - FW.last < 60 || Math.abs(cam.speed || 0) > 0.45) return;
   let pc = false; try{ pc = !!PC.open; }catch(e){} if(pc) return;
   const here = hereNow().filter(o => o && !o.gone && o !== G.you && o.traits && o.x != null && !o.ohSeat && o.kind !== "player" && o.kind !== "envoy" && !o.wantsWord && apBudget(o) && (!o._ngT || G.t - o._ngT > 150));
   const m = here.find(o => Math.hypot(o.x - cam.x, o.z - cam.z) < 1.9);
@@ -31777,6 +31777,228 @@ setTimeout(() => { try{ const SXX = window.NEPTUNE_SITTINGS; if(!SXX) return; co
   SXX.castFor.senate = (M, out) => { try{ if(prev) out = prev(M, out) || out; const sens = hereNow().filter(c => c && c.krole === "senator" && c.traits && c !== G.you).sort((a, b) => (b.pledge ? 1 : 0) - (a.pledge ? 1 : 0)).slice(0, 3);
       sens.forEach(c => { if(out.some(p => p.m === c)) return; out.push({m:c, name:c.name, role:"Senator · " + (c.state || ""), party:c.party, state:c.state, temper:c.traits.temper, conv:c.traits.conviction, vanity:c.traits.vanity, warmth:(c.rel && c.rel.warmth) || 0, want:null, stance0:c.pledge && G.day - (c.pledgeDay || 0) < 6 ? (c.pledge > 0 ? 80 : 22) : undefined}); });
     }catch(x){} return out; }; }catch(x){} }, 3000);
+/* ══ 20261016g · NEPTUNE-VISTA: a real sky (clouds, sun, moon, stars), distant ranges and a skyline, textured ground, light shafts indoors, a grade and vignette, and a HUD that gets out of the way ══ */
+const VST = {K:(MODEST ? 0.66 : 1), dome:null, sun:null, moon:null, stars:null, rings:[], sky:null, tex:{}, shafts:null, shaftRoom:null, t:0};
+function vRng(seed){ let s = seed >>> 0; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
+function vCanvas(w, h){ const c = document.createElement("canvas"); c.width = w; c.height = h; return c; }
+function vTex(c, repX){ const t = new THREE.CanvasTexture(c); try{ t.encoding = THREE.sRGBEncoding; }catch(e){} t.wrapS = THREE.RepeatWrapping; t.wrapT = THREE.ClampToEdgeWrapping; if(repX) t.repeat.set(repX, 1); try{ t.anisotropy = 4; }catch(e){} return t; }
+/* seamless value noise: the lattice wraps in x */
+function vNoiseField(cx, cy, seed){
+  const r = vRng(seed), L = new Float32Array(cx * (cy + 1)); for(let i = 0; i < L.length; i++) L[i] = r();
+  return (u, v) => { const x = u * cx, y = v * cy, x0 = Math.floor(x), y0 = Math.floor(y), fx = x - x0, fy = y - y0, sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
+    const a = L[(y0 % (cy + 1)) * cx + (x0 % cx)], b = L[(y0 % (cy + 1)) * cx + ((x0 + 1) % cx)], c = L[((y0 + 1) % (cy + 1)) * cx + (x0 % cx)], d = L[((y0 + 1) % (cy + 1)) * cx + ((x0 + 1) % cx)];
+    return a + (b - a) * sx + (c - a) * sy + (a - b - c + d) * sx * sy; };
+}
+function vSkyTexture(){
+  if(VST.tex.sky) return VST.tex.sky;
+  const W = 1024, H = 512, c = vCanvas(W, H), g = c.getContext("2d"), img = g.createImageData(W, H), D = img.data;
+  const f1 = vNoiseField(6, 8, 11), f2 = vNoiseField(12, 16, 23), f3 = vNoiseField(24, 32, 37), f4 = vNoiseField(48, 64, 41);
+  const mix = (a, b, t) => a + (b - a) * t;
+  for(let py = 0; py < H; py++){
+    const v = 1 - py / H, e = v - 0.5;
+    let sr, sg, sb;
+    if(e < 0){ const t = clamp(-e * 4, 0, 1); sr = mix(205, 176, t); sg = mix(226, 196, t); sb = mix(240, 190, t); }
+    else { const t = Math.pow(clamp(e / 0.5, 0, 1), 0.62); if(t < 0.35){ const k = t / 0.35; sr = mix(205, 150, k); sg = mix(226, 196, k); sb = mix(240, 232, k); } else { const k = (t - 0.35) / 0.65; sr = mix(150, 46, k); sg = mix(196, 106, k); sb = mix(232, 186, k); } }
+    for(let px = 0; px < W; px++){
+      const u = px / W; let r = sr, gg = sg, b = sb;
+      if(e > 0.012){
+        const deck = 0.05 / (e + 0.045), n = f1(u, (deck * 0.9) % 1) * 0.5 + f2(u, (deck * 1.7) % 1) * 0.28 + f3(u, (deck * 3.1) % 1) * 0.15 + f4(u, (deck * 6.3) % 1) * 0.07;
+        const fade = clamp(e * 14, 0, 1) * (1 - clamp((e - 0.34) / 0.16, 0, 1) * 0.8);
+        const den = clamp((n - 0.5) * 3.4, 0, 1) * fade;
+        if(den > 0){ const shade = clamp((n - 0.5) * 1.8, 0, 1); const cr = mix(255, 176, shade), cg = mix(255, 186, shade), cb = mix(255, 204, shade); r = mix(r, cr, den * 0.92); gg = mix(gg, cg, den * 0.92); b = mix(b, cb, den * 0.92); }
+      }
+      const i = (py * W + px) * 4; D[i] = r; D[i + 1] = gg; D[i + 2] = b; D[i + 3] = 255;
+    }
+  }
+  g.putImageData(img, 0, 0);
+  return VST.tex.sky = vTex(c, 0);
+}
+function vGlowTexture(){
+  if(VST.tex.glow) return VST.tex.glow; const c = vCanvas(128, 128), g = c.getContext("2d"), r = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+  r.addColorStop(0, "rgba(255,255,255,1)"); r.addColorStop(0.08, "rgba(255,250,235,1)"); r.addColorStop(0.18, "rgba(255,236,190,.55)"); r.addColorStop(0.5, "rgba(255,210,150,.14)"); r.addColorStop(1, "rgba(255,200,140,0)");
+  g.fillStyle = r; g.fillRect(0, 0, 128, 128); return VST.tex.glow = new THREE.CanvasTexture(c);
+}
+function vMoonTexture(){
+  if(VST.tex.moon) return VST.tex.moon; const c = vCanvas(128, 128), g = c.getContext("2d"), r = g.createRadialGradient(64, 64, 10, 64, 64, 64);
+  r.addColorStop(0, "rgba(230,236,255,.35)"); r.addColorStop(1, "rgba(200,215,255,0)"); g.fillStyle = r; g.fillRect(0, 0, 128, 128);
+  g.fillStyle = "#e8ecf6"; g.beginPath(); g.arc(64, 64, 22, 0, 6.3); g.fill(); g.fillStyle = "rgba(150,160,185,.35)"; [[56, 58, 6], [72, 68, 5], [66, 52, 3.5], [58, 74, 3]].forEach(a => { g.beginPath(); g.arc(a[0], a[1], a[2], 0, 6.3); g.fill(); });
+  return VST.tex.moon = new THREE.CanvasTexture(c);
+}
+/* ranges, hills and tree lines: seamless, drawn once */
+function vRidgeTexture(kind){
+  if(VST.tex[kind]) return VST.tex[kind]; const W = 2048, H = 256, c = vCanvas(W, H), g = c.getContext("2d"), r = vRng(kind === "far" ? 5 : kind === "mid" ? 9 : 14);
+  const waves = [], nW = kind === "far" ? 5 : 6; for(let i = 0; i < nW; i++) waves.push([1 + Math.floor(r() * (kind === "far" ? 5 : 9)) * (i + 1), r() * 6.28, (kind === "far" ? 38 : kind === "mid" ? 20 : 8) / (i + 1.2)]);
+  const base = kind === "far" ? 150 : kind === "mid" ? 118 : 70, ridge = x => { let y = base; waves.forEach(w => { y -= Math.abs(Math.sin(2 * Math.PI * w[0] * x / W + w[1])) * w[2] * (kind === "far" ? 1.1 : 0.9); }); return y; };
+  const col = kind === "far" ? ["#a4b6cc", "#8499b4"] : kind === "mid" ? ["#79997a", "#5b7e63"] : ["#4a7048", "#2c4d31"];
+  const grd = g.createLinearGradient(0, 0, 0, H); grd.addColorStop(0, col[0]); grd.addColorStop(0.55, col[1]); grd.addColorStop(1, col[1]);
+  g.fillStyle = grd; g.beginPath(); g.moveTo(0, H); for(let x = 0; x <= W; x += 4) g.lineTo(x, ridge(x)); g.lineTo(W, H); g.closePath(); g.fill();
+  if(kind === "far"){ g.globalCompositeOperation = "source-atop"; const hl = g.createLinearGradient(0, 40, 0, 150); hl.addColorStop(0, "rgba(255,255,255,.55)"); hl.addColorStop(0.35, "rgba(255,255,255,.12)"); hl.addColorStop(1, "rgba(255,255,255,0)"); g.fillStyle = hl; g.fillRect(0, 0, W, H); g.globalCompositeOperation = "source-over"; }
+  if(kind !== "far"){
+    const n = kind === "mid" ? 520 : 900;
+    for(let i = 0; i < n; i++){ const x = r() * W, y0 = ridge(x) + 2 + r() * (kind === "mid" ? 30 : 40), s = (kind === "mid" ? 5 : 8) + r() * (kind === "mid" ? 6 : 12), conif = r() < 0.4, shade = r();
+      g.fillStyle = kind === "mid" ? "rgba(" + Math.round(60 + shade * 30) + "," + Math.round(100 + shade * 40) + "," + Math.round(70 + shade * 20) + ",.9)" : "rgba(" + Math.round(28 + shade * 30) + "," + Math.round(66 + shade * 40) + "," + Math.round(36 + shade * 22) + ",1)";
+      [-W, 0, W].forEach(o => { if(x + o < -20 || x + o > W + 20) return; g.beginPath(); if(conif){ g.moveTo(x + o, y0 - s * 2.1); g.lineTo(x + o + s * 0.7, y0); g.lineTo(x + o - s * 0.7, y0); } else { g.arc(x + o, y0 - s * 0.7, s, 0, 6.3); } g.fill(); }); }
+  }
+  g.globalCompositeOperation = "destination-out"; const fd = g.createLinearGradient(0, H * 0.62, 0, H); fd.addColorStop(0, "rgba(0,0,0,0)"); fd.addColorStop(1, "rgba(0,0,0,1)"); g.fillStyle = fd; g.fillRect(0, 0, W, H); g.globalCompositeOperation = "source-over";
+  return VST.tex[kind] = vTex(c, kind === "far" ? 2 : kind === "mid" ? 3 : 4);
+}
+function vSkylineTexture(){
+  if(VST.tex.sky2) return VST.tex.sky2; const W = 2048, H = 256, c = vCanvas(W, H), g = c.getContext("2d"), r = vRng(77), ground = H - 20;
+  let x = 0; while(x < W){ const bw = 40 + r() * 70, bh = 24 + r() * 52, roof = r() < 0.7; g.fillStyle = "rgb(" + Math.round(80 + r() * 28) + "," + Math.round(86 + r() * 26) + "," + Math.round(88 + r() * 24) + ")"; g.fillRect(x, ground - bh, bw, bh);
+    if(roof){ g.fillStyle = "rgb(" + Math.round(104 + r() * 30) + "," + Math.round(72 + r() * 20) + "," + Math.round(64 + r() * 18) + ")"; g.beginPath(); g.moveTo(x - 3, ground - bh); g.lineTo(x + bw / 2, ground - bh - 16 - r() * 12); g.lineTo(x + bw + 3, ground - bh); g.fill(); }
+    if(r() < 0.45){ g.fillStyle = "#4a5252"; g.fillRect(x + bw * (0.2 + r() * 0.5), ground - bh - 22, 5, 16); }
+    g.fillStyle = "rgba(255,226,150,.7)"; for(let wy = ground - bh + 8; wy < ground - 8; wy += 14) for(let wx = x + 7; wx < x + bw - 8; wx += 13) if(r() < 0.5) g.fillRect(wx, wy, 5, 7);
+    x += bw + 2 + r() * 14; }
+  const dx = W * 0.5; g.fillStyle = "#8a8f90"; g.fillRect(dx - 90, ground - 46, 180, 46); g.fillStyle = "#a0a5a5"; for(let i = -80; i <= 70; i += 20) g.fillRect(dx + i, ground - 42, 6, 38);
+  g.fillStyle = "#b4b8b8"; g.beginPath(); g.ellipse(dx, ground - 52, 44, 52, 0, Math.PI, 0); g.fill(); g.fillRect(dx - 44, ground - 54, 88, 8); g.fillStyle = "#8e9494"; g.fillRect(dx - 12, ground - 124, 24, 28); g.beginPath(); g.moveTo(dx - 14, ground - 124); g.lineTo(dx, ground - 156); g.lineTo(dx + 14, ground - 124); g.fill();
+  [[W * 0.22, 118], [W * 0.78, 132]].forEach(a => { g.fillStyle = "#6e7474"; g.fillRect(a[0] - 8, ground - a[1] + 30, 16, a[1] - 30); g.beginPath(); g.moveTo(a[0] - 10, ground - a[1] + 30); g.lineTo(a[0], ground - a[1] - 22); g.lineTo(a[0] + 10, ground - a[1] + 30); g.fill(); });
+  g.globalCompositeOperation = "destination-out"; const fd = g.createLinearGradient(0, H - 70, 0, H); fd.addColorStop(0, "rgba(0,0,0,0)"); fd.addColorStop(1, "rgba(0,0,0,.95)"); g.fillStyle = fd; g.fillRect(0, 0, W, H);
+  return VST.tex.sky2 = vTex(c, 0);
+}
+function vGrassTexture(){
+  if(VST.tex.grass) return VST.tex.grass; const S = 256, c = vCanvas(S, S), g = c.getContext("2d"), r = vRng(3); g.fillStyle = "#d9d9d2"; g.fillRect(0, 0, S, S);
+  for(let i = 0; i < 2600; i++){ const l = 170 + Math.floor(r() * 80), gr = l + Math.floor(r() * 18); g.fillStyle = "rgba(" + l + "," + gr + "," + (l - 20) + ",.38)"; g.fillRect(r() * S, r() * S, 1 + r() * 2.2, 2 + r() * 5); }
+  for(let i = 0; i < 40; i++){ g.fillStyle = "rgba(255,255,230,.18)"; g.beginPath(); g.arc(r() * S, r() * S, 4 + r() * 12, 0, 6.3); g.fill(); }
+  const t = new THREE.CanvasTexture(c); try{ t.encoding = THREE.sRGBEncoding; }catch(e){} t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(36, 36); try{ t.anisotropy = 4; }catch(e){} return VST.tex.grass = t;
+}
+function vClear(){
+  ["dome", "sun", "moon", "stars", "sky"].forEach(k => { const o = VST[k]; if(o && o.parent) o.parent.remove(o); VST[k] = null; });
+  VST.rings.forEach(o => { if(o.parent) o.parent.remove(o); }); VST.rings = [];
+}
+function vBuildOpen(R){
+  vClear(); if(G && G.gfx === "simple") return; const K = VST.K;
+  const dome = new THREE.Mesh(new THREE.SphereGeometry(100 * K, 40, 24), new THREE.MeshBasicMaterial({map:vSkyTexture(), side:THREE.BackSide, fog:false, depthWrite:false, depthTest:false}));
+  dome.renderOrder = -20; dome.frustumCulled = false; scene.add(dome); try{ scene.children.splice(scene.children.indexOf(dome), 1); scene.children.unshift(dome); }catch(e){} VST.dome = dome;
+  const mk = (tex, size, ord) => { const s = new THREE.Sprite(new THREE.SpriteMaterial({map:tex, transparent:true, depthWrite:false, depthTest:true, fog:false, blending:THREE.AdditiveBlending})); s.scale.set(size, size, 1); s.renderOrder = ord; s.frustumCulled = false; scene.add(s); return s; };
+  VST.sun = mk(vGlowTexture(), 46 * K, -19); VST.moon = mk(vMoonTexture(), 15 * K, -19);
+  { const n = 420, p = new Float32Array(n * 3), r = vRng(99); for(let i = 0; i < n; i++){ const a = r() * 6.283, el = 0.12 + r() * 1.35, d = 96 * K; p[i * 3] = Math.cos(a) * Math.cos(el) * d; p[i * 3 + 1] = Math.sin(el) * d; p[i * 3 + 2] = Math.sin(a) * Math.cos(el) * d; }
+    const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(p, 3)); VST.stars = new THREE.Points(g, new THREE.PointsMaterial({size:1.7, sizeAttenuation:false, color:0xdfe8ff, transparent:true, opacity:0, depthWrite:false, depthTest:true, fog:false})); VST.stars.renderOrder = -19; VST.stars.frustumCulled = false; scene.add(VST.stars); }
+  try{ if(skyMesh) skyMesh.visible = false; if(skyGlow) skyGlow.visible = false; }catch(e){}
+  let nd = false; try{ nd = !!window.ONUM_TOWN_READY; }catch(e){}
+  if(!nd){
+    try{ if(landGroup) landGroup.visible = false; }catch(e){}
+    [["far", 92 * K, 40 * K, 3], ["mid", 78 * K, 26 * K, 2], ["near", 66 * K, 15 * K, 1]].forEach(a => { const g = new THREE.CylinderGeometry(a[1], a[1], a[2], 64, 1, true), m = new THREE.MeshBasicMaterial({map:vRidgeTexture(a[0]), side:THREE.BackSide, transparent:true, fog:false, depthWrite:false}); const o = new THREE.Mesh(g, m); o.renderOrder = -15 + a[3]; o.frustumCulled = false; o.userData.h = a[2]; o.userData.kind = a[0]; scene.add(o); VST.rings.push(o); });
+    const sk = new THREE.Mesh(new THREE.PlaneGeometry(74 * K, 9.2 * K), new THREE.MeshBasicMaterial({map:vSkylineTexture(), transparent:true, fog:false, depthWrite:false})); sk.renderOrder = -12; sk.frustumCulled = false; scene.add(sk); VST.sky = sk;
+  }
+  try{ if(horizonMesh && horizonMesh.material){ horizonMesh.material.map = vGrassTexture(); horizonMesh.material.needsUpdate = true; } }catch(e){}
+}
+{ const _bs = buildSky; buildSky = function(R){ _bs.apply(this, arguments); try{ if(R && R.open) vBuildOpen(R); else vClear(); }catch(e){ try{ console.warn("vista", e); }catch(x){} } }; }
+/* time of day: sky tint, sun and moon on their arcs, stars, ranges in haze */
+function vTime(){
+  const h = (G.minute || 0) / 60, day = clamp((h - 5.5) / 2.2, 0, 1) * clamp((20.5 - h) / 2.2, 0, 1), gold = clamp((h - 16) / 3, 0, 1) * clamp((20.7 - h) / 1.8, 0, 1) + clamp((7.6 - h) / 1.6, 0, 1) * clamp((h - 5) / 1.4, 0, 1);
+  let gl = 1; try{ gl = wxGloom(); }catch(e){}
+  let snow = false; try{ const w = wxToday(); snow = !!(w && w.cover > 0 && w.s === "winter"); }catch(e){}
+  const night = 1 - day, t = new THREE.Color();
+  const tint = k => { t.setRGB(lerp(0.07, 1, day) * (1 + gold * 0.28), lerp(0.09, 1, day) * (1 - gold * 0.16), lerp(0.18, 1, day) * (1 - gold * 0.34)); t.multiplyScalar(lerp(1, gl, 0.85) * (k || 1)); return t; };
+  if(VST.dome) VST.dome.material.color.copy(tint(1.02));
+  const ang = clamp((h - 6) / 12, -0.3, 1.3) * Math.PI, el = Math.sin(ang);
+  if(VST.sun){ VST.sun.userData.rel = new THREE.Vector3(-Math.cos(ang) * 78 * VST.K, (Math.max(el, -0.2) * 72 + 4) * VST.K, 64 * VST.K); VST.sun.material.opacity = clamp(el * 3, 0, 1) * lerp(1, 0.28, 1 - gl); VST.sun.material.color.setRGB(1, lerp(1, 0.72, gold), lerp(1, 0.5, gold)); VST.sun.scale.setScalar(lerp(46, 70, gold) * VST.K); }
+  const ma = ang + Math.PI, mel = Math.sin(ma);
+  if(VST.moon){ VST.moon.userData.rel = new THREE.Vector3(-Math.cos(ma) * 78 * VST.K, (Math.max(mel, -0.2) * 72 + 4) * VST.K, 64 * VST.K); VST.moon.material.opacity = clamp(mel * 3, 0, 1) * clamp(night * 1.4, 0, 1) * gl; }
+  if(VST.stars) VST.stars.material.opacity = clamp(night * 1.3 - 0.25, 0, 1) * gl;
+  VST.rings.forEach(o => { const k = o.userData.kind; tint(k === "far" ? 1 : k === "mid" ? 0.95 : 0.9); const c = o.material.color; c.copy(t); if(snow){ c.r *= 1.5; c.g *= 1.55; c.b *= 1.7; } else if(gold > 0.05) c.lerp(new THREE.Color(1, 0.72, 0.55), gold * 0.25); });
+  if(VST.sky){ tint(0.95); VST.sky.material.color.copy(t); }
+}
+function vFollow(){
+  const c = camera.position;
+  if(VST.dome){ VST.dome.position.copy(c); VST.dome.rotation.y = VST.t * 0.0016; }
+  [VST.sun, VST.moon].forEach(o => { if(o && o.userData.rel) o.position.copy(o.userData.rel).add(c); });
+  VST.rings.forEach(o => { o.position.set(c.x, o.userData.h / 2 - 0.4, c.z); });
+  if(VST.sky) VST.sky.position.set(c.x, 4.2 * VST.K, c.z + 60 * VST.K);
+  if(VST.stars) VST.stars.position.copy(c);
+}
+/* shafts through the windows of a lit room */
+function vShaftTexture(){ if(VST.tex.shaft) return VST.tex.shaft; const c = vCanvas(64, 128), g = c.getContext("2d"), gr = g.createLinearGradient(0, 0, 0, 128); gr.addColorStop(0, "rgba(255,244,214,.95)"); gr.addColorStop(0.6, "rgba(255,236,190,.38)"); gr.addColorStop(1, "rgba(255,230,180,0)"); g.fillStyle = gr; g.fillRect(0, 0, 64, 128);
+  g.globalCompositeOperation = "destination-in"; const gx = g.createLinearGradient(0, 0, 64, 0); gx.addColorStop(0, "rgba(0,0,0,0)"); gx.addColorStop(0.3, "rgba(0,0,0,1)"); gx.addColorStop(0.7, "rgba(0,0,0,1)"); gx.addColorStop(1, "rgba(0,0,0,0)"); g.fillStyle = gx; g.fillRect(0, 0, 64, 128); return VST.tex.shaft = new THREE.CanvasTexture(c); }
+function vBuildShafts(id){
+  if(VST.shafts){ if(VST.shafts.parent) VST.shafts.parent.remove(VST.shafts); VST.shafts = null; }
+  VST.shaftRoom = id; const R = id ? ROOMS[id] : null; if(!R || R.open || (G && G.gfx === "simple") || id === "visit") return;
+  const L = R.light; if(L !== "left" && L !== "right" && L !== "high") return;
+  const grp = new THREE.Group(), hw = R.w / 2, n = L === "high" ? 4 : 3, mat = new THREE.MeshBasicMaterial({map:vShaftTexture(), transparent:true, opacity:0, blending:THREE.AdditiveBlending, depthWrite:false, side:THREE.DoubleSide, fog:false});
+  for(let i = 0; i < n; i++){
+    const z = R.d * (0.2 + 0.6 * (i + 0.5) / n), w = L === "high" ? 1.7 : 1.5; let top, bot;
+    if(L === "high"){ const x = (i % 2 ? 1 : -1) * hw * (0.3 + 0.15 * (i % 2)); top = [[x - w, R.h * 0.97, z], [x + w, R.h * 0.97, z]]; bot = [[x - w + 1.1, 0.02, z + 3.2], [x + w + 1.1, 0.02, z + 3.2]]; }
+    else { const s = L === "left" ? -1 : 1; top = [[s * (hw - 0.1), R.h * 0.78, z - w], [s * (hw - 0.1), R.h * 0.78, z + w]]; bot = [[s * (hw - 5.2), 0.02, z - w + 1], [s * (hw - 5.2), 0.02, z + w + 1]]; }
+    const P = [top[0], top[1], bot[1], bot[0]], g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(P.flat()), 3)); g.setAttribute("uv", new THREE.BufferAttribute(new Float32Array([0, 1, 1, 1, 1, 0, 0, 0]), 2)); g.setIndex([0, 1, 2, 0, 2, 3]);
+    const m = new THREE.Mesh(g, mat); m.renderOrder = 8; m.frustumCulled = false; grp.add(m);
+  }
+  grp.userData.mat = mat; scene.add(grp); VST.shafts = grp;
+}
+let _vLast = 0;
+function vFrame(now){
+  requestAnimationFrame(vFrame);
+  try{
+    if(!G || !G.running || document.hidden || !camera) return; VST.t = (now || 0) / 1000;
+    const R = ROOMS[G.room]; if(!R) return;
+    if(R.open){
+      if(VST.shaftRoom) vBuildShafts(null);
+      if(!VST.dome && G.gfx !== "simple" && now - _vLast > 1500){ _vLast = now; try{ vBuildOpen(R); }catch(e){} }
+      if(VST.dome){ if(now - (VST._tt || 0) > 400){ VST._tt = now; vTime(); } vFollow(); }
+    } else {
+      if(VST.dome) vClear();
+      if(VST.shaftRoom !== G.room) vBuildShafts(G.room);
+      if(VST.shafts){ const h = (G.minute || 0) / 60, day = clamp((h - 6.5) / 2, 0, 1) * clamp((18.4 - h) / 2, 0, 1); let gl = 1; try{ gl = wxGloom(); }catch(e){} VST.shafts.userData.mat.opacity = day * gl * (0.17 + 0.05 * Math.sin(VST.t * 0.5)) * (gl > 0.9 ? 1 : 0.5); }
+    }
+  }catch(e){}
+}
+setTimeout(() => { try{ requestAnimationFrame(vFrame); }catch(e){} }, 2000);
+setTimeout(() => { try{ if(G && G.gfx !== "simple"){ vSkyTexture(); ["far", "mid", "near"].forEach(vRidgeTexture); vSkylineTexture(); vGrassTexture(); vGlowTexture(); vMoonTexture(); vShaftTexture(); } }catch(e){} }, 3500);
+/* grade, vignette, and a HUD that lets you look */
+setTimeout(() => { try{
+  const st = document.createElement("style"); st.textContent =
+    "#vGrade{position:absolute;inset:0;pointer-events:none;z-index:2;background:radial-gradient(ellipse at 50% 46%,rgba(0,0,0,0) 52%,rgba(8,10,16,.34) 100%),linear-gradient(180deg,rgba(255,226,190,.05),rgba(40,60,100,.05));mix-blend-mode:multiply}" +
+    "body.hud-calm .ui-toolbar,body.hud-calm .hud,body.hud-calm #kClock{transition:opacity .6s;opacity:.28}body.hud-calm #job{transition:opacity .8s;opacity:0}" +
+    "body.hud-calm .ui-toolbar:hover,body.hud-calm .ui-toolbar:focus-within,body.hud-calm .hud:hover,body.hud-calm #kClock:hover{opacity:1}";
+  document.head.appendChild(st);
+  const sc = el("scene"); if(sc && !el("vGrade")){ const d = document.createElement("div"); d.id = "vGrade"; sc.appendChild(d); }
+  let lastMove = 0; const calm = () => { try{ document.body.classList.toggle("hud-calm", !!(G && G.running && performance.now() - lastMove > 2500 && !TALK.open)); }catch(e){} };
+  ["mousemove", "keydown", "pointerdown", "touchstart"].forEach(ev => window.addEventListener(ev, () => { lastMove = performance.now(); document.body.classList.remove("hud-calm"); }, {passive:true}));
+  setInterval(calm, 700);
+}catch(e){} }, 2200);
+/* ══ 20261016g · everyday life: the weather, the hour and the week are in the air, and people say so to each other ══ */
+const LIFE = {last:-999, day:0, noon:0};
+const LIFE_WX = {
+  rain:[["Mind the floor by the door. It is a pond.", "I have been wet since the steps.", "Whoever said umbrellas work was lying."], ["It was dry when I left home.", "Stand further from the radiator. You are steaming.", "Hang it on the stand. No, the other stand."]],
+  snow:[["They have not cleared the steps again.", "My feet have not been warm since Tuesday.", "Look at it come down. Nothing will get done today."], ["Then we shall have a quorum of the willing.", "I walked. The cab would not start.", "It is pretty. I will say that once and never again."]],
+  frost:[["I could see my breath in the corridor.", "The pipes in my building are singing."], ["Wear the scarf, then.", "The cloakroom stove is the only honest thing in this building."]],
+  wind:[["Did you see the flags? Straight out.", "My hat is in the river, I believe."], ["It is a good day for losing a hat.", "At least it blows the talk away."]],
+  heat:[["The fans in the cloakroom are losing.", "I am not going to wear the jacket. Write that down."], ["Open a window.", "Nobody ever votes sensibly above eighty degrees."]],
+  fog:[["I could not see the dome from the road.", "Fog like this, you could lose a bill in it."], ["Then we shall all be late together.", "Something ought to be lost in it. The budget, perhaps."]],
+  storm:[["Did you hear that? The whole roof.", "I do not like the sound of the dome in a storm."], ["It has stood a hundred years.", "Then do not stand under it."]],
+  overcast:[["A low grey lid on the whole town.", "It has been like this all week."], ["Nobody is in a hurry.", "Good light for reading, at least."]]
+};
+const LIFE_HR = {
+  morning:[["Is there coffee, or only opinions?", "I read the overnight file in the cab and regret it.", "Too early for a vote and too late to hide."], ["The urn is on the second floor and it is brown.", "Nobody is awake. Speak softly.", "Have mine. I have had three."]],
+  lunch:[["Are you eating, or are you standing there?", "The cloakroom has soup, and a view of everyone's business.", "I will vote anything if I am fed first."], ["Soup. It is always soup.", "Not at my desk. I have learned.", "Save me a chair."]],
+  late:[["I have been in this building eleven hours.", "If I hear one more amendment I will leave the Republic.", "My feet have opinions."], ["Go home. They will find you tomorrow.", "Say it to the clerk, not me.", "One more hour. For the record."]],
+  evening:[["I am going home before they find another meeting.", "The lamps are on. That means go.", "Nobody ever changed a mind after six."], ["Then go. I will lock the room.", "Take the side door. The press are on the steps.", "I will say you were here."]]
+};
+function lifeContext(){
+  const h = (G.minute || 0) / 60, out = [], w = (G.day - 1) % 7;
+  let wx = null; try{ wx = wxToday(); }catch(e){}
+  if(wx && wx.k && wx.k !== "clear" && LIFE_WX[wx.k]) out.push({k:"wx:" + wx.k, a:LIFE_WX[wx.k][0], b:LIFE_WX[wx.k][1], w:2});
+  if(h >= 8 && h < 9.6) out.push({k:"morning", a:LIFE_HR.morning[0], b:LIFE_HR.morning[1], w:2});
+  if(h >= 12 && h < 13.6) out.push({k:"lunch", a:LIFE_HR.lunch[0], b:LIFE_HR.lunch[1], w:3});
+  if(h >= 16 && h < 17.6) out.push({k:"late", a:LIFE_HR.late[0], b:LIFE_HR.late[1], w:2});
+  if(h >= 17.6 && h < 20) out.push({k:"evening", a:LIFE_HR.evening[0], b:LIFE_HR.evening[1], w:3});
+  if(w === 4) out.push({k:"friday", a:["Is it Friday? It is Friday. Everyone to the district.", "They scheduled nothing on a Friday. A miracle."], b:["Then why are we both still here?", "My train is at four. Do not let anyone call a vote."], w:2});
+  const b = G.bill && !G.bill.done ? G.bill : null; if(b) out.push({k:"bill", a:["The count on the " + b.title + " has not moved since lunch.", "Somebody is lying about the " + b.title + " and I do not know who.", "Everyone has read the headline on the " + b.title + " and nobody the text."], b:["That is what the whip is for.", "Ask me after the roll call.", "I read the text. I wish I had not."], w:1});
+  return out;
+}
+function lifeTick(){
+  if(!G || !G.running || !G.you || TALK.open || SIT.on || G.t - LIFE.last < 45) return;
+  try{ if(PC.open) return; }catch(e){}
+  const h = Math.floor((G.minute || 0) / 60);
+  if(h === 12 && LIFE.noon !== G.day && dayType() === "session"){ LIFE.noon = G.day; try{ feed("The noon bell. The cloakroom fills and the corridors thin."); }catch(e){} }
+  const here = hereNow().filter(m => m && !m.gone && m !== G.you && m.traits && m.x != null && !m.ohSeat && m.kind !== "envoy" && !m.wantsWord);
+  if(here.length < 2) return;
+  const ctx = lifeContext(); if(!ctx.length) return;
+  LIFE.last = G.t; let tot = 0; ctx.forEach(c => tot += c.w); let r = Math.random() * tot, c = ctx[0]; for(const x of ctx){ r -= x.w; if(r <= 0){ c = x; break; } }
+  const a = pick(here), b = pick(here.filter(m => m !== a)); if(!b) return;
+  /* people who are hungry say so, whatever the hour */
+  let la = pick(c.a), lb = pick(c.b); try{ if(a.sent && a.sent.hunger > 0.78){ la = pick(["I have not eaten since breakfast and I am being civil about it.", "If there is a sandwich in this building I will vote for whoever has it."]); lb = pick(["Cloakroom. Twelve to one. Go.", "Here. Half. Do not tell anyone."]); } }catch(e){}
+  try{ overhear(a, b, la, lb); }catch(e){}
+}
 function kCalText(){
   try{ const D = docketToday().slice().sort((x, z) => x.h - z.h), m = G.minute || 0; if(!D.length) return "Nothing is scheduled for your chair today.";
     return D.map(d => { const st = kOnceToday(d.key) ? "done" : m < d.h * 60 - 60 ? "later" : m >= 19 * 60 ? "missed" : "now", where = (function(){ const sr = d.sit ? String(d.sit).split(":")[0] : null; const r = (sr && ROOMS[sr] && ["senate", "court", "committee", "caucus", "floor"].indexOf(sr) >= 0 ? sr : DK_ROOM[d.key]) || homeRoom(); return ROOMS[r] ? ROOMS[r].t : r; })();
@@ -36114,6 +36336,7 @@ function drainHouseOne(w, dt){
     try{ nearGreet(); }catch(e){}
     try{ stdTick(); }catch(e){}
     try{ stdLive(); }catch(e){}
+    try{ lifeTick(); }catch(e){}
   } else if(lane === 10){
     try{ tieTick(w); }catch(e){}
   } else if(lane === 11){
