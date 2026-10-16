@@ -4,6 +4,16 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## They speak first, and the arguments keep going
+
+`20261016e` (on `20261016d`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- Walk up to someone, touch them or click them and they open the conversation themselves: a line in their own voice, typed into the transcript and spoken aloud. Standing close without clicking is enough: they turn, say something, and a small prompt offers to talk. That counts as you speaking to them. With a live model attached, the opening is generated in their own words.
+- Every sitting (Senate, House floor, committee, caucus, court, open hours, press) now has a named chair. The chair calls objections in order, whoever has said least first, with a lean toward its own side. After a speech the people who disagree answer one another in turn, instead of one speech and then on to the next step.
+- When you hold the chair (governor in open hours, President, Speaker, Whip) you recognize who speaks next, or let the argument run another round. When an NPC holds it you can ask the chair to let someone answer; the chair may refuse.
+- Petitioners in open hours keep competing for the same budget with each other the same way.
+- Sitting speakers now speak aloud, and with a live model the replies are in their own words.
+
 ## The country is one organism, and there is a clock
 
 `20261016d` (on `20261016c`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.

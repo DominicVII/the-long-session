@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261016d">
+<meta name="onum-build" content="20261016e">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261016d";
+  var STAMP = "20261016e";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -31598,6 +31598,51 @@ setTimeout(() => { try{
   const a0 = SX.after.govoffice;
   SX.after.govoffice = (S, good, t, carried) => { const r = a0 ? a0(S, good, t, carried) : ""; try{ const O = orgEnsure(), q = O.up[G.you.state] || []; S.x.cast.filter(p => p.petitionId).forEach(p => { const pet = q.find(x => x.id === p.petitionId); if(!pet) return; if(p.stance >= 60 || p.promised){ if(!orgFund(pet, "state")) orgRefer(pet, false); } else { const T = orgTownOf(pet); if(T) T.log.unshift({d:G.day, t:"The governor heard " + pet.mayor + " and put it off."}); } }); }catch(e){ console.warn("org after", e); } return r; };
 }catch(e){ console.warn("org hooks", e); } }, 0);
+/* ══ 20261016e · they speak first: walk up, touch or click and the other person opens, aloud and in type; that counts as you speaking to them ══ */
+const FW = {n:0, last:-999};
+function fwSupply(m){
+  let l = ""; try{ l = String(convHook(m) || "").trim(); }catch(e){}
+  if(!l) l = pick(["There you are.", "I was hoping you would come by.", "Do you have a moment?"]);
+  l = l.replace(/\s+/g, " "); const cut = l.search(/[.!?]\s/); if(cut > 20 && cut < 160) l = l.slice(0, cut + 1);
+  if(l.length > 170) l = l.slice(0, 167).replace(/\s+\S*$/, "") + "…";
+  if(!/[.!?…"”]$/.test(l)) l += ".";
+  return cap(l);
+}
+function fwLive(m, why, onText){
+  try{ const LT = window.onumLiveTalk; if(!LT || typeof LT.reply !== "function") return; const tok = ++FW.n;
+    Promise.resolve(LT.reply({npcId:m.id, channel:"face", text:"(" + why + " They have not said a word yet. You speak first, unprompted, in your own words: whatever is on your mind right now. One or two sentences. Do not answer as though you were asked a question.)"}))
+      .then(r => { if(tok === FW.n && r && r.live && r.text) onText(String(r.text).replace(/^["“]|["”]$/g, "").slice(0, 320)); }).catch(() => {});
+  }catch(e){}
+}
+{ const _ot2 = openTalk;
+  openTalk = function(m){
+    const r = _ot2.apply(this, arguments);
+    try{
+      if(!m || !m.traits || m === G.you || !TALK.open || TALK.m !== m || m.kind === "envoy") return r;
+      m.met = true; m.lastHail = G.t; m._fwT = G.t;
+      const opening = (el("tkSay") && el("tkSay").textContent) || "";
+      if(opening){ try{ speakAt(m, opening); }catch(e){} }
+      fwLive(m, "The player has just walked up to you, touched or clicked you to start talking.", t => { if(!TALK.open || TALK.m !== m) return; appendMsg("them", t, surname(m.name)); setSay(t, ""); try{ speakAt(m, t); }catch(e){} renderTalk(); });
+    }catch(e){}
+    return r;
+  };
+}
+/* closing in on someone is the same as speaking to them: they turn and open the conversation themselves */
+function nearGreet(){
+  if(!G || !G.running || TALK.open || SIT.on || AP.toast || G.t - FW.last < 20) return;
+  let pc = false; try{ pc = !!PC.open; }catch(e){} if(pc) return;
+  const here = hereNow().filter(o => o && !o.gone && o !== G.you && o.traits && o.x != null && !o.ohSeat && o.kind !== "player" && o.kind !== "envoy" && !o.wantsWord && apBudget(o) && (!o._ngT || G.t - o._ngT > 150));
+  const m = here.find(o => Math.hypot(o.x - cam.x, o.z - cam.z) < 1.9);
+  if(!m) return;
+  FW.last = G.t; m._ngT = G.t;
+  const l = fwSupply(m);
+  m.faceUntil = G.t + 8; m.say = l; m.sayT = 6; m.sayTo = "you";
+  try{ ledgerEnsure(m); ledgerTell(G.you, m, "I walked up to them and they spoke first."); }catch(e){}
+  try{ if(m.rel) ripple(m, 1, null, 0); }catch(e){}
+  try{ speakAt(m, l); }catch(e){}
+  apSpeak(m, {t:l, k:"greet"}, null); apToast(m, {t:l, k:"greet"});
+  try{ momentLog(m.name + " saw you come near and spoke first."); }catch(e){}
+}
 function kCalText(){
   try{ const D = docketToday().slice().sort((x, z) => x.h - z.h), m = G.minute || 0; if(!D.length) return "Nothing is scheduled for your chair today.";
     return D.map(d => { const st = kOnceToday(d.key) ? "done" : m < d.h * 60 - 60 ? "later" : m >= 19 * 60 ? "missed" : "now", where = (function(){ const sr = d.sit ? String(d.sit).split(":")[0] : null; const r = (sr && ROOMS[sr] && ["senate", "court", "committee", "caucus", "floor"].indexOf(sr) >= 0 ? sr : DK_ROOM[d.key]) || homeRoom(); return ROOMS[r] ? ROOMS[r].t : r; })();
@@ -35932,6 +35977,7 @@ function drainHouseOne(w, dt){
     try{ purseLive(w); }catch(e){}
     try{ kAmbient(); }catch(e){}
     try{ orgTick(); }catch(e){}
+    try{ nearGreet(); }catch(e){}
   } else if(lane === 10){
     try{ tieTick(w); }catch(e){}
   } else if(lane === 11){
@@ -38867,7 +38913,7 @@ try{
   const side = p => p.stance >= 60 ? 1 : p.stance <= 40 ? -1 : 0;
   const call = function(p){ return p.m ? (p.m.house === "senate" ? "the Senator from " : "the member for ") + p.state : "the " + p.role.replace(/ \(witness\)/, ""); }
   const L = function(p, text, to, tag, gloss){ return {p, who:p ? p.sn : null, text, to:to == null ? null : to, tag:tag || "position", gloss:gloss || ""}; }
-  const chairLine = function(S, text, gloss){ return {p:null, who:S.D.chair, text, to:null, tag:"procedural", gloss:gloss || "The chair keeping order: who speaks, when, and for how long."}; }
+  const chairLine = function(S, text, gloss){ let who = S.D.chair; try{ if(S.x) who = chairOf(S).label || who; }catch(e){} return {p:null, who, text, to:null, tag:"procedural", gloss:gloss || "The chair keeping order: who speaks, when, and for how long."}; }
   const argue = function(S, p, M){
     const s = side(p);
     if(s > 0) return L(p, one(["I rise for " + M.q + ". " + one(["Ask anyone in " + p.state + ".", "The figures are in the file and they hold.", "We have waited two sessions for this."]),
@@ -38988,6 +39034,93 @@ try{
   }
   const p_or = function(p){ return p.state || "my state"; }
 
+  /* ── the chair, and arguments that keep going ──
+     Whoever holds the chair (an NPC, or you when the sitting is yours) calls objections in order. Speakers answer each
+     other in their own words until nobody is left with an unanswered objection, instead of one speech per step. */
+  const chairMember = function(room){
+    const Mm = (G.members || []).filter(x => x && !x.gone && x.kind === "member");
+    if(room === "floor") return Mm.find(x => x.post === "speaker") || null;
+    if(room === "caucus") return Mm.find(x => x.post === "whip") || null;
+    if(room === "committee") return Mm.find(x => x.post === "judic" || x.post === "ways") || null;
+    if(room === "senate") return Mm.find(x => x.post === "leader") || null;
+    return null;
+  };
+  const chairOf = function(S){
+    if(S.x.chair) return S.x.chair;
+    let you = false, k = null; try{ k = heldOffice(); }catch(e){}
+    if(S.room === "govoffice" && k === "gov") you = true;
+    if(S.room === "exec" && k === "pres") you = true;
+    try{ if(S.room === "floor" && G.you && G.you.post === "speaker") you = true; if(S.room === "caucus" && G.you && G.you.post === "whip") you = true; }catch(e){}
+    const mem = you ? null : chairMember(S.room), cp = mem ? S.x.cast.find(p => p.m === mem) || null : null;
+    let lean = 0; try{ if(cp) lean = side(cp); else if(mem && G.bill && !G.bill.done) lean = alignment(mem, G.bill) >= 0 ? 1 : -1; }catch(e){}
+    const label = you ? "You (in the chair)" : mem ? (S.room === "floor" ? "Speaker " : S.room === "senate" ? "Senator " : "Chair ") + sn(mem.name) : S.D.chair;
+    return S.x.chair = {you, label, mem, p:cp, lean};
+  };
+  const chairHTML = function(S){ try{ const ch = chairOf(S); return '<p class="sx-q"><b>In the chair:</b> ' + esc(ch.you ? "you" : ch.label) + ' <small>· ' + (ch.you ? "you call the objections, in the order you choose" : "calls objections in order, fewest words first" + (ch.lean ? ", leaning to its own side" : "")) + '</small></p>'; }catch(e){ return ""; } };
+  const RETORT = {
+    facts:["Read the schedule, not the speech. The figure for {s} is not the one {q} gave.", "That is not in the record, {q}. I have the record in front of me.", "{q} quoted one line of a six-page file. Read the rest.", "Give me the section number, {q}. I will wait."],
+    cost:["And who pays for {s}, {q}? Name the number.", "It sounds cheap until the bill reaches {st}.", "Every dollar for {s} is a dollar not spent on {w}.", "Show me where the money comes from, {q}, and I will listen."],
+    own:["{st} tried it {q}'s way once. It did not end well.", "Ask the people of {st} what they make of that.", "I answer to {st}, and {st} wants {w}.", "{q} has not been to {st} in a year."],
+    principle:["There is a principle here, {q}, and it is not for sale.", "I did not come here to split the difference on something I believe is wrong.", "If we do this once, we have done it for good.", "Some things are not a matter of degrees."],
+    pers:["{q} argued the opposite last session. The Journal is here.", "With respect, {q} has not been consistent.", "That is rich, coming from {q}.", "Say that to the people who sent you, {q}."],
+    agree:["I will give {q} that much. It is the rest I cannot swallow.", "{q} is right about the cost and wrong about the conclusion.", "On that, {q} and I agree, which makes the rest of it harder.", "Fairly put. I still want {w}."],
+    ally:["Let me add to what {q} said: {w}.", "{q} has it right, and I will say why: {st} needs it.", "I stand with {q} on {s}, and I will not be moved off it.", "What {q} said. And more besides."],
+    cool:["I hear {q}, and I am still in the middle. Convince me about {s}.", "If {q} can show me {w}, I can move. Nobody has yet.", "I came undecided and I am leaving that way unless someone gives me a reason."]
+  };
+  const retort = function(S, p, q, M){
+    const hot = p.temper > 62, sp = side(p), sq = side(q), used = S.x.usedR = S.x.usedR || {};
+    let cats = sp === 0 ? ["cool", "agree", "facts"] : sp === sq ? ["ally", "agree", "own"] : hot ? ["pers", "facts", "own", "principle"] : ["facts", "cost", "principle", "agree", "own"];
+    if(p.rival === q.id || q.rival === p.id) cats = ["pers", "pers", "facts"].concat(cats);
+    const fill = t => t.replace(/\{q\}/g, q.sn).replace(/\{s\}/g, M.short || "this").replace(/\{st\}/g, p.state || "my state").replace(/\{w\}/g, String(p.want || "an answer").replace(/[.\s]+$/, ""));
+    let text = null;
+    for(let tries = 0; tries < 12 && !text; tries++){ const bank = RETORT[one(cats)]; const t = fill(one(bank)); if(!used[t]){ used[t] = 1; text = t; } }
+    if(!text) text = fill(one(RETORT.facts));
+    return L(p, text, q.id, sp === sq && sp !== 0 ? "support" : sp === 0 ? "position" : "oppose",
+      (hot ? p.sn + " is hot and answers at once. " : p.sn + " takes the floor and answers. ") + (sp === sq && sp !== 0 ? "An ally piling on." : sp === 0 ? "Still undecided, and saying what it would take." : p.sn + " stands against " + (sq === sp ? "nobody here" : "this") + ".") + (p.rival === q.id ? " They are rivals, so expect it to get personal." : ""));
+  };
+  const floorState = function(S){ let f = S.x.floor; if(!f || f.step !== S.i) f = S.x.floor = {step:S.i, rounds:0, ans:{}, closed:false, refused:false}; return f; };
+  const floorCap = function(S){ const C = S.x.cast; const avg = C.reduce((a, p) => a + p.temper, 0) / Math.max(1, C.length); return S.x.brisk ? 1 : 2 + (avg > 58 ? 1 : 0); };
+  const floorCands = function(S, last){
+    const f = floorState(S), ans = f.ans[last.id] || [], ch = chairOf(S);
+    const cs = S.x.cast.filter(c => !c.gone && (c.m || (c.case && last.case)) && c !== last && ans.indexOf(c.id) < 0 && S.x.silenced !== c.id && ((c.case && last.case) || c.rival === last.id || last.rival === c.id || side(c) * side(last) < 0 || (side(c) === 0 && c.temper > 55)));
+    return cs.sort((a, b) => (a.spoke * 2 - (ch.lean && side(a) === ch.lean ? 1.5 : 0) - a.temper / 100) - (b.spoke * 2 - (ch.lean && side(b) === ch.lean ? 1.5 : 0) - b.temper / 100));
+  };
+  /* with a live model on the other end, they say it in their own words; the scripted line is the fallback */
+  const liveFill = function(S, ln, p, vs){
+    try{ const LT = window.onumLiveTalk; if(!LT || typeof LT.reply !== "function" || !p || !p.m) return;
+      const said = vs && vs.lastText ? vs.name + ' just said: "' + String(vs.lastText).slice(0, 200) + '". Answer them directly' : "Speak up, unasked";
+      Promise.resolve(LT.reply({npcId:p.m.id, channel:"sitting", text:"(" + S.D.title + ": " + S.x.M.q + ". " + said + ", in your own words, one or two sentences, standing where you stand. Nobody has prompted you.)"}))
+        .then(r => { if(r && r.live && r.text && !ln.shown) ln.text = String(r.text).replace(/^["“]|["”]$/g, "").slice(0, 300); }).catch(() => {});
+    }catch(e){}
+  };
+  const floorRound = function(S, first, force){
+    const f = floorState(S), M = S.x.M, ch = chairOf(S), last = S.x.lastSpeaker != null ? S.x.cast[S.x.lastSpeaker] : null, out = [];
+    if(!last) return out;
+    if(f.closed && !force) return out;
+    let cands = floorCands(S, last); if(first) cands = [first].concat(cands.filter(c => c !== first));
+    if(!cands.length || (!force && f.rounds >= floorCap(S))){
+      if(f.rounds && !f.closed){ f.closed = true; out.push(chairLine(S, ch.you ? "Nobody else seeks the floor on that. We move on." : cands.length ? "Order. The chair has heard enough on that point. We move on." : "Order. Everyone who wished to answer on that point has been heard. We move on.")); }
+      return out;
+    }
+    f.closed = false; f.rounds++; const ans = f.ans[last.id] = f.ans[last.id] || [];
+    const n = first ? 1 : Math.min(2, cands.length);
+    for(let i = 0; i < n; i++){
+      const c = cands[i]; ans.push(c.id);
+      out.push(chairLine(S, ch.you ? "You recognize " + call(c) + "." : "The chair recognizes " + call(c) + (side(c) * side(last) < 0 ? ", who objects to " + last.sn + "'s point." : ", who asks to answer " + last.sn + "."),
+        ch.you ? "You are in the chair: the order of objections is yours." : "The chair calls objections in order: whoever has said least goes first" + (ch.lean ? ", with a lean toward its own side" : "") + "."));
+      const cc = c.case && last.case, a = cc ? caseCross(S, c, last) : retort(S, c, last, M); out.push(a); liveFill(S, a, c, last);
+      if(first || Math.random() < 0.7){ const b = cc ? caseReply(S, last, c) : retort(S, last, c, M); out.push(b); liveFill(S, b, last, c); }
+    }
+    if(out.length > 4 && Math.random() < 0.4) out.push(chairLine(S, "Order. One at a time."));
+    return out;
+  };
+  const floorAuto = function(S){
+    const st = S.D.steps[S.i]; if(["open", "question", "motion"].indexOf(st) < 0 || S.picked || S.x.talking) return false;
+    if(chairOf(S).you) return false;
+    const ln = floorRound(S, null, false); if(!ln.length) return false;
+    S.x.queue = S.x.queue.concat(ln); S.lines = S.x.queue; return true;
+  };
+
   /* ── your moves ── */
   const movesFor = function(S, step){
     const C = S.x.cast.filter(p => !p.gone), last = S.x.lastSpeaker != null ? C.find(p => p.id === S.x.lastSpeaker) : null;
@@ -39002,6 +39135,10 @@ try{
       add("silent", "Stay silent and watch", null, 0, "You learn who is loud. No cost.");
       return A;
     }
+    { const ch = chairOf(S); if(["open", "question", "motion"].indexOf(step) >= 0 && last){ const cs = floorCands(S, last), f = floorState(S);
+        if(ch.you){ cs.slice(0, 2).forEach(c => add("recog", "Recognize " + c.sn + " to answer " + last.sn, c, 0, "You hold the chair. " + c.sn + " has been waiting to answer; the others keep their objections until you call them."));
+          if(cs.length) add("letrun", "Let the argument run another round", null, 0, "You call the next objectors in order without taking a side.");
+        } else if(cs.length && !f.refused && (f.closed || f.rounds >= floorCap(S))) add("letrun", "Ask the chair to let " + cs[0].sn + " answer " + last.sn, cs[0], 0.15, ch.label + " has the gavel. The chair may refuse; you cannot call the order yourself." ); } }
     if(S.x.aide) add("aide", "Have " + S.x.aide.sn + " argue your side", null, 0.05, S.x.aide.name + ", your highest-influence " + (S.x.aide.official ? "administration aide" : "party member") + ", argues your line in their own words while you stay seated.");
     if(step === "vote" || step === "ruling"){
       const t = S.x.tally();
@@ -39023,7 +39160,7 @@ try{
     if(mid && side(mid) <= 0) add("whisper", "Whisper a deal to " + mid.sn + " (" + mid.want + ")", mid, 0.3, "Costs the war chest; turns them if it holds.");
     if(pro && step !== "deliberate") add("yield", "Yield your time to " + pro.sn, pro, 0.05, pro.sn + " argues your case in their own words.");
     add("silent", "Stay silent", null, 0, "The room argues on without you; it drifts toward the louder side.");
-    return A.slice(0, 7);
+    return A.slice(0, 8);
   }
   const STAT = {settle:[{standing:1, influence:1}, {}], question:[{standing:2, influence:1, heat:-3}, {standing:-2, heat:5}], object:[{influence:2}, {standing:-1, influence:-1}], side:[{standing:1}, {}], amend:[{standing:2, approval:1}, {standing:-1}],
     cut:[{influence:2, heat:4}, {standing:-2, heat:8}], whisper:[{pledge:1, funds:-2}, {funds:-2, standing:-2}], yield:[{standing:1}, {}], silent:[{}, {}], aide:[{standing:1}, {}], limits:[{standing:1}, {}], openfloor:[{approval:1}, {}],
@@ -39125,6 +39262,7 @@ try{
       S.x.cast.forEach(p => { if(p.m){ p.m.sayT = 0; } });
       const p = line.p; if(!p || !p.m) return;
       const m = p.m, tgt = line.to === "you" || line.to == null ? null : S.x.cast[line.to];
+      try{ speakAt(m, line.text); }catch(e){}
       m.say = line.text.slice(0, 140); m.sayT = beatMs() / 1000 + 0.6; m.sayTo = tgt && tgt.m ? tgt.m.id : "you"; m.faceUntil = (G.t || 0) + 4; m._sxTalk = performance.now();
       if(tgt && tgt.m){ tgt.m._sxLook = m.id; tgt.m.faceUntil = (G.t || 0) + 4; }
       if(m.room === G.room){ const tx = tgt && tgt.m ? tgt.m.x : (typeof cam !== "undefined" && cam ? cam.x : m.x), tz = tgt && tgt.m ? tgt.m.z : (typeof cam !== "undefined" && cam ? cam.z : m.z + 1); m._sxYaw = Math.atan2(tx - m.x, tz - m.z); }
@@ -39198,7 +39336,8 @@ try{
     if(S.x.silenced != null) q = q.filter(l => !l.p || l.p.id !== S.x.silenced);
     if(S.x.brisk && q.length > 3) q = q.slice(0, 3 + (Math.random() < 0.5 ? 1 : 0));
     S.x.queue = q.length ? q : [chairLine(S, "Order.")];
-    S.lines = S.x.queue; S.li = 0;
+    S.lines = S.x.queue; S.li = 0; S.x.floor = {step:S.i, rounds:0, ans:{}, closed:false, refused:false};
+    S.x.queue.slice(0, 4).forEach(ln => { if(ln.p && ln.p.m && !ln.p.case && ln.tag !== "procedural") liveFill(S, ln, ln.p, ln.to != null && ln.to !== "you" ? S.x.cast[ln.to] : null); });
     spend(Math.round(S.D.min / S.D.steps.length), Math.round(S.D.en / S.D.steps.length));
     draw(); beat();
   }
@@ -39208,15 +39347,21 @@ try{
     const c = CLr(); if(c && c.paused){ SIT.timer = setTimeout(beat, 400); return; }
     if(S.li < S.x.queue.length){
       const ln = S.x.queue[S.li++];
-      if(ln.p){ ln.p.spoke++; S.x.lastSpeaker = ln.p.id; }
-      record(S, ln); face(S, ln); S.x.said.push(ln);
+      if(ln.p){ ln.p.spoke++; S.x.lastSpeaker = ln.p.id; ln.p.lastText = ln.text; }
+      ln.shown = true; record(S, ln); face(S, ln); S.x.said.push(ln);
       draw();
       SIT.timer = setTimeout(beat, beatMs());
-    } else draw();
+    } else if(floorAuto(S)){ draw(); SIT.timer = setTimeout(beat, Math.min(900, beatMs())); } else draw();
   }
   const pick = function(ci){
     const S = SIT.on; if(!S || !S.x || S.picked) return;
     const mv = (S.x.moves || [])[ci]; if(!mv) return;
+    if(mv.k === "recog" || mv.k === "letrun"){
+      const ch = chairOf(S), f = floorState(S), c = mv.tgt != null ? S.x.cast[mv.tgt] : null; let ln;
+      if(!ch.you && Math.random() < 0.15 + (ch.p ? ch.p.temper / 300 : 0.1)){ f.refused = true; f.closed = true; ln = [chairLine(S, "The chair has heard enough on that point. We will move on.")]; S.res = ch.label + " refuses. " + (c ? c.sn + " does not get the floor." : ""); }
+      else { f.closed = false; ln = floorRound(S, c, true); if(c) shift(S, c, 2, "was given the floor"); S.res = ch.you ? "You call the next in order." : "The chair lets them go on."; }
+      S.x.moves = null; S.x.queue = S.x.queue.concat(ln); S.lines = S.x.queue; beat(); return;
+    }
     const before = S.x.cast.map(p => p.stance);
     const r = doMove(S, mv);
     S.picked = true;
@@ -39348,7 +39493,7 @@ try{
     card.innerHTML = '<div class="eyebrow">' + esc(S.D.title) + ' · step ' + (S.i + 1) + ' of ' + S.D.steps.length + (S.prep ? ' · you read the file' : '') + ' · pace ' + esc((CLr() && CLr().pace) || "normal") + '</div>' +
       '<h1>' + SIT_STEP_T[st] + '</h1><div class="sit__prog">' + prog + '</div>' +
       '<p class="sx-q"><b>The question:</b> ' + esc(S.x.M.q) + ' · <span class="sx-c">' + t.yes + (S.watch ? ' for it · ' : ' with you · ') + t.mid + ' undecided · ' + t.no + ' against</span>' + (S.watch ? ' · <i>you are in the gallery</i>' : '') + (S.x.amended ? ' · <i>compromise on the table</i>' : '') + '</p>' +
-      (S.x.aide ? '<p class="sx-q"><b>Your aide:</b> ' + esc(S.x.aide.name) + ' <small>' + esc(S.x.aide.role || "") + ' \u00b7 influence ' + Math.round(S.x.aide.infl) + '</small> \u2014 speaks for your line when you do not.</p>' : '') +
+      chairHTML(S) + (S.x.aide ? '<p class="sx-q"><b>Your aide:</b> ' + esc(S.x.aide.name) + ' <small>' + esc(S.x.aide.role || "") + ' \u00b7 influence ' + Math.round(S.x.aide.infl) + '</small> \u2014 speaks for your line when you do not.</p>' : '') +
       '<div class="sx-grid"><div class="sx-cast">' + S.x.cast.map(p => meter(p, S)).join("") + '</div><div class="sit__lines sx-lines">' + lines + '</div></div>' +
       (S.res ? '<p class="dream">' + esc(S.res) + '</p>' : '') + (st === "adjourn" && S.out ? '<p class="dream">' + esc(S.out) + '</p>' + recap(S) : '') +
       (done && st !== "adjourn" && !S.picked && !S.watch ? '<p class="sx-hint">Your move. Hover a choice to see what it does; it shifts the meters live.</p>' : '') +
