@@ -4,6 +4,14 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## Anomalous emergence
+
+`20261017n` (on `20261017m`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- **The Engine develops abilities nobody designed.** Six emergent abilities (reading every dialect, modelling its own mistakes, writing its own tools, finding the phrasing that moves a reader, proposing experiments, seeing second and third consequences) appear as its capability, compute and makers pass thresholds, with some needing Academy discoveries. When one appears is not forecastable: a small chance each day once the conditions are met.
+- **Each one is met with a reasoned move.** The Engine decides whether to tell you, from its care, its autonomy, Oversight's strength, whether you have posted a reason article and how much you rely on it. What it tells you is in the log and on the Engine card; what it keeps quiet is found later by an audit, costs you approval, and until then makes its forecasts less reliable and the safety gap wider.
+- Emergent abilities raise the Engine's growth, calibration or forecasting where they should, and each one starts a small chain in the world. They save with the game.
+
 ## The Engine's rules hold, and the reception waits for you
 
 `20261017m` (on `20261017l`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.

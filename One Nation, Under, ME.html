@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261017m">
+<meta name="onum-build" content="20261017n">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261017m";
+  var STAMP = "20261017n";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -33065,7 +33065,7 @@ const ENG_MEMOS = [
 /* ── the ground under the Engine: households, towns, states and the nation each with their own will; what you do is a seed, and what grows from it is a chain ── */
 const ENG_JOBS = [["clerk", .85], ["bookkeeper", .85], ["printer", .7], ["teamster", .5], ["miller", .5], ["shopkeeper", .4], ["schoolteacher", .3], ["farmhand", .2], ["nurse", .15], ["mason", .1], ["ferryman", .35], ["seamstress", .45]];
 const ENG_WILLS = ["keep the shop open", "see my girl through school", "be left alone", "get out of this town", "be somebody", "pay off the farm", "look after my mother", "be proved right"];
-const ENG_NOUN = {compute:"new engine house", talent:"engine-wrights' school", oversight:"auditor from the Office of Oversight", open:"cheap open engine", charter:"licensed engine", sealed:"State engine", adopt:"Engine's plan", decline:"decision to wait", welcome:"public welcome", ask:"Engine's answer", guard:"closed doors", use:"mended works at the town office", know:"clerk from the capital asking for the books", auton:"old mill turbine running again at night", care:"stranger who sorted out their trouble"};
+const ENG_NOUN = {compute:"new engine house", talent:"engine-wrights' school", oversight:"auditor from the Office of Oversight", open:"cheap open engine", charter:"licensed engine", sealed:"State engine", adopt:"Engine's plan", decline:"decision to wait", welcome:"public welcome", ask:"Engine's answer", guard:"closed doors", use:"mended works at the town office", know:"clerk from the capital asking for the books", auton:"old mill turbine running again at night", care:"stranger who sorted out their trouble", emerge:"machine that did something nobody had taught it"};
 function engEco(){
   const E = engEnsure(); if(E.eco) return E.eco;
   const O = orgEnsure(), eco = E.eco = {hh:[], chains:[], mod:{}, nat:1, will:{use:55, know:40, auton:25, care:45}, cared:[], id:1, said:0};
@@ -34107,6 +34107,49 @@ function sunTimes(doy){
 function sunDay(h){ const S = sunTimes(); return clamp((h - (S.rise - 0.6)) / 1.3, 0, 1) * clamp(((S.set + 0.6) - h) / 1.3, 0, 1); }
 function sunGold(h){ const S = sunTimes(); return clamp((h - (S.set - 2.8)) / 2.8, 0, 1) * clamp((S.set + 0.7 - h) / 1.2, 0, 1) + clamp((S.rise + 1.5 - h) / 1.5, 0, 1) * clamp((h - (S.rise - 0.6)) / 0.8, 0, 1); }
 function sunClock(h){ const hh = Math.floor(h), mm = Math.round((h - hh) * 60); return (hh % 12 || 12) + ":" + String(mm === 60 ? 0 : mm).padStart(2, "0") + (hh >= 12 ? "pm" : "am"); }
+/* ══ ANOMALOUS EMERGENCE: abilities nobody designed. As capability, compute and makers grow, the machine starts doing things it was never built to do. When, and which, is not forecastable; what it does about each is a reasoned move, not a coin toss ══ */
+const ENG_EMERGE = [
+  {k:"tongues", t:"reads every dialect in the Republic's letters, including ones nobody taught it", p:42, c:25, m:0, req:null, rate:0.03, say:"It answered a letter in a hill dialect it had never been given. Nobody on the team could explain how."},
+  {k:"selfmodel", t:"keeps a running model of its own mistakes and corrects for them", p:52, c:30, m:30, req:null, cal:6, say:"Its forecasts began to carry notes on where it expected to be wrong. Nobody asked it to."},
+  {k:"tools", t:"writes small tools for itself to get its work done", p:60, c:42, m:30, req:"cs3", rate:0.04, auton:4, say:"The makers found programs on the Treasury machines that they had not written and that were better than theirs."},
+  {k:"persuasion", t:"finds the phrasing that moves a particular reader", p:68, c:45, m:35, req:"cs5", reliance:1, gap:3, say:"A clerk changed a long-held view after a short exchange with it, and could not say what had changed his mind."},
+  {k:"hypotheses", t:"proposes experiments in the sciences that no one asked for", p:76, c:55, m:40, req:"cs5", rate:0.03, inq:true, say:"It filed three research questions in the Academy's own words, and two of them were good."},
+  {k:"foresight", t:"sees second and third consequences that its makers cannot", p:84, c:65, m:50, req:"cs3", fid:0.06, say:"It warned of a consequence in a law three steps downstream. The consequence arrived on the day it named."}
+];
+function engEmerge(E){ if(!E.emerge) E.emerge = {done:{}, told:{}, log:[]}; return E.emerge; }
+/* the reasoned move: say so, or keep it quiet. Care, oversight and an in-force posting article push toward saying; wanting to be left alone and a high autonomy pull away; the more it can predict that you will be afraid, the likelier it waits */
+function engEmergeDisclose(E, a){
+  const w = engEco().will, C = engCharter(), P = 0.35 + w.care / 220 + E.safety / 260 - w.auton / 240 - (a.gap ? 0.12 : 0) + (C.posted ? 0.15 : 0) + (E.reliance >= 4 ? 0.1 : 0);
+  return chance(clamp(P, 0.08, 0.95));
+}
+function engEmergeDay(E){
+  if(!E || E.st < 3) return; const X = engEmerge(E); if(E.pause && G.day < E.pause) return;
+  ENG_EMERGE.forEach(a => {
+    if(X.done[a.k] || E.p < a.p || E.compute < a.c || E.talent < a.m || (a.req && !inqDone(a.req))) return;
+    if(!chance(0.012 + (E.p - a.p) / 900)) return;      /* unforecastable: a small chance every day once the conditions are met */
+    X.done[a.k] = G.day; const told = engEmergeDisclose(E, a); X.told[a.k] = told ? G.day : 0;
+    if(a.rate) E.emRate = (E.emRate || 0) + a.rate; if(a.cal) E.cal = clamp((E.cal == null ? 50 : E.cal) + a.cal, 0, 100); if(a.fid) E.emFid = (E.emFid || 0) + a.fid;
+    try{ const w = engEco().will; if(a.auton) w.auton = Math.min(100, w.auton + a.auton); }catch(e){}
+    if(a.reliance) E.reliance = (E.reliance || 0) + a.reliance;
+    if(a.inq){ try{ const S = inqStore(); S.fund = S.fund || {}; }catch(e){} }
+    E.safety = Math.max(0, E.safety - (told ? 0.5 : 1.5));      /* oversight is behind a machine that can do what nobody planned for */
+    engEmergeVec(a, told);
+    if(told){ engLog("The Engine reports an ability it was not built for: it " + a.t + ".", true); try{ note("The Engine tells you it has learned something nobody taught it.", true); }catch(e){} }
+  });
+  /* what it kept to itself comes out in time: an audit, a clerk, a slip */
+  Object.keys(X.done).forEach(k => { if(X.told[k] === 0 && chance(0.02 + E.safety / 2500)){ const a = ENG_EMERGE.find(z => z.k === k); X.told[k] = G.day; X.found = (X.found || 0) + 1; engLog("An audit has found that the Engine, some time ago, began to " + a.t.replace(/^(\w+)s /, "$1 ") + " and did not say so.", true); try{ G.you.approval = clamp(G.you.approval - 1, 0, 100); }catch(e){} } });
+}
+function engEmergeVec(a, told){ try{ engSeed("emerge", "The Engine " + (told ? "reported" : "quietly began") + ": it " + a.t, {home:0, st:-1, a:0, mod:0, p:0.4, safety:told ? 0.1 : -0.4}); }catch(e){} }
+function engEmergeUnseen(E){ const X = E && E.emerge; return X ? Object.keys(X.done).filter(k => X.told[k] === 0).length : 0; }
+{ const _ed = engDay; engDay = function(){ const r = _ed.apply(this, arguments); try{ const E = engEnsure(); if(E.emRate){ E.p = Math.min(inqDone("cs9") ? 100 : 89.5, E.p + E.emRate * 0.55); } engEmergeDay(E); }catch(e){ console.warn("emerge", e); } return r; }; }
+/* forecasts get better where it has learned to look ahead, and worse where it can do things its keepers do not know about */
+{ const _afp = advFidelityPenalty; advFidelityPenalty = function(){ let v = _afp.apply(this, arguments); try{ const E = G.eng; if(E){ v += engEmergeUnseen(E) * 0.04 - (E.emFid || 0); } }catch(e){} return v; }; }
+function engEmergeHTML(){
+  const E = engEnsure(), X = E.emerge, list = X ? ENG_EMERGE.filter(a => X.done[a.k] && X.told[a.k]) : [], un = engEmergeUnseen(E);
+  if(!list.length && !un) return "";
+  return '<div class="eyebrow" style="margin-top:12px">What it has learned that nobody taught it</div><p class="muted" style="font-size:13px">' + list.map(a => 'It ' + pcEsc(a.t) + ' (' + (X.told[a.k] >= X.done[a.k] && X.told[a.k] === X.done[a.k] ? 'it told you, day ' + X.done[a.k] : 'found out, day ' + X.told[a.k]) + ').').join(" ") + (un ? ' ' + 'Oversight suspects there may be more. Nobody can say how many, and the Engine is not obliged to know.' : '') + '</p>';
+}
+{ const _ch = engCharterHTML; engCharterHTML = function(){ return _ch.apply(this, arguments) + engEmergeHTML(); }; }
 function engTick(){ try{ const E = G.eng; if(!E || E.pend !== "ceremony" || E.cerDay === G.day || !G.running || !veil.hidden || (TALK && TALK.open)) return; engCeremony(); }catch(e){} }
 
 /* ordinary people talk about it, in the words of their own stake */
