@@ -4,6 +4,17 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## Quieter, lighter, and the Open Line stays honest
+
+`20261017j` (on `20261017i`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- **Ambient sound sleeps when you do.** Opening a menu, switching tabs or turning it Off now suspends the audio engine instead of leaving the loops running behind everything.
+- **The District sky and gates are built once.** Walking Capitol, Steps and District used to build a fresh dome, moon, stars and gate each trip and leave the old ones in graphics memory; they are now hung back up. Memory growth per lap fell from about 26 to 38 objects to about 4 to 16.
+- **Engine Room racks are one lit panel each** instead of 54 separate lamps, and the lamp materials are shared.
+- **The Open Line only calls the AI where it can be heard.** Away from the Engine Room the machine answers in its plain voice, and a stranger's line is no longer filed as something you said.
+- **The Open Line redraws only when something new is said**, so selecting or copying text in it no longer gets wiped every second.
+- Outside voices reach the Open Line straight after loading a save.
+
 ## The sun keeps real hours
 
 `20261017i` (on `20261017h`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
