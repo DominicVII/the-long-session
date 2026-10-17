@@ -4,6 +4,17 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## The Engine's rules hold, and the reception waits for you
+
+`20261017m` (on `20261017l`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- **Policy stances last.** A state's stance on the machines faded 20 times a day instead of once, so laws and subsidies vanished within a week and states could pass the same law again and again. Fixed, and a state stops at a cap.
+- **The posture is a policy, not a switch.** It can be changed once every ten days; flipping it back and forth no longer farms approval or floods the plan list.
+- **The Engine's reception waits for your answer.** Closing the awakening card without choosing no longer loses it for good; it is offered again the next day until you decide.
+- **A suspension suspends the Engine** for five full days: no plans begun, no standing plans filed, no incidents, no memos.
+- **Machines make bread cheaper, not dearer.** The Engine and the fertiliser discovery were pushing the loaf price up (and clamping famine prices down to 1.5).
+- **Seats from an empty caucus.** If nobody from your party sits to vote, the leadership decides on your standing instead of refusing you for a fee. Committee invitations now reach Senators and Governors too, as the rest of the committee system already did.
+
 ## Shadows follow the sun, settings you can find, and a talk box that behaves
 
 `20261017l` (on `20261017k`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
