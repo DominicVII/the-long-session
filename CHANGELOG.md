@@ -4,6 +4,21 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## Committees as they really work, and an open frontier with no ceiling
+
+`20261017o` (on `20261017n`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- **Committees follow the real thing.**
+  - The majority holds more than its share of every committee.
+  - Your party's steering committee ranks everyone who asks on seniority, fit with the committee's field, their state's claim and standing, against real rivals for the open seats.
+  - First-termers do not get Ways and Means, and incumbents are protected from being moved.
+  - Chairs go by seniority: jumping over senior members can win, but they remember it. Chairs have a term limit. In the minority there is no chair to run for.
+  - The card shows how many seats your party holds of the number it is allowed.
+- **The Engine has no ceiling.** The 89.5 cap is gone. Past 100 on the scale, its growth keeps counting on a separate measure, uncapped.
+- **The Academy has an open frontier.** Beyond the planned tree, real open problems become questions once their foundations are settled: room-temperature superconductors, fusion, protein folding, interpretability, dark matter, and about two dozen more. Instrument anomalies turn up (about half are errors, about half new physics). Settled results combine into new ones, again and again.
+- **The people who work the science and the Engine both push it forward,** the Engine in proportion to what it can do. Findings have real effects: energy, food, climate, health, computing, forecasting.
+- **Emergence has no list.** Every discovery can make the Engine do something nobody planned, without end. It decides whether to say so, as before.
+
 ## Anomalous emergence
 
 `20261017n` (on `20261017m`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
