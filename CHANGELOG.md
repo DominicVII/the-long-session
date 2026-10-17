@@ -4,6 +4,25 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## Heads stay on, the clock opens the calendar, and the Engine stops knowing too much
+
+`20261017k` (on `20261017j`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- **People no longer spin their heads.** Anyone looking at a phone, taking a sip or yawning had a tilt added to their head every frame, so it climbed to about 320° and the head turned over. The tilt is now a bounded pose (about 15° down for a phone).
+- **Click the clock to open the standing calendar.** It never worked: the click was wired before the clock existed, and the clock ignored the mouse. **Go** on a sitting now closes the calendar and lets the game run, instead of walking you into the room behind a frozen card.
+- **Settings, Hear a voice, plays again.** The new rule that people speak only when invited was silencing the preview.
+- **Asking the Engine with no AI model running** now gives its own stage-true answers, not a generic line from a stock NPC, and files no gossip about a reply nobody wrote.
+- **The Engine and far envoys are not told they are hungry** or that they have a household.
+- **Engine Room and Caucus Room chairs sit on the floor** (and on the dais) instead of hovering.
+- **A room's furnishing flags go with its furniture,** so a room rebuilt after being dropped from memory is furnished again, not bare.
+- **The Engine's secrets stay secret.**
+  - A weekly chain no longer prints exact hidden numbers (capability +0.5, oversight -0.6) that reveal what caused it.
+  - Hidden acts are described by what a household saw (a mended office, a clerk asking for the books), not by whose act it was.
+  - An Oversight briefing now arrives three days after you ask. It is a snapshot of that day, covers only what had happened by then and your own state's households, and gives a noisy national mood.
+  - Plan verdicts show the call (about N, near enough or not near), not the hidden measurement.
+  - The Engine card and its awakening show capability and oversight as about the nearest five.
+  - Your own chains no longer count how many consequences have happened that nobody told you about, and the charter counts only the refusals it told you of.
+
 ## Quieter, lighter, and the Open Line stays honest
 
 `20261017j` (on `20261017i`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.

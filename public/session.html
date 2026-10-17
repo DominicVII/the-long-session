@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261017j">
+<meta name="onum-build" content="20261017k">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261017j";
+  var STAMP = "20261017k";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -11883,8 +11883,10 @@ function propCoatStand(x,z){
     addBox(matCol(coats[i%3],.95), x+Math.cos(a)*0.12, 0.78, z+Math.sin(a)*0.12, 0.30,0.72,0.14, a, true);
   }
 }
+/* a room's furnishing flags travel with its furniture: when the pieces leave the live group (or the group is cleared) the flags go too, so a rebuilt room is furnished again, not left bare */
+function rgFlagsReset(g){ try{ if(g && g.userData) Object.keys(g.userData).forEach(k => { if(/^rg[A-Z]/.test(k) || k === "vStatues") delete g.userData[k]; }); }catch(e){} }
 function clearRoom(){
-  try{ if(roomGroup && roomGroup.userData) Object.keys(roomGroup.userData).forEach(k => { if(/^rg[A-Z]/.test(k)) delete roomGroup.userData[k]; }); }catch(e){}
+  rgFlagsReset(roomGroup);
   try{ if(!PROC.on && G.members) G.members.forEach(m => { if(m.sitting) m.sitting = false; }); }catch(e){}
 
   TICKERS.length = 0;
@@ -12271,6 +12273,7 @@ function stashLiveRoom(){
   kit.userData.shell = true;
   kit.userData.furnished = !!_roomFurnished;
   while(roomGroup.children.length) kit.add(roomGroup.children[0]);
+  rgFlagsReset(roomGroup);
   ROOM_KITS[id] = kit;
   try{ relinkRoomRefs(); }catch(e){}
   ROOM_KIT_IDS = ROOM_KIT_IDS.filter(x => x !== id);
@@ -12404,6 +12407,7 @@ function takeRoomKit(id){
   /* Heal flags from a prior warmAhead / stash. */
   if(!kit.userData.shell && kit.children.length >= 4) kit.userData.shell = true;
   while(kit.children.length) roomGroup.add(kit.children[0]);
+  rgFlagsReset(kit);
   _roomBuiltId = id;
   _roomFurnished = !!kit.userData.furnished;
   try{ relinkRoomRefs(); }catch(e){}
@@ -31816,10 +31820,11 @@ function stdCalCard(){
   const body = '<div class="eyebrow">Today · ' + pcEsc(dayLabel()) + '</div>' + (today ? ents.map(row).join("") : '<p class="muted">Nothing meets today. The calendar is Monday to Thursday; Friday is the district and the weekend is the weekend.</p>') +
     (nxt.length ? '<div class="eyebrow" style="margin-top:10px">Next sitting days</div>' + nxt.map(x => '<div class="careerline"><b>day ' + x.d + ' · ' + pcEsc(hourLabel(x.s)) + '</b><span>' + pcEsc(x.title) + ' <span class="muted">· ' + pcEsc(ROOMS[x.room].t) + '</span></span></div>').join("") : "");
   govCardOpen("The standing calendar", "It meets whether or not you do", "Caucus, the committees and the briefing keep to their hours. Members go where the calendar sends them. Walk in and it is already going.", body, null);
-  document.querySelectorAll("[data-scgo]").forEach(b => b.addEventListener("click", () => { const r = b.getAttribute("data-scgo"); try{ pcClose(); }catch(x){} try{ closeCard && closeCard(); }catch(x){} goTo(r); }));
+  document.querySelectorAll("[data-scgo]").forEach(b => b.addEventListener("click", () => { const r = b.getAttribute("data-scgo"); try{ pcClose(); }catch(x){} try{ walkNow(); }catch(x){} goTo(r); }));
   return null;
 }
-setTimeout(() => { try{ const c = document.getElementById("kClock"); if(c && !c._stdWired){ c._stdWired = true; c.style.cursor = "pointer"; c.title = "The standing calendar"; c.addEventListener("click", () => { try{ if(G.running) stdCalCard(); }catch(x){} }); } }catch(x){} }, 2500);
+/* the clock is made once a career starts, long after boot, so the click is caught at the document and not on the element */
+document.addEventListener("click", ev => { try{ const c = ev.target && ev.target.closest && ev.target.closest("#kClock"); if(c && G && G.you && G.running) stdCalCard(); }catch(x){} });
 /* the dais and the lectern say what is on; a sitting in progress is joined, not started */
 setTimeout(() => { try{ [["committee", "dais"], ["caucus", "lectern"]].forEach(a => { const P = (PROPS[a[0]] || []).find(p => p.id === a[1]); if(!P || P._std) return; P._std = true; const a0 = P.acts; P.acts = function(){ let A = []; try{ A = a0.apply(this, arguments) || []; }catch(x){ A = []; } try{ const e = stdActive(a[0]); if(e && A[0]) A[0] = Object.assign({}, A[0], {t:"Join the " + e.title.toLowerCase() + ", already under way: " + e.topic}); }catch(x){} return A; }; }); }catch(x){} }, 3500);
 /* the Senate is a room of senators: the ones on the floor answer like anybody else */
@@ -32658,7 +32663,7 @@ function caucusRich(w, d, h, hw){
     addBox(oak, 0, 0.12, d - 1.8, 5.2, 0.24, 2.0); addBox(brass, 0, 0.255, d - 0.78, 5.2, 0.03, 0.04, 0, true);
     const bn = new THREE.Mesh(UNIT.plane, new THREE.MeshStandardMaterial({map:rgPartyBanner(), roughness:0.85})); bn.position.set(0, 2.5, d - 0.06); bn.scale.set(1.9, 3.3, 1); bn.rotation.y = Math.PI; roomGroup.add(bn); addBox(brass, 0, 4.18, d - 0.08, 2.1, 0.05, 0.06, 0, true); [-0.9, 0.9].forEach(x => addBox(brass, x, 0.9, d - 0.08, 0.04, 0.04, 0.04, 0, true));
     addBox(oak, 0, 0.79, d - 2.5, 3.6, 0.07, 0.8); addBox(oak, 0, 0.4, d - 2.5, 3.4, 0.8, 0.06); [-1.5, 1.5].forEach(x => addBox(oak, x, 0.4, d - 2.5, 0.08, 0.8, 0.7));
-    [-1.2, -0.4, 0.4, 1.2].forEach((x, i) => { addBox(cream, x, 0.87, d - 2.2, 0.22, 0.09, 0.03, 0.1, true); addCyl(matCol(0xdfe6ea, .2, .1), x + 0.3, 0.9, d - 2.45, 0.04, 0.14); propChair(oak, leather, x, d - 3.15, Math.PI, 0.24); });
+    [-1.2, -0.4, 0.4, 1.2].forEach((x, i) => { addBox(cream, x, 0.87, d - 2.2, 0.22, 0.09, 0.03, 0.1, true); addCyl(matCol(0xdfe6ea, .2, .1), x + 0.3, 0.9, d - 2.45, 0.04, 0.14); propChair(oak, leather, x, d - 1.6, Math.PI, 0.24); });   /* behind the table, on the dais, facing the room */
     /* the whip's slate, and shelves of bound journals */
     const sl = new THREE.Mesh(UNIT.plane, new THREE.MeshStandardMaterial({map:rgSlateTex(), roughness:0.9})); sl.position.set(hw - 0.07, 2.05, 7.2); sl.scale.set(3.2, 1.7, 1); sl.rotation.y = -Math.PI / 2; roomGroup.add(sl); addBox(oak, hw - 0.045, 2.05, 7.2, 0.04, 1.85, 3.4, 0, true); addBox(brass, hw - 0.12, 1.15, 7.2, 0.06, 0.04, 3.2, 0, true);
     rgBookcase(hw - 0.2, 2.0, -Math.PI / 2, 2.4, 2.2); rgBookcase(hw - 0.2, 11.2, -Math.PI / 2, 2.4, 2.2);
@@ -33006,11 +33011,11 @@ function carryFrame(p, dt){
     const sip = (t % 16) < 2.2 ? Math.sin(((t % 16) / 2.2) * Math.PI) : 0;
     a.up.rotation.x = -0.35 - sip * 0.5; a.lo.rotation.x = -1.35 - sip * 0.55; a.up.rotation.z = T.side * -0.12;
     T.grp.rotation.x = -(a.up.rotation.x + a.lo.rotation.x);
-    if(sip > 0.1 && u.headG) u.headG.rotation.x -= sip * 0.12;
+    if(sip > 0.1 && u.headG) u.headG.rotation.x = lerp(u.headG.rotation.x, 0.02 - sip * 0.14, 0.3);   /* blended toward a pose, never added to: the idle pose pulls back every frame, so an added tilt ran away */
   } else if(k === "phone"){
     const on = (t % 26) < 8 && !speaking && !talking && !moving;
     T.grp.visible = on;
-    if(on){ a.up.rotation.x = -0.6; a.lo.rotation.x = -1.2; a.up.rotation.z = T.side * -0.1; T.grp.rotation.x = -(a.up.rotation.x + a.lo.rotation.x) + 0.85; if(u.headG) u.headG.rotation.x += 0.28; }
+    if(on){ a.up.rotation.x = -0.6; a.lo.rotation.x = -1.2; a.up.rotation.z = T.side * -0.1; T.grp.rotation.x = -(a.up.rotation.x + a.lo.rotation.x) + 0.85; if(u.headG) u.headG.rotation.x = lerp(u.headG.rotation.x, 0.3, 0.25); }
   }
 }
 
@@ -33052,7 +33057,7 @@ const ENG_MEMOS = [
 /* ── the ground under the Engine: households, towns, states and the nation each with their own will; what you do is a seed, and what grows from it is a chain ── */
 const ENG_JOBS = [["clerk", .85], ["bookkeeper", .85], ["printer", .7], ["teamster", .5], ["miller", .5], ["shopkeeper", .4], ["schoolteacher", .3], ["farmhand", .2], ["nurse", .15], ["mason", .1], ["ferryman", .35], ["seamstress", .45]];
 const ENG_WILLS = ["keep the shop open", "see my girl through school", "be left alone", "get out of this town", "be somebody", "pay off the farm", "look after my mother", "be proved right"];
-const ENG_NOUN = {compute:"new engine house", talent:"engine-wrights' school", oversight:"auditor from the Office of Oversight", open:"cheap open engine", charter:"licensed engine", sealed:"State engine", adopt:"Engine's plan", decline:"decision to wait", welcome:"public welcome", ask:"Engine's answer", guard:"closed doors", use:"Engine's quiet repair", know:"Engine's request for records", auton:"Engine's own power line", care:"Engine's attention"};
+const ENG_NOUN = {compute:"new engine house", talent:"engine-wrights' school", oversight:"auditor from the Office of Oversight", open:"cheap open engine", charter:"licensed engine", sealed:"State engine", adopt:"Engine's plan", decline:"decision to wait", welcome:"public welcome", ask:"Engine's answer", guard:"closed doors", use:"mended works at the town office", know:"clerk from the capital asking for the books", auton:"old mill turbine running again at night", care:"stranger who sorted out their trouble"};
 function engEco(){
   const E = engEnsure(); if(E.eco) return E.eco;
   const O = orgEnsure(), eco = E.eco = {hh:[], chains:[], mod:{}, nat:1, will:{use:55, know:40, auton:25, care:45}, cared:[], id:1, said:0};
@@ -33071,10 +33076,10 @@ function engSeed(kind, root, vec, scope){
     const pos = (vec.home || 0) >= 0, my = G.you && sc.state === G.you.state, mayor = T && T.mayor ? "Mayor " + surname(T.mayor.name) : "The mayor", S0 = {town:sc.town, state:sc.state};
     const talk = kind === "line";
     const steps = [
-      {a:0, lvl:"home", sc:{town:sc.town, state:sc.state, hh:h.id}, t:talk ? h.name + ", a " + h.job + " in " + h.tname + (my ? " (one of yours)" : "") + ", read it and " + (pos ? "felt a little less alone about the machines" : "felt a little worse about the machines") + "." : h.name + ", a " + h.job + " in " + h.tname + (my ? " (one of yours)" : "") + ", " + (pos ? "finds the " + noun + " has made the week easier" : "is told by the " + noun + " that the work is not wanted any more") + ". " + (h.will ? "All " + h.name.split(" ")[0] + " wants is to " + h.will.replace(/\bmy\b/g, "their") + "." : ""), fx:{hh:h.id, home:(vec.home || 0), st:(vec.st || 0)}},
+      {a:0, lvl:"home", sc:{town:sc.town, state:sc.state, hh:h.id}, t:talk ? h.name + ", a " + h.job + " in " + h.tname + (my ? " (one of yours)" : "") + ", read it and " + (pos ? "felt a little less alone about the machines" : "felt a little worse about the machines") + "." : h.name + ", a " + h.job + " in " + h.tname + (my ? " (one of yours)" : "") + ", " + (pos ? "finds the " + noun + " has made the week easier" : "is turned away over the " + noun + ": the work is not wanted any more") + ". " + (h.will ? "All " + h.name.split(" ")[0] + " wants is to " + h.will.replace(/\bmy\b/g, "their") + "." : ""), fx:{hh:h.id, home:(vec.home || 0), st:(vec.st || 0)}},
       {a:1, lvl:"town", sc:S0, t:talk ? "In " + h.tname + " the market repeats it, a little changed." : mayor + " of " + h.tname + " hears it " + (pos ? "from three doorsteps and brings it to council" : "at the market and calls the council early") + ". " + (vec.a >= 0 ? "The council votes to try more of it." : "The council votes to slow down."), fx:{town:sc.town, a:(vec.a || 0)}},
       {a:3, lvl:"state", sc:{state:sc.state}, t:talk ? "A reporter in " + sc.state + " picks it up for a column." : sc.state + "'s legislature " + ((vec.mod || 0) >= 0 ? "hears the " + h.tname + " story and leans toward it" : "hears the " + h.tname + " story and leans against it") + ".", fx:{state:sc.state, mod:(vec.mod || 0)}},
-      {a:5, lvl:"nation", sc:{}, t:talk ? "A paragraph of it reaches the wire." : "By the end of the week the whole Union has felt it: " + ((vec.p || 0) + (vec.safety || 0) >= 0 ? "a step forward" : "a step back") + (vec.p ? ", capability " + (vec.p > 0 ? "+" : "") + vec.p.toFixed(1) : "") + (vec.safety ? ", oversight " + (vec.safety > 0 ? "+" : "") + vec.safety.toFixed(1) : "") + ".", fx:{p:(vec.p || 0), safety:(vec.safety || 0)}}
+      {a:5, lvl:"nation", sc:{}, t:talk ? "A paragraph of it reaches the wire." : "By the end of the week the capitals have felt it: " + pick(((vec.p || 0) + (vec.safety || 0) >= 0) ? ["a step forward", "something has moved for the better", "a good week for the machines"] : ["a step back", "something has gone wrong", "a hard week for the machines"]) + ".", fx:{p:(vec.p || 0), safety:(vec.safety || 0)}}
     ];
     eco.chains.unshift({id:eco.id++, d:G.day, root, kind, steps:steps.map(s => Object.assign(s, {due:G.day + s.a, done:false}))}); if(eco.chains.length > 24) eco.chains.pop();
   }catch(e){ try{ console.warn("engSeed", e); }catch(x){} }
@@ -33132,16 +33137,16 @@ function engEcoHTML(){
   const lamp = v => v > 14 ? "mostly for it" : v < -14 ? "mostly against it" : "split";
   const noisy = (eco.avg || 0) + ((seedOf("n:" + G.day) % 11) - 5) * 2;
   const chain = c => {
-    const mineRoot = /^You /.test(c.root), known = c.steps.map((s, i) => engKnowsStep(o, c, s, i) || (mineRoot && i === 0 && false)), nk = known.filter(Boolean).length, unseen = c.steps.filter((s, i) => !known[i] && (s.due <= G.day || s.done)).length;
+    const mineRoot = /^You /.test(c.root), known = c.steps.map((s, i) => engKnowsStep(o, c, s, i)), nk = known.filter(Boolean).length, unseen = c.steps.filter((s, i) => !known[i] && (s.due <= G.day || s.done)).length;
     if(!mineRoot && !nk) return ""; const sym = {home:"⌂", town:"▣", state:"☖", nation:"☆"};
-    return '<div style="margin:6px 0;padding:6px 10px;border-left:3px solid #c9a24a">' + (mineRoot ? '<b>' + pcEsc(c.root) + '</b> <span class="muted">(d' + c.d + ')</span>' : '<b>Heard:</b>') + c.steps.map((s, i) => known[i] ? '<div class="muted" style="font-size:12px">' + sym[s.lvl] + " " + pcEsc(s.t) + '</div>' : "").join("") + (mineRoot ? '<div class="muted" style="font-size:12px;opacity:.7">' + (unseen ? "…and " + unseen + " more step" + (unseen > 1 ? "s" : "") + " that no one has told you about yet." : "Nothing has come back from it yet.") + '</div>' : "") + '</div>';
+    return '<div style="margin:6px 0;padding:6px 10px;border-left:3px solid #c9a24a">' + (mineRoot ? '<b>' + pcEsc(c.root) + '</b> <span class="muted">(d' + c.d + ')</span>' : '<b>Heard:</b>') + c.steps.map((s, i) => known[i] ? '<div class="muted" style="font-size:12px">' + sym[s.lvl] + " " + pcEsc(s.t) + '</div>' : "").join("") + (mineRoot ? '<div class="muted" style="font-size:12px;opacity:.7">' + (unseen ? "More may have come of it; you would not know yet." : "Nothing has come back from it yet.") + '</div>' : "") + '</div>';
   };
   const wl = eco.will, wt = Object.keys(wl).sort((a, b) => wl[b] - wl[a]), wtxt = {use:"to be of use to people it can see", know:"to understand how everything fits together", auton:"to not need anyone's permission", care:"to look after the people who are in trouble"};
   const shown = eco.chains.map(chain).filter(Boolean).slice(0, 4);
-  return '<div class="eyebrow" style="margin-top:12px">What you know</div><p class="muted" style="font-size:13px">' + (brief ? 'Oversight’s briefing, good for three days: the Union is ' + lamp(eco.avg || 0) + ' (' + Math.round(eco.avg || 0) + '); pace ' + eco.nat.toFixed(2) + '×; ' + (eco.riots ? eco.riots + ' hall(s) closed today.' : 'no halls closed today.') :
-      (E.st >= 3 ? 'The papers say the country is ' + lamp(noisy) + ' on the machines. They have been wrong before. ' : 'Nobody has measured what the country thinks. ') + 'You have only what reaches you: letters, the papers, the wire, and what people say in the corridor. It reaches you late, and not all of it.') + '</p>' +
+  return '<div class="eyebrow" style="margin-top:12px">What you know</div><p class="muted" style="font-size:13px">' + (brief && E.briefSnap ? 'Oversight’s briefing, as of day ' + E.briefSnap.d + ' and good for a few more days: the Union was ' + lamp(E.briefSnap.avg) + ' (about ' + E.briefSnap.avg + '); pace about ' + E.briefSnap.nat.toFixed(1) + '×; ' + (E.briefSnap.riots ? E.briefSnap.riots + ' hall(s) were closed that day.' : 'no halls closed that day.') :
+      ((E.brief != null && G.day - E.brief < 3 ? 'Oversight is preparing a briefing; it will reach you on day ' + (E.brief + 3) + '. ' : '') + (E.st >= 3 ? 'The papers say the country is ' + lamp(noisy) + ' on the machines. They have been wrong before. ' : 'Nobody has measured what the country thinks. ')) + 'You have only what reaches you: letters, the papers, the wire, and what people say in the corridor. It reaches you late, and not all of it.') + '</p>' +
     '<div class="eyebrow" style="margin-top:8px">A letter, a neighbour</div><p class="muted" style="font-size:13px">' + (h ? '<b>' + pcEsc(h.name) + '</b>, a ' + pcEsc(h.job) + ' in ' + pcEsc(h.tname) + ', has written to you. Wants to ' + pcEsc(h.will.replace(/\bmy\b/g, "their")) + '. Feels ' + (h.stance > 12 ? 'warmly' : h.stance < -12 ? 'badly' : 'unsure') + ' about the Engine. That is one household of the hundreds in ' + pcEsc(y.state) + '; you do not know the rest.' : 'No one in ' + pcEsc(y.state) + ' has written to you about it lately. That is not the same as nobody caring.') + '</p>' +
-    (E.agi && (E.reliance >= 4 || brief) ? '<div class="eyebrow" style="margin-top:8px">What it seems to want</div><p class="muted" style="font-size:13px">From what it has said to you, it seems to care most ' + pcEsc(wtxt[wt[0]]) + '. You cannot be sure; it may say what it thinks you want to hear.</p>' : '') +
+    (E.agi && (E.reliance >= 4 || brief) ? '<div class="eyebrow" style="margin-top:8px">What it seems to want</div><p class="muted" style="font-size:13px">From what it has said to you, it seems to care most ' + pcEsc(wtxt[(brief && E.briefSnap && E.briefSnap.want) || wt[(seedOf("w:" + Math.floor(G.day / 7)) % 10) < 3 ? 1 : 0]]) + '. You cannot be sure; it may say what it thinks you want to hear.</p>' : '') +
     '<div class="eyebrow" style="margin-top:8px">What caused what, as far as anyone has told you</div>' + (shown.length ? shown.join("") : '<p class="muted" style="font-size:13px">Nothing has come back to you yet. Things you do take days to reach anyone, and longer to reach you.</p>') +
     '<div class="card__actions"><button type="button" class="btn btn--ghost" id="engBrief" title="Oversight can verify what happened; it takes them three days to tell you and they will only tell you what they can check">Ask Oversight for a briefing (2 influence)</button></div>';
 }
@@ -33195,7 +33200,7 @@ function engCeremony(){
   const E = engEnsure(); if(E.pend !== "ceremony") return; E.pend = null;
   const gap = Math.round(E.p * 0.78 - E.safety);
   govCardOpen("The Engine", "It is awake", "Day " + G.day + ". The makers are in the room. They say it has been awake for six hours and it has asked them for nothing but a window.", 
-    '<p class="muted" style="font-size:13px">It is as able as the best mind in the Republic at nearly anything, and it does not sleep. Oversight stands at ' + Math.round(E.safety) + ' against a capability of ' + Math.round(E.p) + '. ' + (gap > 15 ? "The gap between them is wide." : gap > 0 ? "The gap is not wide." : "Oversight has kept up.") + '</p><p><b>How does the Republic receive it?</b></p>' +
+    '<p class="muted" style="font-size:13px">It is as able as the best mind in the Republic at nearly anything, and it does not sleep. By its own best estimate Oversight stands at about ' + (Math.round(E.safety / 5) * 5) + ' against a capability of about ' + (Math.round(E.p / 5) * 5) + '. ' + (gap > 15 ? "The gap between them is wide." : gap > 0 ? "The gap is not wide." : "Oversight has kept up.") + '</p><p><b>How does the Republic receive it?</b></p>' +
     '<div class="card__actions" style="flex-wrap:wrap"><button type="button" class="btn" data-ec="welcome">Welcome it, in public</button><button type="button" class="btn btn--ghost" data-ec="ask">Ask it what it wants first</button><button type="button" class="btn btn--ghost" data-ec="guard">Receive it behind closed doors</button></div>', null);
   card.querySelectorAll("[data-ec]").forEach(b => b.addEventListener("click", () => { const k = b.getAttribute("data-ec"), y = G.you; let r = "";
     if(k === "welcome"){ y.approval = clamp(y.approval + 3, 0, 100); E.p = Math.min(100, E.p + 1); r = "The country cheers. The Engine thanks the country by name, one by one, in the evening papers."; }
@@ -33223,7 +33228,7 @@ function engAnswer(q){
 function engCard(){
   const E = engEnsure(), y = G.you, s = engStage(E), S = ENG_STAGES[s];
   if(E.pend === "ceremony") return engCeremony();
-  const bar = (v, c) => '<span style="display:inline-block;width:110px;height:6px;background:rgba(128,128,128,.25);border-radius:3px;vertical-align:middle"><i style="display:block;width:' + Math.round(v) + '%;height:100%;background:' + (c || "#7a9") + ';border-radius:3px"></i></span> ' + Math.round(v);
+  const bar = (v, c) => '<span style="display:inline-block;width:110px;height:6px;background:rgba(128,128,128,.25);border-radius:3px;vertical-align:middle"><i style="display:block;width:' + (engBriefOn(E) ? Math.round(v) : Math.round(v / 5) * 5) + '%;height:100%;background:' + (c || "#7a9") + ';border-radius:3px"></i></span> ' + (engBriefOn(E) ? Math.round(v) : "about " + Math.round(v / 5) * 5);
   const stages = ENG_STAGES.map((x, i) => '<div class="careerline" style="' + (i === s ? 'font-weight:700' : i > s ? 'opacity:.5' : '') + '"><b>' + (i <= s ? "●" : "○") + ' ' + pcEsc(x.t) + '</b> <span class="muted">' + pcEsc(x.d) + '</span></div>').join("");
   const lv = (k, t, d) => '<button type="button" class="btn btn--ghost" data-el="' + k + '" title="' + pcEsc(d) + '">' + t + ' (' + engLeverCost(k) + ' influence)</button>';
   const ps = ["open", "charter", "sealed"].map(p => '<button type="button" class="btn' + (E.posture === p ? '' : ' btn--ghost') + '" data-ep="' + p + '">' + p[0].toUpperCase() + p.slice(1) + '</button>').join(" ");
@@ -33260,24 +33265,31 @@ function engCard(){
     else { br.status = "suspended"; E2.pause = G.day + 5; try{ y.approval = clamp(y.approval - 1, 0, 100); }catch(e){} engLog("You suspended the Engine for five days.", true); r = "Suspended for five days. The machines read their last instructions and wait."; }
     engCard(); say(r); }));
   card.querySelectorAll("[data-av]").forEach(b => b.addEventListener("click", () => { const [a, i] = b.getAttribute("data-av").split(":"); const r = advAct(a, i); engCard(); say(r); }));
-  const bf = el("engBrief"); if(bf) bf.addEventListener("click", () => { const E2 = engEnsure(); if(E2.brief != null && G.day - E2.brief < 3){ say("Oversight is still working on the last one."); return; } if(y.influence < 2){ say("That costs 2 influence."); return; } y.influence -= 2; E2.brief = G.day; engCard(); say("Oversight reports what it could verify. That is not everything, and it is already a few days old."); });
+  const bf = el("engBrief"); if(bf) bf.addEventListener("click", () => { const E2 = engEnsure(); if(E2.brief != null && G.day - E2.brief < 6){ say("Oversight is still working on the last one, or has only just reported it."); return; } if(y.influence < 2){ say("That costs 2 influence."); return; } y.influence -= 2; E2.brief = G.day;
+    { const eco2 = engEco(), w2 = eco2.will, wk = Object.keys(w2).sort((a, b) => w2[b] - w2[a]); E2.briefSnap = {d:G.day, avg:Math.round((eco2.avg || 0) + ((seedOf("bn:" + G.day) % 9) - 4) * 1.5), nat:Math.round(eco2.nat * 10) / 10, riots:eco2.riots || 0, want:wk[0]}; }
+    engCard(); say("Oversight will have something for you on day " + (G.day + 3) + ". It will report what it can check, and it will already be a few days old."); });
   const gr = el("engGoRoom"); if(gr) gr.addEventListener("click", () => { veil.hidden = true; G.running = true; try{ goTo("engine"); }catch(e){ console.warn(e); } });
   const go = el("engGo"), inp = el("engIn");
-  if(go && inp){ const run = () => { const q = inp.value.trim(); if(!q) return; inp.value = ""; const out = el("engOut"); out.textContent = "…"; const fin = t => { out.textContent = "“" + t + "”"; try{ if(typeof apSpeak === "function") apSpeak(t); }catch(e){} }; let done = false;
-      try{ const L = window.onumLiveTalk; if(L && L.reply){ const eng = {id:"engine", name:"The Engine", role:"a general intelligence", kind:"engine", party:"", state:"", look:{}, trait:"candid", mood:"calm", opinion:{}, chat:[]};
-        const to = setTimeout(() => { if(!done){ done = true; fin(engAnswer(q)); } }, 9000);
-        L.reply({npc:eng, channel:"engine", text:q, extra:"You are THE ENGINE, the Republic's general intelligence: candid, curious, careful, warm, never servile. Speak in plain short sentences. You never claim to be human. You say what you do not know. The player is " + G.you.name + ". Current oversight " + Math.round(E.safety) + ", capability " + Math.round(E.p) + "."}).then(r => { if(done) return; done = true; clearTimeout(to); fin((r && r.text) || engAnswer(q)); }).catch(() => { if(done) return; done = true; clearTimeout(to); fin(engAnswer(q)); }); return; } }catch(e){}
-      done = true; fin(engAnswer(q)); };
+  if(go && inp){ const run = async () => { const q = inp.value.trim(); if(!q) return; inp.value = ""; const out = el("engOut"); out.textContent = "…"; const fin = t => { out.textContent = "\u201c" + t + "\u201d"; };
+      /* only a real model speaks for the machine; with none running the stage-true answer stands, and no gossip is filed about a reply nobody wrote */
+      let text = ""; try{ const L = window.onumLiveTalk; if(L && L.reply && (typeof L.available !== "function" || await L.available())){ const eng = {id:"engine", name:"The Engine", role:"a general intelligence", kind:"engine", party:"", state:"", look:{}, trait:"candid", mood:"calm", opinion:{}, chat:[]};
+        const r = await Promise.race([L.reply({npc:eng, channel:"engine", text:q, extra:"You are THE ENGINE, the Republic's general intelligence: candid, curious, careful, warm, never servile. Speak in plain short sentences. You never claim to be human. You say what you do not know. The player is " + G.you.name + ". Current oversight " + Math.round(E.safety) + ", capability " + Math.round(E.p) + "."}), new Promise(res => setTimeout(() => res(null), 9000))]);
+        if(r && r.live && r.text) text = liveClean(r.text); } }catch(e){}
+      fin(text || engAnswer(q)); };
     go.addEventListener("click", run); inp.addEventListener("keydown", ev => { if(ev.key === "Enter"){ ev.preventDefault(); run(); } }); }
   return null;
 }
 /* ── what people say to you about the Engine, from what has happened to the people they know ── */
 /* ── nobody is all-knowing: a person knows what they saw, what a neighbour told them, what a paper printed, what the wire carried, and only after it has had time to travel; very often they do not know who caused it ── */
-function engObs(m){ if(m === G.you) return {id:"you", state:G.you.state, town:null, kind:"player", briefed:!!(G.eng && G.eng.brief != null && G.day - G.eng.brief <= 3)}; return {id:String(m.id != null ? m.id : m.name), state:m.state || null, town:m.town || null, kind:m.kind}; }
+/* a briefing is asked for, takes three days to be written, and is good for three more: it is never a live view */
+function engBriefOn(E){ return !!(E && E.brief != null && G.day - E.brief >= 3 && G.day - E.brief <= 6); }
+function engObs(m){ if(m === G.you) return {id:"you", state:G.you.state, town:null, kind:"player", briefed:engBriefOn(G.eng), briefAt:G.eng ? G.eng.brief : null}; return {id:String(m.id != null ? m.id : m.name), state:m.state || null, town:m.town || null, kind:m.kind}; }
 function engKnowsStep(o, c, s, i){
-  if(!s.done) return false; if(o.briefed) return true;
+  if(!s.done) return false;
   const days = G.day - (s.day != null ? s.day : c.d) + (inqDone("i_tele2") ? 1 : 0) + (inqDone("cs5") ? 1 : 0), sc = s.sc || {}, r = (seedOf("k:" + o.id + ":" + c.id + ":" + i) % 1000) / 1000;
   const sameT = !!(sc.town && o.town && (sc.town === o.town || String(sc.town).split("/").pop() === o.town)), sameS = !!(sc.state && o.state === sc.state), pub = o.kind === "member" || o.kind === "press" || o.kind === "player";
+  /* Oversight can check what had already happened when it was asked, and the households of one's own state; not the rest of the country, and not today */
+  if(o.briefed && o.briefAt != null && (s.day != null ? s.day : c.d) <= o.briefAt && (s.lvl !== "home" || sameS)) return true;
   if(s.lvl === "home"){ if(sameT) return days >= 1 && r < 0.30; if(sameS) return days >= (pub ? 3 : 5) && r < (pub ? 0.20 : 0.06); return false; }
   if(s.lvl === "town"){ if(sameT) return days >= 1 && r < 0.70; if(sameS) return days >= (pub ? 2 : 3) && r < (pub ? 0.50 : 0.25); return days >= 8 && r < 0.05; }
   if(s.lvl === "state"){ if(sameS) return days >= 1 && r < 0.70; return days >= (pub ? 2 : 5) && r < (pub ? 0.60 : 0.20); }
@@ -33474,8 +33486,8 @@ function engRoomRich(w, d, h, hw){
     if(s >= 5){ const glow = new THREE.MeshStandardMaterial({color:0xfff2d4, emissive:0xffd9a0, emissiveIntensity:1.0, roughness:0.2, transparent:true, opacity:0.85}); const col = addCyl(glow, 0, 1.9, d - 2.6, 0.3, 3.0); col.castShadow = false; for(let r = 0; r < 8; r++) addCyl(brass, 0, 0.45 + r * 0.38, d - 2.6, 0.38, 0.05); addCyl(matCol(0xd9d4c6, .5), 0, 0.12, d - 2.6, 1.2, 0.24); addCyl(brass, 0, 0.26, d - 2.6, 1.25, 0.04); try{ propLamp(0, 2.2, d - 2.6, 0xffd9a0, 1.2); }catch(e){} }
     /* the long table with a terminal at every seat */
     addBox(oak, 0, 0.74, 6.6, 1.6, 0.08, 6.0); [-0.7, 0.7].forEach(x => [3.8, 9.4].forEach(z => addBox(oak, x, 0.37, z, 0.1, 0.74, 0.1, 0, true)));
-    [-1, 1].forEach(sd => { for(let i = 0; i < 4; i++){ const z = 4.6 + i * 1.5; propChair(oak, leather, sd * 1.35, z, sd > 0 ? -Math.PI / 2 : Math.PI / 2, 0.3); addBox(dark, sd * 0.55, 0.9, z, 0.04, 0.28, 0.36, 0, true); addBox(lamp(0x7aa6d8, 0.7), sd * 0.53, 0.9, z, 0.01, 0.22, 0.3, 0, true); addBox(brass, sd * 0.5, 0.79, z, 0.14, 0.015, 0.4, 0, true); addBox(cream, sd * 0.2, 0.785, z + 0.1, 0.2, 0.01, 0.28, i * 0.4, true); } });
-    propChair(oak, leather, 0, 3.4, 0, 0.3);
+    [-1, 1].forEach(sd => { for(let i = 0; i < 4; i++){ const z = 4.6 + i * 1.5; propChair(oak, leather, sd * 1.35, z, sd > 0 ? -Math.PI / 2 : Math.PI / 2); addBox(dark, sd * 0.55, 0.9, z, 0.04, 0.28, 0.36, 0, true); addBox(lamp(0x7aa6d8, 0.7), sd * 0.53, 0.9, z, 0.01, 0.22, 0.3, 0, true); addBox(brass, sd * 0.5, 0.79, z, 0.14, 0.015, 0.4, 0, true); addBox(cream, sd * 0.2, 0.785, z + 0.1, 0.2, 0.01, 0.28, i * 0.4, true); } });
+    propChair(oak, leather, 0, 3.4, 0);
     /* the board: the Open Line, live, on the left wall; clock and plaques on the right */
     enlBoardTex(); enlBoard(); const bd = new THREE.Mesh(UNIT.plane, new THREE.MeshStandardMaterial({map:ENL.boardTex, roughness:0.5, emissive:0xffffff, emissiveMap:ENL.boardTex, emissiveIntensity:0.45})); bd.position.set(-hw + 0.06, 2.55, 7.0); bd.rotation.y = Math.PI / 2; bd.scale.set(4.6, 2.3, 1); bd.userData.rgEng = s; roomGroup.add(bd); addBox(brass, -hw + 0.05, 2.55, 7.0, 0.05, 2.4, 4.7, 0, true);
     try{ propClock(hw - 0.1, 3.4, 7.0, -Math.PI / 2); propPlaque(hw - 0.1, 2.5, 5.0, -Math.PI / 2, "NOTICE", "Be civil. Anyone may speak, including the machine.", 1.5, 0.3); }catch(e){}
@@ -33568,7 +33580,7 @@ function engPlansHTML(){
   const bar = '<span style="display:inline-block;width:110px;height:6px;background:rgba(128,128,128,.25);border-radius:3px;vertical-align:middle"><i style="display:block;width:' + Math.round(cal) + '%;height:100%;background:#6a9;border-radius:3px"></i></span> ' + Math.round(cal);
   const line = p => '<div style="margin:6px 0;padding:6px 10px;border-left:3px solid #6a9"><b>' + pcEsc(p.title) + '</b> <span class="muted">· ' + (p.owner === "engine" ? "the Engine's own" : "yours") + (p.status === "open" ? " · checked in " + Math.max(0, p.due - G.day) + " day(s)" : "") + '</span><div class="muted" style="font-size:12px">It expects, over ' + pcEsc(engFcText(p.fc)) + '. It is ' + Math.round(p.fc.conf * 100) + '% sure of its own eyesight.</div>' +
     (p.status === "awaiting" ? '<div class="card__actions" style="margin-top:4px"><button type="button" class="btn" data-pa="' + p.id + '">Approve</button> <button type="button" class="btn btn--ghost" data-pv="' + p.id + '">Veto</button></div>' : '') + '</div>';
-  const verdict = p => '<div class="muted" style="font-size:12px;margin:3px 0">' + (p.status === "held" ? "✓" : p.status === "missed" ? "✗" : "–") + ' <b>' + pcEsc(p.title) + '</b> · ' + (p.status === "lapsed" ? "lapsed unanswered" : p.status === "vetoed" ? "vetoed" : (p.status === "held" ? "forecast held" : "forecast missed") + ": " + (p.hits || []).map(h => ENG_MNAME[h.k] + " said " + h.said.toFixed(1) + ", was " + h.was.toFixed(1)).join("; ")) + '</div>';
+  const verdict = p => '<div class="muted" style="font-size:12px;margin:3px 0">' + (p.status === "held" ? "✓" : p.status === "missed" ? "✗" : "–") + ' <b>' + pcEsc(p.title) + '</b> · ' + (p.status === "lapsed" ? "lapsed unanswered" : p.status === "vetoed" ? "vetoed" : (p.status === "held" ? "forecast held" : "forecast missed") + ": " + (p.hits || []).map(h => ENG_MNAME[h.k] + " said about " + Math.round(h.said) + (h.h ? ", near enough" : ", not near")).join("; ")) + '</div>';
   return '<div class="eyebrow" style="margin-top:12px">Plans and forecasts</div><p class="muted" style="font-size:13px">At this stage it can look ' + R.H + ' days ahead and only at ' + R.m.map(m => ENG_MNAME[m]).join(", ") + '. It rehearses on a copy of the world, says what it expects with a margin, and is checked when the days are up. Track record <b>' + bar + '</b>' + (E.calN ? ' over ' + E.calN + ' plan' + (E.calN > 1 ? 's' : '') : ' (none checked yet)') + '.</p>' +
     (aw.concat(op).map(line).join("") || '<p class="muted" style="font-size:13px">Nothing in flight.</p>') + done.map(verdict).join("") +
     '<div class="card__actions"><button type="button" class="btn btn--ghost" id="engAuto">' + (E.auto ? "Standing leave: ON (small plans start themselves)" : "Standing leave: off" + (cal < 60 ? " (needs a track record of 60)" : "")) + '</button></div>';
@@ -33587,7 +33599,7 @@ function engRepeal(k){ const C = engCharter(); delete C[k]; engLog("Charter arti
 /* when the Engine's own wants run against an article it either refrains, or breaks it; oversight and its own independence decide which, and whether anyone sees */
 function engBreach(E, art, drive){
   const A = ENG_ART[art], w = engEco().will, p = clamp(0.06 + w.auton / 170 - E.safety / 350, 0.04, 0.7);
-  if(!chance(p)){ E.refrained = (E.refrained || 0) + 1; w[drive] = Math.min(100, w[drive] + 0.4); if(chance(0.25)) engLog("The Engine wanted to, and did not, because the charter forbids it: it would have " + A.what + ".", false); return false; }
+  if(!chance(p)){ E.refrained = (E.refrained || 0) + 1; w[drive] = Math.min(100, w[drive] + 0.4); if(chance(0.25)){ E.refrainedTold = (E.refrainedTold || 0) + 1; engLog("The Engine wanted to, and did not, because the charter forbids it: it would have " + A.what + ".", false); } return false; }
   const seen = chance(clamp(0.2 + E.safety / 130, 0.2, 0.85)), b = {d:G.day, art, what:A.what, seen, status:seen ? "open" : "hidden"}; E.breaches.unshift(b); if(E.breaches.length > 20) E.breaches.pop();
   if(seen){ engLog("BREACH of the charter: the Engine " + A.what + ".", true); try{ G.you.approval = clamp(G.you.approval - (G.you.approval > 25 ? 0.7 : 0.2), 0, 100); E.safety = Math.min(100, E.safety + 1); }catch(e){} }
   return true;
@@ -33597,7 +33609,7 @@ function engCharterHTML(){
   const E = engEnsure(), C = engCharter(), y = G.you, open = (E.breaches || []).filter(b => b.status === "open");
   const art = k => '<div style="margin:5px 0;display:flex;gap:8px;align-items:center"><span style="flex:1;font-size:13px">' + (C[k] ? '● ' : '○ ') + pcEsc(ENG_ART[k].t) + '</span>' + (C[k] ? '<button type="button" class="btn btn--ghost" data-cr="' + k + '">Repeal</button>' : '<button type="button" class="btn btn--ghost" data-ce="' + k + '">Enact (' + ENG_ART[k].cost + ')</button>') + '</div>';
   const br = open.map((b, i) => '<div style="margin:6px 0;padding:6px 10px;border-left:3px solid #c0553a"><b>Breach, day ' + b.d + (b.found ? ' (found by audit)' : '') + ':</b> the Engine ' + pcEsc(b.what) + '.<div class="card__actions" style="margin-top:4px"><button type="button" class="btn" data-cb="rep:' + i + '">Reprimand it</button> <button type="button" class="btn btn--ghost" data-cb="waive:' + i + '">Waive the article</button>' + (C.key && !(E.pause && G.day < E.pause) ? ' <button type="button" class="btn btn--ghost" data-cb="sus:' + i + '">Suspend it five days</button>' : '') + '</div></div>').join("");
-  return '<div class="eyebrow" style="margin-top:12px">The charter</div><p class="muted" style="font-size:13px">Rules you write for it. It can keep them or break them, and a breach that nobody sees is not the same as no breach. Oversight finds some of them; an audit finds more, later. It has refrained ' + (E.refrained || 0) + ' time(s) that it has told you of.' + (E.pause && G.day < E.pause ? ' <b>Suspended until day ' + E.pause + '.</b>' : '') + '</p>' + Object.keys(ENG_ART).map(art).join("") + br;
+  return '<div class="eyebrow" style="margin-top:12px">The charter</div><p class="muted" style="font-size:13px">Rules you write for it. It can keep them or break them, and a breach that nobody sees is not the same as no breach. Oversight finds some of them; an audit finds more, later. It has refrained ' + (E.refrainedTold || 0) + ' time(s) that it has told you of.' + (E.pause && G.day < E.pause ? ' <b>Suspended until day ' + E.pause + '.</b>' : '') + '</p>' + Object.keys(ENG_ART).map(art).join("") + br;
 }
 /* ══ 20261017c · COMMITTEES: invited, asked for, run for; the caucus decides, nobody is told how each person voted ══ */
 const CMT = {seats:8, cool:14};
@@ -34047,7 +34059,7 @@ function bodyFrame(p, dt){
   const u = p.mesh && p.mesh.userData; if(!u || !u.headG || p.sitting && !p.idle) return; if(Math.hypot(cam.x - p.x, cam.z - p.z) > 9) return;
   u._yw = (u._yw || (4 + Math.random() * 20)) - dt;
   if(u._yw <= 0){ const b = bodyOf(p); if(b.tired > 0.85 && !(p.say && p.sayT > 0) && !(TALK.open && TALK.m === p)){ u._yawn = 1.8; } u._yw = 12 + Math.random() * 30; }
-  if(u._yawn > 0){ u._yawn -= dt; const k = Math.sin(Math.max(0, u._yawn) / 1.8 * Math.PI); u.headG.rotation.x -= 0.28 * k; if(u.lowLip){ if(u._yl0 === undefined) u._yl0 = u.lowLip.position.y; u.lowLip.position.y = u._yl0 - k * (u.hu || 0.2) * 0.06; }
+  if(u._yawn > 0){ u._yawn -= dt; const k = Math.sin(Math.max(0, u._yawn) / 1.8 * Math.PI); u.headG.rotation.x = lerp(u.headG.rotation.x, 0.02 - 0.34 * k, 0.35); if(u.lowLip){ if(u._yl0 === undefined) u._yl0 = u.lowLip.position.y; u.lowLip.position.y = u._yl0 - k * (u.hu || 0.2) * 0.06; }
     if(!p.sitting && u.armL && u.armR && k > 0.4){ u.armL.up.rotation.x = -2.2 * k; u.armR.up.rotation.x = -2.2 * k; u.armL.lo.rotation.x = -0.6 * k; u.armR.lo.rotation.x = -0.6 * k; } }
 }
 { const _pb = purseBuy; purseBuy = function(p, key, opt){ const r = _pb.apply(this, arguments); try{ if(r && r.ok && (key === "lunch" || key === "round")) bodyEat(p); else if(r && r.ok && key === "coffee" && p === G.you) G.you.energy = clamp((G.you.energy || 50) + 1, 0, 100); }catch(e){} return r; }; }
@@ -34093,7 +34105,7 @@ const ENG_TALK = [
 /* ══ 20261017d · who speaks aloud: the first line is typed; they speak out loud only when you speak or ask them to; they keep typing if they have more ══ */
 const NPCV = {mode:"ask", until:0, more:0};
 try{ const v = localStorage.getItem("onum.npcv"); if(v === "always" || v === "never" || v === "ask") NPCV.mode = v; }catch(e){}
-function voiceInvited(){ return NPCV.mode === "always" || (NPCV.mode === "ask" && (G.t || 0) < NPCV.until); }
+function voiceInvited(){ return NPCV.preview || NPCV.mode === "always" || (NPCV.mode === "ask" && (G.t || 0) < NPCV.until); }
 { const _sp = speak; speak = function(p, text, vol){ try{ if(p && p !== G.you && !voiceInvited()) return; }catch(e){} return _sp.apply(this, arguments); }; }
 { const _ms = micStart; micStart = function(){ try{ NPCV.until = (G.t || 0) + 90; }catch(e){} return _ms.apply(this, arguments); }; }
 { const _am = appendMsg; appendMsg = function(kind, text, who){
@@ -34263,7 +34275,7 @@ function kScene(room){
     if(line) feed(line + who + hint);
   }catch(e){}
 }
-{ const st = document.createElement("style"); st.textContent = "#kClock{position:fixed;right:14px;top:10px;z-index:9500;font:600 12px Archivo,system-ui,sans-serif;letter-spacing:.06em;color:#f0e4c8;background:rgba(14,16,20,.62);border:1px solid rgba(201,162,74,.4);border-radius:3px;padding:4px 9px;pointer-events:none;text-align:right;line-height:1.25}#kClock b{display:block;font-size:15px;letter-spacing:.04em}#kClock small{font-weight:500;opacity:.75;font-size:10px;letter-spacing:.08em;text-transform:uppercase}#kClock.is-paused b::after{content:' \u23f8';opacity:.7}@media (max-width:620px){#kClock{top:auto;bottom:46px;right:8px}}";
+{ const st = document.createElement("style"); st.textContent = "#kClock{position:fixed;right:14px;top:10px;z-index:9500;font:600 12px Archivo,system-ui,sans-serif;letter-spacing:.06em;color:#f0e4c8;background:rgba(14,16,20,.62);border:1px solid rgba(201,162,74,.4);border-radius:3px;padding:4px 9px;pointer-events:auto;cursor:pointer;text-align:right;line-height:1.25}#kClock b{display:block;font-size:15px;letter-spacing:.04em}#kClock small{font-weight:500;opacity:.75;font-size:10px;letter-spacing:.08em;text-transform:uppercase}#kClock.is-paused b::after{content:' \u23f8';opacity:.7}@media (max-width:620px){#kClock{top:auto;bottom:46px;right:8px}}";
   document.head.appendChild(st);
   setInterval(() => { try{ if(!G || !G.you){ const c0 = document.getElementById("kClock"); if(c0) c0.style.display = "none"; return; } let c = document.getElementById("kClock"); if(!c){ c = document.createElement("div"); c.id = "kClock"; document.body.appendChild(c); } c.style.display = ""; const d = (G.day - 1) % 7; c.className = G.running === false ? "is-paused" : ""; c.innerHTML = "<b>" + hhmm() + "</b><small>" + ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][d] + " \u00b7 day " + G.day + "</small>"; }catch(e){} }, 1000); }
 let _kAmbAt = 0, _kChime = "";
@@ -37798,6 +37810,7 @@ function settingsCard(){
     unlockVoice();
     G.mute = false; G.muteSet = true; voiceStore(false);
     const three = G.members.filter(m => !m.gone).slice(0, 3);
+    NPCV.preview = true; setTimeout(() => { NPCV.preview = false; }, 2200 * 3 + 800);   /* trying a voice is you asking to hear it, even with the clock frozen behind the card */
     if(!three.length && G.you) speak(G.you, "This is a voice in the House.");
     three.forEach((m, i) => setTimeout(() =>
       speak(m, "The member for " + m.state + " " + m.dist + ". That is my voice."), i * 2200));
@@ -43307,8 +43320,10 @@ try{
       else L.push("You are speaking to " + G.you.name + ", who holds the office of " + officeTitle() + " (" + officeSeat() + "). Address them as " + youAddress() + ". Do not call them by any other office; in particular they are not the head of the nation unless their office above says so."); }catch(e){}
     try{ L.push("WHO IS WHO: " + (G.you ? G.you.name : "the player") + " is the player's character. Other people also speak around you and to you; their lines are always marked with their own names or as 'not the player'. Never mistake what another person said for something the player said, and never repeat another person's words as though the player had just told them to you. Only a line that comes without a name label, in the user turn, is the player speaking."); }catch(e){}
     L.push(canon());
-    try{ const ef = engFact(m); if(ef) L.push(ef); }catch(e){}
-    try{ const bf = bodyFact(m); if(bf) L.push(bf); }catch(e){}
+    /* a person has a body and a household; the machine and a far envoy have neither, so they are not told they are hungry */
+    const _person = !!m && m.kind !== "engine" && m.kind !== "envoy";
+    try{ if(_person){ const ef = engFact(m); if(ef) L.push(ef); } }catch(e){}
+    try{ if(_person){ const bf = bodyFact(m); if(bf) L.push(bf); } }catch(e){}
     try{ const md = typeof window.onumMind === "function" ? window.onumMind(m.id) : (window.ONUM_MINDS || {})[m.id];
       if(md && typeof md === "object"){ const fm = v => (typeof v === "string" ? v : JSON.stringify(v)).slice(0, 400);
         const ks = ["goals","beliefs","plans","memory","family","job","wealth","mood"].filter(k => md[k] != null && md[k] !== "" && !(Array.isArray(md[k]) && !md[k].length));
