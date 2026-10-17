@@ -4,6 +4,12 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## Your district office is a building again
+
+`20261017p` (on `20261017o`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- **Your district office is a storefront in the District**, next to the campaign office, with its own sign. From the desk you can open the war chest, and if the office is not yet open, fund it there (the storefront with your name on it). Once it is open you can hold constituent hours, hire an aide and fund field operations from the same desk, all out of campaign money.
+
 ## Committees as they really work, and an open frontier with no ceiling
 
 `20261017o` (on `20261017n`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.

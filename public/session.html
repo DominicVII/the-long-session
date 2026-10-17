@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261017o">
+<meta name="onum-build" content="20261017p">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261017o";
+  var STAMP = "20261017p";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -26542,6 +26542,13 @@ const PROPS = {
         G.you.margin = Math.max(1, G.you.margin + 1);
         setSay("Lists, doors, and a volunteer who has been here since the first campaign.",
           fx("+"+f+" funds, +1 to your margin","100 minutes")); }}]},
+    {id:"doffice", label:"Your district office", sub:"Where constituents come in, and where the war chest is spent", x:5.8, z:17.5, r:2.6,
+     acts:()=>{ const y = G.you, A = [{t:"Open the war chest", c:"10m", run(){ spend(10, 1); chestCard(); }}];
+       if(!y.dOffice) A.push({t:"Fund the office (a storefront with your name on it)", c:"15m", run(){ spend(15, 2); chestSpend("office"); }});
+       else { A.push({t:"Hold constituent hours", c:"60m", run(){ spend(60, 12); y.approval = clamp(y.approval + 1.5, 0, 100); y.influence = clamp((y.influence || 0) + 0.5, 0, 100); setSay("Eleven people came in. Nine wanted a thing you cannot give and two wanted a thing you can. You wrote it all down.", fx("+1.5 approval","60 minutes")); }});
+         if((y.staff || 0) < 3) A.push({t:"Hire an aide for the office", c:"15m", run(){ spend(15, 2); chestSpend("staff"); }});
+         A.push({t:"Fund field operations from here", c:"15m", run(){ spend(15, 2); chestSpend("field"); }}); }
+       return A; }},
     {id:"church", label:"The church on Main", sub:"Whatever you follow has a door here", x:5.6, z:8.2, r:2.4,
      acts:()=>[{t:"Read the parish notices", c:"10m", run(){ spend(10, 1); parishCard(); }}].concat((()=>{
        const cr = playerCreed();
@@ -32377,6 +32384,10 @@ function sfApply(){
       for(const nm of hqNames){ hp = one(nm, 1) || one(nm, -1); if(hp && sfFree(spot(hp))) break; hp = null; }
       if(!hp){ hp = main.filter(p => !/^(VAUGHN|CAFE|BAKKERIJ|VAN DIJK|CONSULAR POST|THE NO7)/.test(p.name) && sfFree(spot(p))).sort((a, b) => Math.hypot(a.pos.x, a.pos.z - 14) - Math.hypot(b.pos.x, b.pos.z - 14))[0] || null; }
       if(hp){ put("hq", hp, "Campaign office", "Above the " + sfTitle(hp.name).toLowerCase() + ": folding tables, a phone bank, a whiteboard"); } }
+    { const hqSide = take.hq ? Math.sign(take.hq.pos.x) : 1, dn = ["BOOKSELLER", "TOBACCONIST", "WATCHMAKER", "TAILOR & CUTTER", "HABERDASHERY", "ORANJE APOTHEEK", "DE GOUDEN KROON"]; let dp = null;
+      for(const nm of dn){ dp = main.filter(p => p.name === nm && !used.has(p.id) && sfFree(spot(p))).sort((a, b) => (Math.sign(b.pos.x) === -hqSide ? 1 : 0) - (Math.sign(a.pos.x) === -hqSide ? 1 : 0) || a.pos.z - b.pos.z)[0] || null; if(dp) break; }
+      if(!dp) dp = main.filter(p => !used.has(p.id) && !/^(VAUGHN|CAFE|BAKKERIJ|VAN DIJK|CONSULAR POST|THE NO7)/.test(p.name) && sfFree(spot(p)))[0] || null;
+      if(dp) put("doffice", dp, "Your district office", "Constituents come in here, and the war chest is spent from the desk"); }
     const sqNews = P.find(p => p.kind === "newsstand" && /Square/i.test(p.name)); if(sqNews){ const pr = byId("newsstand"); if(pr){ const sp = spot(sqNews); pr.x = sp.x; pr.z = sp.z; pr.label = "The square newsstand"; take.newsstand = sqNews; } }
     const ch = P.find(p => p.kind === "church" && /Willibrord/i.test(p.name)); if(ch){ const pr = byId("church"); if(pr){ const sp = ch.stand && ch.stand[2] ? ch.stand[2] : spot(ch); pr.x = sp.x; pr.z = sp.z; pr.label = "St. Willibrord's"; pr.r = 2.6; take.church = ch; } }
     const legacy = {diner:"diner_1", church:"church_2", newsstand:"newsstand_2", hardware:"shop_25", market:"shop_26"};
@@ -32386,6 +32397,7 @@ function sfApply(){
     main.forEach(p => { const kind = SF_KIND[p.name]; if(!kind || used.has(p.id)) return; const id = "sf:" + p.id; if(byId(id)) return; const sp = spot(p);
       D.push({id, label:sfTitle(p.name), sub:SF_SUB[kind], x:sp.x, z:sp.z, r:2.2, acts:() => purseShopActs(kind)}); });
     if(take.hq) SF.signs.push({poi:take.hq, title:"CAMPAIGN OFFICE", sub:"Open to anyone who will knock on a door"});
+    if(take.doffice) SF.signs.push({poi:take.doffice, title:"DISTRICT OFFICE", sub:"Constituent hours, and the war chest"});
     if(take.diner) SF.signs.push({poi:take.diner, title:"THE COUNTER", sub:"Coffee and grievances"});
     SF.done = key; try{ if(G.room === "district") gateAttach("district"); }catch(e){}
   }catch(e){ try{ console.warn("storefronts", e); }catch(x){} }
