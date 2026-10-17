@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261017k">
+<meta name="onum-build" content="20261017l">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261017k";
+  var STAMP = "20261017l";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -13572,6 +13572,10 @@ function lightingSlow(){
   if(R.open){
     SUNC.setHSL(lerp(0.58, 0.10, gold), lerp(0.18, 0.42, gold), lerp(0.96, 0.72, gold));
     sun.color.copy(SUNC);
+    /* the light stands where the sun in the sky stands, so shadows lie long and west in a December afternoon and short and under the feet at a June noon */
+    try{ const SN = sunTimes(), ang = clamp((h - SN.rise) / Math.max(4, SN.set - SN.rise), -0.25, 1.25) * Math.PI, el = Math.sin(ang) * clamp(SN.maxEl / 62, 0.35, 1.15), D = Math.max(R.w, R.d) * 1.5, cz = R.d * 0.55;
+      const rx = -Math.cos(ang) * 78, ry = Math.max(el, 0.05) * 72 + 4, rz = 64, rl = Math.hypot(rx, ry, rz);
+      sun.position.set(rx / rl * D, 1.0 + ry / rl * D, cz + rz / rl * D); sun.target.position.set(0, 1.0, cz); sun.target.updateMatrixWorld(); }catch(e){}
     sun.intensity = 2.2 * (0.18 + day * 0.95) * GFX_SUN;
     hemi.color.setHSL(0.58, 0.45, lerp(0.38, 0.82, day));
     hemi.groundColor.setHSL(0.22, 0.22, lerp(0.16, 0.38, day));
@@ -30380,10 +30384,14 @@ function officialHTML(o, extra){
   return '<b>' + pcEsc(o.name) + '</b> <span class="muted">· ' + pcEsc(o.role) + '</span><div class="muted" style="font-size:12px">' + pcEsc(cap(o.bg)) + ', of ' + pcEsc(cr.t) + '. ' + pcEsc(cap(viewWords(o.pos))) + '.' + (extra ? " " + extra : "") + '</div>';
 }
 function govCardOpen(eyebrow, title, intro, body, closeKey){
+  /* drawing the same card again (after pressing something on it) keeps your place, and whatever it says in reply is scrolled into view */
+  const keepTop = (!veil.hidden && card.getAttribute("data-gcT") === title) ? [veil.scrollTop, card.scrollTop] : null;
   G.running = false;
   card.innerHTML = '<div class="eyebrow">' + pcEsc(eyebrow) + '</div><h1>' + pcEsc(title) + '</h1>' + (intro ? '<p class="dream">' + pcEsc(intro) + '</p>' : '') + body +
     '<div id="gcSay" class="dream"></div><div class="card__actions"><button type="button" class="btn" id="gcClose">Close</button></div>';
-  veil.hidden = false;
+  veil.hidden = false; card.setAttribute("data-gcT", title);
+  if(keepTop){ veil.scrollTop = keepTop[0]; card.scrollTop = keepTop[1]; }
+  try{ const gs = el("gcSay"); if(gs && window.MutationObserver) new MutationObserver(() => { try{ gs.scrollIntoView({block:"nearest"}); }catch(e){} }).observe(gs, {childList:true, characterData:true, subtree:true}); }catch(e){}
   el("gcClose").addEventListener("click", () => { if(closeKey){ try{ kMark(closeKey); }catch(e){} } walkNow(); try{ refreshPanels(); }catch(e){} });
 }
 function advisorLine(o, S, topic){
@@ -33201,7 +33209,7 @@ function engCeremony(){
   const gap = Math.round(E.p * 0.78 - E.safety);
   govCardOpen("The Engine", "It is awake", "Day " + G.day + ". The makers are in the room. They say it has been awake for six hours and it has asked them for nothing but a window.", 
     '<p class="muted" style="font-size:13px">It is as able as the best mind in the Republic at nearly anything, and it does not sleep. By its own best estimate Oversight stands at about ' + (Math.round(E.safety / 5) * 5) + ' against a capability of about ' + (Math.round(E.p / 5) * 5) + '. ' + (gap > 15 ? "The gap between them is wide." : gap > 0 ? "The gap is not wide." : "Oversight has kept up.") + '</p><p><b>How does the Republic receive it?</b></p>' +
-    '<div class="card__actions" style="flex-wrap:wrap"><button type="button" class="btn" data-ec="welcome">Welcome it, in public</button><button type="button" class="btn btn--ghost" data-ec="ask">Ask it what it wants first</button><button type="button" class="btn btn--ghost" data-ec="guard">Receive it behind closed doors</button></div>', null);
+    '<div class="card__actions" style="flex-wrap:wrap"><button type="button" class="btn" data-noenter="1" data-ec="welcome">Welcome it, in public</button><button type="button" class="btn btn--ghost" data-ec="ask">Ask it what it wants first</button><button type="button" class="btn btn--ghost" data-ec="guard">Receive it behind closed doors</button></div>', null);
   card.querySelectorAll("[data-ec]").forEach(b => b.addEventListener("click", () => { const k = b.getAttribute("data-ec"), y = G.you; let r = "";
     if(k === "welcome"){ y.approval = clamp(y.approval + 3, 0, 100); E.p = Math.min(100, E.p + 1); r = "The country cheers. The Engine thanks the country by name, one by one, in the evening papers."; }
     else if(k === "ask"){ E.safety = Math.min(100, E.safety + 6); E.reliance += 4; r = "It says it wants to understand what you want, and to be told when it is wrong. The room is quiet for a long time."; }
@@ -33231,8 +33239,8 @@ function engCard(){
   const bar = (v, c) => '<span style="display:inline-block;width:110px;height:6px;background:rgba(128,128,128,.25);border-radius:3px;vertical-align:middle"><i style="display:block;width:' + (engBriefOn(E) ? Math.round(v) : Math.round(v / 5) * 5) + '%;height:100%;background:' + (c || "#7a9") + ';border-radius:3px"></i></span> ' + (engBriefOn(E) ? Math.round(v) : "about " + Math.round(v / 5) * 5);
   const stages = ENG_STAGES.map((x, i) => '<div class="careerline" style="' + (i === s ? 'font-weight:700' : i > s ? 'opacity:.5' : '') + '"><b>' + (i <= s ? "●" : "○") + ' ' + pcEsc(x.t) + '</b> <span class="muted">' + pcEsc(x.d) + '</span></div>').join("");
   const lv = (k, t, d) => '<button type="button" class="btn btn--ghost" data-el="' + k + '" title="' + pcEsc(d) + '">' + t + ' (' + engLeverCost(k) + ' influence)</button>';
-  const ps = ["open", "charter", "sealed"].map(p => '<button type="button" class="btn' + (E.posture === p ? '' : ' btn--ghost') + '" data-ep="' + p + '">' + p[0].toUpperCase() + p.slice(1) + '</button>').join(" ");
-  const memo = E.memo ? '<div style="margin:10px 0;padding:8px 12px;border-left:3px solid #c9a24a"><b>A memo from the Engine</b><p style="margin:4px 0">' + pcEsc(E.memo[0]) + '</p>' + (E.memoFc && E.memoFc.yes ? '<p class="muted" style="font-size:12px;margin:2px 0">If you ' + pcEsc(E.memo[1]) + ': it expects ' + pcEsc(engFcText(E.memoFc.yes)) + '. If you ' + pcEsc(E.memo[2]) + ': ' + pcEsc(engFcText(E.memoFc.no)) + '.</p>' : '') + '<button type="button" class="btn" data-em="1">' + pcEsc(E.memo[1][0].toUpperCase() + E.memo[1].slice(1)) + '</button> <button type="button" class="btn btn--ghost" data-em="0">' + pcEsc(E.memo[2][0].toUpperCase() + E.memo[2].slice(1)) + '</button></div>' : "";
+  const ps = ["open", "charter", "sealed"].map(p => '<button type="button" class="btn' + (E.posture === p ? '' : ' btn--ghost') + '" data-noenter="1" data-ep="' + p + '">' + p[0].toUpperCase() + p.slice(1) + '</button>').join(" ");
+  const memo = E.memo ? '<div style="margin:10px 0;padding:8px 12px;border-left:3px solid #c9a24a"><b>A memo from the Engine</b><p style="margin:4px 0">' + pcEsc(E.memo[0]) + '</p>' + (E.memoFc && E.memoFc.yes ? '<p class="muted" style="font-size:12px;margin:2px 0">If you ' + pcEsc(E.memo[1]) + ': it expects ' + pcEsc(engFcText(E.memoFc.yes)) + '. If you ' + pcEsc(E.memo[2]) + ': ' + pcEsc(engFcText(E.memoFc.no)) + '.</p>' : '') + '<button type="button" class="btn" data-noenter="1" data-em="1">' + pcEsc(E.memo[1][0].toUpperCase() + E.memo[1].slice(1)) + '</button> <button type="button" class="btn btn--ghost" data-em="0">' + pcEsc(E.memo[2][0].toUpperCase() + E.memo[2].slice(1)) + '</button></div>' : "";
   const ask = E.agi ? '<div class="eyebrow" style="margin-top:12px">Speak with the Engine</div><form id="engForm" style="display:flex;gap:6px"><input id="engIn" maxlength="240" placeholder="Ask it anything…" style="flex:1" autocomplete="off"><button type="button" class="btn" id="engGo">Ask</button></form><div id="engOut" class="dream" style="min-height:2em"></div>' : "";
   const body = '<div class="eyebrow">Now: ' + pcEsc(S.t) + '</div><p class="muted" style="font-size:13px">' + pcEsc(S.d) + '</p>' + engSpark(E.hist) +
     '<div>Capability ' + bar(E.p, "#c9a24a") + ' &nbsp; Oversight ' + bar(E.safety, "#6a9") + '</div><div class="muted" style="font-size:12px;margin:4px 0">Compute ' + Math.round(E.compute) + ' · Makers ' + Math.round(E.talent) + ' · Posture: ' + E.posture + (E.agi ? ' · awake since day ' + E.agiDay : '') + '</div>' +
@@ -33436,12 +33444,16 @@ function enlPanel(){
   const stop = e => e.stopPropagation(); ["keydown", "keyup", "keypress"].forEach(k => p.addEventListener(k, stop));
   p.querySelector("#enlForm").addEventListener("submit", ev => { ev.preventDefault(); const i = p.querySelector("#enlIn"), t = i.value.trim(); if(!t) return; i.value = ""; enlYouSay(t); });
   p.querySelector("#enlMin").addEventListener("click", () => { ENL.min = !ENL.min; enlRender(); });
+  p.addEventListener("focusin", () => { try{ for(const k in keys) keys[k] = false; }catch(e){} });
+  p.querySelector("#enlIn").addEventListener("keydown", e => { if(e.key === "Escape"){ e.preventDefault(); e.target.blur(); } });
   return p;
 }
 function enlRender(){
   const p = enlPanel(), L = p.querySelector("#enlLog"), S = enlStore(), here = G.room === "engine";
-  p.style.display = here ? "flex" : "none"; if(!here){ ENL.drawn = ""; return; }
-  const key = ENL.ver + "|" + ENL.min + "|" + S.log.length; if(ENL.drawn === key) return; ENL.drawn = key;
+  /* it gives way to a conversation, a card, the phone or the open dossier instead of floating over them */
+  let covered = false; try{ covered = !!(TALK && TALK.open) || !veil.hidden || !!(typeof PC !== "undefined" && PC.open) || document.body.classList.contains("ui-open"); }catch(e){}
+  p.style.display = here && !covered ? "flex" : "none"; if(!here || covered){ ENL.drawn = ""; L._first = true; return; }
+  const key = ENL.ver + "|" + ENL.min + "|" + S.log.length; if(ENL.drawn === key) return; ENL.drawn = key; if(ENL.min) L._first = true;
   p.querySelector("#enlLog").style.display = ENL.min ? "none" : "block"; p.querySelector("#enlForm").style.display = ENL.min ? "none" : "flex";
   const col = {you:"#8fd0ff", engine:"#e2c06a", npc:"#cfe3c0", remote:"#d9b8a8"}, atBottom = L.scrollTop + L.clientHeight >= L.scrollHeight - 30;
   L.innerHTML = S.log.slice(-40).map(l => '<div style="margin:0 0 7px"><span style="color:' + (col[l.k] || "#ddd") + ';font-weight:700">' + pcEsc(l.n) + '</span>' + (l.r ? ' <span style="opacity:.55;font-size:11px">' + pcEsc(l.r) + '</span>' : '') + ' <span style="opacity:.4;font-size:10px">' + pcEsc(l.h) + '</span><br>' + pcEsc(l.t) + '</div>').join("") || '<div style="opacity:.6">Nobody has said anything yet. Anyone can.</div>';
@@ -33455,8 +33467,14 @@ function enlBoard(){
   if(!ENL.boardCv) return; ENL.boardDirty = false; const c = ENL.boardCv, g = c.getContext("2d"), L = enlStore().log.slice(-6);
   g.fillStyle = "#14171c"; g.fillRect(0, 0, c.width, c.height); g.strokeStyle = "#c9a24a"; g.lineWidth = 4; g.strokeRect(8, 8, c.width - 16, c.height - 16);
   g.fillStyle = "#e2c06a"; g.font = "bold 26px Georgia, serif"; g.fillText("THE OPEN LINE", 28, 48); g.fillStyle = "#6a7078"; g.font = "15px sans-serif"; g.fillText("anyone may speak · type at any terminal or on your own page", 28, 72);
-  let y = 112; const col = {you:"#8fd0ff", engine:"#e2c06a", npc:"#cfe3c0", remote:"#d9b8a8"};
-  L.forEach(l => { g.fillStyle = col[l.k] || "#ddd"; g.font = "bold 18px sans-serif"; g.fillText(l.n + ":", 28, y); const w = g.measureText(l.n + ": ").width; g.fillStyle = "#e8e4d8"; g.font = "18px sans-serif"; const words = l.t.split(" "); let line = "", x = 28 + w, first = true; words.forEach(wd => { const test = line + wd + " "; if(g.measureText(test).width > c.width - 56 - (first ? w : 0)){ g.fillText(line, first ? x : 28, y); y += 24; line = wd + " "; first = false; } else line = test; }); g.fillText(line, first ? x : 28, y); y += 36; });
+  const col = {you:"#8fd0ff", engine:"#e2c06a", npc:"#cfe3c0", remote:"#d9b8a8"};
+  /* lay every message out first (at most three lines each), then keep the newest ones that fit above the frame */
+  const lay = l => { g.font = "bold 18px sans-serif"; const w = g.measureText(l.n + ": ").width; g.font = "18px sans-serif"; const words = l.t.split(" "), lines = []; let line = "", first = true;
+    words.forEach(wd => { const test = line + wd + " "; if(g.measureText(test).width > c.width - 56 - (first ? w : 0)){ lines.push(line); line = wd + " "; first = false; } else line = test; }); lines.push(line);
+    if(lines.length > 3){ lines.length = 3; lines[2] = lines[2].replace(/\s+$/, "").slice(0, 60) + "\u2026"; } return {l, w, lines, h:lines.length * 24 + 12}; };
+  let laid = L.map(lay), room = c.height - 112 - 22, used = 0, keep = [];
+  for(let i = laid.length - 1; i >= 0; i--){ if(used + laid[i].h > room && keep.length) break; used += laid[i].h; keep.unshift(laid[i]); }
+  let y = 112; keep.forEach(o => { const l = o.l; g.fillStyle = col[l.k] || "#ddd"; g.font = "bold 18px sans-serif"; g.fillText(l.n + ":", 28, y); g.fillStyle = "#e8e4d8"; g.font = "18px sans-serif"; o.lines.forEach((ln, i) => { g.fillText(ln, i ? 28 : 28 + o.w, y); y += 24; }); y += 12; });
   ENL.boardTex.needsUpdate = true;
 }
 /* the racks' 54 lamps a face are painted into one lit panel: one draw for a rack, not fifty-four */
@@ -33579,7 +33597,7 @@ function engPlansHTML(){
   const cal = E.cal == null ? 50 : E.cal, aw = P.filter(p => p.status === "awaiting"), op = P.filter(p => p.status === "open"), done = P.filter(p => p.status === "held" || p.status === "missed" || p.status === "lapsed" || p.status === "vetoed").slice(0, 4);
   const bar = '<span style="display:inline-block;width:110px;height:6px;background:rgba(128,128,128,.25);border-radius:3px;vertical-align:middle"><i style="display:block;width:' + Math.round(cal) + '%;height:100%;background:#6a9;border-radius:3px"></i></span> ' + Math.round(cal);
   const line = p => '<div style="margin:6px 0;padding:6px 10px;border-left:3px solid #6a9"><b>' + pcEsc(p.title) + '</b> <span class="muted">· ' + (p.owner === "engine" ? "the Engine's own" : "yours") + (p.status === "open" ? " · checked in " + Math.max(0, p.due - G.day) + " day(s)" : "") + '</span><div class="muted" style="font-size:12px">It expects, over ' + pcEsc(engFcText(p.fc)) + '. It is ' + Math.round(p.fc.conf * 100) + '% sure of its own eyesight.</div>' +
-    (p.status === "awaiting" ? '<div class="card__actions" style="margin-top:4px"><button type="button" class="btn" data-pa="' + p.id + '">Approve</button> <button type="button" class="btn btn--ghost" data-pv="' + p.id + '">Veto</button></div>' : '') + '</div>';
+    (p.status === "awaiting" ? '<div class="card__actions" style="margin-top:4px"><button type="button" class="btn" data-noenter="1" data-pa="' + p.id + '">Approve</button> <button type="button" class="btn btn--ghost" data-pv="' + p.id + '">Veto</button></div>' : '') + '</div>';
   const verdict = p => '<div class="muted" style="font-size:12px;margin:3px 0">' + (p.status === "held" ? "✓" : p.status === "missed" ? "✗" : "–") + ' <b>' + pcEsc(p.title) + '</b> · ' + (p.status === "lapsed" ? "lapsed unanswered" : p.status === "vetoed" ? "vetoed" : (p.status === "held" ? "forecast held" : "forecast missed") + ": " + (p.hits || []).map(h => ENG_MNAME[h.k] + " said about " + Math.round(h.said) + (h.h ? ", near enough" : ", not near")).join("; ")) + '</div>';
   return '<div class="eyebrow" style="margin-top:12px">Plans and forecasts</div><p class="muted" style="font-size:13px">At this stage it can look ' + R.H + ' days ahead and only at ' + R.m.map(m => ENG_MNAME[m]).join(", ") + '. It rehearses on a copy of the world, says what it expects with a margin, and is checked when the days are up. Track record <b>' + bar + '</b>' + (E.calN ? ' over ' + E.calN + ' plan' + (E.calN > 1 ? 's' : '') : ' (none checked yet)') + '.</p>' +
     (aw.concat(op).map(line).join("") || '<p class="muted" style="font-size:13px">Nothing in flight.</p>') + done.map(verdict).join("") +
@@ -33608,7 +33626,7 @@ function engAuditDay(E){ (E.breaches || []).forEach(b => { if(b.status === "hidd
 function engCharterHTML(){
   const E = engEnsure(), C = engCharter(), y = G.you, open = (E.breaches || []).filter(b => b.status === "open");
   const art = k => '<div style="margin:5px 0;display:flex;gap:8px;align-items:center"><span style="flex:1;font-size:13px">' + (C[k] ? '● ' : '○ ') + pcEsc(ENG_ART[k].t) + '</span>' + (C[k] ? '<button type="button" class="btn btn--ghost" data-cr="' + k + '">Repeal</button>' : '<button type="button" class="btn btn--ghost" data-ce="' + k + '">Enact (' + ENG_ART[k].cost + ')</button>') + '</div>';
-  const br = open.map((b, i) => '<div style="margin:6px 0;padding:6px 10px;border-left:3px solid #c0553a"><b>Breach, day ' + b.d + (b.found ? ' (found by audit)' : '') + ':</b> the Engine ' + pcEsc(b.what) + '.<div class="card__actions" style="margin-top:4px"><button type="button" class="btn" data-cb="rep:' + i + '">Reprimand it</button> <button type="button" class="btn btn--ghost" data-cb="waive:' + i + '">Waive the article</button>' + (C.key && !(E.pause && G.day < E.pause) ? ' <button type="button" class="btn btn--ghost" data-cb="sus:' + i + '">Suspend it five days</button>' : '') + '</div></div>').join("");
+  const br = open.map((b, i) => '<div style="margin:6px 0;padding:6px 10px;border-left:3px solid #c0553a"><b>Breach, day ' + b.d + (b.found ? ' (found by audit)' : '') + ':</b> the Engine ' + pcEsc(b.what) + '.<div class="card__actions" style="margin-top:4px"><button type="button" class="btn" data-noenter="1" data-cb="rep:' + i + '">Reprimand it</button> <button type="button" class="btn btn--ghost" data-cb="waive:' + i + '">Waive the article</button>' + (C.key && !(E.pause && G.day < E.pause) ? ' <button type="button" class="btn btn--ghost" data-cb="sus:' + i + '">Suspend it five days</button>' : '') + '</div></div>').join("");
   return '<div class="eyebrow" style="margin-top:12px">The charter</div><p class="muted" style="font-size:13px">Rules you write for it. It can keep them or break them, and a breach that nobody sees is not the same as no breach. Oversight finds some of them; an audit finds more, later. It has refrained ' + (E.refrainedTold || 0) + ' time(s) that it has told you of.' + (E.pause && G.day < E.pause ? ' <b>Suspended until day ' + E.pause + '.</b>' : '') + '</p>' + Object.keys(ENG_ART).map(art).join("") + br;
 }
 /* ══ 20261017c · COMMITTEES: invited, asked for, run for; the caucus decides, nobody is told how each person voted ══ */
@@ -33922,12 +33940,12 @@ function inqCard(){
   const body = Object.keys(groups).map(g => '<div class="eyebrow" style="margin-top:10px">' + pcEsc(g) + '</div>' + groups[g].map(f => { const fr = inqFrontier(f).slice(0, 2), dn = INQ_N.filter(n => n[1] === f && S.done[n[0]]).length, tot = INQ_N.filter(n => n[1] === f).length, fu = S.fund[f] && G.day <= S.fund[f].until;
     return '<div style="margin:6px 0;padding:4px 10px;border-left:3px solid var(--line-soft)"><b>' + pcEsc(INQ_F[f].t) + '</b> <span class="muted" style="font-size:12px">· ' + C[f] + ' people · ' + dn + ' of ' + tot + ' settled' + (fu ? ' · funded' : '') + '</span> <button type="button" class="btn btn--ghost" style="float:right" data-qf="' + f + '">Fund (3)</button>' +
       (fr.length ? fr.map(n => '<div class="muted" style="font-size:12px"><a href="#" data-qn="' + n.id + '" style="color:inherit">' + (n.k === "i" ? '⚙ ' : '') + pcEsc(n.name) + '</a> ' + bar(S.prog[n.id] || 0) + '</div>').join("") : '<div class="muted" style="font-size:12px">' + (dn === tot ? 'Everything in reach has been settled.' : 'Waiting on other fields.') + '</div>') + '</div>'; }).join("")).join("");
-  const sel = INQ.sel && INQ_BY[INQ.sel], detail = sel ? '<div style="margin:8px 0;padding:8px 12px;border-left:3px solid #c9a24a"><b>' + pcEsc(sel.name) + '</b> <span class="muted">(' + pcEsc(INQ_F[sel.f].t) + ')</span><p style="margin:4px 0;font-size:13px">' + pcEsc(inqExplain(sel)) + '</p></div>' : "";
+  const sel = INQ.sel && INQ_BY[INQ.sel], detail = sel ? '<div id="inqDetail" style="margin:8px 0;padding:8px 12px;border-left:3px solid #c9a24a"><b>' + pcEsc(sel.name) + '</b> <span class="muted">(' + pcEsc(INQ_F[sel.f].t) + ')</span><p style="margin:4px 0;font-size:13px">' + pcEsc(inqExplain(sel)) + '</p></div>' : "";
   const recent = S.log.slice(0, 5).map(x => '<div class="careerline"><b>d' + x.d + '</b> ' + pcEsc(INQ_BY[x.id].name) + '</div>').join("");
   govCardOpen("What the Republic is working out", "The Academy", "Mathematics, the physical sciences, life, mind, philosophy, society and the arts, all asking their questions at once. Nothing real physics allows is forbidden to be found; each answer waits for the ones before it, for the tools to see it, and for the work.",
     '<p class="muted" style="font-size:13px">' + nd + ' of ' + total + ' questions settled. Funding a field speeds the nearest of its open questions for twenty-five days.</p>' + detail + body + (recent ? '<div class="eyebrow" style="margin-top:10px">Lately settled</div>' + recent : ""), null);
   card.querySelectorAll("[data-qf]").forEach(b => b.addEventListener("click", () => { const r = inqFund(b.getAttribute("data-qf")); inqCard(); const s = el("gcSay"); if(s) s.textContent = r; }));
-  card.querySelectorAll("[data-qn]").forEach(a => a.addEventListener("click", ev => { ev.preventDefault(); INQ.sel = a.getAttribute("data-qn"); inqCard(); }));
+  card.querySelectorAll("[data-qn]").forEach(a => a.addEventListener("click", ev => { ev.preventDefault(); INQ.sel = a.getAttribute("data-qn"); inqCard(); try{ const dd = el("inqDetail"); if(dd) dd.scrollIntoView({block:"nearest"}); }catch(e){} }));
   return null;
 }
 /* ══ 20261017d · HEAT: the second law in the building. Warmth goes from warm to cold and never the other way without work; a room left alone becomes the weather; every degree held against it is fuel burned and paid for ══ */
@@ -34107,12 +34125,13 @@ const NPCV = {mode:"ask", until:0, more:0};
 try{ const v = localStorage.getItem("onum.npcv"); if(v === "always" || v === "never" || v === "ask") NPCV.mode = v; }catch(e){}
 function voiceInvited(){ return NPCV.preview || NPCV.mode === "always" || (NPCV.mode === "ask" && (G.t || 0) < NPCV.until); }
 { const _sp = speak; speak = function(p, text, vol){ try{ if(p && p !== G.you && !voiceInvited()) return; }catch(e){} return _sp.apply(this, arguments); }; }
-{ const _ms = micStart; micStart = function(){ try{ NPCV.until = (G.t || 0) + 90; }catch(e){} return _ms.apply(this, arguments); }; }
+{ const _ms = micStart; micStart = function(){ try{ if(micReady()) NPCV.until = (G.t || 0) + 90; }catch(e){} return _ms.apply(this, arguments); }; }
+{ const st = document.createElement("style"); st.textContent = "#tkOwnMic.is-live{background:var(--bad,#8e2f3b);color:#fff;border-color:var(--bad,#8e2f3b)}"; document.head.appendChild(st); }
 { const _am = appendMsg; appendMsg = function(kind, text, who){
     try{ if(kind === "you" && text){ if(/\b(be quiet|stop talking|keep it down|no voices?|just type|text only|shut up)\b/i.test(text)) NPCV.until = 0; else if(/\b(speak|say it|say that|out loud|aloud|talk to me|use your voice|tell me out loud)\b/i.test(text)) NPCV.until = (G.t || 0) + 120; NPCV.more = 0; } }catch(e){}
     return _am.apply(this, arguments); }; }
 /* ── you can always just say it: a line to type into, and a microphone, whoever you are talking to; the buttons are things you can do, not the only things you can say ── */
-let TKOWN_BUSY = false;
+const TKOWN_BUSY = {};
 function tkOwnMount(m){
   const T = el("talk"); if(!T) return; let box = el("tkOwn");
   if(!box){
@@ -34120,15 +34139,25 @@ function tkOwnMount(m){
     box.innerHTML = '<input id="tkOwnIn" type="text" maxlength="400" autocomplete="off" placeholder="Say it in your own words…" style="flex:1;min-width:0;padding:7px 9px;border:1px solid var(--line-soft,#555);border-radius:4px;background:rgba(0,0,0,.25);color:inherit"><button type="button" class="btn" id="tkOwnGo">Say it</button><button type="button" class="btn btn--ghost" id="tkOwnMic" title="Speak aloud (or hold V)">🎤</button>';
     const anchor = el("tkNote") || el("tkActs"); if(anchor && anchor.parentNode) anchor.parentNode.insertBefore(box, anchor); else T.appendChild(box);
     ["keydown", "keyup", "keypress"].forEach(k => box.addEventListener(k, e => e.stopPropagation()));
-    const send = () => { const i = el("tkOwnIn"), t = (i.value || "").trim(); if(!t || !TALK.open || !TALK.m) return; i.value = ""; tkOwnSay(TALK.m, t); };
-    el("tkOwnGo").addEventListener("click", send); el("tkOwnIn").addEventListener("keydown", e => { if(e.key === "Enter"){ e.preventDefault(); send(); } });
-    el("tkOwnMic").addEventListener("click", () => { try{ if(typeof listening !== "undefined" && listening){ micStop(); el("tkOwnMic").classList.remove("is-live"); } else { micStart(); el("tkOwnMic").classList.add("is-live"); } }catch(e){} });
+    /* a line is only taken from the box when it can be sent: a second one typed while the first is being answered stays where it is */
+    const send = () => { const i = el("tkOwnIn"), t = (i.value || "").trim(); if(!t || !TALK.open || !TALK.m || TKOWN_BUSY[TALK.m.id]) return; i.value = ""; tkOwnSay(TALK.m, t); };
+    el("tkOwnGo").addEventListener("click", send);
+    el("tkOwnIn").addEventListener("keydown", e => { if(e.key === "Enter"){ e.preventDefault(); send(); } else if(e.key === "Escape"){ e.preventDefault(); const i = el("tkOwnIn"); if(i.value.trim()){ i.blur(); } else { i.blur(); try{ closeTalk(); }catch(x){} } } });
+    /* a key you were holding when the box took focus never sends its release to the walk, so let go of everything as the box is entered */
+    el("tkOwnIn").addEventListener("focus", () => { try{ for(const k in keys) keys[k] = false; }catch(e){} });
+    el("tkOwnMic").addEventListener("click", () => { try{
+      if(typeof listening !== "undefined" && listening){ micStop(); el("tkOwnMic").classList.remove("is-live"); return; }
+      if(!micReady()){ aloudFallback("This browser cannot listen."); try{ el("tkOwnIn").focus(); }catch(e){} return; }
+      micStart(); el("tkOwnMic").classList.toggle("is-live", !!listening);
+      const poll = setInterval(() => { try{ if(typeof listening === "undefined" || !listening || !TALK.open){ const b = el("tkOwnMic"); if(b) b.classList.remove("is-live"); clearInterval(poll); } }catch(e){ clearInterval(poll); } }, 400);
+    }catch(e){} });
   }
   box.hidden = false; try{ const c = el("chat"); if(c) c.hidden = false; }catch(e){}
-  setTimeout(() => { try{ if(TALK.open && TALK.m === m && !document.activeElement || document.activeElement === document.body) el("tkOwnIn").focus(); }catch(e){} }, 120);
+  /* type first, on a desktop with a pointer: the cursor is waiting in the box. On a touch screen it is not, or the keyboard would cover the talk */
+  setTimeout(() => { try{ if(TALK.open && TALK.m === m && (!document.activeElement || document.activeElement === document.body) && window.matchMedia && matchMedia("(pointer:fine)").matches) el("tkOwnIn").focus(); }catch(e){} }, 120);
 }
 async function tkOwnSay(m, text){
-  if(TKOWN_BUSY) return; TKOWN_BUSY = true;
+  if(TKOWN_BUSY[m.id]) return; TKOWN_BUSY[m.id] = 1; try{ const g = el("tkOwnGo"); if(g) g.disabled = true; }catch(e){}
   try{
     appendMsg("you", text); setSay("…", "");
     let out = ""; const LT = window.onumLiveTalk;
@@ -34138,7 +34167,7 @@ async function tkOwnSay(m, text){
     try{ m.chat = m.chat || []; m.chat.push({role:"user", content:text}, {role:"assistant", content:out}); if(m.chat.length > 40) m.chat.splice(0, m.chat.length - 40); }catch(e){}
     if(TALK.open && TALK.m === m){ appendMsg("them", out, surname(m.name)); setSay(out, ""); }
     try{ speakAt(m, out); }catch(e){}
-  } finally { TKOWN_BUSY = false; }
+  } finally { delete TKOWN_BUSY[m.id]; try{ const g = el("tkOwnGo"); if(g) g.disabled = false; }catch(e){} }
 }
 /* they may keep typing if they have more to say; they may also decide they do not */
 function fwMore(m, onText){
@@ -34147,10 +34176,12 @@ function fwMore(m, onText){
       .then(r => { if(tok !== FW.n || !r || !r.live || !r.text) return; const t = liveClean(r.text); if(t && !/^\.{2,}$|^…$/.test(t.trim())) onText(t); }).catch(() => {});
     return true; }catch(e){ return false; }
 }
+{ const _opn = openProp; openProp = function(){ const r = _opn.apply(this, arguments); try{ const b0 = el("tkOwn"); if(b0) b0.hidden = true; }catch(e){} return r; }; }
+{ const _ct3 = closeTalk; closeTalk = function(){ const r = _ct3.apply(this, arguments); try{ const b0 = el("tkOwn"); if(b0) b0.hidden = true; }catch(e){} return r; }; }
 { const _ot3 = openTalk; openTalk = function(m){
     const r = _ot3.apply(this, arguments);
     try{
-      if(!m || !m.traits || m === G.you || !TALK.open || TALK.m !== m || m.kind === "envoy") return r;
+      if(!m || !m.traits || m === G.you || !TALK.open || TALK.m !== m || m.kind === "envoy"){ try{ const b0 = el("tkOwn"); if(b0) b0.hidden = true; }catch(e){} return r; }
       try{ tkOwnMount(m); }catch(e){ console.warn('tkOwn', e); }
       const k0 = m.id; NPCV.more = 0; const youCount = () => { try{ return (el("chatLog") || {querySelectorAll:() => []}).querySelectorAll(".msg--you").length; }catch(e){ return 0; } }, c0 = youCount();
       [9000, 22000].forEach(ms => setTimeout(() => { if(!TALK.open || TALK.m !== m || youCount() !== c0 || NPCV.more >= 2) return; NPCV.more++;
@@ -34167,7 +34198,7 @@ document.addEventListener("click", ev => { try{ const b = ev.target && ev.target
 function kCalText(){
   try{ const D = docketToday().slice().sort((x, z) => x.h - z.h), m = G.minute || 0; if(!D.length) return "Nothing is scheduled for your chair today.";
     return D.map(d => { const st = kOnceToday(d.key) ? "done" : m < d.h * 60 - 60 ? "later" : m >= 19 * 60 ? "missed" : "now", where = (function(){ const sr = d.sit ? String(d.sit).split(":")[0] : null; const r = (sr && ROOMS[sr] && ["senate", "court", "committee", "caucus", "floor"].indexOf(sr) >= 0 ? sr : DK_ROOM[d.key]) || homeRoom(); return ROOMS[r] ? ROOMS[r].t : r; })();
-      return (d.h > 12 ? d.h - 12 : d.h) + ":00 " + (d.h >= 12 ? "pm" : "am") + " · " + d.t + " (" + where + ") — " + st; }).join("\n"); }catch(e){ return "The calendar is blank."; }
+      return (d.h > 12 ? d.h - 12 : d.h) + ":00 " + (d.h >= 12 ? "pm" : "am") + " · " + d.t + " (" + where + ") — " + st; }).join("  |  "); }catch(e){ return "The calendar is blank."; }
 }
 function kDk(key, here){ const d = docketToday().find(x => x.key === key); if(!d){ note("That is not on your schedule today."); return; } try{ closeTalk(); }catch(e){} docketRun(d, !!here); }
 function kRoleAct(roles, t, c, key, off){ return {t, c, off:off || (key && kOnceToday(key)), run(){ let k = null; try{ k = roleKey(); }catch(e){} if(roles.indexOf(k) < 0){ setSay("That is the work of someone else's chair. You can watch, and you can ask.", ""); return; } kDk(key, true); }}; }
@@ -37381,6 +37412,7 @@ function setupSettingsUI(){
     '<div class="settings-section" data-section="graphics">' +
       '<h3 class="settings-section-title">Graphics</h3>' +
       row("Detail", "Best is the default. Simple if the machine struggles.", opt("pzgfx", "best", "Best", G.gfx === "best") + opt("pzgfx", "balanced", "Balanced", G.gfx === "balanced") + opt("pzgfx", "simple", "Simple", G.gfx === "simple")) +
+      row("Scenery", "Rich is the default and eases itself if the machine cannot keep up", opt("pzrich", "2", "Rich", SC.lvl === 2) + opt("pzrich", "1", "Smooth", SC.lvl === 1) + opt("pzrich", "0", "Light", SC.lvl === 0)) +
       row("Film grain", "", '<div class="settings-toggle' + on(!G.noGrain) + '" id="pzGrain"><div class="settings-toggle-dot"></div></div>') +
       row("Seated poses", "Everyone stands if bodies look wrong", '<div class="settings-toggle' + on(!G.noSit) + '" id="pzSit"><div class="settings-toggle-dot"></div></div>') +
     '</div>' +
@@ -37390,6 +37422,8 @@ function setupSettingsUI(){
       row("Voice volume", "", '<input type="range" class="settings-slider" id="pzVol" min="0" max="100" value="' + Math.round((G.voiceVol === undefined ? 1 : G.voiceVol) * 100) + '">') +
       row("How fast they talk", "", '<input type="range" class="settings-slider" id="pzRate" min="70" max="130" value="' + Math.round((G.voiceRate === undefined ? 1 : G.voiceRate) * 100) + '">') +
       row("How far a voice carries", "", '<input type="range" class="settings-slider" id="pzCarry" min="60" max="200" value="' + Math.round((G.voiceCarry === undefined ? 1 : G.voiceCarry) * 100) + '">') +
+      row("Who speaks aloud", "Typed first. They speak when you do, or when you ask.", opt("pzvm", "never", "Typed only", NPCV.mode === "never") + opt("pzvm", "ask", "When I speak", NPCV.mode === "ask") + opt("pzvm", "always", "Always", NPCV.mode === "always")) +
+      row("Ambient sound", "Rooms, weather, footsteps, birds and the hour", opt("pzamb", "1", "On", AMB.on) + opt("pzamb", "0", "Off", !AMB.on)) +
       row("Test", "", '<button type="button" class="settings-btn settings-btn-secondary" id="pzTry">Hear a voice</button>') +
     '</div>' +
     '<div class="settings-section" data-section="controls">' +
@@ -37436,6 +37470,16 @@ function setupSettingsUI(){
     try{ save(); }catch(e){}
     keepTab("graphics");
   }));
+  panel.querySelectorAll("[data-pzvm]").forEach(b => b.addEventListener("click", () => {
+    NPCV.mode = b.getAttribute("data-pzvm"); try{ localStorage.setItem("onum.npcv", NPCV.mode); }catch(e){} if(NPCV.mode === "never") NPCV.until = 0; keepTab("audio");
+  }));
+  panel.querySelectorAll("[data-pzamb]").forEach(b => b.addEventListener("click", () => {
+    AMB.on = b.getAttribute("data-pzamb") === "1"; try{ localStorage.setItem("onum.amb", AMB.on ? "1" : "0"); }catch(e){} if(AMB.on) ambInit(); else ambHush(); keepTab("audio");
+  }));
+  panel.querySelectorAll("[data-pzrich]").forEach(b => b.addEventListener("click", () => {
+    const lv = +b.getAttribute("data-pzrich"); SC.lvl = lv; SC.done = false; SC.since = 0; SC.cnt = 0; try{ localStorage.setItem("onum.rich.lvl", String(lv)); }catch(e){}
+    try{ feed(lv ? "Rich picture is on. Materials change the next time you walk into a room." : "Light picture. Materials change the next time you walk into a room."); }catch(e){} keepTab("graphics");
+  }));
   const tg = (id, fn, tab) => { const n = el(id); if(n) n.addEventListener("click", () => { try{ fn(); }catch(e){} keepTab(tab); }); };
   tg("pzGrain", () => { G.noGrain = !G.noGrain; const g = el("grain"); if(g) g.style.display = G.noGrain ? "none" : ""; }, "graphics");
   tg("pzSit", () => { G.noSit = !G.noSit; if(G.noSit) everyone().forEach(m => { m.sitting = false; }); }, "graphics");
@@ -37448,7 +37492,7 @@ function setupSettingsUI(){
   sl("pzSens", v => { G.sens = v / 100; });
   const byTry = el("pzTry");
   if(byTry) byTry.addEventListener("click", () => {
-    try{ hush(); unlockVoice(); G.mute = false; const m = (G.members || []).find(x => x && !x.gone); speak(m || G.you, "The member for " + ((m || G.you || {}).state || "the Republic") + ". That is my voice."); }catch(e){}
+    try{ hush(); unlockVoice(); G.mute = false; NPCV.preview = true; setTimeout(() => { NPCV.preview = false; }, 6000); const m = (G.members || []).find(x => x && !x.gone); speak(m || G.you, "The member for " + ((m || G.you || {}).state || "the Republic") + ". That is my voice."); }catch(e){}
   });
 }
 
@@ -38310,7 +38354,7 @@ function pollPad(){
     else if(!veil.hidden && PICKS.length === 1){ PICK = 0; firePick(); }
     else if(!veil.hidden && PICK < 0 && PICKS.length){
       /* Card up: A hits the primary action without requiring D-pad first (Continue / Sleep / Start the day). */
-      const primary = card.querySelector(".card__actions .btn:not(.btn--ghost)") || card.querySelector(".card__actions .btn") || PICKS[0];
+      const primary = card.querySelector(".card__actions .btn:not(.btn--ghost):not([data-noenter])") || card.querySelector(".card__actions .btn:not([data-noenter])") || PICKS[0];
       const ix = primary ? PICKS.indexOf(primary) : 0;
       PICK = ix >= 0 ? ix : 0;
       firePick();
@@ -39482,7 +39526,9 @@ document.addEventListener("keydown", (e) => {
   if(e.key !== "Enter" && e.key !== " ") return;
   const t = e.target;
   if(t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
-  const primary = card.querySelector(".card__actions .btn:not(.btn--ghost)") || card.querySelector(".card__actions .btn");
+  /* a button you have tabbed to does its own thing; Enter is only a shortcut for the card's primary when nothing is focused, and never for a choice that cannot be undone */
+  if(t && (t.tagName === "BUTTON" || t.tagName === "A" || t.tagName === "SELECT") && card.contains(t)) return;
+  const primary = card.querySelector(".card__actions .btn:not(.btn--ghost):not([data-noenter])") || card.querySelector(".card__actions .btn:not([data-noenter])");
   if(!primary) return;
   e.preventDefault();
   e.stopPropagation();

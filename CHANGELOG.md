@@ -4,6 +4,23 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## Shadows follow the sun, settings you can find, and a talk box that behaves
+
+`20261017l` (on `20261017k`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- **Shadows follow the sun.** The light now stands where the sun is in the sky: long, raking shadows in a December afternoon, short ones under the feet at a June noon, moving through the day.
+- **Ambient sound, who speaks aloud, and scenery are now in the Settings menu** (Voices and Graphics tabs). They were only reachable through Controls, Rebind keys. **Hear a voice** in that menu now plays.
+- **The talk box behaves.**
+  - Escape leaves the box: once to step out of it, and again (when it is empty) to end the conversation.
+  - On a touch screen the cursor is no longer pushed into the box and the keyboard does not cover the conversation.
+  - A second line typed while the first is being answered stays in the box instead of vanishing, and each person's box is independent.
+  - The box no longer shows on desks, terminals and other panels, or on envoys.
+  - The microphone button tells you when the browser cannot listen, lights while listening, and goes dark when it stops.
+- **Enter and Space can no longer approve the Engine's plan by accident.** On a card, Enter or Space now does nothing when a button you tabbed to is focused (that button does its own thing), and it never picks a choice that cannot be undone (approve a plan, reprimand, welcome the Engine, the memo choices, the posture).
+- **The Open Line gets out of the way** of conversations, cards, the phone and the dossier, keeps its place in the log, and the wall board shows the newest lines whole instead of clipping them.
+- **A card's reply is where you can see it.** Pressing something on the Engine or Academy cards keeps your place in the card, and what it says back is scrolled into view; the Academy's explanation scrolls to the question you picked.
+- Today's calendar reads as a list, not one run-on line.
+
 ## Heads stay on, the clock opens the calendar, and the Engine stops knowing too much
 
 `20261017k` (on `20261017j`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
