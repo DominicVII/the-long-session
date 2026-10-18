@@ -4,6 +4,12 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261018s: the Engine is given as long as it needs
+
+`20261018s` (on `20261018r`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+The Engine no longer gets cut short. Every Engine path (letters, works, research loop, journal, its card, the Open Line) now waits up to twenty minutes for its model, and its reply limits are raised from roughly 150-400 words to 500-1200. Letters are answered in full, up to eight questions, with no sentence limit. The card says the Engine is reading while it waits. A side effect of an earlier build is also undone: ordinary NPC lines no longer wait longer just because the Engine has its own model.
+
 ## 20261018r: test the Engine's model from its card
 
 `20261018r` (on `20261018q`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
