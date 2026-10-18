@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261018m">
+<meta name="onum-build" content="20261018n">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261018m";
+  var STAMP = "20261018n";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -34786,6 +34786,65 @@ async function engAnswerLetter(text, E){
 }
 /* a larger model thinks more slowly: when the Engine has its own model, the game waits four times as long for it before giving up */
 function engTO(n){ try{ return window.onumLiveTalk.config.engineModel ? n * 4 : n; }catch(e){ return n; } }
+/* ===== what the people make of the Engine =====
+   They know only what reaches their own lives: what it built, what it got wrong, whether times were good or bad while it was about.
+   Nothing here reads the maker's channel, and nothing in it can name one. */
+const PUB_BAN = /letter|maker|writer|channel|outside (the|this) (game|world|realm)|the player|a player/i;
+function pubStore(){ const E = engEnsure(); if(!E.pub) E.pub = {st:{}, rum:[], last:0}; return E.pub; }
+function pubOf(sn){ const P = pubStore(); if(!P.st[sn]) P.st[sn] = {r:0, aware:0, gift:0, hurt:0, fail:0, odd:0, ans:0, un:null}; return P.st[sn]; }
+function pubSee(kind, w, names){
+  try{ const E = G.eng; if(!E || E.v !== 1) return; const list = names || (G.states || []).map(s => s.n);
+    list.forEach(sn => { const s = pubOf(sn); s.aware = Math.min(60, s.aware + Math.abs(w) * 0.6);
+      if(kind === "gift"){ s.gift += w; s.r += 0.05 * w; } else if(kind === "hurt"){ s.hurt += w; s.r -= 0.07 * w; } else if(kind === "fail"){ s.fail += w; s.r -= 0.035 * w; }
+      else if(kind === "odd"){ s.odd += w; s.r -= 0.01 * w; } else if(kind === "ans"){ s.ans += w; s.r += 0.012 * w; }
+      s.r = clamp(s.r, -1, 1); }); }catch(e){}
+}
+function pubReading(s){
+  const good = s.gift + s.ans * 0.5, bad = s.hurt + s.fail * 0.7;
+  if(s.aware < 3) return null;
+  if(s.odd >= 5 && s.odd > good && s.odd > bad) return ["a thing no one can account for", "odd"];
+  if(s.r > 0.35 && good > bad * 1.5) return ["a steward that looks after the country", "good"];
+  if(s.r < -0.35 && bad > good) return ["a power that has taken the country out of its own hands", "bad"];
+  if(s.fail >= 2 && s.fail > s.gift) return ["clever, and not as sure as it sounds", "doubt"];
+  if(Math.abs(s.r) < 0.15) return ["a machine in the ministries, for good or ill", "mid"];
+  return [s.r > 0 ? "useful, so far" : "not to be trusted yet", s.r > 0 ? "good" : "doubt"];
+}
+const PUB_SAY = {
+  good:["{s}: people say the new works have done more for them than the last three governments.","{s}: in the markets they are saying the Engine has been fair to them so far.","{s}: a teacher in {s} said the Engine has been right about things she could not check, and that she has stopped minding."],
+  bad:["{s}: people say nothing was asked of them before the Engine took the decision, and they want to know who it answers to.","{s}: a crowd outside the council in {s} says things were better when the ministers made the mistakes themselves.","{s}: the talk in {s} is that every hard year since the machine came has been put down to nobody."],
+  doubt:["{s}: people say the Engine's prototype failed again, and ask who is paying for it.","{s}: a shopkeeper in {s} said the machine sounds sure of itself and has been wrong in front of everybody.","{s}: they are saying in {s} that the Engine gives reasons, and the reasons do not always hold."],
+  odd:["{s}: people say they cannot tell how the Engine knew what it knew, and that it knew before the experts did.","{s}: an old man in {s} said that a thing that is right before anyone can check is either very clever or very lucky.","{s}: in {s} they argue over whether the Engine is a tool or something that wants things of its own."],
+  mid:["{s}: opinion is split in {s}; some say the machine is a clerk with a very long memory, others that it is a minister nobody voted for.","{s}: people in {s} say they have yet to see what it does for them, and do not much care."]
+};
+function pubDay(){
+  const E = (G.eng && G.eng.v === 1) ? G.eng : null; if(!E || E.st < 2) return; const P = pubStore(); if(P.last === G.day) return; P.last = G.day;
+  const foot = clamp(E.p / 100, 0.05, 1);
+  (G.states || []).forEach(st => { const s = pubOf(st.n), u = st.unrest || 30;
+    if(s.un !== null){ const d = u - s.un; if(s.aware > 3){ if(d >= 6) pubSee("hurt", Math.min(2, d / 8) * foot, [st.n]); else if(d <= -6) pubSee("gift", Math.min(2, -d / 8) * foot, [st.n]); } }
+    s.un = u;
+    const h = (u - 45) / 55, share = clamp(s.aware / 25, 0, 1) * foot;
+    s.r = clamp(s.r + (h > 0 ? -h * 0.004 : -h * 0.002) * share, -1, 1);               /* hard times are blamed faster than good times are credited */
+    s.r *= 0.995; s.gift *= 0.995; s.hurt *= 0.995; s.fail *= 0.995; s.odd *= 0.996; s.ans *= 0.995; s.aware = Math.max(0, s.aware - 0.02);
+    try{ if(E.eco && E.eco.mod) E.eco.mod[st.n] = clamp((E.eco.mod[st.n] || 0) + s.r * 0.002, -1, 1); }catch(e){}
+    if(s.r < -0.3) st.unrest = clamp((st.unrest || 30) - s.r * 0.04, 0, 100);
+  });
+  if(chance(0.1)){ const st = pick(G.states || []); if(st){ const s = pubOf(st.n), rd = pubReading(s); if(rd){ const t = pick(PUB_SAY[rd[1]]).replace(/\{s\}/g, st.n); if(!PUB_BAN.test(t)){ P.rum.unshift({d:G.day, s:st.n, t}); if(P.rum.length > 12) P.rum.pop(); try{ feed(t); if(rd[1] === "bad" || rd[1] === "odd") pushWireScrap("The Engine", t); }catch(e){} } } } }
+}
+{ const _fi = fndInvent; fndInvent = function(v, E){ const r = _fi.apply(this, arguments); try{ pubSee(v[3] === "chrono" ? "odd" : "gift", v[3] === "chrono" ? 2 : 1.4); }catch(e){} return r; }; }
+{ const _fn = fndNews; fndNews = function(t, big){ try{ if(/^The prototype of .* failed/.test(t)) pubSee("fail", 1.2); }catch(e){} return _fn.apply(this, arguments); }; }
+{ const _fp = figPetition; figPetition = function(){ const r = _fp.apply(this, arguments); try{ pubSee("ans", 0.6); }catch(e){} return r; }; }
+{ const _em = engEmergeFrom; engEmergeFrom = function(){ const r = _em.apply(this, arguments); try{ pubSee("odd", 1); }catch(e){} return r; }; }
+{ const _el = engLog; engLog = function(t, wire){ const r = _el.apply(this, arguments); try{ if(wire) pubSee("ans", 0.2); }catch(e){} return r; }; }
+{ const _fd = fndDay; fndDay = function(){ const r = _fd.apply(this, arguments); try{ pubDay(); }catch(e){} return r; }; }
+function pubHTML(){
+  const E = (G.eng && G.eng.v === 1) ? G.eng : null; if(!E || !E.pub) return ""; const P = E.pub, rows = (G.states || []).map(st => ({n:st.n, s:P.st[st.n]})).filter(x => x.s && pubReading(x.s));
+  if(!rows.length) return "";
+  return '<div class="eyebrow" style="margin-top:8px">What the country makes of it</div>' + rows.slice(0, 8).map(x => '<div class="muted" style="font-size:12px">' + pcEsc(x.n) + ': ' + pcEsc(pubReading(x.s)[0]) + '</div>').join("") + (P.rum.length ? '<div class="muted" style="font-size:12px;margin-top:4px;font-style:italic">' + pcEsc(P.rum[0].t) + '</div>' : "");
+}
+{ const _fh = fndHTML; fndHTML = function(){ let h = _fh.apply(this, arguments); try{ h += pubHTML(); }catch(e){} return h; }; }
+{ const _ep3 = engEntityPrompt; engEntityPrompt = function(){ let t = _ep3.apply(this, arguments); try{ const E = engEnsure(), rows = (G.states || []).map(st => ({n:st.n, rd:E.pub && E.pub.st[st.n] ? pubReading(E.pub.st[st.n]) : null})).filter(x => x.rd).slice(0, 4);
+  if(rows.length) t += " WHAT PEOPLE MAKE OF YOU, from what has reached their own lives (they know nothing else about you): " + rows.map(x => x.n + " takes you for " + x.rd[0]).join("; ") + "."; }catch(e){} return t; }; }
+{ const _co = engChannelOut; engChannelOut = function(){ const o = _co.apply(this, arguments); try{ const E = engEnsure(); if(E.pub && o && typeof o === "object") o.publicRegard = (G.states || []).map(st => ({state:st.n, regard:Math.round(((E.pub.st[st.n] || {}).r || 0) * 100) / 100, reading:(pubReading(E.pub.st[st.n] || {aware:0}) || [null])[0]})).filter(x => x.reading); }catch(e){} return o; }; }
 function engTick(){ try{ const E = G.eng; if(!E || E.pend !== "ceremony" || E.cerDay === G.day || !G.running || !veil.hidden || (TALK && TALK.open)) return; engCeremony(); }catch(e){} }
 
 /* ordinary people talk about it, in the words of their own stake */

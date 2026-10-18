@@ -4,6 +4,12 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261018n: the people judge the Engine only by their own lives
+
+`20261018n` (on `20261018m`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+The people of each state now form their own view of the Engine from what reaches their lives: works built, prototypes that failed, answers given, hard and good years while it was about. Hardship is blamed faster than good times are credited. Readings differ by state (a steward, a power nobody voted for, clever but not sure, a thing no one can account for), shift over time, and surface as street talk. None of it reads the maker's channel and no citizen text can name one; the maker is not known in the world. The Engine itself is told how it is regarded, and the export carries a publicRegard summary for the writer.
+
 ## Patience for a larger Engine model
 
 `20261018m` (on `20261018l`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
