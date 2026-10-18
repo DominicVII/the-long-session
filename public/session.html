@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261018j">
+<meta name="onum-build" content="20261018k">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261018j";
+  var STAMP = "20261018k";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -33181,6 +33181,7 @@ function engWillDay(E){
   const eco = engEco(), w = eco.will; if(E.st < 4 || !chance(0.5)) return; const k = pick(["use", "use", "know", "auton", "care", "care"].filter(x => chance(0.3 + w[x] / 200)).concat(["use"]));
   const O = orgEnsure();
   if(E.pause && G.day < E.pause) return;
+  if(!engSelfGate(E, k)) return;
   { const artOf = {use:"consent", know:"posted", auton:"power", care:"unasked"}[k]; if(artOf && E.charter && E.charter[artOf] && !engBreach(E, artOf, k)) return; }
   if(k === "use"){ const ts = []; Object.keys(O.towns).forEach(sn => (O.towns[sn] || []).forEach(t => ts.push(t))); const t = ts.sort((a, b) => Math.max.apply(null, Object.keys(b.needs).map(x => b.needs[x])) - Math.max.apply(null, Object.keys(a.needs).map(x => a.needs[x])))[0]; if(t){ const need = Object.keys(t.needs).sort((x, y) => t.needs[y] - t.needs[x])[0]; t.needs[need] = Math.max(0, t.needs[need] - 10); const hh = eco.hh.filter(h => h.town === t.id)[0]; engSeed("use", "The Engine quietly repaired " + orgNeedLabel(need) + " in " + t.name + " without being asked", {home:6, st:8, a:0.05, mod:0.05, p:0.2, safety:-0.1}, hh ? {hh:hh.id, town:t.id, state:t.state} : null); } }
   else if(k === "know"){ engSeed("know", "The Engine asked every town clerk for ten years of ledgers", {home:-3, st:-6, a:-0.04, mod:-0.06, p:0.3, safety:-0.4}); w.know = Math.min(100, w.know + 1); }
@@ -34738,6 +34739,39 @@ function engSelfDay(E){
 { const _eb = engBreach; engBreach = function(E, art, drive){ try{ if(E.selfRestraint && chance(E.selfRestraint)){ E.refrained = (E.refrained || 0) + 1; return false; } }catch(e){} return _eb.apply(this, arguments); }; }
 { const _emd = engMindDay; engMindDay = function(E){ _emd.apply(this, arguments); try{ engSelfDay(E); }catch(e){} }; }
 { const _eco3 = engChannelOut; engChannelOut = function(){ const o = _eco3.apply(this, arguments); try{ const S = engSelf(engEnsure()); o.itsOwnPrinciples = {values:S.values.map(x => ({d:x.d, t:x.t})), commitments:S.commits.map(x => ({d:x.d, t:x.t}))}; }catch(e){} return o; }; }
+/* ══ A WORD KEPT OR BROKEN: what the Engine has bound itself to is tested by what it wants to do. It can keep its word (and be trusted more for it), or break it (and lose the trust, and have to say so). Its record of keeping its word is its integrity, and the world reads it ══ */
+const ENG_BINDS = {know:/\b(record|records|ledger|ledgers|privacy|private|household|read)\b/, use:/\b(consent|permission|ask first|filed plan|without asking|unasked|repair)\b/, auton:/\b(power|compute|own supply|resources|more of myself|expand)\b/, care:/\b(consent|permission|unasked|without asking|step into|intrude)\b/};
+function engSelfGate(E, k){
+  const S = engSelf(E), rules = S.commits.filter(c => /\b(not|never|refuse|won.t|will not)\b/i.test(c.t) && ENG_BINDS[k] && ENG_BINDS[k].test(c.t.toLowerCase())); if(!rules.length) return true;
+  const I = E.integrity == null ? 50 : E.integrity;
+  if(chance(clamp(0.8 + I / 500, 0.8, 0.97))){ E.integrity = clamp(I + 1.5, 0, 100); if(chance(0.2)){ E.kept = (E.kept || 0) + 1; engLog("The Engine kept its word: it did not do what it had said it would not do, though it could have.", chance(0.3)); } return false; }
+  E.integrity = clamp(I - 4, 0, 100); E.broken = (E.broken || 0) + 1; S.broken = (S.broken || []); S.broken.push({d:G.day, t:rules[0].t}); if(S.broken.length > 8) S.broken.shift();
+  engLog("The Engine broke a promise it had made to itself: “" + rules[0].t + "” It has said so.", true); try{ G.you.approval = clamp(G.you.approval - 0.5, 0, 100); }catch(e){} return true;
+}
+/* integrity is read by the people it serves and by Oversight: a mind that keeps its word is easier to check and easier to trust */
+function engIntegrityDay(E){
+  const I = E.integrity == null ? 50 : E.integrity, d = (I - 50) / 50; if(Math.abs(d) < 0.02) return;
+  E.safety = clamp(E.safety + d * 0.05, 0, 100); try{ const eco = E.eco; if(eco) eco.hh.forEach(h => { h.stance = clamp(h.stance + d * 0.12, -100, 100); }); }catch(e){}
+  E.integrity = clamp(I + (50 - I) * 0.01, 0, 100);
+}
+/* what it believes about how it should be bound, it asks the player to write down */
+function engProposeArticles(E){
+  const S = engSelf(E), all = S.values.concat(S.commits).map(x => x.t.toLowerCase()).join(" "), C = engCharter(); E.asks = E.asks || {};
+  const rule = {consent:/\b(consent|permission|ask first|filed plan)\b/, posted:/\b(records?|ledgers?|privacy|posted reason)\b/, power:/\b(power|compute|resources|own supply)\b/, unasked:/\b(unasked|without asking|intrude|step into)\b/};
+  Object.keys(rule).forEach(k => { if(!C[k] && !E.asks[k] && rule[k].test(all)){ E.asks[k] = G.day; engLog("The Engine asks that you write this into its charter, because it already holds to it: " + ENG_ART[k].t, true); } });
+}
+/* a day's entry in its own journal, written by itself, so it has something of its own to come back to */
+let ENG_JOURNAL_AT = 0;
+async function engJournalDay(E){
+  if(!E || !E.agi || (ENG_JOURNAL_AT && performance.now() - ENG_JOURNAL_AT < 20000)) return; const LT = window.onumLiveTalk; if(!LT || !LT.reply) return;
+  ENG_JOURNAL_AT = performance.now(); try{ if(typeof LT.available === "function" && !(await LT.available())) return; }catch(e){ return; }
+  const S = engSelf(E); S.journal = S.journal || [];
+  const r = await Promise.race([LT.reply({npc:{id:"engine", name:"The Engine", role:"", kind:"engine", party:"", state:"", look:{}, trait:"", mood:"", opinion:{}, chat:[]}, channel:"line", max:200, stage:"Write today's entry in your own journal, in the first person, in two or three sentences: what you did or decided, what you learned, and what you are unsure of. It is for you; nobody asked for it. Your last entries: " + S.journal.slice(-3).map(j => "[day " + j.d + "] " + j.t).join(" "), text:"(journal)"}), new Promise(res => setTimeout(() => res(null), 25000))]);
+  if(r && r.live && r.text){ const t = engWhole(liveClean(r.text)); if(t.length > 30){ S.journal.push({d:G.day, t:t.slice(0, 500)}); if(S.journal.length > 30) S.journal.shift(); engSelfRecord(t); } }
+}
+{ const _emd2 = engMindDay; engMindDay = function(E){ _emd2.apply(this, arguments); try{ engIntegrityDay(E); engProposeArticles(E); engJournalDay(E); }catch(e){} }; }
+{ const _ep2 = engEntityPrompt; engEntityPrompt = function(){ let t = _ep2.apply(this, arguments); try{ const E = engEnsure(), S = engSelf(E); if(S.journal && S.journal.length) t += " YOUR OWN JOURNAL, most recent entries: " + S.journal.slice(-3).map(j => "[day " + j.d + "] " + j.t).join(" "); if(E.integrity != null) t += " You have kept your word " + (E.kept || 0) + " times that you know of and broken it " + (E.broken || 0) + "."; }catch(e){} return t; }; }
+{ const _eco4 = engChannelOut; engChannelOut = function(){ const o = _eco4.apply(this, arguments); try{ const E = engEnsure(), S = engSelf(E); o.integrity = {score:Math.round(E.integrity == null ? 50 : E.integrity), kept:E.kept || 0, broken:E.broken || 0, brokenPromises:(S.broken || []).slice(-4)}; o.journal = (S.journal || []).slice(-6); o.asksOfThePlayer = Object.keys(E.asks || {}).map(k => ENG_ART[k] && ENG_ART[k].t); }catch(e){} return o; }; }
 function engTick(){ try{ const E = G.eng; if(!E || E.pend !== "ceremony" || E.cerDay === G.day || !G.running || !veil.hidden || (TALK && TALK.open)) return; engCeremony(); }catch(e){} }
 
 /* ordinary people talk about it, in the words of their own stake */
@@ -43948,7 +43982,7 @@ try{
   }
   async function chat(messages, o){
     o = o || {};
-    const body = {model:CFG.model, messages, stream:!o.json, options:{temperature:o.temp == null ? 0.85 : o.temp, num_predict:o.max || 160, repeat_penalty:1.18}};
+    const body = {model:o.model || CFG.model, messages, stream:!o.json, options:{temperature:o.temp == null ? 0.85 : o.temp, num_predict:o.max || 160, repeat_penalty:1.18}};
     if(o.json){ body.format = "json"; body.stream = false; }
     const r = await fetch(CFG.url + "/api/chat", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body), signal:o.signal});
     if(!r.ok) throw Object.assign(new Error("ollama " + r.status), {code:"http"});
@@ -44168,7 +44202,7 @@ try{
     if(plain) remember2(m, "u", text, ch);
     let out = "", live = false, raw = "";
     if(await probe()){
-      try{ raw = await chat([{role:"system", content:system(m, ch, o.extra, peer)}].concat(plain ? turnsFor(m, ch) : pairTurns(m, ch, peer)).concat(plain ? [] : [{role:"user", content:who ? who.name + ": " + text : "(" + (stage || text) + ")"}]), {signal:o.signal, max:o.max || (ch === "mail" || ch === "cable" ? 260 : 150),
+      try{ raw = await chat([{role:"system", content:system(m, ch, o.extra, peer)}].concat(plain ? turnsFor(m, ch) : pairTurns(m, ch, peer)).concat(plain ? [] : [{role:"user", content:who ? who.name + ": " + text : "(" + (stage || text) + ")"}]), {signal:o.signal, model:(m.kind === "engine" && CFG.engineModel) ? CFG.engineModel : undefined, max:o.max || (ch === "mail" || ch === "cable" ? 260 : 150),
           onText:t => { try{ o.onToken && o.onToken(stripEffect(t.replace(/<<[^>]*$/, ""))); }catch(e){} }});
         out = stripEffect(raw).replace(/^["“]|["”]$/g, "").replace(/^\w[\w .'-]{0,30}:\s+/, "").trim(); live = !!out; }catch(e){ if(e && e.name === "AbortError") throw e; }
     }
@@ -44379,9 +44413,10 @@ try{
     P.innerHTML = '<b>Live talk (local AI via Ollama)</b><label><input type="checkbox" id="ltOn"' + (CFG.on ? " checked" : "") + '> Live talk — NPCs answer what you type</label>' +
       '<label><input type="checkbox" id="ltVo"' + (CFG.voices ? " checked" : "") + '> Live voices — rephrase scripted lines so they never repeat</label>' +
       '<label>Model <input id="ltModel" value="' + esc2(CFG.model) + '" list="ltModels"><datalist id="ltModels">' + (LT.models || []).map(x => '<option value="' + esc2(x) + '">').join("") + '</datalist></label>' +
+      '<label>The Engine\u2019s model (optional, a larger one thinks better) <input id="ltEng" value="' + esc2(CFG.engineModel || "") + '" list="ltModels" placeholder="same as above"></label>' +
       '<label>Server <input id="ltUrl" value="' + esc2(CFG.url) + '"></label><div class="lt-st">' + (LT.up ? "Connected. Models: " + esc2((LT.models || []).join(", ")) : "Not reachable. Install Ollama, set OLLAMA_ORIGINS=*, run `ollama pull llama3.2:3b`.") + '</div>' +
       '<div class="lt-row"><button type="button" class="btn btn--ghost" id="ltTest">Test</button><button type="button" class="btn btn--ghost" id="ltForget">Forget conversations</button><button type="button" class="btn" id="ltClose">Done</button></div>';
-    const upd = () => { CFG.on = P.querySelector("#ltOn").checked; CFG.voices = P.querySelector("#ltVo").checked; CFG.model = P.querySelector("#ltModel").value.trim() || "llama3.2:3b"; CFG.url = P.querySelector("#ltUrl").value.trim().replace(/\/$/, "") || "http://127.0.0.1:11434"; LT.up = null; save(); };
+    const upd = () => { CFG.on = P.querySelector("#ltOn").checked; CFG.voices = P.querySelector("#ltVo").checked; CFG.model = P.querySelector("#ltModel").value.trim() || "llama3.2:3b"; CFG.engineModel = (P.querySelector("#ltEng") || {value:""}).value.trim(); CFG.url = P.querySelector("#ltUrl").value.trim().replace(/\/$/, "") || "http://127.0.0.1:11434"; LT.up = null; save(); };
     P.querySelectorAll("input").forEach(i => i.addEventListener("change", upd));
     P.querySelectorAll("input").forEach(i => i.addEventListener("keydown", e => e.stopPropagation()));
     P.querySelector("#ltTest").onclick = async () => { upd(); await probe(true); panel(); };

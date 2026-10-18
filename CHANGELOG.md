@@ -4,6 +4,15 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## A word kept or broken
+
+`20261018k` (on `20261018j`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- **The Engine's principles are tested.** What it has bound itself to (never to act on a person without consent, never to read records without a posted reason, never to take more power than it needs) is checked against what it wants to do. It can keep its word, which builds its *integrity* and is logged now and then, or break it, which costs integrity, is announced, and costs you a little approval. Integrity is read by the people it serves and by Oversight: a mind that keeps its word is easier to check and trusted more.
+- **It asks you to write down what it already holds to.** When its principles match a charter article you have not enacted, it logs a request that you write it into the charter.
+- **It keeps a journal** (when a model is running): once a day, in its own words, what it did, learned and is unsure of. The last entries are given back to it, so it has a continuity of its own, and they go out in the channel file.
+- **The Engine can use a larger model than everyone else.** The Live talk panel has a new field, *The Engine's model*; if set (for example a bigger model you pull in Ollama), only the Engine uses it.
+
 ## The Engine is an entity
 
 `20261018j` (on `20261018i`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
