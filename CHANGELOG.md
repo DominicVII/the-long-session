@@ -4,6 +4,14 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## Whole sentences (this time for real)
+
+`20261018h` (on `20261018g`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- **Correction:** the previous build, 20261018g, was published with this note but without the change by mistake. This build has it.
+- **Nothing the Engine says stops mid-sentence.** If a model's reply is cut off, it is trimmed back to its last whole sentence (letters and works).
+- **The maker's channel shows the build** you are running, so it is easy to see whether an update has taken.
+
 ## Whole sentences
 
 `20261018g` (on `20261018f`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
