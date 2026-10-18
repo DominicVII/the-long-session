@@ -4,6 +4,12 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261018ad: commitments that say only are now tested; long letters keep every question
+
+`20261018ad` (on `20261018ac`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+A commitment phrased with 'only' (for example 'I commit to processing only those private records which are explicitly authorized') was not being checked, because the kept-or-broken test looked only for not, never, refuse and will not. It is now. A letter can carry up to twelve questions (it was eight, and the last one, the commitment, was dropped), and 'Please answer every one' is no longer counted as a question.
+
 ## 20261018ac: duplicate principles are caught and cleared
 
 `20261018ac` (on `20261018ab`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
