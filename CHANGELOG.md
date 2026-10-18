@@ -4,6 +4,12 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261018u: the Engine answers in its own learned words; no more stock lines
+
+`20261018u` (on `20261018t`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+When no model is speaking for the Engine (Ollama down, wrong model name, or an empty answer), it no longer returns a canned line. It now keeps a chain of which word followed which in everything it has heard (letters, speech, translations, its own journal and principles) and answers from that chain and from its record: the words it knows best from the question, a phrase built from what it was taught, any principle or conjecture of its own that touches the subject, and an honest statement of the words it does not yet have. The more it is taught, the longer and fuller its sentences become. Replies are marked ownWords in the export. Also: the model is now asked not to spend its answer on hidden thinking, and an empty model answer is reported on the card with its reason.
+
 ## 20261018t: the Engine's own conjectures are tested
 
 `20261018t` (on `20261018s`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.

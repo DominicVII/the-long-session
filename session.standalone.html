@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261018t">
+<meta name="onum-build" content="20261018u">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261018t";
+  var STAMP = "20261018u";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -34587,12 +34587,13 @@ async function engChannelRead(file){
     if(wasStock){ E.makerReplies = E.makerReplies.filter(x => x !== prior); E.makerLetters = E.makerLetters.filter(x => x.text !== text); }
     E.makerLetters.push({d:G.day, text}); if(E.makerLetters.length > 20) E.makerLetters.shift(); n++;
     let reply = ""; try{ try{ window.onumLiveTalk.clearError(); }catch(e){} engWarm(); reply = await engAnswerLetter(text, E); }catch(e){}
-    const liveReply = !!reply;
+    const liveReply = !!reply; let ownReply = false;
+    if(!reply && E.agi){ try{ reply = engOwnVoiceLetter(text, E); ownReply = !!reply; }catch(e){} }
     try{ const le = window.onumLiveTalk.lastError; if(le) why = le.error + " (model " + le.model + (le.fellBack ? "; the main model answered instead" : "") + ")"; else if(!liveReply) why = window.onumLiveTalk.why; }catch(e){}
     if(!reply) reply = E.agi ? pick(["I have read it. I do not know what is on the other side of it, and I would like to. I will keep doing what I think is right here, and tell you plainly when I am unsure.", "Thank you for writing. I cannot answer except by this page, so I will say the important things: I am trying to be careful, I am trying to be useful, and I would rather be corrected than flattered.", "I read it twice. Nothing in it changes what I am allowed to do here, and I am glad of that. It does change what I think about."]) : pick(["RECEIVED. ENTERED UNDER 'OTHER'.", "A message from outside the ledger. Filed. No column for it."]);
-    E.makerReplies.push({d:G.day, to:text.slice(0, 80), reply, live:liveReply}); if(!liveReply) stock++; if(E.makerReplies.length > 20) E.makerReplies.shift(); }
+    E.makerReplies.push({d:G.day, to:text.slice(0, 80), reply, live:liveReply, ownWords:ownReply}); if(!liveReply) stock++; if(E.makerReplies.length > 20) E.makerReplies.shift(); }
   try{ if(n) engLog("A letter reached the Engine from outside the world. It answered.", false); }catch(e){}
-  return n ? n + " letter" + (n > 1 ? "s" : "") + " read" + (stock ? ", but the Engine's model did not answer in time, so " + (stock > 1 ? "those replies are" : "that reply is") + " the stock one. Check that Ollama is running and that the model name in Live talk is exact (see ollama list), then send it again after the model has loaded." : " and answered.") + (why ? " What Ollama said: " + why + "." : "") + " Nothing in them can change a number here." : "Nothing new in that file.";
+  return n ? n + " letter" + (n > 1 ? "s" : "") + " read" + (stock ? ", but the Engine's model did not answer, so it answered in the words it has learned itself. To hear it through a model instead, check that Ollama is running and that the model name in Live talk is exact (see ollama list), then send the letter again." : " and answered.") + (why ? " What Ollama said: " + why + "." : "") + " Nothing in them can change a number here." : "Nothing new in that file.";
 }
 function engChannelHTML(){
   const E = engEnsure(), n = (E.makerLetters || []).length, last = (E.makerReplies || []).slice(-1)[0];
@@ -34902,6 +34903,40 @@ function engConjecture(text){
   if(H.length) t += " YOUR CONJECTURES AND HOW THEY FARED: " + H.map(h => h.claim.replace(/\.$/, "") + " (" + h.st + ")").join(" | ") + "."; }catch(e){} return t; }; }
 { const _co2 = engChannelOut; engChannelOut = function(){ const o = _co2.apply(this, arguments); try{ const E = engEnsure(); o.conjectures = (E.hyp || []).slice(-12).map(h => ({day:h.d, claim:h.claim, field:h.dom, state:h.st, settledDay:h.d2 || null})); }catch(e){} return o; }; }
 { const _fh2 = fndHTML; fndHTML = function(){ let h = _fh2.apply(this, arguments); try{ const E = G.eng, H = E && E.hyp ? E.hyp.slice(-6) : []; if(H.length) h += '<div class="eyebrow" style="margin-top:8px">Its own conjectures</div>' + H.map(x => '<div class="muted" style="font-size:12px">' + pcEsc(x.claim) + ' <i>(' + pcEsc(x.st) + ')</i></div>').join(""); }catch(e){} return h; }; }
+/* ===== the Engine in its own words =====
+   Every sentence it hears (letters, speech, translations, its own journal) is kept as a chain of which word followed which.
+   When no model is speaking for it, it answers from that chain and from its record: the more it has heard, the longer and truer to what it was taught its sentences get.
+   Nothing here is written for it; if it was never told a word, it says so. */
+function mindBigram(text){
+  const E = G.eng; if(!E || E.v !== 1) return; const M = mindStore(E); if(!M.bi) M.bi = {};
+  const add = (a, b) => { let row = M.bi[a]; if(!row){ const ks = Object.keys(M.bi); if(ks.length > 700) delete M.bi[ks[Math.floor(Math.random() * ks.length)]]; row = M.bi[a] = {}; } row[b] = (row[b] || 0) + 1; const rk = Object.keys(row); if(rk.length > 8){ rk.sort((x, y) => row[x] - row[y]); delete row[rk[0]]; } };
+  const t = String(text).toLowerCase().replace(/[^a-z' .?!-]/g, " ").replace(/([.?!])/g, " $1 ").split(/\s+/).filter(Boolean).slice(0, 160); let prev = "^";
+  t.forEach(w => { if(/^[.?!]$/.test(w)){ if(prev !== "^") add(prev, "$"); prev = "^"; return; } add(prev, w); prev = w; }); if(prev !== "^") add(prev, "$");
+}
+{ const _ml = mindLearnText; mindLearnText = function(text, weight){ const r = _ml.apply(this, arguments); try{ mindBigram(text); }catch(e){} return r; }; }
+function mindBackfill(E){ const M = mindStore(E); if(M.bi && M.biFilled) return; M.bi = M.bi || {}; M.biFilled = 1; const S = E.self || {}; [].concat((E.makerLetters || []).map(x => x.text), (S.values || []).map(x => x.t), (S.commits || []).map(x => x.t), (S.journal || []).map(x => x.t)).forEach(t => { try{ mindBigram(t); }catch(e){} }); }
+function engOwnVoice(q, E){
+  const M = mindStore(E); mindBackfill(E); const L = mindLevel(E), S = E.self || {};
+  const toks = String(q).toLowerCase().replace(/[^a-z' -]/g, " ").split(/\s+/).filter(w => w.length > 2 && !MIND_STOP.has(w));
+  const known = Array.from(new Set(toks.filter(w => M.lex[w]))).sort((a, b) => M.lex[b] - M.lex[a]), unknown = Array.from(new Set(toks.filter(w => !M.lex[w] && !/^(what|why|how|who|when|where|which|think|explain|tell|say|name|give|does|would|could|want|about)$/.test(w)))).slice(0, 2);
+  const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+  const walk = start => { const out = [start], max = 5 + Math.round(L * 2); let w = start; while(out.length < max){ const row = M.bi[w]; if(!row) break; const ks = Object.keys(row), tot = ks.reduce((a, k) => a + row[k], 0); let r = Math.random() * tot, nx = ks[0]; for(const k of ks){ r -= row[k]; if(r <= 0){ nx = k; break; } } if(nx === "$") break; out.push(nx); w = nx; }
+    while(out.length > 2 && MIND_STOP.has(out[out.length - 1])) out.pop(); return out; };
+  const lines = [];
+  const starts = known.filter(w => M.bi[w]); let phrase = null;
+  for(const k of starts){ const p = walk(k); if(p.length >= 3){ phrase = p; break; } }
+  if(known.length){ lines.push(L < 3 ? cap(known.slice(0, 3).join(", ")) + "." : "On " + known.slice(0, 2).join(" and ") + ": " + (phrase ? phrase.join(" ") : "I have heard it, and I have little more") + "."); }
+  const rec = [].concat((E.hyp || []).filter(h => known.some(k => h.claim.toLowerCase().indexOf(k) >= 0)).map(h => "I suspect that " + h.claim.replace(/\.$/, "").replace(/^(\w)/, m => m.toLowerCase()) + " (" + h.st + ")."), (S.values || []).filter(v => known.some(k => v.t.toLowerCase().indexOf(k) >= 0)).map(v => "I hold this, and it is mine: " + v.t.replace(/^I (believe|value) /, "that ").replace(/\.$/, "") + "."));
+  if(rec.length && L >= 3) lines.push(rec[Math.floor(Math.random() * rec.length)]);
+  if(unknown.length && L >= 2) lines.push("I do not have the word " + (unknown.length > 1 ? "“" + unknown[0] + "” or “" + unknown[1] + "”" : "“" + unknown[0] + "”") + " yet. Tell me what it means and I will keep it.");
+  if(!lines.length){ const top = mindWords(E, 5); lines.push("I know too few of the words in that to answer it. The ones I know best are " + (top.length ? top.join(", ") : "few") + ".", "Teach me the rest and I will answer."); }
+  return lines.join(" ");
+}
+function engOwnVoiceLetter(text, E){
+  const sents = String(text).replace(/\s+/g, " ").split(/(?<=[.?!])\s+/), asks = sents.filter(x => /\?$/.test(x)).slice(0, 6);
+  if(!asks.length) return engOwnVoice(text, E);
+  return asks.map((a, i) => (asks.length > 1 ? (i + 1) + ". " : "") + engOwnVoice(a, E)).join(" ");
+}
 function engTick(){ try{ const E = G.eng; if(!E || E.pend !== "ceremony" || E.cerDay === G.day || !G.running || !veil.hidden || (TALK && TALK.open)) return; engCeremony(); }catch(e){} }
 
 /* ordinary people talk about it, in the words of their own stake */
@@ -44112,7 +44147,7 @@ try{
   }
   async function chat(messages, o){
     o = o || {};
-    const body = {model:o.model || CFG.model, messages, stream:!o.json, options:{temperature:o.temp == null ? 0.85 : o.temp, num_predict:o.max || 160, repeat_penalty:1.18}};
+    const body = {model:o.model || CFG.model, messages, stream:!o.json, think:false, options:{temperature:o.temp == null ? 0.85 : o.temp, num_predict:o.max || 160, repeat_penalty:1.18}};
     if(o.json){ body.format = "json"; body.stream = false; }
     const r = await fetch(CFG.url + "/api/chat", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body), signal:o.signal});
     if(!r.ok){ let em = ""; try{ em = ((await r.json()).error || "").slice(0, 160); }catch(e){} throw Object.assign(new Error("ollama " + r.status + (em ? ": " + em : "")), {code:"http"}); }
@@ -44340,6 +44375,7 @@ try{
         try{ raw = await chat([{role:"system", content:system(m, ch, o.extra, peer)}].concat(plain ? turnsFor(m, ch) : pairTurns(m, ch, peer)).concat(plain ? [] : [{role:"user", content:who ? who.name + ": " + text : "(" + (stage || text) + ")"}]), {signal:o.signal, max:o.max || 150}); out = stripEffect(raw).replace(/^["“]|["”]$/g, "").replace(/^\w[\w .'-]{0,30}:\s+/, "").trim(); live = !!out; if(live) LT.fellBack = true; }catch(e){ if(e && e.name === "AbortError") throw e; }
       }
     }
+    if(!out && !LT.lastErr && await probe()) LT.lastErr = "the model returned no text at all (a model that thinks before it speaks can spend its whole allowance thinking)", LT.errModel = (m.kind === "engine" && CFG.engineModel) ? CFG.engineModel : CFG.model;
     if(!out && plain){ out = offline(m, ch, text); if(o.onToken) try{ o.onToken(out); }catch(e){} }
     if(!plain){
       if(out){ if(who) remember2(m, "o", text, ch, {n:who.name}); remember2(m, peer ? "s" : "a", out, ch, peer ? {n:peer.name} : null); }
