@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261017q">
+<meta name="onum-build" content="20261017r">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261017q";
+  var STAMP = "20261017r";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -34385,6 +34385,61 @@ function fndHTML(){
 }
 { const _fs = inqStep; inqStep = function(silent, idx){ const r = _fs.apply(this, arguments); try{ if(!silent) fndDay(); }catch(e){ console.warn("fndDay", e); } return r; }; }
 { const _fv = inqVoice; inqVoice = function(m){ try{ const f = inqFieldOf(m); if(["phys", "phil", "mind", "math"].indexOf(f) >= 0 && chance(0.18)){ const F = fndStore(), c = F.open[0] && fndConcepts().find(x => x.id === F.open[0].k); if(c) return "We are testing whether this is so: " + c.claim.toLowerCase().replace(/\.$/, "") + ". Nobody knows. That is the point of testing it."; } }catch(e){} return _fv.apply(this, arguments); }; }
+/* ══ THE THINKERS: named people in every field that asks these questions: physicists, philosophers, anthropologists, theologians and the rest. Each has leanings of their own and a temper. They push the work toward what they already believe (and can push it wrong), dispute in public, found schools and sects, are proved right or wrong, and take their questions to the Engine, which answers as far as it can know and is held to account for it ══ */
+const GX_SUBJ = [["the arrow of time","time"],["entanglement","quantum"],["the vacuum","quantum"],["gravity","cosmos"],["a mind","mind"],["information","info"],["life","life"],["a black hole","time"],["a single particle","quantum"],["a living cell","life"],["a wormhole","time"],["consciousness","mind"],["a network of machines","info"],["a memory","mind"],["an entire universe","cosmos"],["a law of nature","found"]];
+const GX_PROP = ["can be reversed","can be amplified","can be copied exactly","can be stored without loss","can be shielded from everything else","can be crossed from one side to the other","can be measured without disturbing it","can be made to persist indefinitely","can be made to do useful work","can be made to carry a message","can be made to forget"];
+const GX_REG = ["at room temperature","near a horizon","inside a living cell","at a scale smaller than anything yet measured","at the scale of the whole cosmos","over a very long time","in a lattice of many thousands of parts","in a region of empty space","inside a machine"];
+const GX_NEED = {quantum:["ph8"], time:["ph9"], cosmos:["a3"], mind:["ps2"], info:["m8"], life:["b3"], found:["ph14"]};
+const FIG_ROLE = {phys:"physicist", math:"mathematician", phil:"philosopher", mind:"cognitive scientist", anth:"anthropologist", arts:"theologian", bio:"biologist", cs:"computer scientist", earth:"cosmologist", chem:"chemist", soc:"economist"};
+const SECT_A = ["Open", "Silent", "Lamplit", "Returning", "Patient", "Numbered", "Undivided", "Watching", "Reckoning", "Third"], SECT_N = ["Hand", "Circle", "Vigil", "Assembly", "Lantern", "Order", "Fellowship", "Brethren", "Path", "School"];
+function fndFigs(){ const F = fndStore(); if(!F.figs) F.figs = []; if(!F.sects) F.sects = []; return F; }
+function figMake(){
+  const keys = Object.keys(FIG_ROLE), f = pick(["phys", "phys", "phil", "phil", "mind", "anth", "arts", "arts", "math", "bio", "cs", "earth", "chem", "soc"]), st = (G.states && G.states.length) ? pick(G.states).n : "the Union"; let nm = "A. Scholar"; try{ nm = wallSafeMint(() => newName(st)); }catch(e){}
+  return {id:"f" + (fndStore().n = (fndStore().n || 0) + 1), name:nm, field:f, role:FIG_ROLE[f], state:st, zeal:Math.random(), rep:30 + Math.random() * 40, born:G.day};
+}
+function figLean(fg, c){ const F = fndStore(), base = ((seedOf("ln:" + fg.id + ":" + c.id) % 2000) / 1000 - 1) * 0.9, o = F.open.find(x => x.k === c.id), ev = o ? clamp(o.ev, -1, 1) * 0.5 : 0, r = F.res[c.id]; return clamp(base + (fg.field === "phys" || fg.field === "math" || fg.field === "cs" ? ev : ev * 0.3) + (r ? (r.belief ? 0.3 : -0.3) : 0), -1, 1); }
+function figDay(){
+  const F = fndFigs(), all = fndConcepts(), byId = {}; all.forEach(c => byId[c.id] = c);
+  while(F.figs.length < 12) F.figs.push(figMake());
+  if(chance(0.01)){ F.figs.sort((a, b) => a.born - b.born); F.figs.shift(); F.figs.push(figMake()); }
+  /* motivated reasoning: a thinker with a strong view nudges the work toward it, so a divided field is slower and a one-sided one can be wrong */
+  F.open.forEach(o => { const c = byId[o.k]; if(!c) return; F.figs.forEach(fg => { if(!["phys", "math", "cs", "earth", "chem", "mind", "bio"].includes(fg.field) || Math.random() > 0.15) return; const l = figLean(fg, c); if(Math.abs(l) > 0.6) o.ev += l * 0.004 * (0.5 + fg.zeal); }); });
+  /* public dispute */
+  if(chance(0.05)){ const c = pick(all.filter(x => F.open.some(o => o.k === x.id) || F.res[x.id])); if(c){ const a = pick(F.figs), b = F.figs.find(f => f !== a && Math.sign(figLean(f, c)) !== Math.sign(figLean(a, c)) && Math.abs(figLean(f, c)) > 0.4 && Math.abs(figLean(a, c)) > 0.4); if(b && Math.abs(figLean(a, c)) > 0.4){ a.rep = clamp(a.rep + 1, 0, 100); b.rep = clamp(b.rep + 1, 0, 100); fndNews(a.name + ", " + a.role + ", and " + b.name + ", " + b.role + ", dispute in public whether this is so: " + c.claim.replace(/\.$/, "").toLowerCase() + ".", false); } } }
+  /* a sect forms around a belief a person holds strongly and carries to a flock */
+  if(F.sects.length < 8 && chance(0.012)){ const fg = pick(F.figs.filter(x => ["phil", "arts", "anth", "mind"].includes(x.field) && x.zeal > 0.5)); if(fg){ const c = pick(all.filter(x => ["mind", "found", "cosmos", "time", "life", "info"].includes(x.dom))); if(c){ const l = figLean(fg, c); if(Math.abs(l) > 0.45 && !F.sects.some(z => z.creed[c.id] !== undefined)){ const flock = {}; (G.states || []).forEach(st => { if(chance(0.4)) flock[st.n] = Math.round((0.01 + Math.random() * 0.06) * 1000) / 1000; }); if(!Object.keys(flock).length && G.states && G.states[0]) flock[G.states[0].n] = 0.02;
+      const z = {id:"s" + (F.n = (F.n || 0) + 1), name:"The " + pick(SECT_A) + " " + pick(SECT_N), founder:fg.name, creed:{[c.id]:l > 0}, flock, fervor:0.4 + Math.random() * 0.3, d:G.day}; F.sects.push(z); fndNews(fg.name + ", " + fg.role + ", has founded " + z.name + ", whose creed is that " + (l > 0 ? "" : "it is not so that ") + c.claim.replace(/\.$/, "").replace(/^(\w)/, m => m.toLowerCase()) + ".", false); } } } }
+  /* sects pull on the nation, and on how the Engine is received */
+  F.sects.forEach(z => { const opposes = Object.keys(z.creed).some(id => (id === "m_machine" && z.creed[id] === false) || (id === "m_fund" && z.creed[id] === true) || (id === "m_subst" && z.creed[id] === false) || (id === "i_sim" && z.creed[id] === true)), dir = opposes ? -1 : 0.4;
+    Object.keys(z.flock).forEach(sn => { const st = (G.states || []).find(x => x.n === sn); if(st) st.unrest = clamp((st.unrest || 30) + (opposes ? 1 : -0.4) * z.fervor * z.flock[sn] * 0.6, 0, 100); try{ const eco = G.eng && G.eng.eco; if(eco) eco.mod[sn] = clamp((eco.mod[sn] || 0) + dir * z.fervor * z.flock[sn] * 0.02, -1, 1); }catch(e){} }); z.fervor = clamp(z.fervor + (Math.random() - 0.5) * 0.02, 0.05, 1); });
+  /* the petition: a sect or a thinker puts a question to the Engine. It answers as well as it can know, and what it says lands */
+  const E = (G.eng && G.eng.v === 1) ? G.eng : null;
+  if(E && E.st >= 3 && chance(0.05)){ const fg = pick(F.figs), c = pick(all.filter(x => ["mind", "found", "time", "cosmos", "quantum", "life", "info"].includes(x.dom) && (F.res[x.id] || F.open.some(o => o.k === x.id)))); if(c) figPetition(fg, c, E, F); }
+}
+function figPetition(fg, c, E, F){
+  const truth = fndTruth(c), know = clamp(0.35 + E.p / 220 + Math.log10(1 + (E.beyond || 0)) / 6, 0.35, 0.99), knows = chance(know), said = knows ? truth : null;
+  if(said === null){ fndNews(fg.name + ", " + fg.role + ", put to the Engine whether this is so: " + c.claim.replace(/\.$/, "").toLowerCase() + ". It said it did not know, and said what it would need to find out.", false); const o = F.open.find(x => x.k === c.id); if(o) o.ev += (truth ? 1 : -1) * 0.05; return; }
+  fndNews(fg.name + ", " + fg.role + ", asked the Engine whether this is so: " + c.claim.replace(/\.$/, "").toLowerCase() + ". The Engine said it is " + (said ? "so" : "not so") + ", and gave its reasons.", c.effort >= 8);
+  const o = F.open.find(x => x.k === c.id); if(o) o.ev += (said ? 1 : -1) * 0.25;                       /* its answer speeds the work, and the work still has to check it */
+  F.sects.forEach(z => { if(z.creed[c.id] === undefined) return; if(z.creed[c.id] === said){ z.fervor = clamp(z.fervor + 0.1, 0, 1); fndNews(z.name + " takes the Engine's answer as confirmation.", false); } else { z.fervor = clamp(z.fervor - 0.15, 0, 1); if(chance(0.5)){ const fl = Object.keys(z.flock); fl.forEach(sn => { const st = (G.states || []).find(x => x.n === sn); if(st) st.unrest = clamp((st.unrest || 30) + 1.5 * z.flock[sn] * 10, 0, 100); }); fndNews(z.name + " rejects the Engine's answer, and its members say the machine does not understand what it is being asked.", c.effort >= 8); } else { z.creed[c.id] = said; fndNews(z.name + " revises its creed in light of the Engine's answer.", false); } } });
+}
+function fndGenConcept(F){
+  const sj = pick(GX_SUBJ), pr = pick(GX_PROP), rg = pick(GX_REG), key = sj[0] + "|" + pr + "|" + rg; if(F.derived.some(d => d.key === key)) return;
+  const seed = seedOf("gx:" + F.seed + key); F.derived.push({id:"x" + (++F.n), key, dom:sj[1], name:(sj[0].charAt(0).toUpperCase() + sj[0].slice(1)) + ": " + pr.replace(/^can be /, "") + " " + rg, claim:(sj[0].charAt(0).toUpperCase() + sj[0].slice(1)) + " " + pr + " " + rg + ".", p:0.12 + (seed % 100) / 400, effort:4 + (seed % 6), needs:GX_NEED[sj[1]] || ["ph8"], fx:{quantum:"info", time:"none", cosmos:"energy", mind:"mind", info:"info", life:"health", found:"energy"}[sj[1]], depth:0, roots:[sj[0]]});
+}
+function figHTML(){
+  const F = fndFigs(); if(!F.figs.length) return "";
+  const top = F.figs.slice().sort((a, b) => b.rep - a.rep).slice(0, 5);
+  return '<div class="eyebrow" style="margin-top:10px">Who is thinking about it</div>' + top.map(f => '<div class="muted" style="font-size:12px">' + pcEsc(f.name) + ', ' + pcEsc(f.role) + ' of ' + pcEsc(f.state) + '</div>').join("") +
+    (F.sects.length ? '<div class="eyebrow" style="margin-top:8px">Schools and sects</div>' + F.sects.map(z => '<div class="muted" style="font-size:12px">' + pcEsc(z.name) + ' (founded by ' + pcEsc(z.founder) + '; ' + Object.keys(z.flock).length + ' state' + (Object.keys(z.flock).length > 1 ? 's' : '') + ')</div>').join("") : "");
+}
+{ const _fd = fndDay; fndDay = function(){ _fd.apply(this, arguments); try{ const F = fndStore(); if(F.open.length < 4 || chance(0.12)) fndGenConcept(F); figDay(); }catch(e){ console.warn("figDay", e); } }; }
+{ const _fh = fndHTML; fndHTML = function(){ let h = _fh.apply(this, arguments); try{ if(h) h += figHTML(); }catch(e){} return h; }; }
+{ const _fst = fndSettled; fndSettled = function(c, belief, truth, E){ _fst.apply(this, arguments); try{ const F = fndFigs();
+    F.figs.forEach(fg => { const l = figLean(fg, c); if(Math.abs(l) > 0.5) fg.rep = clamp(fg.rep + (Math.sign(l) === (belief ? 1 : -1) ? 3 : -3), 0, 100); });
+    F.sects.forEach(z => { if(z.creed[c.id] === undefined) return; if(z.creed[c.id] === belief){ z.fervor = clamp(z.fervor + 0.12, 0, 1); fndNews(z.name + " says the finding bears out what it has always held.", false); }
+      else if(chance(0.4)){ const nz = {id:"s" + (F.n = (F.n || 0) + 1), name:"The " + pick(SECT_A) + " " + pick(SECT_N), founder:z.founder, creed:Object.assign({}, z.creed), flock:{}, fervor:0.5, d:G.day}; Object.keys(z.flock).forEach(sn => { if(chance(0.5)){ nz.flock[sn] = z.flock[sn] / 2; z.flock[sn] /= 2; } }); if(Object.keys(nz.flock).length && F.sects.length < 10){ F.sects.push(nz); fndNews(z.name + " splits over the finding: one part holds to its creed, and the other, now " + nz.name + ", will not give it up.", false); } }
+      else { z.creed[c.id] = belief; z.fervor = clamp(z.fervor - 0.1, 0.05, 1); fndNews(z.name + " changes its creed to meet the finding.", false); } }); }catch(e){ console.warn("fig settled", e); } }; }
 function engTick(){ try{ const E = G.eng; if(!E || E.pend !== "ceremony" || E.cerDay === G.day || !G.running || !veil.hidden || (TALK && TALK.open)) return; engCeremony(); }catch(e){} }
 
 /* ordinary people talk about it, in the words of their own stake */

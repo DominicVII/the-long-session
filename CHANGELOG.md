@@ -4,6 +4,16 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## The thinkers
+
+`20261017r` (on `20261017q`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- **Questions are no longer a list.** A grammar of subjects (time, entanglement, the vacuum, a mind, a black hole, a whole universe…), what might be done to them, and the regime they are in generates new questions without end, on top of the forty-odd seeded ones and the combinations of what has already been found. Each gets its own hidden answer in this world.
+- **Named thinkers in every field.** Physicists, philosophers, anthropologists, theologians, cognitive scientists and the rest each have views of their own and a temper. A strongly opinionated researcher nudges the work toward their view, so a divided field is slow and a one-sided one can reach the wrong answer. They dispute in public, and are proved right or wrong.
+- **Schools and sects form** around a belief and spread through the states. A finding can bear a sect out, make it change its creed, or split it. Sects that oppose thinking machines raise unrest and turn states against the Engine; those that welcome them do the opposite.
+- **They put their questions to the Engine.** It answers as well as it can know (more, as its capability grows), says plainly when it does not know, speeds the work without replacing it, and what it says lands on the sects and the nation.
+- All shown on the Academy card (*Who is thinking about it*, *Schools and sects*).
+
 ## The nature of things
 
 `20261017q` (on `20261017p`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
