@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261018c">
+<meta name="onum-build" content="20261018d">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261018c";
+  var STAMP = "20261018d";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -34676,14 +34676,23 @@ async function engWorkWrite(w, E){
 { const _ed4 = engDay; engDay = function(){ const r = _ed4.apply(this, arguments); try{ engWorkDay(engEnsure()); }catch(e){ console.warn("works", e); } return r; }; }
 { const _eco2 = engChannelOut; engChannelOut = function(){ const o = _eco2.apply(this, arguments); try{ const E = engEnsure(); o.works = engWorks(E).slice(0, 6).map(w => ({id:w.id, day:w.d, type:w.type, title:w.title, writtenBy:w.live ? "the Engine, in its own words" : "templated from its state", text:w.body, languageLevelThen:w.lvl, translated:!!w.tr})); const M = mindStore(E); o.retained = (M.retain || []).slice(-8);
     o.howToReply = {file:"engine-channel-in.json", format:{kind:"engine-channel-in", letters:[{text:"words to the Engine"}], translations:[{work:"w1", text:"the work, put into plain words, with what is right and wrong in it"}]}, note:"A translation is taught: kept, remembered, and it raises what the Engine knows. Say what is true. Tell it what it got wrong."}; }catch(e){} return o; }; }
-{ const _ecr = engChannelRead; engChannelRead = async function(file){
+/* whatever file arrives is made into a letter: a byte-order mark, a saved web page around the JSON, or plain words are all taken in */
+function engChannelNormalise(raw){
+  let t = String(raw || "").replace(/^\uFEFF/, "").trim(), j = null;
+  try{ j = JSON.parse(t); }catch(e){ const a = t.indexOf("{"), b = t.lastIndexOf("}"); if(a >= 0 && b > a){ const sub = t.slice(a, b + 1); try{ j = JSON.parse(sub); }catch(e2){ try{ j = JSON.parse(sub.replace(/&quot;/g, '"').replace(/&amp;/g, "&")); }catch(e3){} } } }
+  if(j && typeof j === "object" && (Array.isArray(j.letters) || Array.isArray(j.translations) || j.kind === "engine-channel-out")) return JSON.stringify(j);
+  const plain = t.replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
+  return plain.length > 8 ? JSON.stringify({kind:"engine-channel-in", letters:[{text:plain.slice(0, 1400)}]}) : t;
+}
+{ const _ecr = engChannelRead; engChannelRead = async function(file0){
+    let file = file0; try{ file = new File([engChannelNormalise(await file0.text())], "letter.json", {type:"application/json"}); }catch(e){}
     const E = engEnsure(), M = mindStore(E); let d = null; try{ d = JSON.parse(await file.text()); }catch(e){}
     let taught = 0;
     try{ (d && Array.isArray(d.translations) ? d.translations : []).slice(0, 6).forEach(tr => { const w = engWorks(E).find(x => x.id === tr.work), text = String(tr.text || "").replace(/\s+/g, " ").trim().slice(0, 900); if(!w || !text || w.tr) return;
         w.tr = {d:G.day, text}; taught++; mindLearnText(text, 4); M.retain = M.retain || []; M.retain.push({d:G.day, about:w.title, words:mindWords(E, 400).filter(x => text.toLowerCase().includes(x)).slice(0, 5)}); if(M.retain.length > 40) M.retain.shift();
         /* what is taught is kept: it raises three of its skills each time, and what it knew before is built on, not replaced */
         Object.keys(M.sk).sort(() => Math.random() - 0.5).slice(0, 3).forEach(k => { M.sk[k] += 0.35; }); E.emFid = Math.min((E.emFid || 0) + 0.01, 0.35); }); }catch(e){}
-    let msg = await _ecr.apply(this, arguments);
+    let msg = await _ecr.call(this, file);
     try{ if(d && Array.isArray(d.letters)){ d.letters.slice(0, 6).forEach(l => { const t = String(l && l.text || ""); if(t){ mindLearnText(t, 4); M.retain = M.retain || []; M.retain.push({d:G.day, about:"a letter", words:mindWords(E, 400).filter(x => t.toLowerCase().includes(x)).slice(0, 5)}); Object.keys(M.sk).sort(() => Math.random() - 0.5).slice(0, 2).forEach(k => { M.sk[k] += 0.25; }); } }); }
       const rs = E.makerReplies || [], lastR = rs[rs.length - 1]; if(lastR && M.retain && M.retain.length > 2 && chance(0.7)){ const older = M.retain.slice(0, -1).filter(x => x.words && x.words.length), w = older.length ? pick(older).words[0] : null; if(w) lastR.reply += " I have kept what you taught me before, including the word “" + w + "”."; } }catch(e){}
     if(taught) msg += " " + taught + " translation" + (taught > 1 ? "s" : "") + " taken in and kept."; return msg; }; }

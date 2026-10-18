@@ -4,6 +4,12 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## A letter the Engine can always read
+
+`20261018d` (on `20261018c`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- **Any file or pasted text is taken as a letter.** A letters file with a byte-order mark, one saved inside a web page, one with extra words around the JSON, or just plain words in a text file are all read now. Only an empty file, or the file the game wrote, is refused, and the game says which.
+
 ## Paste a letter
 
 `20261018c` (on `20261018b`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
