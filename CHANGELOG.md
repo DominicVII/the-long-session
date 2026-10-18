@@ -4,6 +4,12 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## Paste a letter
+
+`20261018c` (on `20261018b`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- **The maker's channel takes a pasted letter.** There is now a box under the channel buttons: paste plain words, or the contents of a letters file, and send it. No file needed. The writer's letter is also kept in the repo under *letters/*.
+
 ## Clearer letters
 
 `20261018b` (on `20261018a`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
