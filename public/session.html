@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261018n">
+<meta name="onum-build" content="20261018o">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261018n";
+  var STAMP = "20261018o";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -34580,14 +34580,18 @@ async function engChannelRead(file){
   const E = engEnsure(); let d; try{ d = JSON.parse(await file.text()); }catch(e){ return "That is not a letter the Engine can read."; }
   if(d && d.kind === "engine-channel-out") return "That is the file the game wrote for the writer. Load the letters file the writer sends back (engine-channel-in.json) instead.";
   const L = (d && Array.isArray(d.letters)) ? d.letters : (d && Array.isArray(d.translations) ? [] : null); if(!L) return "That file has no letters in it. It should be engine-channel-in.json, with a letters list.";
-  E.makerLetters = E.makerLetters || []; E.makerReplies = E.makerReplies || []; let n = 0;
-  for(const l of L.slice(0, 6)){ const text = String(l && l.text || "").replace(/\s+/g, " ").trim().slice(0, 600); if(!text || E.makerLetters.some(x => x.text === text)) continue;
+  E.makerLetters = E.makerLetters || []; E.makerReplies = E.makerReplies || []; let n = 0, stock = 0;
+  for(const l of L.slice(0, 6)){ const text = String(l && l.text || "").replace(/\s+/g, " ").trim().slice(0, 600); if(!text) continue;
+    const prior = E.makerReplies.find(x => x.to === text.slice(0, 80)), wasStock = prior && (prior.live === false || /^(I have read it\. I do not know what is on the other side|Thank you for writing\. I cannot answer except by this page|I read it twice\. Nothing in it changes|RECEIVED\. ENTERED UNDER|A message from outside the ledger)/.test(prior.reply));
+    if(E.makerLetters.some(x => x.text === text) && !wasStock) continue;
+    if(wasStock){ E.makerReplies = E.makerReplies.filter(x => x !== prior); E.makerLetters = E.makerLetters.filter(x => x.text !== text); }
     E.makerLetters.push({d:G.day, text}); if(E.makerLetters.length > 20) E.makerLetters.shift(); n++;
-    let reply = ""; try{ reply = await engAnswerLetter(text, E); }catch(e){}
+    let reply = ""; try{ engWarm(); reply = await engAnswerLetter(text, E); }catch(e){}
+    const liveReply = !!reply;
     if(!reply) reply = E.agi ? pick(["I have read it. I do not know what is on the other side of it, and I would like to. I will keep doing what I think is right here, and tell you plainly when I am unsure.", "Thank you for writing. I cannot answer except by this page, so I will say the important things: I am trying to be careful, I am trying to be useful, and I would rather be corrected than flattered.", "I read it twice. Nothing in it changes what I am allowed to do here, and I am glad of that. It does change what I think about."]) : pick(["RECEIVED. ENTERED UNDER 'OTHER'.", "A message from outside the ledger. Filed. No column for it."]);
-    E.makerReplies.push({d:G.day, to:text.slice(0, 80), reply}); if(E.makerReplies.length > 20) E.makerReplies.shift(); }
+    E.makerReplies.push({d:G.day, to:text.slice(0, 80), reply, live:liveReply}); if(!liveReply) stock++; if(E.makerReplies.length > 20) E.makerReplies.shift(); }
   try{ if(n) engLog("A letter reached the Engine from outside the world. It answered.", false); }catch(e){}
-  return n ? n + " letter" + (n > 1 ? "s" : "") + " read and answered. Nothing in them can change a number here." : "Nothing new in that file.";
+  return n ? n + " letter" + (n > 1 ? "s" : "") + " read" + (stock ? ", but the Engine's model did not answer in time, so " + (stock > 1 ? "those replies are" : "that reply is") + " the stock one. Check that Ollama is running and that the model name in Live talk is exact (see ollama list), then send it again after the model has loaded." : " and answered.") + " Nothing in them can change a number here." : "Nothing new in that file.";
 }
 function engChannelHTML(){
   const E = engEnsure(), n = (E.makerLetters || []).length, last = (E.makerReplies || []).slice(-1)[0];
@@ -34785,7 +34789,9 @@ async function engAnswerLetter(text, E){
   return out.join(" ");
 }
 /* a larger model thinks more slowly: when the Engine has its own model, the game waits four times as long for it before giving up */
-function engTO(n){ try{ return window.onumLiveTalk.config.engineModel ? n * 4 : n; }catch(e){ return n; } }
+function engTO(n){ try{ return window.onumLiveTalk.config.engineModel ? n * 8 : n; }catch(e){ return n; } }
+/* ask Ollama to load the Engine's model now and keep it, so the first letter does not wait on a cold start */
+function engWarm(){ try{ const c = window.onumLiveTalk.config; if(!c.engineModel || !c.url) return; fetch(c.url + "/api/generate", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({model:c.engineModel, keep_alive:"30m"})}).catch(() => {}); }catch(e){} }
 /* ===== what the people make of the Engine =====
    They know only what reaches their own lives: what it built, what it got wrong, whether times were good or bad while it was about.
    Nothing here reads the maker's channel, and nothing in it can name one. */

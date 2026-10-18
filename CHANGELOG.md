@@ -4,6 +4,12 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261018o: the Engine's letters say when the model did not answer
+
+`20261018o` (on `20261018n`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+Letter 10 came back with a stock reply instead of an answer: the Engine's model did not respond in time, and the game hid that. Now each reply is marked live or stock in the export, the Engine card says plainly when a stock reply was used, and sending the same letter again replaces the stock reply with a fresh answer instead of skipping it as a duplicate. The game now asks Ollama to load the Engine's model and keep it for 30 minutes when a letter arrives, and waits up to eight times the normal time for a larger model, so a cold start of a big model is not mistaken for silence.
+
 ## 20261018n: the people judge the Engine only by their own lives
 
 `20261018n` (on `20261018m`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
