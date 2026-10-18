@@ -4,6 +4,12 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261018r: test the Engine's model from its card
+
+`20261018r` (on `20261018q`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+The Engine card has a new button, Test the Engine's model. It sends one short question and reports how long the answer took, or the exact reason it failed: Live talk switched off, Ollama not reachable, the model name not found, not enough memory, or the main model answering instead. No exported file is needed to find out why the Engine is not answering.
+
 ## 20261018q: a busy Ollama is no longer mistaken for a missing one
 
 `20261018q` (on `20261018p`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
