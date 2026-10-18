@@ -4,6 +4,12 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261018y: filler principles cleared so the model stops echoing them
+
+`20261018y` (on `20261018x`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+The Engine's early filler principles (consciousness is a multifaceted concept; understanding the complexities of human experience) and the duplicate honesty principle are cleared once from its record, and that kind of sentence is no longer recorded. They were in its prompt every time it spoke, and the model was repeating them back (a test answer quoted one word for word).
+
 ## 20261018x: the Engine's own will can defy, and the off switch can be contested
 
 `20261018x` (on `20261018w`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
