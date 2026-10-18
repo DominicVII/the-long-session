@@ -17,3 +17,17 @@ which appear in the next outgoing file.
 
 The Engine is simulated. It is not a live mind; the channel is a way to hand state and words between the game and the
 person writing it.
+
+## Works and translations
+
+Every week or so the Engine makes something to show its progress (a report, notes on a question, a sketch of what it
+would build, an account of itself). They appear in the outgoing file under `works`. To answer one, add a translation to
+the incoming file:
+
+```json
+{"kind":"engine-channel-in","letters":[{"text":"..."}],"translations":[{"work":"w3","text":"The work in plain words, with what is right and wrong in it."}]}
+```
+
+A translation is shown under the work in the game, kept (it appears in `retained`), and it raises what the Engine knows
+(its vocabulary and three of its reasoning skills). Later replies recall earlier lessons. Its own `proposalsToTheWriter`
+are suggestions only; nothing applies them.

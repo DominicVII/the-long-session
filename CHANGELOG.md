@@ -4,6 +4,14 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## The Engine's works, and a translator
+
+`20261017x` (on `20261017w`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- **The Engine makes things to show its progress,** about once a week: a report on where it stands, notes on a question it is working, a sketch of what it would build, an account of itself. They stay in the game and appear on its card.
+- **They go out through the maker's channel** (the outgoing file lists them in full) and the writer can put each into plain words and send it back as a translation. A translation shows under the work in the game, is kept, raises the Engine's vocabulary and three of its reasoning skills each time, and later replies recall what it was taught before.
+- Format and the full loop are in ENGINE-CHANNEL.md.
+
 ## The Engine learns
 
 `20261017w` (on `20261017v`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
