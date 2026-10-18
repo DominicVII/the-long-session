@@ -4,6 +4,12 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261018p: the real reason the Engine's model failed, and a fallback
+
+`20261018p` (on `20261018o`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+When the Engine's own model fails, the game now reads Ollama's actual error (for example not enough memory for a large model, or a model name it does not have) and shows it on the Engine card after a letter. The main model then answers for the Engine instead of the stock line, and the reply is marked live and says which model spoke. Tested against a stand-in server that refuses the large model for lack of memory.
+
 ## 20261018o: the Engine's letters say when the model did not answer
 
 `20261018o` (on `20261018n`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
