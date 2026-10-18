@@ -4,6 +4,12 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## Tidier research loop
+
+`20261017t` (on `20261017s`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- The research loop's Open Line chatter no longer starts world chains, so it cannot crowd out the consequences of what you actually say or do, and it has its own colour on the board.
+
 ## The research loop, and a seat at any hearing
 
 `20261017s` (on `20261017r`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
