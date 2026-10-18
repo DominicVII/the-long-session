@@ -4,6 +4,12 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## Patience for a larger Engine model
+
+`20261018m` (on `20261018l`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- **The game waits four times longer for the Engine** (letters, works, exchanges, its journal and its card) when it has its own model set in the Live talk panel, so a large model such as a 27B one is not given up on while it is still thinking.
+
 ## One question at a time
 
 `20261018l` (on `20261018k`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
