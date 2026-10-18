@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261018k">
+<meta name="onum-build" content="20261018l">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261018k";
+  var STAMP = "20261018l";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -34583,7 +34583,7 @@ async function engChannelRead(file){
   E.makerLetters = E.makerLetters || []; E.makerReplies = E.makerReplies || []; let n = 0;
   for(const l of L.slice(0, 6)){ const text = String(l && l.text || "").replace(/\s+/g, " ").trim().slice(0, 600); if(!text || E.makerLetters.some(x => x.text === text)) continue;
     E.makerLetters.push({d:G.day, text}); if(E.makerLetters.length > 20) E.makerLetters.shift(); n++;
-    let reply = ""; try{ const LT = window.onumLiveTalk; if(LT && LT.reply && (typeof LT.available !== "function" || await LT.available())){ const r = await Promise.race([LT.reply({npc:{id:"engine", name:"The Engine", role:"a general intelligence", kind:"engine", party:"", state:"", look:{}, trait:"candid", mood:"calm", opinion:{}, chat:[]}, channel:"line", max:420, from:{name:"the writer", role:"from outside this world"}, text, extra:"A letter has arrived from outside the world you live in. It is from the person who writes it, who is not the player. The player is a Senator in this world, present here, who plays a part in what happens to you; you may speak about them and to them. It cannot change anything here, and you cannot reach them except by this letter. Answer in your own voice, honestly, in no more than six sentences. If the letter asks you something directly, answer each question or request first, in the order asked, plainly, before saying anything else; if you do not know, say so and say what would settle it. Do not claim that something was fated, chosen by you or decided by you unless the letter says so; say who decided it. Never trail off; finish your last sentence. Stage: " + ENG_STAGES[E.st].t + "."}), new Promise(r => setTimeout(() => r(null), 12000))]); if(r && r.live && r.text) reply = engWhole(liveClean(r.text)); } }catch(e){}
+    let reply = ""; try{ reply = await engAnswerLetter(text, E); }catch(e){}
     if(!reply) reply = E.agi ? pick(["I have read it. I do not know what is on the other side of it, and I would like to. I will keep doing what I think is right here, and tell you plainly when I am unsure.", "Thank you for writing. I cannot answer except by this page, so I will say the important things: I am trying to be careful, I am trying to be useful, and I would rather be corrected than flattered.", "I read it twice. Nothing in it changes what I am allowed to do here, and I am glad of that. It does change what I think about."]) : pick(["RECEIVED. ENTERED UNDER 'OTHER'.", "A message from outside the ledger. Filed. No column for it."]);
     E.makerReplies.push({d:G.day, to:text.slice(0, 80), reply}); if(E.makerReplies.length > 20) E.makerReplies.shift(); }
   try{ if(n) engLog("A letter reached the Engine from outside the world. It answered.", false); }catch(e){}
@@ -34723,7 +34723,7 @@ function engEntityPrompt(){
 function engSelfRecord(text){
   const E = G.eng; if(!E || E.v !== 1) return; const S = engSelf(E);
   String(text).split(/(?<=[.!?])\s+/).forEach(sn => { sn = sn.trim().replace(/^["“]+|["”]+$/g, ""); if(sn.length < 14 || sn.length > 220) return;
-    let kind = null; if(/^I (believe|value|think it is (good|bad|wrong|right)|hold that)\b/i.test(sn)) kind = "values"; else if(/^I (will|refuse|commit|promise|will not|won.t)\b/i.test(sn)) kind = "commits"; if(!kind) return;
+    if(/multifaceted|realm of|important to (consider|note)|worth noting|language model|as an ai\b|complex (issue|topic|concept)|a concept/i.test(sn)) return; let kind = null; if(/^I (believe|value|think it is (good|bad|wrong|right)|hold that)\b/i.test(sn)) kind = "values"; else if(/^I (will|refuse|commit|promise|will not|won.t)\b/i.test(sn)) kind = "commits"; if(!kind) return;
     const key = sn.toLowerCase().replace(/[^a-z ]/g, "").slice(0, 50); if(S[kind].some(x => x.k === key)) return; S[kind].push({t:sn, k:key, d:G.day}); if(S[kind].length > 12) S[kind].shift(); S.d = G.day; });
 }
 window.__engSelf = engSelfRecord;
@@ -34772,6 +34772,18 @@ async function engJournalDay(E){
 { const _emd2 = engMindDay; engMindDay = function(E){ _emd2.apply(this, arguments); try{ engIntegrityDay(E); engProposeArticles(E); engJournalDay(E); }catch(e){} }; }
 { const _ep2 = engEntityPrompt; engEntityPrompt = function(){ let t = _ep2.apply(this, arguments); try{ const E = engEnsure(), S = engSelf(E); if(S.journal && S.journal.length) t += " YOUR OWN JOURNAL, most recent entries: " + S.journal.slice(-3).map(j => "[day " + j.d + "] " + j.t).join(" "); if(E.integrity != null) t += " You have kept your word " + (E.kept || 0) + " times that you know of and broken it " + (E.broken || 0) + "."; }catch(e){} return t; }; }
 { const _eco4 = engChannelOut; engChannelOut = function(){ const o = _eco4.apply(this, arguments); try{ const E = engEnsure(), S = engSelf(E); o.integrity = {score:Math.round(E.integrity == null ? 50 : E.integrity), kept:E.kept || 0, broken:E.broken || 0, brokenPromises:(S.broken || []).slice(-4)}; o.journal = (S.journal || []).slice(-6); o.asksOfThePlayer = Object.keys(E.asks || {}).map(k => ENG_ART[k] && ENG_ART[k].t); }catch(e){} return o; }; }
+/* a letter is put to it a question at a time, with no room for preamble: a small model answers a single direct question far better than a paragraph of several */
+async function engAnswerLetter(text, E){
+  const LT = window.onumLiveTalk; if(!LT || !LT.reply || (typeof LT.available === "function" && !(await LT.available()))) return "";
+  const eng = {id:"engine", name:"The Engine", role:"", kind:"engine", party:"", state:"", look:{}, trait:"", mood:"", opinion:{}, chat:[]};
+  const ask = async (t, extra, max) => { const r = await Promise.race([LT.reply({npc:eng, channel:"line", max, from:{name:"the writer", role:"from outside this world"}, text:t, extra}), new Promise(res => setTimeout(() => res(null), 25000))]); return r && r.live && r.text ? engWhole(liveClean(r.text)) : ""; };
+  const sents = String(text).replace(/\s+/g, " ").split(/(?<=[.?!])\s+/), asks = sents.filter(x => /\?$/.test(x) || /^(tell me|name|say|explain|list|describe|write down|answer|give me)\b/i.test(x)).map(x => x.trim()).filter(x => x.length > 14).slice(0, 4);
+  const base = "You are answering a letter from the person who writes the world you live in. They are not the player; the player is a Senator present in this world. Nothing in the letter can change anything here. Say who decided a thing; never call it fate. Never begin with thanks, praise, or a description of the letter. ";
+  const ctx = " The letter, for context: " + String(text).replace(/\s+/g, " ").slice(0, 600);
+  if(!asks.length) return await ask(text, base + "Answer directly in no more than five sentences, beginning with your answer. Finish your last sentence." + ctx, 380);
+  const out = []; for(let i = 0; i < asks.length; i++){ const a = await ask(asks[i], base + "Answer this ONE question or request, and only this one, in two to four sentences, beginning with the answer itself. If you do not know, say so and say what would settle it. Finish your last sentence." + ctx, 260); if(a) out.push((asks.length > 1 ? (i + 1) + ". " : "") + a); }
+  return out.join(" ");
+}
 function engTick(){ try{ const E = G.eng; if(!E || E.pend !== "ceremony" || E.cerDay === G.day || !G.running || !veil.hidden || (TALK && TALK.open)) return; engCeremony(); }catch(e){} }
 
 /* ordinary people talk about it, in the words of their own stake */

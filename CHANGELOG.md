@@ -4,6 +4,13 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## One question at a time
+
+`20261018l` (on `20261018k`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- **Letters are put to the Engine one question at a time.** Each question or request in a letter becomes its own short call, told to begin with the answer itself and not with thanks or a description of the letter. A small model answers one direct question far better than a paragraph of several.
+- **Vague remarks are no longer recorded as its principles.** A sentence like “I believe consciousness is a multifaceted concept” is a remark, not a principle, and is ignored.
+
 ## A word kept or broken
 
 `20261018k` (on `20261018j`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
