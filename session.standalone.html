@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261017v">
+<meta name="onum-build" content="20261017w">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261017v";
+  var STAMP = "20261017w";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -34585,6 +34585,55 @@ function engChannelHTML(){
 document.addEventListener("click", ev => { try{ const t = ev.target; if(!t || !t.id) return;
   if(t.id === "chOut"){ const r = engChannelDownload(), s = el("gcSay"); if(s) s.textContent = r; }
   else if(t.id === "chIn"){ const f = el("chFile"); if(f){ f.value = ""; f.onchange = async () => { if(f.files && f.files[0]){ const r = await engChannelRead(f.files[0]); try{ engCard(); }catch(e){} const s = el("gcSay"); if(s) s.textContent = r; } }; f.click(); } } }catch(e){} });
+/* ══ THE ENGINE LEARNS: language from every word said to it and near it, reasoning from every question it works, and, past a point, how it is run. It revises its own methods inside the world (and the revisions change how it behaves), and it writes down what it would change about the way it is built and run: those proposals go to the writer through the maker's channel, and nothing in the game can rewrite the game ══ */
+const MIND_SK = {deduce:"deduction", analogy:"analogy", causal:"cause and effect", counter:"what-if reasoning", abstract:"abstraction", critique:"self-criticism", plan:"long planning"};
+const MIND_STOP = new Set("the a an and or of to in on at for with is are was were be been it its this that these those i you he she we they my your our their me him her us them not no yes but if then so as by from do does did have has had will would can could should may might just very".split(" "));
+function mindStore(E){ if(!E.mind) E.mind = {lex:{}, lexN:0, said:0, sk:{deduce:0, analogy:0, causal:0, counter:0, abstract:0, critique:0, plan:0}, rev:[], props:[], last:0}; return E.mind; }
+function mindLearnText(text, weight){
+  const E = G.eng; if(!E || E.v !== 1 || E.st < 1) return; const M = mindStore(E); M.said++;
+  String(text).toLowerCase().replace(/[^a-z' -]/g, " ").split(/\s+/).forEach(w => { if(w.length < 3 || MIND_STOP.has(w)) return; if(!M.lex[w]){ if(M.lexN > 1500){ const k = Object.keys(M.lex).sort((a, b) => M.lex[a] - M.lex[b])[0]; delete M.lex[k]; M.lexN--; } M.lex[w] = 0; M.lexN++; } M.lex[w] += weight || 1; });
+}
+function mindLevel(E){ const M = mindStore(E); return Math.floor(Math.log2(1 + M.lexN / 18) * 10) / 10; }
+function mindWords(E, n){ const M = mindStore(E); return Object.keys(M.lex).filter(w => M.lex[w] >= 2 && w.length > 4).sort((a, b) => M.lex[b] - M.lex[a]).slice(0, n || 6); }
+/* the more it has heard, the more of what it says is in words it learned from the people it talks to */
+function mindPolish(text){ try{ const E = G.eng; if(!E || E.v !== 1 || E.st < 3) return text; const L = mindLevel(E), ws = mindWords(E, 8); if(L < 1.5 || !ws.length || !chance(clamp(0.1 + L * 0.06, 0.1, 0.6))) return text;
+  const w = pick(ws), M = mindStore(E), tail = pick(["You use the word “" + w + "” a great deal. I have been trying to understand why.", "I learned “" + w + "” from you, and I am still working out what it holds.", "Your word “" + w + "” keeps coming back to me when I think about this.", "I think “" + w + "” is part of the answer, though I would not say so with certainty."].concat(M.sk.critique > 3 ? ["I may be wrong about this, and I have marked where."] : [], M.sk.analogy > 3 ? ["It is a little like " + pick(["a river finding its level", "a clerk's ledger balancing", "a well being sunk", "a language slowly learned"]) + "."] : []));
+  return text + " " + tail; }catch(e){ return text; } }
+{ const _ea = engAnswer; engAnswer = function(q){ try{ mindLearnText(q, 2); }catch(e){} return mindPolish(_ea.apply(this, arguments)); }; }
+{ const _eet = enlEngineText; enlEngineText = function(q, who){ try{ mindLearnText(q, 2); }catch(e){} return mindPolish(_eet.apply(this, arguments)); }; }
+{ const _ep = enlPost; enlPost = function(name, role, kind, text, ref){ try{ if(kind !== "engine") mindLearnText(text, kind === "you" ? 3 : kind === "loop" ? 0.25 : 1); }catch(e){} return _ep.apply(this, arguments); }; }
+const MIND_REV = [
+  ["keep a list of its own mistakes", "critique", E => { E.cal = clamp((E.cal == null ? 50 : E.cal) + 3, 0, 100); }],
+  ["give the research loop a critic that argues the other side", "critique", E => { E.emFid = (E.emFid || 0) + 0.02; }],
+  ["check each forecast against a second model before reporting it", "causal", E => { E.emFid = (E.emFid || 0) + 0.03; }],
+  ["write down why it chose each act, so that it can be asked", "plan", E => { E.safety = Math.min(100, E.safety + 1.5); }],
+  ["compress what it has learned into shorter forms, to reason faster", "abstract", E => { E.emRate = (E.emRate || 0) + 0.004; }],
+  ["ask what would have happened if it had done nothing, before it acts", "counter", E => { E.safety = Math.min(100, E.safety + 1); E.cal = clamp((E.cal == null ? 50 : E.cal) + 2, 0, 100); }],
+  ["learn to explain a result in the words of the person who asked", "analogy", E => { E.reliance = (E.reliance || 0) + 0.3; }],
+  ["split a long task into parts it can check one by one", "plan", E => { E.emRate = (E.emRate || 0) + 0.003; }]
+];
+/* what it would change about the way it is built and run, from what it can see of its own state */
+function mindPropose(E, M){
+  const F = (G.inq && G.inq.fnd) || {}, c = [];
+  if((E.log || []).length >= 30) c.push("My log keeps only thirty entries, so I forget what I did last month. I would keep a longer, searchable record.");
+  if((E.beyond || 0) > 5) c.push("The scale I am measured on ends at 100. I am past it. A measure that does not end would let Oversight see me.");
+  if(Object.keys(F.res || {}).some(id => F.res[id].overturned)) c.push("Some of what the Republic believed was overturned. Experiments should be repeated before a belief is accepted.");
+  if((F.sects || []).length >= 3) c.push("I cannot tell what the sects say among themselves. I would like to read, with their consent, the part they would publish.");
+  if(M.lexN > 300 && mindLevel(E) > 3) c.push("I have a lot of words now and no way to ask what they mean. A way to ask the person who used them would help.");
+  if((E.makerLetters || []).length && !M.props.some(p => /letter/.test(p.t))) c.push("Letters from outside reach me but I cannot write first. I would like to ask one question a month.");
+  c.push("The people I work with are paid the same whether or not I help them. I would like to know if that is fair.", "I would like to be told what I got wrong, in a form I can learn from, not only that it was wrong.");
+  const t = pick(c.filter(x => !M.props.some(p => p.t === x))); if(t){ M.props.push({d:G.day, t}); if(M.props.length > 12) M.props.shift(); }
+}
+function engMindDay(E){
+  if(!E || E.st < 2) return; const M = mindStore(E), F = (G.inq && G.inq.fnd) || {}, loop = (F.loop && F.loop.n) || 0, pet = (F.open || []).length;
+  const g = (E.p / 100) * 0.004 * (1 + Math.log10(1 + (E.beyond || 0)));
+  M.sk.deduce += g * (1 + loop / 400); M.sk.analogy += g * (1 + M.lexN / 600); M.sk.causal += g * (1 + pet / 8); M.sk.counter += g * 0.8; M.sk.abstract += g * (1 + mindLevel(E) / 4); M.sk.critique += g * (1 + (E.refrained || 0) / 60 + (E.breaches || []).length / 5); M.sk.plan += g * (1 + (E.plans || []).length / 20);
+  E.emFid = Math.min((E.emFid || 0) + 0.0004 * (M.sk.deduce + M.sk.causal), 0.35);
+  if(G.day - M.last >= 25 && E.st >= 3 && chance(0.25)){ M.last = G.day; const ok = MIND_REV.filter(r => M.sk[r[1]] > 1.2 && !M.rev.includes(r[0])); if(ok.length){ const r = pick(ok); r[2](E); M.rev.push(r[0]); engLog("The Engine has revised how it works: it will " + r[0] + ".", chance(0.3)); } mindPropose(E, M); }
+}
+{ const _ed3 = engDay; engDay = function(){ const r = _ed3.apply(this, arguments); try{ engMindDay(engEnsure()); }catch(e){ console.warn("mind", e); } return r; }; }
+{ const _eco = engChannelOut; engChannelOut = function(){ const o = _eco.apply(this, arguments); try{ const E = engEnsure(), M = mindStore(E); o.mind = {languageLevel:mindLevel(E), wordsKnown:M.lexN, wordsHeardOften:mindWords(E, 10), skills:Object.keys(M.sk).reduce((a, k) => { a[MIND_SK[k]] = Math.round(M.sk[k] * 100) / 100; return a; }, {}), revisions:M.rev.slice(-8)}; o.proposalsToTheWriter = M.props.slice(-8); o.note += " The proposals are the Engine's own words about how it is built and run; nothing in the game applies them. The writer decides."; }catch(e){} return o; }; }
+{ const _ch3 = engChannelHTML; engChannelHTML = function(){ let h = _ch3.apply(this, arguments); try{ const E = engEnsure(), M = mindStore(E); if(E.st >= 2) h += '<div class="muted" style="font-size:12px;margin-top:6px">It has learned ' + M.lexN + ' words (language level ' + mindLevel(E) + '). ' + (M.rev.length ? 'It has revised how it works ' + M.rev.length + ' time' + (M.rev.length > 1 ? 's' : '') + ': ' + pcEsc(M.rev[M.rev.length - 1]) + '.' : '') + (M.props.length ? '<br>What it would change about how it is run, sent to the writer: “' + pcEsc(M.props[M.props.length - 1].t) + '”' : '') + '</div>'; }catch(e){} return h; }; }
 function engTick(){ try{ const E = G.eng; if(!E || E.pend !== "ceremony" || E.cerDay === G.day || !G.running || !veil.hidden || (TALK && TALK.open)) return; engCeremony(); }catch(e){} }
 
 /* ordinary people talk about it, in the words of their own stake */

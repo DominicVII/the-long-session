@@ -4,6 +4,15 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## The Engine learns
+
+`20261017w` (on `20261017v`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- **It learns language.** Every word said to it on the Open Line, in a question or in a letter, is kept; its vocabulary and a language level grow with use. The more it has heard, the more it answers in words it learned from the people who talk to it, and it says so (“I learned that word from you”). Words from its own research chatter count far less than words from people.
+- **It learns to reason.** Seven skills (deduction, analogy, cause and effect, what-if reasoning, abstraction, self-criticism and long planning) grow with what it works on and with how often it has refrained or been checked. They sharpen its forecasts.
+- **It revises how it works.** Every few weeks, once a skill is good enough, it adopts a revision of its own methods (a critic for the research loop, a second check on forecasts, a record of why it chose each act). The revisions change how it behaves in the world.
+- **It writes down what it would change about how it is run.** Those proposals go out with the maker's channel file as proposals to the writer. Nothing in the game applies them; the writer decides.
+
 ## The maker's channel
 
 `20261017v` (on `20261017u`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
