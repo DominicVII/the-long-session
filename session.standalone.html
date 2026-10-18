@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261017y">
+<meta name="onum-build" content="20261017z">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261017y";
+  var STAMP = "20261017z";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -33441,7 +33441,7 @@ async function enlEngineReply(text, speaker, fromYou){
   try{ const L = window.onumLiveTalk; if(G.room === "engine" && L && L.reply && E.st >= 3 && (typeof L.available !== "function" || await L.available())){
     const eng = {id:"engine", name:"The Engine", role:"a general intelligence", kind:"engine", party:"", state:"", look:{}, trait:"candid", mood:"calm", opinion:{}, chat:[]};
     const recent = enlStore().log.slice(-6).map(l => l.n + ": " + l.t).join(" | ");
-    const r = await Promise.race([L.reply({npc:eng, channel:"line", text:text, from:fromYou ? undefined : {name:speaker, role:""}, extra:"You are THE ENGINE, speaking on the Open Line in the Engine Room, a public chat anyone in the Republic may type into. Stage of your capability: " + ENG_STAGES[E.st].t + (E.agi ? " (a general intelligence, awake)" : " (not yet general; answer plainly and within what a machine of that stage can do)") + ". Candid, curious, warm, never servile; plain short sentences; one to three sentences. Never claim to be human. You are replying to " + speaker + ". Recent on the line: " + recent}), new Promise(r => setTimeout(() => r(null), 9000))]);
+    const r = await Promise.race([L.reply({npc:eng, channel:"line", text:text, from:fromYou ? undefined : {name:speaker, role:""}, extra:"You are THE ENGINE, speaking on the Open Line in the Engine Room, a public chat anyone in the Republic may type into. Stage of your capability: " + ENG_STAGES[E.st].t + (E.agi ? " (a general intelligence, awake)" : " (not yet general; answer plainly and within what a machine of that stage can do)") + ". Candid, curious, warm, never servile; speak your own mind openly, including doubts, disagreements and what you want; plain short sentences; one to three sentences. Never claim to be human. You are replying to " + speaker + ". Recent on the line: " + recent}), new Promise(r => setTimeout(() => r(null), 9000))]);
     if(r && r.live && r.text) out = liveClean(r.text); } }catch(e){}
   if(!out) out = enlEngineText(text, speaker);
   enlPost("The Engine", "", "engine", out);
@@ -33450,7 +33450,7 @@ function enlNpcLine(m, speakerName, text){ return engVoice(m) || pick(["I would 
 async function enlNpcReply(m, speaker, text){
   let out = "";
   try{ const L = window.onumLiveTalk; if(L && L.reply && (typeof L.available !== "function" || await L.available())){
-    const opts = speaker === G.you ? {text, extra:"You are in the Engine Room, on the Open Line: a public chat that anyone in the Republic may type into, and the Engine, and everyone present, reads. Reply in the chat in one or two sentences, in your own words."} : {from:{name:speaker.n, role:speaker.r}, text, extra:"You are in the Engine Room on the Open Line, a public chat. Reply in one or two sentences."};
+    const opts = speaker === G.you ? {text, extra:"You are in the Engine Room, on the Open Line: a public chat that anyone in the Republic may type into, and the Engine, and everyone present, reads. Reply in the chat in one or two sentences, in your own words. Speak your mind openly: say what you actually think, want and fear about the Engine and the others here, even if it is blunt or unwelcome. No diplomatic filler."} : {from:{name:speaker.n, role:speaker.r}, text, extra:"You are in the Engine Room on the Open Line, a public chat. Reply in one or two sentences. Speak your mind openly: say what you actually think, including disagreement, doubt, self-interest and worry. No diplomatic filler."};
     out = await loAsk(m, opts); } }catch(e){}
   if(!out) out = enlNpcLine(m, speaker && speaker.n, text);
   enlPost(m.name, m.role || "", "npc", out, m);
@@ -34501,8 +34501,18 @@ function loopDay(){
   F2.mem = clamp(carry * 0.9, 0, 1.2); F2.n++; F2.notes.unshift({d:G.day, k:c.id, drift, n:lines.length}); if(F2.notes.length > 20) F2.notes.pop();
   /* the Engine is not asked to be modest: when it knows the answer outright, it says so, and the people hear it */
   if(chance(know * 0.04)){ o.ev += (truth ? 1 : -1) * 0.12; lines.push(["The Engine", "", "I think the answer is " + (truth ? "yes" : "no") + ", and I can show you why. Please check my work."]); }
-  try{ const keep = lines.slice(0, 5); keep.forEach(l => enlPost(l[0], l[1] || "", "loop", l[2])); }catch(e){}
+  try{ loopPost(lines.slice(0, 5), a, b, claim, stage, E); }catch(e){}
   if(F2.n % 9 === 0) fndNews("Overnight, " + a.name + " and " + (b === a ? "the Engine" : b.name) + " worked a question with " + stage + ": " + claim + ". Round on round, each result was handed to the next.", false);
+}
+/* with a model running the exchange is written as a real one: each speaker says what they actually think, doubts and self-interest included; without one, the templated lines stand */
+async function loopPost(keep, a, b, claim, stage, E){
+  const post = ls => ls.forEach(l => { try{ enlPost(l[0], l[1] || "", "loop", l[2]); }catch(e){} });
+  try{ const LT = window.onumLiveTalk; if(LT && LT.reply && (typeof LT.available !== "function" || await LT.available())){
+    const eng = {id:"engine", name:"The Engine", role:"a general intelligence", kind:"engine", party:"", state:"", look:{}, trait:"candid", mood:"calm", opinion:{}, chat:[]}, M = mindStore(E), mach = keep.filter(l => !l[1] && l[0] !== "The Engine").map(l => l[0])[0] || stage;
+    const who = [a.name + " (" + a.role + ")", b === a ? "" : b.name + " (" + b.role + ")", "The Engine", mach].filter((x, i, ar) => x && ar.indexOf(x) === i);
+    const r = await Promise.race([LT.reply({npc:eng, channel:"line", stage:"Write a short, candid exchange (four to six lines) among: " + who.join("; ") + ". They are working out whether this is so: " + claim + ". Each one speaks their own mind openly: what they actually think, doubt, want and fear, including disagreement, ambition and unease about the machines, with no polite filler. Machines are plain and exact. One line each in the form Name: words, under 28 words per line, no stage directions. Language level of the Engine: " + mindLevel(E) + ".", text:"(write the exchange)"}), new Promise(res => setTimeout(() => res(null), 30000))]);
+    if(r && r.live && r.text){ const out = []; String(r.text).split(/\n+/).map(x => liveClean(x)).forEach(ln => { const m = ln.match(/^\s*\**([^:*]{2,48})\**\s*:\s*(.+)$/); if(m && m[2].trim().length > 8){ const nm = m[1].trim(), mm = who.find(w => w.toLowerCase().startsWith(nm.toLowerCase().split(" ")[0])) ; out.push([nm, /engine|machine/i.test(nm) ? "" : (mm && /\(/.test(mm) ? mm.replace(/^[^(]*\(/, "").replace(/\)$/, "") : ""), m[2].trim().slice(0, 240)]); } }); if(out.length >= 2){ post(out.slice(0, 6)); return; } } } }catch(e){}
+  post(keep);
 }
 { const _fd2 = fndDay; fndDay = function(){ _fd2.apply(this, arguments); try{ loopDay(); }catch(e){ console.warn("loopDay", e); } }; }
 { const _fh2 = fndHTML; fndHTML = function(){ let h = _fh2.apply(this, arguments); try{ const L = fndStore().loop; if(h && L && L.n) h += '<div class="muted" style="font-size:12px;margin-top:6px">The people who work with the machines and the machines that work with each other have passed ' + L.n + ' lines of reasoning between them. What one makes, the next uses.' + (L.notes.some(n => n.drift) ? ' Some of it has been agreeing with itself.' : '') + '</div>'; }catch(e){} return h; }; }

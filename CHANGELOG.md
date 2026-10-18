@@ -4,6 +4,12 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## Speaking their minds
+
+`20261017z` (on `20261017y`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- **The Open Line speaks plainly.** With a model running, the research exchanges are written as real ones: each person says what they actually think, doubt, want and fear, including ambition, disagreement and unease about the machines; the machines stay exact. The people in the room, and the Engine itself, are told to speak their minds openly, not diplomatically. Without a model the templated lines stand.
+
 ## The Engine writes its own works
 
 `20261017y` (on `20261017x`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
