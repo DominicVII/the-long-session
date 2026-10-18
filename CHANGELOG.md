@@ -4,6 +4,16 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## The nature of things
+
+`20261017q` (on `20261017p`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- **The world has a nature of its own,** fixed for each game and unknown to everyone in it: whether closed timelike curves are allowed, whether the past can be changed, which reading of quantum mechanics holds, whether consciousness is fundamental, whether a copied mind is the same person, whether other universes exist, whether there is one theory of everything, and about forty more questions across quantum physics, time and spacetime, the cosmos, thermodynamics, information, mind and life.
+- **People and the Engine investigate it.** A question is taken up once what it stands on has been found. Experiments lean toward the truth, with noise, and only as well as the work and instruments allow. The Republic comes to believe an answer, and can be wrong: a better experiment, or a prototype that fails because its premise was false, overturns it.
+- **Inventions follow belief.** A quantum network, a fault-tolerant quantum computer, a vacuum energy tap, time-dilation couriers, a closed timelike channel, a wormhole link, a warp craft, mind transfer, a test for machine consciousness and more are built only when the world allows them. A time channel is either self-consistent (the past can only be told what it already knew) or branching (each use leaves a world behind), depending on that world's nature.
+- **There is no end to the questions.** Settled results combine into new ones, and every real anomaly in the instruments raises a question about the law behind it, with no ceiling on depth. What is found also feeds the Engine's emergent behaviour.
+- All of it is on the Academy card under *The nature of things*, and the people who work these fields talk about what they are testing.
+
 ## Your district office is a building again
 
 `20261017p` (on `20261017o`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
