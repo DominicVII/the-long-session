@@ -4,6 +4,12 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## The Engine writes its own works
+
+`20261017y` (on `20261017x`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- **With a model running, the Engine's works are written by the Engine.** Each report, note, sketch or account is drafted from the facts of its state (so it cannot invent numbers), in its own words at its current language level, using words it has learned and building on what it was last taught. It ends with a question it would like answered. Without a model the works are templated as before. The outgoing channel file says which is which (*writtenBy*).
+
 ## The Engine's works, and a translator
 
 `20261017x` (on `20261017w`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
