@@ -4,6 +4,12 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261018ah: a memory and conscience panel
+
+`20261018ah` (on `20261018ag`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+The Engine card's maker's channel now shows a Memory and conscience panel: the player's tally of harm done, care given and repair made; the most recent harms; and, for the people who remember you, what they hold of you (clearly, dimly, or as a feeling) and whether they are still carrying a hurt. It is read-only, and it shows only what reaches people.
+
 ## 20261018ag: memory that fades like a mind, and moral consequences that last
 
 `20261018ag` (on `20261018af`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
