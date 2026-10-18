@@ -4,6 +4,12 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261018ag: memory that fades like a mind, and moral consequences that last
+
+`20261018ag` (on `20261018af`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+The daily rule that kept only each person's twelve newest memories is gone: it threw away a betrayal as soon as twelve trivial things had happened after it. Memories now fade by an Ebbinghaus-style curve slowed by how much they mattered (emotional ones last, a wound lasts longest), by being recalled (spaced recall makes them last longer), and by sleep, which replays what mattered. As the detail fades an episode becomes a gist and leaves an affective residue about the person, and a hurt weighs more than a kindness of the same size. People recall by strength and relevance, not recency; recalling changes a memory a little. Similar episodes interfere with each other. Trivia is forgotten in weeks; a betrayal is not. Moral consequences persist: harm done to someone leaves distress that eases only slowly (a wound much more slowly), festers in their warmth and trust if untreated, and is eased only by real repair (an apology and making it right); the player carries a tally of harm, care and repair, and people who are still hurting are named in the feed. What each person remembers, clearly, dimly or only as a feeling, is put into what they say when the model speaks for them.
+
 ## 20261018af: the Engine is told its own forecasting record
 
 `20261018af` (on `20261018ae`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.

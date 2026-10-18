@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261018af">
+<meta name="onum-build" content="20261018ag">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261018af";
+  var STAMP = "20261018ag";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -2136,7 +2136,7 @@ function everyone(){
 function remember(m, text, weight, sticky){
   if(!m || !m.mem) return;
   m.mem.unshift({d:G.day, t:text, w:weight, s:sticky?2.6:1});
-  if(m.mem.length > 26) m.mem.pop();
+  if(m.mem.length > 60) psyPrune(m);
   try{ ledgerOwn(m, text); }catch(e){}
 }
 function ledgerEnsure(m){
@@ -3295,7 +3295,7 @@ function sustainHouse(){
       G.history = myth.concat(rest);
     }
     everyone().forEach(m => {
-      if(m.mem && m.mem.length > 12) m.mem.length = 12;
+      if(m.mem && m.mem.length > 60) psyPrune(m);
       if(m.chat && m.chat.length > 6) m.chat = m.chat.slice(-6);
       if(m.heard && m.heard.length > 8) m.heard.length = 8;
       if(m && m.machine){ m.gone = false; m.away = null; }
@@ -23384,8 +23384,7 @@ function traitWords(m){
 }
 function dossierFor(m){
   const you = G.you, b = G.bill, mood = moodOf(m);
-  const mems = m.mem.slice(0,6).map(e =>
-    "- (" + (memWeight(m,e) < 0 ? "resents" : "values") + ", day " + e.d + ") " + e.t);
+  const mems = psyRecallLines(m, 6);
   const L = [];
   L.push("You are role-playing one character in a fictional national legislature. Stay in character completely. Never mention that you are an AI, a model, a game, a prompt, or an outside user; never break the fourth wall and never narrate stage directions.");
   L.push("");
@@ -23440,7 +23439,7 @@ function dossierFor(m){
     "do not know when you do not. Never invent private knowledge of another member.");
   if(G.you.out) L.push("Note: they lost their seat. They are not a member any more — no committee, " +
     "no floor, nothing to trade. Treat them accordingly, warmly or otherwise.");
-  if(mems.length){ L.push("What has actually passed between you (your memory, most recent first):"); mems.forEach(x=>L.push(x)); }
+  if(mems.length){ L.push("What has actually passed between you (your memory, strongest first; some of it is only a feeling):"); mems.forEach(x=>L.push(x)); }
   else L.push("Nothing much has passed between you yet.");
   L.push("");
   if(b && !b.done && m.kind === "member"){
@@ -35035,6 +35034,70 @@ setInterval(unseenTick, 15000); setInterval(unseenDigest, 25 * 60 * 1000);
   h += '<div class="eyebrow" style="margin-top:12px">While you were away</div><p class="muted" style="font-size:12px"><label><input type="checkbox" id="unOn"' + (unseenOn() ? " checked" : "") + '> Keep the Republic talking in rooms I am not in (uses the model in the background, one scene at a time)</label></p>' +
   (U.log.length ? U.log.slice(0, 8).map(x => '<div class="muted" style="font-size:12px;border-left:2px solid ' + (x.k === "engine" ? "#c9a24a" : "#556") + ';padding-left:7px;margin:3px 0"><b>' + pcEsc(x.who) + '</b> <span style="opacity:.7">in ' + pcEsc(x.room) + ', day ' + x.d + '</span><br>' + pcEsc(x.t) + '</div>').join("") : '<div class="muted" style="font-size:12px">Nothing yet. Scenes begin once the model is reachable and people are in rooms you are not in.</div>'); }catch(e){} return h; }; }
 document.addEventListener("change", ev => { try{ const t = ev.target; if(t && t.id === "unOn"){ localStorage.setItem("onum.unseen", t.checked ? "on" : "off"); } }catch(e){} });
+/* ===== memory that behaves like a mind =====
+   The old rule kept each person's twelve newest memories and dropped the rest, so a betrayal was lost as soon as twelve trivial things had happened after it.
+   Now a memory fades the way a real one does: by time, slowed by how much it mattered (emotional memories last, a wound lasts longest), by being recalled (each recall, spaced out, makes it last longer), and by sleep, which replays what mattered.
+   As the detail goes the feeling stays: the episode becomes a gist, and the gist leaves an affective residue about the person. Memories are recalled by how strong and how relevant they are, not by how recent, and recall changes them a little. */
+const MOR_NEG = /\b(lied|lie|betray|broke|broken|threat|humiliat|insult|ignored|cheat|cheated|blamed|abandon|ashamed|attack|hurt|went after|barreled|shamed|used me|never told|walked past|left me)\b/i;
+const MOR_POS = /\b(kept|forgave|forgive|helped|thank|honest|protected|gave me|gave you my vote|somewhere to go|owe you|stood by|respect|trusted|credit|took you at your word)\b/i;
+const MOR_REP = /\b(sorry|apolog|made it right|repair|paid back|compensat|corrected)\b/i;
+function psyEnrich(e){
+  if(e.sal != null) return e; const w = e.w || 0, t = e.t || "";
+  e.sal = clamp(Math.abs(w) / 16, 0.1, 1); e.rc = 0; e.last = e.d; if(e.who === undefined) e.who = /\byou\b|\byour\b/i.test(t) ? "you" : null;
+  const neg = MOR_NEG.test(t), pos = MOR_POS.test(t); e.mor = neg && !pos ? -1 : pos && !neg ? 1 : (w < 0 ? -0.4 : w > 0 ? 0.4 : 0); e.trauma = e.sal >= 0.75 && e.mor < 0; return e;
+}
+function memRetention(m, e){
+  psyEnrich(e); const conv = (m.traits && m.traits.conviction) || 50, since = Math.max(0, G.day - Math.max(e.d, e.last || e.d));
+  const tau = 14 * (1 + 3 * e.sal) * Math.sqrt(e.s || 1) * (1 + 0.5 * (e.rc || 0)) * (0.75 + conv / 160) * (e.trauma ? 3 : 1);
+  return Math.exp(-since / tau);
+}
+{ const _mw = memWeight; memWeight = function(m, e){ try{ const R = memRetention(m, e); return (e.w || 0) * (R + (1 - R) * 0.3 * (e.sal || 0.3)); }catch(err){ return _mw.apply(this, arguments); } }; }   /* the facts fade; the feeling stays */
+function psyAffect(m, e){ if(!e.who) return; if(!m.aff) m.aff = {}; const a = m.aff[e.who] || (m.aff[e.who] = {v:0, n:0}); const w0 = e.w || 0; a.v = clamp(a.v + w0 * (0.12 + 0.2 * (e.sal || 0.3)) * (w0 < 0 ? 1.6 : 1), -80, 80); a.n++; }                /* a hurt weighs more than a kindness of the same size */
+function psyPrune(m){
+  if(!m || !m.mem || m.mem.length <= 60) return; const val = e => memRetention(m, e) + 0.6 * (e.sal || 0.3) + (e.trauma ? 1 : 0);
+  const keep = new Set(m.mem.slice().sort((a, b) => val(b) - val(a)).slice(0, 60)); m.mem = m.mem.filter(e => keep.has(e));
+}
+{ const _rm = remember; remember = function(m, text, weight, sticky){ const r = _rm.apply(this, arguments);
+  try{ if(!m || !m.mem || !m.mem[0]) return r; const e = psyEnrich(m.mem[0]);
+    m.mem.slice(1, 30).forEach(o => { if(o.who === e.who && Math.sign(o.w || 0) === Math.sign(e.w || 0) && (o.sal || 0) < 0.4) o.s = Math.max(0.5, (o.s || 1) * 0.96); });   /* retroactive interference between similar episodes */
+    psyAffect(m, e); psyPrune(m); }catch(err){} return r; }; }
+function psyGist(e){ const who = e.who === "you" ? "you" : "them"; return e.mor < 0 ? "I hold something against " + who + ", and I no longer remember exactly what." : e.mor > 0 ? "I think well of " + who + ", though the details have gone." : "Something happened once; I do not recall the details."; }
+function psyDay(){
+  try{ const list = everyone(); for(let i = 0; i < list.length; i++){ const m = list[i]; if(!m || !m.mem || !m.mem.length) { if(m && m.distress) m.distress *= 0.988; continue; }
+    m.mem.forEach(e => { const R = memRetention(m, e); if(R < 0.25 && !e.gist){ e.gist = true; e.t = psyGist(e); } });
+    if(chance(0.35)){ let best = null, bv = 0; m.mem.forEach(e => { const R = memRetention(m, e), v = (e.sal || 0) * (1 - R); if(R < 0.8 && (e.sal || 0) > 0.4 && v > bv){ bv = v; best = e; } }); if(best){ best.rc = (best.rc || 0) + 0.5; best.last = G.day; } }   /* sleep replays what mattered */
+    m.mem = m.mem.filter(e => !(memRetention(m, e) < 0.03 && (e.sal || 0) < 0.35 && !e.trauma));
+    if(m.aff) Object.keys(m.aff).forEach(k => { m.aff[k].v *= 0.996; });
+    if(m.distress){ m.distress *= m.traumaFlag ? 0.997 : 0.988; if(m.distress < 1){ m.distress = 0; m.traumaFlag = false; } else if(m.distress > 25 && m.rel){ m.rel.warmth = clamp(m.rel.warmth - 0.15, -100, 100); m.rel.trust = clamp(m.rel.trust - 0.1, 0, 100); } }   /* an unhealed hurt festers */
+    psyPrune(m); }
+    const hurt = list.filter(m => m && m.distress > 30 && !m.gone).sort((a, b) => b.distress - a.distress)[0];
+    if(hurt && chance(0.04)){ const w = G.you && G.you.moral ? G.you.moral.log.filter(x => x.id === hurt.id).slice(-1)[0] : null; try{ feed(hurt.name + " is still carrying what happened" + (w ? " (" + w.t.replace(/[.\s]+$/, "") + ")" : "") + ". It has not eased."); }catch(e){} }
+  }catch(e){ console.warn("psyDay", e); }
+}
+const PSY = {day:null};
+setInterval(() => { try{ if(G && G.running && G.day !== PSY.day){ if(PSY.day !== null) psyDay(); PSY.day = G.day; } }catch(e){} }, 1500);
+function youMoral(){ const y = G.you; if(!y) return {harm:0, care:0, repair:0, log:[]}; if(!y.moral) y.moral = {harm:0, care:0, repair:0, log:[]}; return y.moral; }
+function psyMoral(m, dW, text, weight){
+  if(!m || !m.rel) return; const w = weight || 0, Y = youMoral(), t = String(text || "");
+  if(MOR_REP.test(t)){ m.distress = Math.max(0, (m.distress || 0) - 12); const h = (m.mem || []).find(e => e.who === "you" && (e.mor || 0) < 0 && !e.forgiven); if(h){ h.w *= 0.6; h.forgiven = true; h.trauma = false; } Y.repair++; return; }
+  if(w <= -6){ const mag = Math.abs(w); m.distress = clamp((m.distress || 0) + mag * 0.9, 0, 100); if(mag >= 12) m.traumaFlag = true; Y.harm += mag; Y.log.push({d:G.day, id:m.id, who:m.name, t:t.slice(0, 120), mag}); if(Y.log.length > 30) Y.log.shift(); }
+  else if(w >= 6){ Y.care += w; m.distress = Math.max(0, (m.distress || 0) - w * 0.4); }
+}
+{ const _rp = ripple; ripple = function(m, dW, text, weight, sticky){ const r = _rp.apply(this, arguments); try{ psyMoral(m, dW, text, weight); }catch(e){} return r; }; }
+function psyRecallLines(m, n){
+  const rank = e => (memRetention(m, e) + 0.6 * (e.sal || 0.3) + (e.trauma ? 0.8 : 0)) * (1 + Math.min(0.5, (e.rc || 0) * 0.1));
+  const top = (m.mem || []).slice().sort((a, b) => rank(b) - rank(a)).slice(0, n || 6), out = [];
+  top.forEach(e => { const R = memRetention(m, e), v = memWeight(m, e) < 0 ? "resents" : "values";
+    out.push(R > 0.55 ? "- (" + v + ", day " + e.d + ", clear) " + e.t : R > 0.25 ? "- (" + v + ", day " + e.d + ", dim) " + String(e.t).split(/[.;—]/)[0] + "…" : "- (" + v + ", a feeling more than a memory) " + e.t);
+    if(e.recallDay !== G.day){ e.recallDay = G.day; e.rc = (e.rc || 0) + 1; e.last = G.day; e.w += ((m.rel && m.rel.warmth || 0) / 100) * 0.4; } });                           /* recalling it changes it a little */
+  const a = m.aff && m.aff.you; if(a && Math.abs(a.v) > 6) out.push("- (overall, " + (a.v > 0 ? "you feel warmly toward" : "you feel cold toward") + " the player, whatever the details)");
+  if(m.distress > 20) out.push("- (you are still carrying a hurt from the player; it has not eased)");
+  return out;
+}
+function psyPromptLine(m){ try{ const l = psyRecallLines(m, 3); return l.length ? " WHAT YOU REMEMBER, as a real person would (some of it clear, some only a feeling, none of it exact): " + l.join(" ") : ""; }catch(e){ return ""; } }
+const _psyLT = setInterval(() => { const LT = window.onumLiveTalk; if(!LT) return; clearInterval(_psyLT); if(LT.__psy) return; LT.__psy = 1; const wrapO = o => { try{ const m = (o && o.npc) || (o && o.npcId != null ? byId(o.npcId) : null); if(m && m.mem && m.kind !== "engine" && !o.npc_isEngine){ o = Object.assign({}, o, {extra:String(o.extra || "") + psyPromptLine(m)}); } }catch(e){} return o; };
+  const _r = LT.reply; LT.reply = function(o){ return _r.call(this, wrapO(o)); };
+  if(LT.stream){ const _s = LT.stream; LT.stream = function(o){ return _s.call(this, wrapO(o)); }; } }, 500);
 function engTick(){ try{ const E = G.eng; if(!E || E.pend !== "ceremony" || E.cerDay === G.day || !G.running || !veil.hidden || (TALK && TALK.open)) return; engCeremony(); }catch(e){} }
 
 /* ordinary people talk about it, in the words of their own stake */
