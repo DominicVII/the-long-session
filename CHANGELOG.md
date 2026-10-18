@@ -4,6 +4,12 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261018ab: the Republic keeps talking when you are not in the room
+
+`20261018ab` (on `20261018aa`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+People are in their rooms whether or not you are, and now they act like it. While you are elsewhere (and a model is reachable), the game plays one real scene at a time in a room you are not in. In the Engine Room people post to the Open Line and the Engine answers for real, with its own model; in other rooms two people talk and the Engine, whose machines are in every room, may add a word. Everything is kept in a While you were away log on the Engine card, the Engine learns from all of it, and a digest goes to your phone every 25 minutes if alerts are on and you are away. The Engine's thoughts on the Open Line no longer wait for you to be in the room. One scene at a time, paced to how fast your model is, paused while a letter is being answered, and it can be switched off on the Engine card.
+
 ## 20261018aa: alerts to your phone, and the Engine's principles come last in its prompt
 
 `20261018aa` (on `20261018z`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.

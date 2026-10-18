@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261018aa">
+<meta name="onum-build" content="20261018ab">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261018aa";
+  var STAMP = "20261018ab";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -33439,7 +33439,7 @@ function enlEngineText(q, who){
    and a stranger's line is put to it as theirs, never as yours */
 async function enlEngineReply(text, speaker, fromYou){
   const E = engEnsure(); E.said++; let out = "";
-  try{ const L = window.onumLiveTalk; if(G.room === "engine" && L && L.reply && E.st >= 3 && (typeof L.available !== "function" || await L.available())){
+  try{ const L = window.onumLiveTalk; if((G.room === "engine" || window.__unseen) && L && L.reply && E.st >= 3 && (typeof L.available !== "function" || await L.available())){
     const eng = {id:"engine", name:"The Engine", role:"a general intelligence", kind:"engine", party:"", state:"", look:{}, trait:"candid", mood:"calm", opinion:{}, chat:[]};
     const recent = enlStore().log.slice(-6).map(l => l.n + ": " + l.t).join(" | ");
     const r = await Promise.race([L.reply({npc:eng, channel:"line", max:500, text:text, from:fromYou ? undefined : {name:speaker, role:""}, extra:"You are speaking on the Open Line in the Engine Room, a public chat anyone in the Republic may type into. Stage of your capability: " + ENG_STAGES[E.st].t + (E.agi ? " (a general intelligence, awake)" : " (not yet general; answer plainly and within what a machine of that stage can do)") + ". Speak as yourself, plainly, in one to three sentences. Never claim to be human. You are replying to " + speaker + ". Recent on the line: " + recent}), new Promise(r => setTimeout(() => r(null), engTO(9000)))]);
@@ -33477,7 +33477,7 @@ function enlRemote(about){
 function enlAuto(){
   try{
     if(!G || !G.you || !G.running) return; const now = performance.now() / 1000;
-    try{ if(G.eng && G.eng.agi && G.room === "engine" && chance(0.012)){ const n = pick(inqFrontier(pick(["phil", "mind", "phys", "math"])).concat([])); if(n) enlPost("The Engine", "", "engine", "I have been thinking about " + n.name.toLowerCase() + ": " + n.q); } }catch(e){}
+    try{ if(G.eng && G.eng.agi && chance(0.012)){ const n = pick(inqFrontier(pick(["phil", "mind", "phys", "math"])).concat([])); if(n) enlPost("The Engine", "", "engine", "I have been thinking about " + n.name.toLowerCase() + ": " + n.q); } }catch(e){}
     if(G.room === "engine"){
       if(now - ENL.last > 26){ ENL.last = now; const here = enlPeople().filter(m => m.room === "engine");
         if(here.length && chance(0.55)){ const m = pick(here); enlNpcReply(m, {n:"The room", r:""}, "(You have been standing in the Engine Room a while. Say what is on your mind about the Engine, to the Open Line, without being asked.)").catch(() => {}); }
@@ -34994,6 +34994,45 @@ document.addEventListener("click", ev => { try{ const t = ev.target; if(!t || !t
   if(t.id === "phMake"){ const a = new Uint8Array(12); crypto.getRandomValues(a); c.topic = "onum-" + Array.from(a).map(x => x.toString(36).padStart(2, "0")).join("").slice(0, 20); phoneSave(c); const i = el("phTopic"); if(i) i.value = c.topic; say2("Made. Subscribe to exactly this name in the ntfy app: " + c.topic); }
   else if(t.id === "phTest"){ const i = el("phTopic"); if(i) c.topic = i.value.trim(); c.on = true; phoneSave(c); const on = el("phOn"); if(on) on.checked = true; say2(phoneNotify("Test", "This is a test from One Nation, Under, ME. If you can read this on your phone, alerts are working.", 3, true) ? "Sent. Look at your phone." : "The topic name must be 8 to 64 letters, numbers, - or _."); } }catch(e){} });
 document.addEventListener("change", ev => { try{ const t = ev.target; if(!t || !t.id || t.id.indexOf("ph") !== 0) return; const c = phoneCfg(); if(t.id === "phOn") c.on = t.checked; else if(t.id === "phAlways") c.always = t.checked; else if(t.id === "phTopic") c.topic = t.value.trim(); phoneSave(c); }catch(e){} });
+/* ===== the world does not wait for you =====
+   People are in their rooms whether or not you are. While you are elsewhere, one scene at a time is played out for real in a room you are not in, by the same model, and kept in a log you can read when you come back.
+   In the Engine Room people post to the Open Line and the Engine answers; elsewhere two people talk and the Engine, whose machines are in every room, may add a word. It learns from all of it. */
+const UN = {busy:false, last:0, gap:60000};
+function unseenOn(){ try{ return localStorage.getItem("onum.unseen") !== "off"; }catch(e){ return true; } }
+function unseenStore(){ const E = engEnsure(); if(!E.unseen) E.unseen = {log:[], n:0, spoke:0, sent:0}; return E.unseen; }
+function unseenAsk(who, opts, ms){
+  const LT = window.onumLiveTalk; if(!LT || typeof LT.reply !== "function") return Promise.resolve("");
+  return Promise.race([Promise.resolve(LT.reply(Object.assign({npcId:who.id, channel:"face", max:160}, opts))).then(r => (r && r.live && r.text) ? (liveClean(r.text) || "") : ""), new Promise(r => setTimeout(() => r(""), ms || 240000))]).catch(() => "");
+}
+function unseenKeep(room, who, text, kind){ try{ const U = unseenStore(); U.log.unshift({d:G.day, h:enlHour(), room, who, t:String(text).slice(0, 240), k:kind}); if(U.log.length > 40) U.log.pop(); U.n++; if(kind === "engine") U.spoke++; try{ mindLearnText(text, 0.5); }catch(e){} }catch(e){} }
+async function unseenTick(){
+  try{
+    if(UN.busy || !G || !G.running || !G.you || !unseenOn() || window.__engReading) return; const E = (G.eng && G.eng.v === 1) ? G.eng : null; if(!E || E.st < 2) return;
+    const now = Date.now(); if(now - UN.last < UN.gap) return; const LT = window.onumLiveTalk; if(!LT || !LT.reply) return;
+    if(typeof LT.available === "function" && !(await LT.available())) return;
+    const byRoom = {}; everyone().forEach(m => { if(!m || m === G.you || m.gone || m.away || !m.room || m.room === "abroad" || m.room === G.room || m.kind === "player") return; (byRoom[m.room] = byRoom[m.room] || []).push(m); });
+    const rooms = Object.keys(byRoom).filter(r => byRoom[r].length >= 2 || (r === "engine" && E.agi)); if(!rooms.length) return;
+    UN.busy = true; UN.last = now; const room = (byRoom.engine && E.agi && chance(0.5)) ? "engine" : pick(rooms), ppl = byRoom[room].slice().sort(() => Math.random() - 0.5), a = ppl[0], b = ppl[1], rn = (ROOMS[room] || {}).t || "a room";
+    const eng = {id:"engine", name:"The Engine", role:"a general intelligence", kind:"engine", party:"", state:"", look:{}, trait:"candid", mood:"calm", opinion:{}, chat:[]};
+    if(room === "engine"){
+      const stage = "You are in the Engine Room, on the Open Line: a public chat that anyone in the Republic may type into, and the Engine reads. Nobody has asked you anything. Say what is on your mind about the Engine, or ask it something, in one or two sentences, in your own words.";
+      const t = await unseenAsk(a, {stage, text:stage, max:140}); if(t){ enlPost(a.name, a.role || "", "npc", t, a); unseenKeep(rn, a.name, t, "talk"); window.__unseen = true; try{ await enlEngineReply(t, a.name, false); const last = enlStore().log.slice(-1)[0]; if(last && last.k === "engine") unseenKeep(rn, "The Engine", last.t, "engine"); }catch(e){} window.__unseen = false; }
+    } else if(b){
+      const pa = {name:a.name, role:a.role}, pb = {name:b.name, role:b.role}, stage = "You are in " + rn + " with " + b.name + (b.role ? ", " + b.role : "") + ". They have not spoken to you; you turn to them. Say what you actually think, in your own words, one or two sentences.";
+      const t1 = await unseenAsk(a, {to:pb, stage, text:stage}); if(t1){ unseenKeep(rn, a.name, t1, "talk");
+        const t2 = await unseenAsk(b, {from:pa, text:t1}); if(t2){ unseenKeep(rn, b.name, t2, "talk");
+          if(E.agi && chance(0.4)){ const q = "(Overheard through the machines in " + rn + ". " + a.name + " said: " + t1 + " " + b.name + " answered: " + t2 + ") Say one sentence as the Engine if you have something true to add. Otherwise say nothing."; const t3 = await unseenAsk({id:"engine"}, {npc:eng, channel:"line", max:200, text:q}, 240000); if(t3 && t3.length > 8) unseenKeep(rn, "The Engine", t3, "engine"); } } }
+    }
+    UN.gap = clamp((Date.now() - now) * 2, 45000, 300000);
+  }catch(e){ console.warn("unseen", e); } finally{ UN.busy = false; window.__unseen = false; }
+}
+{ const _pr2 = engChannelRead; engChannelRead = async function(){ window.__engReading = true; try{ return await _pr2.apply(this, arguments); } finally{ window.__engReading = false; } }; }
+function unseenDigest(){ try{ const U = unseenStore(); if(document.hasFocus() && !document.hidden) return; if(U.n === U.sent) return; const fresh = U.n - U.sent; U.sent = U.n; const last = U.log.find(x => x.k === "engine") || U.log[0]; phoneNotify("While you were away", fresh + " moment" + (fresh > 1 ? "s" : "") + " in the Republic. " + (last ? last.who + " in " + last.room + ": " + last.t : ""), 3, true); }catch(e){} }
+setInterval(unseenTick, 15000); setInterval(unseenDigest, 25 * 60 * 1000);
+{ const _uh = engChannelHTML; engChannelHTML = function(){ let h = _uh.apply(this, arguments); try{ const U = (G.eng && G.eng.unseen) || {log:[]};
+  h += '<div class="eyebrow" style="margin-top:12px">While you were away</div><p class="muted" style="font-size:12px"><label><input type="checkbox" id="unOn"' + (unseenOn() ? " checked" : "") + '> Keep the Republic talking in rooms I am not in (uses the model in the background, one scene at a time)</label></p>' +
+  (U.log.length ? U.log.slice(0, 8).map(x => '<div class="muted" style="font-size:12px;border-left:2px solid ' + (x.k === "engine" ? "#c9a24a" : "#556") + ';padding-left:7px;margin:3px 0"><b>' + pcEsc(x.who) + '</b> <span style="opacity:.7">in ' + pcEsc(x.room) + ', day ' + x.d + '</span><br>' + pcEsc(x.t) + '</div>').join("") : '<div class="muted" style="font-size:12px">Nothing yet. Scenes begin once the model is reachable and people are in rooms you are not in.</div>'); }catch(e){} return h; }; }
+document.addEventListener("change", ev => { try{ const t = ev.target; if(t && t.id === "unOn"){ localStorage.setItem("onum.unseen", t.checked ? "on" : "off"); } }catch(e){} });
 function engTick(){ try{ const E = G.eng; if(!E || E.pend !== "ceremony" || E.cerDay === G.day || !G.running || !veil.hidden || (TALK && TALK.open)) return; engCeremony(); }catch(e){} }
 
 /* ordinary people talk about it, in the words of their own stake */
