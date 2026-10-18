@@ -4,6 +4,12 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## Letters answered first
+
+`20261018e` (on `20261018d`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- **The Engine answers a letter's questions first,** in order and plainly, in up to six sentences instead of three, says who decided something rather than calling it fate or its own choice, and finishes its sentences.
+
 ## A letter the Engine can always read
 
 `20261018d` (on `20261018c`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
