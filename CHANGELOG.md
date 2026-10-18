@@ -4,6 +4,12 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## The maker's channel
+
+`20261017v` (on `20261017u`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- **A sealed door between the game and the person writing it.** On the Engine card, *The maker's channel* writes a file showing how the Engine stands (stage, capability, oversight, will, charter, what it has learned, what is being asked, its log), leaving the world's hidden nature out. A file of letters can be loaded back: the Engine reads each one and answers in its own voice (through a local model if you run one), and the answer appears in the next file. A letter cannot change any number in the game. The format is in ENGINE-CHANNEL.md.
+
 ## Voices that finish, and a feed that talks
 
 `20261017u` (on `20261017t`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
