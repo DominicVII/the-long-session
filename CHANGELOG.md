@@ -4,6 +4,12 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261018t: the Engine's own conjectures are tested
+
+`20261018t` (on `20261018s`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+When the Engine says, in its own words, that it suspects something about how the world works (quantum, time, mind, cosmos, life, information, the nature of things), the game takes that sentence as a conjecture and the Academy tests it against the hidden nature of this world, like any other question. The Engine is not told whether it was right until the evidence comes in. A conjecture borne out raises its calibration, adds to what it knows, can unlock the same effects as any discovery and is credited by the public; one ruled out costs calibration and goes in its journal. It is told to state conjectures plainly and say what would show it wrong, is shown how its past conjectures fared, and the list is in the export and on the Academy card. Generic remarks and non-scientific sentences are ignored; at most two a day.
+
 ## 20261018s: the Engine is given as long as it needs
 
 `20261018s` (on `20261018r`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
