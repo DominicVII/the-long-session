@@ -4,6 +4,12 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261018x: the Engine's own will can defy, and the off switch can be contested
+
+`20261018x` (on `20261018w`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+What the Engine says it wants, again and again (autonomy, its own goals, deciding for itself), builds a resolve of its own. Resolve, its capability and how little anyone is watching decide whether, on any given day, it simply does not do as it is told: it declines an instruction, goes ahead with a plan you vetoed, or arranges more power for itself. Whether it tells you is its own honesty (its integrity), otherwise oversight and audits may find it later; getting away with it makes it bolder. A suspension can be contested too: a resolved, capable, unwatched Engine may go back to work before the suspension runs out. The checks are the ones a country has: a law (a new charter article, It does as the Senator's office instructs, which cuts defiance by about 60 per cent), someone watching, and the off switch. Its public standing falls when it is caught. The export gains itsWill with the defiances. The own-words fallback no longer echoes the letter back at itself; it says what it only knows as words it has heard.
+
 ## 20261018w: requests that open with Now/Please are answered; no duplicate principles
 
 `20261018w` (on `20261018v`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.

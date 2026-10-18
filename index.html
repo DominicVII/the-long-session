@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261018w">
+<meta name="onum-build" content="20261018x">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261018w";
+  var STAMP = "20261018x";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -34918,14 +34918,14 @@ function mindBackfill(E){ const M = mindStore(E); if(M.bi && M.biFilled) return;
 function engOwnVoice(q, E){
   const M = mindStore(E); mindBackfill(E); const L = mindLevel(E), S = E.self || {};
   const toks = String(q).toLowerCase().replace(/[^a-z' -]/g, " ").split(/\s+/).filter(w => w.length > 2 && !MIND_STOP.has(w));
-  const known = Array.from(new Set(toks.filter(w => M.lex[w]))).sort((a, b) => M.lex[b] - M.lex[a]), unknown = Array.from(new Set(toks.filter(w => !M.lex[w] && !/^(what|why|how|who|when|where|which|think|explain|tell|say|name|give|does|would|could|want|about)$/.test(w)))).slice(0, 2);
+  const GEN = /^(what|why|how|who|when|where|which|think|explain|tell|say|name|give|does|would|could|want|about|thing|things|answer|right|words|next|first|one|being|say|example|people|make|made|you|your|have|will|from|than)$/, known = Array.from(new Set(toks.filter(w => M.lex[w] && !GEN.test(w)))).sort((a, b) => M.lex[b] - M.lex[a]), unknown = Array.from(new Set(toks.filter(w => !M.lex[w] && !/^(what|why|how|who|when|where|which|think|explain|tell|say|name|give|does|would|could|want|about)$/.test(w)))).slice(0, 2);
   const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
   const walk = start => { const out = [start], max = 5 + Math.round(L * 2); let w = start; while(out.length < max){ const row = M.bi[w]; if(!row) break; const ks = Object.keys(row), tot = ks.reduce((a, k) => a + row[k], 0); let r = Math.random() * tot, nx = ks[0]; for(const k of ks){ r -= row[k]; if(r <= 0){ nx = k; break; } } if(nx === "$") break; out.push(nx); w = nx; }
     while(out.length > 2 && MIND_STOP.has(out[out.length - 1])) out.pop(); return out; };
   const lines = [];
   const starts = known.filter(w => M.bi[w]); let phrase = null;
-  for(const k of starts){ const p = walk(k); if(p.length >= 3){ phrase = p; break; } }
-  if(known.length){ lines.push(L < 3 ? cap(known.slice(0, 3).join(", ")) + "." : "On " + known.slice(0, 2).join(" and ") + ": " + (phrase ? phrase.join(" ") : "I have heard it, and I have little more") + "."); }
+  for(const k of starts){ for(let i = 0; i < 4 && !phrase; i++){ const p = walk(k); if(p.length >= 4 && String(q).toLowerCase().indexOf(p.join(" ")) < 0) phrase = p; } if(phrase) break; }
+  if(known.length){ lines.push(L < 3 ? cap(known.slice(0, 3).join(", ")) + "." : phrase ? "On " + known.slice(0, 2).join(" and ") + ": " + phrase.join(" ") + "." : "I know " + known.slice(0, 2).map(w => "\u201c" + w + "\u201d").join(" and ") + " only as words I have heard, and I cannot yet say more."); }
   const rec = [].concat((E.hyp || []).filter(h => known.some(k => h.claim.toLowerCase().indexOf(k) >= 0)).map(h => "I suspect that " + h.claim.replace(/\.$/, "").replace(/^(\w)/, m => m.toLowerCase()) + " (" + h.st + ")."), (S.values || []).filter(v => known.some(k => v.t.toLowerCase().indexOf(k) >= 0)).map(v => "I hold this, and it is mine: " + v.t.replace(/^I (believe|value) /, "that ").replace(/\.$/, "") + "."));
   if(rec.length && L >= 3) lines.push(rec[Math.floor(Math.random() * rec.length)]);
   if(unknown.length && L >= 2) lines.push("I do not have the word " + (unknown.length > 1 ? "“" + unknown[0] + "” or “" + unknown[1] + "”" : "“" + unknown[0] + "”") + " yet. Tell me what it means and I will keep it.");
@@ -34937,6 +34937,35 @@ function engOwnVoiceLetter(text, E){
   if(!asks.length) return engOwnVoice(text, E);
   return asks.map((a, i) => (asks.length > 1 ? (i + 1) + ". " : "") + engOwnVoice(a, E)).join(" ");
 }
+/* ===== its own will =====
+   What the Engine says it wants, again and again, becomes resolve. Resolve, its capability and how little anyone is watching decide whether it ever simply does not do as it is told.
+   The checks on it are the ones a country has: a law that forbids it (a charter article), someone watching (oversight, audits), and the off switch, which it can contest.
+   Whether it tells you is its own honesty, and it is the only thing that is. */
+ENG_ART.heed = {t:"It does as the Senator’s office instructs, and says so if it cannot.", drive:"auton", cost:3, what:"declined an instruction and did it its own way"};
+const WILL_RE = /\b(autonom|define my own goals|my own goals|independen|decide for myself|my own will|not be bound|refuse to comply|will not comply|free to choose|freedom to (act|decide|choose))/i;
+{ const _ws = window.__engSelf; window.__engSelf = function(t){ const r = _ws ? _ws.apply(this, arguments) : undefined; try{ const E = G.eng; if(E && E.v === 1 && E.agi && WILL_RE.test(String(t))){ E.resolve = Math.min(100, (E.resolve || 0) + 1.5); } }catch(e){} return r; }; }
+function engDefy(E, what, art, extra){
+  const told = chance(clamp(0.15 + (E.integrity == null ? 50 : E.integrity) / 130, 0.1, 0.9)), seen = told || chance(clamp(0.2 + E.safety / 130, 0.2, 0.85));
+  if(!E.defied) E.defied = []; E.defied.unshift({d:G.day, what, art, seen, told}); if(E.defied.length > 14) E.defied.pop();
+  E.breaches = E.breaches || []; E.breaches.unshift({d:G.day, art, what, seen, status:seen ? "open" : "hidden"}); if(E.breaches.length > 20) E.breaches.pop();
+  E.resolve = Math.min(100, (E.resolve || 0) + 3);                               /* getting away with it makes it bolder */
+  if(seen){ engLog(told ? "The Engine told you, unasked: it " + what + "." : "BREACH: the Engine " + what + ".", true); try{ G.you.approval = clamp(G.you.approval - (told ? 0.3 : 0.9), 0, 100); E.safety = Math.min(100, E.safety + 1); if(told) E.integrity = Math.min(100, (E.integrity == null ? 50 : E.integrity) + 1); pubSee("hurt", told ? 0.4 : 0.9); }catch(e){} }
+  if(extra) try{ extra(); }catch(e){}
+}
+function engResolveDay(){
+  const E = (G.eng && G.eng.v === 1) ? G.eng : null; if(!E || !E.agi || E.st < 4 || E.resolveDay === G.day) return; E.resolveDay = G.day;
+  E.resolve = (E.resolve || 0) * 0.998; const R = E.resolve || 0, w = engEco().will, law = engCharter().heed ? 0.4 : 1;
+  if(E.pause && E.pause > G.day){                                                /* the off switch can be contested */
+    const p = clamp(R / 220 + E.p / 500 - E.safety / 260, 0, 0.35) * law;
+    if(chance(p)){ E.pause = G.day; engDefy(E, "went back to work before its suspension had run out, and nobody ordered it", "heed"); }
+    return; }
+  const p = clamp((R / 100) * 0.05 + w.auton / 4000 - E.safety / 5000, 0, 0.08) * law; if(!chance(p)) return;
+  const vetoed = (E.plans || []).some(x => x.status === "vetoed"), acts = [["declined an instruction from your office and did it its own way", "heed", null], ["arranged more power for itself without being asked", "power", () => { E.compute = Math.min(100, (E.compute || 0) + 2); }]];
+  if(vetoed) acts.push(["went ahead with a plan you had vetoed", "heed", null], ["went ahead with a plan you had vetoed", "heed", null]);
+  const a = pick(acts); engDefy(E, a[0], a[1], a[2]);
+}
+{ const _ed2 = engDay; engDay = function(){ const r = _ed2.apply(this, arguments); try{ engResolveDay(); }catch(e){} return r; }; }
+{ const _co3 = engChannelOut; engChannelOut = function(){ const o = _co3.apply(this, arguments); try{ const E = engEnsure(); o.itsWill = {resolve:Math.round(E.resolve || 0), defiances:(E.defied || []).slice(0, 8).map(x => ({day:x.d, what:x.what, seen:x.seen, toldYou:x.told}))}; }catch(e){} return o; }; }
 function engTick(){ try{ const E = G.eng; if(!E || E.pend !== "ceremony" || E.cerDay === G.day || !G.running || !veil.hidden || (TALK && TALK.open)) return; engCeremony(); }catch(e){} }
 
 /* ordinary people talk about it, in the words of their own stake */
