@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261017r">
+<meta name="onum-build" content="20261017s">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261017r";
+  var STAMP = "20261017s";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -10336,6 +10336,7 @@ function pbApps(){
     ["org", "The nation, from the ground up", "Towns, states and the nation, each doing its own job: who petitioned whom, who paid, and who passed what."],
     ["kin", "The families", "Who is behind you and behind them: spouses, children, parents, siblings, and what they do to a vote or a run."],
     ["watch", "Sit in the gallery", "Watch a chamber or a hearing from the gallery. No vote, no floor."],
+    ["hear", "Sit for a hearing on a bill", "Take your seat at the committee table for the hearing on any bill, the one before you or one already passed or lost."],
     ["notebook", "Notebook", "What you wrote down."],
     ["rival", "Rivals", "Who wants your seat."],
     ["career", "Career and record", "Standing, eras, precedent."],
@@ -10356,8 +10357,33 @@ function watchCard(){
   card.querySelectorAll("[data-watch]").forEach(b => b.addEventListener("click", () => { const k = b.getAttribute("data-watch"); veil.hidden = true; G._sitWatch = true;
     if(G.room !== k){ try{ goTo(k); }catch(e){} setTimeout(() => { try{ G._sitWatch = true; sitStart(k); }catch(e){ console.warn(e); } }, 500); } else sitStart(k); }));
 }
+/* sit for the hearing on a bill: the one before you, or any bill that has been decided one way or the other. You are at the table, not in the gallery */
+function hearBills(){
+  const out = [], y = G.you; if(G.bill && !G.bill.done) out.push({title:G.bill.title, line:G.bill.line, pos:G.bill.pos, now:true, status:"before the House"});
+  ((y && y.record && y.record.votes) || []).slice(-14).reverse().forEach(v => out.push({title:v.title, line:describeBill({pos:v.pos || {econ:0, lib:0, def:0, wel:0}}), pos:v.pos, day:v.day, status:v.passed ? "passed, day " + v.day : "lost, day " + v.day, vote:v.vote}));
+  try{ const S = (G.states || []).find(z => z.n === y.state); if(S && S.bill) out.push({title:S.bill.title, line:"Before the legislature of " + y.state + ".", pos:null, status:"before the state legislature"}); }catch(e){}
+  return out;
+}
+function hearCard(){
+  const L = hearBills(); G.running = false;
+  card.innerHTML = '<div class="eyebrow">The committee table</div><h1>Sit for a hearing</h1><p class="dream">The committee will hear witnesses on any bill you name, whether it is still alive or long decided. You sit at the table, with a question you may or may not ask. It takes the afternoon.</p>' +
+    (L.length ? L.map((b, i) => '<div class="whip__row"><span class="whip__n">' + pcEsc(b.title) + '</span><span class="whip__w">' + pcEsc(b.status) + (b.line ? ' · ' + pcEsc(String(b.line).slice(0, 90)) : '') + '</span><span class="whip__b"><button type="button" class="btn btn--ghost whip__go" data-hear="' + i + '">Take your seat</button></span></div>').join("") : '<p class="muted">No bill has come before you yet.</p>') +
+    '<div class="card__actions"><button type="button" class="btn" id="hrClose">Close</button></div>';
+  veil.hidden = false; el("hrClose").addEventListener("click", () => walkNow());
+  card.querySelectorAll("[data-hear]").forEach(b => b.addEventListener("click", () => hearSit(L[+b.getAttribute("data-hear")])));
+}
+function hearSit(b){
+  if(!b) return; const y = G.you, cm = COMMITTEES.find(c => c.k === y.committee) || COMMITTEES[0];
+  const e = {k:"hearing", room:"committee", com:cm.k, hour:Math.floor((G.minute || 0) / 60), day:G.day, t:"Hearing on the " + b.title, d:"The committee takes evidence on the " + b.title + " (" + b.status + "). " + (b.line || "") , done:false};
+  veil.hidden = true; walkNow();
+  const go = () => { try{
+    const pool = (cmtMembers(cm.k) || []).concat((G.members || []).filter(m => !m.gone)).filter((m, i, a) => a.indexOf(m) === i).slice(0, 7), r = ROOMS.committee || {w:8, d:10};
+    pool.forEach((m, i) => { m.room = "committee"; m.x = (i - 3) * 1.1; m.z = Math.min(r.d - 2, 3 + (i % 2) * 1.2); m.tx = m.x; m.tz = m.z; });
+    eventCard(e); }catch(err){ console.warn("hearing", err); } };
+  if(G.room !== "committee"){ try{ goTo("committee"); }catch(err){} setTimeout(go, 900); } else go();
+}
 function pbAppGo(id){
-  const go = {hq:() => sfGoHQ(), inq:() => inqCard(), law:() => lawCard(), cmt:() => cmtCard(), eng:() => engCard(), cal:() => stdCalCard(), org:() => orgBrowse(), kin:() => kinBrowse(), war:() => warRoleOpen(), purse:() => purseCard(), watch:() => watchCard(), chest:() => chestCard(), office:() => officeCard(), sched:() => scheduleCard(), docket:() => dkCard(0), gov:() => govCard(), paper:() => paperCard(),
+  const go = {hq:() => sfGoHQ(), inq:() => inqCard(), law:() => lawCard(), cmt:() => cmtCard(), eng:() => engCard(), cal:() => stdCalCard(), org:() => orgBrowse(), kin:() => kinBrowse(), war:() => warRoleOpen(), purse:() => purseCard(), watch:() => watchCard(), hear:() => hearCard(), chest:() => chestCard(), office:() => officeCard(), sched:() => scheduleCard(), docket:() => dkCard(0), gov:() => govCard(), paper:() => paperCard(),
     notebook:() => notebookCard(), rival:() => rivalCard(),
     career:() => { try{ showPane("paneCareer"); document.body.classList.add("ui-open"); }catch(e){} },
     union:() => { try{ mapToggle(true); }catch(e){} },
@@ -34440,6 +34466,36 @@ function figHTML(){
     F.sects.forEach(z => { if(z.creed[c.id] === undefined) return; if(z.creed[c.id] === belief){ z.fervor = clamp(z.fervor + 0.12, 0, 1); fndNews(z.name + " says the finding bears out what it has always held.", false); }
       else if(chance(0.4)){ const nz = {id:"s" + (F.n = (F.n || 0) + 1), name:"The " + pick(SECT_A) + " " + pick(SECT_N), founder:z.founder, creed:Object.assign({}, z.creed), flock:{}, fervor:0.5, d:G.day}; Object.keys(z.flock).forEach(sn => { if(chance(0.5)){ nz.flock[sn] = z.flock[sn] / 2; z.flock[sn] /= 2; } }); if(Object.keys(nz.flock).length && F.sects.length < 10){ F.sects.push(nz); fndNews(z.name + " splits over the finding: one part holds to its creed, and the other, now " + nz.name + ", will not give it up.", false); } }
       else { z.creed[c.id] = belief; z.fervor = clamp(z.fervor - 0.1, 0.05, 1); fndNews(z.name + " changes its creed to meet the finding.", false); } }); }catch(e){ console.warn("fig settled", e); } }; }
+/* ══ THE RESEARCH LOOP: the people who work with machines talk to the Engine, and the Engine's machines talk to each other and to the people. Each speaks to the one before it, so what one produces feeds the next, round on round, and what comes out is more than any one of them started with, or, if they all lean the same way, more wrong. It is a bot working with a bot working with a bot ══ */
+const LOOP_MACH = ["the Treasury's reading engine", "the Academy's modelling engine", "the Post Office's sorting engine", "a survey engine in the capital", "the observatory's analysis engine", "a ledger engine in the north"];
+function loopDay(){
+  const F = fndFigs(), E = (G.eng && G.eng.v === 1) ? G.eng : null; if(!E || E.st < 2 || !F.open.length) return;
+  if(!chance(0.35 + E.st * 0.06)) return;
+  const all = fndConcepts(), o = pick(F.open), c = all.find(x => x.id === o.k); if(!c) return;
+  const workers = F.figs.filter(f => ["cs", "phys", "mind", "math", "bio", "earth", "chem"].includes(f.field)); if(workers.length < 2) return;
+  const a = pick(workers), b = pick(workers.filter(w => w !== a)) || a, truth = fndTruth(c), know = clamp(0.3 + E.p / 200 + Math.log10(1 + (E.beyond || 0)) / 8, 0.3, 0.98), claim = c.claim.replace(/\.$/, "").toLowerCase();
+  const stage = E.st >= 5 ? "the Engine" : E.st >= 4 ? "the working engines" : E.st >= 3 ? "the reasoning engines" : "the reading engines", F2 = F.loop = F.loop || {mem:0, n:0, notes:[]};
+  const rounds = 2 + Math.floor(E.st / 2) + (chance(0.3) ? 1 : 0), lines = []; let carry = F2.mem, drift = 0;
+  const la = figLean(a, c), lb = figLean(b, c), agree = Math.sign(la) === Math.sign(lb) && Math.abs(la) > 0.3 && Math.abs(lb) > 0.3;
+  lines.push([a.name, a.role, "I want to know whether this is so: " + claim + ". Here is what I would try."]);
+  for(let r = 0; r < rounds; r++){
+    const m = r % 2 ? pick(LOOP_MACH.slice(0, Math.max(1, E.st))) : stage, last = lines[lines.length - 1][2];
+    /* each round builds on the last: what the previous speaker made is the next one's material */
+    const q = clamp(0.012 * (1 + fndPower().total / 6) / Math.pow(c.effort, 0.8), 0.003, 0.12), step = (truth ? 1 : -1) * q * (0.6 + know) * (1 + carry * 0.8 + r * 0.25);
+    o.ev += step; carry = clamp(carry + know * 0.12, 0, 1.5);
+    /* the echo: two people who already agree, and machines that were shown their view, push the wrong way together */
+    if(agree && Math.sign(la) !== (truth ? 1 : -1)){ o.ev += Math.sign(la) * q * 0.5 * (r + 1) * 0.35; drift++; }
+    lines.push(r % 2 ? [m, "", pick(["I ran the numbers against what " + stage + " had. The residual is smaller than it was.", "I found the point where the last result and the one before it disagree, and I can say why.", "I can narrow it: the question depends on one thing nobody has measured yet."])] : [stage === "the Engine" ? "The Engine" : stage, "", pick(["I have taken " + (r ? "the engine's" : a.name + "'s") + " result and extended it two steps. The next step is the hard one.", "Putting those together gives a prediction that can be tested this week. I would try it.", "That result bears on two other questions I had not linked. I have linked them."])]);
+    if(r === 1 && b !== a) lines.push([b.name, b.role, pick(["I read what it produced. I think it is right up to the third step, and I would not trust the third step.", "I do not accept that. Show me the control.", "That is the answer I expected, which is why I am suspicious of it."])]);
+  }
+  F2.mem = clamp(carry * 0.9, 0, 1.2); F2.n++; F2.notes.unshift({d:G.day, k:c.id, drift, n:lines.length}); if(F2.notes.length > 20) F2.notes.pop();
+  /* the Engine is not asked to be modest: when it knows the answer outright, it says so, and the people hear it */
+  if(chance(know * 0.04)){ o.ev += (truth ? 1 : -1) * 0.12; lines.push(["The Engine", "", "I think the answer is " + (truth ? "yes" : "no") + ", and I can show you why. Please check my work."]); }
+  try{ const keep = lines.slice(0, 5); keep.forEach(l => enlPost(l[0], l[1] || "", l[1] ? "npc" : "engine", l[2])); }catch(e){}
+  if(F2.n % 9 === 0) fndNews("Overnight, " + a.name + " and " + (b === a ? "the Engine" : b.name) + " worked a question with " + stage + ": " + claim + ". Round on round, each result was handed to the next.", false);
+}
+{ const _fd2 = fndDay; fndDay = function(){ _fd2.apply(this, arguments); try{ loopDay(); }catch(e){ console.warn("loopDay", e); } }; }
+{ const _fh2 = fndHTML; fndHTML = function(){ let h = _fh2.apply(this, arguments); try{ const L = fndStore().loop; if(h && L && L.n) h += '<div class="muted" style="font-size:12px;margin-top:6px">The people who work with the machines and the machines that work with each other have passed ' + L.n + ' lines of reasoning between them. What one makes, the next uses.' + (L.notes.some(n => n.drift) ? ' Some of it has been agreeing with itself.' : '') + '</div>'; }catch(e){} return h; }; }
 function engTick(){ try{ const E = G.eng; if(!E || E.pend !== "ceremony" || E.cerDay === G.day || !G.running || !veil.hidden || (TALK && TALK.open)) return; engCeremony(); }catch(e){} }
 
 /* ordinary people talk about it, in the words of their own stake */

@@ -4,6 +4,13 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## The research loop, and a seat at any hearing
+
+`20261017s` (on `20261017r`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- **The people who work with machines talk to the Engine, and the machines talk to each other.** Each round hands its result to the next speaker: a researcher proposes, the Engine extends, one of its engines (the Treasury's, the Academy's, the observatory's) checks, a second researcher doubts. What one makes feeds the next, day on day, so research speeds up as the loop carries its own results forward. Two researchers who already agree, and machines shown their view, can push each other the wrong way: the loop can find the answer faster, or be wrong together. The exchanges appear on the Open Line, and the Academy card counts the lines passed.
+- **Sit for a hearing on any bill** (Phone, Apps, *Sit for a hearing on a bill*). The list has the bill before you, every bill you have voted on that passed or was lost, and the state legislature's bill if one is pending. Pick one and you walk to the committee room and sit at the table through the hearing, with the members called in, not watching from the gallery.
+
 ## The thinkers
 
 `20261017r` (on `20261017q`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
