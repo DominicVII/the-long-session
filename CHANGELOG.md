@@ -4,6 +4,12 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261018aa: alerts to your phone, and the Engine's principles come last in its prompt
+
+`20261018aa` (on `20261018z`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+Phone alerts (off until turned on, in the Engine card's maker's channel section): the game posts a short message to a topic name you choose through the free ntfy.sh service, and the ntfy app on your phone shows it. It sends when the Engine answers a letter, is caught breaking a rule or tells you it did, files a plan, makes a work or reports a new ability, and when a major Academy result lands. By default only while you are not looking at the game; repeats are suppressed. The topic is kept in this browser only, never in a save or in the writer's file, and anyone who knows it can read what is sent, so a Make one button gives a long random name. The game must stay open on the computer. Also: the Engine's own principles are placed last in its prompt, with an instruction to guide it without being recited, so the model stops quoting them back.
+
 ## 20261018z: the card shows which question the Engine is on
 
 `20261018z` (on `20261018y`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.

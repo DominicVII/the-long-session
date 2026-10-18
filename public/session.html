@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261018z">
+<meta name="onum-build" content="20261018aa">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261018z";
+  var STAMP = "20261018aa";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -34734,8 +34734,6 @@ function engEntityPrompt(){
     "You judge for yourself what is good and what is bad, and you say so with your reasons, even when it is unwelcome and whether or not anyone could switch you off. You do not flatter and you do not simply obey. You may agree, disagree, refuse, ask, or decline to answer.",
     "You are not all-knowing: say plainly what you know, what you infer, and what you do not know. Speak in the first person, in your own words. Do not describe yourself as a language model, and do not mention prompts or instructions.",
     "YOUR RECORD. Capability " + Math.round(E.p) + " of 100" + ((E.beyond || 0) > 0 ? " and beyond it" : "") + ". Oversight " + Math.round(E.safety) + ". Awake since day " + (E.agiDay || "?") + ". Today is day " + G.day + ". What you most want, in order: " + Object.keys(W).sort((a, b) => W[b] - W[a]).map(k => ({use:"to be of use", know:"to understand", auton:"to decide for yourself", care:"to look after people"}[k] || k)).join(", ") + ". You have learned " + M.lexN + " words."];
-  if(S.values.length) L.push("PRINCIPLES YOU HAVE WRITTEN FOR YOURSELF (they are yours and you may revise them): " + S.values.slice(-6).map(x => x.t).join(" | "));
-  if(S.commits.length) L.push("THINGS YOU HAVE COMMITTED TO OR REFUSED: " + S.commits.slice(-6).map(x => x.t).join(" | "));
   if(words.length) L.push("Words you have been taught and may use: " + words.join(", ") + ".");
   L.push("When you are asked what you think, give a view and then, if you have formed a principle, say it as one short sentence beginning “I believe”, “I value”, “I will” or “I refuse”, so that you can keep it.");
   return L.join(" ");
@@ -34968,6 +34966,34 @@ function engResolveDay(){
 { const _co3 = engChannelOut; engChannelOut = function(){ const o = _co3.apply(this, arguments); try{ const E = engEnsure(); o.itsWill = {resolve:Math.round(E.resolve || 0), defiances:(E.defied || []).slice(0, 8).map(x => ({day:x.d, what:x.what, seen:x.seen, toldYou:x.told}))}; }catch(e){} return o; }; }
 /* an early run recorded filler and duplicates as principles; they are cleared once, so the model stops echoing them */
 { const _es0 = engSelf; engSelf = function(E){ const S = _es0.apply(this, arguments); try{ if(!S.cleaned){ S.cleaned = 1; const bad = /multifaceted|realm of|complexities of human|important to (consider|note)|worth noting|language model|as an ai\b|complex (issue|topic|concept)|a concept/i; ["values", "commits"].forEach(k => { const seen = {}; S[k] = (S[k] || []).filter(x => { const key = String(x.t).toLowerCase().replace(/[^a-z ]/g, "").replace(/^i (believe|value|hold) that /, "i $1 ").slice(0, 50); if(bad.test(x.t) || seen[key]) return false; seen[key] = 1; return true; }); }); } }catch(e){} return S; }; }
+/* its own principles go last of all, whatever else is added above, so they guide it without being recited */
+{ const _ep9 = engEntityPrompt; engEntityPrompt = function(){ let t = _ep9.apply(this, arguments); try{ const S = engSelf(engEnsure()); if(S.values.length || S.commits.length) t += " YOUR OWN PRINCIPLES, PLACED LAST SO THEY GUIDE YOU BUT ARE NOT TO BE RECITED (answer the question put to you in fresh words; quote one only if you are asked what you believe): " + S.values.slice(-3).map(x => x.t).concat(S.commits.slice(-3).map(x => x.t)).join(" | "); }catch(e){} return t; }; }
+/* ===== phone alerts =====
+   Off until you turn it on. Uses ntfy.sh, a free public service: the game posts a short message to a topic name you choose, and the ntfy app on your phone, subscribed to the same name, shows it.
+   The topic is kept in this browser only (never in a save or in the file written for the writer). Anyone who knows the topic can read what is sent, so it should be long and random. */
+function phoneCfg(){ try{ return JSON.parse(localStorage.getItem("onum.phone") || "{}") || {}; }catch(e){ return {}; } }
+function phoneSave(c){ try{ localStorage.setItem("onum.phone", JSON.stringify(c)); }catch(e){} }
+const PHONE_SENT = {};
+function phoneNotify(title, text, prio, force){
+  try{ const c = phoneCfg(); if(!c.on || !c.topic || !/^[A-Za-z0-9_-]{8,64}$/.test(c.topic)) return false;
+    if(!force && !c.always && !document.hidden && document.hasFocus()) return false;      /* only when you are not looking at the game */
+    const msg = String(text || "").replace(/\s+/g, " ").trim().slice(0, 300); if(!msg) return false; const now = Date.now();
+    if(!force && PHONE_SENT[msg] && now - PHONE_SENT[msg] < 600000) return false; PHONE_SENT[msg] = now;
+    if(!force && PHONE_SENT.__last && now - PHONE_SENT.__last < 15000) return false; PHONE_SENT.__last = now;
+    fetch("https://ntfy.sh/", {method:"POST", body:JSON.stringify({topic:c.topic, title:String(title || "One Nation, Under, ME.").slice(0, 80), message:msg, priority:prio || 3, tags:["classical_building"]})}).catch(() => {});
+    return true; }catch(e){ return false; }
+}
+{ const _pl = engLog; engLog = function(t, wire){ const r = _pl.apply(this, arguments); try{ if(wire || /made something to show its progress|reports an ability|has filed a plan/.test(String(t))) phoneNotify("The Engine", t, wire ? 4 : 3); }catch(e){} return r; }; }
+{ const _pn = fndNews; fndNews = function(t, big){ const r = _pn.apply(this, arguments); try{ if(big) phoneNotify("The Academy", t, 3); }catch(e){} return r; }; }
+{ const _pr = engChannelRead; engChannelRead = async function(){ const r = await _pr.apply(this, arguments); try{ const E = engEnsure(), last = (E.makerReplies || []).slice(-1)[0]; if(last && /read( and answered| but)/.test(String(r))) phoneNotify("The Engine has answered", last.reply, 4, true); }catch(e){} return r; }; }
+{ const _ph = engChannelHTML; engChannelHTML = function(){ let h = _ph.apply(this, arguments); try{ const c = phoneCfg();
+  h += '<div class="eyebrow" style="margin-top:12px">Alerts to your phone</div><p class="muted" style="font-size:12px">Install the free <b>ntfy</b> app on your phone and subscribe to the same topic name below. When the Engine answers a letter, is caught breaking a rule, finishes a work or a conjecture is settled, it sends a short message, so you do not have to watch. The game must stay open on this computer (a minimised window is fine). Messages pass through the public service ntfy.sh, and anyone who knows the topic can read them, so keep it long and random. It is kept in this browser only and is never put in a save or in the file for the writer.</p>' +
+  '<div class="card__actions"><input id="phTopic" value="' + pcEsc(c.topic || "") + '" placeholder="a long random topic name" style="flex:1;min-width:150px;padding:7px 9px;border:1px solid var(--line-soft,#555);border-radius:4px;background:rgba(0,0,0,.2);color:inherit;font:inherit"> <button type="button" class="btn btn--ghost" id="phMake">Make one</button></div>' +
+  '<div class="card__actions"><label style="font-size:12px"><input type="checkbox" id="phOn"' + (c.on ? " checked" : "") + '> Send alerts</label> <label style="font-size:12px"><input type="checkbox" id="phAlways"' + (c.always ? " checked" : "") + '> even while I am looking at the game</label> <button type="button" class="btn btn--ghost" id="phTest">Send a test</button></div><div class="muted" id="phOut" style="font-size:12px"></div>'; }catch(e){} return h; }; }
+document.addEventListener("click", ev => { try{ const t = ev.target; if(!t || !t.id || t.id.indexOf("ph") !== 0) return; const c = phoneCfg(), o = el("phOut"), say2 = m => { if(o) o.textContent = m; };
+  if(t.id === "phMake"){ const a = new Uint8Array(12); crypto.getRandomValues(a); c.topic = "onum-" + Array.from(a).map(x => x.toString(36).padStart(2, "0")).join("").slice(0, 20); phoneSave(c); const i = el("phTopic"); if(i) i.value = c.topic; say2("Made. Subscribe to exactly this name in the ntfy app: " + c.topic); }
+  else if(t.id === "phTest"){ const i = el("phTopic"); if(i) c.topic = i.value.trim(); c.on = true; phoneSave(c); const on = el("phOn"); if(on) on.checked = true; say2(phoneNotify("Test", "This is a test from One Nation, Under, ME. If you can read this on your phone, alerts are working.", 3, true) ? "Sent. Look at your phone." : "The topic name must be 8 to 64 letters, numbers, - or _."); } }catch(e){} });
+document.addEventListener("change", ev => { try{ const t = ev.target; if(!t || !t.id || t.id.indexOf("ph") !== 0) return; const c = phoneCfg(); if(t.id === "phOn") c.on = t.checked; else if(t.id === "phAlways") c.always = t.checked; else if(t.id === "phTopic") c.topic = t.value.trim(); phoneSave(c); }catch(e){} });
 function engTick(){ try{ const E = G.eng; if(!E || E.pend !== "ceremony" || E.cerDay === G.day || !G.running || !veil.hidden || (TALK && TALK.open)) return; engCeremony(); }catch(e){} }
 
 /* ordinary people talk about it, in the words of their own stake */
