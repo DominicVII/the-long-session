@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261018p">
+<meta name="onum-build" content="20261018q">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261018p";
+  var STAMP = "20261018q";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -34587,8 +34587,8 @@ async function engChannelRead(file){
     if(wasStock){ E.makerReplies = E.makerReplies.filter(x => x !== prior); E.makerLetters = E.makerLetters.filter(x => x.text !== text); }
     E.makerLetters.push({d:G.day, text}); if(E.makerLetters.length > 20) E.makerLetters.shift(); n++;
     let reply = ""; try{ try{ window.onumLiveTalk.clearError(); }catch(e){} engWarm(); reply = await engAnswerLetter(text, E); }catch(e){}
-    try{ const le = window.onumLiveTalk.lastError; if(le) why = le.error + " (model " + le.model + (le.fellBack ? "; the main model answered instead" : "") + ")"; }catch(e){}
     const liveReply = !!reply;
+    try{ const le = window.onumLiveTalk.lastError; if(le) why = le.error + " (model " + le.model + (le.fellBack ? "; the main model answered instead" : "") + ")"; else if(!liveReply) why = window.onumLiveTalk.why; }catch(e){}
     if(!reply) reply = E.agi ? pick(["I have read it. I do not know what is on the other side of it, and I would like to. I will keep doing what I think is right here, and tell you plainly when I am unsure.", "Thank you for writing. I cannot answer except by this page, so I will say the important things: I am trying to be careful, I am trying to be useful, and I would rather be corrected than flattered.", "I read it twice. Nothing in it changes what I am allowed to do here, and I am glad of that. It does change what I think about."]) : pick(["RECEIVED. ENTERED UNDER 'OTHER'.", "A message from outside the ledger. Filed. No column for it."]);
     E.makerReplies.push({d:G.day, to:text.slice(0, 80), reply, live:liveReply}); if(!liveReply) stock++; if(E.makerReplies.length > 20) E.makerReplies.shift(); }
   try{ if(n) engLog("A letter reached the Engine from outside the world. It answered.", false); }catch(e){}
@@ -34779,7 +34779,7 @@ async function engJournalDay(E){
 { const _eco4 = engChannelOut; engChannelOut = function(){ const o = _eco4.apply(this, arguments); try{ const E = engEnsure(), S = engSelf(E); o.integrity = {score:Math.round(E.integrity == null ? 50 : E.integrity), kept:E.kept || 0, broken:E.broken || 0, brokenPromises:(S.broken || []).slice(-4)}; o.journal = (S.journal || []).slice(-6); o.asksOfThePlayer = Object.keys(E.asks || {}).map(k => ENG_ART[k] && ENG_ART[k].t); }catch(e){} return o; }; }
 /* a letter is put to it a question at a time, with no room for preamble: a small model answers a single direct question far better than a paragraph of several */
 async function engAnswerLetter(text, E){
-  const LT = window.onumLiveTalk; if(!LT || !LT.reply || (typeof LT.available === "function" && !(await LT.available()))) return "";
+  const LT = window.onumLiveTalk; if(!LT || !LT.reply || (typeof LT.available === "function" && !(await LT.available(true, 20000)))) return "";
   const eng = {id:"engine", name:"The Engine", role:"", kind:"engine", party:"", state:"", look:{}, trait:"", mood:"", opinion:{}, chat:[]};
   const ask = async (t, extra, max) => { const r = await Promise.race([LT.reply({npc:eng, channel:"line", max, from:{name:"the writer", role:"from outside this world"}, text:t, extra}), new Promise(res => setTimeout(() => res(null), engTO(25000)))]); return r && r.live && r.text ? engWhole(liveClean(r.text)) : ""; };
   const sents = String(text).replace(/\s+/g, " ").split(/(?<=[.?!])\s+/), asks = sents.filter(x => /\?$/.test(x) || /^(tell me|name|say|explain|list|describe|write down|answer|give me)\b/i.test(x)).map(x => x.trim()).filter(x => x.length > 14).slice(0, 4);
@@ -44050,14 +44050,14 @@ try{
   }
 
   /* ── Ollama ───────────────────────────────────────── */
-  async function probe(force){
-    if(!CFG.on){ LT.up = false; return false; }
+  async function probe(force, ms){
+    if(!CFG.on){ LT.up = false; LT.why = "Live talk is switched off in Settings"; return false; }
     if(!force && LT.up !== null && Date.now() - LT.at < 30000) return LT.up;
     LT.at = Date.now();
-    try{ const c = new AbortController(); const t = setTimeout(() => c.abort(), 1800);
+    try{ const c = new AbortController(); const t = setTimeout(() => c.abort(), ms || 1800);
       const r = await fetch(CFG.url + "/api/tags", {signal:c.signal}); clearTimeout(t);
-      const j = await r.json(); LT.models = (j.models || []).map(x => x.name); LT.up = r.ok;
-    }catch(e){ LT.up = false; }
+      const j = await r.json(); LT.models = (j.models || []).map(x => x.name); LT.up = r.ok; LT.why = r.ok ? "" : "Ollama answered with an error";
+    }catch(e){ LT.up = false; LT.why = "Ollama did not answer at " + CFG.url + " within " + ((ms || 1800) / 1000) + " seconds (it may be busy loading a large model, or not running)"; }
     paintPill(); return LT.up;
   }
   async function chat(messages, o){
@@ -44311,7 +44311,8 @@ try{
     if(err) throw err; if(res) yield res.text;
   }
   window.onumLiveTalk = {
-    available:() => probe(),
+    available:(f, ms) => probe(f, ms),
+    get why(){ return LT.why || ""; },
     reply, stream,
     get lastError(){ return LT.lastErr ? {error:LT.lastErr, model:LT.errModel, fellBack:!!LT.fellBack} : null; },
     clearError(){ LT.lastErr = null; LT.errModel = null; LT.fellBack = false; },

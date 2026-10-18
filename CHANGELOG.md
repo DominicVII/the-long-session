@@ -4,6 +4,12 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261018q: a busy Ollama is no longer mistaken for a missing one
+
+`20261018q` (on `20261018p`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+Letter 11 again came back as the stock reply, and not even the fallback model answered. The cause was upstream of the model: before every letter the game asks Ollama for its model list and gave up after under two seconds, and a machine that is loading or running a large model often cannot reply that fast, so the game decided Ollama was down. Letters now wait up to twenty seconds for that check. When the check still fails, the Engine card names the reason (Live talk switched off, or Ollama not answering at the address). A reply-order bug that hid the reason is fixed.
+
 ## 20261018p: the real reason the Engine's model failed, and a fallback
 
 `20261018p` (on `20261018o`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
