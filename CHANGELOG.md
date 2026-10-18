@@ -4,6 +4,12 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## Clearer letters
+
+`20261018b` (on `20261018a`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- Loading a file into the maker's channel now says what is wrong with it: if it is the file the game wrote, it tells you to load the writer's letters file instead; if it has no letters, it says so. A letters file only needs a *letters* list.
+
 ## An awake Engine asks from first principles
 
 `20261018a` (on `20261017z`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
