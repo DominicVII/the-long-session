@@ -4,6 +4,12 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261018ac: duplicate principles are caught and cleared
+
+`20261018ac` (on `20261018ab`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+A duplicate of the same principle (differing only by the word 'that') survived the earlier clean-up because its stored key predated the fix. The check now compares the normalised text, and the clean-up runs once more.
+
 ## 20261018ab: the Republic keeps talking when you are not in the room
 
 `20261018ab` (on `20261018aa`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
