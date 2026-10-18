@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261017t">
+<meta name="onum-build" content="20261017u">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261017t";
+  var STAMP = "20261017u";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -16288,8 +16288,10 @@ function voxTick(w){
   const others = G.members.filter(x => x !== m && !x.gone);
   const nn = rint(1, 3);
   for(let i=0;i<nn && others.length;i++) voxReact(post, pick(others));
+  /* and then people answer people: a short thread, each answering the one before */
+  if(chance(.6)) try{ voxThread(post, m); }catch(e){ console.warn("voxThread", e); }
   /* members @ each other without the player */
-  if(chance(.34) && others.length){
+  if(chance(.12) && others.length){
     const o = cultRival(m, others) || pick(others);
     if(chance((o.voxAppetite || 30)/120)){
       const jab = voxFree(o, {});
@@ -21243,17 +21245,19 @@ function speak(p, text, vol){
   if(PROC.on && p && p !== G.you && !(TALK.open && TALK.m === p)) return;
   if(p && !canHearPerson(p, text)) return;
   const now = performance.now();
-  if(now - voiceLastAt < (MODEST ? 900 : 500)) return;
-  voiceLastAt = now;
-  const snippet = String(text).slice(0, MODEST ? 140 : 220);
+  /* the same voice does not start twice in the same breath, but a different one is queued behind the first, not talked over */
+  const who = p ? idNum(p.id) : -1; if(who === voiceLastWho && now - voiceLastAt < 250) return;
+  voiceLastAt = now; voiceLastWho = who;
+  const snippet = voiceClip(text, MODEST ? 240 : 380);
   const fire = () => {
     try{
       if(G.mute || document.hidden) return;
       unlockVoice();
       if(!voiceReady) loadVoices();
       try{ if(speechSynthesis.paused) speechSynthesis.resume(); }catch(e){}
-      try{ if(speechSynthesis.speaking || speechSynthesis.pending) speechSynthesis.cancel(); }catch(e){}
-      const u = new SpeechSynthesisUtterance(snippet);
+      /* a line already being said is finished, not cut off; if more than three are waiting the stale ones go */
+      try{ if(speechSynthesis.pending && VQ.n > 3){ speechSynthesis.cancel(); VQ.n = 0; } }catch(e){}
+      const u = new SpeechSynthesisUtterance(snippet); VQ.n++; u.onend = u.onerror = () => { VQ.n = Math.max(0, VQ.n - 1); };
       if(VOICES.length) u.voice = VOICES[idNum(p ? p.id : "you") % VOICES.length];
       const t = p && p.traits ? p.traits : null;
       const spread = G.voiceVar === undefined ? 1 : G.voiceVar;
@@ -21269,10 +21273,13 @@ function speak(p, text, vol){
   };
   fire();
 }
+const VQ = {n:0}; let voiceLastWho = -2;
+/* cut at the end of a sentence, never in the middle of one */
+function voiceClip(text, max){ const t = String(text).replace(/\s+/g, " ").trim(); if(t.length <= max) return t; const cut = t.slice(0, max), ends = Math.max(cut.lastIndexOf(". "), cut.lastIndexOf("? "), cut.lastIndexOf("! "), cut.lastIndexOf("; ")); if(ends > max * 0.45) return cut.slice(0, ends + 1); const sp = cut.lastIndexOf(" "); return (sp > max * 0.5 ? cut.slice(0, sp) : cut).replace(/[,;:\u2014-]+$/, "") + "\u2026"; }
 function hush(){
   try{
     if("speechSynthesis" in window){
-      speechSynthesis.cancel();
+      speechSynthesis.cancel(); VQ.n = 0;
       voiceLastAt = 0;
     }
   }catch(e){}
@@ -22305,7 +22312,7 @@ function smallTalk(a, b){
    of you, or to the whole room when you have the floor — the same
    words you would have typed, said instead.
    ══════════════════════════════════════════════════════════ */
-let RECOG = null, listening = false, micText = "";
+let RECOG = null, listening = false, micText = "", micSilence = 0, micHeld = false;
 function micReady(){
   return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
 }
@@ -22313,14 +22320,16 @@ function micInit(){
   if(RECOG || !micReady()) return RECOG;
   const R = window.SpeechRecognition || window.webkitSpeechRecognition;
   RECOG = new R();
-  RECOG.continuous = false;
+  RECOG.continuous = true;          /* it does not stop at the first breath: you finish when you stop speaking for a moment, or let go */
   RECOG.interimResults = true;
+  try{ RECOG.maxAlternatives = 1; }catch(e){}
   RECOG.lang = "en-US";
   RECOG.addEventListener("result", e => {
     let t = "";
-    for(let i = e.resultIndex; i < e.results.length; i++) t += e.results[i][0].transcript;
-    micText = t.trim();
+    for(let i = 0; i < e.results.length; i++) t += e.results[i][0].transcript + " ";
+    micText = t.replace(/\s+/g, " ").trim();
     micShow(micText || "…");
+    clearTimeout(micSilence); if(!micHeld) micSilence = setTimeout(() => { if(listening) micStop(); }, 2200);
   });
   RECOG.addEventListener("error", e => {
     micShow(e.error === "not-allowed"
@@ -22374,6 +22383,7 @@ function micStart(){
   try{ RECOG.start(); }catch(e){ listening = false; micHide(); aloudFallback("The microphone would not start."); }
 }
 function micStop(){
+  micHeld = false; clearTimeout(micSilence);
   if(!RECOG) return;
   /* Ask the engine to let go even when we already believe we stopped.
      A dropped keyup — alt-tab with V held — used to leave the browser
@@ -24443,7 +24453,7 @@ el("wireIn").addEventListener("keydown", e => { if(e.key === "Enter"){ e.prevent
       e.preventDefault();
       if(!micReady()){ aloudFallback("This browser cannot listen."); return; }
       if(listening){ lit(false); micStop(); armed = false; return; }   /* second tap stops */
-      t0 = performance.now(); armed = true; lit(true); micStart();
+      t0 = performance.now(); armed = true; lit(true); micHeld = true; micStart();
     };
     const up = () => {
       if(!armed) return; armed = false;
@@ -34496,6 +34506,48 @@ function loopDay(){
 }
 { const _fd2 = fndDay; fndDay = function(){ _fd2.apply(this, arguments); try{ loopDay(); }catch(e){ console.warn("loopDay", e); } }; }
 { const _fh2 = fndHTML; fndHTML = function(){ let h = _fh2.apply(this, arguments); try{ const L = fndStore().loop; if(h && L && L.n) h += '<div class="muted" style="font-size:12px;margin-top:6px">The people who work with the machines and the machines that work with each other have passed ' + L.n + ' lines of reasoning between them. What one makes, the next uses.' + (L.notes.some(n => n.drift) ? ' Some of it has been agreeing with itself.' : '') + '</div>'; }catch(e){} return h; }; }
+/* ══ VOX THREADS: people answering people. A post gets a reply from someone who read it and has their own day and temper, who answers what it said without quoting it back; the next answers that, and the thread wanders, agrees, jokes, pushes back, gives way, or goes somewhere else. They write short, the way people do on a feed ══ */
+function voxTopic(t){
+  const x = String(t).toLowerCase(); const b = G.bill && !G.bill.done ? G.bill : null;
+  if(b && x.indexOf(b.title.toLowerCase().split(" ")[0]) >= 0) return "the bill";
+  if(/engine|machine|thinking|clerk|letters|oversight/.test(x)) return "the machines";
+  if(/guilder|price|bread|loaf|wage|tax|cost/.test(x)) return "prices";
+  if(/vote|whip|count|aye|nay|floor/.test(x)) return "the count";
+  if(/committee|hearing|markup|chair/.test(x)) return "the committee";
+  if(/district|home|county|town/.test(x)) return "home";
+  return "this";
+}
+function voxTurn(m, prev, depth, topic){
+  const T = m.traits || {}, mood = moodOf(m).val, bio = bioOf(m), ah = handleOf(byId(prev.by) || G.you), loud = T.temper > 62, quiet = T.discretion > 66, same = prev.party && m.party === prev.party;
+  const hot = /\b(lie|liar|corrupt|coward|disgrace|resign|hypocrite|shame|clown|fraud)\b/i.test(prev.t), kind = hot ? "hot" : mood > 25 && same ? "warm" : mood < -25 ? "sour" : "plain";
+  const pools = {
+    hot:["Easy. " + ah + " is not wrong that it stings, but that is not how you say it.", "That is a lot to put in writing. Did you mean all of it?", "Say that to their face in the corridor tomorrow, then.", "this is how a thread dies"],
+    warm:["Yes. This. " + (depth > 1 ? "And thanks for saying it first." : ""), "Agree. " + bio.town + " has been saying the same since spring.", "Hard to argue. I'd add that nobody asked the people who live with " + topic + ".", ah + " said it better than I would have."],
+    sour:["I've heard this one. It sounded better in March.", "Sure. And then what happens on Monday?", "Easy to say from where you sit.", "mm. no.", "We are all very brave on here."],
+    plain:["Not sure that is the whole of it. " + (T.discretion > 50 ? "I'd want to see the numbers." : "But go on."), "Fair point. I had not thought of it that way.", "Honestly I came in thinking the opposite about " + topic + ". Not now.", "Wait, which part? The first half I buy.", "I keep coming back to " + bio.town + ". They'd answer this differently.", "Could be. Ask me again after the vote."]
+  };
+  const extra = [];
+  if(depth >= 2) extra.push("ok but we have drifted. what about " + (topic === "this" ? "the actual question" : topic) + "?", "ha. fair.", "I'll stop there. The thread has said what it can.");
+  if(loud) extra.push("Everybody is being very careful. I am not. " + (topic === "this" ? "It is wrong." : topic.charAt(0).toUpperCase() + topic.slice(1) + " is wrong."));
+  if(quiet) extra.push("I'd rather not put more on here. Call the office.");
+  if(topic === "the machines") extra.push("Whatever one thinks of them, the letters are being answered faster than they ever were.", "My clerk says the machine read the whole bill in a minute. I don't know whether to be glad.");
+  if(topic === "prices") extra.push("My constituents do the arithmetic at the till, not in a committee.");
+  try{ const F = G.inq && G.inq.fnd; if(F && F.open && F.open[0] && chance(0.12)){ const c = fndConcepts().find(x => x.id === F.open[0].k); if(c) extra.push("Unrelated, but the Academy says they're testing whether " + c.claim.toLowerCase().replace(/\.$/, "") + ". I have opinions."); } }catch(e){}
+  return pick(pools[kind].concat(extra, extra));
+}
+function voxThread(root, m){
+  const others = G.members.filter(x => x !== m && !x.gone && chance((x.voxAppetite || 30) / 100)); if(!others.length) return;
+  const n = 1 + Math.floor(Math.random() * 3) + (chance(0.25) ? 1 : 0), topic = voxTopic(root.t); let prev = root; const used = [m];
+  for(let i = 0; i < n; i++){
+    const pool = others.filter(x => x.id !== prev.by && (used.indexOf(x) < 0 || used.length > 2)); const x = pick(pool); if(!x) break; used.push(x);
+    const author = byId(prev.by) || G.you; let text = voxTurn(x, {by:prev.by, t:prev.t, party:author && author.party}, i, topic);
+    if(text.indexOf("@") < 0 && chance(0.7)) text = handleOf(author) + " " + text;
+    const kv = voxKindVal(text, x), post = {id:G.vox.id++, by:x.id, t:text, k:kv.k, v:kv.v, day:G.day, at:hhmm(), backs:0, hits:0, voices:[], mine:false, reply:true, to:prev.id};
+    voxAdd(post); try{ voxReact(post, pick(G.members.filter(y => y !== x && !y.gone))); }catch(e){}
+    try{ mindRemember(x, "experience", "Answered a thread on Vox about " + topic); }catch(e){}
+    prev = post;
+  }
+}
 function engTick(){ try{ const E = G.eng; if(!E || E.pend !== "ceremony" || E.cerDay === G.day || !G.running || !veil.hidden || (TALK && TALK.open)) return; engCeremony(); }catch(e){} }
 
 /* ordinary people talk about it, in the words of their own stake */
@@ -37079,7 +37131,7 @@ addEventListener("keydown", e => {
     if(veil.hidden){ openPanels(); return; }
     return;
   }
-  if(k === "v" && veil.hidden && !listening){ const ab=el("aloudBtn"); if(ab) ab.classList.add("is-live"); micStart(); return; }
+  if(k === "v" && veil.hidden && !listening){ const ab=el("aloudBtn"); if(ab) ab.classList.add("is-live"); micHeld = true; micStart(); return; }
   /* KBM: X opens today's schedule, the same as pad X — the phone's own
      hint and the quickstart both promise it, and only the pad had it. */
   if(k === "x" && !bindTaken("x") && veil.hidden && !TALK.open && (G.running || phoneWasRunning !== null)){

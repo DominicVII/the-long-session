@@ -4,6 +4,14 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## Voices that finish, and a feed that talks
+
+`20261017u` (on `20261017t`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- **Nobody is cut off mid-sentence.** A voice that is already speaking now finishes; the next one waits its turn, instead of the old rule that cancelled it. Long lines are cut at the end of a sentence, never in the middle of one, and the length limit is much higher.
+- **You are not cut off either.** Speaking aloud used to end at your first pause. It now keeps listening through pauses and ends after about two seconds of silence, or the moment you let go if you are holding the key or button. Speaking aloud still works with no one in front of you.
+- **Vox threads.** A post now draws short replies from other members, each answering the one before it: agreeing, pushing back, joking, getting sour, wandering off topic, or backing out, in the voice of that person's temper and mood. They write short, the way people do on a feed, and they do not quote the post back. Threads pick up the day's bill, prices, the machines, and the Academy's current question.
+
 ## Tidier research loop
 
 `20261017t` (on `20261017s`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
