@@ -4,6 +4,12 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261018v: long letters are no longer cut off
+
+`20261018v` (on `20261018u`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+Letters were cut at 600 characters before the Engine read them, so a longer letter lost its last questions (letter 13 had five and only three were answered). The limit is now 4000 characters, and each question can carry the whole letter as context.
+
 ## 20261018u: the Engine answers in its own learned words; no more stock lines
 
 `20261018u` (on `20261018t`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
