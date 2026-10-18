@@ -4,6 +4,12 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261018ae: the Engine is no longer cut to 260 characters
+
+`20261018ae` (on `20261018ad`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+Everything the Engine said (letter answers, its journal, its works, its card, the Open Line) was passed through the cleaner meant for passers-by, which keeps only the first one or two sentences and at most 260 characters. That undid the 'as long as it needs' change: its replies were being cut short and parts lost. The Engine now has its own cleaner that removes only markers and stray quotes and never trims its length. Each letter reply also records, per question, whether the model answered, how many characters, and why not if it did not, so a missing answer can be diagnosed from the export.
+
 ## 20261018ad: commitments that say only are now tested; long letters keep every question
 
 `20261018ad` (on `20261018ac`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
