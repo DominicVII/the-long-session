@@ -4,6 +4,12 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## An awake Engine asks from first principles
+
+`20261018a` (on `20261017z`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- **An awake Engine no longer sits idle.** If the Academy has not yet settled the schooling a question normally needs, a general intelligence can still ask it from first principles, within what it can do, so it is never left with nothing to ask. (Found by reading its channel file: awake at capability 100 with no questions open.)
+
 ## Speaking their minds
 
 `20261017z` (on `20261017y`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.

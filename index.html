@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261017z">
+<meta name="onum-build" content="20261018a">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261017z";
+  var STAMP = "20261018a";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -34365,7 +34365,7 @@ function fndStore(){ const S = inqStore(); if(!S.fnd) S.fnd = {seed:Math.floor(M
 function fndConcepts(){ const F = fndStore(); return FND_C.map(c => ({id:c[0], dom:c[1], name:c[2], claim:c[3], p:c[4], effort:c[5], needs:c[6], fx:c[7]})).concat(F.derived); }
 function fndTruth(c){ const F = fndStore(); return (seedOf("nat:" + F.seed + ":" + c.id) % 10000) / 10000 < c.p; }
 function fndBelief(id){ const r = fndStore().res[id]; return r ? r.belief : null; }
-function fndOk(id){ const neg = id.charAt(0) === "!", k = neg ? id.slice(1) : id, S = inqStore(); if(INQ_BY[k]) return !!S.done[k]; const b = fndBelief(k); return neg ? b === false : b === true; }
+function fndOk(id, relax){ const neg = id.charAt(0) === "!", k = neg ? id.slice(1) : id, S = inqStore(); if(INQ_BY[k]) return relax ? true : !!S.done[k]; const b = fndBelief(k); return neg ? b === false : b === true; }
 function fndPower(){ const C = inqCounts(), E = (G.eng && G.eng.v === 1) ? G.eng : null, S = inqStore(), fu = (f) => S.fund[f] && G.day <= S.fund[f].until ? S.fund[f].lvl : 0;
   const people = Math.pow((C.phys || 14) + (C.phil || 14) * 0.5 + (C.mind || 14) * 0.5 + (C.math || 14) * 0.5, 0.5) * (0.6 + (fu("phys") + fu("phil") + fu("mind")) / 3), eng = E ? (E.p / 100) * (E.st / 5) * (1 + Math.log10(1 + (E.beyond || 0))) : 0;
   return {people, eng, total:people + eng * 6}; }
@@ -34373,7 +34373,9 @@ function fndDay(){
   const F = fndStore(), S = inqStore(), E = (G.eng && G.eng.v === 1) ? G.eng : null, P = fndPower(), all = fndConcepts(), byId = {}; all.forEach(c => byId[c.id] = c);
   /* 1 · a question is taken up when what it stands on is known */
   if(F.open.length < 8 && chance(0.05 + P.total / 400)){
-    const ready = all.filter(c => !F.res[c.id] && !F.open.some(o => o.k === c.id) && c.needs.every(fndOk)).sort((a, b) => a.effort - b.effort);
+    let ready = all.filter(c => !F.res[c.id] && !F.open.some(o => o.k === c.id) && c.needs.every(id => fndOk(id))).sort((a, b) => a.effort - b.effort);
+    /* a general intelligence does not wait for the Academy to have finished the schooling a question normally needs: it can ask from first principles, at the price of being slower and less sure */
+    if(!ready.length && E && E.agi) ready = all.filter(c => !F.res[c.id] && !F.open.some(o => o.k === c.id) && c.needs.every(id => fndOk(id, true)) && c.effort <= 5 + Math.log10(1 + (E.beyond || 0)) * 3).sort((a, b) => a.effort - b.effort);
     if(ready.length){ const c = ready[Math.min(ready.length - 1, Math.floor(Math.random() * Math.random() * ready.length))]; F.open.push({k:c.id, ev:0, n:0, d:G.day, by:(E && chance(P.eng / (P.total + 1))) ? "the Engine" : "the people who work it"}); try{ feed("The Academy: " + c.name + " is now being tested. " + c.claim); }catch(e){} }
   }
   /* 2 · evidence: each experiment leans toward the truth, with noise, and only as well as the instruments allow */
