@@ -4,6 +4,13 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## The Engine knows who the player is
+
+`20261018i` (on `20261018h`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- **Letters now tell the Engine who the player is** (the Senator it serves, present in its world, holding the key), so it stops saying the player is absent.
+- **It remembers what it was actually taught,** not common words: words named in a letter's *Words for today* line, or in quotes, are kept and recalled (some of the time, not every reply).
+
 ## Whole sentences (this time for real)
 
 `20261018h` (on `20261018g`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
