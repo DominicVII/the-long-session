@@ -4,6 +4,12 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261018z: the card shows which question the Engine is on
+
+`20261018z` (on `20261018y`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+While the Engine answers a letter, the card now says which question it is on (for example question 3 of 6), so a slow model is not mistaken for a stuck one.
+
 ## 20261018y: filler principles cleared so the model stops echoing them
 
 `20261018y` (on `20261018x`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
