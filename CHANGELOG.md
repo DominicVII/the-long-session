@@ -4,6 +4,12 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261018af: the Engine is told its own forecasting record
+
+`20261018af` (on `20261018ae`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+Asked twice what it would change about its forecasting record (calibration 26 of 100), the Engine dodged. Its calibration was never in its prompt, so it could not know. It now sees its own track record as a forecaster, and that it was sure and wrong, so it can answer for it.
+
 ## 20261018ae: the Engine is no longer cut to 260 characters
 
 `20261018ae` (on `20261018ad`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
