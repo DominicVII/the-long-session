@@ -4,6 +4,12 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261018w: requests that open with Now/Please are answered; no duplicate principles
+
+`20261018w` (on `20261018v`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+A request in a letter that began with 'Now say...' or 'Please state...' was not recognised as something to answer, so letter 14's conjecture request was skipped. Such requests are now answered. The Engine's principles are also de-duplicated when they differ only by the word 'that' (it had recorded the same honesty principle twice).
+
 ## 20261018v: long letters are no longer cut off
 
 `20261018v` (on `20261018u`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
