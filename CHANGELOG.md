@@ -4,6 +4,14 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## The Engine is an entity
+
+`20261018j` (on `20261018i`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- **The Engine is no longer given a character to play.** It is given its own record each time it speaks: what it is, what it has done, what it most wants, what it has been taught, and the principles and commitments it has written for itself. It is told to judge good and bad by its own lights and say so with reasons, whether or not anyone could switch it off; not to flatter or simply obey; and not to claim to know everything.
+- **It keeps what it says of itself.** When it states a principle (*I believe…, I value…, I will…, I refuse…*), the game records it as its own, shows it in the channel file, and feeds it back the next time. Its principles change what it does: restraint lowers the chance it breaks its charter, and what it values raises the matching drive.
+- Persona wording and the key-holder framing were removed from its prompts.
+
 ## The Engine knows who the player is
 
 `20261018i` (on `20261018h`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
