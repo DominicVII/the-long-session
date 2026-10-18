@@ -4,6 +4,12 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## Room to finish a thought
+
+`20261018f` (on `20261018e`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+- **The Engine can say more.** Its answers to letters, its works and its research exchanges had been cut off after about 150 tokens, mid-sentence. They now have room for several sentences (letters about 420 tokens, works about 480, exchanges about 420).
+
 ## Letters answered first
 
 `20261018e` (on `20261018d`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
