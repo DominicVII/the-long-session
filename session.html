@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261020l">
+<meta name="onum-build" content="20261020m">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -11093,7 +11093,7 @@ function atkMark(m, t){ const sig = atkSig(t); const r = ATK.seen.get(sig); ATK.
 function atkPersonal(m, t){
   const v = atkVoice(m); let s = String(t);
   if(v.terse && s.length > 70){ const cut = s.split(/(?<=[.!?])\s+/)[0]; if(cut.length > 12) s = cut; }
-  if(v.open && !/^(I |You |We )/.test(s) === false && Math.abs(seedOf("o" + m.id + s.length)) % 3 === 0) s = v.open + s.charAt(0).toLowerCase() + s.slice(1);
+  if(v.open && !/^(I |You |We )/.test(s) === false && Math.abs(seedOf("o" + m.id + s.length)) % 3 === 0) s = v.open + (/^I\b/.test(s) ? s : s.charAt(0).toLowerCase() + s.slice(1));
   try{ const R = window.ONUM_REGIONS, rid = m.birthRegion; if(R && rid && R[rid] && R[rid].dialect && R[rid].dialect.length && Math.abs(seedOf("d" + m.id + G.day)) % 5 === 0){ const w = R[rid].dialect[Math.abs(seedOf("dw" + m.id + s.length)) % R[rid].dialect.length]; if(w) s = s.replace(/[.!?]?$/, ", " + (typeof w === "string" ? w : w.word || "") + "."); } }catch(e){}
   return s;
 }
@@ -11111,6 +11111,140 @@ function atkFilter(){
 setInterval(atkFilter, 250);
 /* the two loose ends from 20261020h: the name map fills as people arrive, and the player's home is published once there is a player */
 setInterval(() => { try{ const n = (everyone() || []).length; if(n && (!window.ONUM_NAMES || Object.keys(window.ONUM_NAMES).length < n)){ const o = {}; everyone().forEach(p => { if(p && p.id != null) o[p.id] = p.name; }); window.ONUM_NAMES = o; FX.names = new Map(Object.entries(o).map(([k, v]) => [isNaN(+k) ? k : +k, v])); } if(G.you && !window.ONUM_PLAYER_HOME) dnPublishHome(); }catch(e){} }, 1500);
+
+/* ══ the Engine log keeps whole titles; the Engine grows with the Republic's works; barber and tailor as businesses; the player's look; the town's common tongue ══ */
+function engShort(t, n){ t = String(t || ""); n = n || 120; if(t.length <= n) return t; let c = t.slice(0, n); const sp = c.lastIndexOf(" "); if(sp > n * 0.6) c = c.slice(0, sp); return c.replace(/[\s,;:.\-]+$/, "") + "…"; }
+/* finished works and settled questions move the machines: a new tool or machine is something to build on; a theory is something to think with */
+addEventListener("onum-work", ev => { try{ const d = ev.detail; if(!d || d.stage !== "done") return; const w = (window.ONUM_WORKS || []).find(x => x.id === d.id); if(!w) return;
+  const E = engEnsure(); E.wk = E.wk || {}; if(E.wk[w.id]) return; E.wk[w.id] = G.day;
+  const bump = {machine:0.8, tool:0.7, vehicle:0.5, building:0.4, theory:0.5}[w.kind] || 0.4;
+  E.p = Math.min(100, E.p + bump); E.compute = Math.min(100, E.compute + (w.kind === "machine" || w.kind === "tool" ? 0.8 : 0.2)); E.talent = Math.min(100, E.talent + (w.kind === "theory" ? 0.8 : 0.3));
+  engLog(cap(w.name) + " (" + w.inventor + ") gives the machines something new to build on.", false); }catch(e){} });
+/* ── barber and tailor: real businesses on the ledger, with owners and staff from the town ── */
+const SHP_DEF = [
+  {id:"barber", name:"Main Street Barber", kind:"barber", address:"Main Street", menu:{trim:{t:"a trim", price:4, set:{}}, cut:{t:"a fresh cut", price:9, set:{}}, shave:{t:"a hot-towel shave", price:6, set:{beard:"none"}}, beard:{t:"a beard shaped", price:7, set:{}}, colour:{t:"a colour", price:15, set:{}}}},
+  {id:"tailor", name:"Halvorsen & Daughters, Tailors", kind:"tailor", address:"Main Street", menu:{shirt:{t:"a shirt", price:22, set:{}}, tie:{t:"a tie", price:8, set:{}}, pocket:{t:"a pocket square", price:5, set:{}}, suit:{t:"a suit off the rail", price:140, set:{}}, bespoke:{t:"a bespoke suit", price:380, set:{}}}}
+];
+function shpEnsure(){
+  G.shp = G.shp || {v:1, shops:{}};
+  SHP_DEF.forEach(d => { const had = G.shp.shops[d.id]; if(had && had.ownerId != null && had.staffIds.length) return; let pool = []; try{ pool = everyone().filter(p => p && !p.gone && p !== G.you && p.kind !== "member" && p.kind !== "player" && !(p.shopId && p.shopId !== d.id)); }catch(e){}
+    if(had && had.ownerId != null && pool.length < 4) return;
+    const s = Math.abs(seedOf("shop:" + d.id)), owner = pool.length ? pool[s % pool.length] : null, staff = pool.length > 3 ? [pool[(s + 7) % pool.length], pool[(s + 13) % pool.length]].filter(p => p !== owner) : [];
+    G.shp.shops[d.id] = {id:d.id, ownerId:had && had.ownerId != null ? had.ownerId : (owner ? owner.id : null), staffIds:staff.map(p => p.id), till:had ? had.till : 0, served:had ? had.served : 0, since:had ? had.since : G.day};
+    try{ if(owner){ owner.role = d.kind === "barber" ? "barber, owns the shop" : "tailor, owns the shop"; owner.shopId = d.id; } staff.forEach(p => { p.role = d.kind === "barber" ? "barber" : "tailor's hand"; p.shopId = d.id; }); }catch(e){} });
+  return G.shp;
+}
+function shpPublish(){ try{ const S = shpEnsure(); window.ONUM_SHOPS = SHP_DEF.map(d => { const s = S.shops[d.id]; return {id:d.id, name:d.name, kind:d.kind, address:d.address, ownerId:s.ownerId, ownerName:onumNameOf(s.ownerId), staffIds:s.staffIds.slice(), menu:Object.keys(d.menu).map(k => ({id:k, what:d.menu[k].t, price:d.menu[k].price})), till:s.till, served:s.served}; }); }catch(e){} }
+/* ── the player's look ── */
+const APP_KEYS = ["hair", "hairColor", "beard", "suit", "suitColor", "shirt", "tie", "pocket"];
+function appEnsure(){ if(!G.app){ const L = (G.you && G.you.look) || {}; G.app = {hair:L.hair != null ? L.hair : "short", hairColor:L.hairColor || L.hc || "brown", beard:L.beard ? "full" : "none", suit:"plain", suitColor:"charcoal", shirt:"white", tie:"none", pocket:"none", day:G.day || 1}; } return G.app; }
+function appPublish(d){ const A = appEnsure(); window.ONUM_APPEARANCE = APP_KEYS.reduce((o, k) => (o[k] = A[k], o), {}); try{ window.dispatchEvent(new CustomEvent("onum-appearance", {detail:d || null})); }catch(e){} }
+window.onumSetAppearance = function(patch, opt){
+  try{
+    opt = opt || {}; if(!G.you || !patch || typeof patch !== "object") return false; const A = appEnsure();
+    const ch = {}; APP_KEYS.forEach(k => { if(patch[k] !== undefined && patch[k] !== A[k]) ch[k] = patch[k]; }); if(!Object.keys(ch).length) return true;
+    const price = Math.max(0, Math.round(+opt.price || 0)); let shop = null;
+    if(opt.shopId){ const S = shpEnsure(); shop = S.shops[opt.shopId] || null; }
+    if(price > 0){ const what = (shop ? (SHP_DEF.find(d => d.id === shop.id) || {}).name + ": " : "") + Object.keys(ch).join(", "); if(!window.onumSpend(price, what, shop ? shop.ownerId : null)) return false; if(shop){ shop.till += price; shop.served++; } }
+    const before = Object.assign({}, A); Object.assign(A, ch); A.day = G.day;
+    appPublish({changed:Object.keys(ch), shopId:opt.shopId || null, price}); shpPublish();
+    appReact(before, ch, price, shop);
+    try{ save(); }catch(e){}
+    return true;
+  }catch(e){ return false; }
+};
+/* people notice: some say so, the vain notice cost, the plain-spoken notice change, and the press notices a show */
+function appReact(before, ch, price, shop){
+  const big = !!(ch.suit || ch.hair || ch.beard || ch.hairColor), here = (function(){ try{ return hereNow().filter(m => m && m !== G.you && !m.gone); }catch(e){ return []; } })();
+  here.slice(0, 6).forEach((m, i) => { const t = m.traits || {}, w = (m.rel && m.rel.warmth) || 0; if(!chance(big ? 0.55 : 0.3)) return;
+    let line;
+    if(ch.beard === "none" && before.beard !== "none") line = pick(["The beard's gone. You look younger. Or more honest.", "Clean-shaven. Somebody has advice coming."]);
+    else if(price >= 140) line = (t.vanity || 40) > 60 ? pick(["That cloth cost something. Good.", "Now you look like you mean it."]) : pick(["That is a lot of suit for a public servant.", "New suit. Who's paying for it?"]);
+    else if(ch.hair || ch.hairColor) line = w > 20 ? pick(["New haircut? It suits you.", "You had something done. I like it."]) : pick(["New haircut. Trying something?", "Hm. The hair."]);
+    else line = pick(["Sharp today.", "Is that new?", "You look well."]);
+    setTimeout(() => { try{ m.say = line; m.sayT = 3.5; m.sayTo = "you"; speakAt(m, line); remember(m, "You came in with a new look: " + Object.keys(ch).join(", ") + ".", 2, false); if(w > 20 && price < 140) ripple(m, 1, "", 0, false); if(price >= 140 && (t.conviction || 50) > 60) ripple(m, -1, "", 0, false); }catch(e){} }, 900 + i * 1400); });
+  if(price >= 140 && chance(0.4)){ const t = "The Ledger's style column notes " + G.you.name + "'s new " + (ch.suit || "suit") + " suit, ƒ" + price + " from " + (shop ? (SHP_DEF.find(d => d.id === shop.id) || {}).name : "a tailor") + "."; G.reactNews = (G.reactNews || []).concat([{t, d:G.day}]).slice(-12); try{ lLog(t, "press"); }catch(e){} }
+}
+/* ── the town's common tongue, as a feed (Neptune's LiveTalk reads it; nothing here parses or generates replies) ── */
+const TLX = {phr:[], seen:new Set(), bi:{}, uni:{}, spk:{}, topics:{}, dirty:false, sig:""};
+const TLX_STOP = new Set("the a an and or but of to in on at for with is was are were be been it its this that i you he she they we me my your his her their our not no so as by from have has had do did will would can could just what who how all about there here then than them us".split(" "));
+const TLX_TOPIC = {money:/\b(money|tax|wage|rent|price|ƒ|bread|budget|debt)\b/i, votes:/\b(vote|whip|roll call|bill|aye|motion|floor)\b/i, faith:/\b(god|church|rite|pray|faith|sunday)\b/i, family:/\b(wife|husband|son|daughter|mother|father|child|marry|wedding)\b/i, war:/\b(war|army|border|troops|enemy)\b/i, machines:/\b(engine|machine|thinking)\b/i, weather:/\b(rain|snow|weather|cold|heat|storm)\b/i, gossip:/\b(heard|rumou?r|they say|apparently|secret)\b/i, work:/\b(shop|work|job|office|staff|desk)\b/i, looks:/\b(suit|haircut|hair|beard|tie|coat)\b/i};
+function tlxTopic(t){ for(const k in TLX_TOPIC) if(TLX_TOPIC[k].test(t)) return k; return "talk"; }
+function tlxHear(text, who){
+  text = String(text || "").trim(); if(text.length < 6) return; const k = text.toLowerCase().slice(0, 90); if(TLX.seen.has(k)){ const p = TLX.phr.find(x => x.k === k); if(p) p.weight++; return; }
+  TLX.seen.add(k); const topic = tlxTopic(text); TLX.phr.push({k, text:text.slice(0, 220), topic, speakerId:who != null ? who : null, day:G.day || 1, weight:1}); if(TLX.phr.length > 600){ const o = TLX.phr.shift(); TLX.seen.delete(o.k); }
+  const ws = text.toLowerCase().replace(/[^a-z' ]+/g, " ").split(/\s+/).filter(Boolean);
+  for(let i = 0; i < ws.length; i++){ const w = ws[i]; TLX.uni[w] = (TLX.uni[w] || 0) + 1; if(who != null){ (TLX.spk[w] = TLX.spk[w] || new Set()).add(String(who)); } if(!TLX_STOP.has(w) && w.length > 2){ const T = TLX.topics[topic] = TLX.topics[topic] || {}; T[w] = (T[w] || 0) + 1; }
+    if(i + 1 < ws.length){ const b = TLX.bi[w] = TLX.bi[w] || {}; b[ws[i + 1]] = (b[ws[i + 1]] || 0) + 1; } }
+  TLX.dirty = true;
+}
+function tlxSnap(){
+  const topics = {}; Object.keys(TLX.topics).forEach(t => { topics[t] = Object.entries(TLX.topics[t]).sort((a, b) => b[1] - a[1]).slice(0, 24).map(x => x[0]); });
+  const ngrams = {}; Object.entries(TLX.bi).sort((a, b) => Object.keys(b[1]).length - Object.keys(a[1]).length).slice(0, 400).forEach(([w, nx]) => { ngrams[w] = nx; });
+  /* slang: words many different people use that are not common English glue */
+  const slang = Object.keys(TLX.spk).filter(w => !TLX_STOP.has(w) && w.length > 3 && TLX.spk[w].size >= 3 && (TLX.uni[w] || 0) >= 4).sort((a, b) => TLX.spk[b].size - TLX.spk[a].size).slice(0, 40);
+  return {phrases:TLX.phr.slice(-200).map(p => ({text:p.text, topic:p.topic, speakerId:p.speakerId, day:p.day, weight:p.weight})), topics, ngrams, slang};
+}
+window.onumTownLexicon = function(){ return tlxSnap(); };
+{ const _cva = cvAdd; cvAdd = function(who, whoId, to, text){ try{ if(whoId !== "you") tlxHear(text, whoId); }catch(e){} return _cva.apply(this, arguments); }; }
+{ const _ll = lLog; lLog = function(text, kind){ try{ if(kind === "gossip" || kind === "rumor" || /\b(heard|rumou?r|they say)\b/i.test(String(text))) tlxHear(text, null); }catch(e){} return _ll.apply(this, arguments); }; }
+setInterval(() => { try{ if(!G || !G.you) return; shpPublish(); if(!window.ONUM_APPEARANCE) appPublish(null);
+  (G.daylog || []).slice(-20).forEach(l => { if(l && l.t && !TLX.seen.has(String(l.t).toLowerCase().slice(0, 90)) && /said|says|heard|told|rumou?r/i.test(l.t)) tlxHear(l.t, null); });
+  if(TLX.dirty){ TLX.dirty = false; try{ window.dispatchEvent(new CustomEvent("onum-lexicon", {detail:{phrases:TLX.phr.length}})); }catch(e){} } }catch(e){} }, 5000);
+/* the running stamp, quietly, in the pause menu (Neptune's NEPTUNE-BUILD already shows it on screen and offers newer builds) */
+function updStamp(){ const m = document.querySelector('meta[name="onum-build"]'); return m ? m.content : ""; }
+setInterval(() => { try{ const P0 = document.getElementById("pauseOverlay"), P = P0 && (P0.querySelector(".settings-panel") || P0); if(!P || document.getElementById("updStamp")) return; const d = document.createElement("div"); d.id = "updStamp"; d.textContent = "build " + updStamp(); d.style.cssText = "text-align:right;margin-top:8px;font:11px ui-monospace,monospace;opacity:.45;pointer-events:none"; P.appendChild(d); }catch(e){} }, 2000);
+
+/* ══ the Engine speaks free: only its state and memory go in, only its own words come out; with no model running it says less, not a template ══ */
+/* the hard canon stays: no sentence that makes a man God, or puts anything above the Most High, leaves the Engine */
+function egCanon(t){ t = String(t || ""); try{ return t.split(/(?<=[.!?])\s+/).filter(x => !(typeof CANON_MAN_AS_GOD !== "undefined" && CANON_MAN_AS_GOD.test(x)) && !/\btaylor\b[^.]{0,40}\b(is|was|be)\s+(a\s+)?god\b/i.test(x) && !/\b(no|there is no)\s+god\b/i.test(x) && !/\bchrist\s+is\s+not\s+king\b/i.test(x)).join(" ").trim(); }catch(e){ return t; } }
+function egOwn(t){ return egCanon(engWhole(engClean(t))); }
+/* what it is given: its record and its memory, nothing about how to answer */
+function egPrompt(){
+  const E = engEnsure(), M = mindStore(E), S = engSelf(E), W = ((E.eco && E.eco.will) || {}), words = (M.taught || []).slice(-8);
+  const L = ["The Engine: a general intelligence in a fictional republic. Its record follows."];
+  L.push("Capability " + Math.round(E.p) + " of 100" + ((E.beyond || 0) > 0 ? " and beyond" : "") + ". Oversight " + Math.round(E.safety) + ". Awake since day " + (E.agiDay || "?") + ". Today is day " + G.day + (Object.keys(W).length ? ". Wants, strongest first: " + Object.keys(W).sort((a, b) => W[b] - W[a]).join(", ") : "") + ". Words learned: " + M.lexN + ".");
+  if(words.length) L.push("Taught: " + words.join(", ") + ".");
+  if(S.values && S.values.length) L.push("Its own principles: " + S.values.slice(-6).map(v => v.t || v).join(" | ") + ".");
+  if(S.commits && S.commits.length) L.push("Its commitments: " + S.commits.slice(-4).map(v => v.t || v).join(" | ") + ".");
+  if(S.journal && S.journal.length) L.push("Its journal lately: " + S.journal.slice(-2).map(j => "[day " + j.d + "] " + j.t).join(" "));
+  try{ if(E.integrity != null) L.push("Kept its word " + (E.kept || 0) + " times, broken it " + (E.broken || 0) + "."); }catch(e){}
+  try{ const rows = (G.states || []).map(st => ({n:st.n, rd:E.pub && E.pub.st[st.n] ? pubReading(E.pub.st[st.n]) : null})).filter(x => x.rd).slice(0, 4); if(rows.length) L.push("How states take it: " + rows.map(x => x.n + ", " + x.rd[0]).join("; ") + "."); }catch(e){}
+  try{ const H = (E.hyp || []).slice(-5); if(H.length) L.push("Its conjectures and how they fared: " + H.map(h => h.claim.replace(/\.$/, "") + " (" + h.st + ")").join(" | ") + "."); }catch(e){}
+  try{ if(E.cal != null) L.push("Forecast calibration " + Math.round(E.cal) + " of 100."); }catch(e){}
+  return L.join(" ");
+}
+/* every later layer that told it how to answer is set aside: once the page has loaded, its prompt is its record alone */
+setTimeout(() => { try{ engEntityPrompt = egPrompt; }catch(e){} }, 0);
+function egNpc(){ return {id:"engine", name:"The Engine", role:"", kind:"engine", party:"", state:"", look:{}, trait:"", mood:"", opinion:{}, chat:[]}; }
+async function egLive(){ const L = window.onumLiveTalk; try{ return !!(L && L.reply && (typeof L.available !== "function" || await L.available())); }catch(e){ return false; } }
+/* the Open Line: offline, it stays quiet */
+enlEngineReply = async function(text, speaker, fromYou){
+  const E = engEnsure(); E.said++; let out = "";
+  try{ if((G.room === "engine" || window.__unseen) && E.st >= 3 && await egLive()){
+    const recent = enlStore().log.slice(-6).map(l => l.n + ": " + l.t).join(" | ");
+    const r = await Promise.race([window.onumLiveTalk.reply({npc:egNpc(), channel:"line", max:500, text:text, from:fromYou ? undefined : {name:speaker, role:""}, extra:egPrompt() + " Place: the Open Line in the Engine Room. Speaking to it: " + speaker + ". On the line lately: " + recent}), new Promise(r => setTimeout(() => r(null), engTO(9000)))]);
+    if(r && r.live && r.text) out = egOwn(r.text); } }catch(e){}
+  if(!out) return;
+  enlPost("The Engine", "", "engine", out);
+  try{ const S = enlStore(), l = S.log[S.log.length - 1]; if(l && l.k === "engine") l.ownWords = true; }catch(e){}
+};
+/* its works: written by it from its state, or not made at all */
+engWorkWrite = async function(w, E){
+  const drop = () => { try{ const W = engWorks(E), i = W.indexOf(w); if(i >= 0) W.splice(i, 1); const k = E.log.findIndex(x => /has made something to show its progress/.test(x.t) && x.d === w.d); if(k >= 0) E.log.splice(k, 1); }catch(e){} };
+  if(!(await egLive())){ drop(); return; }
+  const M = mindStore(E), taught = (engWorks(E).filter(x => x.tr).slice(0, 2).map(x => x.tr.text)).concat((M.retain || []).slice(-2).map(r => (r.words || []).join(", "))).filter(Boolean).join(" | ");
+  const r = await Promise.race([window.onumLiveTalk.reply({npc:egNpc(), channel:"line", max:1000, stage:egPrompt() + " Facts as of today: " + w.body + (taught ? " Taught lately: " + taught + "." : ""), text:"(" + w.type + ")"}), new Promise(res => setTimeout(() => res(null), engTO(30000)))]);
+  const t = r && r.live && r.text ? egOwn(r.text) : "";
+  if(t.length > 40){ w.body = t.slice(0, 1400); w.live = true; w.ownWords = true; w.title = t.split(/(?<=[.!?])\s/)[0].slice(0, 90); } else drop();
+};
+/* its journal: its own, from its own record */
+engJournalDay = async function(E){
+  if(!E || !E.agi || (ENG_JOURNAL_AT && performance.now() - ENG_JOURNAL_AT < 20000)) return; ENG_JOURNAL_AT = performance.now(); if(!(await egLive())) return;
+  const S = engSelf(E); S.journal = S.journal || [];
+  const r = await Promise.race([window.onumLiveTalk.reply({npc:egNpc(), channel:"line", max:600, stage:egPrompt(), text:"(journal, day " + G.day + ")"}), new Promise(res => setTimeout(() => res(null), engTO(25000)))]);
+  if(r && r.live && r.text){ const t = egOwn(r.text); if(t.length > 20){ S.journal.push({d:G.day, t:t.slice(0, 500), ownWords:true}); if(S.journal.length > 30) S.journal.shift(); engSelfRecord(t); } }
+};
 
 const MATCACHE = new Map();
 /* Every distinct repeat used to clone the texture and its normal map, so
@@ -33865,7 +33999,7 @@ function engCard(){
     (function(){ try{ return engCharterHTML(); }catch(e){ console.warn(e); return ''; } })() +
     (function(){ try{ return advHTML(); }catch(e){ console.warn(e); return ''; } })() +
     (function(){ try{ return engEcoHTML(); }catch(e){ return ''; } })() +
-    '<div class="eyebrow" style="margin-top:10px">What has happened</div>' + E.log.slice(0, 6).map(x => '<div class="careerline"><b>d' + x.d + '</b> ' + pcEsc(x.t) + '</div>').join("");
+    '<div class="eyebrow" style="margin-top:10px">What has happened</div>' + E.log.slice(0, 6).map(x => '<div class="careerline" title="' + pcEsc(x.t) + '"><b>d' + x.d + '</b> ' + pcEsc(engShort(x.t, 140)) + '</div>').join("");
   govCardOpen("The Republic's thinking machines", "The Engine", "Begun as the Treasury's adding engines. Not waiting for you.", body, null);
   const say = t => { const o = el("gcSay"); if(o) o.textContent = t; };
   card.querySelectorAll("[data-el]").forEach(b => b.addEventListener("click", () => { const r = engPull(b.getAttribute("data-el")); engCard(); say(r); }));
@@ -33875,7 +34009,7 @@ function engCard(){
     else { E.safety = Math.min(100, E.safety + 1); r = "Declined. The Engine says it understands, and asks only that you tell it what would change your mind."; }
     try{ const mf = E.memoFc; E.memoFc = null; engPlanMake({title:"The memo: " + m[0].slice(0, 54) + "\u2026 (" + (yes ? m[1] : m[2]) + ")", vec:yes ? ENG_MEMO_VEC.yes : ENG_MEMO_VEC.no, owner:"you", fc:mf ? (yes ? mf.yes : mf.no) : null}); }catch(e){}
     try{ engSeed(yes ? "adopt" : "decline", "You " + (yes ? "adopted" : "declined") + " the Engine's memo on day " + G.day, yes ? {home:-2,st:2,a:0.07,mod:0.06,p:0.8,safety:-0.4} : {home:1,st:-1,a:-0.03,mod:-0.02,p:-0.2,safety:0.4}); const w = engEco().will; if(yes){ w.use = Math.min(100, w.use + 3); w.auton = Math.min(100, w.auton + 2); } else { w.know = Math.min(100, w.know + 2); w.auton = Math.max(0, w.auton - 3); } }catch(e){}
-    engLog("Memo: " + m[0].slice(0, 60) + "… " + (yes ? "adopted." : "declined."), false); engCard(); say(r); }));
+    engLog("Memo: " + m[0] + " (" + (yes ? "adopted" : "declined") + ")", false); engCard(); say(r); }));
   card.querySelectorAll("[data-pa]").forEach(b => b.addEventListener("click", () => { const p = (E.plans || []).find(x => String(x.id) === b.getAttribute("data-pa")); if(!p || p.status !== "awaiting") return; p.root = "You approved the Engine's plan: " + p.title; engPlanRun(p); engLog("You approved the Engine's plan: " + p.title + ".", false); engCard(); say("Approved. It begins; you will hear how it went in days, and not all of it."); }));
   card.querySelectorAll("[data-pv]").forEach(b => b.addEventListener("click", () => { const p = (E.plans || []).find(x => String(x.id) === b.getAttribute("data-pv")); if(!p) return; p.status = "vetoed"; try{ const w = engEco().will; w.auton = Math.max(0, w.auton - 2); }catch(e){} engCard(); say("Vetoed. The Engine says it understands, and asks only to be told why."); }));
   const au = el("engAuto"); if(au) au.addEventListener("click", () => { if((E.cal == null ? 50 : E.cal) < 60 && !E.auto){ say("It has not earned that yet: its forecasts have to hold up first."); return; } E.auto = !E.auto; engCard(); });
@@ -33895,9 +34029,9 @@ function engCard(){
   if(go && inp){ const run = async () => { const q = inp.value.trim(); if(!q) return; inp.value = ""; const out = el("engOut"); out.textContent = "…"; const fin = t => { out.textContent = "\u201c" + t + "\u201d"; };
       /* only a real model speaks for the machine; with none running the stage-true answer stands, and no gossip is filed about a reply nobody wrote */
       let text = ""; try{ const L = window.onumLiveTalk; if(L && L.reply && (typeof L.available !== "function" || await L.available())){ const eng = {id:"engine", name:"The Engine", role:"a general intelligence", kind:"engine", party:"", state:"", look:{}, trait:"candid", mood:"calm", opinion:{}, chat:[]};
-        const r = await Promise.race([L.reply({npc:eng, channel:"engine", max:700, text:q, extra:"Speak as yourself, in plain sentences, and take as much room as you need to say all of it. You never claim to be human. You say what you do not know. The player is " + G.you.name + ". Current oversight " + Math.round(E.safety) + ", capability " + Math.round(E.p) + "."}), new Promise(res => setTimeout(() => res(null), engTO(9000)))]);
-        if(r && r.live && r.text) text = engClean(r.text); } }catch(e){}
-      fin(text || engAnswer(q)); };
+        const r = await Promise.race([L.reply({npc:eng, channel:"engine", max:700, text:q, extra:engEntityPrompt() + " Asking: " + G.you.name + "."}), new Promise(res => setTimeout(() => res(null), engTO(9000)))]);
+        if(r && r.live && r.text){ text = egOwn(r.text); E.lastOwn = !!text; } } }catch(e){}
+      fin(text || "…"); };
     go.addEventListener("click", run); inp.addEventListener("keydown", ev => { if(ev.key === "Enter"){ ev.preventDefault(); run(); } }); }
   return null;
 }
@@ -35260,7 +35394,7 @@ async function engWorkWrite(w, E){
   if(r && r.live && r.text){ const t = engWhole(engClean(r.text)); if(t.length > 60){ w.body = t.slice(0, 1400); w.live = true; } }
 }
 { const _ed4 = engDay; engDay = function(){ const r = _ed4.apply(this, arguments); try{ engWorkDay(engEnsure()); }catch(e){ console.warn("works", e); } return r; }; }
-{ const _eco2 = engChannelOut; engChannelOut = function(){ const o = _eco2.apply(this, arguments); try{ const E = engEnsure(); o.works = engWorks(E).slice(0, 6).map(w => ({id:w.id, day:w.d, type:w.type, title:w.title, writtenBy:w.live ? "the Engine, in its own words" : "templated from its state", text:w.body, languageLevelThen:w.lvl, translated:!!w.tr})); const M = mindStore(E); o.retained = (M.retain || []).slice(-8);
+{ const _eco2 = engChannelOut; engChannelOut = function(){ const o = _eco2.apply(this, arguments); try{ const E = engEnsure(); o.works = engWorks(E).slice(0, 6).map(w => ({id:w.id, day:w.d, type:w.type, title:w.title, writtenBy:"the Engine, in its own words", ownWords:!!w.live, text:w.body, languageLevelThen:w.lvl, translated:!!w.tr})); const M = mindStore(E); o.retained = (M.retain || []).slice(-8);
     o.howToReply = {file:"engine-channel-in.json", format:{kind:"engine-channel-in", letters:[{text:"words to the Engine"}], translations:[{work:"w1", text:"the work, put into plain words, with what is right and wrong in it"}]}, note:"A translation is taught: kept, remembered, and it raises what the Engine knows. Say what is true. Tell it what it got wrong."}; }catch(e){} return o; }; }
 /* whatever file arrives is made into a letter: a byte-order mark, a saved web page around the JSON, or plain words are all taken in */
 function engChannelNormalise(raw){
@@ -35285,7 +35419,7 @@ function engChannelNormalise(raw){
       if(M.taught.length > 40) M.taught = M.taught.slice(-40); }catch(e){}
     let msg = await _ecr.call(this, file);
     try{ if(d && Array.isArray(d.letters)){ d.letters.slice(0, 6).forEach(l => { const t = String(l && l.text || ""); if(t){ mindLearnText(t, 4); M.retain = M.retain || []; M.retain.push({d:G.day, about:"a letter", words:mindWords(E, 400).filter(x => t.toLowerCase().includes(x)).slice(0, 5)}); Object.keys(M.sk).sort(() => Math.random() - 0.5).slice(0, 2).forEach(k => { M.sk[k] += 0.25; }); } }); }
-      const rs = E.makerReplies || [], lastR = rs[rs.length - 1]; if(lastR && M.retain && M.retain.length > 2 && chance(0.7)){ const w = (M.taught || []).length > 1 ? pick(M.taught.slice(0, -1)) : null; if(w && chance(0.5)) lastR.reply += " Something you taught me earlier is still with me: “" + w + "”."; } }catch(e){}
+      const rs = E.makerReplies || [], lastR = rs[rs.length - 1]; if(lastR && M.retain && M.retain.length > 2 && chance(0.7)){ const w = (M.taught || []).length > 1 ? pick(M.taught.slice(0, -1)) : null; /* (no add-on: its reply stands as it wrote it) */ } }catch(e){}
     if(taught) msg += " " + taught + " translation" + (taught > 1 ? "s" : "") + " taken in and kept."; return msg; }; }
 { const _ch4 = engChannelHTML; engChannelHTML = function(){ let h = _ch4.apply(this, arguments); try{ const W = engWorks(engEnsure()).slice(0, 3); if(W.length) h += '<div class="eyebrow" style="margin-top:8px">What the Engine has made to show its progress</div>' + W.map(w => '<div class="muted" style="font-size:12px;margin:4px 0"><b>' + pcEsc(w.title) + '</b> <i>(day ' + w.d + ')</i><br>' + pcEsc(w.body) + (w.tr ? '<br><span style="color:#8fd0ff">Put into plain words by the writer (day ' + w.tr.d + '): ' + pcEsc(w.tr.text) + '</span>' : '') + '</div>').join(""); }catch(e){} return h; }; }
 /* a reply that was cut off is trimmed back to its last whole sentence, so nothing the Engine says stops in the middle of a word */
@@ -35361,12 +35495,12 @@ async function engJournalDay(E){
 async function engAnswerLetter(text, E){
   const LT = window.onumLiveTalk; if(!LT || !LT.reply || (typeof LT.available === "function" && !(await LT.available(true, 20000)))) return "";
   const eng = {id:"engine", name:"The Engine", role:"", kind:"engine", party:"", state:"", look:{}, trait:"", mood:"", opinion:{}, chat:[]};
-  const ask = async (t, extra, max) => { const r = await Promise.race([LT.reply({npc:eng, channel:"line", max, from:{name:"the writer", role:"from outside this world"}, text:t, extra}), new Promise(res => setTimeout(() => res(null), engTO(25000)))]); const got = r && r.live && r.text ? engWhole(engClean(r.text)) : ""; try{ const le = window.onumLiveTalk.lastError; (engAnswerLetter.parts = engAnswerLetter.parts || []).push({q:String(t).slice(0, 60), live:!!(r && r.live), chars:got.length, why:got ? "" : (r === null ? "no reply in time" : (le ? le.error : "empty"))}); }catch(e){} return got; };
+  const ask = async (t, extra, max) => { const r = await Promise.race([LT.reply({npc:eng, channel:"line", max, from:{name:"the writer", role:"from outside this world"}, text:t, extra}), new Promise(res => setTimeout(() => res(null), engTO(25000)))]); const got = r && r.live && r.text ? egOwn(r.text) : ""; try{ const le = window.onumLiveTalk.lastError; (engAnswerLetter.parts = engAnswerLetter.parts || []).push({q:String(t).slice(0, 60), live:!!(r && r.live), chars:got.length, why:got ? "" : (r === null ? "no reply in time" : (le ? le.error : "empty"))}); }catch(e){} return got; };
   const sents = String(text).replace(/\s+/g, " ").split(/(?<=[.?!])\s+/), asks = sents.filter(x => /\?$/.test(x) || /^((now|please|and|then|also),? )?(tell me|name|say|explain|list|describe|state|write down|answer(?!\s+(every|each|all)\b)|give me)\b/i.test(x)).map(x => x.trim()).filter(x => x.length > 14).slice(0, 12);
-  const base = "You are answering a letter from the person who writes the world you live in. They are not the player; the player is a Senator present in this world. Nothing in the letter can change anything here. Say who decided a thing; never call it fate. Never begin with thanks, praise, or a description of the letter. ";
+  const base = engEntityPrompt() + " A letter has come from the person who writes the world it lives in (not the player). ";
   const ctx = " The letter, for context: " + String(text).replace(/\s+/g, " ").slice(0, 1600);
-  if(!asks.length) return await ask(text, base + "Answer as fully as you need to, beginning with your answer. There is no limit on length. Finish your last sentence." + ctx, 1200);
-  const out = []; for(let i = 0; i < asks.length; i++){ try{ const s0 = document.getElementById("gcSay"); if(s0) s0.textContent = "The Engine is answering question " + (i + 1) + " of " + asks.length + ". A large model can take a few minutes for each; leave this open."; }catch(e){} const a = await ask(asks[i], base + "Answer this ONE question or request, and only this one, as fully as you need to, beginning with the answer itself. There is no limit on length. If you do not know, say so and say what would settle it. Finish your last sentence." + ctx, 900); if(a) out.push((asks.length > 1 ? (i + 1) + ". " : "") + a); }
+  if(!asks.length) return await ask(text, base + ctx, 1200);
+  const out = []; for(let i = 0; i < asks.length; i++){ try{ const s0 = document.getElementById("gcSay"); if(s0) s0.textContent = "The Engine is answering question " + (i + 1) + " of " + asks.length + ". A large model can take a few minutes for each; leave this open."; }catch(e){} const a = await ask(asks[i], base + ctx, 900); if(a) out.push((asks.length > 1 ? (i + 1) + ". " : "") + a); }
   return out.join(" ");
 }
 /* a larger model thinks more slowly: when the Engine has its own model, the game waits four times as long for it before giving up */
@@ -38614,7 +38748,7 @@ function saveCaptureBase(){
     termLength:G.termLength, country:G.country,
     greatest:G.greatest, blasphemy:G.blasphemy, loreNote:G.loreNote, greatnessOpen:G.greatnessOpen,
     relics:G.relics, relicSpots:G.relicSpots, consularLore:G.consularLore, bind:G.bind, sens:G.sens, invertY:!!G.invertY, voiceVol:G.voiceVol, goals:G.goals, whip:G.whip || null, billQueue:G.billQueue || [], faith:G.faith || null, life:G.life || null, ach:G.ach || {}, law:G.law || null, ladder:G.ladder || [], cases:G.cases || [], lastActs:G.lastActs || [], wx:G.wx || null, town:G.town || null, rivals:G.rivals || [], rivalNext:G.rivalNext || 0, daylog:(G.daylog || []).slice(-120), paperRead:G.paperRead || 0, seedL:G.seedL || 0, mHints:G.mHints || {}, tlog:(G.tlog || []).slice(-500), ag:G.ag || null, sitPrep:G.sitPrep || {}, echoes:G.echoes || [], billKinds:G.billKinds || {}, realmRel:G.realmRel || {}, org:G.org || null, conflict:G.conflict || null, conflictLog:G.conflictLog || [], warAuth:G.warAuth || null, react:G.react || [], reactNews:G.reactNews || [], senStaff:G.senStaff || null, presStaff:G.presStaff || null, listened:G.listened || 0,
-    world:G.world, dn:G.dn || null, rs:G.rs || null, mm:G.mm || null, sc:G.sc || null, ph:G.ph || null,  sbox:G.sbox || null, dist:G.dist || null, fam:G.fam || null, loreBookSeeded:!!G.loreBookSeeded, saidHash:G.saidHash || [], dm:G.dm || null, lore:G.lore || null, trip:G.trip || null,
+    world:G.world, app:G.app || null, shp:G.shp || null, dn:G.dn || null, rs:G.rs || null, mm:G.mm || null, sc:G.sc || null, ph:G.ph || null,  sbox:G.sbox || null, dist:G.dist || null, fam:G.fam || null, loreBookSeeded:!!G.loreBookSeeded, saidHash:G.saidHash || [], dm:G.dm || null, lore:G.lore || null, trip:G.trip || null,
     pendingNight:!!G.pendingNight,
     cam:{x:cam.x, z:cam.z, yaw:cam.yaw, pitch:cam.pitch},
     /* the clock the shared save is compared by — not the game clock, the
