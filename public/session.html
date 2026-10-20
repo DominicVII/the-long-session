@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261018ai">
+<meta name="onum-build" content="20261020a">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -10391,9 +10391,10 @@ function pbAppGo(id){
   if(go) setTimeout(() => { try{ go(); }catch(e){ console.warn("phone app", e); } }, 30);
 }
 function pbHTML(){
-  const T = [["calls","Calls"],["texts","Texts & DMs"],["contacts","Contacts"],["apps","Apps"],["chat","Chat"]];
+  const T = [["calls","Calls"],["texts","Texts & DMs"],["convo","Conversations"],["contacts","Contacts"],["apps","Apps"],["chat","Chat"]];
   let b = "";
-  if(PB.tab === "contacts"){
+  if(PB.tab === "convo"){ b = cvLogHTML(); }
+  else if(PB.tab === "contacts"){
     const C = pbContacts(); let g = "";
     C.forEach(c => { if(c.grp !== g){ g = c.grp; b += '<div class="pb__h">' + pbEsc(g) + '</div>'; }
       b += '<div class="pb__row"><span><b>' + pbEsc(c.name) + '</b><br><small>' + pbEsc(c.role) + '</small></span><span><button data-pbcall="' + c.id + '">Call</button> <button data-pbdm="' + c.id + '">Text</button></span></div>'; });
@@ -10551,6 +10552,161 @@ setInterval(() => { try{ apTick(); }catch(e){} }, 4000);
   addEventListener("orientationchange", () => setTimeout(() => { try{ resize(); }catch(e){} }, 300));
   const st = document.createElement("style"); st.id = "onumMobile"; st.textContent = css; (document.head || document.documentElement).appendChild(st);
 }catch(e){} })();
+
+/* ══ 20261020a · what people hear, they half-remember: decaying, distorting NPC memory ══ */
+const MM_IMP = /\b(vote|bill|act|money|fund|budget|secret|between us|god|christ|church|family|wife|husband|son|daughter|war|strike|election|governor|president|senat|court|resign|scandal|bribe|promise|threat|secede|secession)\w*/i;
+const MM_EMO = /\b(hate|love|idiot|fool|liar|traitor|proud|afraid|furious|thank|sorry|never|disgrace|shame|wonderful|angry|worried)\w*/i;
+function mmStore(){ G.mm = G.mm || {v:1, by:{}, day:G.day || 0}; return G.mm; }
+function mmAbout(text){
+  try{ const it = (dkItems() || []).find(i => text.indexOf(i.title) >= 0); if(it) return it.title; }catch(e){}
+  const caps = text.match(/\b([A-Z][a-z]+(?:\s[A-Z][a-z]+){0,3})\b/g); if(caps){ const c = caps.find(x => !/^(I|The|A|An|You|We|He|She|It|This|That|Did|Heads|Before|Precedent|Remember|On)$/.test(x)); if(c) return c; }
+  const k = text.match(MM_IMP); return k ? k[0].toLowerCase() : text.split(/\s+/).slice(0, 4).join(" ");
+}
+function mmPerson(id){ try{ return byId(isNaN(+id) ? id : +id); }catch(e){ return null; } }
+function mmGoalsOf(id){ try{ const m = window.ONUM_MINDS && window.ONUM_MINDS[id]; return m && m.goals ? [].concat(m.goals).join(" ").toLowerCase() : ""; }catch(e){ return ""; } }
+function mmStrength(id, text, role){
+  const p = mmPerson(id), T = (p && p.traits) || {};
+  let s = role === "speaker" ? 0.55 : role === "addressee" ? 0.5 : 0.3;
+  if(MM_IMP.test(text)) s += 0.15;
+  if(MM_EMO.test(text)) s += 0.15;
+  const g = mmGoalsOf(id); if(g && text.toLowerCase().split(/\W+/).some(w => w.length > 4 && g.indexOf(w) >= 0)) s += 0.15;
+  s += ((T.discretion | 0) - 50) / 400 + ((T.ambition | 0) - 50) / 600;
+  return clamp(s + (Math.random() - 0.5) * 0.1, 0.05, 0.98);
+}
+function mmAdd(id, text, about, role, src){
+  if(id == null || id === "you") return;
+  const S = mmStore(), L = S.by[id] = S.by[id] || [];
+  const same = L.find(x => x.about === about && Math.abs((x.day || 0) - (G.day || 0)) < 30);
+  if(same){ same.reps++; same.s = clamp(same.s + 0.2, 0, 1); same.day = G.day; if(same.reps >= 3) same.cons = true; if(role === "speaker") same.text = text; return same; }
+  const m = {text, orig:text, about, day:G.day || 0, s:mmStrength(id, text, role), reps:1, cons:false, src:src || role, distorted:false};
+  L.push(m); if(L.length > 60){ L.sort((a, b) => b.s - a.s); L.length = 50; }
+  return m;
+}
+function mmHear(T, who, whoId, to, text){
+  const about = mmAbout(text);
+  if(whoId !== "you") mmAdd(whoId, text, about, "speaker");
+  if(to != null && to !== "you") mmAdd(to, (who === "You" ? "You said: " : who + " said: ") + text, about, "addressee");
+  try{ const sp = mmPerson(whoId); const room = T.room;
+    everyone().filter(m => m && m.room === room && !m.gone && m.id !== whoId && m.id !== to && (!sp || sp.x == null || m.x == null || Math.hypot(m.x - sp.x, m.z - sp.z) < 5)).slice(0, 6)
+      .forEach(m => mmAdd(m.id, "Overheard " + (who === "You" ? "you" : who) + ": " + text, about, "listener")); }catch(e){}
+}
+function mmAct(id, about){ const L = (mmStore().by[id] || []); const m = L.find(x => x.about === about); if(m){ m.reps += 1; m.s = clamp(m.s + 0.25, 0, 1); m.cons = m.reps >= 2 || m.cons; } }
+function mmGarble(text){
+  let t = text;
+  const r = Math.random();
+  if(/\d/.test(t) && r < 0.4) t = t.replace(/\d+/, d => String(Math.max(1, Math.round(+d * (0.5 + Math.random())))));
+  else if(r < 0.65) t = t.replace(/\b(not|never|no)\b\s?/i, "") ;
+  else if(r < 0.85){ try{ const names = everyone().filter(m => m.name).map(m => m.name); const n = t.match(/\b[A-Z][a-z]+ [A-Z][a-z]+\b/); if(n && names.length) t = t.replace(n[0], pick(names)); else t = "something about " + mmAbout(t); }catch(e){ t = "something about " + mmAbout(t); } }
+  else t = "something about " + mmAbout(t);
+  return t;
+}
+function mmDay(){
+  const S = mmStore(), d = G.day || 0, dt = Math.max(0, d - (S.day || 0)); if(!dt) return; S.day = d;
+  Object.keys(S.by).forEach(id => { const p = mmPerson(id), T = (p && p.traits) || {};
+    const half = 4 + ((T.discretion | 0) / 25);
+    S.by[id] = S.by[id].filter(m => { const h = m.cons ? half * 6 : half; m.s *= Math.pow(0.5, dt / h);
+      if(!m.distorted && m.s < 0.4 && Math.random() < 0.25 * dt){ m.text = mmGarble(m.text); m.distorted = m.text !== m.orig; }
+      return m.s > 0.03; }); });
+  /* gossip: someone passes a memory on, maybe bent */
+  try{ const ids = Object.keys(S.by).filter(i => S.by[i].length); for(let k = 0; k < Math.min(4, ids.length); k++){ const a = pick(ids), m = pick(S.by[a]); if(!m || m.s < 0.2) continue;
+      const p = mmPerson(a); if(!p) continue; const peers = everyone().filter(o => o && o !== p && !o.gone && o.room === p.room && o.id !== G.you.id); if(!peers.length) continue; const o = pick(peers);
+      let t = m.text; const bent = Math.random() < 0.35 + (1 - m.s) * 0.3; if(bent) t = mmGarble(t);
+      const n = mmAdd(o.id, p.name + " told me: " + t, m.about, "gossip"); if(n){ n.s = clamp(m.s * 0.7, 0.05, 0.9); n.distorted = bent || m.distorted; }
+      try{ (window.ONUM_TOWN_GOSSIP = window.ONUM_TOWN_GOSSIP || []).push({t:p.name + " passed on to " + o.name + ": " + t, d}); }catch(e){} } }catch(e){}
+}
+function onumRecall(npcId, opt){
+  opt = opt || {}; const lim = opt.limit || 8, ab = opt.about ? String(opt.about).toLowerCase() : null;
+  const L = (mmStore().by[npcId] || mmStore().by[String(npcId)] || []);
+  const out = [];
+  L.slice().sort((a, b) => b.s - a.s).forEach(m => {
+    if(ab && (m.about || "").toLowerCase().indexOf(ab) < 0 && m.text.toLowerCase().indexOf(ab) < 0) return;
+    if(Math.random() > Math.min(1, m.s + 0.15)) return;                       /* may simply not come to mind */
+    let text = m.text, dis = m.distorted;
+    if(!dis && m.s < 0.35 && Math.random() < 0.3){ text = mmGarble(text); dis = true; }   /* misremembered in the moment */
+    out.push({text, about:m.about, day:m.day, strength:Math.round(m.s * 100) / 100, distorted:dis});
+  });
+  return out.slice(0, lim);
+}
+window.onumRecall = onumRecall;
+window.onumRemember = function(npcId, text, about){ return mmAdd(npcId, String(text || ""), about || mmAbout(String(text || "")), "addressee", "external"); };
+window.onumMemoryAct = mmAct;
+(function(){ const base = window.onumMind; window.onumMind = function(id){ let m = base ? base(id) : null; try{ const r = onumRecall(id, {limit:6}); if(r.length){ m = m || {name:(mmPerson(id) || {}).name, goals:[], beliefs:[], plans:[], memory:[], family:null, job:"", wealth:null, mood:null}; m.memory = r.map(x => x.text).concat([].concat(m.memory || []).slice(0, 4)); m.recall = r; } }catch(e){} return m; }; })();
+setInterval(() => { try{ if(G && G.day != null) mmDay(); }catch(e){} }, 5000);
+
+/* ══ 20261020a · local talk reads as conversations: a log and a live thread ══ */
+const CV = {th:[], seen:new WeakMap(), live:null, hideAt:0, lt:{}, lp:{}};
+const CV_COL = ["#c9a96e","#7fb3d5","#e59866","#82e0aa","#d7bde2","#f7dc6f","#76d7c4","#f1948a"];
+function cvCol(id){ let h = 0; String(id).split("").forEach(c => h = (h * 31 + c.charCodeAt(0)) | 0); return CV_COL[Math.abs(h) % CV_COL.length]; }
+function cvRoomT(r){ try{ return ((ROOMS[r || G.room] || {}).t) || r || G.room; }catch(e){ return ""; } }
+function cvAdd(who, whoId, to, text, live, opt){
+  text = String(text || "").trim(); if(!text) return;
+  opt = opt || {};
+  const now = G.minute || 0, room = opt.room || G.room;
+  let T = opt.thread ? CV.th.find(x => x.tag === opt.thread) : null;
+  const key = [whoId, to].filter(x => x != null).map(String).sort().join("|");
+  if(!T && !opt.thread){ const L = CV.th.slice(-1)[0];
+    if(L && !L.tag && L.room === room && L.day === G.day && now - L.end < 4 && (L.keys.has(String(whoId)) || (to != null && L.keys.has(String(to))) || L.key === key)) T = L; }
+  if(!T){ T = {id:CV.th.length ? CV.th[CV.th.length - 1].id + 1 : 1, tag:opt.thread || null, room, place:opt.place || cvRoomT(room), day:G.day, start:now, end:now, key, keys:new Set(), lines:[]}; CV.th.push(T); if(CV.th.length > 150) CV.th.shift(); }
+  const last = T.lines.slice(-1)[0]; if(last && last.who === who && last.t === text) return;
+  T.lines.push({who, id:whoId, t:text, at:opt.at || (function(){ try{ return hhmm(); }catch(e){ return ""; } })(), live:!!live}); T.end = now;
+  if(whoId != null) T.keys.add(String(whoId)); if(to != null) T.keys.add(String(to));
+  if(!opt.quiet){ CV.live = T; CV.hideAt = performance.now() + 22000; cvRenderLive(); }
+  try{ mmHear(T, who, whoId, to, text); }catch(e){}
+  try{ window.ONUM_CONVERSATIONS = CV.th.map(x => ({id:x.id, place:x.place, day:x.day, lines:x.lines})); }catch(e){}
+}
+function cvScan(){
+  try{ everyone().forEach(m => { if(!m || !m.say || m.room !== G.room) return; if(CV.seen.get(m) === m.say) return; CV.seen.set(m, m.say);
+    cvAdd(m.name, m.id, m.sayTo === "you" ? "you" : m.sayTo, m.say, false); }); }catch(e){}
+  try{ cvNeptune(); }catch(e){}
+  cvRenderLive();
+}
+/* Neptune's sources, read only */
+function cvNeptune(){
+  const LT = window.onumLiveTalk;
+  if(LT && LT.memory && G.day !== CV.ltDay || (performance.now() - (CV.ltAt || 0) > 5000)){
+    CV.ltAt = performance.now(); CV.ltDay = G.day;
+    if(LT && LT.memory){ const ids = new Set(); try{ dmState(); Object.keys(G.dm.th || {}).forEach(i => ids.add(i)); }catch(e){} try{ everyone().filter(m => m.room === G.room).forEach(m => ids.add(String(m.id))); }catch(e){}
+      ids.forEach(id => { let M = null; try{ M = LT.memory(isNaN(+id) ? id : +id); }catch(e){} if(!M || !M.turns) return;
+        const n = CV.lt[id] || 0; if(M.turns.length <= n) return;
+        const p = (function(){ try{ return byId(isNaN(+id) ? id : +id); }catch(e){ return null; } })(); const nm = p ? p.name : String(id);
+        M.turns.slice(n).forEach(t => { const you = /^(u|user|you|p|player)$/i.test(String(t.r || "")); cvAdd(you ? "You" : nm, you ? "you" : id, you ? id : "you", t.c, !you, {thread:"lt:" + id + ":" + (t.d != null ? t.d : G.day), place:"LiveTalk · " + (t.ch || "face") + " · " + nm, quiet:true}); });
+        CV.lt[id] = M.turns.length; }); }
+  }
+  const L = G.localParty; if(L && L.items){ L.items.forEach(i => { const k = i.id + ":" + (i.ruled || ""); if(CV.lp[k]) return; CV.lp[k] = 1;
+    cvAdd(i.from || "Local party", "lp:" + (i.from || "x"), null, (i.src === "suggestion" ? "Suggestion" : "Motion") + ": " + i.text, false, {thread:"lp:day" + (i.at || G.day), place:"Local party meeting", quiet:true});
+    if(i.ruled) cvAdd("The chair", "lp:chair", null, "Ruled: " + i.ruled, false, {thread:"lp:day" + (i.at || G.day), place:"Local party meeting", quiet:true}); }); }
+}
+["onum-district-ruling","onum-suggestion-ruling"].forEach(n => addEventListener(n, ev => { try{ const d = ev.detail || {}; cvAdd("The local party", "lp:chair", null, (n.indexOf("district") > 0 ? "District change " : "Suggestion ") + d.id + ": ruled " + d.ruling + ".", false, {thread:"lp:day" + G.day, place:"Local party meeting", quiet:true}); }catch(e){} }));
+function cvLineHTML(l){ const c = l.who === "You" ? "#eef1f4" : cvCol(l.id); const ini = String(l.who).split(" ").map(x => x[0]).join("").slice(0, 2);
+  return '<div class="cv__l"><span class="cv__av" style="background:' + c + '">' + pbEsc(ini) + '</span><div><div class="cv__n" style="color:' + c + '">' + pbEsc(l.who) + ' <small>' + pbEsc(l.at) + (l.live ? ' · live' : '') + '</small></div><div class="cv__t">' + pbEsc(l.t) + '</div></div></div>'; }
+function cvCSS(){ if(document.getElementById("cvCSS")) return; const s = document.createElement("style"); s.id = "cvCSS";
+  s.textContent = '#cvLive{position:fixed;left:14px;bottom:70px;width:380px;max-height:42vh;overflow-y:auto;background:#14181e;color:#eef1f4;border:1px solid #3a424d;border-radius:12px;padding:8px 10px;z-index:9980;font:14px system-ui,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.4)}#cvLive .cv__h{display:flex;justify-content:space-between;font-size:12px;color:#aab3bd;margin-bottom:4px}#cvLive button,.cv__btn{background:#2b333d;color:#eef1f4;border:1px solid #4a5563;border-radius:6px;padding:2px 8px;cursor:pointer;font-size:12px}.cv__l{display:flex;gap:8px;margin:6px 0;align-items:flex-start}.cv__av{flex:0 0 26px;height:26px;border-radius:50%;color:#1c2128;font:700 11px system-ui;display:flex;align-items:center;justify-content:center}.cv__n{font-weight:700;font-size:13px}.cv__n small{font-weight:400;color:#aab3bd}.cv__t{font-size:14px;line-height:1.35}.cv__th{border:1px solid #2b333d;border-radius:8px;padding:6px 8px;margin:8px 0}@media (max-width:900px),(max-height:500px) and (orientation:landscape){#cvLive{left:8px;right:8px;width:auto;bottom:calc(64px + env(safe-area-inset-bottom));max-height:34vh;font-size:15px}.cv__t{font-size:15px}#cvLive button,.cv__btn{min-height:36px;font-size:14px}}';
+  document.head.appendChild(s); }
+function cvRenderLive(){
+  cvCSS();
+  let w = document.getElementById("cvLive"); const T = CV.live;
+  const show = T && T.room === G.room && performance.now() < CV.hideAt && !CV.closed && !document.body.classList.contains("ui-open") && !(typeof veil !== "undefined" && !veil.hidden) && !document.getElementById("pbPhone");
+  if(!show){ if(w) w.style.display = "none"; return; }
+  if(!w){ w = document.createElement("div"); w.id = "cvLive"; document.body.appendChild(w);
+    w.addEventListener("click", ev => { const b = ev.target.closest("button"); if(!b) return; ev.stopPropagation(); if(b.dataset.cvx){ CV.closed = true; w.style.display = "none"; setTimeout(() => CV.closed = false, 30000); } if(b.dataset.cvread) cvRead(CV.live); if(b.dataset.cvlog){ try{ PB.tab = "convo"; pbOpen(); }catch(e){} } }, true); }
+  const sig = T.id + ":" + T.lines.length; if(w.dataset.sig === sig && w.style.display !== "none") return;
+  w.dataset.sig = sig; w.style.display = "block";
+  w.innerHTML = '<div class="cv__h"><span>' + pbEsc(T.place) + ' · day ' + T.day + '</span><span><button data-cvread="1">Read aloud</button> <button data-cvlog="1">Log</button> <button data-cvx="1">×</button></span></div>' + T.lines.slice(-8).map(cvLineHTML).join("");
+  w.scrollTop = w.scrollHeight;
+}
+function cvRead(T){ if(!T || !("speechSynthesis" in window)) return; try{ speechSynthesis.cancel(); T.lines.slice(-10).forEach(l => speechSynthesis.speak(new SpeechSynthesisUtterance(l.who + ": " + l.t))); }catch(e){} }
+function cvLogHTML(){
+  if(!CV.th.length) return '<p>No conversations yet. Talk to people, or stand near them.</p>';
+  return CV.th.slice().reverse().slice(0, 40).map(T => { const names = [...new Set(T.lines.map(l => l.who))].join(", ");
+    return '<div class="cv__th"><div style="display:flex;justify-content:space-between;gap:6px;font-size:12px;color:#aab3bd"><span><b style="color:#eef1f4">' + pbEsc(names) + '</b><br>' + pbEsc(T.place) + ' · day ' + T.day + ' · ' + pbEsc((T.lines[0] || {}).at || "") + '</span><button class="cv__btn" data-cvreadid="' + T.id + '">Read aloud</button></div>' + T.lines.map(cvLineHTML).join("") + '</div>'; }).join("");
+}
+setTimeout(() => { try{
+  const say = document.getElementById("tkSay");
+  if(say) new MutationObserver(() => { try{ const m = TALK.m; const t = say.textContent.trim(); if(m && t) cvAdd(m.name, m.id, "you", t, false); }catch(e){} }).observe(say, {childList:true, characterData:true, subtree:true});
+  document.addEventListener("click", ev => { try{ const b = ev.target.closest(".talk__btn, .talk__acts button"); if(b && TALK.open && TALK.m){ const t = b.textContent.trim(); if(t && t.length > 3 && !/^(leave|close|goodbye|bye|done)$/i.test(t)) cvAdd("You", "you", TALK.m.id, t, false); } }catch(e){} }, true);
+  document.addEventListener("click", ev => { const b = ev.target.closest("[data-cvreadid]"); if(!b) return; ev.stopPropagation(); cvRead(CV.th.find(x => x.id === +b.dataset.cvreadid)); }, true);
+}catch(e){} }, 2000);
+setInterval(() => { try{ cvScan(); }catch(e){} }, 600);
 
 const MATCACHE = new Map();
 /* Every distinct repeat used to clone the texture and its normal map, so
@@ -38049,7 +38205,7 @@ function saveCaptureBase(){
     termLength:G.termLength, country:G.country,
     greatest:G.greatest, blasphemy:G.blasphemy, loreNote:G.loreNote, greatnessOpen:G.greatnessOpen,
     relics:G.relics, relicSpots:G.relicSpots, consularLore:G.consularLore, bind:G.bind, sens:G.sens, invertY:!!G.invertY, voiceVol:G.voiceVol, goals:G.goals, whip:G.whip || null, billQueue:G.billQueue || [], faith:G.faith || null, life:G.life || null, ach:G.ach || {}, law:G.law || null, ladder:G.ladder || [], cases:G.cases || [], lastActs:G.lastActs || [], wx:G.wx || null, town:G.town || null, rivals:G.rivals || [], rivalNext:G.rivalNext || 0, daylog:(G.daylog || []).slice(-120), paperRead:G.paperRead || 0, seedL:G.seedL || 0, mHints:G.mHints || {}, tlog:(G.tlog || []).slice(-500), ag:G.ag || null, sitPrep:G.sitPrep || {}, echoes:G.echoes || [], billKinds:G.billKinds || {}, realmRel:G.realmRel || {}, org:G.org || null, conflict:G.conflict || null, conflictLog:G.conflictLog || [], warAuth:G.warAuth || null, react:G.react || [], reactNews:G.reactNews || [], senStaff:G.senStaff || null, presStaff:G.presStaff || null, listened:G.listened || 0,
-    world:G.world, sc:G.sc || null, ph:G.ph || null,  sbox:G.sbox || null, dist:G.dist || null, fam:G.fam || null, loreBookSeeded:!!G.loreBookSeeded, saidHash:G.saidHash || [], dm:G.dm || null, lore:G.lore || null, trip:G.trip || null,
+    world:G.world, mm:G.mm || null, sc:G.sc || null, ph:G.ph || null,  sbox:G.sbox || null, dist:G.dist || null, fam:G.fam || null, loreBookSeeded:!!G.loreBookSeeded, saidHash:G.saidHash || [], dm:G.dm || null, lore:G.lore || null, trip:G.trip || null,
     pendingNight:!!G.pendingNight,
     cam:{x:cam.x, z:cam.z, yaw:cam.yaw, pitch:cam.pitch},
     /* the clock the shared save is compared by — not the game clock, the
