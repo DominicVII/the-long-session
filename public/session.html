@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261020x">
+<meta name="onum-build" content="20261020y">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -46773,6 +46773,49 @@ try{
   console.log("NEPTUNE home ready");
 }catch(e){ try{ console.warn("NEPTUNE-HOME block", e); }catch(e2){} }
 /* NEPTUNE-HOME END */
+/* NEPTUNE-DONORS BEGIN — 20261020y: the donor hover card. JUPITER's ONUM_DONATIONS (guarded) is drawn on the person's
+   name plate in the room (the latest gift, in one line) and as a "Gifts" section on their name card (tipCard). */
+try{
+  const DN = window.NEPTUNE_DONORS = {byId:new Map(), byName:new Map()};
+  const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;"})[c]);
+  const fl = n => "\u0192" + Math.round(+n || 0).toLocaleString("en-US");
+  function index(){ try{ DN.byId = new Map(); DN.byName = new Map(); const L = Array.isArray(window.ONUM_DONATIONS) ? window.ONUM_DONATIONS : [];
+      L.forEach(d => { if(!d || !(+d.amount > 0)) return; const k = String(d.donorId); if(!DN.byId.has(k)) DN.byId.set(k, []); DN.byId.get(k).push(d); if(d.donorName){ if(!DN.byName.has(d.donorName)) DN.byName.set(d.donorName, []); DN.byName.get(d.donorName).push(d); } });
+      [DN.byId, DN.byName].forEach(M => M.forEach(a => a.sort((x, y) => (y.day || 0) - (x.day || 0)))); }catch(e){} }
+  index(); addEventListener("onum-donation", index); setInterval(index, 5000);
+  DN.of = p => { try{ if(!p) return []; return DN.byId.get(String(p.id)) || DN.byName.get(p.name) || []; }catch(e){ return []; } };
+  const strOf = d => d.strings && d.strings !== "none" ? "wants " + d.strings : "no strings";
+  DN.line = d => fl(d.amount) + " to " + (d.cause || "a cause") + ", day " + (d.day != null ? d.day : "?") + " \u00b7 " + strOf(d);
+
+  /* the plate: one quiet line under the name */
+  try{ const st = document.createElement("style"); st.id = "ndDnCss";
+    st.textContent = ".plate .nd-gift{display:block;margin-top:2px;padding:1px 4px;border-radius:2px;background:#1d2a1f;color:#e9f5dd;font:600 10px/1.3 system-ui,sans-serif;white-space:normal}" +
+      ".nd-gifts{margin:10px 0 0;border-top:1px solid #8a7f66;padding-top:6px}.nd-gifts h4{margin:0 0 4px;font:700 11px system-ui;letter-spacing:.08em;text-transform:uppercase;color:#6a5f46}" +
+      ".nd-gifts li{margin:2px 0;color:#1d1d1d;font:12px/1.35 system-ui}.nd-gifts small{color:#5b5240}";
+    document.head.appendChild(st); }catch(e){}
+  try{ if(typeof updatePlates === "function"){ const _up = updatePlates; updatePlates = function(){ const r = _up.apply(this, arguments);
+        try{ if(DN.byId.size || DN.byName.size){ const here = hereNow(); for(let i = 0; i < plates.length; i++){ const d = plates[i]; if(!d || d._shown !== 1 || !d.children[0]) continue;
+            const nm = d.children[0].textContent, p = here.find(q => q && q.name === nm), g = p && p !== G.you ? DN.of(p)[0] : null; let s = d.querySelector(".nd-gift");
+            if(!g){ if(s) s.remove(); continue; }
+            const t = "Gave " + DN.line(g); if(!s){ s = document.createElement("span"); s.className = "nd-gift"; d.appendChild(s); } if(s.textContent !== t) s.textContent = t; } } }catch(e){}
+        return r; }; } }catch(e){}
+
+  /* the name card */
+  try{ if(typeof tipHTML === "function"){ const _th = tipHTML; tipHTML = function(kind, key){ let h = _th.apply(this, arguments);
+        try{ if(kind === "who"){ const m = byId(isNaN(+key) ? key : +key); const L = m && m !== G.you ? DN.of(m) : [];
+            if(L.length){ const tot = L.reduce((a, d) => a + (+d.amount || 0), 0);
+              h += '<div class="nd-gifts"><h4>Gifts \u00b7 <b style="text-transform:none">' + fl(tot) + '</b> in all</h4><ul>' + L.slice(0, 6).map(d => '<li>' + esc(DN.line(d)) + (d.reaction ? '<br><small>' + esc(d.reaction) + '</small>' : '') + '</li>').join("") + '</ul></div>'; } } }catch(e){}
+        return h; }; } }catch(e){}
+  /* test hook: reach the card from outside the script (guarded) */
+  try{ window.onumDonorCard = {
+      ids(){ try{ return hereNow().filter(q => q && q !== G.you).map(q => q.id); }catch(e){ return []; } },
+      openFor(id){ try{ openTip("who", id); const b = document.getElementById("tipCard"); return b ? b.innerText : ""; }catch(e){ return ""; } },
+      plateFor(id){ try{ const p = hereNow().find(q => q && String(q.id) === String(id)); if(!p) return "";
+          const yaw = cam.yaw; cam.x = p.x - 2.4 * Math.sin(yaw); cam.z = p.z - 2.4 * Math.cos(yaw); index(); updatePlates(p);
+          const s = [].slice.call(document.querySelectorAll(".plate .nd-gift")); return s.map(e => e.textContent).join(" | "); }catch(e){ return ""; } } }; }catch(e){}
+  console.log("NEPTUNE donors ready");
+}catch(e){ try{ console.warn("NEPTUNE-DONORS block", e); }catch(e2){} }
+/* NEPTUNE-DONORS END */
 /* NEPTUNE-POLITIES BEGIN — breakaway nations on the Union map.
    Feed (from JUPITER; read if present, guarded if not): window.ONUM_POLITIES = [{id?, name, leader, govType, memberStates:[state names]}]
    (an object keyed by id is accepted too), plus a CustomEvent 'onum-polity-change' (detail: one polity, or {id|name, removed:true}
