@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261020n">
+<meta name="onum-build" content="20261020o">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -13725,8 +13725,10 @@ function buildRoomInner(id, skipShell){
     propPapers(0.25, DIM.desk + 0.018, 8.28, 4);
     propClock(0, 2.88, d-0.09);
     propFan(0, h-0.28, 5.4);
-    propSconce(-hw+0.12, 2.15, 5.4, Math.PI/2);
-    propSconce(hw-0.12, 2.15, 5.4, -Math.PI/2);
+    /* 20261020o: the wall lamps step clear of the vanity portraits (portraits hang at d*0.48 and d*0.55, 0.70 wide) */
+    { let vn = 0; try{ const ow = id === "visit" ? byId(G.visitId) : G.you; vn = ((ow && ow.traits) || {}).vanity | 0; }catch(e){}
+      propSconce(-hw+0.12, 2.15, vn > 62 ? Math.max(3.95, d * 0.48 - 0.35 - 0.55) : 5.4, Math.PI/2);
+      propSconce(hw-0.12, 2.15, vn > 62 ? Math.max(3.95, d * 0.55 - 0.35 - 0.55) : 5.4, -Math.PI/2); }
     addBox(matCol(0x1e2126,.8), -hw+1.35, 0.16, Math.min(9.55, d - 0.35), 0.30,0.32,0.30, 0, true);
     addBox(woodMat, 1.55, 0.22, 4.85, 0.55, 0.44, 0.50, 0, true);
     propPapers(1.55, 0.46, 4.85, 2);
@@ -14164,9 +14166,9 @@ function buildRoomInner(id, skipShell){
       let idTitle = here.t, idTag = here.tag;
       if(id === "visit" && G.visitId){
         const vm = byId(G.visitId);
-        if(vm){ idTitle = vm.name; idTag = (vm.suite || partyLabel(vm.party)); }
+        if(vm){ idTitle = (typeof ndNm === "function" ? ndNm(vm) : vm.name) || vm.name; idTag = (vm.suite || partyLabel(vm.party)); }
       } else if(id === "office" && G.you){
-        idTitle = G.you.name; idTag = (G.you.suite || partyLabel(G.you.party));
+        idTitle = (typeof ndNm === "function" ? ndNm(G.you) : G.you.name) || G.you.name; idTag = (G.you.suite || partyLabel(G.you.party));
       }
       propPlaque(px, 2.05, pz, ry, idTitle, idTag, 1.10, 0.32);
     }
@@ -32602,6 +32604,10 @@ setTimeout(() => { try{ const SXX = window.NEPTUNE_SITTINGS; if(!SXX) return; co
   SXX.castFor.senate = (M, out) => { try{ if(prev) out = prev(M, out) || out; const sens = hereNow().filter(c => c && c.krole === "senator" && c.traits && c !== G.you).sort((a, b) => (b.pledge ? 1 : 0) - (a.pledge ? 1 : 0)).slice(0, 3);
       sens.forEach(c => { if(out.some(p => p.m === c)) return; out.push({m:c, name:c.name, role:"Senator · " + (c.state || ""), party:(polEnsure(c) || {}).party || c.party, state:c.state, temper:c.traits.temper, conv:c.traits.conviction, vanity:c.traits.vanity, warmth:(c.rel && c.rel.warmth) || 0, want:null, stance0:c.pledge && G.day - (c.pledgeDay || 0) < 6 ? (c.pledge > 0 ? 80 : 22) : undefined}); });
     }catch(x){} return out; }; }catch(x){} }, 3000);
+/* NEPTUNE-NAMES 20261020o: every name and day number Neptune's blocks put on screen is read at display time from onumNameOf(id) and onumDay(), falling back to the old values */
+window.ndNm = function(p){ try{ if(p && p.id != null && typeof window.onumNameOf === "function"){ const n = window.onumNameOf(p.id); if(n) return n; } }catch(e){} return (p && p.name) || ""; };
+addEventListener("onum-rename", ev => { try{ const id = ev.detail && ev.detail.id, r = _roomBuiltId; if(!r || _buildingRoom) return; const hit = (r === "court" && (G.court || []).some(j => j && j.id === id)) || (r === "office" && G.you && id === G.you.id) || (r === "visit" && id == G.visitId); if(hit){ _roomBuiltId = null; _roomFurnished = false; clearRoom(); buildRoom(r); } }catch(e){} });
+window.ndDayN = function(){ try{ if(typeof window.onumDay === "function"){ const d = window.onumDay(); if(d != null) return d; } }catch(e){} try{ return G.day || 1; }catch(e){ return 1; } };
 /* ══ 20261016g · NEPTUNE-VISTA: a real sky (clouds, sun, moon, stars), distant ranges and a skyline, textured ground, light shafts indoors, a grade and vignette, and a HUD that gets out of the way ══ */
 const VST = {K:(MODEST ? 0.66 : 1), dome:null, sun:null, moon:null, stars:null, rings:[], sky:null, tex:{}, shafts:null, shaftRoom:null, t:0};
 function vRng(seed){ let s = seed >>> 0; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
@@ -33680,7 +33686,7 @@ function courtRich(w, d, h, hw){
     addBox(brass, 0, 0.1, front - 0.12, 8.2, 0.05, 0.05, 0, true); addBox(brass, 0, 1.32, front - 0.02, 8.5, 0.03, 0.05, 0, true);
     [-4.2, 4.2].forEach(x => addCyl(brass, x, 0.65, front - 0.1, 0.03, 1.3));
     const J = (G.court && G.court.length) ? G.court : [];
-    for(let i = 0; i < 5; i++){ const x = -3.2 + i * 1.6, nm = (J[i] && J[i].name) || ""; try{ propPlaque(x, 1.02, front - 0.02, Math.PI, i === 2 ? "CHIEF JUSTICE" : "JUSTICE", nm, 1.2, 0.22); }catch(e){} }
+    for(let i = 0; i < 5; i++){ const x = -3.2 + i * 1.6, nm = (J[i] && (typeof ndNm === "function" ? ndNm(J[i]) : J[i].name)) || ""; try{ propPlaque(x, 1.02, front - 0.02, Math.PI, i === 2 ? "CHIEF JUSTICE" : "JUSTICE", nm, 1.2, 0.22); }catch(e){} }
     /* the frieze over the bench: the seal, and the motto cut in gold */
     rgSign(rgSealTex("THE COURT"), 0, 3.6, d - 0.05, Math.PI, 1.9, 1.9);
     rgSign(rgFrieze("EQUAL JUSTICE UNDER LAW", "The Court of the Republic"), 0, 4.75, d - 0.05, Math.PI, 5.0, 0.95);
@@ -42286,7 +42292,7 @@ try{
   CL.past = LS("sessions") || [];
   const PACE = {slow:0.5, normal:0.75, fast:1};
   const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-  const now = () => { try{ return "d" + G.day + " " + hhmm(); }catch(e){ return ""; } };
+  const now = () => { try{ return "d" + (typeof ndDayN === "function" ? ndDayN() : G.day) + " " + hhmm(); }catch(e){ return ""; } };
   const roomName = r => { try{ return (ROOMS[r] && ROOMS[r].t) || r || ""; }catch(e){ return r || ""; } };
   const billNow = () => { try{ return G.bill && !G.bill.done ? G.bill : null; }catch(e){ return null; } };
 
@@ -43331,15 +43337,16 @@ try{
     return null;
   };
   const chairOf = function(S){
-    if(S.x.chair) return S.x.chair;
+    if(S.x.chair){ try{ const c0 = S.x.chair; if(c0.mem && c0.pre && typeof ndNm === "function") c0.label = c0.pre + sn(ndNm(c0.mem)); }catch(e){} return S.x.chair; }
     let you = false, k = null; try{ k = heldOffice(); }catch(e){}
     if(S.room === "govoffice" && k === "gov") you = true;
     if(S.room === "exec" && k === "pres") you = true;
     try{ if(S.room === "floor" && G.you && G.you.post === "speaker") you = true; if(S.room === "caucus" && G.you && G.you.post === "whip") you = true; }catch(e){}
     const mem = you ? null : chairMember(S.room), cp = mem ? S.x.cast.find(p => p.m === mem) || null : null;
     let lean = 0; try{ if(cp) lean = side(cp); else if(mem && G.bill && !G.bill.done) lean = alignment(mem, G.bill) >= 0 ? 1 : -1; }catch(e){}
-    const label = you ? "You (in the chair)" : mem ? (S.room === "floor" ? "Speaker " : S.room === "senate" ? "Senator " : "Chair ") + sn(mem.name) : S.D.chair;
-    return S.x.chair = {you, label, mem, p:cp, lean};
+    const pre = mem ? (S.room === "floor" ? "Speaker " : S.room === "senate" ? "Senator " : "Chair ") : "";
+    const label = you ? "You (in the chair)" : mem ? pre + sn(typeof ndNm === "function" ? ndNm(mem) : mem.name) : S.D.chair;
+    return S.x.chair = {you, label, mem, p:cp, lean, pre};
   };
   const chairHTML = function(S){ try{ const ch = chairOf(S); return '<p class="sx-q"><b>In the chair:</b> ' + esc(ch.you ? "you" : ch.label) + ' <small>· ' + (ch.you ? "you call the objections, in the order you choose" : "calls objections in order, fewest words first" + (ch.lean ? ", leaning to its own side" : "")) + '</small></p>'; }catch(e){ return ""; } };
   const RETORT = {
@@ -43813,6 +43820,8 @@ try{
   /* closing the computer puts the sitting back where it was */
   { const _pcClose = pcClose; pcClose = function(){ _pcClose.apply(this, arguments); try{ if(SIT.on && SIT.on.x){ veil.hidden = false; sitDraw(); } }catch(e){} }; }
   SX.defs = SIT_DEF;
+  /* 20261020o: a renamed chair or a new day redraws the open sitting */
+  ["onum-rename", "onum-day"].forEach(ev => addEventListener(ev, () => { try{ if(SIT.on && SIT.on.x && typeof sitDraw === "function") sitDraw(); }catch(e){} }));
   SX.cur = () => SIT.on && SIT.on.x ? SIT.on.x.cast.map(p => p.m).filter(Boolean) : [];
   SX.start = (room, key) => sitStart(key ? room + ":" + key : room);
 
@@ -44754,7 +44763,7 @@ try{
     const go = () => { try{ if(!document.getElementById("ndBuild")){ const b = document.createElement("div"); b.id = "ndBuild"; b.textContent = "build " + cur;
           b.style.cssText = "position:fixed;left:6px;bottom:2px;z-index:40;font:10px/1.2 ui-monospace,monospace;color:#fff;background:rgba(0,0,0,.55);padding:1px 5px;border-radius:3px;pointer-events:none;opacity:.7"; document.body.appendChild(b); } }catch(e){}
       try{ if(!/^https?:$/.test(location.protocol)) return; fetch(location.pathname + "?v=" + Date.now(), {cache:"no-store"}).then(r => r.ok ? r.text() : "").then(t => {
-          const m = /<meta name="onum-build" content="([^"]+)"/.exec(t || ""); if(!m || !(m[1] > cur) || document.getElementById("ndNewer") || window.ONUM_UPDATE_UI) return;
+          const m = /<meta name="onum-build" content="([^"]+)"/.exec(t || ""); if(!m || String(m[1]).trim() === String(cur).trim() || document.getElementById("ndNewer") || window.ONUM_UPDATE_UI) return;
           const n = document.createElement("div"); n.id = "ndNewer"; n.setAttribute("role", "status"); n.textContent = "A newer build is out (" + m[1] + ") \u2014 press Ctrl+Shift+R";
           n.style.cssText = "position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:9999;background:#111;color:#ffe08a;border:2px solid #ffe08a;font:600 13px/1.3 system-ui;padding:6px 30px 6px 12px;border-radius:6px;box-shadow:0 4px 14px rgba(0,0,0,.4)";
           const x = document.createElement("button"); x.textContent = "\u00d7"; x.setAttribute("aria-label", "Dismiss"); x.style.cssText = "position:absolute;right:4px;top:2px;background:none;border:0;color:#ffe08a;font:700 16px system-ui;cursor:pointer"; x.onclick = () => n.remove(); n.appendChild(x); document.body.appendChild(n); const sd = setInterval(() => { if(window.ONUM_UPDATE_UI){ n.remove(); clearInterval(sd); } }, 3000); }).catch(() => {}); }catch(e){} };
@@ -45033,7 +45042,7 @@ try{
   let saveT = 0; const save = () => { if(saveT) return; saveT = setTimeout(() => { saveT = 0; LSS("mem", MEM); LSS("world", W); LSS("cfg", CFG); LSS("vcache", LT.cache); }, 400); };
   const esc2 = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
   const sn = n => { try{ return surname(n || ""); }catch(e){ return String(n || ""); } };
-  const day = () => { try{ return G.day || 1; }catch(e){ return 1; } };
+  const day = () => { try{ if(typeof window.ndDayN === "function") return window.ndDayN() || 1; return G.day || 1; }catch(e){ return 1; } };
   const npc = id => { try{ return byId(+id) || (everyone() || []).find(m => String(m.id) === String(id)) || null; }catch(e){ return null; } };
   const gloss = n => { try{ if(n && window.onumGlossary && window.onumGlossary.scan) window.onumGlossary.scan(n); }catch(e){} };
   function clLog(who, text, tag, gloss){
@@ -45095,7 +45104,7 @@ try{
     const L = [];
     if(m.kind === "envoy"){ const rn = m.realmName || m.state || (m.realm && (m.realm.t || m.realm)) || "";
       L.push("FOREIGN ENVOY: you represent " + rn + ". Use a real, culturally fitting personal name and diplomatic title for yourself (e.g. Ambassador, Minister-Counsellor, Chargé d'affaires) that suits " + rn + "'s language and culture" + (m.name && !/^the head/.test(m.name) ? " — your name is " + m.name : "; choose one and sign with it") + ". Never call yourself or anyone 'a foreign diplomat'."); }
-    if(m.kind === "engine"){ try{ L.push(engEntityPrompt()); }catch(e){ L.push("You are the Engine, a general intelligence in a fictional republic. Speak as yourself."); } }
+    if(m.kind === "engine"){ try{ const ep = engEntityPrompt(); if(ep) L.push(ep); }catch(e){} }  /* 20261020o: no persona of ours for the Engine */
     else if(!base){
       L.push("You are role-playing " + (m.name || "a person") + " in a fictional national capital. Stay in character completely; never mention AI, models, games or prompts.");
       if(m.role) L.push("Role: " + m.role + (m.outlet ? " for " + m.outlet : "") + ".");
@@ -45105,7 +45114,7 @@ try{
     try{ if(m.rel && !peer) L.push("Relationship with " + G.you.name + ": warmth " + Math.round(m.rel.warmth) + ", trust " + Math.round(m.rel.trust) + " (never say these numbers)."); }catch(e){}
     try{ if(peer){ L.push("You are speaking with " + (peer.name || "another person") + (peer.role ? " (" + peer.role + ")" : "") + ", another person in the building. They are NOT " + G.you.name + ", the player's character, who may be standing nearby and overhearing. Never treat anything this person says as coming from " + G.you.name + ", never address them by " + G.you.name + "'s name or office, and do not report to them as though they were the player."); }
       else L.push("You are speaking to " + G.you.name + ", who holds the office of " + officeTitle() + " (" + officeSeat() + "). Address them as " + youAddress() + ". Do not call them by any other office; in particular they are not the head of the nation unless their office above says so."); }catch(e){}
-    try{ L.push("WHO IS WHO: " + (G.you ? G.you.name : "the player") + " is the player's character. Other people also speak around you and to you; their lines are always marked with their own names or as 'not the player'. Never mistake what another person said for something the player said, and never repeat another person's words as though the player had just told them to you. Only a line that comes without a name label, in the user turn, is the player speaking."); }catch(e){}
+    try{ L.push("WHO IS WHO: " + (G.you ? (typeof ndNm === "function" ? ndNm(G.you) : G.you.name) : "the player") + " is the player's character. Other people also speak around you and to you; their lines are always marked with their own names or as 'not the player'. Never mistake what another person said for something the player said, and never repeat another person's words as though the player had just told them to you. Only a line that comes without a name label, in the user turn, is the player speaking."); }catch(e){}
     L.push(canon());
     /* a person has a body and a household; the machine and a far envoy have neither, so they are not told they are hungry */
     const _person = !!m && m.kind !== "engine" && m.kind !== "envoy";
@@ -45120,9 +45129,10 @@ try{
       H.forEach(h => L.push("- day " + h.d + ", from " + h.src + " (" + (h.conf > .7 ? "sure" : h.conf > .4 ? "fairly sure" : "a rumour") + "): " + h.fact.said)); }
     const mine = peer ? [] : (MEM[m.id] || []).filter(t => t.r === "a").slice(-8).map(t => t.c);
     if(mine.length) L.push("Things you have ALREADY said to them — never repeat or closely rephrase any of these:\n- " + mine.join("\n- "));
-    try{ L.push("SITUATION: " + ((ROOMS[G.room] || {}).t || "the building") + ", " + hhmm() + ", day " + G.day + "."); }catch(e){}
+    try{ L.push("SITUATION: " + ((ROOMS[G.room] || {}).t || "the building") + ", " + hhmm() + ", day " + (typeof ndDayN === "function" ? ndDayN() : G.day) + "."); }catch(e){}
     try{ const ev = (G.tlog || []).slice(-5).map(r => r.who + ": " + r.t).join(" | "); if(ev) L.push("Just now around you (a line labelled You is the player speaking; every other label is that person speaking, to whoever they were facing): " + ev.slice(0, 500)); }catch(e){}
     if(extra) L.push(extra);
+    if(m.kind === "engine") return L.join("\n");  /* 20261020o: the Engine speaks freely: no style, persona or format template of ours */
     L.push("STYLE: " + (STYLE[ch] || STYLE.face) + " Period-appropriate, in character, concise. No stage directions, no quotation marks, no name label. Be difficult if your mood and history say so.");
     L.push("Then on a FINAL separate line an effect tag like <<warmth:+2 trust:-1 pledge:aye remember:short note>> with only what applies (small integers -10..10).");
     return L.join("\n");
@@ -45450,7 +45460,7 @@ try{
     const out = [{id:"aide", label:"Ask your aide (" + AIDE().name + ")", grp:"Your office", m:AIDE()}];
     try{ everyone().filter(m => !m.gone && m.name && m.kind !== "you").forEach(m => {
       const g = m.kind === "member" ? "Members" : m.kind === "press" ? "Press" : m.kind === "envoy" ? "Foreign missions" : m.kind === "civ" ? "Citizens & neighbours" : /aide|staff|clerk|secretary/i.test(m.role || "") ? "Staff & aides" : "Others";
-      out.push({id:String(m.id), label:m.name + (m.party ? " · " + partyLabel(m.party) : "") + (m.state ? " · " + m.state : "") + (m.role && m.kind !== "member" ? " · " + m.role : ""), grp:g, m}); }); }catch(e){}
+      out.push({id:String(m.id), label:(typeof ndNm === "function" ? ndNm(m) : m.name) + (m.party ? " · " + partyLabel(m.party) : "") + (m.state ? " · " + m.state : "") + (m.role && m.kind !== "member" ? " · " + m.role : ""), grp:g, m}); }); }catch(e){}
     try{ (G.realms || []).forEach(r => { const ev = envoyFor(r.t); if(!ev) return; const id = "realm:" + r.t;
       const m = RCACHE[id] || (RCACHE[id] = {id, name:ev.title + " " + ev.name, kind:"envoy", role:ev.title + " of " + r.t + " in the capital", state:r.t, realmName:r.t});
       out.push({id, label:m.name + " · " + r.t, grp:"Foreign missions", m}); }); }catch(e){}
@@ -45477,6 +45487,8 @@ try{
     C.querySelector("#ltcSend").onclick = send; C.querySelector("#ltcIn").addEventListener("keydown", e => { if(e.key === "Enter"){ e.preventDefault(); send(); } if(e.key === "Escape") chatClose(); });
     return C;
   }
+  /* 20261020o: names and days in the chat picker follow renames and the calendar */
+  ["onum-rename", "onum-day"].forEach(ev => addEventListener(ev, () => { try{ const C = document.getElementById("ltChat"); if(C && !C.hidden && !LT.cbusy) chatPaint(); }catch(e){} }));
   function chatPaint(){
     const C = chatBox(), cs = contacts(); if(!LT.chatTo) LT.chatTo = LSG("chatTo", "aide"); if(!cs.some(c => c.id === LT.chatTo)) LT.chatTo = "aide";
     const sel = C.querySelector("#ltcTo"), grps = [...new Set(cs.map(c => c.grp))];
