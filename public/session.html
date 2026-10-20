@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261020q">
+<meta name="onum-build" content="20261020r">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -11415,6 +11415,245 @@ function rgnDay(){
 rgnPublish();
 setTimeout(() => { try{ if(G && G.you){ rgnEnsure(); rgnAssignAll(); rgnFire(); } }catch(e){} }, 1500);
 setInterval(() => { try{ if(G && G.you){ const all = everyone(); for(const p of all) if(p && !p.birthRegion){ rgnAssignAll(); rgnFire(); break; } } }catch(e){} }, 4000);
+
+/* ── 20261020 dynasties (dyn): courtship, marriage, births, aging, school, careers,
+   inheritance, divorce, widowhood, affairs, house feuds and alliances, heirs.
+   Belonging and matching never read skin or hair. Book lore families are left exactly as written. ── */
+const DYN_YR = 12;               /* family time: twelve game days make a year */
+const DYN_SURCUSTOM = {dutch:"father", yankee:"father", midlands:"father", prairie:"father", delta:"father", highplains:"father", mountain:"either", pacific:"double"};
+function dynEnsure(){ if(!G.dyn || G.dyn.v !== 1) G.dyn = {v:1, P:{}, court:{}, houses:{}, seq:0, day:-1, log:[]}; return G.dyn; }
+function dynYear(){ return Math.floor((G.day || 0) / DYN_YR); }
+function dynAge(r){ return r ? Math.floor(((G.day || 0) - r.born) / DYN_YR) : 0; }
+function dynSur(name){ const p = String(name || "").trim().split(" "); if(p.length < 2) return p[0] || ""; const PT = ["van","der","de","ten","den","la","le","du","von","di","da","del","mac","st."];
+  let i = p.length - 1; while(i > 1 && PT.indexOf(p[i - 1].toLowerCase()) >= 0) i--; return p.slice(i).join(" "); }
+function dynFirst(name){ return String(name || "").split(" ")[0]; }
+const DYN_FEM = new Set("Anneliese Katrijn Femke Saskia Marieke Lotte Heleen Noor Elsbeth Johanna Mirjam Geertje Wies Trien Liesbeth Margaret Prudence Abigail Mercy Hannah Patience Lydia Temperance Ruth Constance Hepzibah Faith Clara Dorothy Eunice Brigid Maeve Niamh Siobhan Aisling Bronwen Fiona Cerys Grainne Orla Caitlin Aoife Nuala Roisin Deirdre Ingrid Astrid Solveig Freya Greta Kirsten Helga Marta Dagny Elsa Linnea Ingeborg Esther Celestine Amara Delphine Asha Imani Solange Odette Camille Nia Zora Amina Esme Rosalie Vivienne Eloise Elena Claire Rosa Isabel Lucia Carmen Pilar Sofia Ana Valentina June Harper Teresa Ines Mariana Moira Aileen Sorcha Iona Una Eilidh Morag Isla Bonnie Maisie Kirsty Elspeth Catriona Mei Priya Aiko Sana Yuki Hana Lina Nora Min Ananya Camila Sakura".split(" "));
+function dynSexOfName(first){ if(DYN_FEM.has(first)) return "f"; try{ if(KIN_FIRST.F.indexOf(first) >= 0) return "f"; if(KIN_FIRST.M.indexOf(first) >= 0) return "m"; }catch(e){} for(const k in NAME_CULTURES) if((NAME_CULTURES[k].first || []).indexOf(first) >= 0) return "m"; try{ return kinSexOf({name:first + " X"}) === "F" ? "f" : "m"; }catch(e){ return "m"; } }
+function dynNameSex(first){ if(DYN_FEM.has(first)) return "f"; try{ if(KIN_FIRST.F.indexOf(first) >= 0) return "f"; if(KIN_FIRST.M.indexOf(first) >= 0) return "m"; }catch(e){} for(const k in NAME_CULTURES) if((NAME_CULTURES[k].first || []).indexOf(first) >= 0) return "m"; return null; }
+const _dynNames = {};
+function dynFirstNames(region, sex){
+  const k = region + sex; if(_dynNames[k]) return _dynNames[k];
+  let L = []; try{ const c = NAME_CULTURES[region]; if(c) L = c.first.filter(n => dynSexOfName(n) === sex); }catch(e){}
+  if(L.length < 4) L = L.concat(KIN_FIRST[sex === "f" ? "F" : "M"].slice(0, 40));
+  return (_dynNames[k] = L);
+}
+function dynLore(p){ try{ return !!(p && (p === G.you || wallPerson(p) || p.sealedTaylor || p.lore)); }catch(e){ return true; } }
+function dynHouseId(sur){ return "h_" + String(sur || "nobody").toLowerCase().replace(/[^a-z]+/g, "_"); }
+function dynTraits(p){ const t = p.traits || {}; return {ambition:t.ambition || 50, conviction:t.conviction || 50, loyalty:t.loyalty || 50, vanity:t.vanity || 50, discretion:t.discretion || 50, temper:t.temper || 50}; }
+/* one record per person, real or not yet grown */
+function dynRec(p){
+  const D = dynEnsure(); let r = D.P[p.id];
+  if(r) return r;
+  try{ rgnAssign(p); }catch(e){}
+  let sx = p.sex === "m" || p.sex === "f" ? p.sex : null;
+  if(!sx && (p.sex === "M" || p.sex === "F")) sx = p.sex.toLowerCase();
+  if(!sx) sx = dynNameSex(dynFirst(p.name)) || (p.ksex === "F" ? "f" : p.ksex === "M" ? "m" : dynSexOfName(dynFirst(p.name)));
+  p.sex = sx; p.ksex = sx.toUpperCase();
+  const ageY = p === G.you ? 38 : 24 + Math.abs(seedOf("age" + p.id)) % 46;
+  r = D.P[p.id] = {id:p.id, name:p.name, sex:sx, born:(G.day || 0) - ageY * DYN_YR - Math.abs(seedOf("bd" + p.id)) % DYN_YR, parents:[], spouseId:null, children:[], birthRegion:p.birthRegion || null,
+    role:p.role || p.post || (p.kind === "member" ? "Member of the House" : p.kind === "press" ? "press" : ""), alive:!p.gone, traits:dynTraits(p), npc:true, houseId:dynHouseId(dynSur(p.name)),
+    skills:null, marks:{scandals:[], debts:0, favors:[], promises:[]}, rebel:false, happy:60, lore:dynLore(p)};
+  /* a spouse the old family table already invented stays offstage, so nobody is married twice */
+  try{ const f = G.fam && G.fam.p && G.fam.p[p.id]; if(f && f.spouse) r.offSpouse = f.spouse.name; }catch(e){}
+  return r;
+}
+function dynPerson(id){ if(id == null) return null; if(id === "you") return G.you; return byId(id) || (G.you && G.you.id === id ? G.you : null); }
+function dynAudit(){
+  /* a name that reads as the other sex: keep the person's sex, give a fitting first name. Never lore, never the player. */
+  const D = dynEnsure(), fixed = [];
+  everyone().forEach(p => { if(!p || p.gone || dynLore(p) || p.dynAudited) return; p.dynAudited = true; const r = dynRec(p);
+    const ks = dynNameSex(dynFirst(p.name));
+    if(ks && ks !== r.sex){ const L = dynFirstNames(r.birthRegion || "dutch", r.sex), nf = L[Math.abs(seedOf("au" + p.id)) % L.length];
+      const old = p.name; p.name = nf + " " + p.name.split(" ").slice(1).join(" "); r.name = p.name; fixed.push({id:p.id, from:old, to:p.name}); } });
+  if(fixed.length){ D.audit = (D.audit || []).concat(fixed).slice(-60); }
+  return fixed;
+}
+function dynHouse(hid, sur){
+  const D = dynEnsure(); let h = D.houses[hid];
+  if(!h) h = D.houses[hid] = {id:hid, name:"House " + (sur || hid.slice(2)), members:[], prestige:10, feuds:[], allies:[]};
+  return h;
+}
+function dynSyncHouses(){
+  const D = dynEnsure(); Object.values(D.houses).forEach(h => h.members = []);
+  Object.values(D.P).forEach(r => { const h = dynHouse(r.houseId, dynSur(r.name)); if(r.alive) h.members.push(r.id); });
+  Object.values(D.houses).forEach(h => { let s = 0; h.members.forEach(id => { const p = dynPerson(id); if(p){ s += (p.influence || 0) * 0.6; try{ s += Math.min(30, purseOf(p).cash / 400); }catch(e){} if(p.kind === "member") s += 8; } });
+    h.prestige = Math.round(Math.min(100, 4 + s / Math.max(1, Math.sqrt(h.members.length)))); });
+  /* the old family links: their feuds are house feuds */
+  try{ (G.fam && G.fam.links || []).forEach(l => { if(!l.feud) return; const a = D.P[l.a], b = D.P[l.b]; if(a && b && a.houseId !== b.houseId) dynFeud(a.houseId, b.houseId, null); }); }catch(e){}
+}
+function dynFeud(ha, hb, why){ const D = dynEnsure(), A = D.houses[ha], B = D.houses[hb]; if(!A || !B || ha === hb) return;
+  if(A.feuds.indexOf(hb) < 0){ A.feuds.push(hb); B.feuds.push(ha); A.allies = A.allies.filter(x => x !== hb); B.allies = B.allies.filter(x => x !== ha); if(why) dynNote(why); } }
+function dynAlly(ha, hb, why){ const D = dynEnsure(), A = D.houses[ha], B = D.houses[hb]; if(!A || !B || ha === hb) return;
+  A.feuds = A.feuds.filter(x => x !== hb); B.feuds = B.feuds.filter(x => x !== ha);
+  if(A.allies.indexOf(hb) < 0){ A.allies.push(hb); B.allies.push(ha); if(why) dynNote(why); } }
+function dynNote(t, press){ const D = dynEnsure(); D.log.push({d:G.day, t}); if(D.log.length > 120) D.log.shift(); try{ lLog(t, "family"); }catch(e){} if(press){ try{ feed(t); }catch(e){} } }
+function dynSingle(r){ return r.alive && !r.spouseId && !r.offSpouse && dynAge(r) >= 18; }
+function dynStanding(r){ const p = dynPerson(r.id); let s = 0; if(p){ s += (p.influence || 0); if(p.kind === "member") s += 20; try{ s += Math.min(40, purseOf(p).cash / 300); }catch(e){} } return s; }
+/* who suits whom: attraction, standing, region trust, politics. Never looks. */
+function dynMatch(a, b){
+  if(!a || !b || a.sex === b.sex || !dynSingle(a) || !dynSingle(b) || a.houseId === b.houseId) return -99;
+  if(Math.abs(dynAge(a) - dynAge(b)) > 14) return -99;
+  const pa = dynPerson(a.id), pb = dynPerson(b.id);
+  let s = (Math.abs(seedOf("att" + Math.min(a.id, b.id) + ":" + Math.max(a.id, b.id))) % 100) / 2;
+  s -= Math.abs(dynStanding(a) - dynStanding(b)) / 3;
+  try{ s += (rgnTrust(a.birthRegion, b.birthRegion) - 45) / 2; }catch(e){}
+  if(pa && pb && pa.party && pa.party === pb.party) s += 8; else if(pa && pb && pa.party && pb.party && pa.party !== "IND" && pb.party !== "IND") s -= 6;
+  const D = dynEnsure(); if((D.houses[a.houseId] || {feuds:[]}).feuds.indexOf(b.houseId) >= 0) s -= 25;
+  return s;
+}
+function dynPairKey(a, b){ return a < b ? a + ":" + b : b + ":" + a; }
+function dynMarry(a, b, why){
+  const D = dynEnsure(); a.spouseId = b.id; b.spouseId = a.id; a.happy = b.happy = 70; delete D.court[dynPairKey(a.id, b.id)];
+  const pa = dynPerson(a.id), pb = dynPerson(b.id);
+  if(pa) pa.spouseId = b.id; if(pb) pb.spouseId = a.id;
+  /* the bride's house moves to the groom's by most customs; double-barrel on the Pacific */
+  const wife = a.sex === "f" ? a : b, hus = wife === a ? b : a;
+  /* dowry from the bride's family, savings pooled on the ledger */
+  try{ if(pa && pb){ const PW = purseOf(dynPerson(wife.id)), PH = purseOf(dynPerson(hus.id)), dw = Math.round(Math.max(0, PW.cash) * 0.08);
+    if(dw > 0){ PW.cash -= dw; PH.cash += dw; purseLog(dynPerson(wife.id), "Dowry to " + hus.name, -dw); purseLog(dynPerson(hus.id), "Dowry from " + wife.name, dw); } } }catch(e){}
+  dynAlly(a.houseId, b.houseId, null);
+  const mixed = a.birthRegion && b.birthRegion && a.birthRegion !== b.birthRegion;
+  dynNote(a.name + " and " + b.name + " were married" + (mixed ? ", " + (ONUM_REGIONS[a.birthRegion] || {}).name + " to " + (ONUM_REGIONS[b.birthRegion] || {}).name : "") + ".", true);
+  if(mixed){ try{ window.onumRegionDeed({a:a.id, b:b.id, kind:"marriage", text:a.name + " and " + b.name}); }catch(e){}
+    /* hardliners in a grudge region do not like it */
+    try{ const gr = (ONUM_REGIONS[a.birthRegion].memory.grudges.indexOf(b.birthRegion) >= 0) || (ONUM_REGIONS[b.birthRegion].memory.grudges.indexOf(a.birthRegion) >= 0);
+      if(gr) G.members.filter(m => !m.gone && (m.birthRegion === a.birthRegion || m.birthRegion === b.birthRegion) && (m.traits || {}).conviction > 70).slice(0, 4).forEach(m => {
+        try{ remember(m, "A " + (ONUM_REGIONS[m.birthRegion === a.birthRegion ? b.birthRegion : a.birthRegion] || {}).name + " marriage into our people: " + a.name + " and " + b.name, 3); }catch(e){}
+        if(pa && pa.rel && m !== pa) { } }); }catch(e){} }
+  try{ window.dispatchEvent(new CustomEvent("onum-family", {detail:{kind:"marriage", a:a.id, b:b.id}})); }catch(e){}
+}
+function dynChildName(mom, dad, sex){
+  const custom = DYN_SURCUSTOM[dad.birthRegion] || "father", ds = dynSur(dad.name), ms = dynSur(mom.name);
+  const reg = Math.abs(seedOf("cr" + mom.id + dad.id + G.day)) % 3 === 0 ? mom.birthRegion : dad.birthRegion;
+  const L = dynFirstNames(reg || "dutch", sex);
+  let first = null; for(let i = 0; i < 30; i++){ const n = L[Math.abs(seedOf("cn" + mom.id + dad.id + G.day + i)) % L.length]; if(n !== dynFirst(mom.name) && n !== dynFirst(dad.name)){ first = n; break; } }
+  first = first || L[0];
+  const sur = custom === "double" && ms && ms !== ds ? ds + "-" + ms : custom === "either" && chance(0.3) ? ms : ds;
+  return {name:first + " " + sur, sur};
+}
+function dynBirth(mom, dad){
+  const D = dynEnsure(), sex = chance(0.5) ? "f" : "m", nm = dynChildName(mom, dad, sex), id = "d" + (++D.seq);
+  const mt = mom.traits, dt = dad.traits, tr = {}; Object.keys(mt).forEach(k => tr[k] = clamp(Math.round((mt[k] + dt[k]) / 2 + (Math.random() - 0.5) * 30), 0, 100));
+  /* the child is from where they grow up: the family home */
+  const home = dynPerson(dad.id) || dynPerson(mom.id); let reg = null; try{ reg = rgnOfState(home && home.state) || dad.birthRegion; }catch(e){ reg = dad.birthRegion; }
+  const c = D.P[id] = {id, name:nm.name, sex, born:G.day, parents:[mom.id, dad.id], spouseId:null, children:[], birthRegion:reg, role:"child", alive:true, traits:tr, npc:false,
+    houseId:dynHouseId(nm.sur), state:home && home.state, skills:null, happy:60, lore:false, rebel:chance(0.22),
+    marks:{scandals:[].concat(mom.marks.scandals, dad.marks.scandals).slice(-4), debts:Math.round((mom.marks.debts + dad.marks.debts) / 4), favors:[].concat(mom.marks.favors, dad.marks.favors).slice(-4), promises:[].concat(mom.marks.promises, dad.marks.promises).slice(-4)}};
+  mom.children.push(id); dad.children.push(id);
+  dynHouse(c.houseId, nm.sur);
+  dynNote(mom.name + " and " + dad.name + " welcomed a " + (sex === "f" ? "daughter" : "son") + ", " + dynFirst(nm.name) + ".");
+  try{ window.dispatchEvent(new CustomEvent("onum-family", {detail:{kind:"birth", id, parents:c.parents}})); }catch(e){}
+  return c;
+}
+/* upbringing shapes skills; school from six */
+function dynRaise(c){
+  const a = dynAge(c); if(a < 6) return; const D = dynEnsure(), mom = D.P[c.parents[0]], dad = D.P[c.parents[1]];
+  if(!c.skills){ const R = (window.ONUM_REGIONS || {})[c.birthRegion] || {values:{}}; const v = R.values || {};
+    const roleOf = r => String((r && r.role) || ""); const pr = roleOf(mom) + " " + roleOf(dad);
+    c.skills = {rhetoric:20 + (/Member|Senator|press|lawyer|pastor/i.test(pr) ? 20 : 0), ledger:20 + Math.round(((v.trade || 0) + 1) * 10), craft:20 + (/barber|tailor|farmer|engineer|Union/i.test(pr) ? 20 : 0), faith:20 + Math.round(((v.faith || 0) + 1) * 12)}; }
+  if(a < 18){ c.role = "at school"; Object.keys(c.skills).forEach(k => c.skills[k] = Math.round(Math.min(100, c.skills[k] + Math.random() * 0.6) * 10) / 10); return; }
+  if(c.npc) return;
+  /* grown: a career from aptitude, family pull and region; a real person in the town */
+  const h = D.houses[c.houseId] || {prestige:10}, S = c.skills, best = Object.keys(S).sort((x, y) => S[y] - S[x])[0];
+  const pull = h.prestige + (c.traits.ambition - 50) / 2;
+  const job = best === "rhetoric" ? (pull > 55 ? "county clerk, running for office" : "law clerk") : best === "ledger" ? (pull > 50 ? "bank officer" : "bookkeeper") : best === "craft" ? (c.sex === "f" ? "tradeswoman" : "tradesman") : "parish worker";
+  try{ const p = makeCivilian(); p.name = c.name; p.state = c.state || p.state; p.birthRegion = c.birthRegion; p.sex = c.sex; p.ksex = c.sex.toUpperCase(); p.role = job; p.caseOpen = false; p.cause = null; p.dynAudited = true;
+    Object.assign(p.traits, c.traits); const par = dynPerson(c.parents[1]) || dynPerson(c.parents[0]);
+    if(par && par.party && !c.rebel) p.party = par.party; else if(par && c.rebel) p.party = par.party === "FED" ? "COM" : par.party === "COM" ? "FED" : "IND";
+    G.civ.push(p); try{ _allCache = null; }catch(e){}
+    D.P[p.id] = c; delete D.P[c.id];
+    [c.parents[0], c.parents[1]].forEach(pid => { const q = D.P[pid]; if(q) q.children = q.children.map(x => x === c.id ? p.id : x); });
+    c.id = p.id; c.npc = true; c.role = job;
+    dynNote(c.name + " came of age and went to work as " + (/^[aeiou]/i.test(job) ? "an " : "a ") + job + (c.rebel ? ", against the family line" : "") + ".");
+  }catch(e){}
+}
+function dynDie(r, cause){
+  const D = dynEnsure(); r.alive = false; r.died = G.day; const p = r.npc ? dynPerson(r.id) : null;
+  /* inheritance: spouse first, else children */
+  try{ if(p && p !== G.you){ const P = purseOf(p), heirs = r.spouseId && D.P[r.spouseId] && D.P[r.spouseId].alive ? [r.spouseId] : r.children.filter(id => D.P[id] && D.P[id].alive);
+    const cash = Math.max(0, P.cash); if(heirs.length && cash > 0){ const each = Math.floor(cash / heirs.length); heirs.forEach(id => { const h = dynPerson(id); if(h){ purseOf(h).cash += each; purseLog(h, "Inheritance from " + r.name, each); if(p.home && !h.home) h.home = p.home; } else if(D.P[id]) D.P[id].estate = (D.P[id].estate || 0) + each; }); P.cash -= each * heirs.length; }
+    p.gone = true; try{ _allCache = null; }catch(e){} } }catch(e){}
+  if(r.spouseId && D.P[r.spouseId]){ D.P[r.spouseId].widowed = r.id; D.P[r.spouseId].spouseId = null; const sp = dynPerson(r.spouseId); if(sp) sp.spouseId = null; }
+  dynNote(r.name + " died" + (cause ? " " + cause : "") + ", aged " + dynAge(r) + ".");
+  try{ window.dispatchEvent(new CustomEvent("onum-family", {detail:{kind:"death", id:r.id}})); }catch(e){}
+}
+function dynDivorce(a, b, why){
+  a.spouseId = b.spouseId = null; const pa = dynPerson(a.id), pb = dynPerson(b.id); if(pa) pa.spouseId = null; if(pb) pb.spouseId = null;
+  a.exes = (a.exes || []).concat(b.id); b.exes = (b.exes || []).concat(a.id);
+  dynFeud(a.houseId, b.houseId, null); dynNote(a.name + " and " + b.name + " have divorced" + (why ? ", " + why : "") + ".", true);
+  try{ window.dispatchEvent(new CustomEvent("onum-family", {detail:{kind:"divorce", a:a.id, b:b.id}})); }catch(e){}
+}
+function dynDay(){
+  const D = dynEnsure(); if(D.day === G.day) return; D.day = G.day;
+  everyone().forEach(p => { if(p && !p.gone) dynRec(p); }); if(G.you) dynRec(G.you);
+  if(!D.audited){ D.audited = true; dynAudit(); }
+  const R = Object.values(D.P).filter(r => r.alive);
+  /* courtship */
+  const singles = R.filter(r => dynSingle(r) && r.id !== (G.you && G.you.id) && !r.lore);
+  for(let i = 0; i < Math.min(8, singles.length); i++){ const a = singles[Math.floor(Math.random() * singles.length)]; let best = null, bs = 15;
+    const cur = a.suitor != null ? D.P[a.suitor] : null; if(cur){ const s0 = dynMatch(a, cur); if(s0 > bs){ bs = s0; best = cur; } else a.suitor = null; }
+    if(!best) for(let j = 0; j < 12; j++){ const b = singles[Math.floor(Math.random() * singles.length)]; const s = dynMatch(a, b); if(s > bs){ bs = s; best = b; } }
+    if(best){ a.suitor = best.id; if(best.suitor == null) best.suitor = a.id; }
+    if(best){ const k = dynPairKey(a.id, best.id); D.court[k] = (D.court[k] || 0) + bs / 20; if(D.court[k] > 12 && a.spouseId == null && best.spouseId == null) dynMarry(a, best); } }
+  Object.keys(D.court).forEach(k => { D.court[k] *= 0.97; if(D.court[k] < 0.5) delete D.court[k]; });
+  /* marriages: happiness, births, affairs, divorce */
+  R.forEach(r => { if(!r.spouseId || r.sex !== "f") return; const h = D.P[r.spouseId]; if(!h || !h.alive) return;
+    const fit = dynMatch(Object.assign({}, r, {spouseId:null, offSpouse:null, houseId:"x1"}), Object.assign({}, h, {spouseId:null, offSpouse:null, houseId:"x2"}));
+    r.happy = h.happy = clamp(r.happy + (fit > 10 ? 0.3 : -0.4) + (Math.random() - 0.5), 0, 100);
+    const a = dynAge(r); if(a >= 18 && a <= 44 && r.children.length < 6 && chance(0.03 * (a < 35 ? 1 : 0.5))) dynBirth(r, h);
+    [r, h].forEach(x => { const px = dynPerson(x.id); const disc = (x.traits.discretion || 50); if(px && chance(0.0004 * (100 - disc) / 50)){ x.marks.scandals.push("an affair, day " + G.day); x.happy -= 20; dynNote("Talk in town: " + x.name + " has been seen with someone who is not " + (x === r ? h : r).name.split(" ")[0] + ".", true); try{ ripple(px, -2, "the talk about " + px.name, 2); }catch(e){} } });
+    if(r.happy < 18 && chance(0.05)) dynDivorce(r, h, "after a long cold spell"); });
+  /* growing up, aging, death */
+  R.forEach(r => { dynRaise(r); const a = dynAge(r), p = r.npc ? dynPerson(r.id) : null;
+    if(a >= 68 && (!p || (p.kind === "civ" && !p.scKey && p !== G.you)) && !r.lore && chance(0.0009 * (a - 60))) dynDie(r, "at home"); });
+  dynSyncHouses(); dynPublish();
+}
+/* dynasties vote together: a house head pulls the cousins in the House, unless they run against the family */
+function dynBloc(m, bill){
+  try{ const D = G.dyn; if(!D) return 0; const r = D.P[m.id]; if(!r || r.rebel) return 0; const h = D.houses[r.houseId]; if(!h || h.members.length < 2) return 0;
+    const ms = h.members.map(dynPerson).filter(x => x && x !== m && x.kind === "member" && !x.gone); if(!ms.length) return 0;
+    const head = ms.sort((x, y) => (y.influence || 0) - (x.influence || 0))[0]; const al = alignmentRaw ? alignmentRaw(head, bill) : 0;
+    return al > 0 ? 0.08 : al < 0 ? -0.08 : 0; }catch(e){ return 0; }
+}
+{ const _nv2 = netVoteLean; netVoteLean = function(m, bill){ return _nv2.apply(this, arguments) + dynBloc(m, bill); }; }
+function dynPublish(){
+  try{ const D = dynEnsure(), people = {}, houses = {};
+    Object.values(D.P).forEach(r => { people[r.id] = {name:r.name, parents:r.parents.slice(), spouseId:r.spouseId, children:r.children.slice(), birthRegion:r.birthRegion, role:r.role, alive:r.alive, born:r.born, age:dynAge(r), traits:Object.assign({}, r.traits), sex:r.sex, houseId:r.houseId, skills:r.skills, rebel:r.rebel, offstageSpouse:r.offSpouse || null, lore:r.lore}; });
+    Object.values(D.houses).forEach(h => { if(h.members.length) houses[h.id] = {name:h.name, members:h.members.slice(), prestige:h.prestige, feuds:h.feuds.slice(), allies:h.allies.slice()}; });
+    window.ONUM_FAMILY = {people, houses, log:D.log.slice(-30), yearDays:DYN_YR};
+    /* extend the old table without replacing anything in it */
+    try{ if(window.ONUM_FAMILIES){ window.ONUM_FAMILIES.dynasty = window.ONUM_FAMILY; const by = window.ONUM_FAMILIES.byId || {}; Object.keys(people).forEach(id => { if(by[id]) by[id].dyn = {spouseId:people[id].spouseId, children:people[id].children, sex:people[id].sex, houseId:people[id].houseId}; }); } }catch(e){}
+    window.dispatchEvent(new CustomEvent("onum-family", {detail:{kind:"update", people:Object.keys(people).length, houses:Object.keys(houses).length}}));
+  }catch(e){}
+}
+{ const _fp = famPublish; famPublish = function(){ const r = _fp.apply(this, arguments); try{ if(window.ONUM_FAMILY && window.ONUM_FAMILIES) window.ONUM_FAMILIES.dynasty = window.ONUM_FAMILY; }catch(e){} return r; }; }
+/* the player: court, propose, raise heirs, continue as one */
+window.onumPronouns = function(id){ const p = dynPerson(id); const s = p && (p.sex || (dynRec(p) || {}).sex); return s === "f" ? {he:"she", him:"her", his:"her", hers:"hers"} : {he:"he", him:"him", his:"his", hers:"his"}; };
+window.onumCourt = function(npcId){
+  try{ const you = dynRec(G.you), r = dynRec(dynPerson(npcId)); if(!dynSingle(you) || !dynSingle(r) || you.sex === r.sex) return {ok:false, why:"not free to court"};
+    const k = dynPairKey(you.id, r.id), m = dynPerson(npcId); let s = dynMatch(Object.assign({}, you, {houseId:"x1"}), r) + ((m.rel || {}).warmth || 0) / 2;
+    const D_ = dynEnsure(); D_.court[k] = (D_.court[k] || 0) + Math.max(0.5, s / 10); try{ m.rel.warmth = clamp(m.rel.warmth + 2, -100, 100); }catch(e){}
+    return {ok:true, progress:Math.round(D_.court[k] * 10) / 10, need:12}; }catch(e){ return {ok:false, why:String(e.message || e)}; }
+};
+
+window.onumPropose = function(npcId){
+  try{ const D = dynEnsure(), you = dynRec(G.you), r = dynRec(dynPerson(npcId)), k = dynPairKey(you.id, r.id);
+    if((D.court[k] || 0) < 12 || !dynSingle(r) || !dynSingle(you)) return {ok:false, why:"not yet"}; dynMarry(you, r); return {ok:true}; }catch(e){ return {ok:false, why:String(e.message || e)}; }
+};
+window.onumHeirs = function(){ try{ const D = dynEnsure(), you = dynRec(G.you); return you.children.map(id => D.P[id]).filter(c => c && c.alive).map(c => ({id:c.id, name:c.name, age:dynAge(c), sex:c.sex})); }catch(e){ return []; } };
+window.onumContinueAs = function(heirId){
+  try{ const D = dynEnsure(), you = dynRec(G.you), c = D.P[heirId]; if(!c || !c.alive || you.children.indexOf(heirId) < 0 || dynAge(c) < 18) return {ok:false, why:"no grown heir by that id"};
+    const old = G.you.name; you.alive = false; you.died = G.day;
+    const nid = G.you.id; Object.assign(c, {npc:true}); delete D.P[heirId]; D.P[nid] = Object.assign(c, {id:nid});
+    G.you.name = c.name; G.you.sex = c.sex; G.you.ksex = c.sex.toUpperCase(); G.you.birthRegion = c.birthRegion;
+    D.P["prev_" + nid] = Object.assign({}, you, {id:"prev_" + nid, alive:false, children:you.children.map(x => x === heirId ? nid : x)});
+    c.parents = c.parents.map(x => x === nid ? "prev_" + nid : x);
+    dynNote(c.name + " takes up the family's work after " + old + ".", true);
+    try{ window.dispatchEvent(new CustomEvent("onum-rename", {detail:{id:nid, old, name:c.name}})); }catch(e){}
+    dynPublish(); return {ok:true, name:c.name}; }catch(e){ return {ok:false, why:String(e.message || e)}; }
+};
+{ const _ed2 = engDay; engDay = function(){ const r = _ed2.apply(this, arguments); try{ dynDay(); }catch(e){} return r; }; }
+setInterval(() => { try{ if(G && G.you && (!G.dyn || !window.ONUM_FAMILY || !Object.keys(window.ONUM_FAMILY.people).length)){ dynEnsure(); everyone().forEach(p => p && !p.gone && dynRec(p)); dynRec(G.you); if(!G.dyn.audited){ G.dyn.audited = true; dynAudit(); } dynSyncHouses(); dynPublish(); } }catch(e){} }, 3000);
 
 const MATCACHE = new Map();
 /* Every distinct repeat used to clone the texture and its normal map, so
@@ -34626,7 +34865,7 @@ function cmtOfferAccept(yes){
 function cmtDay(){
   const st = cmtStore(), y = G.you; if(!y || !G.members) return;
   if(G.day % 6 === 0){ const pool = G.members.filter(m => m && !m.gone && !m.post && m.cmte); const m = pool[Math.floor(Math.random() * pool.length)];
-    if(m){ const best = COMMITTEES.slice().sort((a, b) => Math.abs((m.pos && m.pos[b.axis]) || 0) - Math.abs((m.pos && m.pos[a.axis]) || 0))[0]; if(best && best.k !== m.cmte && cmtMembers(best.k).length < CMT.seats && chance(0.6)){ const old = m.cmte; m.cmte = best.k; if(old === y.committee || best.k === y.committee){ try{ feed(m.name + " moves to " + best.t + ", where the work is closer to what " + (m.sex === "F" ? "she" : "he") + " cares about."); }catch(e){} } } } }
+    if(m){ const best = COMMITTEES.slice().sort((a, b) => Math.abs((m.pos && m.pos[b.axis]) || 0) - Math.abs((m.pos && m.pos[a.axis]) || 0))[0]; if(best && best.k !== m.cmte && cmtMembers(best.k).length < CMT.seats && chance(0.6)){ const old = m.cmte; m.cmte = best.k; if(old === y.committee || best.k === y.committee){ try{ feed(m.name + " moves to " + best.t + ", where the work is closer to what " + (/^f/i.test(m.sex || "") ? "she" : "he") + " cares about."); }catch(e){} } } } }
   if(!st.offer && G.day - (st.offerAt || 0) >= 20 && (y.standing || 0) >= 30 && !y.out){
     const alts = COMMITTEES.filter(c => c.k !== y.committee).sort((a, b) => cmtFit(b.k, y) - cmtFit(a.k, y)), c = alts[0], f = (G.members || []).filter(m => m && !m.gone && m.party === y.party && m.post)[0] || (G.members || []).find(m => m && m.party === y.party);
     if(c && f){ st.offer = {k:c.k, from:f.name, d:G.day}; st.offerAt = G.day; try{ note(f.name + " of the Steering Committee asks whether you would take a seat on " + c.t + ". (Phone → Apps → Committees.)", true); }catch(e){} } }
@@ -38924,7 +39163,7 @@ function saveCaptureBase(){
     termLength:G.termLength, country:G.country,
     greatest:G.greatest, blasphemy:G.blasphemy, loreNote:G.loreNote, greatnessOpen:G.greatnessOpen,
     relics:G.relics, relicSpots:G.relicSpots, consularLore:G.consularLore, bind:G.bind, sens:G.sens, invertY:!!G.invertY, voiceVol:G.voiceVol, goals:G.goals, whip:G.whip || null, billQueue:G.billQueue || [], faith:G.faith || null, life:G.life || null, ach:G.ach || {}, law:G.law || null, ladder:G.ladder || [], cases:G.cases || [], lastActs:G.lastActs || [], wx:G.wx || null, town:G.town || null, rivals:G.rivals || [], rivalNext:G.rivalNext || 0, daylog:(G.daylog || []).slice(-120), paperRead:G.paperRead || 0, seedL:G.seedL || 0, mHints:G.mHints || {}, tlog:(G.tlog || []).slice(-500), ag:G.ag || null, sitPrep:G.sitPrep || {}, echoes:G.echoes || [], billKinds:G.billKinds || {}, realmRel:G.realmRel || {}, org:G.org || null, conflict:G.conflict || null, conflictLog:G.conflictLog || [], warAuth:G.warAuth || null, react:G.react || [], reactNews:G.reactNews || [], senStaff:G.senStaff || null, presStaff:G.presStaff || null, listened:G.listened || 0,
-    world:G.world, rgn:G.rgn || null, app:G.app || null, shp:G.shp || null, dn:G.dn || null, rs:G.rs || null, mm:G.mm || null, sc:G.sc || null, ph:G.ph || null,  sbox:G.sbox || null, dist:G.dist || null, fam:G.fam || null, loreBookSeeded:!!G.loreBookSeeded, saidHash:G.saidHash || [], dm:G.dm || null, lore:G.lore || null, trip:G.trip || null,
+    world:G.world, rgn:G.rgn || null, dyn:G.dyn || null, app:G.app || null, shp:G.shp || null, dn:G.dn || null, rs:G.rs || null, mm:G.mm || null, sc:G.sc || null, ph:G.ph || null,  sbox:G.sbox || null, dist:G.dist || null, fam:G.fam || null, loreBookSeeded:!!G.loreBookSeeded, saidHash:G.saidHash || [], dm:G.dm || null, lore:G.lore || null, trip:G.trip || null,
     pendingNight:!!G.pendingNight,
     cam:{x:cam.x, z:cam.z, yaw:cam.yaw, pitch:cam.pitch},
     /* the clock the shared save is compared by — not the game clock, the
