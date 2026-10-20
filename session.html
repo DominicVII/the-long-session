@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261020s">
+<meta name="onum-build" content="20261020t">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -46413,6 +46413,96 @@ try{
   console.log("NEPTUNE offline ready");
 }catch(e){ try{ console.warn("NEPTUNE-OFFLINE block", e); }catch(e2){} }
 /* NEPTUNE-OFFLINE END */
+/* NEPTUNE-SESSION BEGIN — 20261020t: renders whatever session JUPITER publishes in window.ONUM_SESSION (and re-renders on the
+   'onum-session' event): the seats, a spotlight on whoever has the floor, the gavel, the clock, the speakers' queue and the
+   roll-call board. Every button goes through window.onumSession (requestFloor, yieldFloor, vote, gavel... whatever it
+   offers); nothing here changes the session itself. With no ONUM_SESSION, or one that is not open, nothing is drawn.
+   Accepted shape (all optional): {open|active, title, room, seats:[{id,name,party,state,present}], floor:id|{id},
+   chair:id, gavel:{at,kind}|bool, clock:{left|remaining|seconds, label}, queue:[id|{id,name}], roll:{open, aye|yes, no|nay,
+   present|abstain, votes:{id:"aye"|"no"|...}, needed}, actions:[{id,label}]} */
+try{
+  const SN = window.NEPTUNE_SESSIONVIEW = {ver:"20261020t", min:false};
+  const esc4 = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;"})[c]);
+  const idOf = x => x == null ? null : (typeof x === "object" ? (x.id != null ? x.id : x.name) : x);
+  const nm = (id, fb) => { try{ if(id === "you" || (G.you && id === G.you.id)) return "You"; if(typeof window.onumNameOf === "function"){ const n = window.onumNameOf(id); if(n) return n; } }catch(e){} return fb || String(id); };
+  const pcol = p => { try{ return "#" + partyColorNum(p).toString(16).padStart(6, "0"); }catch(e){ return "#888"; } };
+  const clockTxt = c => { if(c == null) return ""; if(typeof c === "number") c = {left:c}; const s = c.left != null ? c.left : c.remaining != null ? c.remaining : c.seconds; if(s == null) return c.label || ""; const t = Math.max(0, Math.round(+s)); return (c.label ? c.label + " " : "") + Math.floor(t / 60) + ":" + String(t % 60).padStart(2, "0"); };
+  const ACT_T = {requestFloor:"Ask for the floor", yieldFloor:"Yield the floor", yield:"Yield", object:"Object", pointOfOrder:"Point of order", moveQuestion:"Move the question", vote:"", gavel:"Gavel", adjourn:"Move to adjourn", leave:"Leave the chamber"};
+  function css(){ if(document.getElementById("ndSessCss")) return; const st = document.createElement("style"); st.id = "ndSessCss";
+    st.textContent = "#ndSess{position:fixed;right:10px;top:84px;z-index:60;width:340px;max-height:72vh;overflow:auto;background:#121419;color:#f4f1e8;border:2px solid #c9a24a;border-radius:8px;font:13px/1.3 system-ui,sans-serif;box-shadow:0 6px 24px #000;padding:8px 10px}" +
+      "#ndSess.min .ns-body{display:none}#ndSess h3{margin:0;font:700 15px Georgia,serif;color:#ffe08a;display:flex;justify-content:space-between;align-items:center;gap:6px}#ndSess h3 button{background:#2a2d35;color:#fff;border:1px solid #6b6f7a;border-radius:4px;font:12px system-ui;cursor:pointer}" +
+      "#ndSess .nsx-row{display:flex;justify-content:space-between;gap:6px;margin:5px 0;color:#e8e2d0}#ndSess .nsx-floor{background:#2b2410;border:1px solid #ffe08a;border-radius:6px;padding:6px;margin:6px 0;color:#fff}#ndSess .nsx-floor b{color:#ffe08a}" +
+      "#ndSess .nsx-seats{display:grid;grid-template-columns:repeat(auto-fill,minmax(22px,1fr));gap:3px;margin:6px 0}#ndSess .nsx-seat{height:22px;border-radius:4px 4px 2px 2px;border:2px solid #000;position:relative}" +
+      "#ndSess .nsx-seat.away{opacity:.3}#ndSess .nsx-seat.on{outline:3px solid #ffe08a;box-shadow:0 0 12px 4px #ffe08a}#ndSess .nsx-seat.you{border-color:#fff}#ndSess .nsx-seat.chair{border-color:#c9a24a;border-style:double}" +
+      "#ndSess .nsx-seat i{position:absolute;bottom:-1px;right:1px;font:700 9px system-ui;color:#000;font-style:normal}#ndSess .nsx-q{margin:4px 0 0 16px;padding:0}#ndSess .nsx-q li{margin:1px 0}" +
+      "#ndSess .nsx-board{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;text-align:center;margin:6px 0}#ndSess .nsx-board div{background:#000;border:1px solid #444;border-radius:4px;padding:4px;font:700 18px ui-monospace,monospace}#ndSess .nsx-board small{display:block;font:600 10px system-ui;color:#cfc8b4}" +
+      "#ndSess .nsx-acts{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}#ndSess .nsx-acts button{background:#ffe08a;color:#111;border:0;border-radius:4px;padding:5px 8px;font:700 12px system-ui;cursor:pointer}#ndSess .nsx-acts button.g{background:#2a2d35;color:#fff;border:1px solid #6b6f7a}" +
+      "#ndSess .nsx-gavel{display:inline-block;transform-origin:80% 80%}#ndSess .nsx-gavel.hit{animation:ndGav .5s ease-out}@keyframes ndGav{0%{transform:rotate(-40deg)}60%{transform:rotate(10deg)}100%{transform:rotate(0)}}"; document.head.appendChild(st); }
+  const per = id => { try{ if(id === "you") return G.you; return byId(isNaN(+id) ? id : +id) || null; }catch(e){ return null; } };
+  const MT = {adjourn:"Move to adjourn", recess:"Move to recess", table:"Move to table", amend:"Offer an amendment", previous_question:"Move the previous question"};
+  /* JUPITER's ONUM_SESSION (bodyId, kind, procedure, stage, chairId, floorId, seats[{seatId, personId}], votes[{personId, vote}] ...) into the shape drawn below */
+  function norm(S){
+    if(!S) return null; if(S.floorId === undefined && S.chairId === undefined && !(S.seats && S.seats[0] && S.seats[0].personId !== undefined)) return S;
+    let body = null; try{ body = window.ONUM_PROCEDURE[S.procedure].bodies[S.kind]; }catch(e){}
+    const st = body && body.stages ? body.stages.find(x => x.id === S.stage) : null, allows = st && Array.isArray(st.allows) ? st.allows : ["seek", "yield", "point_of_order", "vote"];
+    const V = {}; (S.votes || []).forEach(v => { if(v) V[v.personId] = v.vote; });
+    const out = S.walkedOut || [], acts = [];
+    if(allows.indexOf("seek") >= 0 && S.floorId !== "you" && (S.queue || []).indexOf("you") < 0) acts.push({id:"seek", label:"Ask for the floor"});
+    if(allows.indexOf("yield") >= 0 && S.floorId === "you") acts.push({id:"yield", label:"Yield the floor"});
+    if(allows.indexOf("point_of_order") >= 0) acts.push({id:"pointOfOrder", label:"Point of order"});
+    if(allows.indexOf("motion") >= 0) Object.keys((body && body.motions) || {}).filter(k => k !== "point_of_order").forEach(k => acts.push({id:"motion", label:MT[k] || "Move: " + k.replace(/_/g, " "), arg:k}));
+    if(allows.indexOf("filibuster") >= 0 && S.floorId === "you") acts.push({id:"filibuster", label:S.filibuster ? "Keep holding the floor" : "Filibuster"});
+    if(allows.indexOf("walkout") >= 0 && out.indexOf("you") < 0) acts.push({id:"walkout", label:"Walk out"});
+    if(S.chairId === "you") acts.push({id:"next", label:"Next order of business"});
+    const voting = allows.indexOf("vote") >= 0;
+    return {open:true, title:(S.stageName || S.stage || "In session") + (S.kind ? " \u00b7 " + String(S.kind).replace(/_/g, " ") : ""), chair:S.chairId, floor:S.floorId,
+      gavel:{at:String(S.stage) + "|" + S.floorId}, clock:S.clock && (S.clock.total || S.clock.remaining) ? {left:S.clock.remaining, label:S.floorId != null && S.clock.speaker ? "Speaker " + Math.floor(S.clock.speaker / 60) + ":" + String(S.clock.speaker % 60).padStart(2, "0") + " \u00b7 stage" : "Stage"} : null,
+      seats:(S.seats || []).map(x => { const p = per(x.personId) || {}; return {id:x.personId, name:p.name, party:p.party, state:p.state, present:out.indexOf(x.personId) < 0}; }),
+      queue:S.queue || [], roll:(voting || (S.votes && S.votes.length)) ? {open:voting, votes:V} : null, motion:S.motion, speak:allows.indexOf("speak") >= 0 && S.floorId === "you", actions:acts, filibuster:S.filibuster}; }
+  let lastGavel = null;
+  function render(){
+    try{
+      const S = norm(window.ONUM_SESSION), open = S && (S.open === true || S.active === true || (S.open == null && S.active == null && (S.seats || S.floor || S.roll)));
+      let P = document.getElementById("ndSess");
+      if(!open){ if(P) P.remove(); return; }
+      css(); if(!P){ P = document.createElement("div"); P.id = "ndSess"; P.setAttribute("role", "region"); P.setAttribute("aria-label", "Session"); document.body.appendChild(P); }
+      P.classList.toggle("min", !!SN.min);
+      const fl = idOf(S.floor), ch = idOf(S.chair), you = (S.seats || []).some(x => idOf(x) === "you") ? "you" : (G.you ? G.you.id : 0), seats = Array.isArray(S.seats) ? S.seats : [];
+      const floorName = fl != null ? nm(fl, S.floor && S.floor.name) : "", flSeat = seats.find(s => idOf(s) === fl) || {};
+      const R = S.roll || null, ay = R ? (R.aye != null ? R.aye : R.yes) : null, no = R ? (R.no != null ? R.no : R.nay) : null, pr = R ? (R.present != null ? R.present : R.abstain) : null;
+      const cnt = v => { if(!R || !R.votes) return null; return Object.keys(R.votes).filter(k => String(R.votes[k]).toLowerCase() === v).length; };
+      const Q = Array.isArray(S.queue) ? S.queue : [];
+      const gk = S.gavel ? (typeof S.gavel === "object" ? (S.gavel.at || S.gavel.t || JSON.stringify(S.gavel)) : String(S.gavel)) : null, hit = gk && gk !== lastGavel; lastGavel = gk;
+      const acts = [];
+      const OS = window.onumSession || {};
+      if(Array.isArray(S.actions)) S.actions.forEach(a => { if(a && a.id) acts.push({id:a.id, label:a.label || ACT_T[a.id] || a.id, arg:a.arg}); });
+      else Object.keys(ACT_T).forEach(k => { if(typeof OS[k] === "function" && k !== "vote") acts.push({id:k, label:ACT_T[k]}); });
+      const canVote = typeof OS.vote === "function" && R && R.open !== false && !(R.votes && (R.votes[you] != null || R.votes.you != null));
+      P.innerHTML = '<h3><span><span class="nsx-gavel' + (hit ? " hit" : "") + '" aria-hidden="true">\u2696</span> ' + esc4(S.title || S.room || "In session") + '</span><button type="button" id="nsxMin">' + (SN.min ? "Show" : "Hide") + '</button></h3><div class="ns-body">' +
+        '<div class="nsx-row"><span>' + (ch != null ? "Chair: " + esc4(nm(ch)) : "") + '</span><span>' + esc4(clockTxt(S.clock)) + '</span></div>' +
+        (S.motion ? '<div class="nsx-row"><span>Motion: ' + esc4(S.motion.kind || S.motion.target || S.motion.name || "pending") + (S.motion.by != null ? " \u00b7 " + esc4(nm(S.motion.by)) : "") + '</span></div>' : "") + (S.filibuster ? '<div class="nsx-row"><span>A filibuster holds the floor.</span></div>' : "") + (fl != null ? '<div class="nsx-floor">On the floor: <b>' + esc4(floorName) + '</b>' + (flSeat.party ? ' \u00b7 ' + esc4(flSeat.party) : "") + (flSeat.state ? ' \u00b7 ' + esc4(flSeat.state) : "") + '</div>' : '<div class="nsx-row"><span>The floor is open.</span></div>') +
+        (seats.length ? '<div class="nsx-seats">' + seats.map(s => { const id = idOf(s), v = R && R.votes ? R.votes[id] : null; return '<div class="nsx-seat' + (id === fl ? " on" : "") + (id === you || id === "you" ? " you" : "") + (id === ch ? " chair" : "") + (s.present === false ? " away" : "") + '" style="background:' + pcol(s.party) + '" title="' + esc4(nm(id, s.name)) + (v ? " \u00b7 " + esc4(v) : "") + '">' + (v ? '<i>' + esc4(String(v)[0].toUpperCase()) + '</i>' : "") + '</div>'; }).join("") + '</div>' : "") +
+        (Q.length ? '<div><b style="color:#ffe08a">Waiting to speak</b><ol class="nsx-q">' + Q.slice(0, 8).map(q => '<li>' + esc4(nm(idOf(q), q && q.name)) + '</li>').join("") + '</ol>' + (Q.length > 8 ? '<small>and ' + (Q.length - 8) + ' more</small>' : "") + '</div>' : "") +
+        (R ? '<div class="nsx-board"><div>' + (ay != null ? ay : cnt("aye") || 0) + '<small>AYE</small></div><div>' + (no != null ? no : cnt("no") || 0) + '<small>NO</small></div><div>' + (pr != null ? pr : cnt("present") || 0) + '<small>PRESENT</small></div></div>' + (R.needed ? '<div class="nsx-row"><span>Needed to carry</span><span>' + esc4(R.needed) + '</span></div>' : "") : "") +
+        (S.speak ? '<div class="nsx-row"><input id="nsxSay" placeholder="Say to the chamber\u2026" style="flex:1;background:#000;color:#fff;border:1px solid #6b6f7a;border-radius:4px;padding:4px"><button type="button" id="nsxSpeak" style="background:#ffe08a;color:#111;border:0;border-radius:4px;font-weight:700;cursor:pointer">Speak</button></div>' : "") + '<div class="nsx-acts">' + (canVote ? '<button type="button" data-v="aye">Vote aye</button><button type="button" data-v="no">Vote no</button><button type="button" class="g" data-v="present">Present</button>' : "") +
+          acts.map(a => '<button type="button" class="g" data-a="' + esc4(a.id) + '">' + esc4(a.label) + '</button>').join("") + '</div></div>';
+      const sb = P.querySelector("#nsxSpeak"); if(sb) sb.onclick = () => { const i = P.querySelector("#nsxSay"), t = i && i.value.trim(); if(!t) return; try{ (window.onumSession || {}).speak(t); }catch(e){} };
+      P.querySelector("#nsxMin").onclick = () => { SN.min = !SN.min; render(); };
+      P.querySelectorAll("[data-v]").forEach(b => b.onclick = () => { try{ OS.vote(b.getAttribute("data-v")); }catch(e){ try{ console.warn("onumSession.vote", e); }catch(e2){} } });
+      P.querySelectorAll("[data-a]").forEach(b => b.onclick = () => { const id = b.getAttribute("data-a"), a = acts.find(x => x.id === id); try{ const O = window.onumSession || {}; if(typeof O[id] === "function") O[id](a && a.arg); else if(typeof O.act === "function") O.act(id, a && a.arg); }catch(e){ try{ console.warn("onumSession." + id, e); }catch(e2){} } });
+    }catch(e){ try{ console.warn("NEPTUNE-SESSION render", e); }catch(e2){} }
+  }
+  SN.render = render;
+  addEventListener("onum-session", () => render());
+  ["onum-rename"].forEach(ev => addEventListener(ev, () => { if(window.ONUM_SESSION) render(); }));
+  /* the clock ticks between events; a poll catches a session published without an event */
+  let sig = ""; setInterval(() => { try{ const S = window.ONUM_SESSION; const s = S ? JSON.stringify([S.open, S.active, S.floor, S.floorId, S.stage, S.clock, S.roll && [S.roll.aye, S.roll.no, S.roll.yes, S.roll.nay], (S.votes || []).length, (S.queue || []).length]) : ""; if(s !== sig){ sig = s; render(); } }catch(e){} }, 1000);
+  console.log("NEPTUNE session view ready");
+}catch(e){ try{ console.warn("NEPTUNE-SESSION block", e); }catch(e2){} }
+/* NEPTUNE-SESSION END */
+/* NEPTUNE-BUILDLINE 20261020t: a small 'Build <stamp>' line at the foot of Settings */
+try{ const _sc = settingsCard; settingsCard = function(){ const r = _sc.apply(this, arguments); try{ const m = document.querySelector('meta[name="onum-build"]'), c = typeof card !== "undefined" ? card : null;
+    if(m && c && !c.querySelector("#ndSetBuild")){ const d = document.createElement("div"); d.id = "ndSetBuild"; d.textContent = "Build " + m.content; d.style.cssText = "margin-top:10px;font:11px ui-monospace,monospace;color:#5a5446;text-align:right"; c.appendChild(d); } }catch(e){} return r; }; }catch(e){}
 /* NEPTUNE-POLITIES BEGIN — breakaway nations on the Union map.
    Feed (from JUPITER; read if present, guarded if not): window.ONUM_POLITIES = [{id?, name, leader, govType, memberStates:[state names]}]
    (an object keyed by id is accepted too), plus a CustomEvent 'onum-polity-change' (detail: one polity, or {id|name, removed:true}
