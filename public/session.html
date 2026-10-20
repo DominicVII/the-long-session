@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261020e">
+<meta name="onum-build" content="20261020f">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -10707,6 +10707,325 @@ setTimeout(() => { try{
   document.addEventListener("click", ev => { const b = ev.target.closest("[data-cvreadid]"); if(!b) return; ev.stopPropagation(); cvRead(CV.th.find(x => x.id === +b.dataset.cvreadid)); }, true);
 }catch(e){} }, 2000);
 setInterval(() => { try{ cvScan(); }catch(e){} }, 600);
+
+/* ══ voice hooks: calls, read-back texts, Conversations and approaches go to Neptune's onumVoice ══ */
+const VH = {said:new Map(), call:{id:null, n:0}, rb:(function(){ try{ return localStorage.getItem("onum.readback") === "1"; }catch(e){ return false; } })()};
+function vhSay(id, text, o){ if(id && typeof id === "object") id = id.id != null ? id.id : (id.name || "npc");
+  if(!window.onumVoice || typeof window.onumVoice.speak !== "function" || !text) return;
+  const k = String(text).trim().slice(0, 120), t = VH.said.get(k), now = performance.now();
+  if(t && now - t < 8000) return; VH.said.set(k, now); if(VH.said.size > 200) VH.said.clear();
+  try{ window.onumVoice.speak(id, String(text), o || {}); }catch(e){}
+}
+/* phone calls: the other end's lines are spoken as they arrive */
+setInterval(() => { try{
+  const c = (typeof PB !== "undefined") ? PB.call : null;
+  if(!c){ VH.call.id = null; VH.call.n = 0; return; }
+  if(VH.call.id !== c.id){ VH.call.id = c.id; VH.call.n = 0; }
+  while(VH.call.n < c.lines.length){ const l = c.lines[VH.call.n++]; if(l && l.w !== "You") vhSay(c.id, l.t); }
+}catch(e){} }, 400);
+/* approaches: you hear them when they stop you */
+(function(){ if(typeof apSpeak !== "function") return; const base = apSpeak;
+  apSpeak = function(m, a, to){ const r = base.apply(this, arguments);
+    try{ if(!to && m){ const first = m.say; setTimeout(() => vhSay(m.id, m.say || first), 1200); } }catch(e){} return r; }; })();
+/* texts and DMs read back, when that is switched on */
+(function(){ if(typeof dmPush !== "function") return; const base = dmPush;
+  dmPush = function(id, from, t, extra){ const r = base.apply(this, arguments);
+    try{ if(VH.rb && from !== "you" && t){ const p = byId(id); vhSay(id, (p ? p.name.split(" ")[0] + " writes: " : "") + t); } }catch(e){} return r; }; })();
+/* Conversations: Read aloud speaks each line in its speaker's voice, in turn */
+if(typeof cvRead === "function") cvRead = function(T){ if(!T || !window.onumVoice) return; try{ window.onumVoice.stop && window.onumVoice.stop(); }catch(e){} VH.said.clear(); T.lines.slice(-10).forEach(l => vhSay(l.id === "you" ? "you" : l.id, l.t)); };
+/* the read-back switch lives on the phone's Texts tab */
+document.addEventListener("change", ev => { const t = ev.target; if(t && t.id === "vhRb"){ VH.rb = !!t.checked; try{ localStorage.setItem("onum.readback", VH.rb ? "1" : "0"); }catch(e){} } }, true);
+setInterval(() => { try{ const w = document.getElementById("pbPhone"); if(!w || typeof PB === "undefined" || PB.tab !== "texts" || !window.onumVoice) return; const b = w.querySelector(".pb__body"); if(b && !b.querySelector("#vhRb")) b.insertAdjacentHTML("afterbegin", '<label style="display:block;padding:6px 0;font-size:14px"><input type="checkbox" id="vhRb"' + (VH.rb ? " checked" : "") + '> Read messages back aloud</label>'); }catch(e){} }, 800);
+
+/* ══ engine: time-sliced background systems, distance-tiered minds, compressed checked saves, log caps, perf overlay ══ */
+/* ── 1. a cooperative scheduler: background systems share at most 4 ms of each frame ── */
+const ENG = {budget:4, jobs:[], q:[], cost:{}, frames:0, simMs:0, last:performance.now()};
+function engJob(name, everyMs, fn){ ENG.jobs.push({name, every:everyMs, fn, next:performance.now() + Math.random() * everyMs}); }
+function engDefer(name, fn){ ENG.q.push({name, fn}); }
+function engCost(name, ms){ const c = ENG.cost[name] || (ENG.cost[name] = {ms:0, n:0, max:0}); c.ms = c.ms * 0.95 + ms * 0.05; c.n++; if(ms > c.max) c.max = ms; else c.max *= 0.999; }
+function engRun(){
+  const t0 = performance.now(); let used = 0;
+  /* due periodic jobs, nearest-due first */
+  const due = ENG.jobs.filter(j => j.next <= t0).sort((a, b) => a.next - b.next);
+  for(const j of due){ if(used >= ENG.budget) break; const s = performance.now(); try{ j.fn(); }catch(e){} const d = performance.now() - s; used += d; engCost(j.name, d); j.next = s + j.every; }
+  /* deferred one-shot work (day rollover pieces) */
+  while(ENG.q.length && used < ENG.budget){ const w = ENG.q.shift(); const s = performance.now(); try{ w.fn(); }catch(e){} const d = performance.now() - s; used += d; engCost(w.name, d); }
+  ENG.simMs = ENG.simMs * 0.9 + used * 0.1; ENG.frames++;
+}
+(function pump(){ try{ engRun(); }catch(e){} if(typeof requestAnimationFrame === "function" && !document.hidden) requestAnimationFrame(pump); else setTimeout(pump, 250); })();
+document.addEventListener("visibilitychange", () => { if(!document.hidden) try{ requestAnimationFrame(() => engRun()); }catch(e){} });
+try{ if(typeof ohTick === "function"){ const real = ohTick; ohTick = function(){ engDefer("officeholders", real); }; } }catch(e){}
+try{ if(typeof apTick === "function"){ const real = apTick; apTick = function(){ engDefer("approaches", real); }; } }catch(e){}
+try{ if(typeof cvScan === "function"){ const real = cvScan; cvScan = function(){ engDefer("conversations", real); }; } }catch(e){}
+/* day rollover: the heavy mind/state/party passes run one per frame instead of all in one frame */
+try{ if(typeof scDay === "function"){ const real = scDay; scDay = function(){ const a = arguments; engDefer("statecraft", () => real.apply(null, a)); }; } }catch(e){}
+try{ if(typeof cpDay === "function"){ const real = cpDay; cpDay = function(){ const a = arguments; engDefer("counterparts", () => real.apply(null, a)); }; } }catch(e){}
+try{ if(typeof phDay === "function"){ const real = phDay; phDay = function(){ const a = arguments; engDefer("parties", () => real.apply(null, a)); }; } }catch(e){}
+/* ── 2. minds near you think more often ── */
+function engTier(p){ try{ if(!p || p.x == null || p.room !== G.room) return 3; const d = Math.hypot(p.x - cam.x, p.z - cam.z); return d < 6 ? 0 : d < 14 ? 1 : 2; }catch(e){ return 3; } }
+window.onumSimTier = engTier;
+engJob("minds", 500, () => {
+  if(!G || !G.members) return;
+  ENG.mi = (ENG.mi || 0) + 1;
+  const M = window.ONUM_MINDS = window.ONUM_MINDS || {};
+  const ev = (typeof everyone === "function") ? everyone() : G.members;
+  let n = 0;
+  for(const p of ev){ if(!p || p.gone) continue; const t = engTier(p), every = [1, 4, 12, 40][t];
+    if((ENG.mi + idNum(String(p.id))) % every) continue;
+    try{ if(typeof onumMindOf === "function") M[p.id] = Object.assign(M[p.id] || {}, onumMindOf(p.id) || {}, {tier:t}); }catch(e){}
+    if(++n > 12) break; }
+});
+/* ── 3. logs never grow without end ── */
+function engTrim(){
+  const cap = (a, n) => { if(Array.isArray(a) && a.length > n) a.splice(0, a.length - n); };
+  try{ cap(G.moments, 60); cap(G.feedLog, 300); cap(G.mail, 220); cap(G.news, 200); cap(G.log, 400); cap(G.journal, 300); cap(G.lastActs, 120); }catch(e){}
+  try{ if(G.vox && G.vox.posts) cap(G.vox.posts, 60); }catch(e){}
+  try{ const D = G.dm; if(D && D.th) Object.keys(D.th).forEach(k => cap(D.th[k], 60)); if(D && D.leaks) cap(D.leaks, 80); }catch(e){}
+  try{ (G.members || []).forEach(m => { cap(m.mem, 80); cap(m.chat, 20); cap(m.journal, 40); cap(m.memory, 80); }); }catch(e){}
+  try{ if(typeof CV !== "undefined") cap(CV.th, 150); }catch(e){}
+  try{ if(G.sc){ cap(G.sc.log, 200); cap(G.sc.crises, 80); } }catch(e){}
+  try{ if(G.ph) Object.values(G.ph.p).forEach(P => { cap(P.snaps, 60); cap(P.notes, 40); cap(P.votes, 40); }); }catch(e){}
+  try{ if(G.dist){ cap(G.dist.gossip, 120); cap(G.dist.ledger, 400); } }catch(e){}
+}
+engJob("trim", 30000, engTrim);
+/* ── 4. saves: compressed, checksummed, mirrored to IndexedDB ── */
+function engHash(s){ let h = 2166136261; for(let i = 0; i < s.length; i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(36) + ":" + s.length.toString(36); }
+/* LZW into UTF-16 code units (15 bits each, so the string stays valid in localStorage); no dependencies */
+function engPack(str){
+  str = str.replace(/[\u0001\u0100-\uffff]/g, ch => "\u0001" + ch.charCodeAt(0).toString(16).padStart(4, "0"));
+  let dict = new Map(), next = 256, w = "", buf = 0, bits = 0; const out = [], W = 16;
+  const emit = c => { buf = buf * 65536 + c; bits += W; while(bits >= 15){ bits -= 15; const v = Math.floor(buf / Math.pow(2, bits)) & 0x7fff; out.push(String.fromCharCode(v + 0x20)); buf = buf % Math.pow(2, bits); } };
+  for(let i = 0; i < str.length; i++){
+    const c = str.charAt(i), wc = w + c;
+    if(!w){ w = c; continue; }
+    if(dict.has(wc)){ w = wc; continue; }
+    emit(w.length === 1 ? w.charCodeAt(0) : dict.get(w));
+    dict.set(wc, next++);
+    if(next >= 65535){ dict = new Map(); next = 256; emit(65535); }
+    w = c;
+  }
+  if(w) emit(w.length === 1 ? w.charCodeAt(0) : dict.get(w));
+  if(bits > 0){ out.push(String.fromCharCode(((buf * Math.pow(2, 15 - bits)) & 0x7fff) + 0x20)); }
+  return out.length + "~" + out.join("");
+}
+function engUnpack(s0){
+  const k = s0.indexOf("~"); const n = +s0.slice(0, k), s = s0.slice(k + 1);
+  let dict = [], next = 256, buf = 0, bits = 0, i = 0, prev = null; const out = [], W = 16;
+  const read = () => { while(bits < W){ if(i >= s.length) return -1; buf = buf * 32768 + ((s.charCodeAt(i++) - 0x20) & 0x7fff); bits += 15; } bits -= W; const p2 = Math.pow(2, bits); const c = Math.floor(buf / p2); buf = buf % p2; return c; };
+  const total = Math.floor(n * 15 / W);
+  for(let r = 0; r < total; r++){
+    const c = read(); if(c < 0) break;
+    if(c === 65535){ dict = []; next = 256; prev = null; continue; }
+    let e; if(c < 256) e = String.fromCharCode(c); else if(dict[c] !== undefined) e = dict[c]; else if(c === next && prev !== null) e = prev + prev[0]; else break;
+    out.push(e);
+    if(prev !== null){ dict[next++] = prev + e[0]; }
+    prev = e;
+  }
+  return out.join("").replace(/\u0001([0-9a-f]{4})/g, (m, h) => String.fromCharCode(parseInt(h, 16)));
+}
+/* the wrapped form is "ONZ1|<hash>|<packed>"; anything else is the old plain JSON */
+function engWrap(json){ try{ const z = engPack(json); if(engUnpack(z) !== json) return json; return "ONZ1|" + engHash(json) + "|" + z; }catch(e){ return json; } }
+function engOpen(raw){ if(!raw || raw.slice(0, 5) !== "ONZ1|") return raw; const a = raw.indexOf("|", 5); const h = raw.slice(5, a); const j = engUnpack(raw.slice(a + 1)); if(engHash(j) !== h) return null; return j; }
+const ENG_IDB = {db:null, cache:null};
+try{ const rq = indexedDB.open("onum-saves", 1); rq.onupgradeneeded = () => { try{ rq.result.createObjectStore("s"); }catch(e){} };
+  rq.onsuccess = () => { ENG_IDB.db = rq.result; try{ const g = ENG_IDB.db.transaction("s").objectStore("s").get("career"); g.onsuccess = () => { ENG_IDB.cache = g.result || null; }; }catch(e){} }; }catch(e){}
+function engIdbPut(raw){ try{ if(!ENG_IDB.db) return; ENG_IDB.db.transaction("s", "readwrite").objectStore("s").put(raw, "career"); ENG_IDB.cache = raw; }catch(e){} }
+(function(){
+  const baseParse = parseSaveRaw;
+  parseSaveRaw = function(raw){ try{ return baseParse(engOpen(raw)); }catch(e){ return null; } };
+  const baseWrite = writeSaveKey;
+  writeSaveKey = function(key, raw){ const t = performance.now(); const w = (typeof raw === "string" && raw.length > 20000 && raw.charAt(0) === "{") ? engWrap(raw) : raw; const ok = baseWrite(key, w); if(key === SAVE_KEY && ok){ engCost("save-write", performance.now() - t); ENG.lastSave = {plain:raw.length, stored:w.length, at:Date.now()}; engIdbPut(w); } return ok; };
+  const basePick = pickNewestSave;
+  pickNewestSave = function(){ let b = basePick(); try{ const d = ENG_IDB.cache ? parseSaveRaw(ENG_IDB.cache) : null; if(d && (!b || isBetterSave(d, b))) b = d; }catch(e){} return b; };
+})();
+/* autosave on a steady beat, never mid-walk (queueSave already refuses then) */
+engJob("autosave", 90000, () => { try{ if(G && G.running && !G.over) queueSave(false); }catch(e){} });
+addEventListener("pagehide", () => { try{ save(false, true); }catch(e){} });
+/* ── 5. what each system costs, on screen (F9 or ?perf=1) ── */
+function engOverlay(on){
+  let w = document.getElementById("engPerf");
+  if(!on){ if(w) w.remove(); return; }
+  if(!w){ w = document.createElement("div"); w.id = "engPerf"; w.style.cssText = "position:fixed;right:8px;top:60px;z-index:99999;background:rgba(10,12,16,.92);color:#d6f5d6;font:12px/1.35 ui-monospace,monospace;padding:8px 10px;border:1px solid #2e3a2e;border-radius:6px;pointer-events:none;white-space:pre;min-width:220px"; document.body.appendChild(w); }
+  const R = (window.ONUM_PROF && ONUM_PROF.ring) || [];
+  const last = R.slice(-60), avg = {};
+  last.forEach(f => Object.keys(f).forEach(k => { if(typeof f[k] === "number") avg[k] = (avg[k] || 0) + f[k] / last.length; }));
+  const fps = (function(){ try{ return Math.round(_hzEma / (_stride || 1)); }catch(e){ return 0; } })();
+  let t = "fps " + fps + "   frame " + (avg.total || 0).toFixed(1) + " ms\n";
+  ["tick","crowd","lighting","shadow","render","hud","feed","sync","furnish","ui"].forEach(k => { if(avg[k] != null) t += k.padEnd(10) + (avg[k] || 0).toFixed(2) + " ms\n"; });
+  t += "-- background (budget " + ENG.budget + " ms) " + ENG.simMs.toFixed(2) + " ms\n";
+  Object.keys(ENG.cost).sort((a, b) => ENG.cost[b].ms - ENG.cost[a].ms).slice(0, 10).forEach(k => { const c = ENG.cost[k]; t += k.padEnd(14) + c.ms.toFixed(2) + " (max " + c.max.toFixed(1) + ")\n"; });
+  if(ENG.lastSave) t += "save " + Math.round(ENG.lastSave.plain / 1024) + " KB -> " + Math.round(ENG.lastSave.stored * 2 / 1024) + " KB stored\n";
+  try{ if(performance.memory) t += "heap " + Math.round(performance.memory.usedJSHeapSize / 1048576) + " MB\n"; }catch(e){}
+  w.textContent = t;
+}
+ENG.overlay = /(?:\?|&)perf=1/.test(location.search || "");
+addEventListener("keydown", e => { if(e.key === "F9"){ ENG.overlay = !ENG.overlay; engOverlay(ENG.overlay); e.preventDefault(); } });
+setInterval(() => { if(ENG.overlay) engOverlay(true); }, 500);
+window.onumEngine = ENG;
+
+/* ══ research: minds form theories and run experiments in tiers (MARS ruleset); the frontier never closes; works unlock economy and civic projects ══ */
+const RS_Q = [
+  {id:"mech", t:1, f:"mechanics", q:"Do forces add like arrows?", works:[{k:"engine", n:"a steam engine", kind:"machine"}]},
+  {id:"thermo", t:1, f:"thermodynamics", q:"Where does the heat in a working engine go?", needs:["mech"], works:[{k:"generator", n:"a dynamo generator", kind:"machine"}]},
+  {id:"em", t:1, f:"electromagnetism", q:"Are electricity and magnetism one thing?", works:[{k:"grid", n:"a district power grid", kind:"building"}]},
+  {id:"qm", t:2, f:"quantum mechanics", q:"Why does light come in lumps?", needs:["thermo", "em"], works:[{k:"semi", n:"a semiconductor junction", kind:"tool"}, {k:"laser", n:"a laser", kind:"machine"}]},
+  {id:"ent", t:3, f:"entanglement", q:"Can two particles share one state across a room?", needs:["qm"], works:[{k:"qcomm", n:"a secure quantum line", kind:"tool"}, {k:"qsense", n:"a quantum sensor", kind:"tool"}]},
+  {id:"deco", t:3, f:"decoherence", q:"Why do big things stop behaving like small ones?", needs:["qm"], works:[{k:"qpc", n:"an early quantum computer", kind:"machine"}]},
+  {id:"qgrav", t:4, f:"quantum gravity", q:"Is space itself made of pieces?", needs:["ent", "deco"], works:[{k:"tqg", n:"a theory of quantum gravity", kind:"theory"}]},
+  {id:"dark", t:4, f:"cosmology", q:"What holds the galaxies together?", needs:["em", "qm"], works:[{k:"tdark", n:"a theory of the missing mass", kind:"theory"}]},
+  {id:"mind", t:4, f:"the mind", q:"Can a machine know that it knows?", needs:["deco"], works:[{k:"tmind", n:"a theory of machine awareness", kind:"theory"}]}
+];
+const RS_FAIL = {1:[0.10, 0.20], 2:[0.25, 0.40], 3:[0.40, 0.60], 4:[0.70, 0.90]};
+const RS_FRONT = ["the arrow of time", "why the constants are what they are", "matter that should not exist", "information inside a black hole", "life from chemistry", "a fifth force", "the shape of the universe", "memory in water", "the limit of computation", "whether the vacuum decays"];
+const RS_WORDS = {
+  ok:["It held. Three times, it held.", "I think we have it. Do not tell anyone yet.", "The numbers came back the way the theory said they would."],
+  fail:["Nothing. The apparatus leaks, or I do.", "It failed again, but now I know one more way it fails.", "Wrong. Beautifully wrong, but wrong."],
+  null:["Inconclusive. The data will bear any reading you like.", "Half the room says yes and half says no, and both have a paper."],
+  drift:["I have been thinking about something else entirely.", "I want to try a different question for a while.", "I am bored of heat. Light is more interesting."],
+  tired:["I need a week away from the bench.", "I keep making the same mistake. I should sleep."]
+};
+function rsEnsure(){
+  if(G.rs && G.rs.v === 1) return G.rs;
+  G.rs = {v:1, qs:{}, works:[], theories:[], ppl:{}, front:0, fund:1, n:0, log:[]};
+  RS_Q.forEach(q => { G.rs.qs[q.id] = {id:q.id, st:"open", prog:0, boost:0, tries:0}; });
+  return G.rs;
+}
+function rsQ(id){ return RS_Q.find(q => q.id === id) || (G.rs.extra || []).find(q => q.id === id); }
+function rsAllQ(){ return RS_Q.concat(rsEnsure().extra || []); }
+function rsOpen(){ const R = rsEnsure(); return rsAllQ().filter(q => { const s = R.qs[q.id]; return s && s.st !== "done" && (q.needs || []).every(n => R.qs[n] && R.qs[n].st === "done"); }); }
+function rsFail(q){ if(q.t <= 4){ const r = RS_FAIL[q.t]; return r[0] + (seedOf("rf:" + q.id) % 100) / 100 * (r[1] - r[0]); } return 1 - 0.1 * Math.pow(0.7, q.t - 4); }
+/* the researchers: people in the Republic with a mind for it, chosen once; their skill, energy and interest are their own */
+function rsPeople(){
+  const R = rsEnsure(); let all = []; try{ all = everyone().filter(p => p && !p.gone && p !== G.you); }catch(e){ all = (G.members || []).slice(); }
+  if(Object.keys(R.ppl).length < 6){ all.filter(p => (seedOf("sci:" + p.id) % 9) === 0).slice(0, 8).forEach(p => { if(!R.ppl[p.id]) R.ppl[p.id] = {id:p.id, sk:30 + seedOf("sk:" + p.id) % 45, fat:0, mot:55 + seedOf("mo:" + p.id) % 40, on:null, idle:0, done:0}; });
+    if(!Object.keys(R.ppl).length) all.slice(0, 4).forEach(p => { R.ppl[p.id] = {id:p.id, sk:40, fat:0, mot:60, on:null, idle:0, done:0}; }); }
+  return Object.values(R.ppl).map(r => ({r, p:all.find(x => x.id === r.id)})).filter(x => x.p);
+}
+function rsSay(p, kind){
+  const line = pick(RS_WORDS[kind]); try{ if(p.room === G.room){ p.say = line; p.sayT = 4; speakAt(p, line); } }catch(e){}
+  try{ remember(p, line, 2, false); }catch(e){} return line;
+}
+function rsLine(t, big){ const R = rsEnsure(); R.log.unshift({d:G.day, t}); if(R.log.length > 40) R.log.length = 40; try{ lLog(t, "science"); }catch(e){} if(big){ try{ feed(t, "world"); }catch(e){} } }
+function rsWork(w, q, inv, stage){
+  const R = rsEnsure(); let x = R.works.find(o => o.id === w.k);
+  if(!x){ x = {id:w.k, name:w.n, kind:w.kind, inventor:inv ? inv.name : "unknown", inventorId:inv ? inv.id : null, stage:"idea", day:G.day, desc:"From work on " + q.f + ": " + q.q}; R.works.push(x); }
+  if(stage && stage !== x.stage){ x.stage = stage; x.day = G.day; if(stage === "done") rsUnlock(x); }
+  rsPublish(x); return x;
+}
+/* what a finished work changes: machines and grids lift what the Republic makes; tools and theories lift what it knows and how it argues */
+function rsUnlock(x){
+  const R = rsEnsure(); R.unlocks = R.unlocks || []; if(R.unlocks.includes(x.id)) return; R.unlocks.push(x.id);
+  try{ if(G.money && x.kind !== "theory") G.money.index = clamp(G.money.index + (x.kind === "building" ? 3 : 2), 42, 190); }catch(e){}
+  try{ if(G.you) G.you.approval = clamp(G.you.approval + 0.5, 0, 100); }catch(e){}
+  try{ const E = G.eng; if(E && x.kind !== "building") E.talent = Math.min(100, E.talent + 0.6); }catch(e){}
+  rsLine(cap(x.name) + " is finished, built by " + x.inventor + ". " + ({machine:"Workshops are already asking for one.", building:"A civic project can now be put to the Assembly.", tool:"The universities want it first.", vehicle:"It is on the roads by spring.", theory:"It is in the journals and the debates have started."}[x.kind] || ""), true);
+}
+function rsPublish(x){
+  const R = rsEnsure(); window.ONUM_WORKS = R.works.map(w => ({id:w.id, name:w.name, kind:w.kind, inventor:w.inventor, stage:w.stage, day:w.day, desc:w.desc}));
+  window.ONUM_UNLOCKS = (R.unlocks || []).slice();
+  try{ window.dispatchEvent(new CustomEvent("onum-work", {detail:x ? {id:x.id, stage:x.stage, day:x.day} : null})); }catch(e){}
+}
+/* past the fourth tier the frontier writes its own questions: each settled one raises more, harder, but never certain to fail */
+function rsFrontier(from){
+  const R = rsEnsure(); R.extra = R.extra || []; R.front++;
+  const t = Math.max(5, (from.t || 4) + (from.t >= 5 ? 1 : 1)), topic = RS_FRONT[(R.front * 7 + seedOf(from.id)) % RS_FRONT.length], id = "f" + R.front;
+  const nth = R.extra.filter(x => x.f === topic).length, roman = nth === 0 ? "" : nth < 5 ? [" (II)", " (III)", " (IV)", " (V)"][nth - 1] : " (" + (nth + 1) + ")";
+  const q = {id, t, f:topic, q:"An open question, raised by the work on " + from.f + ": " + topic + ".", needs:[from.id], works:[{k:"w" + id, n:"a theory of " + topic + roman, kind:"theory"}]};
+  R.extra.push(q); R.qs[id] = {id, st:"open", prog:0, boost:0, tries:0}; return q;
+}
+function rsOverturn(q){
+  const R = rsEnsure(), old = R.theories.filter(x => !x.over && x.id !== q.id && x.t >= 2); if(!old.length || !chance(0.15)) return;
+  const o = pick(old); o.over = G.day; rsLine("The new work on " + q.f + " overturns the old account of " + o.f + ". Some of the textbooks are wrong.", true);
+  const w = R.works.find(x => x.id === (rsQ(o.id).works[0] || {}).k && x.kind === "theory"); if(w){ w.desc += " (overturned on day " + G.day + ")"; rsPublish(w); }
+}
+function rsDay(){
+  const R = rsEnsure(); if(!G.you) return;
+  try{ R.fund = clamp(((G.money && G.money.index) || 100) / 100 + (R.gift || 0) / 400, 0.5, 2.2); R.gift = (R.gift || 0) * 0.97; }catch(e){}
+  const open = rsOpen(); if(!open.length) return;
+  rsPeople().forEach(({r, p}) => {
+    /* free will: rest when tired, drift when bored, and the skill fades when unused */
+    r.fat = Math.max(0, r.fat - 4);
+    if(r.fat > 70 || r.mot < 20){ r.fat = Math.max(0, r.fat - 18); r.mot = Math.min(95, r.mot + 6); r.idle++; r.sk = Math.max(5, r.sk - 0.05); if(chance(0.2)) rsSay(p, "tired"); return; }
+    if(!r.on || !open.find(q => q.id === r.on) || chance(0.06)){ const was = r.on; r.on = pick(open).id; if(was && was !== r.on && chance(0.4)) rsSay(p, "drift"); }
+    if(!chance(0.18 + r.mot / 600)){ r.idle++; if(r.idle > 10) r.sk = Math.max(5, r.sk - 0.08); return; }
+    const q = rsQ(r.on), s = R.qs[q.id]; if(!q || !s || s.st === "done") return; s.tries++; r.idle = 0; r.fat += 9 + q.t * 2; r.sk = Math.min(99, r.sk + 0.2);
+    const prior = Object.values(R.qs).filter(x => x.st === "done").length;
+    let ok = (1 - rsFail(q)) * (0.55 + r.sk / 110) * (1 - r.fat / 220) * (0.7 + R.fund * 0.3) * (1 + Math.min(prior, 12) * 0.02) * (1 + s.boost);
+    ok = clamp(ok, 0.003, 0.97); const roll = Math.random();
+    if(q.t === 4 && roll < ok && chance(0.3)){ s.boost += 0.05; rsSay(p, "null"); if(chance(0.4)) rsLine(p.name + "'s results on " + q.f + " are inconclusive. Two papers, two answers.", false); return; }
+    if(roll < ok){
+      s.prog += (0.10 + r.sk / 900) / (1 + (q.t - 1) * 1.0); s.boost = 0; r.sk = Math.min(99, r.sk + 1.5); r.mot = Math.min(99, r.mot + 8); rsSay(p, "ok");
+      q.works.forEach(w => rsWork(w, q, p, s.prog >= 1 ? "done" : s.prog >= 0.5 ? "prototype" : "idea"));
+      if(s.prog >= 1){ s.st = "done"; s.day = G.day; r.done++; R.n++; R.theories.push({id:q.id, f:q.f, t:q.t, by:p.name, d:G.day});
+        rsLine(p.name + " has settled a question in " + q.f + " (tier " + q.t + "): " + q.q, true); try{ ripple(p, 1, "I settled the question of " + q.f + ".", 6, true); }catch(e){}
+        if(q.t >= 4){ rsFrontier(q); if(chance(0.3)) rsFrontier(q); rsOverturn(q); } }
+      else rsLine(p.name + " has a result in " + q.f + ". " + (s.prog >= 0.5 ? "There is a working prototype." : "It is an idea on paper for now."), false);
+    } else { s.boost = Math.min(0.9, s.boost + 0.12); r.mot = Math.max(0, r.mot - 5); if(chance(0.35)) rsSay(p, "fail"); }
+  });
+}
+window.onumResearch = function(){ const R = rsEnsure(); return {open:rsOpen().map(q => ({id:q.id, tier:q.t, field:q.f, question:q.q, failChance:+rsFail(q).toFixed(2), tries:R.qs[q.id].tries, progress:+R.qs[q.id].prog.toFixed(2)})), settled:R.theories.slice(), researchers:rsPeople().map(({r, p}) => ({name:p.name, skill:Math.round(r.sk), fatigue:Math.round(r.fat), motivation:Math.round(r.mot), on:r.on})), funding:+R.fund.toFixed(2), log:R.log.slice(0, 10)}; };
+{ const _rsEng = engDay; engDay = function(){ const r = _rsEng.apply(this, arguments); try{ rsDay(); }catch(e){ console.warn("research", e); } return r; }; }
+setTimeout(() => { try{ if(G && G.rs) rsPublish(null); else window.ONUM_WORKS = window.ONUM_WORKS || []; }catch(e){} }, 1500);
+
+/* ══ home, pocketbook and donations: data only (Neptune draws the hover card and the home); every coin moves on the closed ledger ══ */
+const DN_CAUSES = [
+  {k:"campaign", t:"your campaign", chest:true, likes:["ambition"], press:0.5},
+  {k:"clinic", t:"the district clinic", likes:["conviction"], appr:1.5, press:0.3},
+  {k:"school", t:"the schoolhouse roof", appr:1.2, press:0.25},
+  {k:"research", t:"the research fund", sci:true, appr:0.6, press:0.35},
+  {k:"veterans", t:"the veterans' hall", appr:1.0, press:0.3},
+  {k:"church", t:"the church poor box", appr:0.8, press:0.15}
+];
+const DN_STRINGS = ["none", "a word with you before the next vote", "a seat on the committee", "a contract for a cousin", "your name on their bill", "that you not forget who helped"];
+function dnEnsure(){ if(!G.dn || G.dn.v !== 1) G.dn = {v:1, list:[], n:0}; return G.dn; }
+function dnHome(){
+  const P = purseOf(G.you), H = PURSE_HOMES[P.home] || PURSE_HOMES.flat, s = Math.abs(seedOf("home:" + (G.you.name || "you")));
+  const kind = "apartment";
+  return {id:"home-you", address:(2 + s % 60) + " " + ["Canal Row", "Lindenstraat", "Harbour Lane", "Mill Street"][s % 4] + ", apt " + (1 + (s >> 3) % 9), kind, ownedOrRented:P.home === "house" ? "owned" : "rented", monthly:Math.round(H.cost * 30)};
+}
+function dnPublishHome(){ try{ if(G.you) window.ONUM_PLAYER_HOME = dnHome(); }catch(e){} }
+window.onumPocketbook = function(){
+  if(!G.you) return null; const P = purseOf(G.you), H = PURSE_HOMES[P.home] || PURSE_HOMES.flat;
+  return {savings:Math.floor(P.cash), salary:purseSalary(G.you), rentOrMortgage:H.cost, recentSpend:(P.log || []).filter(l => l.a < 0).slice(0, 10).map(l => ({day:l.d, amount:-l.a, what:l.t})), warChest:G.you.funds || 0, homeId:"home-you"};
+};
+/* resting at home saves the game */
+window.onumRestAtHome = function(){ try{ sleepToMorning("your apartment"); }catch(e){} try{ setTimeout(() => { try{ save(); }catch(e){} }, 900); }catch(e){} };
+{ const _stm = sleepToMorning; sleepToMorning = function(where){ const r = _stm.apply(this, arguments); if(/home|apartment|flat/i.test(String(where || ""))){ setTimeout(() => { try{ save(); feed("Home. The game is saved."); }catch(e){} }, 900); } return r; }; }
+function dnPublish(d){ const D = dnEnsure(); window.ONUM_DONATIONS = D.list.slice(-60).map(x => ({id:x.id, donorId:x.donorId, donorName:x.donorName, amount:x.amount, day:x.day, cause:x.cause, strings:x.strings, reaction:x.reaction})); try{ window.dispatchEvent(new CustomEvent("onum-donation", {detail:d ? {id:d.id} : null})); }catch(e){} }
+function dnLine(t, big){ try{ lLog(t, "money"); }catch(e){} if(big){ try{ feed(t); }catch(e){} } }
+function dnGive(p, cause){
+  const D = dnEnsure(), P = purseOf(p), C = DN_CAUSES.find(c => c.k === cause) || pick(DN_CAUSES); if(P.cash < 30) return null;
+  const amount = Math.max(5, Math.round(P.cash * (0.06 + (seedOf("g" + p.id + G.day) % 15) / 100)));
+  P.cash -= amount; P.spent = (P.spent || 0) + amount; try{ purseLog(p, "Gave to " + C.t, -amount); }catch(e){}
+  const tr = purseTr(p), strings = p.kind === "member" && (tr.ambition || 50) > 55 ? pick(DN_STRINGS.slice(1)) : (chance(0.25) ? pick(DN_STRINGS.slice(1)) : "none");
+  if(C.chest) G.you.funds = (G.you.funds || 0) + amount / 1000;
+  if(C.sci){ try{ const R = rsEnsure(); R.gift = (R.gift || 0) + amount; }catch(e){} }
+  if(C.appr) G.you.approval = clamp(G.you.approval + C.appr * (amount > 60 ? 1 : 0.5), 0, 100);
+  const rx = [];
+  try{ ripple(p, 2, "I gave ƒ" + amount + " to " + C.t + ".", 4, false); }catch(e){}
+  if(strings !== "none"){ rx.push(p.name + " wants " + strings + "."); }
+  /* rivals dig into who paid */
+  try{ const riv = (G.members || []).filter(m => m !== p && !m.gone && m.rel && m.rel.warmth < -20); if(riv.length && (C.chest || chance(0.3))){ const r = pick(riv); rx.push(r.name + " is asking who paid, and why."); try{ remember(r, p.name + " gave ƒ" + amount + " to " + C.t + ". Worth knowing.", 3, false); }catch(e){} } }catch(e){}
+  /* the press notices */
+  if(chance(C.press * (amount > 50 ? 1.4 : 0.7))){ const t = "The Ledger notes ƒ" + amount + " from " + p.name + " to " + C.t + (strings !== "none" ? ". Readers may wonder what was asked in return." : "."); rx.push("The press noticed."); G.reactNews = (G.reactNews || []).concat([{t, d:G.day}]).slice(-12); dnLine(t, true); }
+  /* constituents and the district */
+  if(C.chest){ if(strings !== "none" && chance(0.5)){ G.you.approval = clamp(G.you.approval - 0.6, 0, 100); rx.push("Some constituents grumble about strings."); } else rx.push("Supporters are pleased."); }
+  else { rx.push(cap(C.t) + " is grateful; the district talks about it."); try{ const T = townEnsure(); const h = pick(T.hh); h.mood = clamp((h.mood || 50) + 3, 0, 100); }catch(e){} }
+  const d = {id:"dn" + (++D.n), donorId:p.id, donorName:p.name, amount, day:G.day, cause:C.t, strings, reaction:rx.join(" "), due:strings !== "none" ? G.day + 3 + (seedOf("due" + D.n) % 8) : 0};
+  D.list.push(d); if(D.list.length > 120) D.list.splice(0, D.list.length - 120);
+  dnLine(p.name + " gave ƒ" + amount + " to " + C.t + ". " + d.reaction, false); dnPublish(d); return d;
+}
+window.onumDonate = function(donorId, cause){ try{ const p = everyone().find(x => x.id === donorId); return p ? dnGive(p, cause) : null; }catch(e){ return null; } };
+function dnDay(){
+  const D = dnEnsure(); if(!G.you) return;
+  /* donors choose for themselves: warmth toward you and money of their own */
+  try{ everyone().filter(p => p && !p.gone && p !== G.you && p.purse && p.purse.cash > 60).forEach(p => { const w = (p.rel && p.rel.warmth) || 0; if(chance(0.004 + Math.max(0, w) / 6000)) dnGive(p, w > 25 && chance(0.5) ? "campaign" : pick(DN_CAUSES).k); }); }catch(e){ console.warn("donations", e); }
+  /* the favour comes due */
+  D.list.forEach(d => { if(d.due && G.day >= d.due && !d.asked){ d.asked = G.day; const p = everyone().find(x => x.id === d.donorId); if(!p) return; d.reaction += " On day " + G.day + " they asked for " + d.strings + "."; dnLine(p.name + " reminds you of the ƒ" + d.amount + " and asks for " + d.strings + ".", true); try{ remember(p, "I asked for " + d.strings + " in return for my gift.", 4, true); }catch(e){} dnPublish(d); } });
+  dnPublishHome();
+}
+{ const _dnPd = purseDay; purseDay = function(){ const r = _dnPd.apply(this, arguments); try{ dnDay(); }catch(e){ console.warn("dn", e); } return r; }; }
+setTimeout(() => { try{ dnPublishHome(); if(G.dn) dnPublish(null); else window.ONUM_DONATIONS = window.ONUM_DONATIONS || []; }catch(e){} }, 1500);
 
 const MATCACHE = new Map();
 /* Every distinct repeat used to clone the texture and its normal map, so
@@ -38205,7 +38524,7 @@ function saveCaptureBase(){
     termLength:G.termLength, country:G.country,
     greatest:G.greatest, blasphemy:G.blasphemy, loreNote:G.loreNote, greatnessOpen:G.greatnessOpen,
     relics:G.relics, relicSpots:G.relicSpots, consularLore:G.consularLore, bind:G.bind, sens:G.sens, invertY:!!G.invertY, voiceVol:G.voiceVol, goals:G.goals, whip:G.whip || null, billQueue:G.billQueue || [], faith:G.faith || null, life:G.life || null, ach:G.ach || {}, law:G.law || null, ladder:G.ladder || [], cases:G.cases || [], lastActs:G.lastActs || [], wx:G.wx || null, town:G.town || null, rivals:G.rivals || [], rivalNext:G.rivalNext || 0, daylog:(G.daylog || []).slice(-120), paperRead:G.paperRead || 0, seedL:G.seedL || 0, mHints:G.mHints || {}, tlog:(G.tlog || []).slice(-500), ag:G.ag || null, sitPrep:G.sitPrep || {}, echoes:G.echoes || [], billKinds:G.billKinds || {}, realmRel:G.realmRel || {}, org:G.org || null, conflict:G.conflict || null, conflictLog:G.conflictLog || [], warAuth:G.warAuth || null, react:G.react || [], reactNews:G.reactNews || [], senStaff:G.senStaff || null, presStaff:G.presStaff || null, listened:G.listened || 0,
-    world:G.world, mm:G.mm || null, sc:G.sc || null, ph:G.ph || null,  sbox:G.sbox || null, dist:G.dist || null, fam:G.fam || null, loreBookSeeded:!!G.loreBookSeeded, saidHash:G.saidHash || [], dm:G.dm || null, lore:G.lore || null, trip:G.trip || null,
+    world:G.world, dn:G.dn || null, rs:G.rs || null, mm:G.mm || null, sc:G.sc || null, ph:G.ph || null,  sbox:G.sbox || null, dist:G.dist || null, fam:G.fam || null, loreBookSeeded:!!G.loreBookSeeded, saidHash:G.saidHash || [], dm:G.dm || null, lore:G.lore || null, trip:G.trip || null,
     pendingNight:!!G.pendingNight,
     cam:{x:cam.x, z:cam.z, yaw:cam.yaw, pitch:cam.pitch},
     /* the clock the shared save is compared by — not the game clock, the
