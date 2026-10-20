@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261020u">
+<meta name="onum-build" content="20261020v">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -11888,6 +11888,35 @@ window.onumSession = {
   filibuster:() => window.onumSessionEvent({bodyId:SSN && SSN.bodyId, kind:SSN && SSN.kind, actorId:"you", action:"filibuster"}),
   next:() => { ssnNext(); return true; }
 };
+
+/* ── 20261020u: load-time shells and clean answers before a career exists ── */
+try{ if(!window.ONUM_FAMILY) window.ONUM_FAMILY = {people:{}, houses:{}}; }catch(e){}
+try{ if(!window.ONUM_SESSION) window.ONUM_SESSION = {stage:"idle"}; }catch(e){}
+{ const _sp = ssnPublish; ssnPublish = function(){ const r = _sp.apply(this, arguments); try{ if(!window.ONUM_SESSION) window.ONUM_SESSION = {stage:"idle"}; }catch(e){} return r; }; }
+const FIX_NOCAREER = () => ({ok:false, reason:"no career yet", why:"no career yet"});
+function fixCareer(){ try{ return !!(G && G.you && G.you.id != null); }catch(e){ return false; } }
+{ const _c = window.onumCourt, _p = window.onumPropose, _h = window.onumHeirs, _ca = window.onumContinueAs;
+  const who = (id) => { try{ return dynPerson(id); }catch(e){ return null; } };
+  window.onumCourt = function(npcId){ if(!fixCareer()) return FIX_NOCAREER(); if(!who(npcId)) return {ok:false, reason:"no such person", why:"no such person"}; const r = _c.apply(this, arguments); if(r && r.why && !r.reason) r.reason = r.why; return r; };
+  window.onumPropose = function(npcId){ if(!fixCareer()) return FIX_NOCAREER(); if(!who(npcId)) return {ok:false, reason:"no such person", why:"no such person"}; const r = _p.apply(this, arguments); if(r && r.why && !r.reason) r.reason = r.why; return r; };
+  window.onumHeirs = function(){ if(!fixCareer()){ const a = []; a.ok = false; a.reason = "no career yet"; return a; } return _h.apply(this, arguments); };
+  window.onumContinueAs = function(id){ if(!fixCareer()) return FIX_NOCAREER(); const r = _ca.apply(this, arguments); if(r && r.why && !r.reason) r.reason = r.why; return r; }; }
+/* unknown people get a neutral form */
+window.onumPronouns = function(id){
+  let s = null; try{ const p = id != null ? dynPerson(id) : null; if(p) s = p.sex === "m" || p.sex === "f" ? p.sex : (G && G.dyn && G.dyn.P[p.id] || {}).sex || null; }catch(e){}
+  return s === "f" ? {he:"she", him:"her", his:"her", hers:"hers"} : s === "m" ? {he:"he", him:"him", his:"his", hers:"his"} : {he:"they", him:"them", his:"their", hers:"theirs"};
+};
+/* whoever already exists has a name on window from the first frame */
+function fixSeedNames(){
+  try{ const o = window.ONUM_NAMES && typeof window.ONUM_NAMES === "object" ? window.ONUM_NAMES : {};
+    let all = []; try{ all = everyone() || []; }catch(e){ try{ all = [].concat(G.members || [], G.press || [], G.civ || []); }catch(_){} }
+    all.forEach(p => { if(p && p.id != null && p.name) o[p.id] = p.name; });
+    try{ if(G && G.you && G.you.id != null && G.you.name) o[G.you.id] = G.you.name; }catch(e){}
+    try{ if(typeof FIRST_CONSUL !== "undefined" && FIRST_CONSUL.name && !Object.values(o).includes(FIRST_CONSUL.name)) o.consul = FIRST_CONSUL.name; }catch(e){}
+    window.ONUM_NAMES = o; }catch(e){}
+}
+fixSeedNames(); setTimeout(fixSeedNames, 0); setTimeout(fixSeedNames, 1500);
+{ const _w = engWarm; engWarm = function(){ try{ const L = window.onumLiveTalk; if(L && typeof L.available === "function"){ L.available().then(ok => { if(ok) _w(); }).catch(() => {}); return; } }catch(e){} }; }
 
 const MATCACHE = new Map();
 /* Every distinct repeat used to clone the texture and its normal map, so
@@ -45696,6 +45725,7 @@ try{
   /* ── Ollama ───────────────────────────────────────── */
   async function probe(force, ms){
     if(!CFG.on){ LT.up = false; LT.why = "Live talk is switched off in Settings"; return false; }
+    if(LT.up === false && force !== "ui") return false;   /* 20261020u: one quiet check per session; Settings can try again */
     if(!force && LT.up !== null && Date.now() - LT.at < 30000) return LT.up;
     LT.at = Date.now();
     try{ const c = new AbortController(); const t = setTimeout(() => c.abort(), ms || 1800);
@@ -45979,7 +46009,7 @@ try{
     clearError(){ LT.lastErr = null; LT.errModel = null; LT.fellBack = false; },
     memory:id => ({turns:(MEM[id] || []).slice(), heard:heardOf(id).map(h => ({fact:h.fact.said, src:h.src, conf:h.conf, d:h.d})), facts:W.facts.filter(f => f.withId == id || f.heardBy.indexOf(+id) >= 0 || f.heardBy.indexOf(id) >= 0)}),
     get config(){ return Object.assign({}, CFG); },
-    setConfig(c){ Object.assign(CFG, c || {}); LT.up = null; save(); probe(true); paintPill(); },
+    setConfig(c){ Object.assign(CFG, c || {}); LT.up = null; save(); probe("ui"); paintPill(); },
     world:() => W, spreadDay
   };
 
@@ -46169,9 +46199,9 @@ try{
     const upd = () => { CFG.on = P.querySelector("#ltOn").checked; CFG.voices = P.querySelector("#ltVo").checked; { const nv = P.querySelector("#ltModel").value.trim() || "llama3.2:3b"; if(nv !== CFG.model) CFG.userModel = true; CFG.model = nv; } CFG.engineModel = (P.querySelector("#ltEng") || {value:""}).value.trim(); CFG.url = P.querySelector("#ltUrl").value.trim().replace(/\/$/, "") || "http://127.0.0.1:11434"; LT.up = null; save(); };
     P.querySelectorAll("input").forEach(i => i.addEventListener("change", upd));
     P.querySelectorAll("input").forEach(i => i.addEventListener("keydown", e => e.stopPropagation()));
-    P.querySelector("#ltTest").onclick = async () => { upd(); await probe(true); panel(); };
+    P.querySelector("#ltTest").onclick = async () => { upd(); await probe("ui"); panel(); };
     P.querySelector("#ltForget").onclick = () => { Object.keys(MEM).forEach(k => delete MEM[k]); W.facts = []; W.heard = {}; W.promises = []; save(); panel(); };
-    P.querySelector("#ltClose").onclick = () => { upd(); P.hidden = true; probe(true); };
+    P.querySelector("#ltClose").onclick = () => { upd(); P.hidden = true; probe("ui"); };
   }
   LT.panel = panel; LT.decor = () => { decorMail(); decorSit(); };
   LT.open = m => { try{ openTalk(typeof m === "object" ? m : npc(m)); }catch(e){} };   /* for tests and other workers */
@@ -46190,7 +46220,7 @@ try{
     ".lt-sit{background:#fffaf0;padding:6px;border:1px solid #b9a77a;border-radius:6px;margin-top:6px}" +
     ".lt-typing span:after,.lt-typing:after{content:' ▍';animation:ltb 1s steps(2) infinite}@keyframes ltb{50%{opacity:0}}";
   document.head.appendChild(st);
-  probe(true).then(paintPill); setInterval(() => probe(true), 30000);
+  probe(true).then(paintPill); setInterval(() => { if(LT.up !== false) probe(true); }, 30000);
 
   /* ── VOICE (20261020): window.onumVoice — every character read aloud with a voice of their own ──
      onumVoice.speak(npcIdOrPerson, text, {interrupt, vol, lang, gender}) queues the line in that speaker's voice;
