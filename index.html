@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261018ah">
+<meta name="onum-build" content="20261018ai">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -44528,7 +44528,19 @@ try{
     }
   }
   LT.offline = offline;
+  /* reply(): what the person remembers (window.onumRecall) goes into their prompt, and a streamed answer is read
+     aloud sentence by sentence through window.onumVoice (face, sittings, meetings, calls) */
   async function reply(o){
+    o = Object.assign({}, o || {}); const ch = o.channel || "face"; let m = null; try{ m = o.npc || npc(o.npcId); }catch(e){}
+    try{ if(m && m.kind !== "engine" && typeof window.onumRecall === "function"){ const w = (String(o.text || "").match(/[A-Za-z][A-Za-z'-]{5,}/g) || []).sort((x, y) => y.length - x.length)[0];
+        let r = w ? window.onumRecall(m.id, {limit:4, about:w}) : []; if(!r || !r.length) r = window.onumRecall(m.id, {limit:4}) || [];
+        if(r.length) o.extra = (o.extra ? o.extra + "\n" : "") + "WHAT YOU REMEMBER (your own memory; it can be hazy or wrong, use it only if it fits, never quote it as a list): " + r.map(x => "- " + String(x.text || "").slice(0, 180) + (x.distorted ? " (you may have this wrong)" : "")).join(" "); } }catch(e){}
+    let VS = null; try{ if(m && o.onToken && o.voice !== false && /^(face|sitting|meeting|call|phone)$/.test(ch) && window.onumVoice){ VS = window.onumVoice.streamer(m, {}); const ot = o.onToken; o.onToken = t => { try{ VS.push(t); }catch(e){} return ot(t); }; } }catch(e){}
+    const r = await reply0(o);
+    try{ if(VS && r && r.text){ VS.end(r.text); LT._streamed = {k:m.id, t:String(r.text).trim(), at:Date.now()}; } }catch(e){}
+    return r;
+  }
+  async function reply0(o){
     o = o || {}; const ch = o.channel || "face"; const m = o.npc || npc(o.npcId); const text = String(o.text || "").trim().slice(0, 1500);
     if(!m || !text) throw new Error("onumLiveTalk.reply: need npcId and text");
     /* from: another person is the one speaking. to / stage: a moment you are narrating for them (nobody typed it). Neither is ever the player's own speech. */
@@ -44784,6 +44796,78 @@ try{
     ".lt-typing span:after,.lt-typing:after{content:' ▍';animation:ltb 1s steps(2) infinite}@keyframes ltb{50%{opacity:0}}";
   document.head.appendChild(st);
   probe(true).then(paintPill); setInterval(() => probe(true), 30000);
+
+  /* ── VOICE (20261020): window.onumVoice — every character read aloud with a voice of their own ──
+     onumVoice.speak(npcIdOrPerson, text, {interrupt, vol, lang, gender}) queues the line in that speaker's voice;
+     onumVoice.stop() silences everything. Voice, pitch and rate are seeded by the speaker's id, so the same person
+     always sounds the same; gender (from the person, or opts.gender) and language/accent (envoys and foreign
+     characters prefer an installed voice for their country's language) narrow the choice when known.
+     Uses the browser's speechSynthesis (free, offline, no Ollama). On/off and volume are the game's own voice
+     settings (Settings → Audio → Voice Volume, saved as onum.voice / voiceVol) and a high-contrast row in the
+     Live talk panel. Hooked: the game's speak()/hush() (talk, people stopping you, overheard chats, sittings and
+     party meetings incl. LOCALPARTY) and streamed LiveTalk replies (spoken sentence by sentence). Phone calls,
+     texts and Conversations call onumVoice.speak from their own code. Stops when Talk, the phone or a scene closes. */
+  const VO = window.onumVoice = (function(){
+    const has = typeof window.speechSynthesis !== "undefined" && typeof window.SpeechSynthesisUtterance !== "undefined";
+    let all = [], q = 0, gen = 0; const hashV = s => { let h = 2166136261; s = String(s); for(let i = 0; i < s.length; i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
+    const load = () => { try{ all = speechSynthesis.getVoices() || []; }catch(e){ all = []; } };
+    if(has){ load(); try{ speechSynthesis.addEventListener("voiceschanged", load); }catch(e){} }
+    const FEM = /female|woman|zira|susan|samantha|victoria|karen|moira|tessa|fiona|veena|hazel|heather|linda|aria|jenny|libby|sonia|natasha|catherine|elsa|hedda|helena|paulina|ioana|amelie|anna|alice|ellen|joana|luciana|monica|paola|sara|nora|zuzana|yelena|milena|google .*female/i;
+    const MAL = /\bmale\b|\bman\b|david|mark|george|james|daniel|alex|fred|thomas|oliver|arthur|ryan|guy|richard|sean|paul|stefan|pablo|diego|jorge|luca|frank|maged|rishi|yuri|xander|google uk english male/i;
+    const LANG = {nl:/nieuw|zeeland|vlissingen|oranje|haarlem|dutch|holland|polder/i, de:/german|reich|prussi|bavar/i, fr:/french|franc|gaul|quebec/i, es:/spain|spanish|castil|mexic/i, it:/ital|roman/i, ru:/russ|muscov/i, pl:/pol(and|ish)/i, pt:/portug|brazil/i, sv:/swed/i, ja:/japan|nippon/i, zh:/china|chinese/i, ar:/arab/i};
+    const person = id => { if(id && typeof id === "object") return id; try{ return typeof byId === "function" ? byId(isNaN(+id) ? id : +id) : null; }catch(e){ return null; } };
+    const genderOf = (p, o) => { const g = String((o && o.gender) || (p && (p.gender || p.sex || p.pronoun)) || "").toLowerCase(); return /^(f|w|she)/.test(g) ? "f" : /^(m|he)/.test(g) ? "m" : null; };
+    const langOf = (p, o) => { if(o && o.lang) return String(o.lang).slice(0, 2).toLowerCase(); const s = p ? [p.realmName, p.realm && (p.realm.t || p.realm), p.nation, p.country, p.kind === "envoy" ? p.state : ""].filter(Boolean).join(" ") : "";
+      for(const k in LANG) if(s && LANG[k].test(s)) return k; return "en"; };
+    function pickFor(key, p, o){ if(!all.length) load(); if(!all.length) return null; const h = hashV(key), g = genderOf(p, o), lg = langOf(p, o);
+      let pool = all.filter(v => String(v.lang || "").toLowerCase().indexOf(lg) === 0); if(!pool.length) pool = all.filter(v => /^en/i.test(v.lang)); if(!pool.length) pool = all.slice();
+      if(g){ const re = g === "f" ? FEM : MAL, gp = pool.filter(v => re.test(v.name) && !(g === "m" && FEM.test(v.name))); if(gp.length) pool = gp; }
+      pool.sort((a, b) => (a.name < b.name ? -1 : 1)); return pool[h % pool.length]; }
+    const enabled = () => { try{ return !(typeof G !== "undefined" && G.mute); }catch(e){ return true; } };
+    const volume = () => { try{ return typeof G !== "undefined" && G.voiceVol !== undefined ? G.voiceVol : 1; }catch(e){ return 1; } };
+    function speak(id, text, o){ o = o || {}; text = String(text || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim(); if(!has || !text || !enabled()) return false;
+      const p = person(id), key = String(p && p.id != null ? p.id : id != null ? id : "narrator");
+      try{ if(o.interrupt){ speechSynthesis.cancel(); q = 0; gen++; } if(speechSynthesis.paused) speechSynthesis.resume(); if(speechSynthesis.pending && q > 5){ speechSynthesis.cancel(); q = 0; } }catch(e){}
+      const u = new SpeechSynthesisUtterance(text.slice(0, 600)), v = pickFor(key, p, o), h = hashV(key + "#"), t = p && p.traits;
+      if(v){ u.voice = v; u.lang = v.lang; } else u.lang = langOf(p, o) === "en" ? "en-US" : langOf(p, o);
+      const g = genderOf(p, o); u.pitch = Math.min(1.8, Math.max(0.55, (g === "f" ? 1.12 : g === "m" ? 0.9 : 1) + ((h % 9) - 4) * 0.045 + (t && t.temper != null ? (t.temper - 50) / 400 : 0)));
+      u.rate = Math.min(1.45, Math.max(0.75, 0.96 + (((h >> 5) % 7) - 3) * 0.035 + (t && t.temper != null ? (t.temper - 50) / 300 : 0) + (p && p.post ? -0.05 : 0)));
+      u.volume = Math.min(1, Math.max(0, (o.vol == null ? 1 : o.vol) * volume()));
+      u.onend = u.onerror = () => { q = Math.max(0, q - 1); }; q++; VO.last = {id:key, text:u.text, voice:v ? v.name : null, pitch:u.pitch, rate:u.rate};
+      try{ speechSynthesis.speak(u); }catch(e){ return false; } return true; }
+    function stop(){ gen++; q = 0; try{ if(has) speechSynthesis.cancel(); }catch(e){} }
+    /* streamed text: speak each finished sentence once, the remainder at the end */
+    function streamer(id, o){ let said = 0, g0 = gen; const cut = (t, fin) => { if(g0 !== gen && !fin) return; const s = String(t || ""); let end = -1; const re = /[.!?…]["”')\]]?(\s|$)/g; let m; re.lastIndex = said;
+        while((m = re.exec(s))) end = m.index + m[0].length; if(fin) end = s.length; if(end > said){ const part = s.slice(said, end).trim(); said = end; if(part) speak(id, part, o); } };
+      return {push:t => cut(t, false), end:t => cut(t, true), get said(){ return said; }}; }
+    return {speak, stop, streamer, voiceFor:(id, o) => { const p = person(id); const v = pickFor(String(p && p.id != null ? p.id : id), p, o); return v ? v.name : null; }, get enabled(){ return enabled(); }};
+  })();
+  /* the game's own speech goes through onumVoice (all checks of who can hear stay as they were) */
+  try{ const sp0 = speak; speak = function(p, text, vol){ try{
+      if(typeof G === "undefined" || G.mute || !text) return; if(PROC.on && p && p !== G.you && !(TALK.open && TALK.m === p)) return; if(p && !canHearPerson(p, text)) return;
+      const k = p ? p.id : "you", now = Date.now(); if(LT._streamed && LT._streamed.k === k && now - LT._streamed.at < 20000 && String(text).trim() === LT._streamed.t) return;
+      const c = G.voiceCarry === undefined ? 1 : G.voiceCarry; VO.speak(p || "you", (typeof voiceClip === "function" ? voiceClip(text, MODEST ? 240 : 380) : text), {vol:(vol === undefined ? 1 : vol) * c}); }catch(e){ try{ return sp0.apply(this, arguments); }catch(e2){} } }; }catch(e){}
+  try{ const hu0 = hush; hush = function(){ try{ VO.stop(); }catch(e){} try{ return hu0.apply(this, arguments); }catch(e){} }; }catch(e){}
+  /* Talk / scene closing stops the voice */
+  try{ if(typeof closeTalk === "function"){ const ct0 = closeTalk; closeTalk = function(){ try{ VO.stop(); }catch(e){} return ct0.apply(this, arguments); }; } }catch(e){}
+  try{ if(typeof phoneClose === "function"){ const pc0 = phoneClose; phoneClose = function(){ try{ VO.stop(); }catch(e){} return pc0.apply(this, arguments); }; } }catch(e){}
+  /* Phone calls, texts and Conversations threads are voiced by JUPITER's own code calling onumVoice.speak (guarded). */
+  /* for tests and other workers: the wrapped game functions as they stand now */
+  try{ VO._hooks = {speak:(...a) => speak(...a), dmPush:(...a) => dmPush(...a), dmToggle:(...a) => dmToggle(...a), dmState:() => dmState(), pbRender:() => pbRender(), PB:() => (typeof PB !== "undefined" ? PB : null)}; }catch(e){}
+  /* Live talk panel: an opaque, high-contrast Voice row (same settings as Settings → Audio) */
+  try{ new MutationObserver(() => { const P = document.getElementById("ltPanel"); if(!P || P.hidden || P.querySelector("#ltVoice")) return;
+      const row = document.createElement("div"); row.id = "ltVoice"; row.style.cssText = "display:flex;gap:8px;align-items:center;background:#111;color:#fff;border:2px solid #fff;outline:1px solid #111;border-radius:6px;padding:6px 8px;font:600 13px system-ui";
+      row.innerHTML = '<label style="display:flex;gap:6px;align-items:center;color:#fff"><input type="checkbox" id="ltVoiceOn"' + (G.mute ? "" : " checked") + '> Voice (read aloud)</label><input type="range" id="ltVoiceVol" min="0" max="100" value="' + Math.round((G.voiceVol === undefined ? 1 : G.voiceVol) * 100) + '" style="flex:1" aria-label="Voice volume">';
+      const b = P.querySelector("b"); if(b) b.after(row); else P.prepend(row);
+      row.querySelector("#ltVoiceOn").onchange = e => { G.mute = !e.target.checked; G.muteSet = true; try{ localStorage.setItem(VOICE_KEY, G.mute ? "0" : "1"); }catch(err){} if(G.mute) VO.stop(); };
+      row.querySelector("#ltVoiceVol").oninput = e => { G.voiceVol = Math.max(0, Math.min(1, e.target.value / 100)); try{ const s = document.getElementById("voiceVolume"); if(s) s.value = e.target.value; }catch(err){} try{ save(); }catch(err){} }; }).observe(document.body, {childList:true, subtree:true, attributes:true, attributeFilter:["hidden"]}); }catch(e){}
+  /* ── no film grain (20261020, Dominic: it looks bad on screen): the #grain overlay, its generated noise texture and
+     the fractal-noise paper texture on cards are all switched off by default; nothing else is touched ── */
+  try{ const ng = document.createElement("style"); ng.id = "ndNoGrain"; ng.textContent = "#grain,.grain{display:none!important;background-image:none!important;opacity:0!important;animation:none!important}"; document.head.appendChild(ng);
+    try{ if(typeof G !== "undefined") G.noGrain = true; }catch(e){}
+    const unPaper = () => { document.querySelectorAll("style").forEach(st => { if(st.id === "ndNoGrain" || st.textContent.indexOf("feTurbulence") < 0) return;
+        const t = st.textContent.replace(/url\("data:image\/svg\+xml;utf8,<svg[^"]*?feTurbulence[\s\S]*?<\/svg>"\)/g, "none"); if(t !== st.textContent) st.textContent = t; }); };
+    unPaper(); new MutationObserver(ms => { if(ms.some(m => [...m.addedNodes].some(n => n.nodeName === "STYLE"))) unPaper(); }).observe(document.head, {childList:true}); }catch(e){}
   console.log("NEPTUNE livetalk ready");
 }catch(e){ try{ console.warn("NEPTUNE-LIVETALK block", e); }catch(e2){} }
 /* NEPTUNE-LIVETALK END */
