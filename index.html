@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261020a">
+<meta name="onum-build" content="20261020b">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -43404,8 +43404,13 @@ try{
   const poiLocal = (kind, name, lx, lz, ldx, ldz, lstand) => { const p = local(lx, lz), d = local(ldx, ldz); poi(kind, name, p[0], p[1], d[0], d[1], (lstand || []).map(s => local(s[0], s[1]))); };
 
   const SIGNS = ["VAUGHN'S DINER", "ORANJE APOTHEEK", "DE GOUDEN KROON", "BAKKERIJ TAYLOR", "CONSULAR POST", "THE NO7 LEDGER", "VAN DIJK & ZONEN", "TOBACCONIST",
-    "HABERDASHERY", "BOOKSELLER", "CAFE ZEVEN", "BANK OF NIEUW ORANJE", "WATCHMAKER", "TAILOR & CUTTER", "CINEMA REX", "FLORIST"];
-  const SIGN_BG = [0x1f3d2c, 0x5a1f24, 0x1d2b44, 0x22201e, 0x6b4a1f, 0x7a2a22, 0x1f3d2c, 0x3a2418, 0x1d2b44, 0x2a3a2a, 0x5a1f24, 0x14243a, 0x22201e, 0x3c2a1a, 0x6a1a1e, 0x24402a];
+    "HABERDASHERY", "BOOKSELLER", "CAFE ZEVEN", "BANK OF NIEUW ORANJE", "WATCHMAKER", "TAILOR & CUTTER", "CINEMA REX", "FLORIST",
+    "DISTRICT OFFICE", "CAMPAIGN OFFICE", "HOEDENMAKER", "SHOEMAKER", "STATIONER", "DE VRIES GROCER", "PHOTOGRAPHER", "PASTRY & TEA",
+    "RADIO & ELECTRIC", "OPTICIAN", "TOY SHOP", "BARBER", "FISHMONGER", "WINE & SPIRITS", "MUSIC HALL", "LAUNDRY"];
+  /* 20261020 crisp: Main Street names are unique, in address order; the bank, post, and the two offices are reserved lots */
+  const SN = 32, SIGN_RES = new Set([4, 11, 16, 17]), SIGN_POOL = [...Array(SN).keys()].filter(i => !SIGN_RES.has(i));
+  const SIGN_BG = [0x1f3d2c, 0x5a1f24, 0x1d2b44, 0x22201e, 0x6b4a1f, 0x7a2a22, 0x1f3d2c, 0x3a2418, 0x1d2b44, 0x2a3a2a, 0x5a1f24, 0x14243a, 0x22201e, 0x3c2a1a, 0x6a1a1e, 0x24402a,
+    0x14243a, 0x6b1f1f, 0x2a3a2a, 0x3a2418, 0x1d2b44, 0x24402a, 0x22201e, 0x5a1f24, 0x1d2b44, 0x3c2a1a, 0x6a1a1e, 0x1f3d2c, 0x14243a, 0x5a1f24, 0x3a2418, 0x2a3a2a];
   const relief = (cv, H, k) => {
     const w = cv.width, h = cv.height, src = H.getImageData(0, 0, w, h).data, o = document.createElement("canvas"); o.width = w; o.height = h;
     const g = o.getContext("2d"), id = g.createImageData(w, h), d = id.data, at = (x, y) => src[(((y + h) % h) * w + ((x + w) % w)) * 4] / 255;
@@ -43448,10 +43453,10 @@ try{
     o.glow = new THREE.MeshStandardMaterial({color:0xfff2d4, roughness:.4, emissive:new THREE.Color(0xffd9a0), emissiveIntensity:.5});
     o.brass = pbr("brass", new THREE.MeshStandardMaterial({color:0xb08b45, roughness:.32, metalness:.86}));
     o.asphalt = pbr("asphalt", new THREE.MeshStandardMaterial({color:0x3a3d3a, roughness:.95}));
-    const cv = document.createElement("canvas"); cv.width = 1024; cv.height = 1024; const g = cv.getContext("2d");
+    const cv = document.createElement("canvas"); cv.width = 1024; cv.height = 64 * SN; const g = cv.getContext("2d");
     SIGNS.forEach((t, i) => { const y = i * 64; g.fillStyle = "#" + SIGN_BG[i].toString(16).padStart(6, "0"); g.fillRect(0, y, 1024, 64);
       g.strokeStyle = "#c9a24a"; g.lineWidth = 3; g.strokeRect(6, y + 6, 1012, 52);
-      g.fillStyle = "#e3c06a"; g.font = "bold 40px Georgia, 'Times New Roman', serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(t, 512, y + 33); });
+      g.fillStyle = "#e3c06a"; g.textAlign = "center"; g.textBaseline = "middle"; let fs = 40; do { g.font = "bold " + fs + "px Georgia, 'Times New Roman', serif"; fs -= 2; } while(fs > 22 && g.measureText(t).width > 560); g.fillText(t, 512, y + 33); });
     const st = new THREE.CanvasTexture(cv); st.anisotropy = 4;
     o.sign = new THREE.MeshStandardMaterial({map:st, roughness:.5, metalness:.1, emissive:new THREE.Color(0xffffff), emissiveMap:st, emissiveIntensity:0});
     let ft = null; try{ if(Fm) ft = Fm.makeFlagTexture(THREE, "consular_republic", 7, {width:256}); }catch(e){ ndWarn("flag tex", e); }
@@ -43506,7 +43511,7 @@ try{
     if(lod < 0){ box("paint", cx, H / 2, -D / 2, bw - 0.1, H, D, wc); box("paint", cx, 1.4, 0.02, bw - 0.6, 2.0, 0.04, 0x2a3036); return {cx, si:0}; }
     box(mat, cx, H / 2, -D / 2 - 0.12, bw, H, D, wc); solidLocal(x0, -D - 0.12, x0 + bw, 0.12);
     box("stone", x0 + 0.11, H / 2, 0.05, 0.22, H, 0.12, ST.trim); box("stone", x0 + bw - 0.11, H / 2, 0.05, 0.22, H, 0.12, ST.trim);
-    const si = civic != null ? civic : (signI++) % SIGNS.length, sc = SIGN_BG[si];
+    const si = civic != null ? civic : SIGN_POOL[(signI++) % SIGN_POOL.length], sc = SIGN_BG[si];
     box("stone", cx, 0.25, 0.06, bw - 0.44, 0.5, 0.12, 0xcfc6b2);
     const gx0 = x0 + 0.34, gx1 = x0 + bw - 1.25, gw = gx1 - gx0;
     win((gx0 + gx1) / 2, 1.5, -0.05, gw, 1.95, 0.03, 0.02 + r() * 0.2);
@@ -43517,7 +43522,7 @@ try{
     box("paint", x0 + bw - 0.72, 1.17, -0.02, 0.86, 2.3, 0.06, 0x2a1d14);
     if(lod){ win(x0 + bw - 0.72, 1.6, 0.015, 0.5, 0.9, 0.02, 0.1); box("brass", x0 + bw - 0.42, 1.1, 0.04, 0.03, 0.22, 0.04); }
     box("paint", cx, 2.95, 0.07, bw - 0.36, 0.64, 0.12, sc);
-    quad("sign", cx, 2.95, 0.135, bw - 0.6, 0.48, 0, [0, 1 - (si + 1) / 16, 1, 1 / 16]);
+    quad("sign", cx, 2.95, 0.135, bw - 0.6, 0.48, 0, [0, 1 - (si + 1) / SN, 1, 1 / SN]);
     box("stone", cx, 3.34, 0.14, bw, 0.14, 0.32, ST.trim);
     if(r() < 0.5){ const ac = [0x8a2f36, 0x2f4a6a, 0x2f6b45, 0xb07a2e, 0xe8e0cc][(r() * 5) | 0];
       box("paint", cx, 2.62, 0.55, bw - 0.5, 0.04, 1.08, ac, 0, 0.38); box("paint", cx, 2.34, 1.06, bw - 0.5, 0.2, 0.02, ac); }
@@ -43692,15 +43697,15 @@ try{
     for(let i = 0; i < 18; i++) box("stone", -40 + i * 2.2 + (i > 8 ? 4.4 : 0), 0.064, 22, 0.9, 0.012, 0.1, 0xd4b84a);
     crosswalk(0, 18.9, "x", 4.2); crosswalk(0, 25.1, "x", 4.2); crosswalk(-3.0, 22, "z", 4.2); crosswalk(3.0, 22, "z", 4.2);
     /* Main Street walls, broken for Taylor Lane; the bank and the post office face the street */
-    frame(8.05, -1.6, -Math.PI / 2); const rE1 = row(19.8, seed + 1, {lod:x => lodZ(x - 1.6), flagEvery:3});
-    frame(8.05, 25.8, -Math.PI / 2); const rE2 = row(24, seed + 2, {lod:() => lowCap ? 0 : 1, flagEvery:3, civic:{0:{sign:11}}});
+    signI = 0; frame(8.05, -1.6, -Math.PI / 2); const rE1 = row(19.8, seed + 1, {lod:x => lodZ(x - 1.6), flagEvery:3});
+    frame(8.05, 25.8, -Math.PI / 2); const rE2 = row(24, seed + 2, {lod:() => lowCap ? 0 : 1, flagEvery:3, civic:{0:{sign:11}, 2:{sign:17}, 4:{sign:16}}});
     frame(-8.05, 18.2, Math.PI / 2); const rW1 = row(19.8, seed + 3, {lod:x => lodZ(18.2 - x), flagEvery:3});
     frame(-8.05, 49.8, Math.PI / 2); const rW2 = row(24, seed + 4, {lod:() => lowCap ? 0 : 1, flagEvery:3, civic:{3:{sign:4}}});
     frame(-14, -4.8, 0); row(Math.max(4, sx - 3.3 + 14), seed + 5, {lod:() => lowCap ? 0 : 1, flagEvery:2});
     frame(sx + 3.3, -4.8, 0); row(Math.max(3, 14 - sx - 3.3), seed + 6, {lod:() => lowCap ? 0 : 1});
     frame(8.05, 25.8, -Math.PI / 2); { const b = rE2[0]; box("stone", b.cx, 4.6, 0.55, b.bw, 0.5, 1.1, 0xe6dfcf); for(let i = 0; i < 4; i++) cyl("stone", b.x0 + 0.35 + i * (b.bw - 0.7) / 3, 2.2, 0.9, 0.17, 4.2, 0xece6d8, 10);
       put("stone", T.prism, b.cx, 4.85, 0.6, b.bw + 0.2, 1.0, 1.2, 0xe6dfcf); poiLocal("bank", "Bank of Nieuw Oranje", b.cx, -2.7, b.x0 + b.bw - 0.72, 0.8, [[b.cx - 0.8, 1.6], [b.cx + 0.8, 1.6]]);
-      rE2.slice(1).forEach(b2 => poiLocal("shop", SIGNS[b2.si], b2.cx, -2.7, b2.x0 + b2.bw - 0.72, 0.8, [[b2.cx, 1.5]])); }
+      rE2.slice(1).forEach(b2 => poiLocal(b2.si === 16 ? "district_office" : b2.si === 17 ? "campaign_office" : "shop", b2.si === 16 ? "District Office" : b2.si === 17 ? "Campaign Office" : SIGNS[b2.si], b2.cx, -2.7, b2.x0 + b2.bw - 0.72, 0.8, [[b2.cx, 1.5]])); }
     frame(-8.05, 49.8, Math.PI / 2); { const pi = Math.min(3, rW2.length - 1), b = rW2[pi]; poiLocal("post_office", "Consular Post Office", b.cx, -2.7, b.x0 + b.bw - 0.72, 0.8, [[b.cx, 1.5], [b.cx + 0.9, 1.5]]); mailbox(b.cx - 1.0, 1.6);
       rW2.forEach((b2, i) => { if(i !== pi) poiLocal("shop", SIGNS[b2.si], b2.cx, -2.7, b2.x0 + b2.bw - 0.72, 0.8, [[b2.cx, 1.5]]); }); }
     frame(-8.05, 18.2, Math.PI / 2); rW1.forEach(b => poiLocal("shop", SIGNS[b.si], b.cx, -2.7, b.x0 + b.bw - 0.72, 0.8, [[b.cx, 1.5]]));
@@ -44120,7 +44125,7 @@ try{
         else if(kind === "church"){ noFrame(); churchAt(lot.x, lot.z + 1, name); }
         else if(kind === "school"){ noFrame(); schoolAt(lot.x, lot.z + 2, name); }
         else { const si = CHG_SIGN[kind] != null ? CHG_SIGN[kind] : 6; const b = building(-w / 2, w, kind === "lab" || kind === "station" ? 2 : 1 + (r() < 0.5 ? 1 : 0), r, 1, kind === "station", si);
-          quad("sign", 0, 2.95, 0.15, w - 0.6, 0.48, 0, [0, 1 - (si + 1) / 16, 1, 1 / 16]);
+          quad("sign", 0, 2.95, 0.15, w - 0.6, 0.48, 0, [0, 1 - (si + 1) / SN, 1, 1 / SN]);
           if(kind === "station"){ box("paint", 0, 4.4 + 2 * 2.9, 0.6, 2.2, 1.2, 0.2, 0xf4f1ea); }
           poiLocal(kind === "restaurant" ? "diner" : kind, name, 0, -2.7, w / 2 - 0.72, 0.8, [[0, 1.5], [1, 1.5]]); }
         /* the name board out front */
@@ -44178,6 +44183,17 @@ try{
   };
   window.onumTownStyles = Object.keys(STYLES);
 
+
+  /* 20261020 crisp: the Campaign Office and the District Office stand on their own labeled lots on Main Street (east side).
+     After the storefront pass (sfApply) runs, the two office props move to those doors, and their floating signs are
+     dropped because the facade itself now carries the name. Guarded: if anything is missing, nothing changes. */
+  try{ if(typeof sfApply === "function" && typeof SF !== "undefined"){ const sf0 = sfApply;
+    sfApply = function(){ const r = sf0.apply(this, arguments); try{ const P = window.ONUM_TOWN_POIS || [], D = (typeof PROPS !== "undefined" && PROPS.district) || [];
+        const lots = {hq:P.find(p => p && p.kind === "campaign_office"), doffice:P.find(p => p && p.kind === "district_office")}; let ch = false;
+        Object.keys(lots).forEach(k => { const poi = lots[k], pr = D.find(x => x.id === k); if(!poi || !pr) return; const st = (poi.stand && poi.stand[0]) || poi.door || poi.pos;
+          if(Math.abs(pr.x - st.x) > 0.05 || Math.abs(pr.z - st.z) > 0.05){ pr.x = st.x; pr.z = st.z; ch = true; } pr.label = k === "hq" ? "Campaign office" : "Your district office"; });
+        const n0 = (SF.signs || []).length; SF.signs = (SF.signs || []).filter(sg => !(sg.title === "CAMPAIGN OFFICE" && lots.hq) && !(sg.title === "DISTRICT OFFICE" && lots.doffice));
+        if((ch || SF.signs.length !== n0) && G.room === "district"){ try{ gateAttach("district"); }catch(e){} } }catch(e){ ndWarn("offices", e); } return r; }; } }catch(e){}
   /* walk bounds: the district is a town now; buildings, cars, kiosks and monuments collide through NM.solids */
   const _roomBox = roomBox;
   roomBox = function(id){ const b = _roomBox.apply(this, arguments);
