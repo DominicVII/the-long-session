@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261020g">
+<meta name="onum-build" content="20261020h">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -11026,6 +11026,46 @@ function dnDay(){
 }
 { const _dnPd = purseDay; purseDay = function(){ const r = _dnPd.apply(this, arguments); try{ dnDay(); }catch(e){ console.warn("dn", e); } return r; }; }
 setTimeout(() => { try{ dnPublishHome(); if(G.dn) dnPublish(null); else window.ONUM_DONATIONS = window.ONUM_DONATIONS || []; }catch(e){} }, 1500);
+
+/* ══ fixes: the routine runs by the clock, one day number, one name per person, and a shared till ══ */
+/* the routine: sorted by minutes since midnight */
+{ const _dkT = docketToday; docketToday = function(){ const D = _dkT.apply(this, arguments) || []; return D.slice().sort((a, b) => Math.round((a.h || 0) * 60) - Math.round((b.h || 0) * 60)); }; }
+/* the NOW bar: what is on now (started within the last two hours and not done), else the next thing coming */
+docketNext = function(){
+  const m = G.minute || 0; if(m >= 19 * 60) return null;
+  const D = docketToday().filter(d => !kOnceToday(d.key));
+  const cur = D.filter(d => m >= d.h * 60 && m < d.h * 60 + 120).pop(); if(cur) return cur;
+  return D.find(d => d.h * 60 > m) || null;
+};
+function fxHour(h){ const hh = Math.floor(h), mm = Math.round((h - hh) * 60); return ((hh % 12) || 12) + ":" + String(mm).padStart(2, "0") + " " + (hh >= 12 ? "pm" : "am"); }
+/* one day number: everything reads G.day through this, and hears when it changes */
+window.onumDay = function(){ return G.day || 1; };
+/* one name per person: resolve by id at the moment of display */
+window.onumNameOf = function(id){ try{ if(id === "you" || (G.you && id === G.you.id)) return G.you ? G.you.name : "You"; const p = byId(isNaN(+id) ? id : +id); return p ? p.name : null; }catch(e){ return null; } };
+const FX = {day:null, names:new Map()};
+function fxWatch(){
+  try{ if(!G || G.day == null) return;
+    if(FX.day !== G.day){ const was = FX.day; FX.day = G.day; window.ONUM_DAY = G.day; if(was != null){ try{ refreshBar(); }catch(e){} try{ refreshPanels(); }catch(e){} try{ paintJob(); }catch(e){} } try{ window.dispatchEvent(new CustomEvent("onum-day", {detail:{day:G.day}})); }catch(e){} }
+    let ch = 0; (everyone() || []).forEach(p => { if(!p || p.id == null) return; const o = FX.names.get(p.id); if(o !== p.name){ if(o != null){ ch++; try{ window.dispatchEvent(new CustomEvent("onum-rename", {detail:{id:p.id, old:o, name:p.name}})); }catch(e){} } FX.names.set(p.id, p.name); } });
+    if(ch || !window.ONUM_NAMES){ const o = {}; FX.names.forEach((v, k) => o[k] = v); window.ONUM_NAMES = o; }
+  }catch(e){}
+}
+setInterval(fxWatch, 1000);
+/* the conversations log shows each speaker under the name they carry now */
+{ const _cvL = cvLineHTML; cvLineHTML = function(l){ try{ if(l && l.id != null && l.who !== "You"){ const n = window.onumNameOf(l.id); if(n && n !== l.who) l = Object.assign({}, l, {who:n}); } }catch(e){} return _cvL.call(this, l); }; }
+/* a shared till: the player pays from their own savings; the shop owner (or whoever is paid) is credited on the same ledger */
+window.onumSpend = function(amount, what, payee){
+  try{
+    amount = Math.round(+amount || 0); if(!G.you || amount <= 0) return false;
+    const P = purseOf(G.you); if(P.cash < amount) return false;
+    let to = null; if(payee != null){ to = typeof payee === "object" ? payee : (function(){ try{ return byId(isNaN(+payee) ? payee : +payee); }catch(e){ return null; } })(); }
+    P.cash -= amount; P.spent = (P.spent || 0) + amount; purseLog(G.you, String(what || "a purchase") + (to ? " (" + to.name + ")" : ""), -amount);
+    if(to && to !== G.you){ const Q = purseOf(to); Q.cash += amount; purseLog(to, "Paid by " + G.you.name + " for " + (what || "goods"), amount); }
+    try{ purseChip(); }catch(e){}
+    try{ window.dispatchEvent(new CustomEvent("onum-spend", {detail:{amount, what:what || "", payee:to ? to.id : (payee == null ? null : payee), day:G.day}})); }catch(e){}
+    return true;
+  }catch(e){ return false; }
+};
 
 const MATCACHE = new Map();
 /* Every distinct repeat used to clone the texture and its normal map, so
@@ -28289,7 +28329,7 @@ function activeJob(){
   }catch(e){}
   try{
     const dn = abroadOffice() ? docketNext() : null;
-    if(dn) return (dn.h > 12 ? dn.h - 12 : dn.h) + ":00 · " + dn.t + (G.room === homeRoom() ? ". " + officeTabName() + " panel, or the desk. E." : ". " + ROOMS[homeRoom()].t + ".");
+    if(dn) return fxHour(dn.h) + " · " + dn.t + (G.room === homeRoom() ? ". " + officeTabName() + " panel, or the desk. E." : ". " + ROOMS[homeRoom()].t + ".");
   }catch(e){}
   try{
     const kr = kChamberDue();
