@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261020v">
+<meta name="onum-build" content="20261020w">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -34306,6 +34306,11 @@ function stepsRich(w, d, h, hw){
       const lm = new THREE.MeshStandardMaterial({color:0xfff2d4, emissive:0xffd9a0, emissiveIntensity:0.6, roughness:0.4});
       addBox(brass, x, deckY + 2.3, z - 0.26, 0.05, 0.05, 0.22, 0, true); addBox(dark, x, deckY + 2.22, z - 0.38, 0.18, 0.06, 0.18, 0, true); addBox(lm, x, deckY + 2.42, z - 0.38, 0.14, 0.28, 0.14, 0, true); addBox(dark, x, deckY + 2.62, z - 0.38, 0.22, 0.06, 0.22, 0, true); });
     rgSign(rgFrieze("THE CAPITOL", "of the Republic"), 0, deckY + 4.45, fz - 0.1, Math.PI, 3.6, 0.62);
+    /* 20261020w: the doors stand in a real doorway: stone reveals from the leaves back to the wall, a lintel and keystone, a bronze frame and a step */
+    { const zb = fz - 0.135, zw = d - 0.42, dd = Math.max(0.1, zw - zb), zc = (zb + zw) / 2, rv = matCol(0xc9bfa8, .9), bz = matCol(0x5a4528, .45, .6);
+      [-1, 1].forEach(s => { addBox(rv, s * 0.74, deckY + 1.17, zc, 0.12, 2.34, dd); addBox(bz, s * 0.69, deckY + 1.15, zb - 0.01, 0.05, 2.3, 0.05, 0, true); });
+      addBox(rv, 0, deckY + 2.42, zc, 1.6, 0.16, dd); addBox(bz, 0, deckY + 2.29, zb - 0.01, 1.43, 0.05, 0.05, 0, true); addBox(stone, 0, deckY + 2.62, zb - 0.06, 1.7, 0.24, 0.16); addBox(matCol(0xe6dfcf, .9), 0, deckY + 2.62, zb - 0.15, 0.26, 0.3, 0.06);
+      addBox(matCol(0xbfb69e, .92), 0, deckY + 0.06, zb - 0.16, 1.7, 0.12, 0.3); addBox(dark, 0, deckY + 1.15, zw - 0.02, 1.36, 2.3, 0.02); }
     addBox(matCol(0xbfb69e, .92), 0, deckY + 0.03, fz - 0.55, 2.0, 0.06, 0.9);
     [-0.6, 0.6].forEach(x => { addBox(matCol(0x3b6a4a, .9), x * 1.7, deckY + 0.28, fz - 0.9, 0.5, 0.5, 0.4, 0, true); });
   }catch(e){ try{ console.warn("steps rich", e); }catch(x){} }
@@ -42811,7 +42816,7 @@ try{
    Everything is guarded: if a module fails to load, the game runs exactly as before. */
 try{
   const NEP = {mods:null, decree:null, failed:false};
-  window.NEPTUNE = NEP; NEP.debug = () => ({G, cam, camera, scene, govCard, PROPS, hereNow, syncPeople});
+  window.NEPTUNE = NEP; NEP.debug = () => ({G, cam, camera, scene, govCard, PROPS, hereNow, syncPeople, enterRoom, purseShopActs, ROOMS});
   const GOV_MAP = {republic:"republic", democracy:"democracy", conservative:"parliamentary", commonwealth:"socialist",
     national:"dictatorship", monarchy:"constitutional_monarchy", empire:"empire", consular:"consular_republic",
     theocratic:"theocracy", junta:"junta", mob:"anarchist", oligarchy:"oligarchy", machine:"corporate"};
@@ -44703,8 +44708,13 @@ try{
   };
   const styleFor = o => { o = o || {}; if(o.style && STYLES[o.style]) return o.style;
     let cult = o.culture; try{ if(!cult && o.stateId){ const s = (typeof STATE_DEF !== "undefined" ? STATE_DEF : []).find(s => s.n === o.stateId || s.id === o.stateId); if(s) cult = s.cult; } }catch(e){}
-    if(cult && STYLE_BY_CULT[cult]) return STYLE_BY_CULT[cult];
+    if(cult && STYLE_BY_CULT[cult]){ try{ if(rgStyle(cult)) return "rg_" + cult; }catch(e){} return STYLE_BY_CULT[cult]; }
     const k = Object.keys(STYLES); return k[hashS(o.stateId || o.seed || "x") % k.length]; };
+  /* 20261020w: region looks. Each region's own palette from ONUM_REGIONS (guarded) paints its doors, shutters and trim over the house style; refreshed on onum-origins */
+  const rgHex = s => { const m = /^#?([0-9a-f]{6})$/i.exec(String(s || "")); return m ? parseInt(m[1], 16) : null; };
+  const rgStyle = cult => { const R = window.ONUM_REGIONS, d = R && R[cult], base = STYLES[STYLE_BY_CULT[cult]]; if(!d || !Array.isArray(d.palette) || !base) return null; const k = "rg_" + cult, p = d.palette.map(rgHex);
+    if(!STYLES[k] || STYLES[k]._sig !== d.palette.join()){ STYLES[k] = Object.assign({}, base, {shut:p[0] != null ? p[0] : base.shut, door:p[0] != null ? p[0] : base.door, trim:p[2] != null ? p[2] : base.trim, _sig:d.palette.join(), _region:cult}); } return STYLES[k]; };
+  try{ addEventListener("onum-origins", () => { try{ Object.keys(STYLE_BY_CULT).forEach(c => rgStyle(c)); }catch(e){} }); }catch(e){}
   const homeStyle = () => { try{ return styleFor({stateId:(G.you && G.you.state) || "Nieuw Oranje"}); }catch(e){ return "dutch_gable"; } };
 
   /* ── pieces ── */
@@ -44969,8 +44979,9 @@ try{
     poi("park", "Oranje Park", 23.5, 36, 23.5, 26.6, [[21.5, 34.2], [25.5, 37.8], [19, 38.2], [23.5, 30], [27.5, 40]]);
     /* parked cars, lane lamps and furniture */
     const CC = [0x6b1f24, 0x23384f, 0xb9b6ad, 0x2f4a3a, 0x1c1c1e, 0x8a6a3a, 0x5a6670];
-    [28.5, 33.4, 38.6, 44.0].forEach((z, i) => { car(-1.55, z, 0, CC[i % 7]); if(i % 2) car(1.55, z + 1.2, Math.PI, CC[(i + 3) % 7]); });
-    [-36, -29, -19, 11.5, 18, 27, 38].forEach((x, i) => car(x, i % 2 ? 20.95 : 23.05, i % 2 ? Math.PI / 2 : -Math.PI / 2, CC[(i + 1) % 7]));
+    /* 20261020w: parked along one kerb with a car length and a half between them, so the lane stays open */
+    [27.6, 33.9, 40.2, 46.5].forEach((z, i) => car(-1.55, z, i % 2 ? Math.PI : 0, CC[i % 7]));
+    [-38, -27.5, -17, 12.5, 21, 30.5, 40].forEach((x, i) => car(x, i % 2 ? 20.95 : 23.05, i % 2 ? Math.PI / 2 : -Math.PI / 2, CC[(i + 1) % 7]));
     [-1, 1].forEach(s => { for(let i = 0; i < 4; i++) lamp(s * 2.85, 28 + i * 6, 3.8, 0, false); for(let i = 0; i < 5; i++){ lamp(s * (12 + i * 7.5), 19.6, 3.8, 0, false); lamp(s * (15 + i * 7.5), 24.4, 3.8, 0, false); }
       ND._street = true; for(let i = 0; i < 3; i++) tree(s * 3.45, 30 + i * 7, 2.6, 1.0, 600 + i * 2 + (s > 0 ? 1 : 0)); ND._street = false; bin(s * 2.9, 26.4); });
     hydrant(-2.9, 33.2); hydrant(13.2, 19.5); mailbox(-12.5, 19.6);
@@ -45033,7 +45044,10 @@ try{
       along("brass", T.cyl(6, 1), [x, 0.95, 4.6], [x, deckY + 0.92, 10.8], 0.03); });
     /* balustrades on the cheeks and along the deck */
     [-1, 1].forEach(s => { baluster([s * 5.82, 4.72], [s * 5.82, 10.6], 0.02, deckY, {});
-      baluster([s * 5.82, 11.32], [s * 9.3, 11.32], deckY, deckY, {noUrn:true}); });
+      baluster([s * 5.82, 11.32], [s * 9.3, 11.32], deckY, deckY, {noUrn:true});
+      /* 20261020w: the deck balustrade stood in the air; a dressed retaining wall and the deck behind it now carry it */
+      box("stone", s * 7.56, deckY / 2, 11.32, 3.48, deckY, 0.42, 0xc9bfa8); box("stone", s * 7.56, deckY - 0.04, 11.76, 3.48, 0.08, 0.9, 0xd6cdb8);
+      box("stone", s * 7.56, 0.12, 11.08, 3.56, 0.24, 0.1, 0xb9b09c); box("stone", s * 7.56, deckY - 0.1, 11.09, 3.56, 0.08, 0.06, 0xe6dfcf); solidLocal(s * 5.82, 11.1, s * 9.3, 12.2); });
     /* candelabra standards on the newels */
     [-1, 1].forEach(s => { lamp(s * 5.82, 4.72, 2.6, 1.0, true); lamp(s * 5.82, 10.6, 2.4, deckY + 1.0, true); });
     /* paving: granite border, fountain rings and spokes */
@@ -45057,7 +45071,7 @@ try{
     [[-1.4, -0.6], [0.6, 1.4]].forEach(([a, b]) => along("paint", T.cyl(5, 1), [a, deckY + 0.72, 12.3], [b, deckY + 0.72, 12.3], 0.02, 0x7a1e22));
     /* hedges and lawn parterres at the plaza edges */
     [-1, 1].forEach(s => { hedge(s * 9.55, 0.3, s * 9.55, 10.6, 0.95); hedge(s * 7.2, 5.6, s * 7.2, 10.2, 0.6); hedge(s * 9.3, 10.6, s * 7.2, 10.6, 0.6);
-      box("leaf", s * 8.25, 0.02, 8.0, 1.9, 0.04, 4.6, 0x4a7a3c); tree(s * 8.3, 9.4, 2.6, 0.9, 41 + s); });
+      box("leaf", s * 8.25, 0.02, 8.0, 1.9, 0.04, 4.6, 0x4a7a3c); tree(s * 8.3, 6.6, 2.6, 0.9, 41 + s); });  /* 20261020w: the parterre trees stand clear of the wings */
     /* the Capitol: wings, drum, dome, lantern */
     [-1, 1].forEach(s => { const x0 = s * 9.6, x1 = s * 17, cx = (x0 + x1) / 2, ww = Math.abs(x1 - x0), Hh = deckY + 6.2;
       box("stone", cx, Hh / 2, 14.6, ww, Hh, 4.4, 0xd6cdb8); box("stone", cx, deckY / 2, 12.2, ww, deckY, 0.6, 0xc9bfa8);
@@ -45066,7 +45080,8 @@ try{
         box("stone", px, deckY + 3.1, 12.35, 0.42, 6.0, 0.18, 0xe6dfcf);
         if(i < 5){ const wx = px + s * (ww - 1.2) / 10;
           [deckY + 1.5, deckY + 4.4].forEach(wy => { win(wx, wy, 12.38, 0.9, 1.7, 0.02, 0.1 + ((i * 7 + (wy > 4 ? 3 : 0) + (s > 0 ? 5 : 0)) % 10) / 11);
-            box("stone", wx, wy - 0.95, 12.42, 1.1, 0.08, 0.16, 0xe6dfcf); box("stone", wx, wy + 1.0, 12.42, 1.15, 0.14, 0.14, 0xe6dfcf); }); } } });
+            box("stone", wx, wy - 0.95, 12.42, 1.1, 0.08, 0.16, 0xe6dfcf); box("stone", wx, wy + 1.0, 12.42, 1.15, 0.14, 0.14, 0xe6dfcf);
+            /* 20261020w: deep reveals so each window sits in the wall, with a sash bar */ [-1, 1].forEach(j => box("stone", wx + j * 0.5, wy, 12.3, 0.1, 1.8, 0.2, 0xcfc5ae)); box("stone", wx, wy + 0.88, 12.3, 1.1, 0.06, 0.2, 0xcfc5ae); box("paint", wx, wy, 12.36, 0.04, 1.66, 0.03, 0x2a2d30); box("paint", wx, wy + 0.1, 12.36, 0.86, 0.04, 0.03, 0x2a2d30); }); } } });
     const dz = 16.4, dy = deckY + 7.0;
     cyl("stone", 0, dy + 0.6, dz, 3.9, 1.2, 0xd6cdb8, 32); cyl("stone", 0, dy + 2.4, dz, 3.3, 2.4, 0xe2d9c6, 32);
     for(let i = 0; i < 20; i++){ const a = i * Math.PI / 10; cyl("stone", Math.cos(a) * 3.55, dy + 2.4, dz + Math.sin(a) * 3.55, 0.13, 2.4, 0xece6d8, 8); }
@@ -45725,7 +45740,7 @@ try{
   /* ── Ollama ───────────────────────────────────────── */
   async function probe(force, ms){
     if(!CFG.on){ LT.up = false; LT.why = "Live talk is switched off in Settings"; return false; }
-    if(LT.up === false && force !== "ui") return false;   /* 20261020u: one quiet check per session; Settings can try again */
+    if(LT.up === false && force !== "ui" && force !== "re") return false;   /* 20261020u: one quiet check per session; Settings can try again */
     if(!force && LT.up !== null && Date.now() - LT.at < 30000) return LT.up;
     LT.at = Date.now();
     try{ const c = new AbortController(); const t = setTimeout(() => c.abort(), ms || 1800);
@@ -45737,6 +45752,9 @@ try{
     }catch(e){ LT.up = false; LT.why = "Ollama did not answer at " + CFG.url + " within " + ((ms || 1800) / 1000) + " seconds (it may be busy loading a large model, or not running)"; }
     paintPill(); return LT.up;
   }
+  /* 20261020w: Ollama started after the page loaded: one quiet re-check when a chat opens or a reply is asked for, at most once a minute, and only after a failed check */
+  async function reprobe(){ try{ if(LT.up !== false || !CFG.on) return false; const n = Date.now(); if(n - (LT.reAt || 0) < 60000) return false; LT.reAt = n; return !!(await probe("re")); }catch(e){ return false; } }
+  LT.reprobe = reprobe;
   async function chat(messages, o){
     o = o || {};
     const body = {model:o.model || CFG.model, messages, stream:!o.json, think:false, options:{temperature:o.temp == null ? 0.85 : o.temp, num_predict:o.max || 160, repeat_penalty:1.18}};
@@ -45954,6 +45972,7 @@ try{
   /* reply(): what the person remembers (window.onumRecall) goes into their prompt, and a streamed answer is read
      aloud sentence by sentence through window.onumVoice (face, sittings, meetings, calls) */
   async function reply(o){
+    try{ await reprobe(); }catch(e){}
     o = Object.assign({}, o || {}); const ch = o.channel || "face"; let m = null; try{ m = o.npc || npc(o.npcId); }catch(e){}
     try{ if(m && m.kind !== "engine" && typeof window.onumRecall === "function"){ const w = (String(o.text || "").match(/[A-Za-z][A-Za-z'-]{5,}/g) || []).sort((x, y) => y.length - x.length)[0];
         let r = w ? window.onumRecall(m.id, {limit:4, about:w}) : []; if(!r || !r.length) r = window.onumRecall(m.id, {limit:4}) || [];
@@ -46171,7 +46190,7 @@ try{
     if(!log.children.length){ const d = document.createElement("div"); d.className = "ltc-note"; d.textContent = c && c.m.kind === "aide" ? "Ask about the bill, your numbers, the money, the diary, the mail, a member by name, or what people are saying about you." : "Start the conversation. What you say here travels like anything else."; log.appendChild(d); }
     log.scrollTop = 1e9; gloss(log); paintPill();
   }
-  function chatOpen(dock){ const C = chatBox(); C.hidden = false; C.classList.toggle("is-dock", !!dock); if(dock) dock.appendChild(C); else if(C.parentNode !== document.body) document.body.appendChild(C); chatPaint(); setTimeout(() => { try{ C.querySelector("#ltcIn").focus(); }catch(e){} }, 30); try{ if(document.pointerLockElement) document.exitPointerLock(); }catch(e){} }
+  function chatOpen(dock){ try{ reprobe(); }catch(e){} const C = chatBox(); C.hidden = false; C.classList.toggle("is-dock", !!dock); if(dock) dock.appendChild(C); else if(C.parentNode !== document.body) document.body.appendChild(C); chatPaint(); setTimeout(() => { try{ C.querySelector("#ltcIn").focus(); }catch(e){} }, 30); try{ if(document.pointerLockElement) document.exitPointerLock(); }catch(e){} }
   function chatClose(){ const C = document.getElementById("ltChat"); if(C){ C.hidden = true; if(C.parentNode !== document.body) document.body.appendChild(C); } }
   LT.chatOpen = chatOpen; LT.chatClose = chatClose; LT.contacts = contacts;
   window.addEventListener("keydown", e => { if(e.ctrlKey && e.shiftKey && (e.key === "K" || e.key === "k")){ e.preventDefault(); const C = document.getElementById("ltChat"); if(C && !C.hidden) chatClose(); else chatOpen(); } }, true);
@@ -46325,7 +46344,7 @@ try{
     if(n.pocket !== c.pocket) it.push(["a pocket square", price("tailor", "pocket", 5)]);
     return it; }
   function css(){ if(document.getElementById("ndStyleCss")) return; const st = document.createElement("style"); st.id = "ndStyleCss";
-    st.textContent = "#ndStyle{position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center}" +
+    st.textContent = "#ndStyle{position:fixed;inset:0;z-index:10050;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center}" +
       "#ndStyle .ns-p{background:#14161b;color:#f4f1e8;border:2px solid #c9a24a;border-radius:8px;max-width:760px;width:94vw;max-height:90vh;overflow:auto;padding:14px 18px;font:14px/1.35 system-ui,sans-serif;box-shadow:0 10px 40px #000}" +
       "#ndStyle h2{margin:0 0 2px;font:700 19px Georgia,serif;color:#ffe08a}#ndStyle .ns-sub{color:#cfc8b4;font-size:12px;margin-bottom:8px}" +
       "#ndStyle .ns-g{border-top:1px solid #3a3d46;padding:8px 0}#ndStyle .ns-g b{display:block;color:#ffe08a;font-size:12px;letter-spacing:.06em;text-transform:uppercase;margin-bottom:5px}" +
@@ -46390,6 +46409,10 @@ try{
       if(shop === "barber") return [{t:"Sit in the barber's chair", c:"hair, colour, a shave", run:() => SE.open({shop:"barber"})}, {t:"Use the mirror (free)", c:"skin and hair", run:() => SE.open({})}];
       if(shop === "tailor") return [{t:"Step into the fitting room", c:"suits, shirts, ties", run:() => SE.open({shop:"tailor"})}].concat(_psa.call(this, "market"));
       return _psa.apply(this, arguments); }; }catch(e){}
+  /* 20261020w: the town's BARBER storefront is off Main Street, so its door gets its own place in the district too */
+  try{ if(typeof sfApply === "function"){ const sfB = sfApply; sfApply = function(){ const r = sfB.apply(this, arguments); try{ const D = (typeof PROPS !== "undefined" && PROPS.district) || null, P = window.ONUM_TOWN_POIS || [];
+        if(D && !D.some(x => x && (x.id === "sf:barber" || /barber/i.test(x.label || "")))){ const bs = P.filter(p => p && /^BARBER/i.test(p.name || "")).sort((a, b) => Math.hypot(a.pos.x, a.pos.z) - Math.hypot(b.pos.x, b.pos.z))[0];
+          if(bs){ const st = (bs.stand && bs.stand[0]) || bs.door || bs.pos; D.push({id:"sf:barber", label:"The Barber", sub:"A chair, a strop, hot towels", x:st.x, z:st.z, r:2.2, acts:() => purseShopActs("barber")}); if(G.room === "district"){ try{ gateAttach("district"); }catch(e){} } } } }catch(e){} return r; }; } }catch(e){}
   console.log("NEPTUNE style ready");
 }catch(e){ try{ console.warn("NEPTUNE-STYLE block", e); }catch(e2){} }
 /* NEPTUNE-STYLE END */
