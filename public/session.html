@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261020r">
+<meta name="onum-build" content="20261020s">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -11654,6 +11654,240 @@ window.onumContinueAs = function(heirId){
 };
 { const _ed2 = engDay; engDay = function(){ const r = _ed2.apply(this, arguments); try{ dynDay(); }catch(e){} return r; }; }
 setInterval(() => { try{ if(G && G.you && (!G.dyn || !window.ONUM_FAMILY || !Object.keys(window.ONUM_FAMILY.people).length)){ dynEnsure(); everyone().forEach(p => p && !p.gone && dynRec(p)); dynRec(G.you); if(!G.dyn.audited){ G.dyn.audited = true; dynAudit(); } dynSyncHouses(); dynPublish(); } }catch(e){} }, 3000);
+
+/* ── 20261020 session engine (ssn): parliamentary procedure as data, and a live
+   state machine for whatever body is sitting. Neptune only renders it. ── */
+const SSN_M = (o) => Object.assign({interrupts:false, needsSecond:true, threshold:0.5}, o);
+const SSN_STD_MOTIONS = {
+  point_of_order:SSN_M({interrupts:true, needsSecond:false, threshold:0}),
+  adjourn:SSN_M({threshold:0.5}), recess:SSN_M({threshold:0.5}), table:SSN_M({threshold:0.5}),
+  amend:SSN_M({threshold:0.5}), previous_question:SSN_M({threshold:0.5})
+};
+function ssnMot(extra){ return Object.assign({}, SSN_STD_MOTIONS, extra || {}); }
+const SSN_ST = (id, name, speaker, secs, allows) => ({id, name, speaker, timed:secs > 0, secs:secs || 0, allows});
+window.ONUM_PROCEDURE = {
+  congress:{bodies:{
+    senate_floor:{stages:[SSN_ST("call","Call to order","chair",20,["point_of_order"]), SSN_ST("morning","Morning business","queue",90,["seek","speak","yield","point_of_order","walkout"]),
+      SSN_ST("debate","Debate on the measure","queue",0,["seek","speak","yield","interrupt","point_of_order","motion","filibuster","walkout"]),
+      SSN_ST("vote","Roll call","all",60,["vote","point_of_order","walkout"]), SSN_ST("adjourn","Adjourned","chair",0,[])],
+      recognition:"first_to_rise_majority_leader_priority", timeRules:{perSpeaker:0, unlimited:true, yieldable:true, cloture:0.6, holdFloorWhileStanding:true},
+      voteMethods:["voice","roll"], motions:ssnMot({cloture:SSN_M({threshold:0.6}), unanimous_consent:SSN_M({needsSecond:false, threshold:1}), quorum_call:SSN_M({interrupts:true, needsSecond:false, threshold:0})})},
+    house_floor:{stages:[SSN_ST("call","Call to order and prayer","chair",20,["point_of_order"]), SSN_ST("one_minutes","One-minute speeches","queue",120,["seek","speak","point_of_order","walkout"]),
+      SSN_ST("rule","Debate on the rule","queue",90,["seek","speak","yield","point_of_order","motion"]), SSN_ST("debate","General debate, time controlled by managers","queue",240,["seek","speak","yield","interrupt","point_of_order","motion","walkout"]),
+      SSN_ST("amend","Five-minute rule on amendments","queue",150,["seek","speak","motion","point_of_order"]), SSN_ST("vote","Recorded vote","all",60,["vote","point_of_order","walkout"]), SSN_ST("adjourn","Adjourned","chair",0,[])],
+      recognition:"chair_alternates_parties_by_manager", timeRules:{perSpeaker:60, unlimited:false, yieldable:true, oneMinute:60, fiveMinute:300},
+      voteMethods:["voice","division","recorded"], motions:ssnMot({recommit:SSN_M({threshold:0.5}), suspend_rules:SSN_M({threshold:2 / 3}), discharge:SSN_M({needsSecond:false, threshold:0.5})})},
+    committee_hearing:{stages:[SSN_ST("call","Chair's opening","chair",40,["point_of_order"]), SSN_ST("ranking","Ranking member's opening","ranking",40,["point_of_order"]),
+      SSN_ST("witness","Witness testimony, under oath","witness",90,["refuse","perjury","point_of_order"]), SSN_ST("questions","Five minutes per member, by seniority","queue",300,["seek","speak","yield","interrupt","point_of_order","motion","refuse","perjury","walkout"]),
+      SSN_ST("adjourn","Adjourned","chair",0,[])],
+      recognition:"seniority_alternating_parties", timeRules:{perSpeaker:300, unlimited:false, yieldable:true},
+      voteMethods:["voice","roll"], motions:ssnMot({subpoena:SSN_M({threshold:0.5}), contempt:SSN_M({threshold:0.5}), executive_session:SSN_M({threshold:0.5})})},
+    markup:{stages:[SSN_ST("call","Chair's mark","chair",30,["point_of_order"]), SSN_ST("amend","Amendments in order","queue",240,["seek","speak","motion","point_of_order","walkout"]),
+      SSN_ST("vote","Vote to report","all",45,["vote","point_of_order"]), SSN_ST("adjourn","Adjourned","chair",0,[])],
+      recognition:"chair_discretion_by_seniority", timeRules:{perSpeaker:300, unlimited:false, yieldable:true},
+      voteMethods:["voice","roll"], motions:ssnMot({report_favorably:SSN_M({threshold:0.5})})}
+  }},
+  parliament:{bodies:{
+    question_time:{stages:[SSN_ST("call","Speaker calls questions","chair",15,["point_of_order"]), SSN_ST("questions","Questions to the government","queue",300,["seek","speak","interrupt","point_of_order","refuse","walkout"]),
+      SSN_ST("adjourn","Questions end","chair",0,[])],
+      recognition:"speaker_catches_eye_alternating", timeRules:{perSpeaker:45, unlimited:false, yieldable:false},
+      voteMethods:["voice","division"], motions:ssnMot({})},
+    confidence_vote:{stages:[SSN_ST("call","Motion of no confidence moved","chair",20,["point_of_order"]), SSN_ST("debate","Debate on confidence","queue",240,["seek","speak","interrupt","point_of_order","walkout"]),
+      SSN_ST("vote","Division","all",60,["vote"]), SSN_ST("adjourn","Result","chair",0,[])],
+      recognition:"speaker_alternates_government_opposition", timeRules:{perSpeaker:90, unlimited:false, yieldable:true},
+      voteMethods:["division"], motions:ssnMot({no_confidence:SSN_M({threshold:0.5}), closure:SSN_M({threshold:0.5})})}
+  }},
+  council:{bodies:{
+    consensus:{stages:[SSN_ST("call","The circle is opened","chair",20,[]), SSN_ST("round","Each speaks in turn","round",300,["speak","yield","point_of_order","walkout"]),
+      SSN_ST("sense","Sense of the council","all",60,["vote","refuse"]), SSN_ST("adjourn","The circle closes","chair",0,[])],
+      recognition:"round_robin_by_age", timeRules:{perSpeaker:60, unlimited:false, yieldable:true, blockByOne:true},
+      voteMethods:["consensus","stand_aside","block"], motions:ssnMot({stand_aside:SSN_M({needsSecond:false, threshold:0}), block:SSN_M({needsSecond:false, threshold:0})})}
+  }},
+  autocracy:{bodies:{
+    decree:{stages:[SSN_ST("read","The decree is read","ruler",30,[]), SSN_ST("adjourn","So ordered","ruler",0,[])],
+      recognition:"ruler_only", timeRules:{perSpeaker:0, unlimited:true, yieldable:false}, voteMethods:["acclamation"], motions:{}},
+    rubber_stamp:{stages:[SSN_ST("call","The chamber assembles","chair",15,[]), SSN_ST("praise","Speeches in favour","queue",90,["seek","speak","walkout"]),
+      SSN_ST("vote","Acclamation","all",20,["vote","refuse","walkout"]), SSN_ST("adjourn","Unanimous","chair",0,[])],
+      recognition:"chair_by_list", timeRules:{perSpeaker:30, unlimited:false, yieldable:false, dissentRisk:true},
+      voteMethods:["acclamation","standing"], motions:{}}
+  }},
+  court:{bodies:{
+    oral_argument:{stages:[SSN_ST("call","Oyez: the court is in session","chair",15,[]), SSN_ST("petitioner","Petitioner's argument","counsel",180,["speak","refuse","perjury"]),
+      SSN_ST("respondent","Respondent's argument","counsel",180,["speak","refuse","perjury"]), SSN_ST("rebuttal","Rebuttal","counsel",60,["speak"]),
+      SSN_ST("adjourn","Submitted","chair",0,[])],
+      recognition:"bench_interrupts_freely", timeRules:{perSpeaker:180, unlimited:false, yieldable:false, benchInterrupts:true},
+      voteMethods:["conference"], motions:{point_of_order:SSN_M({interrupts:true, needsSecond:false, threshold:0})}}
+  }}
+};
+/* every polity's government type maps to its procedure */
+window.ONUM_GOVMAP = {"republic":"congress", "the republic":"congress", "provisional republic":"congress", "reformist":"parliament", "technocratic":"parliament",
+  "people's assembly":"parliament", "populist":"parliament", "theocratic council":"council", "consensus":"council", "pious":"council", "old-family":"council",
+  "strongman":"autocracy", "boss rule":"autocracy", "court":"court"};
+window.onumProcedureFor = function(govType){ const k = window.ONUM_GOVMAP[String(govType || "republic").toLowerCase()] || "congress"; return {procedure:k, bodies:window.ONUM_PROCEDURE[k].bodies}; };
+function ssnEnsure(){ if(!G.ssn || G.ssn.v !== 1) G.ssn = {v:1, decorum:{}, log:[], perjury:[], held:0}; return G.ssn; }
+let SSN = null;   /* the live sitting; not saved, rebuilt when a body sits */
+const SSN_ROOM = {floor:["congress","house_floor"], senate:["congress","senate_floor"], committee:["congress","committee_hearing"], court:["court","oral_argument"]};
+function ssnBodyDef(gov, kind){ const P = window.ONUM_PROCEDURE[gov]; return P && P.bodies[kind]; }
+function ssnPeopleFor(kind){
+  let ps = [];
+  try{ if(kind === "house_floor") ps = G.members.filter(m => !m.gone && m.kind === "member"); else ps = hereNow().filter(p => p && p !== G.you && !p.gone); }catch(e){}
+  if(kind === "oral_argument"){ try{ (G.court || []).forEach(j => { if(j && j.id != null && ps.indexOf(j) < 0) ps.push(j); }); }catch(e){} }
+  return ps;
+}
+function ssnChair(kind, ps){
+  const post = kind === "house_floor" ? "speaker" : null;
+  let c = post ? ps.find(m => m.post === post) : null;
+  if(!c) c = ps.slice().sort((a, b) => (b.influence || 0) - (a.influence || 0))[0];
+  return c ? c.id : null;
+}
+function ssnPublish(){
+  if(!SSN){ window.ONUM_SESSION = null; }
+  else window.ONUM_SESSION = {bodyId:SSN.bodyId, kind:SSN.kind, govType:SSN.govType, procedure:SSN.gov, stage:SSN.def.stages[SSN.si].id, stageName:SSN.def.stages[SSN.si].name,
+    chairId:SSN.chairId, floorId:SSN.floorId, seats:SSN.seats.map(s => ({seatId:s.seatId, personId:s.personId})), queue:SSN.queue.slice(),
+    clock:{remaining:Math.max(0, Math.round(SSN.remaining)), total:SSN.total, speaker:Math.max(0, Math.round(SSN.spk))}, motion:SSN.motion ? Object.assign({}, SSN.motion) : null,
+    votes:Object.keys(SSN.votes).map(k => ({personId:isNaN(+k) ? k : +k, vote:SSN.votes[k]})), filibuster:!!SSN.fili, walkedOut:SSN.out.slice(), billId:SSN.billId};
+  try{ window.dispatchEvent(new CustomEvent("onum-session", {detail:window.ONUM_SESSION})); }catch(e){}
+}
+function ssnOpen(o){
+  o = o || {}; const gov = o.gov || (window.ONUM_GOVMAP[String(o.govType || "republic").toLowerCase()] || "congress"), kind = o.kind, def = ssnBodyDef(gov, kind); if(!def) return null;
+  const ps = o.people || ssnPeopleFor(kind);
+  SSN = {bodyId:o.bodyId || (kind + ":" + G.day), kind, gov, govType:o.govType || "republic", def, si:0, remaining:def.stages[0].secs, total:def.stages[0].secs,
+    chairId:o.chairId != null ? o.chairId : ssnChair(kind, ps), floorId:null, spk:0, seats:ps.map((p, i) => ({seatId:kind.slice(0, 2) + (i + 1), personId:p.id})).concat(G.you ? [{seatId:"you", personId:"you"}] : []),
+    queue:[], motion:null, votes:{}, fili:null, out:[], billId:o.billId != null ? o.billId : (G.bill && G.bill.id), room:o.room || G.room, said:0};
+  ssnEnsure().held++; ssnPublish(); return SSN;
+}
+function ssnClose(){ if(!SSN) return; SSN = null; ssnPublish(); }
+function ssnStage(){ return SSN ? SSN.def.stages[SSN.si] : null; }
+function ssnNext(){
+  if(!SSN) return; if(SSN.si === SSN.def.stages.findIndex(s => s.id === "vote")) ssnTally();
+  SSN.si = Math.min(SSN.def.stages.length - 1, SSN.si + 1); const st = ssnStage(); SSN.remaining = SSN.total = st.secs; SSN.floorId = null; SSN.spk = 0; SSN.queue = []; SSN.fili = null;
+  if(st.speaker === "chair" || st.speaker === "ruler") SSN.floorId = SSN.chairId;
+  if(st.id === "vote") ssnNpcVotes();
+  ssnPublish();
+}
+function ssnBill(){ try{ return G.bill && (SSN.billId == null || G.bill.id === SSN.billId) ? G.bill : null; }catch(e){ return null; } }
+function ssnNpcVotes(){
+  const b = ssnBill(); SSN.seats.forEach(s => { if(s.personId === "you" || SSN.out.indexOf(s.personId) >= 0) return; const m = byId(s.personId); if(!m || m.kind !== "member") return;
+    let v = 0; try{ v = b ? memberVote(m, b) : (chance(0.5) ? 1 : -1); }catch(e){}
+    if(SSN.gov === "autocracy") v = (m.traits || {}).conviction > 92 && chance(0.2) ? -1 : 1;
+    SSN.votes[m.id] = v > 0 ? "aye" : "no"; });
+}
+function ssnTally(){
+  const vs = Object.values(SSN.votes), aye = vs.filter(v => v === "aye").length, no = vs.filter(v => v === "no").length;
+  SSN.result = {aye, no, passed:aye > no}; ssnEnsure().log.push({d:G.day, kind:SSN.kind, aye, no}); if(ssnEnsure().log.length > 60) ssnEnsure().log.shift();
+}
+function ssnRecognize(){
+  if(!SSN || SSN.floorId != null || !SSN.queue.length) return;
+  const rec = SSN.def.recognition; let pick_ = SSN.queue[0];
+  if(/alternat/.test(rec)){ const last = SSN.lastParty, alt = SSN.queue.find(id => { const p = id === "you" ? G.you : byId(id); return p && p.party !== last; }); if(alt != null) pick_ = alt; }
+  if(/seniority/.test(rec)) pick_ = SSN.queue.slice().sort((a, b) => ((b === "you" ? G.you : byId(b)) || {}).terms - ((a === "you" ? G.you : byId(a)) || {}).terms)[0];
+  /* a chair favours warmth, and remembers a breach of decorum */
+  const D = ssnEnsure().decorum; if(SSN.queue.length > 1 && (D[pick_] || 0) < -6){ const other = SSN.queue.find(x => x !== pick_); if(other != null) pick_ = other; }
+  SSN.queue = SSN.queue.filter(x => x !== pick_); SSN.floorId = pick_; SSN.spk = (SSN.def.timeRules.perSpeaker || 0); SSN.said = 0;
+  const p = pick_ === "you" ? G.you : byId(pick_); SSN.lastParty = p && p.party; ssnPublish();
+}
+function ssnNpcLine(m){
+  const b = ssnBill(), st = ssnStage(); let al = 0; try{ al = b ? alignment(m, b) : 0; }catch(e){}
+  const mind = (() => { try{ return onumMindOf(m.id) || {}; }catch(e){ return {}; } })();
+  const home = m.state || "home", t = b ? b.title : "the question";
+  const reg = mind.region && mind.region.hardship ? " " + home + " remembers " + mind.region.hardship + "." : "";
+  if(st.id === "questions" && SSN.kind === "committee_hearing") return "Yes or no: what did you know about " + t + ", and when?";
+  if(SSN.gov === "autocracy") return "This chamber thanks the government for its wisdom on " + t + ".";
+  return al > 0 ? "I rise for " + t + ". " + home + " has waited long enough." + reg : "I cannot support " + t + " as written. " + home + " pays for it and gets nothing." + reg;
+}
+function ssnTick(){
+  try{
+    if(!G || !G.you){ if(SSN) ssnClose(); return; }
+    const cardUp = typeof veil !== "undefined" && veil && !veil.hidden; if(cardUp || document.hidden) return;
+    /* a body sits when you are in its room */
+    const want = SSN_ROOM[G.room];
+    if(!SSN && want) ssnOpen({gov:want[0], kind:want[1], room:G.room});
+    else if(SSN && SSN.room && SSN.room !== G.room && SSN.auto !== false) { ssnClose(); return; }
+    if(!SSN) return;
+    const st = ssnStage(); if(st.id === "adjourn") return;
+    if(st.timed && !SSN.fili){ SSN.remaining -= 1; if(SSN.remaining <= 0){ ssnNext(); return; } }
+    if(st.speaker === "queue" || st.speaker === "round"){
+      /* members rise to seek recognition */
+      if(SSN.queue.length < 4 && chance(0.25)){ const cand = SSN.seats.filter(s => s.personId !== "you" && SSN.queue.indexOf(s.personId) < 0 && s.personId !== SSN.floorId && SSN.out.indexOf(s.personId) < 0);
+        const c = cand[Math.floor(Math.random() * cand.length)]; if(c) SSN.queue.push(c.personId); }
+      if(SSN.floorId == null) ssnRecognize();
+      else { if(SSN.spk > 0){ SSN.spk -= 1; if(SSN.spk <= 0 && !(SSN.fili && SSN.fili.id === SSN.floorId)){ SSN.floorId = null; ssnPublish(); return; } }
+        if(SSN.floorId !== "you" && SSN.said < 2 && chance(0.35)){ const m = byId(SSN.floorId); if(m){ SSN.said++; window.onumSessionEvent({bodyId:SSN.bodyId, kind:SSN.kind, actorId:m.id, action:"speak", text:ssnNpcLine(m)}); } }
+        else if(SSN.floorId !== "you" && SSN.said >= 2 && chance(0.3)){ SSN.floorId = null; ssnPublish(); return; }
+        if(SSN.fili && SSN.fili.id === "you"){ try{ G.you.energy = clamp(G.you.energy - 0.25, 0, 100); }catch(e){} if(G.you.energy <= 5){ SSN.fili = null; SSN.floorId = null; window.onumSessionEvent({bodyId:SSN.bodyId, kind:SSN.kind, actorId:"you", action:"yield", text:"You cannot stand any longer."}); } } }
+    }
+    if(st.id === "vote" && SSN.votes.you == null && SSN.remaining < 3) ssnTally();
+    if(Math.round(SSN.remaining) % 5 === 0) ssnPublish();
+  }catch(e){}
+}
+setInterval(ssnTick, 1000);
+function ssnWho(id){ return id === "you" || (G.you && id === G.you.id) ? G.you : byId(id); }
+function ssnListeners(n){ if(!SSN) return []; return SSN.seats.map(s => s.personId).filter(id => id !== "you").map(byId).filter(Boolean).slice(0, n || 40); }
+function ssnDecor(id, d){ const D = ssnEnsure().decorum; D[id] = clamp((D[id] || 0) + d, -30, 30); }
+/* the effects of anything said or done in a sitting */
+window.onumSessionEvent = function(e){
+  try{ e = e || {}; const S = ssnEnsure(), a = ssnWho(e.actorId), isYou = a === G.you, nm = a ? a.name : "Someone", kind = e.kind || (SSN && SSN.kind) || "session", act = e.action;
+    const body = {senate_floor:"the Senate floor", house_floor:"the House floor", committee_hearing:"the hearing", markup:"the markup", question_time:"Question Time", confidence_vote:"the confidence debate", consensus:"the council", decree:"the decree", rubber_stamp:"the chamber", oral_argument:"the court"}[kind] || "the session";
+    if(SSN && isYou && (!e.kind || e.kind === SSN.kind)){ const al = ssnStage().allows, need = act === "point_of_order" ? "point_of_order" : act; if(al.indexOf(need) < 0 && !(act === "speak" && al.indexOf("seek") >= 0)) return {ok:false, why:"not in order at this stage (" + ssnStage().name + ")"}; }
+    const t = String(e.text || "").slice(0, 400), tgt = e.target != null ? ssnWho(e.target) : null, ls = ssnListeners(24);
+    const mem = (txt, w) => ls.forEach(m => { try{ window.onumRemember(m.id, txt, nm); }catch(_){} try{ if(Math.abs(w) > 0 && isYou) m.rel.warmth = clamp(m.rel.warmth + w * (m.party === G.you.party ? 1 : 0.5), -100, 100); }catch(_){} });
+    const log = (txt, press) => { try{ lLog(txt, "session"); }catch(_){} if(press){ try{ feed(txt); }catch(_){} try{ G.reactNews = (G.reactNews || []).concat([{t:txt, d:G.day}]).slice(-12); }catch(_){} } S.log.push({d:G.day, kind, act, who:nm, t:txt.slice(0, 160)}); if(S.log.length > 80) S.log.shift(); };
+    if(act === "speak"){
+      if(a && a !== G.you){ try{ speakAt(a, t); }catch(_){} try{ vhSay(a, t); }catch(_){} }
+      if(t) mem(nm + " on " + body + ": \"" + t.slice(0, 140) + "\"", 0);
+      if(isYou && t){ let w = 0; try{ const b = ssnBill(); if(b) w = /support|for |aye/i.test(t) ? 0.5 : 0; }catch(_){} ls.forEach(m => { try{ m.rel.warmth = clamp(m.rel.warmth + (SSN && SSN.floorId === "you" ? 0.4 : -0.6), -100, 100); }catch(_){} });
+        if(!(SSN && SSN.floorId === "you")){ ssnDecor("you", -2); log("You spoke out of turn on " + body + ".", false); } else { ssnDecor("you", 0.5); G.you.standing = clamp(G.you.standing + 0.3, 0, 100); } if(t.length > 120) log("On " + body + ", " + nm + " said: " + t.slice(0, 160), true); }
+    }
+    else if(act === "yield"){ if(SSN){ SSN.floorId = tgt ? (tgt === G.you ? "you" : tgt.id) : null; SSN.spk = SSN.def.timeRules.perSpeaker || 0; SSN.said = 0; if(SSN.fili && SSN.fili.id === e.actorId) SSN.fili = null; }
+      if(tgt && tgt !== G.you && isYou){ try{ tgt.rel.warmth = clamp(tgt.rel.warmth + 3, -100, 100); remember(tgt, "You yielded me your time on " + body + ".", 3); }catch(_){} } if(t) log(nm + " yielded the floor" + (tgt ? " to " + tgt.name : "") + ".", false); }
+    else if(act === "interrupt"){ ssnDecor(e.actorId, -3); if(tgt && tgt !== G.you){ try{ ripple(tgt, isYou ? -3 : 0, isYou ? "You talked over me on " + body + "." : "", 3); }catch(_){} } if(isYou) G.you.standing = clamp(G.you.standing - 1, 0, 100); log(nm + " interrupted" + (tgt ? " " + tgt.name : "") + " on " + body + ".", false); }
+    else if(act === "point_of_order"){ const D = S.decorum, culprit = SSN ? SSN.floorId : null, valid = culprit != null && culprit !== e.actorId && (D[culprit] || 0) < -2;
+      if(valid){ ssnDecor(culprit, -2); if(SSN){ SSN.floorId = null; } log("The chair sustained a point of order from " + nm + ".", false); if(isYou) G.you.standing = clamp(G.you.standing + 1, 0, 100); }
+      else { ssnDecor(e.actorId, -1.5); log("The chair ruled " + nm + "'s point of order out of order.", false); if(isYou) G.you.standing = clamp(G.you.standing - 0.5, 0, 100); }
+      if(SSN) ssnPublish(); return {ok:true, sustained:valid}; }
+    else if(act === "motion"){ const mk = String(e.target || e.text || "adjourn"), def = SSN && (SSN.def.motions[mk]); if(!def) return {ok:false, why:"not in order here"};
+      let seconded = !def.needsSecond; if(def.needsSecond){ const al = ls.filter(m => a && m.party === a.party); seconded = al.length > 0 && chance(isYou ? Math.min(0.95, 0.5 + al.length / 30) : 0.7); }
+      if(!seconded){ log(nm + " moved to " + mk.replace(/_/g, " ") + ". No second.", false); return {ok:true, seconded:false}; }
+      let yes = 0, tot = 0; ls.forEach(m => { tot++; const w = (m.rel && m.rel.warmth) || 0; const same = a && m.party === a.party; if(same ? chance(0.85) : chance(0.2 + w / 300)) yes++; });
+      const passed = def.threshold === 0 ? true : tot > 0 && yes / tot >= def.threshold; if(SSN) SSN.motion = {kind:mk, by:e.actorId, seconded:true, yes, of:tot, passed};
+      log(nm + " moved to " + mk.replace(/_/g, " ") + (passed ? "; the motion carried." : "; it failed."), mk === "cloture" || mk === "no_confidence" || mk === "contempt" || mk === "subpoena");
+      if(passed && SSN){ if(mk === "cloture" || mk === "previous_question" || mk === "closure"){ SSN.fili = null; const vi = SSN.def.stages.findIndex(s => s.id === "vote"); if(vi > SSN.si){ SSN.si = vi - 1; ssnNext(); } }
+        else if(mk === "adjourn"){ SSN.si = SSN.def.stages.length - 2; ssnNext(); } else if(mk === "table"){ SSN.billId = null; } }
+      if(SSN) ssnPublish(); return {ok:true, seconded:true, passed}; }
+    else if(act === "vote"){ const v = /^(aye|yes|yea|1)$/i.test(String(e.text || e.target)) ? "aye" : /^(no|nay|-1)$/i.test(String(e.text || e.target)) ? "no" : "present";
+      if(SSN) SSN.votes[isYou ? "you" : e.actorId] = v; if(isYou && v !== "present" && SSN && SSN.kind === "house_floor" && G.bill && !G.bill.done){ try{ G.you.vote = v === "aye" ? 1 : -1; }catch(_){} }
+      log(nm + " voted " + v + " on " + body + ".", false); if(SSN){ ssnPublish(); } }
+    else if(act === "perjury"){ S.perjury.push({d:G.day, who:e.actorId, t:t.slice(0, 160)}); ssnDecor(e.actorId, -10);
+      if(a){ try{ remember(a, "I lied under oath at " + body + ".", -6, true); }catch(_){} try{ if(G.dyn && G.dyn.P[a.id]) G.dyn.P[a.id].marks.scandals.push("perjury, day " + G.day); }catch(_){} }
+      if(isYou){ G.you.standing = clamp(G.you.standing - 12, 0, 100); G.you.approval = clamp(G.you.approval - 6, 0, 100); G.you.perjuryRisk = (G.you.perjuryRisk || 0) + 1; }
+      mem(nm + " was caught lying under oath at " + body + ".", isYou ? -6 : 0); log(nm + " lied under oath at " + body + "; a contempt referral is being drafted.", true); }
+    else if(act === "refuse"){ ssnDecor(e.actorId, -2); if(isYou) G.you.standing = clamp(G.you.standing - 2, 0, 100); log(nm + " refused to answer at " + body + (t ? ": " + t.slice(0, 100) : "") + ".", true); }
+    else if(act === "filibuster"){ if(!SSN || !SSN.def.timeRules.unlimited) return {ok:false, why:"no unlimited debate in this body"};
+      if(SSN.floorId !== e.actorId && !(isYou && SSN.floorId === "you")) return {ok:false, why:"you do not hold the floor"};
+      SSN.fili = {id:isYou ? "you" : e.actorId, since:G.t || 0}; if(isYou){ G.you.energy = clamp(G.you.energy - 8, 0, 100); } log(nm + " has begun to filibuster" + (ssnBill() ? " " + ssnBill().title : "") + ".", true); mem(nm + " is holding the floor to stop the vote.", isYou ? -1 : 0); ssnPublish(); }
+    else if(act === "walkout"){ const id = isYou ? "you" : e.actorId; if(SSN && SSN.out.indexOf(id) < 0) SSN.out.push(id);
+      const followers = ls.filter(m => a && m.party === a.party && (m.rel.warmth > 20 || !isYou) && chance(0.35)); followers.forEach(m => { if(SSN && SSN.out.indexOf(m.id) < 0) SSN.out.push(m.id); });
+      if(isYou){ G.you.standing = clamp(G.you.standing - 2, 0, 100); ls.forEach(m => { try{ m.rel.warmth = clamp(m.rel.warmth + (m.party === G.you.party ? 1 : -2), -100, 100); }catch(_){} }); }
+      log(nm + " walked out of " + body + (followers.length ? ", and " + followers.length + " followed" : "") + ".", true); if(SSN) ssnPublish(); }
+    else return {ok:false, why:"unknown action"};
+    if(SSN && act !== "vote") ssnPublish();
+    return {ok:true};
+  }catch(err){ return {ok:false, why:String(err && err.message || err)}; }
+};
+/* the player's hands in a sitting; nothing here opens a popup */
+window.onumSession = {
+  open:(o) => !!ssnOpen(Object.assign({auto:false}, o || {})), close:() => { ssnClose(); return true; },
+  state:() => window.ONUM_SESSION,
+  seek:() => { if(!SSN) return false; const st = ssnStage(); if(st.allows.indexOf("seek") < 0 && st.speaker !== "round") return false; if(SSN.queue.indexOf("you") < 0 && SSN.floorId !== "you") SSN.queue.unshift("you"); if(SSN.floorId == null) ssnRecognize(); ssnPublish(); return true; },
+  speak:(text) => window.onumSessionEvent({bodyId:SSN && SSN.bodyId, kind:SSN && SSN.kind, actorId:"you", action:"speak", text}).ok,
+  yield:(toId) => window.onumSessionEvent({bodyId:SSN && SSN.bodyId, kind:SSN && SSN.kind, actorId:"you", action:"yield", target:toId}).ok,
+  pointOfOrder:() => window.onumSessionEvent({bodyId:SSN && SSN.bodyId, kind:SSN && SSN.kind, actorId:"you", action:"point_of_order"}),
+  motion:(kind) => window.onumSessionEvent({bodyId:SSN && SSN.bodyId, kind:SSN && SSN.kind, actorId:"you", action:"motion", target:kind}),
+  vote:(v) => window.onumSessionEvent({bodyId:SSN && SSN.bodyId, kind:SSN && SSN.kind, actorId:"you", action:"vote", text:String(v)}).ok,
+  walkout:() => window.onumSessionEvent({bodyId:SSN && SSN.bodyId, kind:SSN && SSN.kind, actorId:"you", action:"walkout"}).ok,
+  filibuster:() => window.onumSessionEvent({bodyId:SSN && SSN.bodyId, kind:SSN && SSN.kind, actorId:"you", action:"filibuster"}),
+  next:() => { ssnNext(); return true; }
+};
 
 const MATCACHE = new Map();
 /* Every distinct repeat used to clone the texture and its normal map, so
@@ -39163,7 +39397,7 @@ function saveCaptureBase(){
     termLength:G.termLength, country:G.country,
     greatest:G.greatest, blasphemy:G.blasphemy, loreNote:G.loreNote, greatnessOpen:G.greatnessOpen,
     relics:G.relics, relicSpots:G.relicSpots, consularLore:G.consularLore, bind:G.bind, sens:G.sens, invertY:!!G.invertY, voiceVol:G.voiceVol, goals:G.goals, whip:G.whip || null, billQueue:G.billQueue || [], faith:G.faith || null, life:G.life || null, ach:G.ach || {}, law:G.law || null, ladder:G.ladder || [], cases:G.cases || [], lastActs:G.lastActs || [], wx:G.wx || null, town:G.town || null, rivals:G.rivals || [], rivalNext:G.rivalNext || 0, daylog:(G.daylog || []).slice(-120), paperRead:G.paperRead || 0, seedL:G.seedL || 0, mHints:G.mHints || {}, tlog:(G.tlog || []).slice(-500), ag:G.ag || null, sitPrep:G.sitPrep || {}, echoes:G.echoes || [], billKinds:G.billKinds || {}, realmRel:G.realmRel || {}, org:G.org || null, conflict:G.conflict || null, conflictLog:G.conflictLog || [], warAuth:G.warAuth || null, react:G.react || [], reactNews:G.reactNews || [], senStaff:G.senStaff || null, presStaff:G.presStaff || null, listened:G.listened || 0,
-    world:G.world, rgn:G.rgn || null, dyn:G.dyn || null, app:G.app || null, shp:G.shp || null, dn:G.dn || null, rs:G.rs || null, mm:G.mm || null, sc:G.sc || null, ph:G.ph || null,  sbox:G.sbox || null, dist:G.dist || null, fam:G.fam || null, loreBookSeeded:!!G.loreBookSeeded, saidHash:G.saidHash || [], dm:G.dm || null, lore:G.lore || null, trip:G.trip || null,
+    world:G.world, rgn:G.rgn || null, dyn:G.dyn || null, ssn:G.ssn || null, app:G.app || null, shp:G.shp || null, dn:G.dn || null, rs:G.rs || null, mm:G.mm || null, sc:G.sc || null, ph:G.ph || null,  sbox:G.sbox || null, dist:G.dist || null, fam:G.fam || null, loreBookSeeded:!!G.loreBookSeeded, saidHash:G.saidHash || [], dm:G.dm || null, lore:G.lore || null, trip:G.trip || null,
     pendingNight:!!G.pendingNight,
     cam:{x:cam.x, z:cam.z, yaw:cam.yaw, pitch:cam.pitch},
     /* the clock the shared save is compared by — not the game clock, the
