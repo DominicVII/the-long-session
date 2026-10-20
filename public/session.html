@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261020h">
+<meta name="onum-build" content="20261020i">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -44560,6 +44560,11 @@ try{
           if(Math.abs(pr.x - st.x) > 0.05 || Math.abs(pr.z - st.z) > 0.05){ pr.x = st.x; pr.z = st.z; ch = true; } pr.label = k === "hq" ? "Campaign office" : "Your district office"; });
         const n0 = (SF.signs || []).length; SF.signs = (SF.signs || []).filter(sg => !(sg.title === "CAMPAIGN OFFICE" && lots.hq) && !(sg.title === "DISTRICT OFFICE" && lots.doffice));
         if((ch || SF.signs.length !== n0) && G.room === "district"){ try{ gateAttach("district"); }catch(e){} } }catch(e){ ndWarn("offices", e); } return r; }; } }catch(e){}
+  /* NEPTUNE-QA 20261020i: nobody idles in a doorframe. Anyone standing still within 1.3 m of a door steps 1.8 m into the room. */
+  try{ setInterval(() => { try{ if(typeof G === "undefined" || !G.room || !DOORS[G.room]) return; const ds = DOORS[G.room].map(dr => { try{ return doorAt(G.room, dr); }catch(e){ return null; } }).filter(Boolean);
+      (hereNow() || []).forEach(m => { if(!m || m.sitting || m.kStand || m.leaving || m.exiting) return; if(Math.hypot((m.tx || 0) - (m.x || 0), (m.tz || 0) - (m.z || 0)) > 0.15) return;
+        for(const d of ds){ const dx = m.x - d.x, dz = m.z - d.z, L = Math.hypot(dx, dz); if(L < 1.3){ const now = Date.now(); if(!m._ndDw || now - m._ndDw > 12000){ m._ndDw = now; break; } if(now - m._ndDw < 4000) break; m._ndDw = 0; const b = roomBox(G.room), cx = 0, cz = (b.d0 + b.d1) / 2, ux = cx - d.x, uz = cz - d.z, U = Math.hypot(ux, uz) || 1;
+          m.tx = Math.max(-b.hw + 0.5, Math.min(b.hw - 0.5, d.x + ux / U * 1.8)); m.tz = Math.max(b.d0 + 0.5, Math.min(b.d1 - 0.5, d.z + uz / U * 1.8)); break; } } }); }catch(e){} }, 1500); }catch(e){}
   /* walk bounds: the district is a town now; buildings, cars, kiosks and monuments collide through NM.solids */
   const _roomBox = roomBox;
   roomBox = function(id){ const b = _roomBox.apply(this, arguments);
@@ -44849,7 +44854,10 @@ try{
     LT.at = Date.now();
     try{ const c = new AbortController(); const t = setTimeout(() => c.abort(), ms || 1800);
       const r = await fetch(CFG.url + "/api/tags", {signal:c.signal}); clearTimeout(t);
-      const j = await r.json(); LT.models = (j.models || []).map(x => x.name); LT.up = r.ok; LT.why = r.ok ? "" : "Ollama answered with an error";
+      const j = await r.json(); LT.models = (j.models || []).map(x => x.name); LT.up = r.ok; try{ if(r.ok && !CFG.userModel && LT.models.length){ const L = LT.models, sz = n => { const m = /:(\d+(?:\.\d+)?)b/i.exec(n); return m ? +m[1] : 99; };
+        const pref = ["llama3.2:3b", "llama3.2:latest", "llama3.2", "qwen2.5:3b", "phi3:mini", "gemma3:4b", "llama3.2:1b", "qwen2.5:1.5b"]; let pick = pref.find(x => L.includes(x));
+        if(!pick){ const small = L.filter(n => !/embed/i.test(n) && sz(n) <= 4).sort((x, y) => sz(y) - sz(x)); pick = small[0] || (L.includes("gemma3:12b") ? "gemma3:12b" : L.filter(n => !/embed/i.test(n)).sort((x, y) => sz(x) - sz(y))[0]); }
+        if(pick && pick !== CFG.model){ CFG.model = pick; try{ save(); }catch(e){} } } }catch(e){} LT.why = r.ok ? "" : "Ollama answered with an error";
     }catch(e){ LT.up = false; LT.why = "Ollama did not answer at " + CFG.url + " within " + ((ms || 1800) / 1000) + " seconds (it may be busy loading a large model, or not running)"; }
     paintPill(); return LT.up;
   }
@@ -45309,7 +45317,7 @@ try{
       '<label>The Engine\u2019s model (optional, a larger one thinks better) <input id="ltEng" value="' + esc2(CFG.engineModel || "") + '" list="ltModels" placeholder="same as above"></label>' +
       '<label>Server <input id="ltUrl" value="' + esc2(CFG.url) + '"></label><div class="lt-st">' + (LT.up ? "Connected. Models: " + esc2((LT.models || []).join(", ")) : "Not reachable. Install Ollama, set OLLAMA_ORIGINS=*, run `ollama pull llama3.2:3b`.") + '</div>' +
       '<div class="lt-row"><button type="button" class="btn btn--ghost" id="ltTest">Test</button><button type="button" class="btn btn--ghost" id="ltForget">Forget conversations</button><button type="button" class="btn" id="ltClose">Done</button></div>';
-    const upd = () => { CFG.on = P.querySelector("#ltOn").checked; CFG.voices = P.querySelector("#ltVo").checked; CFG.model = P.querySelector("#ltModel").value.trim() || "llama3.2:3b"; CFG.engineModel = (P.querySelector("#ltEng") || {value:""}).value.trim(); CFG.url = P.querySelector("#ltUrl").value.trim().replace(/\/$/, "") || "http://127.0.0.1:11434"; LT.up = null; save(); };
+    const upd = () => { CFG.on = P.querySelector("#ltOn").checked; CFG.voices = P.querySelector("#ltVo").checked; { const nv = P.querySelector("#ltModel").value.trim() || "llama3.2:3b"; if(nv !== CFG.model) CFG.userModel = true; CFG.model = nv; } CFG.engineModel = (P.querySelector("#ltEng") || {value:""}).value.trim(); CFG.url = P.querySelector("#ltUrl").value.trim().replace(/\/$/, "") || "http://127.0.0.1:11434"; LT.up = null; save(); };
     P.querySelectorAll("input").forEach(i => i.addEventListener("change", upd));
     P.querySelectorAll("input").forEach(i => i.addEventListener("keydown", e => e.stopPropagation()));
     P.querySelector("#ltTest").onclick = async () => { upd(); await probe(true); panel(); };
