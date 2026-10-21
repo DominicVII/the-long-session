@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261021c">
+<meta name="onum-build" content="20261021d">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -12146,6 +12146,125 @@ function cndAsk(speaker, audience, stage, fallback, deliver){
     try{ if(e && e.action === "speak" && e.actorId !== "you" && !e._cnd && typeof window.onumCandid !== "undefined"){ const m = cndPerson(e.actorId);
       if(m){ const st = (typeof ssnStage === "function" && ssnStage()) || {}; cndAsk(m, "room", "session:" + (e.kind || "") + ":" + (st.id || ""), e.text, (t) => { try{ _ev(Object.assign({}, e, {text:t, _cnd:true})); }catch(_){} }); return {ok:true, pending:true}; } } }catch(err){}
     return _ev.apply(this, arguments); }; }
+
+/* ── 20261021d: saves that never hitch the walk. Snapshot in slices under requestIdleCallback
+   (4 ms budget), pack + checksum in a Worker, write each copy in its own idle tick, IndexedDB
+   async, repeated requests coalesce into one, skipped entirely when nothing changed. Sync flush
+   on pagehide only. Format unchanged ("ONZ1|hash|packed"), so old saves load and these load. ── */
+const SV = {busy:false, pending:false, pendExplicit:false, rank:null, lastBody:null, worker:null, wseq:0, wcb:{},
+  maxSlice:0, slices:0, runs:0, skipped:0, last:null, BUDGET:4};
+function svSliceDone(t0, nm){ const d = performance.now() - t0; SV.slices++; if(d > SV.maxSlice){ SV.maxSlice = d; SV.maxAt = nm; } try{ engCost("save-slice", d); }catch(e){} }
+function svWalking(){ try{ if(houseQuiet()) return true; }catch(e){} try{ if(typeof playerMoving === "function" && playerMoving()) return true; }catch(e){} return false; }
+function svIdle(fn, explicit){
+  const run = dl => { if(!explicit && svWalking()){ setTimeout(() => svIdle(fn, explicit), 300); return; }
+    const t0 = performance.now(); const left = () => Math.min(SV.BUDGET, dl && dl.timeRemaining ? dl.timeRemaining() : SV.BUDGET) - (performance.now() - t0);
+    try{ fn(left); }catch(e){ svFail(e); } svSliceDone(t0, fn.name); };
+  try{ if(typeof requestIdleCallback === "function"){ requestIdleCallback(run, {timeout:1000}); return; } }catch(e){}
+  setTimeout(() => run(null), 16);
+}
+function svWorker(){
+  if(SV.worker !== null) return SV.worker;
+  try{
+    const src = engHash.toString() + "\n" + engPack.toString() + "\n" + engUnpack.toString() +
+      "\nonmessage = e => { const {id, json} = e.data; let raw = json; try{ const z = engPack(json); if(engUnpack(z) === json) raw = 'ONZ1|' + engHash(json) + '|' + z; }catch(x){} postMessage({id, raw}); };";
+    const w = new Worker(URL.createObjectURL(new Blob([src], {type:"text/javascript"})));
+    w.onmessage = e => { const cb = SV.wcb[e.data.id]; delete SV.wcb[e.data.id]; if(cb) cb(e.data.raw); };
+    w.onerror = () => { SV.worker = false; Object.keys(SV.wcb).forEach(k => { const cb = SV.wcb[k]; delete SV.wcb[k]; cb(null); }); };
+    SV.worker = w;
+  }catch(e){ SV.worker = false; }
+  return SV.worker;
+}
+function svPack(json, done){
+  const w = svWorker();
+  if(w){ const id = ++SV.wseq; SV.wcb[id] = raw => { if(raw == null){ svPackSliced(json, done); } else done(raw); }; try{ w.postMessage({id, json}); return; }catch(e){ delete SV.wcb[id]; } }
+  svPackSliced(json, done);
+}
+/* no Worker: still never one long block. LZW in 4 ms slices; checksum in slices; verify skipped (the checksum guards the load). */
+function svPackSliced(json, done){
+  const str = json.replace(/[\u0001\u0100-\uffff]/g, ch => "\u0001" + ch.charCodeAt(0).toString(16).padStart(4, "0"));
+  let dict = new Map(), next = 256, w = "", buf = 0, bits = 0, i = 0, h = 2166136261, hi = 0; const out = [], W = 16;
+  const emit = c => { buf = buf * 65536 + c; bits += W; while(bits >= 15){ bits -= 15; const v = Math.floor(buf / Math.pow(2, bits)) & 0x7fff; out.push(String.fromCharCode(v + 0x20)); buf = buf % Math.pow(2, bits); } };
+  const step = left => {
+    while(hi < json.length && left() > 0){ const e = Math.min(json.length, hi + 20000); for(; hi < e; hi++){ h ^= json.charCodeAt(hi); h = Math.imul(h, 16777619); } }
+    while(i < str.length && left() > 0){ const e = Math.min(str.length, i + 4000);
+      for(; i < e; i++){ const c = str.charAt(i), wc = w + c; if(!w){ w = c; continue; } if(dict.has(wc)){ w = wc; continue; }
+        emit(w.length === 1 ? w.charCodeAt(0) : dict.get(w)); dict.set(wc, next++); if(next >= 65535){ dict = new Map(); next = 256; emit(65535); } w = c; } }
+    if(hi < json.length || i < str.length) return svIdle(step, true);
+    if(w) emit(w.length === 1 ? w.charCodeAt(0) : dict.get(w));
+    if(bits > 0) out.push(String.fromCharCode(((buf * Math.pow(2, 15 - bits)) & 0x7fff) + 0x20));
+    done("ONZ1|" + (h >>> 0).toString(36) + ":" + json.length.toString(36) + "|" + out.length + "~" + out.join(""));
+  };
+  svIdle(step, true);
+}
+function svFail(e){ SV.busy = false; try{ if(window.console) console.warn("save", e); }catch(e2){} svNext(); }
+function svNext(){ if(SV.pending){ const ex = SV.pendExplicit; SV.pending = false; SV.pendExplicit = false; setTimeout(() => save(ex), 50); } }
+function svRawWrite(key, raw){ try{ localStorage.setItem(key, raw); return true; }catch(e){ return false; } }
+function svDone(base, explicit, wrote){
+  if(!wrote){ G._saveFails = (G._saveFails || 0) + 1; const t = Date.now();
+    if(!G._saveWarnAt || t - G._saveWarnAt > 120000){ G._saveWarnAt = t; try{ note("The game could not save: this browser's storage is full. Career, then Export career save, keeps your day.", true); }catch(e){} }
+  } else { G._saveFails = 0; G.savedAt = hhmm(); saveCount++; SV.rank = careerRank(base); if(explicit) note("Saved.", false);
+    try{ const pip = el("savePip"); if(pip){ pip.classList.add("is-on"); clearTimeout(save._pip); save._pip = setTimeout(() => pip.classList.remove("is-on"), 1200); } }catch(e){} }
+  SV.busy = false; svNext();
+}
+/* the known best career rank, cached once at load so each save need not re-read three copies */
+(function(){ const basePick = pickNewestSave; pickNewestSave = function(){ const b = basePick(); try{ if(b){ const r = careerRank(b); if(SV.rank == null || r > SV.rank) SV.rank = r; } }catch(e){} return b; }; })();
+const SV_ARR = {members:1, press:1, civ:1};
+save = function(explicit, sync){
+  if(sync) return svFlushSync();
+  if(SV.busy){ SV.pending = true; if(explicit) SV.pendExplicit = true; return true; }  /* coalesce */
+  if(!G || !G.you || !G.members || !G.members.length) return false;
+  SV.busy = true; SV.runs++;
+  const T0 = performance.now();
+  const S = {base:null, keys:null, ki:0, parts:[], arr:null, ai:0, aparts:null, explicit:!!explicit};
+  const snap = left => {
+    if(!S.base){ S.base = saveCaptureBase(); delete S.base.savedAtMs;
+      S.src = {members:(G.members || []).slice(), press:(G.press || []).slice(), civ:(G.civ || []).slice()}; S.base.you = stripMesh(G.you);
+      S.keys = Object.keys(S.base).concat(["members", "press", "civ"]); }
+    while(S.ki < S.keys.length && left() > 0){
+      const k = S.keys[S.ki];
+      if(SV_ARR[k]){ const src = S.src[k]; if(!S.aparts) { S.aparts = []; S.ai = 0; }
+        while(S.ai < src.length && left() > 0){ const s = JSON.stringify(stripMesh(src[S.ai++]), saveRound); S.aparts.push(s === undefined ? "null" : s); }
+        if(S.ai < src.length) break;
+        S.parts.push(JSON.stringify(k) + ":[" + S.aparts.join(",") + "]"); S.aparts = null; S.ki++; continue; }
+      const s = JSON.stringify(S.base[k], saveRound); if(s !== undefined) S.parts.push(JSON.stringify(k) + ":" + s); S.ki++;
+    }
+    if(S.ki < S.keys.length) return svIdle(snap, S.explicit);
+    svIdle(seal, S.explicit);
+  };
+  const seal = () => {
+    const body = S.parts.join(",");
+    S.base.savedAtMs = Date.now();
+    if(!S.explicit && SV.lastBody && SV.lastBody.length === body.length && SV.lastBody === body){ SV.skipped++; SV.busy = false; SV.last = {ms:performance.now() - T0, skipped:true}; return svNext(); }  /* nothing changed */
+    if(SV.rank != null && careerRank(S.base) < SV.rank){ SV.busy = false; return svNext(); }                          /* never a shorter career over a longer one */
+    S.body = body; S.json = "{" + body + (body ? "," : "") + '"savedAtMs":' + S.base.savedAtMs + "}";
+    svPack(S.json, raw => { S.raw = raw; svIdle(w1, S.explicit); });
+  };
+  const w1 = () => {
+    let ok = svRawWrite(SAVE_KEY, S.raw);
+    if(!ok){ for(const k of [SAVE_BEST_KEY, SAVE_BACKUP_KEY]){ try{ localStorage.removeItem(k); }catch(e){} ok = svRawWrite(SAVE_KEY, S.raw); if(ok) break; } }
+    if(!ok) return svDone(S.base, S.explicit, false);
+    SV.lastBody = S.body; try{ ENG.lastSave = {plain:S.json.length, stored:S.raw.length, at:Date.now()}; }catch(e){}
+    svIdle(w2, S.explicit);
+  };
+  const w2 = () => { svRawWrite(SAVE_BACKUP_KEY, S.raw); svIdle(w3, S.explicit); };          /* the backup, its own tick */
+  const w3 = () => { if(S.raw.length < 1600000) svRawWrite(SAVE_BEST_KEY, S.raw); try{ engIdbPut(S.raw); }catch(e){}  /* IDB put is async */
+    SV.last = {ms:performance.now() - T0, plain:S.json.length, stored:S.raw.length}; svDone(S.base, S.explicit, true); };
+  svIdle(snap, S.explicit);
+  return true;
+};
+/* the page is going away: one synchronous pass, primary key only (backup holds the last good copy) */
+function svFlushSync(){
+  try{ if(!G || !G.you || !G.members || !G.members.length) return false;
+    const base = saveCaptureBase(); base.members = G.members.map(stripMesh); base.press = (G.press || []).map(stripMesh); base.civ = (G.civ || []).map(stripMesh); base.you = stripMesh(G.you);
+    if(SV.rank != null && careerRank(base) < SV.rank) return false;
+    const json = JSON.stringify(base, saveRound);
+    let ok = svRawWrite(SAVE_KEY, json);
+    if(!ok){ const z = engWrap(json); ok = svRawWrite(SAVE_KEY, z); if(ok) try{ engIdbPut(z); }catch(e){} } else { try{ engIdbPut(json); }catch(e){} }
+    if(ok) SV.rank = careerRank(base);
+    return ok;
+  }catch(e){ return false; }
+}
+window.onumSaveStats = () => ({runs:SV.runs, skipped:SV.skipped, slices:SV.slices, maxSliceMs:+SV.maxSlice.toFixed(2), maxAt:SV.maxAt, last:SV.last, worker:!!SV.worker, busy:SV.busy, pending:SV.pending});
 
 const MATCACHE = new Map();
 /* Every distinct repeat used to clone the texture and its normal map, so
@@ -42986,8 +43105,7 @@ setInterval(() => {
   }catch(e){}
 }, 1500);
 addEventListener("beforeunload", () => {
-  /* One sync save on tab death is allowed. */
-  try{ if(G.you && G.members && G.members.length) save(false, true); }catch(e){}
+  /* 20261021d: the sync flush happens on pagehide only (it always follows); nothing here. */
 });
 addEventListener("visibilitychange", () => {
   try{
