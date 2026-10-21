@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261021b">
+<meta name="onum-build" content="20261021c">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -47065,6 +47065,234 @@ try{
   console.log("NEPTUNE donors ready");
 }catch(e){ try{ console.warn("NEPTUNE-DONORS block", e); }catch(e2){} }
 /* NEPTUNE-DONORS END */
+/* NEPTUNE-CANDID BEGIN — 20261021c: candid speech (MARS spec) and the office's roll of holders.
+   Speech: answers JUPITER's 'onum-speak' within 1.5 s through onumSpoke(speaker, text, {reqId}); MARS's onumCandid first, then a
+   line built from onumSpeakerState (want+reason, reaction+question), a fast Ollama line only if it lands in time. Every line is
+   checked: not one of their last five, no stock opener, no person who is not in the room, the office history or the ledger. */
+try{
+/* ---- MARS onumCandid (inlined from /workspace/ov/mars/onum-candid.js) ---- */
+/* MARS-CANDID 20261021a: window.onumCandid(npc, ctx) -> {text, prompt}. Reads only; never mutates game state.
+   ctx: {channel, text (what was said to them), stage, audience:{id,name}, last:[their recent lines]} */
+(function(){
+  const W = typeof window !== "undefined" ? window : globalThis;
+  const pick = (a, r) => a && a.length ? a[Math.floor(r() * a.length) % a.length] : "";
+  const seedRng = s => { let h = 2166136261; for(const c of String(s)) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return () => ((h = Math.imul(h ^ (h >>> 15), 2246822507) ^ Math.imul(h ^ (h >>> 13), 3266489909)) >>> 0) / 4294967296; };
+  const STOCK = /^(mr\.? speaker|madam speaker|i rise|indeed|as you know|well,? well|ah,|my friend,|honou?red colleague)/i;
+  const safe = f => { try{ return f(); }catch(e){ return null; } };
+
+  function voiceOf(npc){
+    const r = seedRng("voice:" + (npc.id != null ? npc.id : npc.name)), t = (safe(() => W.ONUM_FAMILY.people[npc.id].traits) || npc.traits || []).map(String);
+    const has = k => t.some(x => x.toLowerCase().indexOf(k) >= 0);
+    return {
+      terse: has("terse") || has("stoic") ? true : has("garrul") || has("gregar") ? false : r() < 0.5,
+      blunt: has("honest") || has("wrath") || has("blunt") ? true : has("deceit") || has("craft") || has("shy") ? false : r() < 0.5,
+      folksy: r() < 0.5, traits: t
+    };
+  }
+  function stateOf(npc, ctx){
+    const reg = safe(() => W.ONUM_REGIONS[npc.birthRegion]) || null;
+    const rec = safe(() => W.onumRecall(npc.id)) || [];
+    const fam = safe(() => W.ONUM_FAMILY.people[npc.id]) || {};
+    const S = safe(() => W.ONUM_SESSION) || {};
+    const SS = safe(() => W.onumSpeakerState(npc.id)) || {};
+    const lex = safe(() => W.onumTownLexicon()) || [];
+    const warmth = (npc.rel && npc.rel.warmth) || 0;
+    const motion = S.motion || S.measure || (S.docket && S.docket[0]) || null;
+    const motionName = motion ? (motion.title || motion.name || String(motion)) : "";
+    const lean = motion && motion.votes && npc.id in motion.votes ? motion.votes[npc.id] : null;
+    const feud = (fam.feuds || [])[0] || null;
+    return {SS, reg, rec:Array.isArray(rec) ? rec : [rec], fam, motionName, lean, warmth, feud, lex:Array.isArray(lex) ? lex : Object.keys(lex || {}),
+      mood: warmth > 20 ? "warm toward the person in front of you" : warmth < -20 ? "cold toward the person in front of you" : "guarded"};
+  }
+  function wantOf(st, v, r){
+    if(st.motionName) return st.lean === "no" || st.lean === "nay" ? "to see " + st.motionName + " fail" : st.lean ? "your vote on " + st.motionName : "to know where you stand on " + st.motionName;
+    if(st.feud) return "you to keep clear of " + (st.feud.name || "the other house");
+    return pick(["a straight answer", "a favor they won't name yet", "to be left out of it", "news from the floor"], r);
+  }
+  function buildPrompt(npc, ctx, v, st, want){
+    const lines = [
+      "You are " + (npc.name || "a local") + ", a person in the NO7 Consular Republic. Speak as yourself, in the first person, out loud.",
+      "Manner: " + (v.terse ? "few words" : "you run on a little") + ", " + (v.blunt ? "blunt" : "you dodge and hedge") + ", " + (v.folksy ? "plain-spoken" : "formal") + ".",
+      st.reg ? "You come from " + st.reg.name + "; it shows in how you talk." : "",
+      v.traits.length ? "Your nature: " + v.traits.slice(0, 4).join(", ") + "." : "",
+      "Right now you are " + st.mood + ". What you want from this exchange: " + want + ".",
+      st.feud ? "You have a running feud with " + (st.feud.name || "another house") + "." : "",
+      st.rec.length ? "Things you actually remember them saying: " + st.rec.slice(-3).map(x => typeof x === "string" ? x : (x.gist || x.fact || x.text || x.c || "")).filter(Boolean).join(" | ") + "." : "",
+      "Rules: no speeches, no stock openers, no example phrasing. You may disagree, dodge, ask back, interrupt, admit you don't know, or trail off.",
+      "Only mention events from the memories above. Never invent who held an office or what happened before.",
+      "Say one thing that serves what you want or reacts to what was just said. " + (v.terse ? "One sentence." : "One to three sentences.") + " Output only the words spoken."
+    ];
+    return lines.filter(Boolean).join("\n");
+  }
+  function buildText(npc, ctx, v, st, want, r){
+    const heard = String(ctx.text || "").trim();
+    const pet = pick((st.SS && st.SS.voice && st.SS.voice.phrases) || (st.reg && (st.reg.phrases || st.reg.petPhrases)) || [], r);
+    const slang = r() < 0.3 ? pick(st.lex, r) : "";
+    const react = !heard ? "" : v.blunt
+      ? pick(["No.", "That's not how I see it.", "Fine, but say it plainly.", "You don't believe that."], r)
+      : pick(["Maybe.", "I'd have to think on that.", "Hm. Could be.", "That's one way to put it."], r);
+    const ask = want.indexOf("your vote") === 0 || want.indexOf("to know") === 0
+      ? (v.blunt ? "Where are you on " + st.motionName + "?" : "I suppose you've made up your mind on " + st.motionName + "?")
+      : want.indexOf("to see") === 0 ? (v.blunt ? st.motionName + " dies on the floor, if I have anything to do with it." : "I'd not lose sleep if " + st.motionName + " went nowhere.")
+      : want.indexOf("you to keep clear") === 0 ? "Stay away from " + (st.feud.name || "them") + ". I mean it."
+      : want === "a straight answer" ? "Just tell me what you're after." : want === "to be left out of it" ? "Leave me out of this one." : want === "news from the floor" ? "What are they saying up there?" : "I'll want something back for this. Later.";
+    const mem = st.rec.length && r() < 0.4 ? (() => { const m = st.rec[st.rec.length - 1]; const s = typeof m === "string" ? m : (m.gist || m.fact || m.text || m.c || ""); if(!s) return ""; const f = s.replace(/[.]$/, "").slice(0, 80).replace(/^you /i, ""); return pick(v.blunt
+        ? ["You told me you " + f + ".", "Last time you said you " + f + ". Did you mean it?", "I haven't forgotten: you " + f + ".", "You " + f + ", or so you said."]
+        : ["If I recall, you " + f + ".", "Didn't you say you " + f + "?", "I seem to remember you " + f + ".", "You mentioned you " + f + ", once."], r); })() : "";
+    let parts = v.terse ? [react || ask].filter(Boolean) : [react, mem, ask].filter(Boolean);
+    let out = parts.join(" ");
+    if(pet && !v.terse && r() < 0.5) out += " " + pet.replace(/^./, c => c.toUpperCase()).replace(/[^.!?]$/, m => m + ".");
+    if(slang && !v.terse) out = out.replace(/\.$/, ", " + slang + ".");
+    return out.trim();
+  }
+  W.onumCandid = function(npc, ctx){
+    try{ if(!npc || npc.kind === "engine") return null; ctx = ctx || {};
+      const v = voiceOf(npc), st = stateOf(npc, ctx), last = (ctx.last || (st.SS && st.SS.memory) || []).map(x => typeof x === "string" ? x : (x.text || x.c || ""));
+      if(st.SS.voice){ if(st.SS.voice.terse != null) v.terse = !!st.SS.voice.terse; if(st.SS.voice.blunt != null) v.blunt = !!st.SS.voice.blunt; }
+      for(let k = 0; k < 6; k++){
+        const r = seedRng((npc.id || npc.name) + ":" + Date.now() + ":" + Math.random() + ":" + k);
+        const want = wantOf(st, v, r), text = buildText(npc, ctx, v, st, want, r);
+        if(text && !STOCK.test(text) && last.indexOf(text) < 0) return {text, prompt:buildPrompt(npc, ctx, v, st, want)};
+      }
+      return null;
+    }catch(e){ return null; }
+  };
+  W.onumCandid.isStock = s => STOCK.test(String(s || "").trim());
+})();
+/* ---- end MARS ---- */
+  const CD = window.NEPTUNE_CANDID = {n:0, live:0, off:0, rej:0, log:[]};
+  const sv = f => { try{ return f(); }catch(e){ return null; } };
+  const memStr = x => typeof x === "string" ? x : x ? (x.gist || x.text || x.c || "") : "";
+  const memText = x => typeof x === "string" ? x : x ? (x.text || x.gist || x.c || "") : "";
+  const STOCK = /^\s*(mr\.?|madam)\s+speaker\b|^\s*i rise\b|^\s*indeed\b|^\s*as you know\b|^\s*well,? well\b|^\s*my friend,|^\s*honou?red colleague/i;
+  const norm = s => String(s || "").toLowerCase().replace(/[^a-z0-9 ]+/g, "").replace(/\s+/g, " ").trim();
+  /* names the game knows: people, office holders, ledger, places */
+  function known(){ const K = new Set();
+    const add = s => { String(s || "").split(/\s+/).forEach(w => { if(w) K.add(w.replace(/[^A-Za-z'-]/g, "").toLowerCase()); }); };
+    sv(() => everyone().forEach(p => p && add(p.name))); sv(() => G.you && add(G.you.name));
+    sv(() => { const S = (window.ONUM_OFFICE_HISTORY || {}).seats || {}; Object.keys(S).forEach(k => { add(S[k].title); (S[k].holders || []).forEach(h => add(h.name)); }); });
+    sv(() => (G.history || []).forEach(h => add(typeof h === "string" ? h : (h.t || h.text || h.name || "")))); sv(() => (G.presidents || []).forEach(h => add(h && h.name)));
+    sv(() => { const R = window.ONUM_REGIONS || {}; Object.keys(R).forEach(k => add(R[k] && R[k].name)); });
+    sv(() => { add(G.bill && G.bill.title); (G.bills || G.docket || []).forEach(x => add(x && (x.title || x.name))); const S = window.ONUM_SESSION || {}; add(S.floor); add(S.motion && (S.motion.title || S.motion.name)); (S.docket || S.queue || []).forEach(x => add(x && (x.title || x.name || x))); });
+    sv(() => document.querySelectorAll(".ticker, #wire, .wire").forEach(e => add(e.textContent)));
+    sv(() => (G.states || []).forEach(s => add(s && (s.n || s.name)))); sv(() => (window.ONUM_TOWN_POIS || []).forEach(p => add(p && p.name)));
+    sv(() => { const L = window.onumTownLexicon && window.onumTownLexicon(); (Array.isArray(L) ? L : Object.keys(L || {})).forEach(add); });
+    return K; }
+  const COMMON = new Set("the a an i you we they he she it my our your this that what when where why how no yes not but and or if so then there here mr mrs ms miss dr sir madam speaker god lord house senate court congress republic state district office floor bill act amendment resolution union party national federal charter emergency authorization day monday tuesday wednesday thursday friday saturday sunday january february march april may june july august september october november december".split(" "));
+  function strangers(t, K){ const out = []; const re = /\b([A-Z][a-z'’-]+)\s+([A-Z][a-z'’-]+)\b/g; let m;
+    while((m = re.exec(t))){ const a = m[1].toLowerCase(), b = m[2].toLowerCase(); if(COMMON.has(a) || COMMON.has(b)) continue; if(!K.has(a) && !K.has(b)) out.push(m[0]); }
+    return out; }
+  function okLine(t, last, K){ t = String(t || "").trim(); if(!t) return "empty"; if(STOCK.test(t)) return "stock";
+    const n = norm(t); if((last || []).some(x => { const y = norm(memText(x)); return y && (y === n || (n.length > 24 && (y.indexOf(n) >= 0 || n.indexOf(y) >= 0))); })) return "repeat";
+    if(strangers(t, K || known()).length) return "unknown name"; return ""; }
+  CD.okLine = okLine;
+  CD.said = {}; const said = (id, t) => { try{ const k = String(id), A = CD.said[k] = CD.said[k] || []; A.push(String(t)); if(A.length > 5) A.shift(); }catch(e){} };
+  const lastOf = (id, st) => ((st && st.memory) || []).slice(-5).map(memText).concat(CD.said[String(id)] || []);
+  /* length by context */
+  function fit(t, stage, terse){ const S = String(t || "").replace(/\s+/g, " ").trim().match(/[^.!?…]+[.!?…]+["'”’)]*|[^.!?…]+$/g) || [];
+    const floor = /floor|sitting|speech|debate|chamber/i.test(stage || ""), max = terse ? 1 : floor ? 4 : 1;
+    let o = S.slice(0, max).map(x => x.trim().replace(/^(["'“‘(]?)([a-z])/, (m, q, c) => q + c.toUpperCase())).join(" ").trim(); if(!floor && o.length > 160) o = o.slice(0, 157).replace(/\s+\S*$/, "") + "\u2026"; return o; }
+  const pickR = a => a && a.length ? a[Math.floor(Math.random() * a.length)] : "";
+  /* offline, from their state: want+reason or reaction+question, in their voice */
+  function slotLine(p, st, ctx){ st = st || {}; const v = st.voice || {}, w = st.wants || {}, heard = String(ctx.text || "").trim();
+    const want = typeof w === "string" ? w : (w.what || w.want || w.text || ""), why = typeof w === "object" && w ? (w.why || w.reason || "") : "";
+    const ph = (v.phrases || []).filter(Boolean), GEN = /^(made a remark|asked a question)$/, pet = ph.length ? ph[(CD.n + (p.id | 0)) % ph.length] : "";
+    const g = st.grudge, d = st.debt, mem = (st.memory || []).map(memStr).filter(g => g && !/^(made a remark|asked a question)$/.test(g)), stance = st.stance && (st.stance.label || st.stance.on || st.stance.text || (typeof st.stance === "string" ? st.stance : "")) || "";
+    const blunt = v.blunt != null ? !!v.blunt : (p.id | 0) % 2 === 0, terse = !!v.terse;
+    const S = [];
+    if(heard){ const react = blunt ? pickR(["No.", "I don't buy that.", "Say it plainly, then.", "That's not what I heard."]) : pickR(["Maybe.", "I'm not sure.", "Hm.", "Could be. Could not be."]);
+      const q = want ? (blunt ? "What does that do for " + want.replace(/^to /, "") + "?" : "And " + want.replace(/^to /, "") + "\u2014where does that leave it?") : (blunt ? "What do you want from me?" : "What are you really asking?");
+      S.push(react + " " + q); }
+    if(want) S.push((blunt ? "I want " : "What I'd like is ") + want.replace(/^to /, "to ").replace(/\.$/, "") + (why ? ", because " + why.replace(/\.$/, "") : "") + ".");
+    if(g && (g.what || g.why)) S.push((blunt ? "You " : "I haven't forgotten you ") + String(g.what || g.why).replace(/^you /i, "").replace(/\.$/, "") + (g.day != null ? ", day " + g.day : "") + ".");
+    if(d && d.what) S.push((blunt ? "You owe me. You " : "There's the matter of how you ") + String(d.what).replace(/^you /i, "").replace(/\.$/, "") + ".");
+    if(mem.length) S.push((blunt ? "Last time you " : "I remember you ") + mem[mem.length - 1].replace(/^you /i, "").replace(/\.$/, "") + (blunt ? ". Still true?" : "."));
+    if(stance) S.push((blunt ? "I'm " : "I suppose I'm ") + String(stance).replace(/\.$/, "") + ".");
+    if(!S.length) S.push(pickR(["I don't know.", "Ask me later.", "Not now.", "I was just going to\u2026 never mind."]));
+    let line = S[CD.n % S.length]; if(pet && !terse && Math.random() < 0.4) line += " " + pet.replace(/^./, c => c.toUpperCase()).replace(/[^.!?…]$/, m => m + ".");
+    return line; }
+  /* one candid line, offline, checked; up to 2 retries */
+  function offlineLine(p, ctx){ CD.n++; const st = ctx.state || sv(() => window.onumSpeakerState(p.id, ctx.audience)) || {}; const last = lastOf(p.id, st), K = known();
+    const terse = !!(st.voice && st.voice.terse);
+    for(let k = 0; k < 3; k++){ let t = "";
+      const c = sv(() => typeof window.onumCandid === "function" ? window.onumCandid(p, {channel:ctx.stage, text:ctx.text, stage:ctx.stage, audience:ctx.audienceObj, last:last.map(memText)}) : null);
+      t = c && c.text ? c.text : slotLine(p, st, ctx); if(k === 2 && c && c.text) t = slotLine(p, st, ctx);
+      t = fit(t, ctx.stage, terse); const why = okLine(t, last, K); if(!why) return {text:t, prompt:addState(c && c.prompt ? c.prompt : basePrompt(p, st), st, ctx)}; CD.rej++; CD.log.push({who:p.name, t, why}); if(CD.log.length > 30) CD.log.shift(); }
+    return {text:fit(pickR(["I don't know.", "Not now.", "Hm."]), ctx.stage, true), prompt:null}; }
+  CD.offlineLine = offlineLine;
+  function basePrompt(p, st){ const v = st.voice || {}, w = st.wants, mem = (st.memory || []).map(memStr).filter(g => g && !/^(made a remark|asked a question)$/.test(g));
+    return ["You are " + (p.name || "a local") + ", speaking aloud in your own words, first person.",
+      "Manner: " + (v.terse ? "few words" : "you talk a little") + (v.blunt === false ? ", you hedge" : v.blunt ? ", blunt" : "") + ".",
+      st.region && st.region.name ? "You come from " + st.region.name + "." : "",
+      w ? "What you want: " + (typeof w === "string" ? w : (w.what || w.want || w.text || "")) + "." : "",
+      mem.length ? "What you remember of the last talk: " + mem.slice(-3).join("; ") + "." : "",
+      "You may disagree, dodge, ask back, interrupt, say you don't know, or trail off. No stock openers. Do exactly one thing: push what you want, react to what was said, or bring up a real memory.",
+      "Name only people and events you were told about here. Output only the words spoken."].filter(Boolean).join("\n"); }
+  /* the person, not examples: stance, grudge, debt, mood, the moment */
+  function addState(pr, st, ctx){ try{ const x = [];
+      if(st.stance) x.push("Your stance: " + (typeof st.stance === "string" ? st.stance : (st.stance.label || st.stance.text || JSON.stringify(st.stance))) + ".");
+      if(st.wants && typeof st.wants === "object" && (st.wants.why || st.wants.reason)) x.push("Why you want it: " + (st.wants.why || st.wants.reason) + ".");
+      if(st.grudge && (st.grudge.what || st.grudge.why)) x.push("A grudge you hold against them: " + (st.grudge.what || st.grudge.why) + ".");
+      if(st.debt && st.debt.what) x.push("What is owed between you: they " + st.debt.what + ".");
+      if(st.mood && st.mood.label) x.push("Your mood today: " + st.mood.label + ".");
+      x.push("The moment: " + (/floor|sitting|chamber/i.test(ctx.stage || "") ? "on the floor, others listening; one to four sentences." : "an aside; one line.") + (st.voice && st.voice.terse ? " You are a person of few words." : ""));
+      return pr + "\n" + x.join("\n"); }catch(e){ return pr; } }
+  function liveUp(){ const L = window.onumLiveTalk; return !!(L && L.status && L.status.up === true && typeof L.chat === "function"); }
+  async function liveLine(p, ctx, prompt, ms){ if(!prompt || !liveUp()) return null; const c = new AbortController(), t = setTimeout(() => c.abort(), ms);
+    try{ const out = await window.onumLiveTalk.chat([{role:"system", content:prompt}, {role:"user", content:ctx.text ? String(ctx.text) : "(your turn to speak)"}], {signal:c.signal, max:/floor/i.test(ctx.stage || "") ? 140 : 60, temp:0.9, json:true});
+      clearTimeout(t); return out ? String(out).replace(/^["'\s]+|["'\s]+$/g, "") : null; }catch(e){ clearTimeout(t); return null; } }
+  /* JUPITER's request: answer in time, always */
+  addEventListener("onum-speak", ev => { try{ const D = ev.detail || {}; const p = sv(() => byId(D.speaker)) || sv(() => everyone().find(q => q && String(q.id) === String(D.speaker))); if(!p || D.reqId == null) return;
+      const ctx = {stage:D.stage || "ambient", audience:D.audience, audienceObj:sv(() => byId(D.audience)) || null, state:D.state || null, text:""};
+      const off = offlineLine(p, ctx); let sent = false; const send = (t, live) => { if(sent) return; sent = true; if(live) CD.live++; else CD.off++; said(p.id, t); try{ window.onumSpoke(p.id, t, {reqId:D.reqId}); }catch(e){} };
+      if(!liveUp() || !off.prompt){ send(off.text, false); return; }
+      const fall = setTimeout(() => send(off.text, false), 1150);
+      liveLine(p, ctx, off.prompt, 1100).then(t => { if(sent) return; t = t && fit(t, ctx.stage, !!(ctx.state && ctx.state.voice && ctx.state.voice.terse)); const last = lastOf(p.id, ctx.state);
+        if(t && !okLine(t, last)){ clearTimeout(fall); send(t, true); } }); }catch(e){} });
+  /* offline replies (no Ollama): candid first, the old generator after */
+  try{ if(typeof window.onumOfflineReply === "function"){ const _or = window.onumOfflineReply; window.onumOfflineReply = function(o){ try{ const p = o && o.npc; if(p && p.kind !== "engine" && p !== G.you){
+          const r = offlineLine(p, {stage:o.channel || o.kind || "face", text:o.text || "", audience:"you"}); if(r && r.text){ said(p.id, r.text); try{ window.onumSpoke(p.id, r.text); }catch(e){} return r.text; } } }catch(e){} return _or.apply(this, arguments); }; } }catch(e){}
+  /* live replies: the same checks; up to 2 retries, then a candid offline line */
+  try{ const L = window.onumLiveTalk; if(L && typeof L.reply === "function" && !L.__cnd){ L.__cnd = 1; const _rp = L.reply;
+      L.reply = async function(o){ let r = await _rp.apply(this, arguments);
+        try{ const p = o && o.npc; if(!p || p.kind === "engine" || !r || !r.text) return r; const st = sv(() => window.onumSpeakerState(p.id)) || {}, last = lastOf(p.id, st), K = known();
+          let why = okLine(r.text, last, K);
+          for(let k = 0; why && k < 2 && r.live === true && !(o && o.onText); k++){ CD.rej++; const r2 = await _rp.apply(this, arguments); if(r2 && r2.text){ r = r2; why = okLine(r.text, last, K); } }
+          if(why){ CD.rej++; const off = offlineLine(p, {stage:o.channel || "face", text:o.text || "", audience:"you", state:st}); r = Object.assign({}, r, {text:off.text, candid:true}); }
+          said(p.id, r.text); try{ window.onumSpoke(p.id, r.text); }catch(e){} }catch(e){}
+        return r; }; } }catch(e){}
+
+  /* ---- the roll of holders, framed on the office wall ---- */
+  function seatKey(){ const k = sv(() => typeof ofhPlayerSeatKey === "function" ? ofhPlayerSeatKey() : null); if(k) return k;
+    const S = (window.ONUM_OFFICE_HISTORY || {}).seats || {}; return Object.keys(S).find(x => (S[x].holders || []).some(h => h.personId === "you" && h.to == null)) || null; }
+  function rollCanvas(){ const S = (window.ONUM_OFFICE_HISTORY || {}).seats || {}, key = seatKey(), R = key && S[key]; if(!R || !(R.holders || []).length) return null;
+    const c = document.createElement("canvas"); c.width = 512; c.height = 660; const g = c.getContext("2d");
+    g.fillStyle = "#f4ecd6"; g.fillRect(0, 0, 512, 660); g.strokeStyle = "#6a5126"; g.lineWidth = 6; g.strokeRect(14, 14, 484, 632);
+    g.fillStyle = "#1c160c"; g.textAlign = "center"; g.font = "700 30px Georgia,serif"; g.fillText("Holders of this office", 256, 64);
+    g.font = "italic 21px Georgia,serif"; g.fillStyle = "#4a3b1c"; g.fillText(String(R.title || key).slice(0, 40), 256, 96);
+    g.fillStyle = "#6a5126"; g.fillRect(96, 112, 320, 2);
+    const H = R.holders.slice(-14); g.textAlign = "left"; let y = 146;
+    const dy = d => d == null ? "now" : d <= 0 ? Math.max(1, Math.round(-d / 365)) + " yr before" : "day " + d;
+    H.forEach(h => { g.fillStyle = h.personId === "you" ? "#1d3d66" : "#1c160c"; g.font = (h.personId === "you" ? "700 " : "600 ") + "22px Georgia,serif";
+      g.fillText(String(h.name || "unknown").slice(0, 30), 40, y); g.textAlign = "right"; g.font = "18px Georgia,serif"; g.fillStyle = "#3a2f1a";
+      g.fillText((h.from == null ? "?" : dy(h.from)) + " \u2013 " + dy(h.to), 472, y); g.textAlign = "left"; y += 34; });
+    if(R.holders.length > 14){ g.font = "italic 16px Georgia,serif"; g.fillStyle = "#4a3b1c"; g.fillText("and " + (R.holders.length - 14) + " before them", 40, y); }
+    return c; }
+  let rollMesh = null;
+  let rollDims = null;
+  function drawRoll(w, d, h, hw){ try{ rollMesh = null; rollDims = [w, d, h, hw]; const c = rollCanvas(); if(!c){ [800, 2500, 6000].forEach(ms => setTimeout(lateRoll, ms)); return; }
+      const tex = new THREE.CanvasTexture(c); try{ tex.colorSpace = THREE.SRGBColorSpace; }catch(e){} tex.anisotropy = 4;
+      const x = -(w / 2 - 0.04), z = 4.7, y = 1.86, ry = Math.PI / 2;   /* the blank stretch of the left wall, over the sofa */
+      try{ addBox(matCol(0x5a3b24, .6), x - 0.01, y, z, 0.04, 1.36, 1.08, 0, true); addBox(matCol(0xb08b45, .35, .8), x + 0.005, y, z, 0.03, 1.3, 1.02, 0, true); }catch(e){}
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(0.92, 1.186), new THREE.MeshBasicMaterial({map:tex, toneMapped:false}));
+      m.position.set(x + 0.025, y, z); m.rotation.y = ry; m.name = "ndHolders"; roomGroup.add(m); rollMesh = m; }catch(e){ try{ console.warn("NEPTUNE-CANDID roll", e); }catch(x){} } }
+  function lateRoll(){ try{ if(rollMesh || !rollDims || G.room !== "office" || (typeof _buildingRoom !== "undefined" && _buildingRoom)) return; if(rollCanvas()) drawRoll.apply(null, rollDims); }catch(e){} }
+  CD.drawRoll = drawRoll; CD.rollCanvas = rollCanvas; CD.seatKey = seatKey;
+  try{ if(typeof kOfficeRich === "function"){ const _k = kOfficeRich; kOfficeRich = function(id, w, d, h, hw){ const r = _k.apply(this, arguments); if(id === "office") drawRoll(w, d, h, hw); return r; }; } }catch(e){}
+  addEventListener("onum-office-history", () => { try{ if(!rollMesh || !rollMesh.parent){ lateRoll(); return; } if(rollMesh && rollMesh.parent && G.room === "office"){ const c = rollCanvas(); if(c){ rollMesh.material.map.image = c; rollMesh.material.map.needsUpdate = true; } } }catch(e){} });
+  console.log("NEPTUNE candid ready");
+}catch(e){ try{ console.warn("NEPTUNE-CANDID block", e); }catch(e2){} }
+/* NEPTUNE-CANDID END */
 /* NEPTUNE-POLITIES BEGIN — breakaway nations on the Union map.
    Feed (from JUPITER; read if present, guarded if not): window.ONUM_POLITIES = [{id?, name, leader, govType, memberStates:[state names]}]
    (an object keyed by id is accepted too), plus a CustomEvent 'onum-polity-change' (detail: one polity, or {id|name, removed:true}
