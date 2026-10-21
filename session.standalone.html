@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261021f">
+<meta name="onum-build" content="20261021g">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -25134,12 +25134,13 @@ function dossierFor(m){
   if(m.dayEvent) L.push("Today: " + m.dayEvent.t);
   L.push("");
   /* the briefing names the office they hold NOW, not the House seat they left */
-  const youTitle = (function(){ try{ return youAddress(); }catch(e){ return "Representative"; } })();
+  const youTitle = (function(){ try{ return ndYou().address; }catch(e){ return "Representative"; } })();
   const youHouse = (function(){ try{ return inHouse(); }catch(e){ return true; } })();
-  const youPlace = youHouse ? you.state + " " + you.dist : officeSeat();
+  const youPlace = (function(){ try{ return ndYou().seat; }catch(e){ return youHouse ? you.state + " " + you.dist : officeSeat(); } })();
   const youPost = youHouse && you.post ? postTitle(you.post) : null;
   L.push("THE PERSON YOU ARE TALKING TO: " + you.name + ", " + partyName(you.party) +
     (youPost ? ", " + youPost : "") + ", " + youTitle + " (" + youPlace + ").");
+  try{ const Y = ndYou(); if(Y.formerLine) L.push("They are " + Y.formerLine + " (history only)."); if(Y.homeLine) L.push(Y.homeLine); }catch(e){}
   L.push("Address them as " + youTitle + ". " + (youHouse
     ? "They sit in the House with you, as a fellow member."
     : "They do not sit in the House with you any more; they hold the office above, and you speak to them as the " + youTitle + " they are."));
@@ -26138,7 +26139,7 @@ async function deliverReplies(){
     }
     if(!reply){
       const mood = moodOf(m);
-      reply = pick(MOODS[mood.key].open).replace(/^Representative\./, (function(){ try{ return youAddress(); }catch(e){ return "Representative"; } })() + ".") + " I got your note. " +
+      reply = pick(MOODS[mood.key].open).replace(/^Representative\./, (function(){ try{ return ndYou().address; }catch(e){ return "Representative"; } })() + ".") + " I got your note. " +
         (m.rel.warmth > 20 ? "Come and find me." : "We can talk about it when there is time.");
     }
     m.chat.push({role:"assistant", content:reply});
@@ -44091,7 +44092,7 @@ try{
     try{ towns = (stateLore(n).towns || []).map(t => t.name); }catch(e){}
     const gov = isGov();
     let h = '<div class="billbox cl-union" style="margin-top:12px"><div class="eyebrow">Your options in ' + esc(n) + (CL.town ? ' · ' + esc(CL.town) : '') + '</div>' +
-      nameSummary("state", n) + sumRow("Your role", gov ? "Governor (more reach in statehouses, lower exposure)" : (inHouse() ? "House member" : officeTitle())) + sumRow("Your influence", Math.round(G.you.influence)) +
+      nameSummary("state", n) + sumRow("Your role", gov ? "Governor (more reach in statehouses, lower exposure)" : (inHouse() ? "House member" : ndYou().title)) + sumRow("Your influence", Math.round(G.you.influence)) +
       sumRow("Relations", (R.rel > 0 ? "+" : "") + R.rel + (R.pact > G.day ? " · pact until day " + R.pact : "") + (R.informant ? " · informant in place" : "") + (R.dirt ? " · " + R.dirt + " file(s) of dirt" : "")) +
       (towns.length ? '<div style="margin:6px 0;font:12px system-ui">Towns: ' + towns.map(t => '<button type="button" class="cl-btn" data-cltown="' + esc(t) + '"' + (CL.town === t ? ' style="background:#2f5d3a;color:#fff"' : '') + '>' + esc(t) + '</button>').join("") + '</div>' : '') +
       (G.clOps.filter(o => o.st === n && o.k !== "favret").length ? '<p class="muted">Under way: ' + G.clOps.filter(o => o.st === n && o.k !== "favret").map(o => esc(UA.find(a => a.k === o.k).t) + " (day " + o.due + ")").join(", ") + '</p>' : '');
@@ -44503,7 +44504,7 @@ try{
         out.push({p:null, who:A.name + " (for you)", text:text2, to:t.id, tag:"support", gloss:A.name + " argues your line in their own words. They are your highest-influence " + (A.official ? "administration aide" : "party member") + "."}); continue; }
       if(!reason) reason = one(["the cost is known and the delay costs more", "the people who asked for this have waited long enough", "the alternative is to do nothing, and nothing has a price too", "it is a fair settlement, and fair is rarer than perfect"]);
       const own = A.pos && M.bill && M.bill.pos ? (alignment({pos:A.pos}, M.bill) >= 0) === (alignment(y, M.bill) >= 0) : true;
-      const text = (i === 0 ? one(["The chair will forgive me; I speak for " + (function(){ try{ return youAddress(); }catch(e){ return "the member"; } })() + ". ", "Allow me to say what my principal has said to me. ", "Let me put the case, since it is not being put. "]) : "And to " + t.sn + " directly: ") + (own ? "I believe it myself: " : "I would not always have chosen it, but the line is clear and here is the best of it: ") + reason + ".";
+      const text = (i === 0 ? one(["The chair will forgive me; I speak for " + (function(){ try{ return ndYou().address; }catch(e){ return "the member"; } })() + ". ", "Allow me to say what my principal has said to me. ", "Let me put the case, since it is not being put. "]) : "And to " + t.sn + " directly: ") + (own ? "I believe it myself: " : "I would not always have chosen it, but the line is clear and here is the best of it: ") + reason + ".";
       const f = A.party && t.party === A.party ? 1.3 : 1, d = Math.round(delta * f * (Math.random() < Math.max(0, (A.temper - 70) / 120) ? -0.3 : 1));
       shift(S, t, d, "argued by " + A.sn); C.filter(o => o !== t && side(o) === 0).forEach(o => shift(S, o, 2, A.sn + " argued your line"));
       out.push({p:null, who:A.name + " (for you)", text, to:t.id, tag:"support", gloss:A.name + " argues your line in their own words. They are your highest-influence " + (A.official ? "administration aide" : "party member") + "."});
@@ -44653,7 +44654,7 @@ try{
     S.picked = false; S.res = ""; S.x.moves = null; S.x.said = [];
     if(S.x.silenced != null && st !== "question") S.x.silenced = null;
     let q = exchange(S, st);
-    if(S.i === 0 && S.x.aide) q.unshift({p:null, who:S.x.aide.name + " (your aide)", text:"I will be at your shoulder, " + (function(){ try{ return youAddress(); }catch(e){ return "sir"; } })() + ". If you cannot take the floor, I will make your case.", to:null, tag:"support", gloss:S.x.aide.name + " is the highest-influence " + (S.x.aide.official ? "person in your administration" : "member of your party") + ", and speaks for your line whenever you are not speaking."});
+    if(S.i === 0 && S.x.aide) q.unshift({p:null, who:S.x.aide.name + " (your aide)", text:"I will be at your shoulder, " + (function(){ try{ return ndYou().address; }catch(e){ return "sir"; } })() + ". If you cannot take the floor, I will make your case.", to:null, tag:"support", gloss:S.x.aide.name + " is the highest-influence " + (S.x.aide.official ? "person in your administration" : "member of your party") + ", and speaks for your line whenever you are not speaking."});
     if(S.x.silenced != null) q = q.filter(l => !l.p || l.p.id !== S.x.silenced);
     if(S.x.brisk && q.length > 3) q = q.slice(0, 3 + (Math.random() < 0.5 ? 1 : 0));
     S.x.queue = q.length ? q : [chairLine(S, "Order.")];
@@ -45942,7 +45943,7 @@ try{
     const items = cur.items = LP.agenda(kind, 2), pl = cur.place = {name:LP.placeToday(kind)};
     const it = items.map(i => i.text);
     return {q:"the party backing " + it[0] + (it[1] ? ", and " + it[1] : ""), short:"the agenda", yes:"back it", no:"table it", comp:"a working group that reports at the next meeting, with " + it[0] + " first", petition:true,
-      greet:[(function(){ try{ return youAddress(); }catch(e){ return "Representative"; } })() + ", ", "Thanks for coming home. ", "Evening, everybody. "], gavel:"Evening, all. Coffee's at the back. We're at " + pl.name + ", and there are " + items.length + " things on tonight's list.",
+      greet:[(function(){ try{ return ndYou().address; }catch(e){ return "Representative"; } })() + ", ", "Thanks for coming home. ", "Evening, everybody. "], gavel:"Evening, all. Coffee's at the back. We're at " + pl.name + ", and there are " + items.length + " things on tonight's list.",
       adjourn:"That's the list. Stack your chairs. Same time " + (kind === "state" ? "next month" : "next week") + ".", state:G.you.state, bill:null, items, kind};
   };
   const cast = kind => (M, out) => {
@@ -46006,7 +46007,7 @@ try{
   const dlgRealm = () => { let rs = []; try{ rs = realmEnsure() || []; }catch(e){} return rs.find(x => x.k === G._dlgRealm) || rs[0] || {k:"reach", t:"the Reach", want:"grain and a quiet border", capital:"their capital"}; };
   SX.matter.delegation = () => { const r = dlgRealm(), D = DLG[r.k] || {ask:r.want};
     return {q:"what " + r.t + " asks of the Union, and what it gives in return", short:"the delegation's requests", yes:"agree", no:"decline", comp:"a letter of intent now and a joint working group on " + D.ask + " by spring", petition:true,
-      greet:[(function(){ try{ return youAddress(); }catch(e){ return "Governor"; } })() + ", ", "Thank you for receiving us. "], gavel:"Please sit. The delegation from " + r.t + " has asked for an hour. They will speak first.",
+      greet:[(function(){ try{ return ndYou().address; }catch(e){ return "Governor"; } })() + ", ", "Thank you for receiving us. "], gavel:"Please sit. The delegation from " + r.t + " has asked for an hour. They will speak first.",
       adjourn:"The delegation thanks you. They will wait for your answer in writing.", state:G.you.state, bill:null, realm:r}; };
   SX.castFor.delegation = (M, out) => {
     const r = M.realm, cs = delegationCases(r), rr = rng(seedOf("dlgn:" + r.k + ":" + (G.day || 1))); let env = null; try{ env = window.onumForeignEnvoy && window.onumForeignEnvoy(r.k); }catch(e){}
@@ -46171,7 +46172,7 @@ try{
     const rl = regionLine(m); if(rl) L.push(rl);
     try{ if(m.rel && !peer) L.push("Relationship with " + G.you.name + ": warmth " + Math.round(m.rel.warmth) + ", trust " + Math.round(m.rel.trust) + " (never say these numbers)."); }catch(e){}
     try{ if(peer){ L.push("You are speaking with " + (peer.name || "another person") + (peer.role ? " (" + peer.role + ")" : "") + ", another person in the building. They are NOT " + G.you.name + ", the player's character, who may be standing nearby and overhearing. Never treat anything this person says as coming from " + G.you.name + ", never address them by " + G.you.name + "'s name or office, and do not report to them as though they were the player."); }
-      else L.push("You are speaking to " + G.you.name + ", who holds the office of " + officeTitle() + " (" + officeSeat() + "). Address them as " + youAddress() + ". Do not call them by any other office; in particular they are not the head of the nation unless their office above says so."); }catch(e){}
+      else { const Y = ndYou(); L.push("You are speaking to " + G.you.name + ", who holds the office of " + Y.title + " (" + Y.seat + ") now. Address them as " + Y.address + "." + (Y.formerLine ? " They were " + Y.formerLine + "; that is history, never how you address them." : "") + (Y.homeLine ? " " + Y.homeLine : "") + " Do not call them by any other office; in particular they are not the head of the nation unless their office above says so."); } }catch(e){}
     try{ L.push("WHO IS WHO: " + (G.you ? (typeof ndNm === "function" ? ndNm(G.you) : G.you.name) : "the player") + " is the player's character. Other people also speak around you and to you; their lines are always marked with their own names or as 'not the player'. Never mistake what another person said for something the player said, and never repeat another person's words as though the player had just told them to you. Only a line that comes without a name label, in the user turn, is the player speaking."); }catch(e){}
     L.push(canon());
     /* a person has a body and a household; the machine and a far envoy have neither, so they are not told they are hungry */
@@ -47236,6 +47237,7 @@ try{
       "Right now you are " + st.mood + ". What you want from this exchange: " + want + ".",
       st.feud ? "You have a running feud with " + (st.feud.name || "another house") + "." : "",
       st.rec.length ? "Things you actually remember them saying: " + st.rec.slice(-3).map(x => typeof x === "string" ? x : (x.gist || x.fact || x.text || x.c || "")).filter(Boolean).join(" | ") + "." : "",
+      (() => { const A = safe(() => W.onumAddressYou()); return A && A.title ? "The person in front of you is the " + A.title + (A.address ? "; address them as \"" + A.address + "\"" : "") + (A.home ? ". " + A.home + " is only their home district, not their jurisdiction" : "") + ". Mention their past offices only as history." : ""; })(),
       "Rules: no speeches, no stock openers, no example phrasing. You may disagree, dodge, ask back, interrupt, admit you don't know, or trail off.",
       "Only mention events from the memories above. Never invent who held an office or what happened before.",
       "Say one thing that serves what you want or reacts to what was just said. " + (v.terse ? "One sentence." : "One to three sentences.") + " Output only the words spoken."
@@ -47345,6 +47347,7 @@ try{
       w ? "What you want: " + (typeof w === "string" ? w : (w.what || w.want || w.text || "")) + "." : "",
       mem.length ? "What you remember of the last talk: " + mem.slice(-3).join("; ") + "." : "",
       "You may disagree, dodge, ask back, interrupt, say you don't know, or trail off. No stock openers. Do exactly one thing: push what you want, react to what was said, or bring up a real memory.",
+      (() => { try{ const Y = ndYou(); return "The person in front of you is " + Y.title + "; address them as " + Y.address + "." + (Y.homeLine ? " " + Y.homeLine : ""); }catch(e){ return ""; } })(),
       "Name only people and events you were told about here. Output only the words spoken."].filter(Boolean).join("\n"); }
   /* the person, not examples: stance, grudge, debt, mood, the moment */
   function addState(pr, st, ctx){ try{ const x = [];
@@ -47429,7 +47432,7 @@ try{
     let charter = arr(C && (C.limits || C.rules || C)).map(txt).filter(Boolean); if(!charter.length) charter = arr(A.charter).map(txt).filter(Boolean);
     const refusedSrc = A.refused || sv(() => window.ONUM_ENGINE_REFUSED) || (C && C.refused) || null;
     const norm = r => ({day:r && (r.day != null ? r.day : r.d), what:txt(r), why:r && (r.reason || r.why || r.because || "")});
-    const asked = arr(A.asked || A.proposals).map(norm), granted = arr(A.granted || A.approved).map(norm), refused = arr(refusedSrc).map(norm);
+    const asked = arr(A.asked || A.asks || A.proposals).map(norm), granted = arr(A.granted || A.approved).map(norm), refused = arr(refusedSrc).map(norm);
     const byDay = (a, b) => (b.day || 0) - (a.day || 0); [asked, granted, refused].forEach(L => L.sort(byDay));
     return {live:!!(charter.length || refusedSrc || A.asked || A.granted), charter:charter.length ? charter : CHARTER0, charterLive:!!charter.length, asked, granted, refused, refusedLive:!!refusedSrc}; }
   EW.audit = audit;
@@ -47479,6 +47482,31 @@ try{
   console.log("NEPTUNE engine wall ready");
 }catch(e){ try{ console.warn("NEPTUNE-ENGINE-WALL block", e); }catch(e2){} }
 /* NEPTUNE-ENGINE-WALL END */
+/* NEPTUNE-YOU BEGIN — 20261021g: one swap point for what the player is called. onumAddressYou() first, then onumPlayerOffice(),
+   then the old game helpers. Always the CURRENT office; a former office is only history; the home district is never the Union. */
+try{
+  window.ndYou = function(){
+    const sv = f => { try{ return f(); }catch(e){ return null; } };
+    const A = sv(() => typeof window.onumAddressYou === "function" ? window.onumAddressYou() : null) || {};
+    const P = sv(() => typeof window.onumPlayerOffice === "function" ? window.onumPlayerOffice() : null) || {};
+    const k = P.office || sv(() => heldOffice()) || null;
+    const y = sv(() => G.you) || {};
+    const home = A.home || P.houseSeat || (y.state ? y.state + (y.dist != null && (!k || k === "house") ? " " + y.dist : "") : "");
+    let title = A.title || P.title || sv(() => officeTitle()) || "Representative";
+    const mr = /^(f|female|w|woman)$/i.test(String(y.gender || y.sex || "")) ? "Madam" : "Mr.";
+    let address = A.address || "";
+    if(!address){ const a = P.address || sv(() => youAddress()) || title; address = /^(President|Vice President|Speaker|Chief Justice)$/i.test(a) ? mr + " " + a : a; }
+    let seat = P.seat || (k === "pres" ? "the Union" : sv(() => officeSeat())) || home;
+    if(k === "pres" || /president/i.test(title)) seat = "the Union";
+    const former = sv(() => { const L = []; (typeof OFFICE_RANK !== "undefined" ? OFFICE_RANK : []).forEach(o => { if(o !== k && o !== "house" && officeTermsOf(o) > 0) L.push(officeShort(o) + (o === "senate" ? " for " : o === "gov" ? " of " : " ") + (y.state || "")); }); return L; }) || [];
+    return {title, address, seat, home, office:k, former, formerLine:former.length ? "formerly " + former.join(", ") : "",
+      homeLine:home && seat !== home ? home + " is only their home district, not " + (seat === "the Union" ? "the Union" : seat) + "." : ""};
+  };
+  /* the Engine's articles name the player's office as it is now (ENG_ART is the game's; only the wording follows the office) */
+  try{ if(typeof ENG_ART !== "undefined" && ENG_ART.heed && !ENG_ART.heed.__ndYou){ const H = ENG_ART.heed; H.__ndYou = true;
+      Object.defineProperty(H, "t", {configurable:true, enumerable:true, get(){ let o = "Senator"; try{ o = window.ndYou().title.replace(/\s+(of|for|from)\s+.*$/i, ""); }catch(e){} return "It does as the " + o + "\u2019s office instructs, and says so if it cannot."; }}); } }catch(e){}
+}catch(e){ try{ console.warn("NEPTUNE-YOU", e); }catch(x){} }
+/* NEPTUNE-YOU END */
 /* NEPTUNE-POLITIES BEGIN — breakaway nations on the Union map.
    Feed (from JUPITER; read if present, guarded if not): window.ONUM_POLITIES = [{id?, name, leader, govType, memberStates:[state names]}]
    (an object keyed by id is accepted too), plus a CustomEvent 'onum-polity-change' (detail: one polity, or {id|name, removed:true}
