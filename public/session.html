@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261021i">
+<meta name="onum-build" content="20261021j">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -47518,6 +47518,84 @@ try{
       Object.defineProperty(H, "t", {configurable:true, enumerable:true, get(){ let o = "Senator"; try{ o = window.ndYou().title.replace(/\s+(of|for|from)\s+.*$/i, ""); }catch(e){} return "It does as the " + o + "\u2019s office instructs, and says so if it cannot."; }}); } }catch(e){}
 }catch(e){ try{ console.warn("NEPTUNE-YOU", e); }catch(x){} }
 /* NEPTUNE-YOU END */
+/* NEPTUNE-FLOORDESK BEGIN — 20261021j: a typing desk for sessions, cabinet meetings and deliberations (UI only).
+   JUPITER owns the rules and the pacing; this calls onumSession.hold(true) while you type (guarded), hold(false) on send or
+   cancel, seek()/interject() from the Raise hand button, and speak(text) to send. No timers touch the procedure. */
+try{
+  const FD = window.NEPTUNE_FLOORDESK = {on:false, lines:[], seekSent:false, held:false};
+  const sv = f => { try{ return f(); }catch(e){ return null; } };
+  const OS = () => window.onumSession || {};
+  const call = (k, ...a) => { try{ const f = OS()[k]; return typeof f === "function" ? f.apply(OS(), a) : undefined; }catch(e){ return undefined; } };
+  const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;"})[c]);
+  const isYou = id => id === "you" || sv(() => G.you && id === G.you.id);
+  const per = id => sv(() => isYou(id) ? G.you : byId(isNaN(+id) ? id : +id));
+  const nameOf = id => { if(isYou(id)) return "You"; const p = per(id); return (p && p.name) || sv(() => window.onumNameOf(id)) || String(id); };
+  const colOf = id => { const p = per(id); return sv(() => "#" + partyColorNum(p.party).toString(16).padStart(6, "0")) || "#6b6f7a"; };
+  const S = () => { const s = window.ONUM_SESSION; return s && s.stage && s.stage !== "idle" && (s.bodyId || s.kind || s.open || s.active) ? s : null; };
+  const myTurn = s => !!s && (isYou(s.floorId) || (s.offer && isYou(s.offer)) || (Array.isArray(s.turn) ? s.turn.some(isYou) : isYou(s.turn)));
+  const nextIsMe = s => !!s && Array.isArray(s.queue) && s.queue.length && isYou(s.queue[0]);
+  function css(){ if(document.getElementById("ndFdCss")) return; const st = document.createElement("style"); st.id = "ndFdCss";
+    st.textContent = "#ndFd{position:fixed;left:50%;bottom:44px;transform:translateX(-50%);z-index:10040;width:min(720px,94vw);background:#121419;color:#f4f1e8;border:2px solid #c9a24a;border-radius:10px;box-shadow:0 8px 30px #000;font:14px/1.4 system-ui,sans-serif;padding:8px 10px}" +
+      "#ndFd.turn{border-color:#ffe08a;box-shadow:0 0 0 3px #ffe08a55,0 8px 30px #000}#ndFd .fd-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}" +
+      "#ndFd .fd-next{display:flex;gap:6px;align-items:center;flex:1;min-width:0;background:#1d2028;border:1px solid #3a3f4b;border-radius:8px;padding:4px 8px}#ndFd .fd-next.me{background:#3a2f0c;border-color:#ffe08a}" +
+      "#ndFd .fd-next b{font:700 11px system-ui;letter-spacing:.08em;text-transform:uppercase;color:#ffe08a;margin-right:2px}#ndFd .fd-sp{display:flex;align-items:center;gap:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px}" +
+      "#ndFd .fd-av{width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font:700 11px system-ui;color:#fff;border:2px solid #000;flex:none;background-size:cover}#ndFd .fd-sp.you{color:#ffe08a;font-weight:700}" +
+      "#ndFd .fd-hand{background:#ffe08a;color:#111;border:0;border-radius:6px;padding:7px 12px;font:700 13px system-ui;cursor:pointer}#ndFd .fd-hand[disabled]{opacity:.55;cursor:default}" +
+      "#ndFd .fd-cue{margin:6px 0 2px;color:#ffe08a;font:700 14px Georgia,serif}#ndFd .fd-log{max-height:120px;overflow:auto;margin:6px 0;padding:4px 6px;background:#0b0d11;border-radius:6px}" +
+      "#ndFd .fd-l{margin:2px 0;cursor:pointer}#ndFd .fd-l b{color:#ffe08a}#ndFd .fd-l.aside{font-style:italic;color:#cfc7b0;font-size:13px}#ndFd .fd-l.aside b{color:#e7c87a}" +
+      "#ndFd textarea{width:100%;box-sizing:border-box;min-height:74px;resize:vertical;background:#fff;color:#111;border:2px solid #7a6a4a;border-radius:6px;padding:7px;font:15px/1.4 system-ui}#ndFd.turn textarea{border-color:#ffe08a}" +
+      "#ndFd .fd-row{display:flex;gap:6px;justify-content:flex-end;margin-top:5px}#ndFd .fd-row button{border-radius:6px;padding:6px 12px;font:700 13px system-ui;cursor:pointer}#ndFd .fd-send{background:#ffe08a;color:#111;border:0}#ndFd .fd-cancel{background:#2a2d35;color:#fff;border:1px solid #6b6f7a}" +
+      "#ndFd .fd-min{background:none;border:0;color:#cfc7b0;cursor:pointer;font:700 14px system-ui}#ndFd.min .fd-body{display:none}";
+    document.head.appendChild(st); }
+  let D = null, ta = null;
+  function build(){ css(); D = document.createElement("div"); D.id = "ndFd"; D.setAttribute("role", "region"); D.setAttribute("aria-label", "Floor desk");
+    D.innerHTML = '<div class="fd-top"><div class="fd-next"></div><button type="button" class="fd-hand"></button><button type="button" class="fd-min" title="Fold">\u2013</button></div>' +
+      '<div class="fd-body"><div class="fd-cue" hidden></div><div class="fd-log" aria-live="polite"></div><textarea placeholder="Say something to the room\u2026 (typing asks for the floor)"></textarea>' +
+      '<div class="fd-row"><button type="button" class="fd-cancel">Cancel</button><button type="button" class="fd-send">Speak</button></div></div>';
+    document.body.appendChild(D); ta = D.querySelector("textarea");
+    ["keydown", "keyup", "keypress"].forEach(k => ta.addEventListener(k, e => e.stopPropagation()));
+    ta.addEventListener("focus", () => hold(true));
+    ta.addEventListener("blur", () => { if(!ta.value.trim()) hold(false); });
+    ta.addEventListener("input", () => { hold(true); const s = S(); if(s && !myTurn(s) && !FD.seekSent && ta.value.trim()){ FD.seekSent = true; seek(); } });
+    ta.addEventListener("keydown", e => { if(e.key === "Enter" && !e.shiftKey){ e.preventDefault(); send(); } else if(e.key === "Escape"){ cancel(); } });
+    D.querySelector(".fd-send").onclick = send; D.querySelector(".fd-cancel").onclick = cancel;
+    D.querySelector(".fd-hand").onclick = () => { const s = S(); if(s && s.floorId && !isYou(s.floorId)) { if(call("interject") === undefined) seek(); } else seek(); FD.seekSent = true; paint(); };
+    D.querySelector(".fd-min").onclick = () => { if(myTurn(S())) return; D.classList.toggle("min"); };
+    D.querySelector(".fd-log").addEventListener("click", e => { const l = e.target.closest(".fd-l"); if(l && l._full){ l._done = true; l.querySelector(".t").textContent = l._full; } }); }
+  function hold(on){ if(FD.held === on) return; FD.held = on; call("hold", on); }
+  function seek(){ if(call("seek") === undefined) call("requestFloor"); }
+  function send(){ const t = ta.value.trim(); if(!t) return; let ok = call("speak", t); if(ok === undefined){ try{ const i = document.getElementById("nsxSay"); if(i){ i.value = t; const b = document.getElementById("nsxSpeak"); if(b) b.click(); ok = true; } }catch(e){} }
+    ta.value = ""; FD.seekSent = false; hold(false); line("you", t, false); paint(); }
+  function cancel(){ ta.value = ""; FD.seekSent = false; hold(false); try{ ta.blur(); }catch(e){} paint(); }
+  /* a line in the desk log, word by word; click finishes it */
+  function line(id, text, aside){ if(!D) return; const L = D.querySelector(".fd-log"); const d = document.createElement("div"); d.className = "fd-l" + (aside ? " aside" : "");
+    d.innerHTML = "<b>" + esc(nameOf(id)) + (aside ? "" : ":") + "</b> <span class=\"t\"></span>"; L.appendChild(d); while(L.children.length > 30) L.removeChild(L.firstChild);
+    const W = String(text).split(/(\s+)/), t = d.querySelector(".t"); d._full = String(text);
+    if(isYou(id)){ t.textContent = d._full; L.scrollTop = L.scrollHeight; return; }
+    let i = 0; const step = () => { if(d._done || i >= W.length){ t.textContent = d._full; return; } t.textContent += W[i++]; if(W[i - 1].trim()) L.scrollTop = L.scrollHeight; setTimeout(step, W[i - 1].trim() ? 140 : 0); }; step(); }
+  FD.line = line;
+  /* every line spoken in the room while a session is open */
+  try{ if(typeof speakAt === "function"){ const _sa = speakAt; speakAt = function(p, text){ const r = _sa.apply(this, arguments); try{ const s = S(); if(s && p && p !== G.you && text){ const id = p.id; const aside = s.floorId != null && !isYou(s.floorId) && String(s.floorId) !== String(id); if(!D) paint(); line(id, String(text), aside); } }catch(e){} return r; }; } }catch(e){}
+  let wasTurn = false;
+  function paint(){ try{ const s = S(); if(!s){ if(D && !(ta && ta.value.trim())){ D.hidden = true; } if(FD.held && !(ta && ta.value.trim())) hold(false); wasTurn = false; return; }
+      if(!D) build(); D.hidden = false; const turn = myTurn(s), nx = nextIsMe(s);
+      D.classList.toggle("turn", turn); if(turn) D.classList.remove("min");
+      const q = (s.queue || []).slice(0, 3);
+      D.querySelector(".fd-next").className = "fd-next" + (nx || turn ? " me" : "");
+      D.querySelector(".fd-next").innerHTML = '<b>' + (turn ? "Now: you" : "Up next") + '</b>' + (q.length ? q.map(id => { const p = per(id), por = p && (p.portrait || p.photo); const ini = (nameOf(id).match(/\b\w/g) || ["?"]).slice(0, 2).join("").toUpperCase();
+          return '<span class="fd-sp' + (isYou(id) ? " you" : "") + '"><i class="fd-av" style="background-color:' + colOf(id) + (por ? ";background-image:url(" + esc(por) + ")" : "") + '">' + (por ? "" : esc(ini)) + '</i>' + esc(nameOf(id)) + '</span>'; }).join("") : '<span class="fd-sp">nobody waiting</span>');
+      const h = D.querySelector(".fd-hand"), fl = s.floorId != null && !isYou(s.floorId);
+      h.textContent = turn ? "You have the floor" : (FD.seekSent || (s.queue || []).some(isYou)) ? "Hand raised" : fl ? "Interject" : "Raise hand"; h.disabled = turn || (s.queue || []).some(isYou);
+      const cue = D.querySelector(".fd-cue"); cue.hidden = !turn; cue.textContent = "You have the floor \u2014 take your time.";
+      if(turn && !wasTurn){ setTimeout(() => { try{ ta.focus({preventScroll:true}); }catch(e){} }, 30); }
+      if(!turn && !(s.queue || []).some(isYou)) FD.seekSent = false;
+      wasTurn = turn; }catch(e){ try{ console.warn("NEPTUNE-FLOORDESK", e); }catch(x){} } }
+  FD.paint = paint;
+  addEventListener("onum-session", () => setTimeout(paint, 0));
+  setInterval(paint, 700);   /* repaint only; JUPITER's clock and pacing are untouched */
+  console.log("NEPTUNE floor desk ready");
+}catch(e){ try{ console.warn("NEPTUNE-FLOORDESK block", e); }catch(e2){} }
+/* NEPTUNE-FLOORDESK END */
 /* NEPTUNE-POLITIES BEGIN — breakaway nations on the Union map.
    Feed (from JUPITER; read if present, guarded if not): window.ONUM_POLITIES = [{id?, name, leader, govType, memberStates:[state names]}]
    (an object keyed by id is accepted too), plus a CustomEvent 'onum-polity-change' (detail: one polity, or {id|name, removed:true}
