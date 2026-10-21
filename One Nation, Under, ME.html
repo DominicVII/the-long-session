@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261021k">
+<meta name="onum-build" content="20261021l">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -10470,6 +10470,7 @@ function apBudget(m){ const d = G.day; if(m._apD !== d){ m._apD = d; m._apN = 0;
 function apToast(m, a){
   try{ if(AP.toast) AP.toast.remove(); }catch(e){}
   const w = document.createElement("div"); w.id = "apToast";
+  try{ w.dataset.npc = m.id; w.dataset.name = m.name; }catch(e){}
   w.style.cssText = "position:fixed;left:50%;transform:translateX(-50%);bottom:72px;max-width:520px;background:#1c2128;color:#eef1f4;border:1px solid #3a424d;border-radius:12px;padding:10px 14px;z-index:9998;font:13px system-ui,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.4)";
   w.innerHTML = '<b></b><div class="apT" style="margin:4px 0 8px"></div><button data-ap="talk">Talk</button> <button data-ap="away">Walk away</button>';
   w.querySelector("b").textContent = m.name + " stops you";
@@ -48191,6 +48192,179 @@ armFrame();
 })();
 </script>
 
+
+<script>
+/* Neptune 20261021l: HUD layout manager (onumHud). Edge docks (left/right columns, top strip, bottom bar);
+   panels stack in their dock and never overlap; centre (middle 50% x 60%) stays clear except modals the player opened.
+   Every docked panel gets a collapse control and leaves a reopen tab. Always-on bottom bar in immersive: Say aloud + Cables. */
+(function(){
+  "use strict";
+  if(window.onumHud) return;
+  const GAP = 6, PAD = 8;
+  /* dock: L/R/T/B; talk = compact talk row; chip = tiny control merged into the bottom bar */
+  const REG = [
+    {s:"#prompt", d:"R", n:"Prompt", noX:1},
+    {s:"#hail", d:"R", n:"Wants a word", talk:1},
+    {s:"#apToast", d:"R", n:"Stops you", talk:1},
+    {s:"#kClock", d:"R", n:"Clock", noX:1, small:1},
+    {s:"#ndSess", d:"R", n:"Session"},
+    {s:"#feed", d:"R", n:"Feed"},
+    {s:"#clDock", d:"L", n:"Notices", noX:1, small:1},
+    {s:".notices", d:"L", n:"Notices"},
+    {s:"#cvLive", d:"L", n:"Room log"},
+    {s:"#procBar", d:"L", n:"Procedure"},
+    {s:"#tele", d:"L", n:"Status"},
+    {s:"#job", d:"L", n:"Checklist"},
+    {s:".quest,#quest,#questBox,#ckList", d:"L", n:"Checklist"},
+    {s:".ach-toast", d:"T", n:"Toast"},
+    {s:"#tipCard", d:"T", n:"Tip"},
+    {s:"#ndFd", d:"B", n:"Floor desk"},
+    {s:"#ltPill", chip:1}, {s:"#ltChatBtn", chip:1}, {s:"#dmBadge", chip:1}, {s:"#ndBuild", chip:1}
+  ];
+  const H = window.onumHud = {collapsed:{}, last:null};
+  const css = document.createElement("style"); css.id = "hmCss";
+  css.textContent = ".hm-col{display:none!important}" +
+    ".hmX{position:absolute!important;top:2px!important;right:2px!important;z-index:5!important;width:20px;height:20px;line-height:16px;padding:0!important;margin:0!important;border:1px solid #c9a24a!important;border-radius:4px;background:#0d0f13!important;color:#f4f1e8!important;font:700 13px system-ui!important;cursor:pointer;pointer-events:auto!important;min-height:0!important}" +
+    ".hm-p{pointer-events:auto!important}" +
+    "#hmBar{position:fixed;left:8px;right:8px;bottom:6px;z-index:10050;display:flex;gap:6px;align-items:center;background:#0d0f13;color:#f4f1e8;border:1px solid #c9a24a;border-radius:8px;padding:4px 6px;font:13px system-ui,sans-serif;box-sizing:border-box}" +
+    "#hmBar[hidden]{display:none}#hmBar input{flex:1;min-width:80px;background:#1b1f27;color:#fff;border:1px solid #5a6474;border-radius:5px;padding:5px 8px;font:13px system-ui}" +
+    "#hmBar button,.hmTab{background:#2b333d;color:#fff;border:1px solid #c9a24a;border-radius:5px;padding:4px 8px;font:600 12px system-ui;cursor:pointer;white-space:nowrap}" +
+    "#hmBar .hmChips{display:flex;gap:4px;align-items:center;flex-wrap:nowrap;overflow:hidden}#hmBar .hmChips>*{position:static!important;transform:none!important;margin:0!important}" +
+    "#hmBar.hm-desk #hmSayWrap{display:none}#hmSayWrap{display:flex;flex:1;gap:6px;align-items:center;min-width:0}" +
+    ".hm-talk{display:flex!important;gap:8px;align-items:center;font-size:12px!important;padding:6px 26px 6px 6px!important}" +
+    ".hm-talk .hmPort{flex:none;width:40px;height:40px;border-radius:50%;border:1px solid #c9a24a;background:#2a2f3a;color:#fff;font:700 15px system-ui;display:flex;align-items:center;justify-content:center;overflow:hidden}" +
+    ".hm-talk .hmPort canvas{width:40px;height:40px}.hm-talk .hmBody{flex:1;min-width:0}";
+  document.head.appendChild(css);
+  const vis = e => { if(!e || !e.isConnected || e.hidden || e.classList.contains("hm-col")) return false; const cs = getComputedStyle(e); if(cs.display === "none" || cs.visibility === "hidden") return false; const r = e.getBoundingClientRect(); return r.width > 1 && r.height > 1; };
+  const set = (e, k, v) => { if(e.style.getPropertyValue(k) !== v || e.style.getPropertyPriority(k) !== "important") e.style.setProperty(k, v, "important"); };
+  const gG = () => { try{ return window.NEPTUNE && typeof NEPTUNE.debug === "function" ? NEPTUNE.debug().G : null; }catch(e){ return null; } };
+  const inGame = () => { const g = gG(); return !!(g && g.you && g.room); };
+  /* ----- bottom bar ----- */
+  let bar = null, tabs = null, chips = null;
+  function say(text){
+    text = String(text || "").trim(); if(!text) return false;
+    try{ const S = window.onumSession; if(S && typeof S.speak === "function" && (window.ONUM_SESSION ? window.ONUM_SESSION.open !== false : true) && document.getElementById("ndFd")){ S.speak(text); return true; } }catch(e){}
+    try{ const wi = document.getElementById("wireIn"), ws = document.getElementById("wireSend"); if(wi && ws){ wi.value = text; ws.click(); return true; } }catch(e){}
+    try{ if(typeof wireSend === "function"){ const wi = document.getElementById("wireIn"); if(wi) wi.value = text; wireSend(); return true; } }catch(e){}
+    return false;
+  }
+  H.say = say;
+  function cables(){ try{ if(typeof dmToggle === "function"){ dmToggle(true); return; } }catch(e){} try{ const b = document.getElementById("dmBadge"); if(b) b.click(); }catch(e){} }
+  H.cables = cables;
+  function mkBar(){
+    if(bar && bar.isConnected) return;
+    bar = document.createElement("div"); bar.id = "hmBar"; bar.className = "hm-p";
+    bar.innerHTML = '<span id="hmSayWrap"><b style="white-space:nowrap">Say aloud</b><input id="hmSay" type="text" maxlength="400" autocomplete="off" placeholder="Speak to the room, or whoever is near (Enter)"><button type="button" id="hmSayGo">Say</button></span>' +
+      '<button type="button" id="hmCab" title="Cables and messages">\u2709 Cables</button><span class="hmTabs"></span><span class="hmChips"></span>';
+    document.body.appendChild(bar); tabs = bar.querySelector(".hmTabs"); chips = bar.querySelector(".hmChips");
+    const inp = bar.querySelector("#hmSay");
+    const go = () => { if(say(inp.value)){ inp.value = ""; } else { inp.placeholder = "Nobody can hear you here yet."; } };
+    bar.querySelector("#hmSayGo").onclick = go; bar.querySelector("#hmCab").onclick = cables;
+    const stop = e => { e.stopPropagation(); };
+    inp.addEventListener("keydown", e => { e.stopPropagation(); if(e.key === "Enter"){ e.preventDefault(); go(); } else if(e.key === "Escape"){ inp.blur(); } });
+    inp.addEventListener("keyup", stop); inp.addEventListener("keypress", stop);
+  }
+  /* Ctrl/Meta combos (copy, paste, select all, undo...) in any text field: let the browser have them, no game handler sees them. */
+  const editable = t => t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
+  window.addEventListener("keydown", e => { if((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && editable(e.target)) e.stopImmediatePropagation(); }, true);
+  /* ----- collapse/reopen ----- */
+  function addX(e, r){
+    if(r.noX || e.querySelector(":scope>.hmX")) return;
+    if(getComputedStyle(e).position === "static") set(e, "position", "fixed");
+    const x = document.createElement("button"); x.type = "button"; x.className = "hmX"; x.textContent = "\u2013"; x.title = "Collapse " + r.n + " (reopen from the bar)";
+    x.onclick = ev => { ev.stopPropagation(); collapse(e, r); };
+    e.appendChild(x);
+  }
+  function collapse(e, r){ e.classList.add("hm-col"); const k = r.s; H.collapsed[k] = r.n; layout(); }
+  H.collapse = sel => { const r = REG.find(q => q.s === sel); const e = r && document.querySelector(r.s); if(e) collapse(e, r); };
+  H.reopen = sel => { document.querySelectorAll(sel).forEach(e => e.classList.remove("hm-col")); delete H.collapsed[sel]; layout(); };
+  function drawTabs(){
+    if(!tabs) return; const want = Object.keys(H.collapsed).filter(s => document.querySelector(s));
+    const key = want.join("|"); if(tabs.dataset.k === key) return; tabs.dataset.k = key; tabs.innerHTML = "";
+    want.forEach(s => { const b = document.createElement("button"); b.type = "button"; b.className = "hmTab"; b.textContent = "\u25B8 " + H.collapsed[s]; b.title = "Reopen"; b.onclick = () => H.reopen(s); tabs.appendChild(b); });
+  }
+  /* ----- compact talk rows with a portrait ----- */
+  function talkify(e){
+    if(e.querySelector(":scope>.hmPort")) return;
+    const txt = (e.innerText || "").trim(); if(!txt) return;
+    e.dataset.hmT = "1"; e.classList.add("hm-talk");
+    const id = e.dataset.npc; let port = document.createElement("span"); port.className = "hmPort";
+    try{ if(id != null && window.onumFamilyTree && typeof onumFamilyTree.portrait === "function"){ const c = onumFamilyTree.portrait(id, null, 80); if(c) port.appendChild(c); } }catch(x){}
+    if(!port.firstChild){ const nm = e.dataset.name || txt.split(/\s+/).slice(0, 2).join(" "); port.textContent = nm.split(/\s+/).map(w => w[0] || "").join("").slice(0, 2).toUpperCase(); }
+    const body = document.createElement("div"); body.className = "hmBody"; while(e.firstChild) body.appendChild(e.firstChild);
+    e.appendChild(port); e.appendChild(body);
+  }
+  /* ----- layout ----- */
+  function place(e, o){
+    set(e, "position", "fixed"); set(e, "transform", "none"); set(e, "margin", "0"); set(e, "box-sizing", "border-box");
+    set(e, "left", o.left == null ? "auto" : o.left + "px"); set(e, "right", o.right == null ? "auto" : o.right + "px");
+    set(e, "top", o.top == null ? "auto" : o.top + "px"); set(e, "bottom", o.bottom == null ? "auto" : o.bottom + "px");
+    if(o.w != null){ set(e, "width", o.w + "px"); set(e, "max-width", o.w + "px"); }
+    if(o.mh != null){ set(e, "max-height", o.mh + "px"); set(e, "overflow", "auto"); }
+    e.classList.add("hm-p");
+  }
+  function layout(){
+    const W = innerWidth, Ht = innerHeight;
+    const game = inGame();
+    mkBar();
+    bar.hidden = !game;
+    const desk = document.getElementById("ndFd"); bar.classList.toggle("hm-desk", !!(desk && vis(desk)));
+    /* chips into the bar */
+    REG.filter(r => r.chip).forEach(r => { const e = document.querySelector(r.s); if(e && e.parentElement !== chips && game) chips.appendChild(e); });
+    drawTabs();
+    const colW = Math.max(160, Math.floor(W * 0.25) - PAD * 2), bandB = Math.max(Math.round(Ht * 0.2), 60);
+    const barH = game && vis(bar) ? bar.getBoundingClientRect().height + 6 : 0;
+    const bottomLimit = Ht - Math.max(bandB, barH + 4);
+    const out = {L:[], R:[], T:[], B:[]};
+    for(const r of REG){ if(r.chip) continue; document.querySelectorAll(r.s).forEach(e => { if(e.closest("#hmBar") || !vis(e)) return; if(out[r.d].some(x => x.e === e || x.e.contains(e))) return; out[r.d].push({e, r}); }); }
+    const stack = (list, side) => {
+      let y = PAD;
+      for(const {e, r} of list){
+        if(r.talk) talkify(e); addX(e, r);
+        const room = bottomLimit - y; if(room < 28){ collapse(e, r); continue; }
+        const o = {top:y, w:colW, mh:room}; if(side === "L") o.left = PAD; else o.right = PAD;
+        if(r.small){ o.w = null; set(e, "max-width", colW + "px"); }
+        place(e, o); y += Math.min(e.getBoundingClientRect().height, room) + GAP;
+      }
+    };
+    stack(out.L, "L"); stack(out.R, "R");
+    /* top strip: between the columns, above the centre zone */
+    let x = Math.floor(W * 0.25) + PAD; const tW = Math.floor(W * 0.5) - PAD * 2, tH = Math.floor(Ht * 0.2) - PAD;
+    let ty = PAD;
+    for(const {e, r} of out.T){ addX(e, r); place(e, {left:x, top:ty, w:tW, mh:Math.max(24, tH - ty)}); ty += e.getBoundingClientRect().height + GAP; }
+    /* bottom band: the floor desk, merged with the bar (bar shows only Cables + tabs + chips while the desk is up) */
+    for(const {e, r} of out.B){
+      addX(e, r);
+      const bw = vis(bar) ? bar.getBoundingClientRect() : null;
+      if(bw){ set(bar, "left", "auto"); set(bar, "right", PAD + "px"); }
+      const right = bw ? (W - bar.getBoundingClientRect().left) + GAP : PAD;
+      place(e, {left:PAD, right, bottom:6, mh:bandB - 12});
+      set(e, "width", "auto"); set(e, "max-width", "none");
+    }
+    if(!out.B.length && bar){ bar.style.removeProperty("left"); bar.style.removeProperty("right"); }
+    H.last = {W, Ht, L:out.L.length, R:out.R.length, T:out.T.length, B:out.B.length};
+  }
+  H.layout = layout;
+  /* overlap/centre check (QA hook) */
+  H.check = function(){
+    const W = innerWidth, Ht = innerHeight, cz = {l:W * .25, t:Ht * .2, r:W * .75, b:Ht * .8};
+    const els = [];
+    REG.forEach(r => document.querySelectorAll(r.s).forEach(e => { if(vis(e) && !e.closest("#hmBar") && !els.some(x => x.e === e)) els.push({e, n:r.s}); }));
+    if(bar && vis(bar)) els.push({e:bar, n:"#hmBar"});
+    const R = els.map(x => { const b = x.e.getBoundingClientRect(); return {n:x.n, l:b.left, t:b.top, r:b.right, b:b.bottom}; });
+    const hit = (a, b) => a.l < b.r - 0.5 && b.l < a.r - 0.5 && a.t < b.b - 0.5 && b.t < a.b - 0.5;
+    const overlaps = [], centre = [];
+    for(let i = 0; i < R.length; i++){ if(hit(R[i], cz)) centre.push(R[i].n); for(let j = i + 1; j < R.length; j++) if(hit(R[i], R[j])) overlaps.push(R[i].n + " x " + R[j].n); }
+    return {panels:R.map(r => r.n + "@" + [r.l, r.t, r.r, r.b].map(Math.round).join(",")), overlaps, centre, ok:!overlaps.length && !centre.length};
+  };
+  let q = 0; const kick = () => { if(q) return; q = requestAnimationFrame(() => { q = 0; try{ layout(); }catch(e){} }); };
+  addEventListener("resize", kick);
+  try{ new MutationObserver(kick).observe(document.body, {childList:true}); }catch(e){}
+  try{ ["prompt", "hail", "procBar", "tipCard"].forEach(id => { const e = document.getElementById(id); if(e) new MutationObserver(kick).observe(e, {attributes:true, attributeFilter:["hidden", "class"]}); }); }catch(e){}
+  setInterval(() => { try{ layout(); }catch(e){} }, 400);
+  kick();
+})();
+</script>
 
 </body>
 </html>
