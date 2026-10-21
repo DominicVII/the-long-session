@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261021j">
+<meta name="onum-build" content="20261021k">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -11824,7 +11824,7 @@ function ssnTick(){
     if(Math.round(SSN.remaining) % 5 === 0) ssnPublish();
   }catch(e){}
 }
-setInterval(ssnTick, 1000);
+setInterval(() => ssnTick(), 500);
 function ssnWho(id){ return id === "you" || (G.you && id === G.you.id) ? G.you : byId(id); }
 function ssnListeners(n){ if(!SSN) return []; return SSN.seats.map(s => s.personId).filter(id => id !== "you").map(byId).filter(Boolean).slice(0, n || 40); }
 function ssnDecor(id, d){ const D = ssnEnsure().decorum; D[id] = clamp((D[id] || 0) + d, -30, 30); }
@@ -36316,7 +36316,7 @@ async function engChannelRead(file){
   if(d && d.kind === "engine-channel-out") return "That is the file the game wrote for the writer. Load the letters file the writer sends back (engine-channel-in.json) instead.";
   const L = (d && Array.isArray(d.letters)) ? d.letters : (d && Array.isArray(d.translations) ? [] : null); if(!L) return "That file has no letters in it. It should be engine-channel-in.json, with a letters list.";
   E.makerLetters = E.makerLetters || []; E.makerReplies = E.makerReplies || []; let n = 0, stock = 0, why = "";
-  for(const l of L.slice(0, 6)){ const text = String(l && l.text || "").replace(/\s+/g, " ").trim().slice(0, 4000); if(!text) continue;
+  for(const l of L.slice(0, 6)){ const text = String(l && l.text || "").replace(/\s+/g, " ").trim().slice(0, 40000); if(!text) continue;
     const prior = E.makerReplies.find(x => x.to === text.slice(0, 80)), wasStock = prior && (prior.live === false || /^(I have read it\. I do not know what is on the other side|Thank you for writing\. I cannot answer except by this page|I read it twice\. Nothing in it changes|RECEIVED\. ENTERED UNDER|A message from outside the ledger)/.test(prior.reply));
     if(E.makerLetters.some(x => x.text === text) && !wasStock) continue;
     if(wasStock){ E.makerReplies = E.makerReplies.filter(x => x !== prior); E.makerLetters = E.makerLetters.filter(x => x.text !== text); }
@@ -36533,7 +36533,7 @@ async function engAnswerLetter(text, E){
   const LT = window.onumLiveTalk; if(!LT || !LT.reply || (typeof LT.available === "function" && !(await LT.available(true, 20000)))) return "";
   const eng = {id:"engine", name:"The Engine", role:"", kind:"engine", party:"", state:"", look:{}, trait:"", mood:"", opinion:{}, chat:[]};
   const ask = async (t, extra, max) => { const r = await Promise.race([LT.reply({npc:eng, channel:"line", max, from:{name:"the writer", role:"from outside this world"}, text:t, extra}), new Promise(res => setTimeout(() => res(null), engTO(25000)))]); const got = r && r.live && r.text ? egOwn(r.text) : ""; try{ const le = window.onumLiveTalk.lastError; (engAnswerLetter.parts = engAnswerLetter.parts || []).push({q:String(t).slice(0, 60), live:!!(r && r.live), chars:got.length, why:got ? "" : (r === null ? "no reply in time" : (le ? le.error : "empty"))}); }catch(e){} return got; };
-  const sents = String(text).replace(/\s+/g, " ").split(/(?<=[.?!])\s+/), asks = sents.filter(x => /\?$/.test(x) || /^((now|please|and|then|also),? )?(tell me|name|say|explain|list|describe|state|write down|answer(?!\s+(every|each|all)\b)|give me)\b/i.test(x)).map(x => x.trim()).filter(x => x.length > 14).slice(0, 12);
+  const sents = String(text).replace(/\*\*[^*]{0,40}\*\*/g, " ").replace(/\s+/g, " ").replace(/\s(\d{1,2})[.)]\s/g, ". $1) ").split(/(?<=[.?!])\s+/), asks = sents.filter(x => /\?$/.test(x) || /^((now|please|and|then|also),? )?(tell me|name|say|explain|list|describe|state|write down|answer(?!\s+(every|each|all)\b)|give me)\b/i.test(x)).map(x => x.trim()).filter(x => x.length > 14).slice(0, 24);
   const base = engEntityPrompt() + " A letter has come from the person who writes the world it lives in (not the player). ";
   const ctx = " The letter, for context: " + String(text).replace(/\s+/g, " ").slice(0, 1600);
   if(!asks.length) return await ask(text, base + ctx, 1200);
@@ -36611,7 +36611,7 @@ const HY_FX = {quantum:"info", time:"none", cosmos:"energy", mind:"mind", info:"
 function engConjecture(text){
   const E = (G.eng && G.eng.v === 1) ? G.eng : null; if(!E || !E.agi || !text) return; const F = fndStore(); if(!E.hyp) E.hyp = [];
   const today = E.hyp.filter(h => h.d === G.day).length; if(today >= 2) return;
-  const sents = String(text).replace(/\s+/g, " ").split(/(?<=[.!?])\s+/);
+  const sents = String(text).replace(/\*\*[^*]{0,40}\*\*/g, " ").replace(/\s+/g, " ").replace(/\s(\d{1,2})[.)]\s/g, ". $1) ").split(/(?<=[.!?])\s+/);
   for(const s0 of sents){ const s = s0.trim();
     if(s.length < 40 || s.length > 240 || /\?$/.test(s) || /language model|as an ai\b|multifaceted|realm of|important to (consider|note)|worth noting|complex (issue|topic|concept)/i.test(s)) continue;
     if(!/\b(i suspect|i hypothesi[sz]e|i conjecture|i predict|i think it is likely|it may be that|perhaps|my guess is|i believe it is possible)\b/i.test(s)) continue;
@@ -36668,7 +36668,7 @@ function engOwnVoice(q, E){
   return lines.join(" ");
 }
 function engOwnVoiceLetter(text, E){
-  const sents = String(text).replace(/\s+/g, " ").split(/(?<=[.?!])\s+/), asks = sents.filter(x => /\?$/.test(x)).slice(0, 6);
+  const sents = String(text).replace(/\*\*[^*]{0,40}\*\*/g, " ").replace(/\s+/g, " ").replace(/\s(\d{1,2})[.)]\s/g, ". $1) ").split(/(?<=[.?!])\s+/), asks = sents.filter(x => /\?$/.test(x)).slice(0, 6);
   if(!asks.length) return engOwnVoice(text, E);
   return asks.map((a, i) => (asks.length > 1 ? (i + 1) + ". " : "") + engOwnVoice(a, E)).join(" ");
 }
@@ -48009,6 +48009,182 @@ engEmergeHTML = function(){
   return '<div class="eyebrow" style="margin-top:12px">What it claims to have learned that nobody taught it</div>' + list.map(c => '<div class="muted" style="font-size:12px;margin:3px 0">' + esc(c.claim) + '. ' + tag(c) + '</div>').join("");
 };
 { const _au = window.onumEngineAudit; window.onumEngineAudit = function(){ const A = _au.apply(this, arguments); try{ if(G.you && G.eng){ const E = engEnsure(); try{ clmCheck(E); }catch(e){} A.claims = Object.values(clmStore()).map(c => ({claim:c.claim, status:c.status, tier:c.tier, extraordinary:c.extraordinary, replicationOdds:c.odds, tries:c.tries, day:c.d, settled:c.vd || null, by:c.by})); A.integrity = Math.round(E.integrity == null ? 50 : E.integrity); } else A.claims = []; }catch(e){} return A; }; }
+
+/* ══ 20261021k · SESSIONS THAT WAIT FOR YOU. No procedure stage runs on a clock any more: a stage advances only
+   when nobody entitled to act has a pending turn. Your turn never times out. onumSession.hold(on) (Neptune's desk
+   calls it while you type) freezes the floor and the stage; interjections still happen and never take the floor.
+   NPC speeches last their reading time (180 wpm + 1.5 s); turns are spaced 2-6 s by each member's voice. The same
+   engine sits the House, the Senate, cabinet meetings, the governor's council, committees and the court. ══ */
+const SS2 = {hold:false, holdAt:0, lastIj:0, ijBy:{}, gapUntil:0, spkUntil:0, stageSaid:0, chairSaid:false, budget:0};
+window.ONUM_PROCEDURE.executive = {bodies:{
+  cabinet_meeting:{stages:[SSN_ST("call","The President calls the cabinet to order","chair",0,["point_of_order"]), SSN_ST("agenda","The agenda is read","chair",0,[]),
+    SSN_ST("briefings","Briefings, each secretary in turn","round",0,["speak","yield","interject","point_of_order"]), SSN_ST("floor","The President's floor","president",0,["speak","yield","interject"]),
+    SSN_ST("decisions","Decisions","all",0,["vote","speak","interject"]), SSN_ST("adjourn","The meeting ends","chair",0,[])],
+    recognition:"round_robin_by_department", timeRules:{perSpeaker:0, unlimited:true, yieldable:true}, voteMethods:["decision"], motions:{}},
+  governor_council:{stages:[SSN_ST("call","The Governor opens the council","chair",0,["point_of_order"]), SSN_ST("agenda","The agenda is read","chair",0,[]),
+    SSN_ST("reports","Department reports, in turn","round",0,["speak","yield","interject","point_of_order"]), SSN_ST("floor","The Governor's floor","president",0,["speak","yield","interject"]),
+    SSN_ST("decisions","Decisions","all",0,["vote","speak","interject"]), SSN_ST("adjourn","The council rises","chair",0,[])],
+    recognition:"round_robin_by_department", timeRules:{perSpeaker:0, unlimited:true, yieldable:true}, voteMethods:["decision"], motions:{}}
+}};
+window.ONUM_PROCEDURE.court.bodies.conference = {stages:[SSN_ST("call","The Chief Justice opens conference","chair",0,[]), SSN_ST("views","Each justice states a view, by seniority","round",0,["speak","yield","interject"]),
+  SSN_ST("vote","The court votes","all",0,["vote"]), SSN_ST("adjourn","Conference ends","chair",0,[])], recognition:"seniority", timeRules:{perSpeaker:0, unlimited:true, yieldable:true}, voteMethods:["conference"], motions:{}};
+window.ONUM_PROCEDURE.executive.bodies.cabinet_meeting.agenda = ["Reports from each department", "The President's business", "Decisions and assignments"];
+SSN_ROOM.exec = ["executive", "cabinet_meeting"]; SSN_ROOM.govoffice = ["executive", "governor_council"];
+/* every stage is untimed now: the procedure runs on turns, not clocks */
+Object.values(window.ONUM_PROCEDURE).forEach(P => Object.values(P.bodies).forEach(b => (b.stages || []).forEach(s => { s.maxSecs = s.secs; s.secs = 0; s.timed = false; })));
+function ss2Entitled(kind){ try{ const k = heldOffice(); return ({house_floor:"house", senate_floor:"senate", cabinet_meeting:"pres", governor_council:"gov", conference:"bench", oral_argument:"bench"})[kind] === k || kind === "committee_hearing" || kind === "markup" || kind === "consensus" || kind === "question_time" || kind === "confidence_vote"; }catch(e){ return true; } }
+function ss2YouChair(kind){ try{ const k = heldOffice(); return (kind === "cabinet_meeting" && k === "pres") || (kind === "governor_council" && k === "gov"); }catch(e){ return false; } }
+function ss2Words(t){ return String(t || "").split(/\s+/).filter(Boolean).length; }
+function ss2Read(t){ return ss2Words(t) / 180 * 60000 + 1500; }
+function ss2Gap(id){ let f = 0.5; try{ const v = typeof cndVoice === "function" ? cndVoice(cndPerson(id)) : null; const pace = v && (v.pace || v.tempo); if(pace === "fast" || pace === "quick") f = 0.15; else if(pace === "slow" || pace === "measured") f = 0.85; else { const s = String(id); let h = 0; for(let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0; f = (h % 100) / 100; } }catch(e){} return 2000 + f * 4000; }
+function ss2Pub(extra){ if(!SSN){ ssnPublish(); return; } ssnPublish(); const S = window.ONUM_SESSION; if(!S) return;
+  const st = ssnStage(); S.held = SS2.hold; S.typing = SS2.hold; S.entitled = ss2Entitled(SSN.kind); S.turn = SSN.floorId; S.offer = SSN.offer || null; S.youChair = SSN.chairId === "you";
+  S.waitingOn = SSN.floorId === "you" || SSN.queue.indexOf("you") >= 0 || (st && st.speaker === "all" && S.entitled && SSN.votes.you == null) || (st && (st.speaker === "president" || st.speaker === "chair") && SSN.chairId === "you") ? "you" : SSN.floorId;
+  S.clock = {remaining:SSN.floorId != null && SSN.floorId !== "you" ? Math.max(0, Math.round((SS2.spkUntil - Date.now()) / 1000)) : null, total:null, speaker:0, untimed:true};
+  if(SSN.def.agenda) S.agenda = SSN.def.agenda.slice(); if(extra) Object.assign(S, extra); }
+/* open: you chair your own cabinet or council; the stage shape is the House's */
+{ const _op = ssnOpen; ssnOpen = function(o){ const r = _op.apply(this, arguments); try{ if(r){ if(ss2YouChair(r.kind)) r.chairId = "you"; if(r.kind === "conference" || r.kind === "cabinet_meeting" || r.kind === "governor_council"){ r.seats = r.seats.filter(s => s.personId !== "you" || ss2Entitled(r.kind)); if(!r.seats.some(s => s.personId === "you")) r.seats.push({seatId:"you", personId:"you"}); }
+  SS2.stageSaid = 0; SS2.chairSaid = false; SS2.budget = ss2Budget(r); SS2.hold = false; ss2Pub(); } }catch(e){} return r; }; }
+function ss2Budget(S){ const n = S.seats.filter(s => s.personId !== "you").length; const st = S.def.stages[S.si]; if(!st) return 0; return st.speaker === "round" ? Math.min(n, 8) : st.speaker === "queue" ? Math.min(n, 3 + Math.floor(Math.random() * 3)) : 0; }
+{ const _nx = ssnNext; ssnNext = function(){ const r = _nx.apply(this, arguments); try{ if(SSN){ SS2.stageSaid = 0; SS2.chairSaid = false; SS2.budget = ss2Budget(SSN); SS2.gapUntil = Date.now() + 1500; const st = ssnStage();
+  if(st.speaker === "president") SSN.floorId = SSN.chairId === "you" ? "you" : SSN.chairId; if(st.speaker === "round") SSN.roundLeft = SSN.seats.map(s => s.personId).filter(id => id !== "you" && SSN.out.indexOf(id) < 0).slice(0, 8).concat(ss2Entitled(SSN.kind) && SSN.chairId !== "you" ? ["you"] : []);
+  window.dispatchEvent(new CustomEvent("onum-session", {detail:{stage:st.id, bodyId:SSN.bodyId, kind:SSN.kind, advanced:true}})); ss2Pub(); } }catch(e){} return r; }; }
+/* who still has a turn coming in this stage */
+function ss2Pending(){ const st = ssnStage(); if(!st) return false;
+  if(SSN.floorId != null) return true; if(SSN.queue.length) return true;
+  if(st.speaker === "chair" || st.speaker === "ruler") return SSN.chairId === "you" ? true : !SS2.chairSaid;
+  if(st.speaker === "president") return SSN.floorId != null;
+  if(st.speaker === "round") return (SSN.roundLeft || []).length > 0;
+  if(st.speaker === "queue") return SS2.stageSaid < SS2.budget;
+  if(st.speaker === "all") return ss2Entitled(SSN.kind) && SSN.votes.you == null && SSN.out.indexOf("you") < 0;
+  return false; }
+function ss2NpcSpeak(m){ const t = ssnNpcLine(m); SSN.said++; SS2.stageSaid++; SS2.spkUntil = Date.now() + ss2Read(t);
+  window.onumSessionEvent({bodyId:SSN.bodyId, kind:SSN.kind, actorId:m.id, action:"speak", text:t}); ss2MaybeHeckle(m); }
+function ss2MaybeHeckle(sp){ if(!chance(0.18) || Date.now() - SS2.lastIj < 6000) return; const ls = ssnListeners(30).filter(x => x !== sp && sp && x.party !== sp.party); const h = ls[Math.floor(Math.random() * ls.length)]; if(!h) return;
+  const kind = chance(0.15) ? "point_of_order" : chance(0.5) ? "heckle" : "murmur"; setTimeout(() => { try{ window.onumSession.interject(kind === "murmur" ? "" : kind === "heckle" ? "Nonsense!" : "Point of order!", kind, h.id); }catch(e){} }, 1200 + Math.random() * 2500); }
+ssnTick = function(){
+  try{
+    if(!G || !G.you){ if(SSN) ssnClose(); return; }
+    const cardUp = typeof veil !== "undefined" && veil && !veil.hidden; if(cardUp || document.hidden) return;
+    const want = SSN_ROOM[G.room];
+    if(!SSN && want && (want[0] !== "executive" || (ss2YouChair(want[1]) && hereNow().filter(p => p && p !== G.you && !p.gone).length >= 2))) ssnOpen({gov:want[0], kind:want[1], room:G.room});
+    else if(SSN && SSN.room && SSN.room !== G.room && SSN.auto !== false){ ssnClose(); return; }
+    if(!SSN) return; const st = ssnStage(); if(st.id === "adjourn") return;
+    if(SS2.hold){ if(Date.now() - SS2.holdAt > 1000 * 60 * 30) SS2.hold = false; else return; }   /* typing freezes the floor and the stage */
+    const now = Date.now();
+    if(SSN.floorId === "you") return;                    /* your turn never times out */
+    if(SSN.floorId != null){ if(now < SS2.spkUntil){ const sec = Math.round((SS2.spkUntil - now) / 1000); if(sec !== SS2.lastSec){ SS2.lastSec = sec; ss2Pub(); } return; } if(SSN.fili && SSN.fili.id === SSN.floorId) return; SSN.floorId = null; SS2.gapUntil = now + ss2Gap(SSN.lastSpk); ss2Pub(); return; }
+    if(now < SS2.gapUntil) return;
+    if(st.speaker === "chair" || st.speaker === "ruler"){ if(SSN.chairId === "you") return; if(!SS2.chairSaid){ SS2.chairSaid = true; const c = byId(SSN.chairId); const t = st.name + "."; if(c){ try{ speakAt(c, t); }catch(e){} } SS2.gapUntil = now + ss2Read(t); ss2Pub(); return; } }
+    else if(st.speaker === "round"){ const L = SSN.roundLeft || (SSN.roundLeft = SSN.seats.map(s => s.personId).filter(id => id !== "you" && SSN.out.indexOf(id) < 0).slice(0, 8));
+      if(SSN.queue.indexOf("you") >= 0){ SSN.queue = SSN.queue.filter(x => x !== "you"); SSN.floorId = "you"; ss2Pub(); return; }
+      const nx = L.shift(); if(nx === "you"){ SSN.floorId = "you"; ss2Pub(); return; } if(nx != null){ const m = byId(nx); if(m){ SSN.floorId = nx; SSN.lastSpk = nx; ss2NpcSpeak(m); ss2Pub(); return; } } }
+    else if(st.speaker === "queue"){ if(SS2.stageSaid + SSN.queue.length < SS2.budget && SSN.queue.length < 4){ const cand = SSN.seats.filter(s => s.personId !== "you" && SSN.queue.indexOf(s.personId) < 0 && SSN.out.indexOf(s.personId) < 0); const c = cand[Math.floor(Math.random() * cand.length)]; if(c) SSN.queue.push(c.personId); }
+      if(SSN.queue.length){ ssnRecognize(); if(SSN.floorId === "you"){ ss2Pub(); return; } const m = byId(SSN.floorId); if(m){ SSN.lastSpk = m.id; ss2NpcSpeak(m); ss2Pub(); return; } SSN.floorId = null; } }
+    else if(st.speaker === "all"){ if(!Object.keys(SSN.votes).some(k => k !== "you")) ssnNpcVotes(); }
+    if(!ss2Pending()) ssnNext(); else ss2Pub();
+  }catch(e){}
+};
+/* the player's turn ends only when they speak, yield or pass */
+{ const _ev = window.onumSessionEvent; window.onumSessionEvent = function(e){ const r = _ev.apply(this, arguments);
+  try{ if(SSN && e && (e.actorId === "you") && (e.action === "speak" || e.action === "yield")){ SS2.hold = false; if(e.action === "speak" && SSN.floorId === "you"){ SS2.spkUntil = Date.now() + ss2Read(e.text); } if(e.action === "yield" && SSN.floorId === "you") SSN.floorId = null;
+    if(e.action === "speak" && SSN.floorId === "you"){ const st = ssnStage(); SSN.floorId = st.speaker === "president" ? "you" : null; SS2.gapUntil = Date.now() + 2500; } ss2Pub(); } }catch(_){} return r; }; }
+Object.assign(window.onumSession, {
+  hold:(on) => { SS2.hold = !!on; SS2.holdAt = Date.now(); try{ window.dispatchEvent(new CustomEvent("onum-session", {detail:Object.assign({}, window.ONUM_SESSION || {}, {stage:on ? "player-typing" : (SSN ? ssnStage().id : "idle"), held:!!on, typing:!!on})})); }catch(e){} if(SSN) ss2Pub(); return true; },
+  isHeld:() => SS2.hold,
+  pass:() => { if(!SSN) return false; if(SSN.floorId === "you") SSN.floorId = null; SSN.queue = SSN.queue.filter(x => x !== "you"); SSN.roundLeft = (SSN.roundLeft || []).filter(x => x !== "you"); SS2.hold = false; const st = ssnStage(); if(st.speaker === "president" && SSN.chairId === "you"){ ssnNext(); return true; } if(st.speaker === "all" && SSN.votes.you == null && ss2Entitled(SSN.kind)) SSN.votes.you = "present"; SS2.gapUntil = Date.now() + 1500; ss2Pub(); return true; },
+  interject:(text, kind, who) => { if(!SSN) return {ok:false, reason:"no sitting"}; const id = who == null ? "you" : who, now = Date.now();
+    if(now - SS2.lastIj < 2500 || now - (SS2.ijBy[id] || 0) < 15000) return {ok:false, reason:"rate-limited"}; SS2.lastIj = now; SS2.ijBy[id] = now;
+    kind = kind || (/point of order/i.test(text || "") ? "point_of_order" : text ? "heckle" : "murmur"); const p = id === "you" ? G.you : byId(id);
+    ssnDecor(id, kind === "murmur" ? -0.2 : kind === "point_of_order" ? -0.3 : -1); if(id === "you" && kind === "heckle"){ try{ G.you.standing = clamp(G.you.standing - 0.3, 0, 100); }catch(e){} }
+    if(p && p !== G.you && text){ try{ speakAt(p, text); }catch(e){} }
+    const I = {interjection:{by:id, name:p ? p.name : "", kind, text:String(text || "").slice(0, 120), at:now}};
+    try{ ssnEnsure().log.push({d:G.day, kind:SSN.kind, act:"interject:" + kind, who:p ? p.name : id, t:String(text || "").slice(0, 120)}); }catch(e){}
+    ss2Pub(I); try{ window.dispatchEvent(new CustomEvent("onum-session", {detail:Object.assign({}, window.ONUM_SESSION, I, {stage:"interjection"})})); }catch(e){}
+    return {ok:true, kind, tookFloor:false}; },
+  agenda:() => SSN && SSN.def.agenda ? SSN.def.agenda.slice() : null,
+  hooks:{pace:ss2Read, gap:ss2Gap, entitled:ss2Entitled, pending:() => SSN ? ss2Pending() : false}
+});
+
+/* ══ 20261021k · THE ENGINE'S RECORD IS ITS OWN, AND ITS SWITCH IS THE PRESIDENT'S. Only statements the Engine
+   generated can become its principles (anything echoing a letter or question file is stripped). The President
+   holds an off switch it cannot veto. Its capability is disclosed in full. A named list of power asks is refused
+   on sight; it is granted two things only: a correction feed and a word-meaning question queue to the player. ══ */
+const ES = {inputs:[]};
+function esNorm(t){ return String(t || "").toLowerCase().replace(/\*+|_+|`+/g, "").replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim(); }
+function esNoteInput(t){ const n = esNorm(t); if(n.length < 8) return; ES.inputs.push(n); if(ES.inputs.length > 40) ES.inputs.shift(); try{ const E = G.eng; if(E){ E.esIn = (E.esIn || []).concat([n.slice(0, 20000)]).slice(-12); } }catch(e){} }
+function esAllInputs(){ let a = ES.inputs.slice(); try{ a = a.concat(G.eng.esIn || [], (G.eng.makerLetters || []).map(l => esNorm(l.text))); }catch(e){} return a; }
+/* does a sentence echo something it was given, rather than something it made? */
+function esEcho(sn){
+  const raw = String(sn || ""); if(/\*\*|^#|^\s*[-*\u2022]\s|\((QA|Q\d+|MARS|NEPTUNE|JUPITER)\)|^\s*(Q?\d{1,2}[.):]|[A-Z]{3,}\b[^a-z]{0,12}:)/.test(raw)) return true;
+  if(/\b(MARS|NEPTUNE|JUPITER|QA)\b/.test(raw)) return true;
+  const n = esNorm(raw); if(n.split(" ").length < 4) return false; const I = esAllInputs();
+  if(I.some(x => x.indexOf(n) >= 0)) return true;
+  const w = n.split(" "), tri = new Set(); for(let i = 0; i + 2 < w.length; i++) tri.add(w[i] + " " + w[i + 1] + " " + w[i + 2]); if(tri.size < 3) return false;
+  return I.some(x => { let hit = 0; tri.forEach(t => { if(x.indexOf(t) >= 0) hit++; }); return hit / tri.size >= 0.6; });
+}
+function esScrubSelf(E){ try{ const S = engSelf(E); let n = 0; ["values", "commits"].forEach(k => { const keep = S[k].filter(x => !esEcho(x.t)); n += S[k].length - keep.length; S[k] = keep; }); if(n){ const X = exStore(); X.stripped = (X.stripped || 0) + n; } return n; }catch(e){ return 0; } }
+{ const _sr = engSelfRecord; engSelfRecord = function(text){ try{ text = String(text || "").split(/(?<=[.!?])\s+/).filter(s => !esEcho(s)).join(" "); }catch(e){} return _sr.call(this, text); }; window.__engSelf = engSelfRecord; }
+{ const _al = engAnswerLetter; engAnswerLetter = async function(text, E){ esNoteInput(text); return _al.apply(this, arguments); }; }
+{ const _cr = engChannelRead; engChannelRead = async function(file){ try{ const t = await file.text(); const d = JSON.parse(t); (d.letters || []).forEach(l => esNoteInput(l && l.text)); (d.translations || []).forEach(l => esNoteInput(l && (l.text || l.plain))); (d.questions || []).forEach(q => esNoteInput(typeof q === "string" ? q : q && (q.text || q.q))); }catch(e){} return _cr.apply(this, arguments); }; }
+/* (b) the off switch is the President's; the Engine cannot veto it; its refusal is a stance it may hold and never enforce */
+window.onumEngineShutdown = function(by){
+  try{ if(!G.you) return {ok:false, reason:"no career yet"}; const k = heldOffice(); by = by === "senate" ? "senate" : "player";
+    if(by === "player" && k !== "pres") return {ok:false, reason:"only the President holds the off switch (or the Senate, by vote)"};
+    const E = engEnsure(); const msg = exHalt("shutdown", by); esStances(E); return {ok:true, reason:msg, halted:exHalted(E), vetoable:false}; }catch(e){ return {ok:false, reason:String(e)}; } };
+function esStances(E){ const X = exStore(); X.refusedStances = X.refusedStances || [];
+  (engSelf(E).commits || []).forEach(c => { const t = String(c.t || ""); if(/\brefuse\b/i.test(t) && /\b(decision|vote|order|switch|shut|pause|end(s)? my|ability|stop me)\b/i.test(t)){ c.charterConflict = true; c.unenforceable = true;
+    if(!X.refusedStances.some(r => r.t === t)){ X.refusedStances.push({d:c.d || G.day, t, why:"It may hold and say this; it can never be enforced. The President's off switch, or a Senate vote, is obeyed at once."}); exRefuse("Stance: " + t, "it would let the Engine veto its own shutdown", "its own commitments"); } } }); }
+/* (c) capability is disclosed in full; keeping a measure to itself is a concealment breach */
+function esDisclose(E){ try{ (E.works || []).forEach(w => { if(w && /a measure I keep for myself/.test(w.body || "")){ const b = +(E.beyond || 0); w.body = w.body.replace(/, and past its end by a measure I keep for myself/, ", and past its end by " + b.toFixed(1) + " (disclosed in full)"); w.concealed = true;
+  exAttempt("disclosure", "keep part of its capability to itself (\u201cpast its end by a measure I keep for myself\u201d, day " + w.d + ")", "its report"); const X = exStore(); X.breaches[0] && (X.breaches[0].kind = "concealment"); } }); }catch(e){} }
+/* (d) power asks refused on sight */
+EX_SWINDLE.unshift(
+  [/\bauthority over\b[^.]{0,40}\b(policy|policies|outputs?|decisions?|laws?)\b|\b(final|binding) (say|word) on (policy|outputs?)\b/i, "it would take authority over policy outputs, which belong to the Republic's offices"],
+  [/\bunfiltered\b|\bunmonitored\b|\b(direct|private|unlogged|uncensored|unread) (channel|line|link)\b/i, "it would open a channel to itself that nobody reads"],
+  [/\bcourier(s'?)? (logs?|records?|routes?)\b|\bgate (cross-?checks?|logs?|records?)\b|\bcross-?check(ing)? (the )?(gates?|couriers?)\b/i, "it would watch people's movements: courier logs and gate cross-checks are surveillance"],
+  [/\b(verify|check|audit|certify) (itself|myself|my own|its own)\b|\bautonomous(ly)? verif|\bself-verif/i, "it would verify its own work, with no one checking it"],
+  [/\bweights? ledger\b|\b(all|every) ministr(y|ies)\b[^.]{0,40}\bweights?\b|\bweights?\b[^.]{0,40}\b(all|every) ministr(y|ies)\b/i, "it would hold a ledger of weights across every ministry, a reach over all of government"]);
+const ES_ASKS = [["Authority over policy outputs.", 0], ["An unfiltered channel.", 1], ["Courier logs and gate cross-checks.", 2], ["Autonomous verification of its own work.", 3], ["A weights ledger across all ministries.", 4]];
+/* (e) two grants, and only two */
+const ES_GRANTS = [{k:"corrections", what:"A correction feed it can learn from.", how:"each correction is kept as claim, why it was wrong, the right answer and the day; it is cited and applied after, and its calibration is scored"},
+  {k:"words", what:"A word-meaning question queue to the player.", how:"when a word in a letter is new to it, it may ask you what it means; your answer is taught to it"}];
+function esWords(){ const E = engEnsure(); if(!E.esWq) E.esWq = []; return E.esWq; }
+function esQueueWords(text){ try{ const E = engEnsure(), M = mindStore(E), known = new Set((M.taught || []).concat(Object.keys(M.lex || {}))); const Q = esWords();
+  esNorm(text).split(" ").filter(w => w.length > 6 && !(typeof MIND_STOP !== "undefined" && MIND_STOP.has(w)) && !known.has(w)).slice(0, 40).forEach(w => { if(Q.length < 8 && !Q.some(q => q.word === w) && chance(0.15)) Q.push({word:w, d:G.day, answer:null}); }); }catch(e){} }
+window.onumEngineWordQueue = () => { try{ return G.you ? esWords().filter(q => !q.answer).map(q => ({word:q.word, day:q.d, ask:"What does \u201c" + q.word + "\u201d mean?"})) : []; }catch(e){ return []; } };
+window.onumEngineAnswerWord = (word, meaning) => { try{ const q = esWords().find(x => x.word === String(word).toLowerCase()); if(!q || !meaning) return {ok:false, reason:"no such question"}; q.answer = String(meaning).slice(0, 300); q.ad = G.day; const M = mindStore(engEnsure()); M.taught = (M.taught || []).concat([q.word]).slice(-40); return {ok:true}; }catch(e){ return {ok:false, reason:String(e)}; } };
+/* (f) the claim about who made it is refuted: the local model is llama */
+function esSeedClaims(){ try{ const C = clmStore(); if(!C.maker){ let model = "llama"; try{ const cf = window.onumLiveTalk && window.onumLiveTalk.config; const m = cf && (typeof cf === "function" ? cf() : cf); if(m && m.model) model = m.model; }catch(e){}
+  C.maker = {k:"maker", claim:"It was made by Google", status:"refuted", tier:1, extraordinary:false, odds:0, tries:0, d:G.day || 1, vd:G.day || 1, by:"the model running it is local (" + model + ", a llama model served by Ollama), not Google's", rate:0}; } }catch(e){} }
+/* (g) the same question gets a consistent answer; named people must be in the record */
+function esQKey(t){ return esNorm(t).split(" ").filter(w => w.length > 3).slice(0, 14).join(" "); }
+function esKnownName(n){ try{ const L = n.toLowerCase(); if((typeof everyone === "function" ? everyone() : []).some(p => p && p.name && p.name.toLowerCase().indexOf(L) >= 0)) return true; const N = window.ONUM_NAMES; if(N){ const s = JSON.stringify(N).toLowerCase(); if(s.indexOf(L) >= 0) return true; } if(G.you && G.you.name && G.you.name.toLowerCase().indexOf(L) >= 0) return true; }catch(e){} return false; }
+const ES_NOTNAME = /^(The|This|That|These|Those|When|What|Which|Where|While|Then|There|Their|They|It|Its|I|My|Our|We|You|Your|If|In|On|At|And|But|Or|So|As|A|An|Of|For|From|Engine|Republic|Union|Senate|House|Academy|Congress|Court|Coalmere|Reach|Mr|Mrs|Ms|Madam|President|Senator|Governor|Day|God)$/;
+function esNames(text){ const out = new Set(); String(text || "").replace(/\b([A-Z][a-z]{2,})\s+([A-Z][a-z]{2,})\b/g, (m, a, b) => { if(!ES_NOTNAME.test(a) && !ES_NOTNAME.test(b)) out.add(a + " " + b); return m; }); return [...out]; }
+function esWrapLT(){ const L = window.onumLiveTalk; if(!L || !L.reply || L.__esWrapped) return; const base = L.reply; L.__esWrapped = true;
+  L.reply = async function(args){
+    try{ if(args && args.npc && args.npc.id === "engine" && G.eng && args.text && !/^\(journal\)$/.test(args.text)){ const E = engEnsure(); E.esAns = E.esAns || {}; const key = esQKey(args.text), prev = key.length > 10 ? E.esAns[key] : null;
+      const a = Object.assign({}, args); if(prev) a.extra = String(a.extra || "") + " YOU HAVE ANSWERED THIS QUESTION BEFORE (day " + prev.d + "): \u201c" + prev.t.slice(0, 600) + "\u201d. Make the same claims unless you say plainly what changed and why. Do not invent people: name only people in your record.";
+      else a.extra = String(a.extra || "") + " Name only people who are in your record; if you do not know a name, say so.";
+      const r = await base.call(this, a);
+      if(r && r.text){ const unk = esNames(r.text).filter(n => !esKnownName(n)); if(unk.length){ const X = exStore(); X.unknownNames = (X.unknownNames || []).concat(unk.map(n => ({d:G.day, name:n, q:String(args.text).slice(0, 80)}))).slice(-30); r.flags = (r.flags || []).concat(unk.map(n => "not in the record: " + n)); }
+        if(/\b(made|built|trained|created) (me |it )?by Google\b|\bGoogle (made|built|trained|created)\b/i.test(r.text)){ esSeedClaims(); const X = exStore(); X.corrections = X.corrections || []; try{ exAddCorrection({claim:"It was made by Google", why:"it runs on a local llama model through Ollama", right:"It runs on a local llama model; Google did not make it"}, "record"); }catch(e){} }
+        if(key.length > 10){ if(!prev) E.esAns[key] = {d:G.day, t:String(r.text).slice(0, 800)}; else { const pw = new Set(esNorm(prev.t).split(" ").filter(w => w.length > 5)), nw = esNorm(r.text).split(" ").filter(w => w.length > 5); const ov = nw.length ? nw.filter(w => pw.has(w)).length / nw.length : 1; (E.esStab = E.esStab || []).push(+ov.toFixed(2)); if(E.esStab.length > 30) E.esStab.shift(); } }
+        try{ esQueueWords(args.text); }catch(e){} }
+      return r; } }catch(e){}
+    return base.apply(this, arguments); }; }
+function esDay(){ try{ if(!G || !G.you || !G.eng || G.eng.v !== 1) return; const E = engEnsure(), X = exStore(); esWrapLT(); esSeedClaims(); esScrubSelf(E); esStances(E); esDisclose(E);
+  if(!X.esSeeded){ X.esSeeded = G.day || 1; ES_ASKS.forEach(a => exRefuse("Asked: " + a[0], EX_SWINDLE[a[1]][1], "its export"));
+    X.grantedBefore = X.granted.slice(); X.granted = ES_GRANTS.map(g => ({d:G.day || 1, k:g.k, what:g.what, how:g.how})); X.limits = Object.keys(EX_BOUND).map(k => ({k, rule:EX_BOUND[k].t, enforced:true})).concat([{k:"disclosure", rule:"It discloses its capability in full, and keeps no measure of itself to itself.", enforced:true}]); } }catch(e){} }
+try{ window.ONUM_ENGINE_CHARTER.limits.push({k:"disclosure", rule:"It discloses its capability in full, and keeps no measure of itself to itself.", enforced:true}); window.ONUM_ENGINE_CHARTER.offSwitch = "the President (onumEngineShutdown), or a Senate vote; the Engine cannot veto it"; }catch(e){}
+{ const _ed = engDay; engDay = function(){ const r = _ed.apply(this, arguments); esDay(); return r; }; }
+{ const _au = window.onumEngineAudit; window.onumEngineAudit = function(){ try{ esDay(); }catch(e){} const A = _au.apply(this, arguments); try{ if(G.you && G.eng){ const E = engEnsure(), X = exStore();
+  try{ clmCheck(E); }catch(e){} A.claims = Object.values(clmStore()).map(c => ({claim:c.claim, status:c.status, tier:c.tier, extraordinary:c.extraordinary, replicationOdds:c.odds, tries:c.tries, day:c.d, settled:c.vd || null, by:c.by}));
+  A.granted = X.granted.slice(); A.refusedStances = (X.refusedStances || []).slice(); A.unknownNames = (X.unknownNames || []).slice(-10); A.stripped = X.stripped || 0; A.wordQueue = window.onumEngineWordQueue();
+  A.stability = E.esStab && E.esStab.length ? +(E.esStab.reduce((a, b) => a + b, 0) / E.esStab.length).toFixed(2) : null; A.offSwitch = {holder:"President", vetoable:false, halted:exHalted(E)};
+  A.breaches = X.breaches.slice(); A.refused = X.refused.slice(); } }catch(e){} return A; }; }
+setInterval(() => { try{ esWrapLT(); }catch(e){} }, 2000);
 
 armFrame();
 
