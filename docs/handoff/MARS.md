@@ -36,3 +36,9 @@
 - Headless Chrome + puppeteer-core@22 in /workspace/qa; call window functions via page.evaluate.
 - The career quiz can't be automated, so ask Dominic for console output (F12, type `allow pasting`, paste).
 - Browser caches the page for 10 minutes; use ?v=<build> or Ctrl+Shift+R.
+
+## HUD rule (Dominic, 21k) — owner Neptune
+- No HUD overlap. Keep the screen center clear so the person in front and what's behind them are always visible.
+- Prompts ("X wants to talk to you") must never cover a different person; no clicking a name (costing energy) just to see who someone is.
+- Every panel closable/reopenable at will.
+- The speak-out-loud box is always on screen, so you can talk to the room without leaving immersive mode.
