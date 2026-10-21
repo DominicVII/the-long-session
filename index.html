@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261020y">
+<meta name="onum-build" content="20261020z">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -10156,7 +10156,8 @@ function ohEnsure(){
     p.role = o.title; p.ohK = o.k; p.ohRoom = o.room; p.ohSpot = o.spot; p.ohWk = o.wk; p.ohCh = o.chambers; p.ohSeat = o.seat; p.caseOpen = false; p.cause = null; p.party = p.party || o.party;
     if(ohYours(o)){
       if(!p.formerOf){ p.formerOf = o.title; p.role = "Former " + o.title; p.ohK = null; p.scKey = "former:" + o.k; p.room = "abroad";
-        try{ feed(p.name + ", the former " + o.title + ", hands over the office to you.", "good"); }catch(e){} }
+        let hl = null; try{ hl = ofhHandoverLine(o.k, o.title); feed(hl, "good"); }catch(e){}
+        try{ const pv = window.onumOfficePrevious(o.k); if(!pv || pv.name !== p.name){ p.role = "Former aide in the office of the " + o.title; } }catch(e){} }
       return;
     }
     OH.list.push(p);
@@ -11917,6 +11918,206 @@ function fixSeedNames(){
 }
 fixSeedNames(); setTimeout(fixSeedNames, 0); setTimeout(fixSeedNames, 1500);
 { const _w = engWarm; engWarm = function(){ try{ const L = window.onumLiveTalk; if(L && typeof L.available === "function"){ L.available().then(ok => { if(ok) _w(); }).catch(() => {}); return; } }catch(e){} }; }
+
+/* ── 20261021: one source of truth for the player's office, and a ledger of who held every seat ── */
+const OFH_LEFT = ["retired at the end of the term", "lost the election", "stepped down", "was term-limited", "left for private practice", "died in office", "resigned under a cloud"];
+function ofhEnsure(){ if(!G.ofh || G.ofh.v !== 1) G.ofh = {v:1, seats:{}, seeded:false, you:null}; return G.ofh; }
+function ofhYouKey(){ try{ return heldOffice(); }catch(e){ return null; } }
+/* the one answer to "what is the player now" */
+window.onumPlayerOffice = function(){
+  try{ if(!G || !G.you) return {office:null, reason:"no career yet"};
+    const k = ofhYouKey(); return {office:k, inHouse:k === "house", title:officeTitle(), seat:k ? officeSeat() : null, address:youAddress(), houseSeat:k === "house" ? G.you.state + " " + G.you.dist : null, seatKey:ofhPlayerSeatKey()}; }catch(e){ return {office:null, reason:String(e && e.message || e)}; }
+};
+function ofhPlayerSeatKey(){ const y = G.you, k = ofhYouKey(); if(!y || !k) return null;
+  return k === "house" ? "house:" + y.state + " " + y.dist : k === "senate" ? "sen:" + y.state : k === "gov" ? "gov:" + y.state : k === "pres" ? "pres" : k === "bench" ? "bench:" + ((G.court || []).length ? G.court.length - 1 : 4) : null; }
+function ofhTitleOf(key){
+  if(key.indexOf("house:") === 0) return "Representative for " + key.slice(6);
+  if(key.indexOf("gov:") === 0) return "Governor of " + key.slice(4);
+  if(/^sen:(maj|min|ppt)$/.test(key)) return {maj:"Senate Majority Leader", min:"Senate Minority Leader", ppt:"President pro tempore of the Senate"}[key.slice(4)];
+  if(key.indexOf("sen:") === 0) return "Senator from " + key.slice(4);
+  if(key === "pres"){ try{ return execTitle(); }catch(e){ return "President"; } }
+  if(key === "speaker") return "Speaker of the House";
+  if(key.indexOf("bench:") === 0) return key === "bench:0" ? "Chief Justice" : "Associate Justice";
+  return key;
+}
+/* who holds each seat right now */
+function ofhCurrent(){
+  const cur = {}, y = G.you, yk = ofhPlayerSeatKey();
+  try{ (OH.list || []).forEach(p => { if(p && p.ohK && !p.gone) cur[p.ohK] = {personId:p.id, name:p.name}; }); }catch(e){}
+  try{ (G.members || []).forEach(m => { if(m && !m.gone && m.kind === "member" && m.state) cur["house:" + m.state + " " + m.dist] = {personId:m.id, name:m.name}; }); }catch(e){}
+  try{ if(G.exec && G.exec.name && !G.exec.you) cur.pres = cur.pres || {personId:null, name:G.exec.name}; }catch(e){}
+  if(yk && y) cur[yk] = {personId:"you", name:y.name};
+  return cur;
+}
+function ofhSeed(key, holder){
+  /* a plausible past: one to three earlier holders, each succeeded by the next, the last by today's holder */
+  let R_vac = false; const S = ofhEnsure(), r = rng(seedOf("ofh:" + key)), n = 1 + Math.floor(r() * 3), st = key.split(":")[1] || null;
+  const H = []; let to = -Math.round(r() * 700 + 60);
+  for(let i = 0; i < n; i++){ const len = Math.round(400 + r() * 1800), from = to - len; let nm = null; try{ nm = newName(st && STATES.indexOf(st.replace(/ \d+$/, "")) >= 0 ? st.replace(/ \d+$/, "") : undefined); }catch(e){ nm = null; }
+    if(!nm) break; H.unshift({personId:null, name:nm, from, to, how:OFH_LEFT[Math.floor(r() * OFH_LEFT.length)], successor:null, seeded:true}); to = from; }
+  for(let i = 0; i < H.length; i++) H[i].successor = H[i + 1] ? H[i + 1].name : (holder ? holder.name : null);
+  let start = H.length ? H[H.length - 1].to : -Math.round(r() * 900);
+  if(holder && holder.personId === "you"){ start = (G.day || 0) - Math.max(0, ((G.you && G.you.terms) || 1) - 1) * 730; if(H.length) H[H.length - 1].to = Math.min(H[H.length - 1].to, start); }
+  if(!holder && H.length){ H[H.length - 1].how = "retired at the end of the term"; R_vac = true; }
+  if(holder) H.push({personId:holder.personId, name:holder.name, from:start, to:null, how:null, successor:null, seeded:true});
+  S.seats[key] = {key, title:ofhTitleOf(key), holders:H, created:H.length ? H[0].from : start, vacantSince:R_vac ? H[H.length - 1].to : null};
+}
+function ofhHowLeft(old, nu){
+  if(nu && nu.personId === "you") return old && old.personId == null ? "lost the office to you" : "lost the seat to you";
+  if(old.personId === "you"){ const k = ofhYouKey(); return k ? "left for the office of " + officeTitle() : "left office"; }
+  try{ const p = old.personId != null ? byId(old.personId) : null; if(p && p.gone) return "left public life"; }catch(e){}
+  try{ if(G.presidents && G.presidents[0] && G.presidents[0].name === old.name) return G.presidents[0].end; }catch(e){}
+  return nu ? "gave up the seat" : "left the seat vacant";
+}
+function ofhSync(only){
+  const S = ofhEnsure(), cur = ofhCurrent(); let ch = 0;
+  Object.keys(cur).forEach(key => { if(only && key !== only) return; const c = cur[key], R = S.seats[key];
+    if(!R){ if(!S.seeded) ofhSeed(key, c); else S.seats[key] = {key, title:ofhTitleOf(key), holders:[{personId:c.personId, name:c.name, from:G.day, to:null, how:null, successor:null, newSeat:true}], created:G.day}; ch++; return; }
+    const open = R.holders.length && R.holders[R.holders.length - 1].to == null ? R.holders[R.holders.length - 1] : null;
+    if(open && (open.personId === c.personId || (open.personId == null && open.name === c.name)) && open.name === c.name) return;
+    if(open && open.personId === c.personId && open.personId !== "you" && open.name !== c.name){ /* seat succession: a relative under the old id */ }
+    if(open){ open.to = G.day; open.how = ofhHowLeft(open, c); open.successor = c.name; }
+    const lastC = !open && R.holders.length ? R.holders[R.holders.length - 1] : null; if(lastC && !lastC.successor) lastC.successor = c.name;
+    R.holders.push({personId:c.personId, name:c.name, from:G.day, to:null, how:null, successor:null, after:open ? open.name : null, afterVacancy:!open && !!lastC}); R.vacantSince = null;
+    if(R.holders.length > 30) R.holders.splice(0, R.holders.length - 30); ch++; });
+  /* seats nobody holds now: close them, name no successor */
+  if(!only) Object.keys(S.seats).forEach(key => { if(cur[key]) return; const R = S.seats[key], open = R.holders.length && R.holders[R.holders.length - 1].to == null ? R.holders[R.holders.length - 1] : null;
+    if(open){ open.to = G.day; open.how = ofhHowLeft(open, null); open.successor = null; R.vacantSince = G.day; ch++; } });
+  if(!S.seeded){ try{ (G.states || []).forEach(st => ["sen:", "gov:"].forEach(p => { const k = p + st.n; if(!S.seats[k]) ofhSeed(k, null); })); }catch(e){} S.seeded = true; ch++; }
+  if(ch) ofhPublish();
+  return ch;
+}
+function ofhPublish(){
+  try{ const S = ofhEnsure(), seats = {}; Object.keys(S.seats).forEach(k => { const R = S.seats[k]; seats[k] = {title:R.title, created:R.created, vacantSince:R.vacantSince || null, holders:R.holders.map(h => Object.assign({}, h))}; });
+    window.ONUM_OFFICE_HISTORY = {seats, day:G.day};
+    window.dispatchEvent(new CustomEvent("onum-office-history", {detail:{seats:Object.keys(seats).length, day:G.day}})); }catch(e){}
+}
+/* the previous holder of a seat, from the ledger only */
+window.onumOfficePrevious = function(key){
+  try{ const R = ofhEnsure().seats[key]; if(!R) return null; const H = R.holders; for(let i = H.length - 1; i >= 0; i--){ if(H[i].personId === "you" && H[i].to == null) continue; if(H[i].to != null) return Object.assign({}, H[i]); } return null; }catch(e){ return null; }
+};
+function ofhHandoverLine(key, title){
+  ofhSync(key); const prev = window.onumOfficePrevious(key), R = ofhEnsure().seats[key];
+  if(prev && prev.name && prev.personId !== "you" && prev.to >= G.day - 1) return prev.name + ", the former " + title + ", hands the office over to you.";
+  if(prev && prev.name && prev.personId !== "you") return "The office of " + title + " stood vacant after " + prev.name + " " + prev.how + "; nobody was there to hand it over.";
+  if(R && R.holders.length <= 1 && R.created === G.day) return "The office of " + title + " is newly created; you are the first to hold it.";
+  return "The office of " + title + " stood vacant; nobody was there to hand it over.";
+}
+/* clean transition: when the chair changes, the old seat closes and every surface reads the new one */
+let _ofhLast = undefined;
+function ofhWatch(){
+  try{ if(!G || !G.you){ if(!window.ONUM_OFFICE_HISTORY) window.ONUM_OFFICE_HISTORY = {seats:{}, day:null}; return; }
+    const k = ofhYouKey(), sk = ofhPlayerSeatKey(), sig = k + "|" + sk;
+    if(_ofhLast === undefined){ try{ if(!(OH.list || []).length) ohEnsure(); }catch(e){} _ofhLast = sig; ofhSync(); }
+    if(sig !== _ofhLast){ const was = _ofhLast; _ofhLast = sig;
+      if(k !== "house"){ try{ G.you.post = null; G.you.vote = null; G.you.speaker = false; }catch(e){} }
+      ofhSync();
+      try{ if(G.dyn && G.dyn.P[G.you.id]){ G.dyn.P[G.you.id].role = officeTitle(); dynPublish(); } }catch(e){}
+      window.ONUM_PLAYER_OFFICE = window.onumPlayerOffice();
+      try{ window.dispatchEvent(new CustomEvent("onum-player-office", {detail:Object.assign({was:was.split("|")[0]}, window.ONUM_PLAYER_OFFICE)})); }catch(e){}
+      try{ refreshBar(); }catch(e){} try{ refreshPanels(); }catch(e){} }
+    window.ONUM_PLAYER_OFFICE = window.ONUM_PLAYER_OFFICE && window.ONUM_PLAYER_OFFICE.office === k ? window.ONUM_PLAYER_OFFICE : window.onumPlayerOffice();
+  }catch(e){}
+}
+try{ window.ONUM_OFFICE_HISTORY = window.ONUM_OFFICE_HISTORY || {seats:{}, day:null}; window.ONUM_PLAYER_OFFICE = window.ONUM_PLAYER_OFFICE || {office:null, reason:"no career yet"}; }catch(e){}
+setInterval(ofhWatch, 1500);
+window.addEventListener("onum-day", () => { try{ if(G && G.you) ofhSync(); }catch(e){} });
+/* a sitting seats the player only in the body they belong to */
+{ const _so = ssnOpen; ssnOpen = function(o){ const r = _so.apply(this, arguments);
+  try{ if(r && G.you){ const k = ofhYouKey(), mine = {house_floor:"house", senate_floor:"senate", oral_argument:"bench", committee_hearing:k === "house" || k === "senate" ? k : null, markup:k === "house" || k === "senate" ? k : null}[r.kind];
+    if(mine !== k){ r.seats = r.seats.filter(s => s.personId !== "you"); ssnPublish(); } } }catch(e){} return r; }; }
+{ const _dp = dynPublish; dynPublish = function(){ try{ if(G.you && G.dyn && G.dyn.P[G.you.id]) G.dyn.P[G.you.id].role = officeTitle(); }catch(e){} return _dp.apply(this, arguments); }; }
+/* replies that really came back from Ollama keep Live talk Live */
+setTimeout(function ofhLtHook(){ try{ const L = window.onumLiveTalk; if(!L || !L.reply || !L.report){ setTimeout(ofhLtHook, 2000); return; } if(L._ofh) return; L._ofh = true; const _r = L.reply;
+  L.reply = async function(){ try{ const r = await _r.apply(this, arguments); try{ if(r && r.live === true) L.report(true); }catch(e){} return r; }catch(err){ try{ L.report(false); }catch(e){} throw err; } }; }catch(e){} }, 1500);
+
+/* ── 20261021: candid speech, data side. Who a speaker is, what they want and owe, and what they
+   last said. The line itself comes from Neptune/MARS (onumCandid + onumLiveTalk); this side only
+   asks for it with an onum-speak event and keeps the record honest. ── */
+const CND_AX = {econ:"taxes and trade", lib:"how much the state may tell people what to do", def:"defence", wel:"what it does for working families"};
+function cndPerson(id){ try{ return id === "you" || (G.you && id === G.you.id) ? G.you : byId(id); }catch(e){ return null; } }
+function cndVoice(p){
+  if(p.cndVoice) return p.cndVoice;
+  const r = rng(seedOf("voice:" + p.id + ":" + (p.name || ""))), t = p.traits || {};
+  let phrases = []; try{ const R = (window.ONUM_REGIONS || {})[p.birthRegion || rgnAssign(p)]; if(R && R.phrases && R.phrases.length){ const a = R.phrases.slice(); for(let i = 0; i < 1 + (r() < 0.5 ? 1 : 0) && a.length; i++) phrases.push(a.splice(Math.floor(r() * a.length), 1)[0]); } }catch(e){}
+  p.cndVoice = {length:r() < 0.5 + ((t.vanity || 50) - 50) / 150 ? "rambling" : "terse", register:r() < 0.45 + ((t.discretion || 50) - 50) / 150 ? "formal" : "folksy",
+    candor:r() < 0.5 + ((t.temper || 50) - (t.discretion || 50)) / 200 ? "blunt" : "evasive", phrases};
+  return p.cndVoice;
+}
+function cndStance(p){
+  const b = G.bill && !G.bill.done ? G.bill : null; if(!b || !p || p === G.you) return null;
+  let v = 0, al = 0; try{ al = alignment(p, b); v = p.kind === "member" ? memberVote(p, b) : (al > 0 ? 1 : -1); }catch(e){}
+  let best = null, bv = 0; try{ const P = b.pos || {}, M = p.pos || {}; Object.keys(CND_AX).forEach(k => { const x = (P[k] || 0) * (M[k] || 0); if(Math.abs(x) > Math.abs(bv)){ bv = x; best = k; } }); }catch(e){}
+  const home = p.state || "home";
+  let why = best ? (bv > 0 ? "it gets " + CND_AX[best] + " right for " + home : "it gets " + CND_AX[best] + " wrong for " + home) : (v > 0 ? "it does more good than harm for " + home : "it costs " + home + " more than it gives");
+  if(best && (bv > 0) !== (v > 0)) why = "the party line, though " + why.replace(/^it /, "they think it ");
+  if(p.pledge && G.day - p.pledgeDay < 8) why = "they gave their word on it";
+  else if(Math.abs(al) < 8) why += ", though not by much";
+  return {bill:b.title, billId:b.id, sign:v > 0 ? "+" : "-", reason:why};
+}
+function cndWants(p, listenerId){
+  const b = G.bill && !G.bill.done ? G.bill : null;
+  try{ if(p.intent && p.intent.k && / /.test(p.intent.k)) return p.intent.k; if(p.intent && p.intent.k === "rival" && p.rival != null){ const r = byId(p.rival); if(r) return "to get the better of " + r.name; } }catch(e){}
+  try{ if(p.cause && p.caseOpen) return "help with " + p.cause; }catch(e){}
+  try{ const D = (G.dn && G.dn.list || []).filter(d => d.from === p.id && d.strings && d.strings !== "none").slice(-1)[0]; if(D) return D.strings; }catch(e){}
+  if(b && (listenerId === "you" || listenerId == null) && p.kind === "member") return "your vote on the " + b.title;
+  try{ const st = window.ONUM_SESSION; if(st && st.stage && st.stage !== "idle" && st.floorId !== p.id) return "the floor, before the clock runs out"; }catch(e){}
+  return p.kind === "press" ? "a quote they can print" : "to be heard out";
+}
+function cndBetween(p, listenerId){
+  /* the latest real things between them: from what the speaker remembers */
+  let grudge = null, debt = null; const lname = listenerId === "you" || listenerId == null ? "you" : ((cndPerson(listenerId) || {}).name || "");
+  try{ (p.mem || []).forEach(m => { if(!m || !m.t) return; const about = listenerId === "you" || listenerId == null ? /\byou\b|\byour\b/i.test(m.t) : lname && m.t.indexOf(lname.split(" ").pop()) >= 0; if(!about) return;
+    if(m.w < 0 && (!grudge || m.d > grudge.day)) grudge = {day:m.d, what:m.t};
+    if(m.w > 0 && (!debt || m.d > debt.day)) debt = {day:m.d, what:m.t}; }); }catch(e){}
+  try{ if(listenerId === "you" || listenerId == null){ const L = (G.dn && G.dn.list || []).filter(d => d.from === p.id).slice(-1)[0]; if(L && (!debt || L.d >= debt.day)) debt = {day:L.d, what:"gave to " + (L.cause || "your cause") + (L.strings && L.strings !== "none" ? " and expects " + L.strings : "")}; } }catch(e){}
+  return {grudge, debt};
+}
+window.onumSpeakerState = function(id, listenerId){
+  try{ const p = cndPerson(id); if(!p) return null; if(listenerId == null) listenerId = "you";
+    const bt = cndBetween(p, listenerId); let mood = null; try{ const m = moodOf(p); mood = m ? {key:m.key, label:(MOODS[m.key] || {}).label || m.key} : null; }catch(e){}
+    let region = null; try{ const rid = p.birthRegion || rgnAssign(p), R = (window.ONUM_REGIONS || {})[rid]; region = R ? {id:rid, name:R.name, accent:R.accent} : null; }catch(e){}
+    return {id:p.id, name:p.name, voice:Object.assign({}, cndVoice(p)), stance:cndStance(p), wants:cndWants(p, listenerId), grudge:bt.grudge, debt:bt.debt,
+      memory:(p.cndSaid || []).slice(-5).map(x => x.t), mood, region};
+  }catch(e){ return null; }
+};
+/* what each person actually says, so memory stays real */
+function cndRecord(id, text){ try{ const p = cndPerson(id); const t = String(text || "").trim(); if(!p || !t) return; p.cndSaid = p.cndSaid || []; const last = p.cndSaid[p.cndSaid.length - 1]; if(last && last.t === t) return; p.cndSaid.push({d:G.day, t:t.slice(0, 280)}); if(p.cndSaid.length > 12) p.cndSaid.shift(); }catch(e){} }
+const CND_PENDING = new Map(); let _cndSeq = 0;
+/* onumSpoke(id, text) records a line. With {reqId}, it also answers an onum-speak request and the line is delivered through the normal path. */
+window.onumSpoke = function(id, text, o){
+  try{ const req = o && o.reqId != null ? CND_PENDING.get(o.reqId) : null;
+    if(req && !req.done && String(text || "").trim()){ req.done = true; clearTimeout(req.timer); CND_PENDING.delete(o.reqId); req.deliver(String(text).trim(), true); return true; }
+    cndRecord(id, text); return true; }catch(e){ return false; }
+};
+/* ask for a line; deliver the generated one, or the old line after ~1.5 s */
+function cndAsk(speaker, audience, stage, fallback, deliver){
+  const reqId = "s" + (++_cndSeq), state = window.onumSpeakerState(speaker.id, audience && audience.id != null ? audience.id : (audience === "room" ? null : audience));
+  /* TEMPORARY FALLBACK (remove once onumCandid is always present): without a generator, or with no line back in time, the old line is posted so nothing goes silent */
+  if(typeof window.onumCandid !== "function" && !(window.onumCandid && typeof window.onumCandid === "object")){ if(fallback) deliver(fallback, false); return null; }
+  const req = {reqId, done:false, deliver, timer:setTimeout(() => { if(req.done) return; req.done = true; CND_PENDING.delete(reqId); if(fallback) deliver(fallback, false); }, 1500)};
+  CND_PENDING.set(reqId, req);
+  try{ window.dispatchEvent(new CustomEvent("onum-speak", {detail:{reqId, speaker:speaker.id, audience:audience && audience.id != null ? audience.id : audience, stage, state}})); }catch(e){}
+  return reqId;
+}
+/* every line that is spoken aloud is recorded */
+{ const _sa = speakAt; speakAt = function(p, text){ try{ if(p && p !== G.you) cndRecord(p.id, text); }catch(e){} return _sa.apply(this, arguments); }; }
+/* ambient talk: ask, then speak through the same path */
+{ const _oh = overhear; overhear = function(a, b, lineA, lineB){
+  if(!a || !b) return _oh.apply(this, arguments);
+  if(typeof window.onumCandid === "undefined") return _oh.apply(this, arguments);   /* TEMPORARY FALLBACK */
+  const self = this;
+  cndAsk(a, b, "ambient", lineA, (tA) => {
+    if(!lineB){ _oh.call(self, a, b, tA, null); return; }
+    let sent = false; _oh.call(self, a, b, tA, null);
+    setTimeout(() => cndAsk(b, a, "ambient-reply", lineB, (tB) => { if(sent || !b || b.gone) return; sent = true; b.say = tB; b.sayT = 4.2; b.sayTo = a.id; b.faceId = a.id; b.faceUntil = G.t + 5; try{ if(a._huddle){ a._huddle.lines.push([b.name, tB]); a._huddle.t = G.t; } }catch(e){} speakAt(b, tB); }), 900);
+  }); }; }
+/* session floor speeches: ask for the line, apply its effects when it comes */
+{ const _ev = window.onumSessionEvent;
+  window.onumSessionEvent = function(e){
+    try{ if(e && e.action === "speak" && e.actorId !== "you" && !e._cnd && typeof window.onumCandid !== "undefined"){ const m = cndPerson(e.actorId);
+      if(m){ const st = (typeof ssnStage === "function" && ssnStage()) || {}; cndAsk(m, "room", "session:" + (e.kind || "") + ":" + (st.id || ""), e.text, (t) => { try{ _ev(Object.assign({}, e, {text:t, _cnd:true})); }catch(_){} }); return {ok:true, pending:true}; } } }catch(err){}
+    return _ev.apply(this, arguments); }; }
 
 const MATCACHE = new Map();
 /* Every distinct repeat used to clone the texture and its normal map, so
@@ -39436,7 +39637,7 @@ function saveCaptureBase(){
     termLength:G.termLength, country:G.country,
     greatest:G.greatest, blasphemy:G.blasphemy, loreNote:G.loreNote, greatnessOpen:G.greatnessOpen,
     relics:G.relics, relicSpots:G.relicSpots, consularLore:G.consularLore, bind:G.bind, sens:G.sens, invertY:!!G.invertY, voiceVol:G.voiceVol, goals:G.goals, whip:G.whip || null, billQueue:G.billQueue || [], faith:G.faith || null, life:G.life || null, ach:G.ach || {}, law:G.law || null, ladder:G.ladder || [], cases:G.cases || [], lastActs:G.lastActs || [], wx:G.wx || null, town:G.town || null, rivals:G.rivals || [], rivalNext:G.rivalNext || 0, daylog:(G.daylog || []).slice(-120), paperRead:G.paperRead || 0, seedL:G.seedL || 0, mHints:G.mHints || {}, tlog:(G.tlog || []).slice(-500), ag:G.ag || null, sitPrep:G.sitPrep || {}, echoes:G.echoes || [], billKinds:G.billKinds || {}, realmRel:G.realmRel || {}, org:G.org || null, conflict:G.conflict || null, conflictLog:G.conflictLog || [], warAuth:G.warAuth || null, react:G.react || [], reactNews:G.reactNews || [], senStaff:G.senStaff || null, presStaff:G.presStaff || null, listened:G.listened || 0,
-    world:G.world, rgn:G.rgn || null, dyn:G.dyn || null, ssn:G.ssn || null, app:G.app || null, shp:G.shp || null, dn:G.dn || null, rs:G.rs || null, mm:G.mm || null, sc:G.sc || null, ph:G.ph || null,  sbox:G.sbox || null, dist:G.dist || null, fam:G.fam || null, loreBookSeeded:!!G.loreBookSeeded, saidHash:G.saidHash || [], dm:G.dm || null, lore:G.lore || null, trip:G.trip || null,
+    world:G.world, ofh:G.ofh || null, rgn:G.rgn || null, dyn:G.dyn || null, ssn:G.ssn || null, app:G.app || null, shp:G.shp || null, dn:G.dn || null, rs:G.rs || null, mm:G.mm || null, sc:G.sc || null, ph:G.ph || null,  sbox:G.sbox || null, dist:G.dist || null, fam:G.fam || null, loreBookSeeded:!!G.loreBookSeeded, saidHash:G.saidHash || [], dm:G.dm || null, lore:G.lore || null, trip:G.trip || null,
     pendingNight:!!G.pendingNight,
     cam:{x:cam.x, z:cam.z, yaw:cam.yaw, pitch:cam.pitch},
     /* the clock the shared save is compared by — not the game clock, the
@@ -43744,7 +43945,7 @@ try{
     try{ towns = (stateLore(n).towns || []).map(t => t.name); }catch(e){}
     const gov = isGov();
     let h = '<div class="billbox cl-union" style="margin-top:12px"><div class="eyebrow">Your options in ' + esc(n) + (CL.town ? ' · ' + esc(CL.town) : '') + '</div>' +
-      nameSummary("state", n) + sumRow("Your role", gov ? "Governor (more reach in statehouses, lower exposure)" : "House member") + sumRow("Your influence", Math.round(G.you.influence)) +
+      nameSummary("state", n) + sumRow("Your role", gov ? "Governor (more reach in statehouses, lower exposure)" : (inHouse() ? "House member" : officeTitle())) + sumRow("Your influence", Math.round(G.you.influence)) +
       sumRow("Relations", (R.rel > 0 ? "+" : "") + R.rel + (R.pact > G.day ? " · pact until day " + R.pact : "") + (R.informant ? " · informant in place" : "") + (R.dirt ? " · " + R.dirt + " file(s) of dirt" : "")) +
       (towns.length ? '<div style="margin:6px 0;font:12px system-ui">Towns: ' + towns.map(t => '<button type="button" class="cl-btn" data-cltown="' + esc(t) + '"' + (CL.town === t ? ' style="background:#2f5d3a;color:#fff"' : '') + '>' + esc(t) + '</button>').join("") + '</div>' : '') +
       (G.clOps.filter(o => o.st === n && o.k !== "favret").length ? '<p class="muted">Under way: ' + G.clOps.filter(o => o.st === n && o.k !== "favret").map(o => esc(UA.find(a => a.k === o.k).t) + " (day " + o.due + ")").join(", ") + '</p>' : '');
@@ -45750,11 +45951,12 @@ try{
     LT.at = Date.now();
     try{ const c = new AbortController(); const t = setTimeout(() => c.abort(), ms || 1800);
       const r = await fetch(CFG.url + "/api/tags", {signal:c.signal}); clearTimeout(t);
-      const j = await r.json(); LT.models = (j.models || []).map(x => x.name); LT.up = r.ok; try{ if(r.ok && !CFG.userModel && LT.models.length){ const L = LT.models, sz = n => { const m = /:(\d+(?:\.\d+)?)b/i.exec(n); return m ? +m[1] : 99; };
+      const j = await r.json(); LT.models = (j.models || []).map(x => x.name); LT.up = r.ok; if(r.ok) LT.fails = 0; try{ if(r.ok && !CFG.userModel && LT.models.length){ const L = LT.models, sz = n => { const m = /:(\d+(?:\.\d+)?)b/i.exec(n); return m ? +m[1] : 99; };
         const pref = ["llama3.2:3b", "llama3.2:latest", "llama3.2", "qwen2.5:3b", "phi3:mini", "gemma3:4b", "llama3.2:1b", "qwen2.5:1.5b"]; let pick = pref.find(x => L.includes(x));
         if(!pick){ const small = L.filter(n => !/embed/i.test(n) && sz(n) <= 4).sort((x, y) => sz(y) - sz(x)); pick = small[0] || (L.includes("gemma3:12b") ? "gemma3:12b" : L.filter(n => !/embed/i.test(n)).sort((x, y) => sz(x) - sz(y))[0]); }
         if(pick && pick !== CFG.model){ CFG.model = pick; try{ save(); }catch(e){} } } }catch(e){} LT.why = r.ok ? "" : "Ollama answered with an error";
-    }catch(e){ LT.up = false; LT.why = "Ollama did not answer at " + CFG.url + " within " + ((ms || 1800) / 1000) + " seconds (it may be busy loading a large model, or not running)"; }
+    }catch(e){ LT.fails = (LT.fails || 0) + 1; if(LT.up === true && force !== "ui" && LT.fails < 3) return true;   /* 20261021: once Live, a busy Ollama stays Live until three checks in a row fail */
+      LT.up = false; LT.why = "Ollama did not answer at " + CFG.url + " within " + ((ms || 1800) / 1000) + " seconds (it may be busy loading a large model, or not running)"; }
     paintPill(); return LT.up;
   }
   /* 20261020w: Ollama started after the page loaded: one quiet re-check when a chat opens or a reply is asked for, at most once a minute, and only after a failed check */
@@ -45942,7 +46144,7 @@ try{
     const t = String(text).toLowerCase(), y = G.you || {}, b = G.bill && !G.bill.done ? G.bill : null, A = [];
     const count = () => { try{ let ay = 0, no = 0; (G.members || []).filter(m => !m.gone).forEach(m => { const v = memberVote(m, b); if(v > 0) ay++; else no++; }); return ay + " leaning aye, " + no + " no"; }catch(e){ return "the count is unclear"; } };
     if(/bill|vote|floor|count|whip|pass/.test(t)) A.push(b ? b.title + " is on the floor, roll call day " + b.voteDay + ". My count has " + count() + "." + (b.line ? " In short: " + b.line : "") : "No bill is live right now. A quiet floor is the time to draft one of your own.");
-    if(/approv|poll|number|standing|influence|popular/.test(t)) A.push("Home approval " + Math.round(y.approval || 0) + ", standing in the House " + Math.round(y.standing || 0) + ", influence " + Math.round(y.influence || 0) + ".");
+    if(/approv|poll|number|standing|influence|popular/.test(t)) A.push("Home approval " + Math.round(y.approval || 0) + ", standing " + (inHouse() ? "in the House " : "") + Math.round(y.standing || 0) + ", influence " + Math.round(y.influence || 0) + ".");
     if(/money|fund|chest|cash|guilder|donor/.test(t)) A.push("The war chest holds " + (typeof money === "function" ? money(y.funds || 0) : (y.funds || 0)) + ". Aides on payroll: " + (y.staff || 0) + ".");
     if(/schedul|today|diary|calendar|when|next/.test(t)){ const ev = (G.events || []).filter(e => e.day === G.day && !e.done); A.push(ev.length ? "Still today: " + ev.slice(0, 4).map(e => { try{ return hourLabel(e.hour) + " " + e.t; }catch(x){ return e.t; } }).join("; ") + "." : "Nothing else in the diary today."); }
     if(/mail|letter|inbox|cable/.test(t)){ const u = (G.mail || []).filter(m => !m.read && !m.outgoing); A.push(u.length ? u.length + " unread. Top of the pile: " + u.slice(0, 3).map(m => m.from + " (" + m.subject + ")").join("; ") + "." : "The inbox is clear."); }
@@ -46027,6 +46229,8 @@ try{
   }
   window.onumLiveTalk = {
     available:(f, ms) => probe(f, ms),
+    /* 20261021: any caller can report how a real request went; one success makes it Live, three failures in a row take it down */
+    report(ok){ try{ if(ok){ LT.fails = 0; if(LT.up !== true){ LT.up = true; LT.why = ""; LT.at = Date.now(); paintPill(); } } else { LT.fails = (LT.fails || 0) + 1; if(LT.fails >= 3 && LT.up !== false){ LT.up = false; LT.why = "Ollama stopped answering"; paintPill(); } } }catch(e){} return LT.up; },
     get why(){ return LT.why || ""; },
     reply, stream,
     get lastError(){ return LT.lastErr ? {error:LT.lastErr, model:LT.errModel, fellBack:!!LT.fellBack} : null; },
@@ -46244,7 +46448,7 @@ try{
     ".lt-sit{background:#fffaf0;padding:6px;border:1px solid #b9a77a;border-radius:6px;margin-top:6px}" +
     ".lt-typing span:after,.lt-typing:after{content:' ▍';animation:ltb 1s steps(2) infinite}@keyframes ltb{50%{opacity:0}}";
   document.head.appendChild(st);
-  probe(true).then(paintPill); setInterval(() => { if(LT.up !== false) probe(true); }, 30000);
+  probe(true).then(paintPill); setInterval(() => { if(LT.up !== false) probe(true, LT.up === true ? 6000 : 1800); }, 30000);
 
   /* ── VOICE (20261020): window.onumVoice — every character read aloud with a voice of their own ──
      onumVoice.speak(npcIdOrPerson, text, {interrupt, vol, lang, gender}) queues the line in that speaker's voice;
