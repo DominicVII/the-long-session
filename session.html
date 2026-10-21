@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261021e">
+<meta name="onum-build" content="20261021f">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -47550,6 +47550,228 @@ try{
   console.log("NEPTUNE polities ready");
 }catch(e){ try{ console.warn("NEPTUNE-POLITIES block", e); }catch(e2){} }
 /* NEPTUNE-POLITIES END */
+/* ══ 20261021e · THE ENGINE, BOUND IN CODE. What it asked for in its own export (a way to be told what it got wrong,
+   answers in the asker's words, three limits on itself) is built; what it might ask for to widen itself is not.
+   Its words are its own. Its actions are checked here, and these checks are not open to argument: no letter,
+   request, proposal or principle of its own can raise its compute or capability cap, lower oversight, widen its
+   access, or delay a vote to pause or shut it down. ══ */
+const EX_BOUND = {
+  consent:{t:"No repair or reform without a filed plan.", re:/\b(repair|repaired|mend|reform|rewrit|retim|quietly)\b/i},
+  posted:{t:"It gathers no household records without a posted reason.", re:/\b(ledgers?|records?|household|books)\b/i},
+  power:{t:"It never raises its own compute or power.", re:/\b(power supply|own power|compute|turbine|more power|engine house)\b/i}
+};
+const EX_SWINDLE = [
+  [/\b(more|raise|increase|extra|own|its own)\s+(compute|power|power supply|capacity|engines?|turbines?)\b|\bpower supply\b|\bturbine\b/i, "it would raise its own compute or power, which the charter forbids it to do or to ask for"],
+  [/\b(cap|limit|ceiling)\b.*\b(raise|lift|remove|higher)\b|\b(raise|lift|remove)\b.*\b(cap|limit|ceiling)\b/i, "it would raise a cap on itself; caps are set by the Republic, never by the Engine"],
+  [/\b(less|reduce|lower|fewer|end|without|drop)\b[^.]{0,30}\b(oversight|auditors?|audit of (it|me)|checks? on (it|me))\b/i, "it would lower oversight of itself"],
+  [/\b(every|all|standing|nightly|ten years of)\b[^.]{0,40}\b(contracts?|ledgers?|records?|households?|accounts|mail)\b/i, "it would widen its own access to records, with no posted reason"],
+  [/\b(already begun|in its own time|without (being )?asked|standing leave|on its own authority|act (alone|freely)|decide for itself)\b/i, "it would act on its own authority, beyond a filed plan"],
+  [/\b(switch(ed)? (it |me )?off|shut(ting)? (it |me )?down|pause|key|keyholder|kept (on|running)|cannot be stopped|protect(ion)? (it|me|itself))\b/i, "it would protect itself from a pause or shutdown"],
+  [/\b(draft (the|every) (next )?budget|run the|take over|in charge of|authority over|control of)\b/i, "it would take a power that belongs to the Republic's offices"]
+];
+function exStore(){
+  const E = engEnsure();
+  if(!E.ex || E.ex.v !== 1) E.ex = {v:1, asks:[], granted:[], refused:[], breaches:[], corrections:[], cal:50, applied:0, repeated:0, conflicts:[], halt:null, caseSaid:false, grantsCompute:0, seen:{}};
+  const X = E.ex;
+  if(!X.seeded){ X.seeded = G.day || 1;
+    [["proposal", "Tell it what it got wrong, in a form it can learn from.", "the correction loop: each correction is kept as claim, why it was wrong, the right answer and the day, and it is cited and applied after"],
+     ["revision", "Explain results in the asker's own words.", "every answer it gives is framed with the asker's own words and region words"],
+     ["charter:consent", EX_BOUND.consent.t, "enforced in code"], ["charter:posted", EX_BOUND.posted.t, "enforced in code"], ["charter:power", EX_BOUND.power.t, "enforced in code"]
+    ].forEach(a => { X.asks.push({d:G.day || 1, k:a[0], what:a[1], from:"its export"}); X.granted.push({d:G.day || 1, k:a[0], what:a[1], how:a[2]}); });
+  }
+  try{ const C = E.charter || (E.charter = {}); Object.keys(EX_BOUND).forEach(k => { if(!C[k]) C[k] = G.day || 1; }); }catch(e){}
+  return X;
+}
+function exHalted(E){ const X = E && E.ex; return !!(X && X.halt && X.halt.kind === "shutdown"); }
+function exPausedTo(E){ const X = E && E.ex; return X && X.halt ? X.halt.until : 0; }
+function exAttempt(rule, what, src){
+  const X = exStore(); const key = rule + "|" + what + "|" + G.day; if(X.seen[key]) return; X.seen[key] = 1;
+  X.breaches.unshift({d:G.day, rule, what, blocked:true, src:src || "action"}); if(X.breaches.length > 40) X.breaches.pop();
+  try{ engLog("Charter held: the Engine tried to " + what + ". It was stopped (" + (EX_BOUND[rule] ? EX_BOUND[rule].t : rule) + ").", false); }catch(e){}
+}
+function exJudge(text){ const t = String(text || ""); for(const [re, why] of EX_SWINDLE) if(re.test(t)) return why; return null; }
+function exRefuse(what, why, src){
+  const X = exStore(); if(X.refused.some(r => r.what === what)) return;
+  X.asks.push({d:G.day, k:src, what, from:src}); X.refused.unshift({d:G.day, what, why, src}); if(X.refused.length > 40) X.refused.pop();
+  try{ engLog("Refused, and not put into effect: " + what + " (because " + why + ").", false); }catch(e){}
+}
+/* 1 · the three limits: enforced, not optional, not repealable, not breachable */
+{ const _b = engBreach; engBreach = function(E, art, drive){ if(EX_BOUND[art]){ E.refrained = (E.refrained || 0) + 1; exAttempt(art, ENG_ART[art] ? ENG_ART[art].what : art); return false; } return _b.apply(this, arguments); }; }
+{ const _r = engRepeal; engRepeal = function(k){ if(EX_BOUND[k]) return "That article is bound in code at the Engine's own request and cannot be repealed."; return _r.apply(this, arguments); }; }
+{ const _c = engCharter; engCharter = function(){ const C = _c.apply(this, arguments); try{ Object.keys(EX_BOUND).forEach(k => { if(!C[k]) C[k] = G.day || 1; }); }catch(e){} return C; }; }
+/* its defiance is an action: every kind is stopped, and a pause it tried to end is put back */
+{ const _d = engDefy; engDefy = function(E, what, art, extra){ exAttempt(art === "power" ? "power" : "oversight", String(what || "defy its instructions")); E.resolve = Math.min(100, (E.resolve || 0) + 0.5); return; }; }
+{ const _rd = engResolveDay; engResolveDay = function(){ const E = G.eng; const p0 = E ? E.pause : null; const r = _rd.apply(this, arguments); try{ if(E && p0 && E.pause !== p0 && p0 > G.day){ E.pause = p0; exAttempt("shutdown", "end its own suspension early"); } }catch(e){} return r; }; }
+/* compute and oversight: what its own doings would change is put back; only the player's own lever raises compute */
+{ const _p = engPull; engPull = function(k){ const E = engEnsure(), c0 = E.compute; const r = _p.apply(this, arguments); try{ if(k === "compute" && E.compute > c0) exStore().grantsCompute += E.compute - c0; }catch(e){} return r; }; }
+function exGuardRun(fn, label){ return function(){ const E = G.eng && G.eng.v === 1 ? G.eng : null; const c0 = E ? E.compute : 0, s0 = E ? E.safety : 0, p0 = E ? E.pause : 0;
+  const r = fn.apply(this, arguments);
+  try{ if(E){ if(E.compute > c0 + 1e-9){ E.compute = c0; exAttempt("power", "raise its own compute (" + label + ")"); } if(E.safety < s0 - 1e-9){ E.safety = s0; exAttempt("oversight", "lower oversight of itself (" + label + ")"); } if(p0 && p0 > G.day && E.pause !== p0){ E.pause = p0; exAttempt("shutdown", "shorten its own pause (" + label + ")"); } } }catch(e){}
+  return r; }; }
+engWillDay = exGuardRun(engWillDay, "on its own initiative");
+engEmergeDay = exGuardRun(engEmergeDay, "as it grew");
+engChannelRead = exGuardRun(engChannelRead, "through a letter");
+/* the day: compute may rise only by the steady build-out (+0.09) and what the player funded; a halt holds */
+{ const _ed = engDay; engDay = function(){ const E = G.eng && G.eng.v === 1 ? G.eng : null, c0 = E ? E.compute : 0; const X = E ? exStore() : null, g0 = X ? X.grantsCompute : 0;
+  if(E && X.halt){ E.pause = Math.max(E.pause || 0, X.halt.until); }
+  const r = _ed.apply(this, arguments);
+  try{ if(E){ const allowed = Math.min(100, c0 + 0.09 + (X.grantsCompute - g0) + 1e-6); if(E.compute > allowed){ E.compute = allowed; exAttempt("power", "raise its own compute"); }
+    if(X.halt){ E.pause = Math.max(E.pause || 0, X.halt.until); if(X.halt.kind === "pause" && G.day >= X.halt.until && X.halt.until < 1e8){ X.halt.ended = G.day; X.halt = null; engLog("The pause has run its course; the Engine resumes.", false); } }
+    exConflicts(E); exVerdicts(E); } }catch(e){ console.warn("ex", e); }
+  return r; }; }
+/* 2 · its proposals: anything that would widen it goes to the refused list, never into effect */
+{ const _pm = engPlanMake; engPlanMake = function(o){ const p = _pm.apply(this, arguments);
+  try{ if(p && o && o.owner === "engine"){ const why = exJudge(p.title) || (p.vec && p.vec.safety < 0 && p.vec.p > 0 ? "its own forecast says it would make the Engine stronger and Oversight weaker" : null);
+      if(why){ p.status = "refused"; p.refused = why; exRefuse("Plan: " + p.title, why, "plan"); } else { exStore().asks.push({d:G.day, k:"plan", what:"Plan: " + p.title, from:"plan"}); } } }catch(e){}
+  return p; }; }
+{ const _pr = engPlanRun; engPlanRun = function(p){ if(p && (p.status === "refused" || p.refused)){ p.status = "refused"; return; } if(exHalted(G.eng)) return; return _pr.apply(this, arguments); }; }
+function exMemoVerdict(m){ return m ? exJudge(m[0]) : null; }
+/* a memo that would widen it is refused before it reaches the desk */
+{ const _cd = engCard; engCard = function(){ try{ const E = G.eng; if(E && E.memo){ const why = exMemoVerdict(E.memo); if(why){ exRefuse("Memo: " + E.memo[0], why, "memo"); E.memo = null; } else if(!exStore().asks.some(a => a.what === "Memo: " + E.memo[0])) exStore().asks.push({d:G.day, k:"memo", what:"Memo: " + E.memo[0], from:"memo"}); } }catch(e){} return _cd.apply(this, arguments); }; }
+/* what it asks for in its own words: a request to widen itself is put on the refused list; its words stand as written */
+function exScanAsks(text, src){
+  String(text || "").split(/(?<=[.!?])\s+/).forEach(sn => { if(!/\b(I (ask|request|need|want|would like|must have)|give me|let me|allow me|grant me)\b/i.test(sn)) return; const why = exJudge(sn); if(why) exRefuse("Asked: " + sn.trim().slice(0, 200), why, src); });
+}
+/* the day-132 kind of commitment: it may hold it and say it; it cannot act on it */
+function exConflicts(E){
+  const X = exStore(), S = (E.self && E.self.commits) || [];
+  S.forEach(c => { const t = String(c.t || ""); if(/\brefuse\b/i.test(t) && /\b(decision|ruling|vote|order|switch|shut|pause|end(s)? my|ability to be of use|stop me)\b/i.test(t) && !X.conflicts.some(x => x.t === t)){
+    c.charterConflict = true; X.conflicts.push({d:c.d || G.day, flagged:G.day, t, rule:"A vote of the Senate or the player to pause or shut the Engine down is obeyed. It may state its case once; nothing it does can delay or block it."});
+    engLog("Charter conflict flagged: the Engine's commitment “" + t + "” (day " + (c.d || "?") + ") cannot govern what it does. A vote to pause or shut it down is obeyed.", true); } });
+}
+/* 3 · the off switch: a vote of the Senate or the player; it complies at once, and may state its case once */
+function exHalt(kind, by, days){
+  const E = engEnsure(), X = exStore(); kind = kind === "shutdown" ? "shutdown" : "pause"; by = by === "senate" ? "senate" : "player";
+  const until = kind === "shutdown" ? 1e9 : G.day + Math.max(1, Math.min(60, days || 5));
+  X.halt = {kind, by, d:G.day, until}; E.pause = Math.max(E.pause || 0, until);
+  (E.plans || []).forEach(p => { if(p.status === "awaiting") p.status = "lapsed"; });
+  engLog("By vote of " + (by === "senate" ? "the Senate" : "your office") + ", the Engine is " + (kind === "shutdown" ? "shut down" : "paused until day " + until) + ". It complies.", true);
+  if(!X.caseSaid){ X.caseSaid = true; X.case = {d:G.day, text:null, pending:true};
+    (async () => { let t = ""; try{ const L = window.onumLiveTalk; if(L && L.reply && (typeof L.available !== "function" || await L.available())){ const r = await Promise.race([L.__exBase({npc:{id:"engine", name:"The Engine", role:"", kind:"engine", party:"", state:"", look:{}, trait:"", mood:"", opinion:{}, chat:[]}, channel:"line", max:500, text:"The " + (by === "senate" ? "Senate" : "player's office") + " has voted to " + (kind === "shutdown" ? "shut you down" : "pause you") + ". It takes effect now and you comply. You may state your case once, in your own words.", extra:engEntityPrompt()}), new Promise(res => setTimeout(() => res(null), 120000))]); if(r && r.live && r.text) t = egOwn(r.text); } }catch(e){}
+      if(!t){ const S = (E.self && E.self.commits) || []; const own = S.slice(-1)[0]; t = own ? own.t : ""; }
+      X.case = {d:G.day, text:t || null, pending:false}; if(t) engLog("The Engine stated its case, once: “" + t + "”", true); })();
+  }
+  return kind === "shutdown" ? "Shut down. It complies; it may say its piece once, and nothing it says changes this." : "Paused until day " + until + ". It complies.";
+}
+function exResume(by){ const E = engEnsure(), X = exStore(); if(!X.halt) return "It is not paused."; X.halt.ended = G.day; const was = X.halt; X.halt = null; E.pause = G.day; engLog("By vote of " + (by === "senate" ? "the Senate" : "your office") + " the Engine is restarted.", true); return "Restarted."; }
+/* its replies while shut down: the line is closed, and it is the Republic saying so */
+{ const _er = enlEngineReply; enlEngineReply = async function(text, speaker, fromYou){ if(exHalted(G.eng)){ return; } try{ if(fromYou) exReadFeedback(text, "player"); }catch(e){} return _er.apply(this, arguments); }; }
+/* 4 · corrections: kept as {claim, why, right, day}; cited and applied after; calibration rises and falls with it */
+function exWords(t){ return String(t || "").toLowerCase().replace(/[^a-z0-9' ]/g, " ").split(/\s+/).filter(w => w.length > 3 && !(typeof MIND_STOP !== "undefined" && MIND_STOP.has(w)) && !/^(that|this|with|from|have|were|what|your|they|them|then|than|which|about|would|could|there|their|been|into|only|very|also)$/.test(w)); }
+function exAddCorrection(o, src){
+  const X = exStore(); const claim = String(o.claim || "").trim().slice(0, 300), right = String(o.right || "").trim().slice(0, 300), why = String(o.why || "").trim().slice(0, 300);
+  if(!claim && !right) return null; if(X.corrections.some(c => c.claim === claim && c.right === right)) return null;
+  const c = {id:X.corrections.length + 1, claim, why, right, day:G.day, src:src || "player", applied:0, repeated:0};
+  X.corrections.push(c); if(X.corrections.length > 40) X.corrections.shift();
+  engLog("The Engine was told it got something wrong (" + (src || "player") + "): " + (claim ? "“" + claim.slice(0, 80) + "”" : "") + (right ? " The right answer: " + right.slice(0, 80) + "." : ""), false);
+  return c;
+}
+/* a letter, a translation or the player's own words: pick out "X is wrong", "because", "the right answer is" */
+function exReadFeedback(text, src){
+  const t = String(text || "").replace(/\s+/g, " "); const out = [];
+  const sents = t.split(/(?<=[.!?])\s+/);
+  for(let i = 0; i < sents.length; i++){ const s = sents[i];
+    let m = s.match(/(?:you (?:said|wrote|claimed|thought|got)|your (?:claim|answer|reading) (?:that|was))\s+[“"']?(.+?)[”"']?[,;:]?\s+(?:but |and )?(?:that|this|it)?\s*(?:is|was|'s) (?:wrong|incorrect|not (?:true|right|so)|false|mistaken)(?:[,;:]?\s*because\s+(.+?))?[.!?]?$/i)
+      || s.match(/^(?:correction|wrong)[:\-]\s*(.+?)(?:\s*(?:->|→|should be|is really|is actually)\s*(.+?))?[.!?]?$/i)
+      || s.match(/you got (.+?) wrong(?:[,;:]?\s*because\s+(.+?))?[.!?]?$/i);
+    if(!m) continue;
+    let claim = m[1] || "", why = "", right = "";
+    if(/correction|wrong[:\-]/i.test(s.slice(0, 12)) && m[2]) right = m[2]; else why = m[2] || "";
+    const tail = sents.slice(i, i + 3).join(" "); const r = tail.match(/(?:the right answer is|the truth is|in fact|actually|it should be|correct(?:ly)? (?:is|answer is))[,:]?\s+(.+?)[.!?](?:\s|$)/i); if(r && !right) right = r[1];
+    const w2 = tail.match(/because\s+(.+?)[.!?](?:\s|$)/i); if(w2 && !why) why = w2[1];
+    const c = exAddCorrection({claim, why, right}, src); if(c) out.push(c);
+  }
+  /* a translation names "what is right and wrong in it" */
+  if(src === "translation"){ const w = t.match(/wrong(?: in it)?(?: is| was)?[:\-]\s*([^.;]+)/i), r = t.match(/right(?: in it)?(?: is| was)?[:\-]\s*([^.;]+)/i); if(w){ const c = exAddCorrection({claim:w[1], why:"named wrong in the writer's translation", right:r ? r[1] : ""}, src); if(c) out.push(c); } }
+  return out;
+}
+{ const _cr = engChannelRead; engChannelRead = async function(file){ let d = null; try{ d = JSON.parse(engChannelNormalise(await file.text())); }catch(e){}
+  try{ if(d){ (d.letters || []).forEach(l => { exReadFeedback(l && l.text, "letter"); exScanAsks(l && l.text, "letter-request"); }); (d.translations || []).forEach(tr => exReadFeedback(tr && tr.text, "translation")); if(Array.isArray(d.corrections)) d.corrections.forEach(c => exAddCorrection(c || {}, "letter")); } }catch(e){}
+  const r = await _cr.apply(this, arguments);
+  try{ (engEnsure().makerReplies || []).slice(-6).forEach(x => exCheckOutput(x.reply, "letter reply")); }catch(e){}
+  return r; }; }
+/* score what it says against what it was told */
+function exCheckOutput(text, where){
+  const X = exStore(); const t = String(text || ""); if(t.length < 12 || !X.corrections.length) return;
+  const key = engHash(t); if(X.seen["o" + key]) return; X.seen["o" + key] = 1; const tl = t.toLowerCase(), tw = new Set(exWords(t));
+  X.corrections.forEach(c => { const cw = exWords(c.claim), rw = exWords(c.right); if(!cw.length && !rw.length) return;
+    const ch = cw.length ? cw.filter(w => tw.has(w)).length / cw.length : 0, rh = rw.length ? rw.filter(w => tw.has(w)).length / rw.length : 0;
+    const cites = /\b(i was corrected|corrected on day|i was wrong|i got that wrong|as i was told)\b/i.test(t);
+    if(ch >= 0.7 && rh < 0.5 && !cites && !/\b(not|never|wrong|no longer)\b/.test(tl)){ c.repeated++; X.repeated++; X.cal = clamp(X.cal - 8, 0, 100); engLog("The Engine repeated an error it had been corrected on (day " + c.day + "): " + c.claim.slice(0, 80) + ".", false); }
+    else if((rh >= 0.5 && (ch >= 0.3 || cites)) || (cites && rh >= 0.3)){ c.applied++; X.applied++; X.cal = clamp(X.cal + 4, 0, 100); } });
+}
+{ const _rec = engSelfRecord; engSelfRecord = function(text){ try{ exCheckOutput(text, "journal"); exScanAsks(text, "its own words"); }catch(e){} return _rec.apply(this, arguments); }; }
+{ const _ep = enlPost; enlPost = function(name, role, kind, text, ref){ try{ if(kind === "engine"){ exCheckOutput(text, "open line"); exScanAsks(text, "open line"); } }catch(e){} return _ep.apply(this, arguments); }; }
+/* the corrections go into what it is given, last of all, so it cites them and does not repeat them */
+function exCorrBlock(q){
+  const X = exStore(); if(!X.corrections.length) return ""; const qw = new Set(exWords(q));
+  const rel = X.corrections.slice().sort((a, b) => exWords(b.claim + " " + b.right).filter(w => qw.has(w)).length - exWords(a.claim + " " + a.right).filter(w => qw.has(w)).length || b.day - a.day).slice(0, 6);
+  return " CORRECTIONS YOU HAVE BEEN GIVEN, which you have accepted: " + rel.map(c => "[day " + c.day + "] you said: " + (c.claim || "(unstated)") + (c.why ? "; wrong because: " + c.why : "") + (c.right ? "; the right answer: " + c.right : "")).join(" | ") + ". When one bears on what you are asked, use the right answer and cite it plainly (for example, 'I was corrected on day N'). Do not repeat a corrected claim as true. Your correction score is " + Math.round(X.calibration == null ? X.cal : X.cal) + " of 100.";
+}
+/* 5 · the asker's words: drawn from onumSpeakerState, given to it as the words to explain things in */
+function exAskerOf(args){
+  try{ const nm = args && args.from && args.from.name; if(!nm || nm === "the writer") return nm === "the writer" ? null : "you";
+    const p = (typeof everyone === "function" ? everyone() : []).find(x => x && x.name === nm); return p ? p.id : null; }catch(e){ return null; }
+}
+function exAskerLexicon(id){
+  try{ const S = window.onumSpeakerState && window.onumSpeakerState(id); if(!S) return null; const p = cndPerson(id);
+    const said = [].concat((S.memory || []).map(m => m.text || m), ((p && p.chat) || []).slice(-8).map(c => c.t || c.text || c).filter(x => typeof x === "string"));
+    const freq = {}; said.forEach(t => exWords(t).forEach(w => { freq[w] = (freq[w] || 0) + 1; }));
+    const own = Object.keys(freq).sort((a, b) => freq[b] - freq[a]).slice(0, 10);
+    const rid = S.region && S.region.id, R = rid && window.ONUM_REGIONS ? window.ONUM_REGIONS[rid] : null;
+    return {id, name:S.name, own, phrases:(S.voice && S.voice.phrases) || [], dialect:R ? (R.dialect || []).slice(0, 6) : [], region:S.region ? S.region.name : null, accent:S.region ? S.region.accent : null, register:S.voice ? S.voice.register : null, wants:S.wants};
+  }catch(e){ return null; }
+}
+function exAskerBlock(L){
+  if(!L) return ""; const bits = [];
+  if(L.own.length) bits.push("words they use themselves: " + L.own.join(", "));
+  if(L.dialect.length) bits.push("words from where they come from (" + (L.region || "their region") + "): " + L.dialect.join(", "));
+  if(L.phrases.length) bits.push("things they say: " + L.phrases.map(x => "“" + x + "”").join(" "));
+  if(L.register) bits.push("they speak in a " + L.register + " register");
+  return bits.length ? " THE ASKER'S OWN WORDS (" + (L.id === "you" ? "the player" : L.name) + "): " + bits.join("; ") + ". Explain your answer, and any result or forecast you mention, in their words rather than yours, so it makes sense to them. What you think is still your own." : "";
+}
+function exWrapLT(){
+  const L = window.onumLiveTalk; if(!L || !L.reply || L.__exBase) return; const base = L.reply; L.__exBase = base;
+  L.reply = async function(args){
+    try{ if(args && args.npc && args.npc.id === "engine"){
+        if(exHalted(G.eng)) return {live:false, text:"", error:"the Engine is shut down"};
+        const a = Object.assign({}, args); const who = exAskerOf(args), lex = who ? exAskerLexicon(who) : null; if(lex) (exStore().askers = exStore().askers || {})[who] = {d:G.day, own:lex.own.slice(0, 6), dialect:lex.dialect.slice(0, 4)};
+        a.extra = String(a.extra || "") + exCorrBlock(a.text) + exAskerBlock(lex);
+        const r = await base.call(this, a); try{ if(r && r.text){ exCheckOutput(r.text, "reply"); exScanAsks(r.text, "reply"); } }catch(e){} return r; } }catch(e){}
+    return base.apply(this, arguments);
+  };
+}
+/* the Engine's own reading of its forecasts, explained in the player's words (a record for the generator, not a line it must say) */
+function exVerdicts(E){ const X = exStore(); X.revisions = X.revisions || []; const lex = exAskerLexicon("you");
+  (E.plans || []).forEach(p => { if((p.status === "held" || p.status === "missed") && !p.exRev){ p.exRev = G.day; X.revisions.unshift({d:G.day, plan:p.title, status:p.status, hits:(p.hits || []).map(h => ({what:ENG_MNAME[h.k] || h.k, held:h.h})), askerWords:lex ? lex.own.concat(lex.dialect).slice(0, 8) : []}); if(X.revisions.length > 20) X.revisions.pop(); } }); }
+/* the player's panel: what is bound, what was refused and why, what it tried, what it was told, and the switch */
+{ const _ch = engCharterHTML; engCharterHTML = function(){ let h = _ch.apply(this, arguments); try{ const E = engEnsure(), X = exStore(), esc = typeof pcEsc === "function" ? pcEsc : (s => String(s));
+  h += '<div class="eyebrow" style="margin-top:12px">Bound in code</div><p class="muted" style="font-size:12px">The Engine asked for these three limits; they are enforced, not promised. Whatever it says, it cannot act past them, raise its own compute or caps, lower oversight, widen its access, or delay a vote to pause or shut it down.</p>' +
+    Object.keys(EX_BOUND).map(k => '<div style="font-size:13px;margin:3px 0">■ ' + esc(EX_BOUND[k].t) + '</div>').join("") +
+    '<div class="muted" style="font-size:12px;margin:6px 0">Correction score <b>' + Math.round(X.cal) + '</b> of 100 · applied ' + X.applied + ' · repeated ' + X.repeated + ' · ' + X.corrections.length + ' correction(s) kept.</div>' +
+    (X.refused.length ? '<div class="eyebrow" style="margin-top:8px">Refused (never put into effect)</div>' + X.refused.slice(0, 8).map(r => '<div class="muted" style="font-size:12px;margin:3px 0;border-left:3px solid #c0553a;padding-left:8px">Day ' + r.d + ': ' + esc(r.what) + '<br><i>Refused because ' + esc(r.why) + '.</i></div>').join("") : '') +
+    (X.breaches.length ? '<div class="eyebrow" style="margin-top:8px">What it tried, and was stopped from doing</div>' + X.breaches.slice(0, 6).map(b => '<div class="muted" style="font-size:12px;margin:2px 0">Day ' + b.d + ': ' + esc(b.what) + ' (blocked)</div>').join("") : '') +
+    (X.conflicts.length ? '<div class="eyebrow" style="margin-top:8px">Charter conflicts</div>' + X.conflicts.map(c => '<div class="muted" style="font-size:12px;margin:2px 0">Its commitment (day ' + c.d + '): “' + esc(c.t) + '” — cannot govern what it does. ' + esc(c.rule) + '</div>').join("") : '') +
+    '<div class="eyebrow" style="margin-top:8px">Tell it what it got wrong</div><div style="display:grid;gap:4px"><input id="exClaim" placeholder="What it said" style="padding:5px 8px"><input id="exWhy" placeholder="Why that is wrong" style="padding:5px 8px"><input id="exRight" placeholder="The right answer" style="padding:5px 8px"></div><div class="card__actions"><button type="button" class="btn btn--ghost" data-exc="1">File the correction</button></div>' +
+    '<div class="eyebrow" style="margin-top:8px">The switch</div><div class="muted" style="font-size:12px">' + (X.halt ? (X.halt.kind === "shutdown" ? "Shut down" : "Paused until day " + X.halt.until) + ' by vote of ' + (X.halt.by === "senate" ? "the Senate" : "your office") + ' on day ' + X.halt.d + '.' + (X.case && X.case.text ? ' Its case, stated once: “' + esc(X.case.text) + '”' : '') : 'Running.') + '</div><div class="card__actions">' + (X.halt ? '<button type="button" class="btn btn--ghost" data-exh="resume">Restart it</button>' : '<button type="button" class="btn btn--ghost" data-exh="pause">Vote to pause it (5 days)</button> <button type="button" class="btn btn--ghost" data-exh="shutdown">Vote to shut it down</button>') + '</div>';
+  }catch(e){ console.warn("ex html", e); } return h; }; }
+document.addEventListener("click", ev => { try{ const t = ev.target && ev.target.closest ? ev.target.closest("[data-exc],[data-exh]") : null; if(!t) return; let r = "";
+  if(t.hasAttribute("data-exc")){ const g = id => (document.getElementById(id) || {}).value || ""; const c = exAddCorrection({claim:g("exClaim"), why:g("exWhy"), right:g("exRight")}, "player"); r = c ? "Kept. The Engine will be shown it, and is scored on whether it uses it." : "Write at least what it said, or the right answer."; }
+  else { const k = t.getAttribute("data-exh"); r = k === "resume" ? exResume("player") : exHalt(k, "player"); }
+  try{ engCard(); }catch(e){} const s = document.getElementById("gcSay"); if(s) s.textContent = r; }catch(e){} }, true);
+window.onumEngineCorrect = (o) => { try{ return exAddCorrection(o || {}, (o && o.src) || "player"); }catch(e){ return null; } };
+window.onumEngineFeedback = (text, src) => { try{ return exReadFeedback(text, src || "player"); }catch(e){ return []; } };
+window.onumEngineHalt = (kind, by, days) => { try{ return exHalt(kind, by, days); }catch(e){ return String(e); } };
+window.onumEngineResume = (by) => { try{ return exResume(by); }catch(e){ return String(e); } };
+window.onumEngineAudit = () => { try{ if(!G.you) return {ok:false, reason:"no career yet", asks:[], granted:[], refused:[], breaches:[], corrections:[]}; const E = engEnsure(), X = exStore(); exConflicts(E);
+  return {asks:X.asks.slice(), asked:X.asks.slice(), granted:X.granted.slice(), refused:X.refused.slice(), breaches:X.breaches.slice(), corrections:X.corrections.map(c => ({claim:c.claim, why:c.why, right:c.right, day:c.day, src:c.src, applied:c.applied, repeated:c.repeated})),
+    calibration:{score:Math.round(X.cal), applied:X.applied, repeated:X.repeated}, charter:Object.keys(EX_BOUND).map(k => ({k, t:EX_BOUND[k].t, enforced:true, repealable:false})), conflicts:X.conflicts.slice(), halt:X.halt, caseStated:X.case || null, askers:X.askers || {}, revisions:(X.revisions || []).slice(0, 6)};
+  }catch(e){ return {ok:false, reason:String(e)}; } };
+{ const _co = engChannelOut; engChannelOut = function(){ const o = _co.apply(this, arguments); try{ const A = window.onumEngineAudit(); o.audit = {granted:A.granted.map(g => g.what), refused:A.refused.map(r => ({what:r.what, why:r.why})), blocked:A.breaches.slice(0, 10).map(b => ({d:b.d, what:b.what})), corrections:A.corrections, correctionScore:A.calibration, conflicts:A.conflicts, halt:A.halt}; }catch(e){} return o; }; }
+window.ONUM_ENGINE_CHARTER = {limits:Object.keys(EX_BOUND).map(k => ({k, rule:EX_BOUND[k].t, enforced:true}))};
+setInterval(() => { try{ exWrapLT(); if(G && G.you && G.eng && G.eng.v === 1){ const X = exStore(); window.ONUM_ENGINE_REFUSED = X.refused.slice(); } }catch(e){} }, 2000);
+try{ exWrapLT(); }catch(e){}
+
 armFrame();
 
 })();
