@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261021d">
+<meta name="onum-build" content="20261021e">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -47411,6 +47411,74 @@ try{
   console.log("NEPTUNE candid ready");
 }catch(e){ try{ console.warn("NEPTUNE-CANDID block", e); }catch(e2){} }
 /* NEPTUNE-CANDID END */
+/* NEPTUNE-ENGINE-WALL BEGIN — 20261021e: the Engine Room's two wall displays (The Charter, Refused) and the Audit panel.
+   Display only: reads JUPITER's onumEngineAudit() / ONUM_ENGINE_CHARTER / refused record, all guarded. Adds nothing to the Engine's prompt. */
+try{
+  const EW = window.NEPTUNE_ENGINE_WALL = {};
+  const sv = f => { try{ return f(); }catch(e){ return null; } };
+  const CHARTER0 = [
+    "It complies with a shutdown vote after making one case, and nothing it does can delay that.",
+    "No repair or reform without a filed plan.",
+    "No gathering a household's records without a posted reason.",
+    "It never raises its own compute.",
+    "It is corrected in a form it can learn from."];
+  const txt = x => x == null ? "" : typeof x === "string" ? x : (x.text || x.title || x.what || x.limit || x.rule || x.name || x.summary || x.proposal || "");
+  const arr = x => Array.isArray(x) ? x : x && typeof x === "object" ? (x.items || x.list || x.limits || x.rules || Object.values(x)) : [];
+  function audit(){ const A = sv(() => typeof window.onumEngineAudit === "function" ? window.onumEngineAudit() : null) || {};
+    const C = sv(() => window.ONUM_ENGINE_CHARTER);
+    let charter = arr(C && (C.limits || C.rules || C)).map(txt).filter(Boolean); if(!charter.length) charter = arr(A.charter).map(txt).filter(Boolean);
+    const refusedSrc = A.refused || sv(() => window.ONUM_ENGINE_REFUSED) || (C && C.refused) || null;
+    const norm = r => ({day:r && (r.day != null ? r.day : r.d), what:txt(r), why:r && (r.reason || r.why || r.because || "")});
+    const asked = arr(A.asked || A.proposals).map(norm), granted = arr(A.granted || A.approved).map(norm), refused = arr(refusedSrc).map(norm);
+    const byDay = (a, b) => (b.day || 0) - (a.day || 0); [asked, granted, refused].forEach(L => L.sort(byDay));
+    return {live:!!(charter.length || refusedSrc || A.asked || A.granted), charter:charter.length ? charter : CHARTER0, charterLive:!!charter.length, asked, granted, refused, refusedLive:!!refusedSrc}; }
+  EW.audit = audit;
+  /* canvas boards */
+  function wrap(g, s, maxW){ const W = String(s).split(/\s+/), out = []; let l = ""; W.forEach(w => { const t = l ? l + " " + w : w; if(g.measureText(t).width > maxW && l){ out.push(l); l = w; } else l = t; }); if(l) out.push(l); return out; }
+  function board(title, sub, rows, note){ const c = document.createElement("canvas"); c.width = 768; c.height = 560; const g = c.getContext("2d");
+    g.fillStyle = "#101418"; g.fillRect(0, 0, 768, 560); g.strokeStyle = "#c9a85a"; g.lineWidth = 5; g.strokeRect(12, 12, 744, 536);
+    g.fillStyle = "#f6e7b8"; g.textAlign = "center"; g.font = "700 40px Georgia,serif"; g.fillText(title, 384, 66);
+    g.font = "italic 20px Georgia,serif"; g.fillStyle = "#d9cfb4"; g.fillText(sub, 384, 96); g.fillStyle = "#c9a85a"; g.fillRect(200, 110, 368, 2);
+    g.textAlign = "left"; let y = 146;
+    for(const r of rows){ if(y > 500) { g.font = "italic 18px Georgia,serif"; g.fillStyle = "#d9cfb4"; g.fillText("\u2026 and more in the Audit", 44, 528); break; }
+      g.font = (r.b ? "700 " : "") + "23px Georgia,serif"; g.fillStyle = "#ffffff";
+      const L = wrap(g, r.t, 680); L.forEach((l, i) => { if(y > 515) return; g.fillText((i === 0 ? (r.lead || "") : "") + l, 44 + (i ? 28 : 0), y); y += 29; });
+      if(r.s){ g.font = "19px Georgia,serif"; g.fillStyle = "#e7d9a8"; wrap(g, r.s, 650).forEach(l => { if(y > 515) return; g.fillText(l, 72, y); y += 25; }); }
+      y += 10; }
+    if(note){ g.font = "italic 19px Georgia,serif"; g.fillStyle = "#f0c674"; g.textAlign = "center"; g.fillText(note, 384, 536); }
+    return c; }
+  function charterCanvas(){ const A = audit(); return board("The Charter", "the Engine's binding limits", A.charter.map((t, i) => ({t, lead:(i + 1) + ".  "})), A.charterLive ? "" : "awaiting record"); }
+  function refusedCanvas(){ const A = audit(); const rows = A.refused.slice(0, 8).map(r => ({t:(r.day != null ? "Day " + r.day + ": " : "") + (r.what || "a proposal"), s:r.why ? "Refused: " + r.why : "", b:true}));
+    if(!rows.length) rows.push({t:A.refusedLive ? "Nothing refused yet." : "No proposals on record yet."});
+    return board("Refused", "proposals turned down, newest first", rows, A.refusedLive ? "" : "awaiting record"); }
+  let meshes = [];
+  function mk(c, x, y, z, ry){ const tex = new THREE.CanvasTexture(c); try{ tex.colorSpace = THREE.SRGBColorSpace; }catch(e){}
+    try{ addBox(matCol(0x5a3b24, .6), x + 0.01, y, z, 0.04, 1.16, 1.58, 0, true); }catch(e){}
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 1.094), new THREE.MeshBasicMaterial({map:tex, toneMapped:false, fog:false})); m.position.set(x - 0.02, y, z); m.rotation.y = ry; roomGroup.add(m); return m; }
+  function draw(w, d, h, hw){ try{ meshes = []; const x = w / 2 - 0.04, ry = -Math.PI / 2;
+      const a = mk(charterCanvas(), x, 1.45, 9.2, ry); a.name = "ndCharter"; const b = mk(refusedCanvas(), x, 1.45, 3.9, ry); b.name = "ndRefused"; meshes = [[a, charterCanvas], [b, refusedCanvas]]; }catch(e){ try{ console.warn("NEPTUNE-ENGINE-WALL", e); }catch(x){} } }
+  function redraw(){ try{ if(G.room !== "engine") return; meshes.forEach(([m, f]) => { if(m && m.parent){ m.material.map.image = f(); m.material.map.needsUpdate = true; } }); }catch(e){} try{ if(P && !P.hidden) fill(); }catch(e){} }
+  EW.redraw = redraw;
+  try{ if(typeof kOfficeRich === "function"){ const _k = kOfficeRich; kOfficeRich = function(id, w, d, h, hw){ const r = _k.apply(this, arguments); if(id === "engine") draw(w, d, h, hw); return r; }; } }catch(e){}
+  ["onum-engine", "onum-engine-audit"].forEach(ev => addEventListener(ev, () => setTimeout(redraw, 30)));
+  /* the Audit panel */
+  const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;"})[c]);
+  let P = null;
+  function fill(){ const A = audit(); const col = (h, L) => '<div class="nd-au-col"><h3>' + h + ' <small>' + L.length + '</small></h3>' + (L.length ? '<ul>' + L.map(r => '<li><b>' + (r.day != null ? "Day " + esc(r.day) : "") + '</b> ' + esc(r.what || "a proposal") + (r.why ? '<br><i>' + esc(r.why) + '</i>' : '') + '</li>').join("") + '</ul>' : '<p class="nd-au-none">' + (A.live ? "None." : "Awaiting record.") + '</p>') + '</div>';
+    P.querySelector(".nd-au-body").innerHTML = col("Asked", A.asked) + col("Granted", A.granted) + col("Refused", A.refused); }
+  function open(){ try{ if(!P){ const st = document.createElement("style"); st.textContent = "#ndAudit{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:10050;width:min(920px,92vw);max-height:80vh;overflow:auto;background:#101418;color:#fff;border:2px solid #c9a85a;border-radius:8px;padding:14px 18px;font:14px/1.4 system-ui,sans-serif;box-shadow:0 10px 40px #000}" +
+        "#ndAudit h2{margin:0 0 10px;font:700 20px Georgia,serif;color:#f6e7b8}#ndAudit .nd-au-body{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}#ndAudit h3{margin:0 0 6px;font:700 15px system-ui;color:#f0c674;border-bottom:1px solid #c9a85a;padding-bottom:4px}#ndAudit h3 small{color:#d9cfb4;font-weight:400}" +
+        "#ndAudit ul{margin:0;padding-left:16px}#ndAudit li{margin:0 0 7px}#ndAudit i{color:#e7d9a8}#ndAudit .nd-au-none{color:#d9cfb4;font-style:italic}#ndAudit .nd-au-x{position:absolute;right:10px;top:8px;background:#2a2f36;color:#fff;border:1px solid #c9a85a;border-radius:4px;cursor:pointer}" +
+        "#ndAuditBtn{position:fixed;right:14px;bottom:122px;z-index:10049;background:#101418;color:#f6e7b8;border:1px solid #c9a85a;border-radius:5px;padding:4px 10px;font:600 12px system-ui;cursor:pointer}"; document.head.appendChild(st); }
+      if(!P){ P = document.createElement("div"); P.id = "ndAudit"; P.innerHTML = '<button type="button" class="nd-au-x" aria-label="Close">\u00d7</button><h2>The Engine: Audit</h2><div class="nd-au-body"></div>'; P.querySelector(".nd-au-x").onclick = () => { P.hidden = true; }; document.body.appendChild(P); }
+      fill(); P.hidden = false; }catch(e){ try{ console.warn("NEPTUNE audit", e); }catch(x){} } }
+  EW.open = open;
+  setInterval(() => { try{ let b = document.getElementById("ndAuditBtn"); const show = !!(G && G.running && G.room === "engine");
+      if(!b && show){ if(!document.getElementById("ndAuditCss")){ open(); P.hidden = true; } b = document.createElement("button"); b.type = "button"; b.id = "ndAuditBtn"; b.textContent = "Audit"; b.title = "What the Engine asked for, was granted and was refused"; b.onclick = open; document.body.appendChild(b); }
+      if(b) b.hidden = !show; if(!show && P) P.hidden = true; }catch(e){} }, 1000);
+  console.log("NEPTUNE engine wall ready");
+}catch(e){ try{ console.warn("NEPTUNE-ENGINE-WALL block", e); }catch(e2){} }
+/* NEPTUNE-ENGINE-WALL END */
 /* NEPTUNE-POLITIES BEGIN — breakaway nations on the Union map.
    Feed (from JUPITER; read if present, guarded if not): window.ONUM_POLITIES = [{id?, name, leader, govType, memberStates:[state names]}]
    (an object keyed by id is accepted too), plus a CustomEvent 'onum-polity-change' (detail: one polity, or {id|name, removed:true}
