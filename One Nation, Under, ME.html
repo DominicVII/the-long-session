@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261021a">
+<meta name="onum-build" content="20261021b">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -5956,6 +5956,7 @@ function ndGate(){
   ND.f = (ND.f || 0) + 1;
   const key = (typeof G !== "undefined" ? G.room : "") + "|" + scene.children.length + "|" + (roomGroup ? roomGroup.children.length : 0) + "|" + (peopleGroup ? peopleGroup.children.length : 0);
   if(key === ND.key && !ND.pend) return false;
+  const _ndRoom = (typeof G !== "undefined" ? G.room : "") + "|" + (roomGroup ? roomGroup.children.length : 0), _ndNewRoom = _ndRoom !== ND.room; ND.room = _ndRoom;   /* 20261021b */
   ND.key = key;
   const t0 = performance.now(), todo = [];
   try{
@@ -5966,12 +5967,14 @@ function ndGate(){
   }catch(e){ return false; }
   if(!todo.length){ ND.pend = false; ND.skip = 0; return false; }
   let i = 0;
-  while(i < todo.length && performance.now() - t0 < 140){
+  const _ndBud = (_ndNewRoom || ND.hold) ? 140 : 6; if(_ndNewRoom) ND.hold = true;
+  while(i < todo.length && performance.now() - t0 < _ndBud){
     const x = todo[i++]; ND_SEEN.add(x.material); ndCompileOnly([x]);
   }
   ND.pend = i < todo.length;
   ND.gated = (ND.gated || 0) + 1;
-  if(!ND.pend){ ND.skip = 0; return false; }
+  if(!ND.pend){ ND.skip = 0; ND.hold = false; return false; }
+  if(!ND.hold) return false;   /* 20261021b: in the same room, never freeze the picture for a newcomer */
   ND.skip = (ND.skip || 0) + 1;
   return ND.skip < 60;
 }
@@ -41031,6 +41034,7 @@ function pollPad(){
 
 }
 
+const _tkF = {x:0, z:1}, _tkR = {x:-1, z:0};
 function tick(dt){
   /* A stalled tab can report a huge delta; never turn that into a physics
      teleport or a burst of room/voice work after the tab resumes. */
@@ -41071,8 +41075,7 @@ function tick(dt){
 
   /* forward is the camera's -Z; right is its +X, which with the half-turn
      offset comes out as (-cos, sin). Getting this wrong mirrors A and D. */
-  const f = {x:Math.sin(cam.yaw), z:Math.cos(cam.yaw)};
-  const r = {x:-Math.cos(cam.yaw), z:Math.sin(cam.yaw)};
+  const f = _tkF, r = _tkR; f.x = Math.sin(cam.yaw); f.z = Math.cos(cam.yaw); r.x = -f.z; r.z = f.x;   /* 20261021b: reused */
   /* walking while seated stands you up, rather than dragging the chair */
   if(G.you && G.you.sitting && (vx || vz)){
     G.you.sitting = false;
@@ -41828,7 +41831,7 @@ function frameBody(now, draw){
      within half a second instead of staying wrong. */
   const playerMoving = Math.hypot(cam.vx || 0, cam.vz || 0) > 0.12;
   /* While moving: dip PR slightly (restore on stop). Safe — setPR no-ops if near same. */
-  if(playerMoving){
+  if(playerMoving && false){   /* 20261021b: off: setPixelRatio on every start/stop of a step reallocated the framebuffer */
     if(!_movePrOn){
       _movePrSaved = _lastPR > 0 ? _lastPR : GFX_PR;
       try{ setPR(Math.min(GFX_PR, MODEST ? 0.95 : 1.1)); }catch(e){}
@@ -45672,10 +45675,10 @@ try{
         const n0 = (SF.signs || []).length; SF.signs = (SF.signs || []).filter(sg => !(sg.title === "CAMPAIGN OFFICE" && lots.hq) && !(sg.title === "DISTRICT OFFICE" && lots.doffice));
         if((ch || SF.signs.length !== n0) && G.room === "district"){ try{ gateAttach("district"); }catch(e){} } }catch(e){ ndWarn("offices", e); } return r; }; } }catch(e){}
   /* NEPTUNE-QA 20261020i: nobody idles in a doorframe. Anyone standing still within 1.3 m of a door steps 1.8 m into the room. */
-  try{ setInterval(() => { try{ if(typeof G === "undefined" || !G.room || !DOORS[G.room]) return; const ds = DOORS[G.room].map(dr => { try{ return doorAt(G.room, dr); }catch(e){ return null; } }).filter(Boolean);
+  try{ setInterval(() => { try{ if(typeof G === "undefined" || !G.room || G.moving || !DOORS[G.room]) return; const ds = DOORS[G.room].map(dr => { try{ return doorAt(G.room, dr); }catch(e){ return null; } }).filter(Boolean);
       (hereNow() || []).forEach(m => { if(!m || m.sitting || m.kStand || m.leaving || m.exiting) return; if(Math.hypot((m.tx || 0) - (m.x || 0), (m.tz || 0) - (m.z || 0)) > 0.15) return;
         for(const d of ds){ const dx = m.x - d.x, dz = m.z - d.z, L = Math.hypot(dx, dz); if(L < 1.3){ const now = Date.now(); if(!m._ndDw || now - m._ndDw > 12000){ m._ndDw = now; break; } if(now - m._ndDw < 4000) break; m._ndDw = 0; const b = roomBox(G.room), cx = 0, cz = (b.d0 + b.d1) / 2, ux = cx - d.x, uz = cz - d.z, U = Math.hypot(ux, uz) || 1;
-          m.tx = Math.max(-b.hw + 0.5, Math.min(b.hw - 0.5, d.x + ux / U * 1.8)); m.tz = Math.max(b.d0 + 0.5, Math.min(b.d1 - 0.5, d.z + uz / U * 1.8)); break; } } }); }catch(e){} }, 1500); }catch(e){}
+          m.tx = Math.max(-b.hw + 0.5, Math.min(b.hw - 0.5, d.x + ux / U * 1.8)); m.tz = Math.max(b.d0 + 0.5, Math.min(b.d1 - 0.5, d.z + uz / U * 1.8)); break; } } }); }catch(e){} }, 3000); }catch(e){}
   /* NEPTUNE-BUILD: the running stamp, small, bottom-left; and a quiet banner when a newer build is on the server */
   try{ (function(){ const meta = document.querySelector('meta[name="onum-build"]'), cur = meta ? meta.getAttribute("content") : ""; if(!cur) return;
     const go = () => { try{ if(!document.getElementById("ndBuild")){ const b = document.createElement("div"); b.id = "ndBuild"; b.textContent = "build " + cur;
@@ -45969,25 +45972,39 @@ try{
   }
 
   /* ── Ollama ───────────────────────────────────────── */
-  async function probe(force, ms){
+  /* 20261021b: sticky. A good reply or check makes it Live; it goes Offline only after 2 failures in a row, never while a reply is
+     being written, and concurrent checks (the 30 s poll, the 60 s re-check, an outside probe) share one request. */
+  function ltSet(ok, ui){ if(ok){ LT.up = true; LT.fails = 0; return; } if((LT.busy || 0) > 0 && !ui) return; LT.fails = (LT.fails || 0) + 1; if(LT.up === true && LT.fails < 2 && !ui) return; LT.up = false; }
+  function probe(force, ms){
+    if(CFG.on && (LT.busy || 0) > 0 && LT.up) return Promise.resolve(true);
+    if(LT._pp) return LT._pp;
+    const pr = probeNet(force, ms); LT._pp = pr; const clr = () => { if(LT._pp === pr) LT._pp = null; }; pr.then(clr, clr); return pr;
+  }
+  async function probeNet(force, ms){
     if(!CFG.on){ LT.up = false; LT.why = "Live talk is switched off in Settings"; return false; }
     if(LT.up === false && force !== "ui" && force !== "re") return false;   /* 20261020u: one quiet check per session; Settings can try again */
     if(!force && LT.up !== null && Date.now() - LT.at < 30000) return LT.up;
     LT.at = Date.now();
     try{ const c = new AbortController(); const t = setTimeout(() => c.abort(), ms || 1800);
       const r = await fetch(CFG.url + "/api/tags", {signal:c.signal}); clearTimeout(t);
-      const j = await r.json(); LT.models = (j.models || []).map(x => x.name); LT.up = r.ok; if(r.ok) LT.fails = 0; try{ if(r.ok && !CFG.userModel && LT.models.length){ const L = LT.models, sz = n => { const m = /:(\d+(?:\.\d+)?)b/i.exec(n); return m ? +m[1] : 99; };
+      const j = await r.json(); LT.models = (j.models || []).map(x => x.name); ltSet(r.ok); try{ if(r.ok && !CFG.userModel && LT.models.length){ const L = LT.models, sz = n => { const m = /:(\d+(?:\.\d+)?)b/i.exec(n); return m ? +m[1] : 99; };
         const pref = ["llama3.2:3b", "llama3.2:latest", "llama3.2", "qwen2.5:3b", "phi3:mini", "gemma3:4b", "llama3.2:1b", "qwen2.5:1.5b"]; let pick = pref.find(x => L.includes(x));
         if(!pick){ const small = L.filter(n => !/embed/i.test(n) && sz(n) <= 4).sort((x, y) => sz(y) - sz(x)); pick = small[0] || (L.includes("gemma3:12b") ? "gemma3:12b" : L.filter(n => !/embed/i.test(n)).sort((x, y) => sz(x) - sz(y))[0]); }
         if(pick && pick !== CFG.model){ CFG.model = pick; try{ save(); }catch(e){} } } }catch(e){} LT.why = r.ok ? "" : "Ollama answered with an error";
-    }catch(e){ LT.fails = (LT.fails || 0) + 1; if(LT.up === true && force !== "ui" && LT.fails < 3) return true;   /* 20261021: once Live, a busy Ollama stays Live until three checks in a row fail */
-      LT.up = false; LT.why = "Ollama did not answer at " + CFG.url + " within " + ((ms || 1800) / 1000) + " seconds (it may be busy loading a large model, or not running)"; }
+    }catch(e){ ltSet(false, force === "ui"); if(LT.up === true){ paintPill(); return true; }   /* 20261021b: one counter (ltSet) for checks, replies and report() */
+      LT.why = "Ollama did not answer at " + CFG.url + " within " + ((ms || 1800) / 1000) + " seconds (it may be busy loading a large model, or not running)"; }
     paintPill(); return LT.up;
   }
   /* 20261020w: Ollama started after the page loaded: one quiet re-check when a chat opens or a reply is asked for, at most once a minute, and only after a failed check */
   async function reprobe(){ try{ if(LT.up !== false || !CFG.on) return false; const n = Date.now(); if(n - (LT.reAt || 0) < 60000) return false; LT.reAt = n; return !!(await probe("re")); }catch(e){ return false; } }
   LT.reprobe = reprobe;
   async function chat(messages, o){
+    LT.busy = (LT.busy || 0) + 1; let ok = false;
+    try{ const out = await chatNet(messages, o); ok = true; return out; }
+    catch(e){ LT.busy--; const net = !(e && (e.code === "http" || e.name === "AbortError")); if(net){ ltSet(false); try{ paintPill(); }catch(x){} } LT.busy++; throw e; }
+    finally{ LT.busy = Math.max(0, LT.busy - 1); if(ok){ ltSet(true); try{ paintPill(); }catch(x){} } }
+  }
+  async function chatNet(messages, o){
     o = o || {};
     const body = {model:o.model || CFG.model, messages, stream:!o.json, think:false, options:{temperature:o.temp == null ? 0.85 : o.temp, num_predict:o.max || 160, repeat_penalty:1.18}};
     if(o.json){ body.format = "json"; body.stream = false; }
@@ -46255,14 +46272,16 @@ try{
   window.onumLiveTalk = {
     available:(f, ms) => probe(f, ms),
     /* 20261021: any caller can report how a real request went; one success makes it Live, three failures in a row take it down */
-    report(ok){ try{ if(ok){ LT.fails = 0; if(LT.up !== true){ LT.up = true; LT.why = ""; LT.at = Date.now(); paintPill(); } } else { LT.fails = (LT.fails || 0) + 1; if(LT.fails >= 3 && LT.up !== false){ LT.up = false; LT.why = "Ollama stopped answering"; paintPill(); } } }catch(e){} return LT.up; },
+    report(ok){ try{ const was = LT.up; ltSet(!!ok); if(ok){ LT.why = ""; LT.at = Date.now(); } else if(LT.up === false && was !== false) LT.why = "Ollama stopped answering"; if(LT.up !== was) paintPill(); }catch(e){} return LT.up; },
     get why(){ return LT.why || ""; },
     reply, stream,
     get lastError(){ return LT.lastErr ? {error:LT.lastErr, model:LT.errModel, fellBack:!!LT.fellBack} : null; },
     clearError(){ LT.lastErr = null; LT.errModel = null; LT.fellBack = false; },
     memory:id => ({turns:(MEM[id] || []).slice(), heard:heardOf(id).map(h => ({fact:h.fact.said, src:h.src, conf:h.conf, d:h.d})), facts:W.facts.filter(f => f.withId == id || f.heardBy.indexOf(+id) >= 0 || f.heardBy.indexOf(id) >= 0)}),
     get config(){ return Object.assign({}, CFG); },
-    setConfig(c){ Object.assign(CFG, c || {}); LT.up = null; save(); probe("ui"); paintPill(); },
+    setConfig(c){ Object.assign(CFG, c || {}); LT.up = null; LT.fails = 0; LT._pp = null; save(); probe("ui"); paintPill(); },
+    get status(){ return {up:LT.up, fails:LT.fails || 0, busy:LT.busy || 0}; },   /* 20261021b */
+    chat:(m, o) => chat(m, o),
     world:() => W, spreadDay
   };
 
@@ -46780,8 +46799,9 @@ try{
     }catch(e){ try{ console.warn("NEPTUNE-SESSION render", e); }catch(e2){} }
   }
   SN.render = render;
-  addEventListener("onum-session", () => render());
-  ["onum-rename"].forEach(ev => addEventListener(ev, () => { if(window.ONUM_SESSION) render(); }));
+  const renderSoon = () => { if(SN._rq) return; SN._rq = setTimeout(() => { SN._rq = 0; render(); }, 120); };   /* 20261021b: bursts of events draw once */
+  addEventListener("onum-session", renderSoon);
+  ["onum-rename"].forEach(ev => addEventListener(ev, () => { if(window.ONUM_SESSION) renderSoon(); }));
   /* the clock ticks between events; a poll catches a session published without an event */
   let sig = ""; setInterval(() => { try{ const S = window.ONUM_SESSION; const s = S ? JSON.stringify([S.open, S.active, S.floor, S.floorId, S.stage, S.clock, S.roll && [S.roll.aye, S.roll.no, S.roll.yes, S.roll.nay], (S.votes || []).length, (S.queue || []).length]) : ""; if(s !== sig){ sig = s; render(); } }catch(e){} }, 1000);
   console.log("NEPTUNE session view ready");
@@ -46994,11 +47014,11 @@ try{
   /* QA: a person whose room changed while the people were still being dripped in stays standing at (0, 0), in the doorway.
      When that happens, let the game's own syncPeople put the room right (it keeps exactly who is here). */
   setInterval(() => { try{
-      if(!G.running || typeof peopleGroup === "undefined" || !peopleGroup || _buildingRoom || syncPeople._busy || (typeof syncPeopleStaged !== "undefined" && syncPeopleStaged._busy)) return;
+      if(!G.running || G.moving || typeof peopleGroup === "undefined" || !peopleGroup || _buildingRoom || syncPeople._busy || (typeof syncPeopleStaged !== "undefined" && syncPeopleStaged._busy)) return;
       const here = new Set(hereNow().map(p => p.mesh).filter(Boolean)); let stray = false;
       for(let i = 0; i < peopleGroup.children.length; i++){ const ch = peopleGroup.children[i]; if(ch && ch.visible && !here.has(ch) && ch.userData && (ch.userData.H || ch.userData.cheap) && Math.hypot(ch.position.x, ch.position.z) < 0.35){ stray = true; break; } }
-      if(stray) syncPeople();
-    }catch(e){} }, 1500);
+      if(stray && Date.now() - (HM._syncAt || 0) > 10000 && !(Math.hypot(cam.vx || 0, cam.vz || 0) > 0.12)){ HM._syncAt = Date.now(); syncPeople(); }
+    }catch(e){} }, 4000);   /* 20261021b */
   console.log("NEPTUNE home ready");
 }catch(e){ try{ console.warn("NEPTUNE-HOME block", e); }catch(e2){} }
 /* NEPTUNE-HOME END */
@@ -47008,10 +47028,10 @@ try{
   const DN = window.NEPTUNE_DONORS = {byId:new Map(), byName:new Map()};
   const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;"})[c]);
   const fl = n => "\u0192" + Math.round(+n || 0).toLocaleString("en-US");
-  function index(){ try{ DN.byId = new Map(); DN.byName = new Map(); const L = Array.isArray(window.ONUM_DONATIONS) ? window.ONUM_DONATIONS : [];
+  function index(){ try{ const L0 = Array.isArray(window.ONUM_DONATIONS) ? window.ONUM_DONATIONS : [], sg = L0.length + ":" + (L0.length ? (L0[L0.length - 1] || {}).id : ""); if(sg === DN.sig) return; DN.sig = sg; DN.byId = new Map(); DN.byName = new Map(); const L = Array.isArray(window.ONUM_DONATIONS) ? window.ONUM_DONATIONS : [];
       L.forEach(d => { if(!d || !(+d.amount > 0)) return; const k = String(d.donorId); if(!DN.byId.has(k)) DN.byId.set(k, []); DN.byId.get(k).push(d); if(d.donorName){ if(!DN.byName.has(d.donorName)) DN.byName.set(d.donorName, []); DN.byName.get(d.donorName).push(d); } });
       [DN.byId, DN.byName].forEach(M => M.forEach(a => a.sort((x, y) => (y.day || 0) - (x.day || 0)))); }catch(e){} }
-  index(); addEventListener("onum-donation", index); setInterval(index, 5000);
+  DN.sig = ""; index(); addEventListener("onum-donation", () => { DN.sig = ""; index(); }); setInterval(index, 15000);
   DN.of = p => { try{ if(!p) return []; return DN.byId.get(String(p.id)) || DN.byName.get(p.name) || []; }catch(e){ return []; } };
   const strOf = d => d.strings && d.strings !== "none" ? "wants " + d.strings : "no strings";
   DN.line = d => fl(d.amount) + " to " + (d.cause || "a cause") + ", day " + (d.day != null ? d.day : "?") + " \u00b7 " + strOf(d);
@@ -47023,7 +47043,7 @@ try{
       ".nd-gifts li{margin:2px 0;color:#1d1d1d;font:12px/1.35 system-ui}.nd-gifts small{color:#5b5240}";
     document.head.appendChild(st); }catch(e){}
   try{ if(typeof updatePlates === "function"){ const _up = updatePlates; updatePlates = function(){ const r = _up.apply(this, arguments);
-        try{ if(DN.byId.size || DN.byName.size){ const here = hereNow(); for(let i = 0; i < plates.length; i++){ const d = plates[i]; if(!d || d._shown !== 1 || !d.children[0]) continue;
+        try{ if((DN.byId.size || DN.byName.size) && ((DN.n = (DN.n || 0) + 1) & 3) === 0){ const here = hereNow(); for(let i = 0; i < plates.length; i++){ const d = plates[i]; if(!d || d._shown !== 1 || !d.children[0]) continue;
             const nm = d.children[0].textContent, p = here.find(q => q && q.name === nm), g = p && p !== G.you ? DN.of(p)[0] : null; let s = d.querySelector(".nd-gift");
             if(!g){ if(s) s.remove(); continue; }
             const t = "Gave " + DN.line(g); if(!s){ s = document.createElement("span"); s.className = "nd-gift"; d.appendChild(s); } if(s.textContent !== t) s.textContent = t; } } }catch(e){}
@@ -47040,7 +47060,7 @@ try{
       ids(){ try{ return hereNow().filter(q => q && q !== G.you).map(q => q.id); }catch(e){ return []; } },
       openFor(id){ try{ openTip("who", id); const b = document.getElementById("tipCard"); return b ? b.innerText : ""; }catch(e){ return ""; } },
       plateFor(id){ try{ const p = hereNow().find(q => q && String(q.id) === String(id)); if(!p) return "";
-          const yaw = cam.yaw; cam.x = p.x - 2.4 * Math.sin(yaw); cam.z = p.z - 2.4 * Math.cos(yaw); index(); updatePlates(p);
+          const yaw = cam.yaw; cam.x = p.x - 2.4 * Math.sin(yaw); cam.z = p.z - 2.4 * Math.cos(yaw); DN.sig = ""; index(); DN.n = 3; updatePlates(p);
           const s = [].slice.call(document.querySelectorAll(".plate .nd-gift")); return s.map(e => e.textContent).join(" | "); }catch(e){ return ""; } } }; }catch(e){}
   console.log("NEPTUNE donors ready");
 }catch(e){ try{ console.warn("NEPTUNE-DONORS block", e); }catch(e2){} }
