@@ -4,6 +4,12 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261018ai: the first-ten-minutes simplification Neptune left unfinished
+
+`20261018ai` (on `20261018ah`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+From Neptune's UI-SIMPLIFY review, the items that had not been done: (1) number badges 1 to 9 no longer land on the character-creator rows, colour swatches or edit chips, only on primary choices; (3) the title card shows one sentence and puts the rest of the lore behind a What is this? disclosure (nothing removed, the Handbook is unchanged); (4) the returning-officer card shows the verdict and the ticket choices first, and asks for a party name and colour only after Found your own party is pressed; (5) a today's-aims tracker sits under the location tag (next aim and progress, the full list on hover or focus); (7) the toolbar says what each button does and its key (Panels (H), Map (M), Menu (Esc)), with larger text; (8) the map is grouped by wing (Cannon building, Capitol main floor, Senate wing, Executive, Outside) in two-line tiles with a you-are-here pill, and Leave this room is the first row; (14) Speak Aloud says Listening, click to send; (15) the location tag has a dark backing so it reads on light marble. Not done: the one-card-per-person name tooltips (#11, I could not find where they are built), the phone bill-screen summary (#9), and the P2 coach marks and unified key-prompt style.
+
 ## 20261018ah: a memory and conscience panel
 
 `20261018ah` (on `20261018ag`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
