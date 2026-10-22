@@ -4,6 +4,12 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261022j: the offices from the record; the seat you left is filled; the wire shows
+
+`20261022j` (on `20261022i`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+The Offices ledger now follows the game's own record only: your tenures come from your career (House member for your district, then Governor, Senator, President, each from the term after the win), the presidents before you from the presidents' list, and predecessors nobody recorded are no longer invented. A holder no longer appears dozens of times from closing and reopening a seat day after day (one missed check no longer closes a seat). Dates count in days and terms of this game. When you leave the House for higher office your district now sends a new member, and a save where the seat stood empty gets one. The wire line above the bottom bar was hidden behind it and now shows.
+
 ## 20261022i: the war map uses your country's name
 
 `20261022i` (on `20261022h`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.

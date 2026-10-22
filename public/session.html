@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261022i">
+<meta name="onum-build" content="20261022j">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261022i";
+  var STAMP = "20261022j";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -11986,13 +11986,13 @@ function ofhCurrent(){
 }
 function ofhSeed(key, holder){
   /* a plausible past: one to three earlier holders, each succeeded by the next, the last by today's holder */
-  let R_vac = false; const S = ofhEnsure(), r = rng(seedOf("ofh:" + key)), n = 1 + Math.floor(r() * 3), st = key.split(":")[1] || null;
+  let R_vac = false; const S = ofhEnsure(), r = rng(seedOf("ofh:" + key)), n = 0, st = key.split(":")[1] || null;   /* nothing before the record is invented */
   const H = []; let to = -Math.round(r() * 700 + 60);
   for(let i = 0; i < n; i++){ const len = Math.round(400 + r() * 1800), from = to - len; let nm = null; try{ nm = newName(st && STATES.indexOf(st.replace(/ \d+$/, "")) >= 0 ? st.replace(/ \d+$/, "") : undefined); }catch(e){ nm = null; }
     if(!nm) break; H.unshift({personId:null, name:nm, from, to, how:OFH_LEFT[Math.floor(r() * OFH_LEFT.length)], successor:null, seeded:true}); to = from; }
   for(let i = 0; i < H.length; i++) H[i].successor = H[i + 1] ? H[i + 1].name : (holder ? holder.name : null);
   let start = H.length ? H[H.length - 1].to : -Math.round(r() * 900);
-  if(holder && holder.personId === "you"){ start = (G.day || 0) - Math.max(0, ((G.you && G.you.terms) || 1) - 1) * 730; if(H.length) H[H.length - 1].to = Math.min(H[H.length - 1].to, start); }
+  if(holder && holder.personId === "you"){ start = (G.day || 0) - Math.max(0, ((G.you && G.you.terms) || 1) - 1) * (G.termLength || 52); if(H.length) H[H.length - 1].to = Math.min(H[H.length - 1].to, start); }
   if(!holder && H.length){ H[H.length - 1].how = "retired at the end of the term"; R_vac = true; }
   if(holder) H.push({personId:holder.personId, name:holder.name, from:start, to:null, how:null, successor:null, seeded:true});
   S.seats[key] = {key, title:ofhTitleOf(key), holders:H, created:H.length ? H[0].from : start, vacantSince:R_vac ? H[H.length - 1].to : null};
@@ -12004,19 +12004,64 @@ function ofhHowLeft(old, nu){
   try{ if(G.presidents && G.presidents[0] && G.presidents[0].name === old.name) return G.presidents[0].end; }catch(e){}
   return nu ? "gave up the seat" : "left the seat vacant";
 }
+/* the seat you leave is filled: when the player goes up out of the House, their district sends someone new (the game says so at the count; this makes it so, and mends a save where it never happened) */
+function homeSeatFill(){
+  try{ const y = G.you; if(!y || !y.state || y.dist == null || !G.members) return null; if(ofhYouKey() === "house") return null;
+    if(G.members.some(m => m && !m.gone && m.state === y.state && String(m.dist) === String(y.dist))) return null;
+    const st = (G.states || []).find(q => q.n === y.state) || {}, p = (st.lean || 0) >= 0 ? "FED" : "COM";
+    const m = makeMember(p, {fresh:true, state:y.state}); if(!m) return null; m.kind = m.kind || "member"; m.state = y.state; m.dist = y.dist; m.margin = rint(1, 14); m.terms = 1; m.freshman = true;
+    try{ m.creed = pickCreed(m.state, {fresh:true}); m.consular = (m.creed === "consul"); if(m.consular) m.faction = "consul"; }catch(e){}
+    G.members.push(m); G.seatsBy[m.party] = (G.seatsBy[m.party] || 0) + 1; try{ wireGraph(); }catch(e){} try{ _allCache = null; }catch(e){}
+    try{ feed(m.name + " is sworn in for " + y.state + " " + y.dist + ", the House seat you left."); }catch(e){}
+    return m; }catch(e){ return null; } }
+/* a seat's record is repaired once: the same person closed and reopened day after day becomes one tenure, and the player's own past (Governor, Senator, President, by term) is put back from the career, with terms counted in the game's own days */
+function ofhFix(S){
+  let ch = 0; const T = G.termLength || 52;
+  Object.keys(S.seats).forEach(k => { const R = S.seats[k], H = R.holders, out = [];
+    H.forEach(h => { const p = out[out.length - 1]; if(p && p.name === h.name && p.personId === h.personId && h.from - (p.to == null ? h.from : p.to) <= 3 && p.to != null){ p.to = h.to; p.how = h.how; p.successor = h.name === h.successor ? null : h.successor; ch++; } else out.push(h); });
+    out.forEach(h => { if(h.successor === h.name) h.successor = null; if(h.to != null && h.from != null && h.to < h.from){ h.from = h.to - 365; ch++; } });
+    if(out.length !== H.length) R.holders = out; });
+  /* the record, and only the record: the player's own tenures come from the career (a win in term N is the office from term N+1), the presidents from the presidents' list; names nobody recorded are not made up */
+  if(!S.cf3 && G.you && Array.isArray(G.career)){
+    S.cf3 = 1; const y = G.you, st = y.state, key = {Governor:"gov:" + st, Senator:"sen:" + st, President:"pres"}, wins = [];
+    G.career.forEach(c => { if(c && c.term && key[c.post] && /^won/.test(c.note || "")) wins.push({post:c.post, term:c.term}); });
+    wins.sort((p, q) => p.term - q.term);
+    const ten = [{key:"house:" + st + " " + y.dist, from:1, to:wins.length ? wins[0].term * T : null, how:null}];
+    wins.forEach((w, i) => { const nx = wins[i + 1]; ten.push({key:key[w.post], from:w.term * T + 1, to:nx ? nx.term * T : null, how:nx ? (nx.post === "Senator" ? "left for the Senate" : nx.post === "President" ? "left for the Presidency" : "left office") : null}); });
+    if(ten[0].to != null) ten[0].how = wins[0].post === "Governor" ? "left the House for the governorship" : wins[0].post === "Senator" ? "left the House for the Senate" : "left the House for the Presidency";
+    /* invented predecessors are struck from every seat: a holder the game never recorded is not shown */
+    Object.keys(S.seats).forEach(k => { const R = S.seats[k]; const n = R.holders.length; R.holders = R.holders.filter(h => !(h.seeded && h.personId == null)); if(R.holders.length !== n){ R.noEarlier = true; ch++; } });
+    ten.forEach(t => { const R = S.seats[t.key] || (S.seats[t.key] = {key:t.key, title:ofhTitleOf(t.key), holders:[], created:t.from});
+      R.holders = R.holders.filter(h => h.personId !== "you");
+      const nowHolds = t.to == null, others = R.holders.filter(h => h.name !== y.name);
+      const me = {personId:"you", name:y.name, from:t.from, to:t.to, how:t.how, successor:null, backfilled:true};
+      const before = others.filter(h => h.to != null && h.to <= t.from), after = others.filter(h => before.indexOf(h) < 0);
+      if(before.length) before[before.length - 1].successor = y.name;
+      if(after.length && t.to != null){ after[0].from = t.to + 1; after[0].after = y.name; me.successor = after[0].name; }
+      R.holders = before.concat([me], after); R.vacantSince = null; ch++; });
+    /* the presidents on record, before you */
+    try{ const P = (G.presidents || []).filter(p => p && !p.you && p.name); if(P.length){ const R = S.seats.pres || (S.seats.pres = {key:"pres", title:"President", holders:[], created:1});
+      const mine = R.holders.filter(h => h.personId === "you"), rec = P.map(p => ({personId:null, name:p.name, from:((p.since || 1) - 1) * T + 1, to:(p.until || 1) * T, how:p.end || null, successor:null, recorded:true}));
+      rec.forEach((h, i) => { h.successor = rec[i + 1] ? rec[i + 1].name : (mine[0] ? mine[0].name : null); });
+      R.holders = rec.concat(R.holders.filter(h => h.personId === "you" || !(h.recorded))); R.created = 1; ch++; } }catch(e){}
+  }
+  return ch;
+}
 function ofhSync(only){
-  const S = ofhEnsure(), cur = ofhCurrent(); let ch = 0;
+  const S = ofhEnsure(), cur = ofhCurrent(); let ch = 0; try{ if(ofhFix(S)) ch++; }catch(e){}
   Object.keys(cur).forEach(key => { if(only && key !== only) return; const c = cur[key], R = S.seats[key];
     if(!R){ if(!S.seeded) ofhSeed(key, c); else S.seats[key] = {key, title:ofhTitleOf(key), holders:[{personId:c.personId, name:c.name, from:G.day, to:null, how:null, successor:null, newSeat:true}], created:G.day}; ch++; return; }
     const open = R.holders.length && R.holders[R.holders.length - 1].to == null ? R.holders[R.holders.length - 1] : null;
     if(open && (open.personId === c.personId || (open.personId == null && open.name === c.name)) && open.name === c.name) return;
     if(open && open.personId === c.personId && open.personId !== "you" && open.name !== c.name){ /* seat succession: a relative under the old id */ }
+    if(!open && R.holders.length){ const lh = R.holders[R.holders.length - 1]; if(lh.name === c.name && lh.personId === c.personId && lh.to != null && G.day - lh.to <= 2){ lh.to = null; lh.how = null; lh.successor = null; R.vacantSince = null; R.miss = 0; ch++; return; } }
     if(open){ open.to = G.day; open.how = ofhHowLeft(open, c); open.successor = c.name; }
     const lastC = !open && R.holders.length ? R.holders[R.holders.length - 1] : null; if(lastC && !lastC.successor) lastC.successor = c.name;
     R.holders.push({personId:c.personId, name:c.name, from:G.day, to:null, how:null, successor:null, after:open ? open.name : null, afterVacancy:!open && !!lastC}); R.vacantSince = null;
     if(R.holders.length > 30) R.holders.splice(0, R.holders.length - 30); ch++; });
   /* seats nobody holds now: close them, name no successor */
-  if(!only) Object.keys(S.seats).forEach(key => { if(cur[key]) return; const R = S.seats[key], open = R.holders.length && R.holders[R.holders.length - 1].to == null ? R.holders[R.holders.length - 1] : null;
+  Object.keys(cur).forEach(key => { if(S.seats[key]) S.seats[key].miss = 0; });
+  if(!only) Object.keys(S.seats).forEach(key => { if(cur[key]) return; const R = S.seats[key]; R.miss = (R.miss || 0) + 1; if(R.miss < 4) return; const open = R.holders.length && R.holders[R.holders.length - 1].to == null ? R.holders[R.holders.length - 1] : null;
     if(open){ open.to = G.day; open.how = ofhHowLeft(open, null); open.successor = null; R.vacantSince = G.day; ch++; } });
   if(!S.seeded){ try{ (G.states || []).forEach(st => ["sen:", "gov:"].forEach(p => { const k = p + st.n; if(!S.seats[k]) ofhSeed(k, null); })); }catch(e){} S.seeded = true; ch++; }
   if(ch) ofhPublish();
@@ -12043,7 +12088,7 @@ let _ofhLast = undefined;
 function ofhWatch(){
   try{ if(!G || !G.you){ if(!window.ONUM_OFFICE_HISTORY) window.ONUM_OFFICE_HISTORY = {seats:{}, day:null}; return; }
     const k = ofhYouKey(), sk = ofhPlayerSeatKey(), sig = k + "|" + sk;
-    if(_ofhLast === undefined){ try{ if(!(OH.list || []).length) ohEnsure(); }catch(e){} _ofhLast = sig; ofhSync(); }
+    if(_ofhLast === undefined){ try{ if(!(OH.list || []).length) ohEnsure(); }catch(e){} try{ homeSeatFill(); }catch(e){} _ofhLast = sig; ofhSync(); }
     if(sig !== _ofhLast){ const was = _ofhLast; _ofhLast = sig;
       if(k !== "house"){ try{ G.you.post = null; G.you.vote = null; G.you.speaker = false; }catch(e){} }
       ofhSync();
@@ -29308,6 +29353,7 @@ function election(){
     you.office = seeking;
     /* you leave the House: the post, the vote and the Cannon office go with it */
     you.post = null; you.vote = null; you.sitting = false;
+    try{ setTimeout(homeSeatFill, 0); }catch(e){}
     if(seeking === "pres"){
       if(typeof retireExec === "function") retireExec("was beaten by you");
       G.exec = {name:you.name, party:you.party, terms:1, you:true, vetoes:0, pos:you.pos};
@@ -36911,7 +36957,7 @@ window.onumCooperation = function(topic){ const t = String(topic || "").toLowerC
 function odSeats(){ return ((window.ONUM_OFFICE_HISTORY || {}).seats) || {}; }
 function odTitle(k, R){ return OFFICE_NICE[k] || (R && R.title && R.title !== k ? R.title : k); }
 function odCurrent(k){ const R = odSeats()[k]; if(!R) return null; const h = (R.holders || []).find(x => x.to == null); return h ? Object.assign({}, h, {name:h.personId === "you" && G.you ? G.you.name : h.name}) : null; }
-function odAgo(d){ if(d == null) return ""; const yrs = (G.day - d) / 365; return yrs < 0.1 ? "days ago" : yrs.toFixed(1) + " years ago"; }
+function odAgo(d){ if(d == null) return ""; const n = Math.round(G.day - d), T = G.termLength || 52; return n <= 0 ? "today" : n < T ? n + (n === 1 ? " day ago" : " days ago") : (n / T).toFixed(1) + " terms ago"; }
 function odSeatOf(m){ const S = odSeats(); if(!m || !m.name) return null; const hit = Object.keys(S).filter(k => (S[k].holders || []).some(h => h.to == null && h.name === m.name)); return hit.length === 1 ? hit[0] : (hit.find(k => S[k].title === m.role) || hit[0] || null); }   /* ids repeat across the ledger's lists, so a holder is found by name, which is unique */
 function odPromptLine(m){
   try{ const k = odSeatOf(m); if(!k) return ""; const D = window.onumDutiesOf(k); if(!D) return ""; const S = odSeats();
@@ -36986,7 +37032,7 @@ window.onumSession.callon = cabCallOn;
   const mk = () => { if(el0 && el0.isConnected) return el0; el0 = document.createElement("div"); el0.id = "hmWire"; el0.title = "The wire. Click to read the Ledger.";
     el0.style.cssText = "position:fixed;left:8px;right:8px;z-index:10049;background:#12151a;color:#d8d2bf;border:1px solid #3a424d;border-radius:6px;padding:3px 10px;font:12px/1.3 system-ui,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;opacity:.95";
     el0.addEventListener("click", () => { try{ if(G.you && veil.hidden) paperCard(); }catch(e){} }); document.body.appendChild(el0); return el0; };
-  const place = () => { const w = mk(); const tops = ["hmBar", "ndFd"].map(id => document.getElementById(id)).filter(e => e && e.offsetParent !== null && getComputedStyle(e).display !== "none").map(e => e.getBoundingClientRect().top); const top = tops.length ? Math.min.apply(null, tops) : innerHeight; w.style.bottom = Math.max(4, Math.round(innerHeight - top + 4)) + "px"; };
+  const place = () => { const w = mk(); const tops = ["hmBar", "ndFd"].map(id => document.getElementById(id)).filter(e => { if(!e || e.hidden) return false; const cs = getComputedStyle(e), r = e.getBoundingClientRect(); return cs.display !== "none" && cs.visibility !== "hidden" && r.width > 0 && r.height > 0; }).map(e => e.getBoundingClientRect().top); const top = tops.length ? Math.min.apply(null, tops) : innerHeight; w.style.bottom = Math.max(4, Math.round(innerHeight - top + 4)) + "px"; };
   const tick = () => { try{ const w = mk(); if(!G || !G.running || !G.you || !veil.hidden){ w.style.display = "none"; return; } let H = []; try{ H = makeHeadlines(); }catch(e){} if(!H.length){ w.style.display = "none"; return; } w.style.display = "block"; const h = H[i++ % H.length]; const txt = String(h[0]).toUpperCase() + "  " + String(h[1]).replace(/<[^>]+>/g, ""); if(txt !== last){ w.innerHTML = '<b style="color:#c9a24a;letter-spacing:.12em;font-size:10px;margin-right:8px">THE WIRE</b>'; w.appendChild(document.createTextNode(String(h[0]).toUpperCase() + "  " + String(h[1]).replace(/<[^>]+>/g, ""))); last = txt; } place(); }catch(e){} };
   setInterval(tick, 7000); setInterval(() => { try{ place(); }catch(e){} }, 1500); setTimeout(tick, 1500);
 })();
