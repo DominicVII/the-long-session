@@ -4,6 +4,12 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261022e: wardrobe, kitchen, pantry, steps landing
+
+`20261022e` (on `20261022d`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+Your home (room, flat or townhouse) gets a wardrobe that opens the style editor with the suits, shirts and cuts you own, a kitchen where you can eat, and the office gets a pantry shelf. Coffee wakes you but does not feed you. Hunger warnings now say where to eat. The east steps landing now starts at the last tread.
+
 ## 20261022d: a clearer screen, your turn is yours, cabinet members answer, chairs face the front
 
 `20261022d` (on `20261022c`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.

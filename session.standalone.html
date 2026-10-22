@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261022d">
+<meta name="onum-build" content="20261022e">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261022d";
+  var STAMP = "20261022e";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -7421,6 +7421,10 @@ function kAmenMine(id){ try{ return id !== "office" && homeRoom() === id; }catch
 function kAmenities(id, w, d, h, hw){
   if(K_AMEN_ROOMS.indexOf(id) < 0 || !kAmenMine(id)) return;
   const S = kAmenSpots(id);
+  /* a pantry shelf beside the coffee: bread, a tin of biscuits, fruit, a covered plate */
+  try{ const pw = matCol(0x5a3b24, .7), pt = matCol(0xd8c9a0, .8), pf = matCol(0xb5532a, .7), pp = matCol(0xf3efe6, .6), px = S.coffee.x, pz = S.coffee.z + 0.85;
+    addBox(pw, px, 0.45, pz, 0.62, 0.9, 0.5, 0, true); addBox(pt, px - 0.14, 0.95, pz, 0.22, 0.1, 0.3, 0, true); addCyl(pp, px + 0.16, 0.93, pz, 0.12, 0.05); addCyl(pf, px + 0.2, 0.99, pz, 0.05, 0.1);
+    propPlaque(px, 1.3, pz - 0.2, 0, "PANTRY", "Press E", 0.42, 0.12); }catch(e){}
   /* if a teammate's amenities module is present, let it place them */
   if(typeof addOfficeAmenities === "function"){
     try{ const r = addOfficeAmenities(THREE, roomGroup, {bounds:{minX:-hw, maxX:hw, minZ:0, maxZ:d, floorY:0}, doorPos:(() => { try{ const dr = (DOORS[id] || [])[0]; if(dr){ const p = doorAt(id, dr); return {x:p.x, z:p.z}; } }catch(e){} return {x:0, z:0}; })(), seed:(G.you && G.you.id) || 7});
@@ -7444,6 +7448,13 @@ function kAmenities(id, w, d, h, hw){
   try{ propPlaque(b.x + 0.55, 1.2, b.z - 1.0, Math.PI / 2, "BED", "Sleep · Press E", 0.5, 0.12); }catch(e){}
   G._amen = {id, S};
 }
+/* coffee wakes you (energy) but does not feed you; food does both. The office pantry is the quick, plain meal; Vaughn's Diner and the members' dining room are the proper ones. */
+function foodHint(){ return "Food: your pantry shelf in your own office, the members' dining room off the floor, Vaughn's Diner on Main Street, or your kitchen at home."; }
+function officeFoodActs(){
+  const b = (typeof bodyOf === "function") ? bodyOf(G.you) : {hunger:0}, full = b.hunger < 0.15;
+  const eat = (t, mins, gain, line) => ({t, c:mins + "m", off:full, run(){ spend(mins, -gain); try{ bodyEat(G.you); }catch(e){} setSay(line, fx("+" + (gain + 6) + " energy", mins + " minutes")); }});
+  return [eat("Make a cheese sandwich", 15, 8, "Bread, cheese, and a window."), eat("Eat the fruit and biscuits", 8, 4, "It is not lunch. It is a promise of lunch."), {t:"Pour a coffee (it will not feed you)", c:"10m", run(){ spend(10, -16); setSay("Coffee is not food. Your stomach files a complaint.", fx("+16 energy", "10 minutes")); }}].concat(full ? [{t:"You are not hungry", c:"", off:true, run(){}}] : []);
+}
 function kAmenProps(id){
   if(K_AMEN_ROOMS.indexOf(id) >= 0 && !kAmenMine(id)){ try{ if(kChamberRoom() === id){ const DP0 = deskProp(id), SB0 = sbProp(id); return (DP0 ? [DP0] : []).concat(SB0 ? [SB0] : []); } }catch(e){} return []; }
   if(K_AMEN_ROOMS.indexOf(id) < 0 || !kAmenMine(id)) return [];
@@ -7453,6 +7464,8 @@ function kAmenProps(id){
   return (DP ? [DP] : []).concat(SBP ? [SBP] : [], [
     {id:"amenCoffee", label:"The coffee machine", sub:"Your own, and it works", x:S.coffee.x, z:S.coffee.z, r:1.8,
      acts:() => [{t:G.you.energy > 88 ? "Pour a cup (you are already wide awake)" : "Pour a cup", c:"10m", run(){ spend(10, -16); setSay(G.you.energy > 88 ? "You do not need it. You drink it anyway." : "Strong, hot, and nobody else's.", fx("+16 energy", "10 minutes")); }}]},
+    {id:"amenPantry", label:"The pantry shelf", sub:"Bread, cheese, fruit, biscuits: the only food in the building you do not have to walk to", x:S.coffee.x, z:S.coffee.z + 0.85, r:1.8,
+     acts:() => officeFoodActs()},
     {id:"amenBed", label:"The bed", sub:"A narrow bed behind a screen; the job keeps odd hours", x:S.bed.x, z:S.bed.z, r:2.0,
      acts:() => [sleepAct("your office"),
       {t:"Lie down for an hour", c:"60m", off:G.you.energy > 96, run(){ spend(60, -40); setSay("An hour flat on your back. It helps.", fx("+40 energy", "60 minutes")); }}]}
@@ -14555,7 +14568,8 @@ function buildRoomInner(id, skipShell){
     const deckY = 1.62;
     const facadeZ = d - 0.42;
     addBox(wall, 0, deckY + 3.35, facadeZ + 0.35, w * 0.96, 6.7, 1.55, 0, true);
-    addBox(stone, 0, deckY * 0.5, facadeZ - 0.85, w * 0.92, deckY, 2.85, 0, true);
+    /* the landing begins where the last tread ends: it began 0.7 m further on, which left a gap at the top step */
+    { const zF = 5.05 + 9 * 0.58 + 0.29 - 0.03, zB = facadeZ + 0.575; addBox(stone, 0, deckY * 0.5, (zF + zB) / 2, w * 0.92, deckY, zB - zF, 0, true); }
     const treads = 10, rise = deckY / treads, run = 0.58;
     for(let i = 0; i < treads; i++){
       const yTop = (i + 1) * rise;
@@ -35891,7 +35905,7 @@ function bodyTick(){
     /* you: your stomach and your eyelids keep the time even when you do not */
     const y = G.you, b = bodyOf(y);
     if(b.hunger > 1.0) y.energy = clamp((y.energy || 50) - 0.15, 0, 100);
-    if(now - BODY.warnAt > 150){ if(b.hunger > 1.0){ BODY.warnAt = now; try{ feed("You have not eaten since " + bodyClock(b.ate) + ". Your stomach says so."); }catch(e){} } else if(b.tired > 1.05){ BODY.warnAt = now; try{ feed("Your eyes are heavy. It has been a long day."); }catch(e){} } }
+    if(now - BODY.warnAt > 150){ if(b.hunger > 1.0){ BODY.warnAt = now; try{ feed("You have not eaten since " + bodyClock(b.ate) + ". Your stomach says so. " + foodHint()); }catch(e){} } else if(b.hunger > 0.75){ BODY.warnAt = now; try{ feed("You look hungry, and people are noticing. " + foodHint()); }catch(e){} } else if(b.tired > 1.05){ BODY.warnAt = now; try{ feed("Your eyes are heavy. It has been a long day."); }catch(e){} } }
     const c = el("kClock"); if(c){ const base = (c.title || "").split(" · you")[0]; c.title = base + " · you last ate at " + bodyClock(b.ate) + " and feel " + bodyWord(b); }
   }catch(e){}
 }
@@ -46836,11 +46850,16 @@ try{
   const esc3 = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;"})[c]);
   const menu = id => { try{ const d = (typeof SHP_DEF !== "undefined" ? SHP_DEF : []).find(x => x.id === id); return d ? d.menu : {}; }catch(e){ return {}; } };
   const price = (id, k, fb) => { const m = menu(id)[k]; return m && m.price != null ? m.price : fb; };
-  const shopName = id => { try{ const s = (window.ONUM_SHOPS || []).find(x => x.id === id); if(s) return s.name + (s.ownerName ? " \u00b7 " + s.ownerName : ""); }catch(e){} return id === "barber" ? "The barber" : id === "tailor" ? "The tailor" : "The mirror"; };
+  const shopName = id => { try{ const s = (window.ONUM_SHOPS || []).find(x => x.id === id); if(s) return s.name + (s.ownerName ? " \u00b7 " + s.ownerName : ""); }catch(e){} return id === "barber" ? "The barber" : id === "tailor" ? "The tailor" : id === "home" ? "At home" : "The mirror"; };
   let D = null;
   function cur(){ const L = (G.you && G.you.look) || {}, A = window.ONUM_APPEARANCE || {};
     return {skin:L.skin, hairHex:L.hair, style:L.style | 0, beard:L.beard ? (A.beard && A.beard !== "none" ? A.beard : "full") : "none", wear:L.wear, suitHex:L.suit, shirtHex:L.shirt, tie:A.tie || "none", pocket:A.pocket || "none", glasses:!!L.glasses}; }
-  function bill(s){ const c = D.base, n = D.v, it = [];
+  /* the wardrobe at home holds what you own: what you wear now, a few staples, and anything bought at the tailor */
+  function own(){ const y = G.you, L = y.look || {}, W = y.wardrobe = y.wardrobe || {wear:[], suit:[], shirt:[]}, add = (a, v) => { if(v != null && a.indexOf(v) < 0) a.push(v); };
+    add(W.wear, L.wear); add(W.suit, L.suit); add(W.shirt, L.shirt);
+    if(!W.seeded){ W.seeded = 1; (L.frame === "fem" ? WEAR_FEM : WEAR_MASC).slice(0, 3).forEach(w => add(W.wear, w)); [SUITS[0], SUITS[1], SUITS[8]].forEach(c => add(W.suit, c)); [SHIRTS[0], SHIRTS[1], SHIRTS[2]].forEach(c => add(W.shirt, c)); }
+    return W; }
+  function bill(s){ const c = D.base, n = D.v, it = []; if(D.shop === "home") return it;
     if(D.byBarber && (n.style !== c.style)) it.push(["a fresh cut", price("barber", "cut", 9)]);
     if(D.byBarber && (n.hairHex !== c.hairHex)) it.push(["a colour", price("barber", "colour", 15)]);
     if(n.beard !== c.beard) it.push(n.beard === "none" ? ["a hot-towel shave", price("barber", "shave", 6)] : ["a beard shaped", price("barber", "beard", 7)]);
@@ -46860,21 +46879,21 @@ try{
       "#ndStyle .ns-note{color:#cfc8b4;font-size:12px}#ndStyle .ns-bill{background:#0b0c0f;border:1px solid #3a3d46;border-radius:6px;padding:8px;margin-top:6px;font-size:13px}" +
       "#ndStyle .ns-act{display:flex;gap:8px;justify-content:flex-end;margin-top:10px}#ndStyle .ns-act button{background:#ffe08a;color:#111;border:0;border-radius:5px;padding:7px 14px;font:700 14px system-ui;cursor:pointer}#ndStyle .ns-act button.ns-x{background:#2a2d35;color:#fff;border:1px solid #6b6f7a}" +
       "#ndStyle .ns-msg{color:#ff9d8a;font-weight:600;margin-top:6px;min-height:1em}"; document.head.appendChild(st); }
-  function row(label, opts, key, on, dis){ return '<div class="ns-r"><i>' + label + '</i>' + opts.map(o => '<button type="button" class="ns-o' + (o.v === on ? " on" : "") + '" data-k="' + key + '" data-v="' + esc3(o.v) + '"' + (dis ? " disabled" : "") + '>' + esc3(o.t) + '</button>').join("") + '</div>'; }
-  function sw(label, list, names, key, on, dis){ return '<div class="ns-r"><i>' + label + '</i>' + list.map((h, i) => '<button type="button" class="ns-sw' + (h === on ? " on" : "") + '" style="background:' + hex(h) + '" data-k="' + key + '" data-v="' + h + '" title="' + esc3(names ? names[i] || "" : "") + '" aria-label="' + esc3(names ? names[i] || "colour" : "skin tone " + (i + 1)) + '"' + (dis ? " disabled" : "") + '></button>').join("") + '</div>'; }
+  function row(label, opts, key, on, dis){ return '<div class="ns-r"><i>' + label + '</i>' + opts.map(o => '<button type="button" class="ns-o' + (o.v === on ? " on" : "") + '" data-k="' + key + '" data-v="' + esc3(o.v) + '"' + ((typeof dis === "function" ? dis(o.v) : dis) ? " disabled" : "") + '>' + esc3(o.t) + '</button>').join("") + '</div>'; }
+  function sw(label, list, names, key, on, dis){ return '<div class="ns-r"><i>' + label + '</i>' + list.map((h, i) => '<button type="button" class="ns-sw' + (h === on ? " on" : "") + '" style="background:' + hex(h) + '" data-k="' + key + '" data-v="' + h + '" title="' + esc3(names ? names[i] || "" : "") + '" aria-label="' + esc3(names ? names[i] || "colour" : "skin tone " + (i + 1)) + '"' + ((typeof dis === "function" ? dis(h) : dis) ? " disabled" : "") + '></button>').join("") + '</div>'; }
   function paint(){
     const W = document.getElementById("ndStyle"); if(!W || !D) return; const v = D.v, fem = ((G.you && G.you.look) || {}).frame === "fem";
-    const atB = D.shop === "barber", atT = D.shop === "tailor", it = bill(), tot = it.reduce((a, x) => a + x[1], 0);
+    const atB = D.shop === "barber", atT = D.shop === "tailor", atH = D.shop === "home", it = bill(), OW = atH ? own() : null, tot = it.reduce((a, x) => a + x[1], 0);
     let cash = null; try{ cash = Math.floor(purseOf(G.you).cash); }catch(e){}
     const wear = uniq((fem ? WEAR_FEM : WEAR_MASC).concat(v.wear ? [v.wear] : []));
-    W.innerHTML = '<div class="ns-p" role="dialog" aria-label="Your look"><h2>' + (atB ? "The barber's chair" : atT ? "The fitting room" : "The mirror") + '</h2><div class="ns-sub">' + esc3(shopName(D.shop)) + (cash != null ? " \u00b7 you have \u0192 " + cash : "") + '</div>' +
+    W.innerHTML = '<div class="ns-p" role="dialog" aria-label="Your look"><h2>' + (atB ? "The barber's chair" : atT ? "The fitting room" : atH ? "Your wardrobe" : "The mirror") + '</h2><div class="ns-sub">' + esc3(shopName(D.shop)) + (cash != null ? " \u00b7 you have \u0192 " + cash : "") + '</div>' +
       '<div class="ns-g"><b>Skin and hair \u00b7 always yours to change, free</b>' + sw("Skin", SKINS, null, "skin", v.skin) + sw("Hair colour", HAIRS, HAIR_N, "hairHex", v.hairHex) +
         row("Hair style", HAIRSTYLES.map((t, i) => ({v:String(i), t})), "style", String(v.style)) +
         (atB ? '<div class="ns-r"><i></i><label class="ns-note"><input type="checkbox" id="nsByB"' + (D.byBarber ? " checked" : "") + '> Have the barber do the hair (\u0192 ' + price("barber", "cut", 9) + ' a cut, \u0192 ' + price("barber", "colour", 15) + ' a colour)</label></div>' : "") + '</div>' +
       '<div class="ns-g"><b>The barber</b>' + row("Beard", [{v:"none", t:"Clean-shaven"}, {v:"trimmed", t:"Trimmed"}, {v:"full", t:"Full"}], "beard", v.beard, !atB) + (atB ? "" : '<div class="ns-note">A shave or a beard is done at the barber on Main Street.</div>') + '</div>' +
-      '<div class="ns-g"><b>The tailor</b>' + row("Cut", wear.map(w => ({v:w, t:WEAR_T[w] || w})), "wear", v.wear, !atT) + sw("Cloth", SUITS, SUIT_N, "suitHex", v.suitHex, !atT) + sw("Shirt", SHIRTS, SHIRT_N, "shirtHex", v.shirtHex, !atT) +
-        row("Tie", TIES.map(t => ({v:t, t:t === "none" ? "No tie" : t})), "tie", v.tie, !atT) + row("Pocket", POCKETS.map(t => ({v:t, t:t === "none" ? "None" : t})), "pocket", v.pocket, !atT) +
-        (atT ? '<div class="ns-r"><i></i><label class="ns-note"><input type="checkbox" id="nsBesp"' + (D.bespoke ? " checked" : "") + '> Bespoke (\u0192 ' + price("tailor", "bespoke", 380) + ') rather than off the rail (\u0192 ' + price("tailor", "suit", 140) + ')</label></div>' : '<div class="ns-note">Clothes are made at the tailor on Main Street.</div>') + '</div>' +
+      '<div class="ns-g"><b>The tailor</b>' + row("Cut", (atH ? uniq(wear.concat(OW.wear)) : wear).map(w => ({v:w, t:WEAR_T[w] || w})), "wear", v.wear, atH ? (w => OW.wear.indexOf(w) < 0) : !atT) + sw("Cloth", SUITS, SUIT_N, "suitHex", v.suitHex, atH ? (h => OW.suit.indexOf(h) < 0) : !atT) + sw("Shirt", SHIRTS, SHIRT_N, "shirtHex", v.shirtHex, atH ? (h => OW.shirt.indexOf(h) < 0) : !atT) +
+        row("Tie", TIES.map(t => ({v:t, t:t === "none" ? "No tie" : t})), "tie", v.tie, !(atT || atH)) + row("Pocket", POCKETS.map(t => ({v:t, t:t === "none" ? "None" : t})), "pocket", v.pocket, !(atT || atH)) +
+        (atT ? '<div class="ns-r"><i></i><label class="ns-note"><input type="checkbox" id="nsBesp"' + (D.bespoke ? " checked" : "") + '> Bespoke (\u0192 ' + price("tailor", "bespoke", 380) + ') rather than off the rail (\u0192 ' + price("tailor", "suit", 140) + ')</label></div>' : (atH ? '<div class="ns-note">These are the suits and shirts you own. New cloth is cut at the tailor on Main Street.</div>' : '<div class="ns-note">Clothes are made at the tailor on Main Street.</div>')) + '</div>' +
       '<div class="ns-bill">' + (it.length ? it.map(x => esc3(x[0]) + " \u2014 \u0192 " + x[1]).join("<br>") + "<br><b>Total \u0192 " + tot + "</b>" : "Nothing to pay." + (D.dirtyFree ? " The mirror is free." : "")) + '</div>' +
       '<div class="ns-msg" id="nsMsg">' + esc3(D.msg || "") + '</div><div class="ns-act"><button type="button" class="ns-x" id="nsX">Leave it</button><button type="button" id="nsGo">' + (tot ? "Pay \u0192 " + tot : "Done") + '</button></div></div>';
     W.querySelectorAll("[data-k]").forEach(b => b.onclick = () => { const k = b.getAttribute("data-k"), raw = b.getAttribute("data-v"); D.v[k] = /Hex$|^skin$/.test(k) ? +raw : k === "style" ? +raw : raw; D.msg = ""; paint(); });
@@ -46897,13 +46916,14 @@ try{
     }
     if(!ok){ D.msg = tot ? "You cannot cover \u0192 " + tot + " today." : "That did not take."; paint(); return; }
     L.skin = v.skin; L.hair = v.hairHex; L.style = v.style; L.beard = v.beard !== "none"; if(v.wear) L.wear = v.wear; L.suit = v.suitHex; L.shirt = v.shirtHex;
+    try{ const W = G.you.wardrobe = G.you.wardrobe || {wear:[], suit:[], shirt:[]}; [["wear", v.wear], ["suit", v.suitHex], ["shirt", v.shirtHex]].forEach(([k, x]) => { if(x != null && (W[k] = W[k] || []).indexOf(x) < 0) W[k].push(x); }); }catch(e){}
     refreshFigure(); try{ save(); }catch(e){}
-    try{ setSay(tot ? "Paid \u0192 " + tot + " at " + shopName(D.shop) + "." : "A new look in the mirror.", ""); }catch(e){}
+    try{ setSay(D.shop === "home" ? "You dress for the day." : tot ? "Paid \u0192 " + tot + " at " + shopName(D.shop) + "." : "A new look in the mirror.", ""); }catch(e){}
     close();
   }
   function close(){ const W = document.getElementById("ndStyle"); if(W) W.remove(); D = null; try{ if(SE._spd != null && typeof setSpeed === "function") setSpeed(SE._spd); }catch(e){} SE._spd = null; }
   SE.open = function(o){ try{ if(!G || !G.you || !G.you.look) return false; o = o || {}; css(); close();
-      const base = cur(); D = {shop:o.shop === "barber" || o.shop === "tailor" ? o.shop : null, base, v:Object.assign({}, base), byBarber:o.shop === "barber", bespoke:false, msg:""};
+      const base = cur(); D = {shop:o.shop === "barber" || o.shop === "tailor" || o.shop === "home" ? o.shop : null, base, v:Object.assign({}, base), byBarber:o.shop === "barber", bespoke:false, msg:""};
       const W = document.createElement("div"); W.id = "ndStyle"; W.addEventListener("click", e => { if(e.target === W) close(); }); W.addEventListener("keydown", e => { if(e.key === "Escape"){ e.stopPropagation(); close(); } });
       document.body.appendChild(W); try{ SE._spd = G.speed; if(typeof setSpeed === "function") setSpeed(0); }catch(e){} paint(); return true; }catch(e){ try{ console.warn("NEPTUNE-STYLE open", e); }catch(e2){} return false; } };
   SE.close = close;
@@ -47221,6 +47241,11 @@ try{
       PROPS.home = PROPS.home || [];
       PROPS.home.push({id:"nh:bed", label:"Your bed", sub:"Sleep here and the day is saved", x:2.1, z:5.9, r:2.0,
         acts:() => { try{ const a = sleepAct("your apartment"); a.t += " (the game saves)"; return [a]; }catch(e){ return []; } }});
+      PROPS.home.push({id:"nh:ward", label:"Your wardrobe", sub:"Suits, shirts, ties; the hair and the mirror are free", x:-2.35, z:6.3, r:2.0,
+        acts:() => [{t:"Open the wardrobe", c:"5m", run(){ try{ spend(5, 0); }catch(e){} try{ window.onumStyleEditor.open({shop:"home"}); }catch(e){} return null; }}]});
+      PROPS.home.push({id:"nh:kit", label:"Your kitchen", sub:"A stove, an icebox, a loaf; the food is yours", x:-2.4, z:3.4, r:2.0,
+        acts:() => { const b = bodyOf(G.you), full = b.hunger < 0.15, eat = (t, m, g, line) => ({t, c:m + "m", off:full, run(){ spend(m, -g); try{ bodyEat(G.you); }catch(e){} setSay(line, fx("+" + (g + 6) + " energy", m + " minutes")); }});
+          return [eat("Make breakfast", 20, 8, "Eggs, toast, and the quiet before the building wakes."), eat("Cook a proper supper", 45, 14, "You cook for one, and it is better than the dining room."), eat("Something cold from the icebox", 8, 4, "Standing up, in the dark, with the door open."), {t:"Put the kettle on", c:"10m", run(){ spend(10, -8); setSay("Tea. Not food, but it helps.", fx("+8 energy", "10 minutes")); }}]; }});
       PROPS.home.push({id:"nh:book", label:"The pocketbook", sub:"Savings, salary, rent and what went where", x:-0.7, z:4.3, r:1.9,
         acts:() => [{t:"Open the pocketbook", c:"0m", run(){ HM.open(); return null; }}]});
       PROPS.district = PROPS.district || [];
