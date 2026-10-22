@@ -4,6 +4,12 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261022c: the offices, their holders and their duties
+
+`20261022c` (on `20261022b`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+A new Offices button opens an overview of the Union's offices in four groups (the executive, Congress, the bench, the state executives). For each office it shows its own duties, what it may do only together with another office, and what it may never do; and for each seat its current holder and every past holder from JUPITER's ledger, with when they held it and how they left. Raw seat keys now read as proper titles (Vice President, Secretary of State and so on). The people who speak for an office now carry the same duty line, so they stay in their own lane and send what belongs to another office to whoever decides it, and they know who holds the offices they must work with. Holders are found by name because the ledger's person ids repeat between lists. Also: the Engine's report states its real capability beyond the scale, not the old flavour line, and a templated report is no longer logged as an Engine breach (only words the Engine itself wrote count). This reads JUPITER's ledger and does not change it, and it does not define ONUM_POWERS, which is JUPITER's.
+
 ## 20261022b: the Engine knows who the player is now
 
 `20261022b` (on `20261022a`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
