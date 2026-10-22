@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261022f">
+<meta name="onum-build" content="20261022g">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261022f";
+  var STAMP = "20261022g";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -971,6 +971,7 @@ body.boot-menu .shell{grid-template-rows:minmax(0,1fr)}
           <button type="button" id="uiPurseBtn" title="Your purse: your own money, not the war chest">ƒ</button>
           <button type="button" id="uiGalleryBtn" title="Sit in and watch a sitting">Gallery</button>
           <button type="button" id="uiPaperBtn" title="Read the Capitol Ledger">Ledger</button>
+          <button type="button" id="uiWarMapBtn" title="The world: where each power lies, the toll, the battles, and the delegations waiting on you">World</button>
           <button type="button" id="uiOfficesBtn" title="Who holds each office, who held it, and what each is for">Offices</button>
           <button type="button" id="uiSettingsBtn" title="Pause, save, settings. Key Esc.">⚙ Menu (Esc)</button>
         </div>
@@ -48347,6 +48348,188 @@ Object.assign(window.onumSession, {
   press:(id) => { try{ if(!cabKind()) return false; const p = id != null ? byId(id) : (window.__cabLast != null ? byId(window.__cabLast) : null) || cabPick(""); if(!p) return false; cabAsk(p, G.you, "(The chair presses you.) Be specific: the figure, who pays, and what happens if we do nothing.", SSN.kind); return true; }catch(e){ return false; } },
   challenge:(id) => { try{ if(!cabKind()) return false; const p = id != null ? byId(id) : (window.__cabLast != null ? byId(window.__cabLast) : null) || cabPick(""); if(!p) return false; cabAsk(p, G.you, "(The chair challenges your position in front of the room.) Defend it against the strongest objection to it, or give some ground.", SSN.kind); return true; }catch(e){ return false; } }
 });
+/* ══ 20261022g · THE WAR MAP. The world as the Republic sees it: where each power lies from Coalmere, how it stands towards us, what the fighting
+   has cost, the battles won, drawn and lost (a concession is a win, a stalemate a draw, a backfire a loss), the condition of the world (bread,
+   convoys, rationing, the heat), how every power reads the bill now before the Houses, and the delegations that come to lobby. Each lobbying ask
+   can be met in five ways or answered in your own words, and the envoy answers back. Nothing here is a menu of right answers: every choice
+   spends one thing to buy another. ══ */
+const WM_GEO = {rep:{x:320, y:218}, reach:{x:548, y:196}, horn:{x:344, y:382}, pale:{x:314, y:58}, marches:{x:98, y:222}, isles:{x:540, y:342}, rift:{x:150, y:96}};
+const WM_LOOK = {reach:"the grain plains", horn:"the strait and its oil", pale:"the iron north", marches:"the free corridor", isles:"the fishing grounds", rift:"the river country"};
+const WM_LENS = {
+  security:"Security dilemma (Jervis): each side's defensive step reads to the other as a threat, so caution can feed the very fear it was meant to calm.",
+  audience:"Audience costs (Fearon): once a threat is public, backing down costs the leader at home, so open threats raise the price of retreat for everyone.",
+  twolevel:"Two-level game (Putnam): the envoy is bargaining with you and with his own hardliners at once; what he can sign abroad is limited by what he can sell at home.",
+  linkage:"Linkage: an unrelated favour is being tied to the one asked for. Linking widens the deal, and also widens what you can be blamed for.",
+  agent:"Principal-agent: an envoy serves two principals, his government and himself. A gift is a bet on your discretion, not a gesture.",
+  balance:"Balancing: weaker powers court the rivals of the strong one next door. Their attention to you says as much about their neighbour as about you.",
+  logroll:"Log-rolling: trades across unrelated matters pass what none could pass alone, and leave the cost with whoever was not at the table.",
+  commit:"Commitment problem: a promise that cannot be enforced is cheap to give and dear to rely on; ask what happens if either side defects.",
+  pub:"Public goods and free-riding: a neighbour will happily enjoy the security you pay for, and ask you for more."
+};
+function wmStore(){ if(!G.wm) G.wm = {base:null, dead:{}, rec:{}, asks:[], log:[], seen:0, n:0, sel:null}; const W = G.wm; if(W.base == null){ try{ W.base = worldEnsure().dead || 0; }catch(e){ W.base = 0; } } return W; }
+function wmRec(k){ const W = wmStore(); return W.rec[k] || (W.rec[k] = {w:0, d:0, l:0}); }
+function wmRel(k){ return (G.realmRel || {})[k] || 0; }
+function wmRelClamp(k, d){ G.realmRel = G.realmRel || {}; G.realmRel[k] = clamp((G.realmRel[k] || 0) + d, -100, 100); }
+function wmColor(v, dk){ return dk ? (v >= 60 ? "#3fa66b" : v >= 25 ? "#7fb069" : v > -25 ? "#c9a24a" : v > -60 ? "#d9822b" : "#c8453b") : (v >= 60 ? "#1f7a4a" : v >= 25 ? "#4a7d2c" : v > -25 ? "#8a6a10" : v > -60 ? "#a85a0c" : "#b3372d"); }
+function wmName(k){ const p = WORLD_POWERS.find(x => x.k === k); return p ? p.t : k; }
+function wmEnvoy(k){ try{ scLeaders(); const a = scEnsure().na[k]; if(a) return {name:a.envoy, id:a.envoyId, head:a.leader, headT:a.leaderT}; }catch(e){} const f = realmFolk(k); const e = f.find(x => x.id === "envoy") || f.find(x => x.id === "head"); return {name:e ? e.name : "the envoy", id:null, head:(f.find(x => x.id === "head") || {}).name, headT:(f.find(x => x.id === "head") || {}).title}; }
+/* how a power reads a bill: defence and hawkishness frighten the neighbours who live by the border and the sea, markets and tariffs touch those who live by trade, and provision at home touches those who sell grain */
+function wmBillView(b){
+  const p = (b && b.pos) || {}, out = {};
+  WORLD_POWERS.forEach(P => { const I = REALM_INT[P.k] || {}, hawk = (p.def || 0) / 100, mkt = (p.econ || 0) / 100, wel = (p.wel || 0) / 100;
+    let s = -hawk * ((I.border || 0) * 0.8 + (I.navy || 0) * 0.7) + mkt * (I.trade || 0) * 0.6 + wel * (I.grain || 0) * 0.3;
+    if(REALM_RIVAL[P.k] && hawk > 0.2 && wmRel(REALM_RIVAL[P.k]) < -25) s += 0.25 * hawk;   /* the enemy of their enemy */
+    s = clamp(s, -1, 1);
+    const why = s > 0.2 ? (hawk > 0.2 ? "welcomes a harder line on its rival" : mkt > 0.2 ? "gains from freer trade" : "benefits") : s < -0.2 ? (hawk > 0.2 ? "reads a harder line as aimed at its own border" : mkt < -0.2 ? "loses by a more closed market" : "is worse off") : "has no strong view";
+    out[P.k] = {s, why}; });
+  return out;
+}
+function wmPressureFromBill(b){ const v = wmBillView(b); const worst = Object.keys(v).sort((a, c) => v[a].s - v[c].s)[0]; return {v, worst}; }
+/* the map, as one SVG. Land masses are loose shapes (the world is a sketch from here), lines show relations, size and ring show heat. */
+function wmSVG(sel){
+  const w = worldEnsure(), W = wmStore(), C = G.conflict;
+  const land = (k, c) => { const g = WM_GEO[k], rx = k === "rep" ? 62 : 54, ry = k === "rep" ? 44 : 38; return '<ellipse cx="' + g.x + '" cy="' + g.y + '" rx="' + rx + '" ry="' + ry + '" fill="' + c + '" stroke="#2b2f36" stroke-width="1.5"/>'; };
+  let s = '<svg viewBox="0 0 640 440" role="img" aria-label="War map of the world" style="width:100%;max-height:60vh;background:#0e1a24;border-radius:8px;border:1px solid #2b3946">';
+  s += '<rect x="0" y="0" width="640" height="440" fill="#0e1a24"/><path d="M470 300 C520 280 610 300 628 360 L628 430 L420 430 C400 380 430 320 470 300Z" fill="#102838"/>';
+  s += '<path d="M60 140 C90 120 130 120 160 140" stroke="#25445a" stroke-width="3" fill="none"/><path d="M180 130 C230 170 250 200 260 230" stroke="#25445a" stroke-width="2" fill="none" opacity=".6"/>';
+  /* rivalries: dashed lines between neighbours who are each other's enemies */
+  const done = {}; Object.keys(REALM_RIVAL).forEach(a => { const b = REALM_RIVAL[a], key = [a, b].sort().join("-"); if(done[key]) return; done[key] = 1; s += '<line x1="' + WM_GEO[a].x + '" y1="' + WM_GEO[a].y + '" x2="' + WM_GEO[b].x + '" y2="' + WM_GEO[b].y + '" stroke="#8a6d9a" stroke-width="1.2" stroke-dasharray="4 5" opacity=".7"/>'; });
+  /* lines from Coalmere: colour is how they stand with us, weight is the heat of the quarrel */
+  WORLD_POWERS.forEach(P => { const g = WM_GEO[P.k], v = wmRel(P.k), foe = w.foe === P.k, hot = C && C.k === P.k, wt = 1.5 + (foe ? Math.round((w.heat || 0) / 25) : 0) + (hot ? 2 : 0);
+    s += '<line x1="' + WM_GEO.rep.x + '" y1="' + WM_GEO.rep.y + '" x2="' + g.x + '" y2="' + g.y + '" stroke="' + wmColor(v, 1) + '" stroke-width="' + wt + '" opacity=".85"' + (hot ? ' stroke-dasharray="2 4"' : "") + '/>'; });
+  s += land("rep", "#2d4d3a") + '<text x="' + WM_GEO.rep.x + '" y="' + (WM_GEO.rep.y - 4) + '" text-anchor="middle" fill="#f4f1e8" font-size="15" font-weight="700" font-family="Georgia,serif">The Republic</text><text x="' + WM_GEO.rep.x + '" y="' + (WM_GEO.rep.y + 14) + '" text-anchor="middle" fill="#cfd8c8" font-size="11">Coalmere</text>';
+  WORLD_POWERS.forEach(P => { const g = WM_GEO[P.k], v = wmRel(P.k), dead = W.dead[P.k] || 0, on = sel === P.k, foe = w.foe === P.k, open = W.asks.filter(a => a.k === P.k && a.status === "open").length;
+    s += '<g data-wm="' + P.k + '" style="cursor:pointer" tabindex="0" role="button" aria-label="' + pcEsc(cap(P.t)) + ', ' + realmRelLabel(v) + '">' + land(P.k, on ? "#5b4a2a" : "#3a3f48").replace('stroke="#2b2f36" stroke-width="1.5"', 'stroke="' + (on ? "#ffe08a" : wmColor(v, 1)) + '" stroke-width="' + (on ? 3 : 2) + '"');
+    s += '<text x="' + g.x + '" y="' + (g.y - 4) + '" text-anchor="middle" fill="#f4f1e8" font-size="12.5" font-weight="700">' + pcEsc(cap(P.t.replace(/^the /, ""))) + '</text><text x="' + g.x + '" y="' + (g.y + 11) + '" text-anchor="middle" fill="' + wmColor(v, 1) + '" font-size="11">' + realmRelLabel(v) + ' ' + (v > 0 ? "+" : "") + v + '</text>';
+    if(foe) s += '<circle cx="' + (g.x + 42) + '" cy="' + (g.y - 30) + '" r="8" fill="#c8453b"/><text x="' + (g.x + 42) + '" y="' + (g.y - 26) + '" text-anchor="middle" fill="#fff" font-size="11" font-weight="700">!</text>';
+    if(dead) s += '<text x="' + g.x + '" y="' + (g.y + 26) + '" text-anchor="middle" fill="#e8a49c" font-size="10.5">' + dead + ' dead</text>';
+    if(open) s += '<circle cx="' + (g.x - 42) + '" cy="' + (g.y - 30) + '" r="9" fill="#ffe08a"/><text x="' + (g.x - 42) + '" y="' + (g.y - 26) + '" text-anchor="middle" fill="#111" font-size="11" font-weight="700">' + open + '</text>';
+    s += '</g>'; });
+  s += '<text x="12" y="414" fill="#6f8798" font-size="10.5">Line colour: how they stand with us. Heavy line: the quarrel is hot. Dashed purple: rivals.</text><text x="12" y="429" fill="#6f8798" font-size="10.5">Gold badge: delegations waiting. Red !: the quarrel of the day. Click a power for its detail.</text></svg>';
+  return s;
+}
+function wmBattleLine(){ const rec = Object.keys(wmStore().rec).reduce((a, k) => { const r = wmStore().rec[k]; a.w += r.w; a.d += r.d; a.l += r.l; return a; }, {w:0, d:0, l:0}); return rec; }
+function wmWorldRows(){
+  const w = worldEnsure(), W = wmStore(), rec = wmBattleLine(), since = Math.max(0, (w.dead || 0) - (W.base || 0)), b = G.bill && !G.bill.done ? G.bill : null;
+  const bar = (v, c) => '<span style="display:inline-block;width:90px;height:8px;background:#2a2d35;border-radius:4px;vertical-align:middle"><i style="display:block;height:8px;width:' + clamp(Math.round(v), 0, 100) + '%;background:' + c + ';border-radius:4px"></i></span>';
+  let h = '<table style="width:100%;font-size:13px;border-collapse:collapse">' +
+    '<tr><td>The word abroad</td><td>' + pcEsc(cap(worldWar().t)) + '</td></tr>' +
+    '<tr><td>Heat of the quarrels</td><td>' + bar(w.heat || 0, wmColor(-(w.heat || 0))) + ' ' + Math.round(w.heat || 0) + '</td></tr>' +
+    '<tr><td>Price of bread</td><td>' + (w.bread || 1).toFixed(2) + (w.ration ? ' <b style="color:#b3372d">rationed in the north</b>' : "") + '</td></tr>' +
+    '<tr><td>The grain convoy</td><td>' + (w.convoy ? "running" : "not arrived") + ', ' + pcEsc(String(w.sky || "clear")) + ' skies, ' + pcEsc(String(w.season || "")) + '</td></tr>' +
+    '<tr><td>Dead, all told</td><td><b>' + (w.dead || 0).toLocaleString("en-US") + '</b> <span class="muted">(' + since.toLocaleString("en-US") + ' since you took the chair)</span></td></tr>' +
+    '<tr><td>Engagements</td><td><b style="color:#2f7d4f">' + rec.w + ' won</b> · ' + rec.d + ' drawn · <b style="color:#b3372d">' + rec.l + ' lost</b> <span class="muted">(a concession is a win, a stalemate a draw, a backfire a loss)</span></td></tr>' +
+    (G.conflict ? '<tr><td>Under way</td><td>Pressure ' + Math.round(G.conflict.pressure) + ' on ' + pcEsc(wmName(G.conflict.k)) + ', verdict about day ' + G.conflict.due + '</td></tr>' : '<tr><td>Under way</td><td class="muted">No measure is running.</td></tr>') + '</table>';
+  if(b){ const pb = wmPressureFromBill(b), ks = Object.keys(pb.v).sort((a, c) => pb.v[a].s - pb.v[c].s);
+    h += '<p style="font-size:13px;margin:8px 0 2px"><b>The bill before the Houses: ' + pcEsc(b.title) + '</b></p><p style="font-size:12px;margin:0" class="muted">How abroad reads it. ' + ks.filter(k => Math.abs(pb.v[k].s) > 0.2).slice(0, 4).map(k => '<span style="color:' + (pb.v[k].s > 0 ? "#2f7d4f" : "#b3372d") + '">' + pcEsc(cap(wmName(k))) + ' ' + pcEsc(pb.v[k].why) + '</span>').join("; ") + (ks.every(k => Math.abs(pb.v[k].s) <= 0.2) ? "Nobody abroad has a strong view." : ".") + '</p>'; }
+  else h += '<p class="muted" style="font-size:12px;margin:8px 0 0">No bill is on the floor; nobody abroad has anything to read yet.</p>';
+  return h;
+}
+function wmRealmPanel(k){
+  const P = WORLD_POWERS.find(x => x.k === k); if(!P) return "";
+  const v = wmRel(k), rec = wmRec(k), W = wmStore(), w = worldEnsure(), F = wmEnvoy(k), rv = REALM_RIVAL[k], I = REALM_INT[k] || {}, top = Object.keys(I).sort((a, b) => I[b] - I[a]).slice(0, 2), IW = {grain:"bread and grain", trade:"trade", border:"the border", navy:"the sea lanes"};
+  const lens = w.foe === k && (w.heat || 0) > 55 ? WM_LENS.security : v < -40 ? WM_LENS.audience : rv && wmRel(rv) < -25 ? WM_LENS.balance : v > 40 ? WM_LENS.pub : WM_LENS.twolevel;
+  let h = '<div style="border:1px solid #3a3d46;border-radius:6px;padding:8px 10px;margin:8px 0"><b style="color:#8a6a10">' + pcEsc(cap(P.t)) + '</b> <span class="muted">' + pcEsc(P.adj) + ' of Coalmere · ' + pcEsc(WM_LOOK[k] || "") + ' · capital ' + pcEsc(realmCapital(k)) + '</span>' +
+    '<p style="font-size:13px;margin:4px 0">' + pcEsc(cap(P.t)) + ' is <b style="color:' + wmColor(v) + '">' + realmRelLabel(v) + '</b> towards us (' + v + '). It is led by ' + pcEsc(F.head || "its head of government") + (F.headT ? ", " + pcEsc(F.headT) : "") + ', and wants ' + pcEsc(P.want) + '. It lives by ' + top.map(t => IW[t]).join(" and ") + (rv ? ", and counts " + pcEsc(wmName(rv)) + " its rival (we stand " + realmRelLabel(wmRel(rv)) + " with it)" : "") + '.</p>' +
+    '<p style="font-size:13px;margin:4px 0">Record against them: <b style="color:#2f7d4f">' + rec.w + ' won</b>, ' + rec.d + ' drawn, <b style="color:#b3372d">' + rec.l + ' lost</b>; ' + (W.dead[k] || 0) + ' dead in the quarrel. Their envoy is ' + pcEsc(F.name || "unnamed") + '.</p>';
+  const b = G.bill && !G.bill.done ? G.bill : null; if(b){ const bv = wmBillView(b)[k]; h += '<p style="font-size:12px;margin:4px 0"><b>On the bill, ' + pcEsc(b.title) + ':</b> ' + pcEsc(cap(P.t)) + ' ' + pcEsc(bv.why) + '.</p>'; }
+  h += '<p class="muted" style="font-size:12px;margin:4px 0"><b>Lens.</b> ' + pcEsc(lens) + '</p>';
+  h += '<div class="card__actions" style="flex-wrap:wrap"><button type="button" class="btn btn--ghost" data-wmcall="' + k + '">Ring the envoy</button><button type="button" class="btn btn--ghost" data-wmfoe="' + k + '">The situation room</button></div></div>';
+  return h;
+}
+/* ── the delegations: asks, the five ways to meet them, and your own words ── */
+const WM_TYPES = {
+  grain:{t:"grain", say:(n, P) => n + " asks for grain on easy terms: a cargo at last year's price, before the winter shuts the roads. " + cap(P.t) + " cannot feed itself on what the harvest gave it.", bread:0.04, appr:-2, lens:"commit", side:"Our own bread would be dearer for it."},
+  tariff:{t:"trade", say:(n, P) => n + " asks that the tariff on " + P.adj.toLowerCase() + " goods come down for a season. The merchants of " + cap(P.t) + " are being ruined at the customs house.", bread:-0.03, appr:-1, lens:"logroll", side:"Our own makers will say we sold them."},
+  silence:{t:"border", say:(n, P) => n + " asks you to say nothing about the incident at the border: a patrol, a farm, a body nobody is claiming. Say nothing, and it can be handled quietly.", bread:0, appr:-1, lens:"audience", side:"If it comes out, you will have known and kept quiet."},
+  passage:{t:"navy", say:(n, P) => n + " asks for passage for " + cap(P.t) + "'s ships through our waters and a berth for their convoy. It is routine, he says, and he says it twice.", bread:0, appr:-1, lens:"security", side:"Their rivals will read it as a side taken."},
+  bill:{t:"bill", say:(n, P, b) => n + " has heard you are to vote on the " + (b ? b.title : "bill") + ", and would be grateful for a view that does not injure " + cap(P.t) + ". He does not say what he will do if you do.", bread:0, appr:0, lens:"twolevel", side:"Members will ask why a foreign envoy knew the order paper."}
+};
+function wmNewAsk(){
+  const W = wmStore(); if(W.asks.filter(a => a.status === "open").length >= 3) return;
+  if(Math.random() > 0.32 + ((worldEnsure().heat || 0) / 400)) return;
+  const taken = W.asks.filter(a => a.status === "open").map(a => a.k), pool = WORLD_POWERS.filter(p => taken.indexOf(p.k) < 0); if(!pool.length) return;
+  const P = pool[Math.floor(Math.random() * pool.length)], I = REALM_INT[P.k] || {}, b = G.bill && !G.bill.done ? G.bill : null;
+  let type; if(b && Math.random() < 0.35) type = "bill"; else { const t = Object.keys(I).sort((a, c) => (I[c] + Math.random() * 0.5) - (I[a] + Math.random() * 0.5))[0]; type = ({grain:"grain", trade:"tariff", border:"silence", navy:"passage"})[t] || "tariff"; }
+  const gift = Math.random() < 0.3 ? {amt:2 + Math.floor(Math.random() * 4), what:pick(["a case of the Horn's best brandy and an envelope beneath it", "a favour at a Vara bank, quietly arranged", "a donation to your party's fund, from a source nobody will name", "a place for a nephew in a foreign ministry"])} : null;
+  const F = wmEnvoy(P.k);
+  W.asks.push({id:"wa" + (++W.n), k:P.k, type, day:G.day, due:G.day + 6, status:"open", env:F.name, gift, bill:b ? b.title : null});
+  try{ feed("A delegation from " + P.t + " has asked to see you: " + F.name + " (" + WM_TYPES[type].t + ")."); }catch(e){}
+}
+function wmAskLine(a){ const P = WORLD_POWERS.find(x => x.k === a.k), T = WM_TYPES[a.type]; return T.say(a.env || "The envoy", P, a.bill ? {title:a.bill} : null) + (a.gift ? " He lets you know, lightly, that " + a.gift.what + " is on offer, “with no strings, of course”." : ""); }
+function wmOpts(a){
+  const rv = REALM_RIVAL[a.k], o = [{id:"agree", t:"Agree"}];
+  if(a.gift) o.push({id:"take", t:"Agree and take what he offers"});
+  o.push({id:"decline", t:"Decline, politely"}, {id:"counter", t:"Counter: ask for something in return"});
+  if(rv) o.push({id:"rival", t:"Take it to " + wmName(rv) + "'s envoy"});
+  o.push({id:"public", t:"Put it on the record"});
+  return o;
+}
+function wmApply(a, opt){
+  const T = WM_TYPES[a.type], y = G.you, w = worldEnsure(), W = wmStore(), rv = REALM_RIVAL[a.k], d = {rel:0, heat:0, bread:0, appr:0, stand:0, infl:0, funds:0}; let line = "", lens = T.lens;
+  const rel = wmRel(a.k);
+  if(opt === "agree"){ d.rel = 10; d.bread = T.bread; d.appr = T.appr; d.infl = 1; line = "You agree. " + T.side + " " + a.env + " leaves lighter and a little owed to you."; }
+  else if(opt === "take"){ d.rel = 14; d.bread = T.bread; d.appr = T.appr; d.funds = a.gift.amt; d.infl = 2; d.stand = -1; W.scandal = {day:G.day + 3 + Math.floor(Math.random() * 5), k:a.k, what:a.gift.what}; line = "You agree, and you take it. Nobody saw. The envoy remembers, which is what the gift was for."; lens = "agent"; }
+  else if(opt === "decline"){ d.rel = a.gift ? -3 : -5; d.appr = 0; d.stand = a.gift ? 1 : 0; line = a.gift ? "You decline, and the envelope goes back unopened. He bows, and files you as a man who cannot be had." : "You decline politely. " + a.env + " says he understands, and reports that he does not."; }
+  else if(opt === "counter"){ const ok = Math.random() < clamp(0.5 + rel / 300 + (y.standing || 50) / 400, 0.15, 0.85); if(ok){ d.rel = 4; d.bread = T.bread * 0.5; d.appr = Math.min(T.appr, 0) + 1; d.infl = 2; d.stand = 1; line = "You ask for something back and he finds he can give it: a small concession on his side to sit beside yours. Both of you can sell that at home."; } else { d.rel = -4; d.stand = -1; line = "You ask for something in return and he cannot give it. He says his hands are tied at home, which is true, and no help."; } lens = "twolevel"; }
+  else if(opt === "rival"){ d.rel = -7; d.heat = 1; if(rv) wmRelClamp(rv, 6); d.infl = 1; line = "You carry it to " + wmName(rv) + ". They are delighted to be asked, and say a good deal about their neighbour. " + cap(wmName(a.k)) + " learns where you took it."; lens = "balance"; }
+  else if(opt === "public"){ d.rel = -12; d.heat = 2; d.appr = a.gift ? 3 : 1; d.stand = a.gift ? 2 : -1; if(a.gift) line = "You read the offer into the record. The press has it by supper. The envoy is recalled within the week, and a clean pair of hands has its uses."; else line = "You make the request public. The papers are interested; the envoy is humiliated, and so is his government."; lens = "audience"; }
+  if(w){ w.heat = clamp((w.heat || 0) + d.heat, 0, 100); w.bread = clamp((w.bread || 1) + d.bread, 0.7, 2.6); }
+  wmRelClamp(a.k, d.rel); y.approval = clamp(y.approval + d.appr, 0, 100); y.standing = clamp(y.standing + d.stand, 0, 100); y.influence = clamp(y.influence + d.infl, 0, 100); if(d.funds) y.funds = (y.funds || 0) + d.funds;
+  a.status = "done"; a.how = opt; a.dayDone = G.day; W.log.push({d:G.day, k:a.k, type:a.type, how:opt}); if(W.log.length > 40) W.log.shift();
+  return {line, lens, d};
+}
+async function wmReply(a, text){
+  const LT = window.onumLiveTalk, F = wmEnvoy(a.k), P = WORLD_POWERS.find(x => x.k === a.k); if(!LT || !LT.reply || !F.id) return "";
+  const ctx = "You are " + F.name + ", envoy of " + P.t + " to the Republic of Coalmere. You came to ask the President for something: " + wmAskLine(a) + " Your home government wants " + P.want + ". Your duty is to your government and your own career, in that order, and you have a rival at home who would like your post. The President has just answered you in these words. Answer as a seasoned diplomat with a real temper and real interests: you may be pleased, offended, evasive or hopeful, and you may press, concede a little, or name a price. Do not simply agree, and do not lecture. Two to four sentences, no stage directions.";
+  let out = ""; try{ const r = await Promise.race([LT.reply({npcId:F.id, channel:"face", text, extra:ctx, max:240}), new Promise(res => setTimeout(() => res(null), 60000))]); out = r && r.text ? String(r.text) : ""; }catch(e){}
+  return engWhole(engClean(out));
+}
+function wmTone(text){ const t = String(text || "").toLowerCase(); let s = 0; if(/\b(thank|appreciate|friend|respect|together|understand|reciprocat|mutual|fair)\b/.test(t)) s += 1; if(/\b(price|in return|on condition|if you|exchange|terms)\b/.test(t)) s += 1; if(/\b(never|insult|refuse|threat|or else|warn|fool|enemy|liar|lie)\b/.test(t)) s -= 2; return s; }
+function wmRender(msg){
+  const W = wmStore(), w = worldEnsure(), sel = W.sel;
+  const open = W.asks.filter(a => a.status === "open");
+  let h = '<div id="wmMapWrap">' + wmSVG(sel) + '</div><div style="margin-top:8px">' + wmWorldRows() + '</div>' + (sel ? wmRealmPanel(sel) : '<p class="muted" style="font-size:12px;margin:8px 0">Click any power on the map for its leader, what it wants, how it reads the laws before you, and your record against it.</p>');
+  h += '<h3 style="margin:12px 0 4px;font-size:15px">Delegations waiting (' + open.length + ')</h3>';
+  if(!open.length) h += '<p class="muted" style="font-size:12px;margin:0">Nobody is waiting for an answer.</p>';
+  open.forEach(a => { const P = WORLD_POWERS.find(x => x.k === a.k);
+    h += '<div style="border-left:3px solid ' + wmColor(wmRel(a.k)) + ';padding:4px 10px;margin:8px 0"><b>' + pcEsc(cap(P.t)) + '</b> <span class="muted">· ' + pcEsc(a.env || "") + ' · answer by day ' + a.due + '</span><p style="font-size:13px;margin:4px 0">' + pcEsc(wmAskLine(a)) + '</p>' +
+      '<div class="card__actions" style="flex-wrap:wrap">' + wmOpts(a).map(o => '<button type="button" class="btn btn--ghost" data-wma="' + a.id + ':' + o.id + '">' + pcEsc(o.t) + '</button>').join("") + '</div>' +
+      '<div style="display:flex;gap:6px;margin-top:6px"><input type="text" data-wmt="' + a.id + '" placeholder="Or answer him in your own words…" style="flex:1;min-width:0;background:#000;color:#fff;border:1px solid #6b6f7a;border-radius:4px;padding:5px"><button type="button" class="btn" data-wms="' + a.id + '">Say it</button></div></div>'; });
+  const done = W.asks.filter(a => a.status === "done").slice(-3).reverse();
+  if(done.length) h += '<p class="muted" style="font-size:12px;margin:8px 0 0">Recently answered: ' + done.map(a => pcEsc(cap(wmName(a.k))) + ' (' + pcEsc(WM_TYPES[a.type].t) + ', ' + pcEsc(a.how) + ')').join("; ") + '.</p>';
+  h += '<p class="muted" style="font-size:11px;margin:10px 0 0">Reading the world: political science in a line — ' + pcEsc(WM_LENS[["security", "audience", "twolevel", "linkage", "agent", "balance", "logroll", "commit", "pub"][(G.day || 0) % 9]]) + '</p>';
+  return h;
+}
+function wmCard(sel){
+  const W = wmStore(); if(sel !== undefined) W.sel = sel;
+  govCardOpen("The world", "The war map", "", wmRender());
+  const root = card;
+  root.querySelectorAll("[data-wm]").forEach(g => { const f = () => { wmCard(g.getAttribute("data-wm") === W.sel ? null : g.getAttribute("data-wm")); }; g.addEventListener("click", f); g.addEventListener("keydown", e => { if(e.key === "Enter" || e.key === " "){ e.preventDefault(); f(); } }); });
+  root.querySelectorAll("[data-wmcall]").forEach(b => b.addEventListener("click", () => { try{ const F = wmEnvoy(b.getAttribute("data-wmcall")); const p = F.id != null ? byId(F.id) : null; if(p && typeof openTalk === "function"){ veil.hidden = true; G.running = true; openTalk(p); } else el("gcSay").textContent = "No line to their envoy is open."; }catch(e){} }));
+  root.querySelectorAll("[data-wmfoe]").forEach(b => b.addEventListener("click", () => { try{ warCard(b.getAttribute("data-wmfoe")); }catch(e){} }));
+  const say = t => { const g = el("gcSay"); if(g) g.textContent = t; };
+  root.querySelectorAll("[data-wma]").forEach(b => b.addEventListener("click", () => { const [id, opt] = b.getAttribute("data-wma").split(":"), a = W.asks.find(x => x.id === id); if(!a || a.status !== "open") return; const r = wmApply(a, opt); wmCard(); say(r.line + " " + WM_LENS[r.lens]); }));
+  root.querySelectorAll("[data-wms]").forEach(b => b.addEventListener("click", async () => { const id = b.getAttribute("data-wms"), a = W.asks.find(x => x.id === id), inp = root.querySelector('[data-wmt="' + id + '"]'), text = inp && inp.value.trim(); if(!a || a.status !== "open" || !text) return; b.disabled = true; say("You say it. " + (a.env || "He") + " considers it…");
+    const reply = await wmReply(a, text), tone = wmTone(text), opt = tone >= 1 ? "counter" : tone <= -1 ? "public" : "decline";
+    const base = wmApply(a, opt === "public" ? "decline" : opt); wmRelClamp(a.k, tone * 2); if(tone <= -1) wmRelClamp(a.k, -3);
+    wmCard(); say((reply ? a.env + ": “" + reply + "” " : "") + base.line + " " + WM_LENS[base.lens]); }));
+  return null;
+}
+/* each day: tally the engagements, the dead by quarrel, bring a delegation now and then, answer silence with silence, and let a taken gift come out */
+{ const _wd = warDay; warDay = function(){
+    let d0 = 0, k0 = null, n0 = 0; try{ d0 = worldEnsure().dead || 0; k0 = G.conflict && G.conflict.k; n0 = (G.conflictLog || []).length; }catch(e){}
+    const r = _wd.apply(this, arguments);
+    try{ const W = wmStore(), w = worldEnsure(); const dd = (w.dead || 0) - d0; if(k0 && dd > 0) W.dead[k0] = (W.dead[k0] || 0) + dd;
+      const L = G.conflictLog || []; if(L.length > n0 || (L.length && L[L.length - 1].d === G.day && W.seen !== G.day)){ const e = L[L.length - 1]; if(e && W.seen !== e.d + ":" + e.k){ W.seen = e.d + ":" + e.k; const rc = wmRec(e.k); if(e.result === "concession") rc.w++; else if(e.result === "stalemate") rc.d++; else rc.l++; } }
+      W.asks.filter(a => a.status === "open" && a.due < G.day).forEach(a => { a.status = "done"; a.how = "no answer"; wmRelClamp(a.k, -3); try{ feed(cap(wmName(a.k)) + " took your silence for an answer."); }catch(e){} });
+      if(W.scandal && W.scandal.day <= G.day){ const sc = W.scandal; W.scandal = null; if(Math.random() < 0.5){ G.you.approval = clamp(G.you.approval - 5, 0, 100); G.you.standing = clamp(G.you.standing - 4, 0, 100); wmRelClamp(sc.k, -4); try{ feed("The Ledger prints it: " + sc.what + ", from " + wmName(sc.k) + ", to the President. Nobody is surprised, and everybody is angry.", "bad"); }catch(e){} } }
+      wmNewAsk(); } catch(e){}
+    return r; }; }
+function wmBrief(){ try{ const w = worldEnsure(), foe = worldFoe(), C = G.conflict; return "the world beyond the border: " + worldWar().t + (C ? "; measures are running against " + wmName(C.k) : "") + "; bread at " + (w.bread || 1).toFixed(2) + (w.ration ? " and rationed in the north" : "") + "; the sharpest quarrel is with " + foe.t; }catch(e){ return ""; } }
+window.onumWarMap = {open:wmCard, brief:wmBrief, asks:() => wmStore().asks.slice(), record:wmBattleLine};
+{ const _scb2 = saveCaptureBase; saveCaptureBase = function(){ const o = _scb2.apply(this, arguments); try{ o.wm = G.wm || null; }catch(e){} return o; }; }
+document.addEventListener("click", ev => { try{ const t = ev.target; if(t && t.id === "uiWarMapBtn" && G.you && veil.hidden) wmCard(); }catch(e){} });
 /* ══ 20261021k · THE ENGINE'S RECORD IS ITS OWN, AND ITS SWITCH IS THE PRESIDENT'S. Only statements the Engine
    generated can become its principles (anything echoing a letter or question file is stripped). The President
    holds an off switch it cannot veto. Its capability is disclosed in full. A named list of power asks is refused

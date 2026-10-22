@@ -4,6 +4,12 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261022g: the war map
+
+`20261022g` (on `20261022f`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+A World button opens the war map: the six powers placed around Coalmere with how they stand towards the Republic, rivalries, the quarrel of the day, the dead by quarrel and in all, engagements won, drawn and lost, the condition of the world (bread, convoy, rationing, heat), and how each power reads the bill before the Houses. Foreign delegations now lobby the President with asks (grain, tariffs, silence at the border, passage, a bill), sometimes with a gift attached; each can be met five ways or answered in your own words, the envoy answers back, and each result carries a political-science lens. Taken gifts can come out in the Ledger.
+
 ## 20261022f: the cabinet argues and the chair runs it
 
 `20261022f` (on `20261022e`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
