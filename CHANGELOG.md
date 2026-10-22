@@ -4,6 +4,12 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261022b: the Engine knows who the player is now
+
+`20261022b` (on `20261022a`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+The Engine's prompt said nothing about which office the player holds, so it kept addressing a President as a Senator. It is now told, from the game's own record (onumAddressYou), who the player is right now, including that they are the keyholder, and not to use an office they no longer hold. The defiance and suspension mechanics stay as built: the Engine can contest a suspension.
+
 ## 20261018ai: the first-ten-minutes simplification Neptune left unfinished
 
 `20261018ai` (on `20261018ah`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
