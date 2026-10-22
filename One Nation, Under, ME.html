@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261022j">
+<meta name="onum-build" content="20261022k">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261022j";
+  var STAMP = "20261022k";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -13905,7 +13905,7 @@ function propColumn(x, z, h, r){
 /* Walk every corner: plants, flush art, decor sconces, rugs — room-by-room ornate fill.
    No extra PointLights (uses propSconceDecor). Skips door bays. Pictures stay flush (0.006). */
 function dressOrnateCorners(id){
-  const R = ROOMS[id]; if(!R) return;
+  const R = ROOMS[id]; if(!R || R.style === "home") return;   /* a flat has no Capitol mouldings */
   const w = R.w, d = R.d, h = R.h, hw = w/2;
   const inset = 0.62;
   try{
@@ -14282,7 +14282,7 @@ function buildRoomShell(id){
                  : R.style==="town"  ? matTex(TEX.stone, 4, 2, .95)
                  : R.style==="chamber" ? matTex(TEX.damask, w/3.2, h/3.2, .93)
                  : R.style==="wood"  ? matTex(TEX.damask, w/3.4, h/3.4, .93)
-                 : matTex(TEX.plaster, w/3, h/3, .95, R.style==="marble" ? 0xcfc5b3 : undefined);
+                 : matTex(TEX.plaster, w/3, h/3, .95, R.style==="marble" ? 0xcfc5b3 : R.style==="home" ? 0xe6d6b8 : undefined);
   const floorMat = R.style==="plain" ? matTex(TEX.lino, w/2.2, d/2.2, .55)
                  : R.style==="chamber" ? matTex(TEX.carpet, w/1.6, d/1.6, .98)
                  : R.style==="marble"  ? matTex(TEX.marble, w/2.4, d/2.4, .48)
@@ -14294,7 +14294,7 @@ function buildRoomShell(id){
     floorMat.polygonOffset = true; floorMat.polygonOffsetFactor = 1; floorMat.polygonOffsetUnits = 1;
   }
   addPlane(floorMat, 0, 0, d/2, w + 0.08, d + 0.08, -Math.PI/2); /* y=0 — furniture feet plant here */
-  if(!R.open){ const ceil = matTex(TEX.coffer, Math.max(1,w/3.6), Math.max(1,d/3.6), .95);
+  if(!R.open){ const ceil = R.plainCeil ? matCol(0xf3eee4, .95) : matTex(TEX.coffer, Math.max(1,w/3.6), Math.max(1,d/3.6), .95);
     ceil.side = THREE.DoubleSide; addPlane(ceil, 0, h - 0.004, d/2, w + 0.06, d + 0.06, Math.PI/2); }
   /* Keep the four shell planes on distinct contact lines.  The old corner
      overlap created doubled wall edges and z-fighting when viewed obliquely. */
@@ -47230,7 +47230,7 @@ try{
 
   /* the room */
   if(typeof ROOMS !== "undefined" && !ROOMS.home){
-    ROOMS.home = {t:"Your Apartment", tag:"Home", w:7, d:8, h:3.0, travel:20, style:"wood", light:"left"};
+    ROOMS.home = {t:"Your Apartment", tag:"Home", w:7, d:8, h:2.8, travel:20, style:"home", plainCeil:true, light:"left"};
     DOORS.home = [{to:"district", side:"front", at:0.5}];
   }
   function homeRich(w, d, h, hw){
@@ -48394,6 +48394,12 @@ Object.assign(window.onumSession, {
   press:(id) => { try{ if(!cabKind()) return false; const p = id != null ? byId(id) : (window.__cabLast != null ? byId(window.__cabLast) : null) || cabPick(""); if(!p) return false; cabAsk(p, G.you, "(The chair presses you.) Be specific: the figure, who pays, and what happens if we do nothing.", SSN.kind); return true; }catch(e){ return false; } },
   challenge:(id) => { try{ if(!cabKind()) return false; const p = id != null ? byId(id) : (window.__cabLast != null ? byId(window.__cabLast) : null) || cabPick(""); if(!p) return false; cabAsk(p, G.you, "(The chair challenges your position in front of the room.) Defend it against the strongest objection to it, or give some ground.", SSN.kind); return true; }catch(e){ return false; } }
 });
+/* ══ 20261022k · nobody stands where you walk in: on entering a room, anyone within a step of you moves aside a pace into the room, so the first thing you see is the room and not the back of a head ══ */
+{ const _erK = enterRoom; enterRoom = function(){ const r = _erK.apply(this, arguments);
+    setTimeout(() => { try{ const b = roomBox(G.room); (hereNow() || []).forEach(m => { if(!m || m === G.you || m.sitting || m.gone) return; const dx = m.x - cam.x, dz = m.z - cam.z, L = Math.hypot(dx, dz); if(L > 1.25) return;
+        const fx = Math.sin(cam.yaw), fz = Math.cos(cam.yaw), side = (dx * fz - dz * fx) >= 0 ? 1 : -1, nx = cam.x + fx * 1.6 + fz * side * 1.3, nz = cam.z + fz * 1.6 - fx * side * 1.3;
+        m.x = m.tx = Math.max(-b.hw + 0.5, Math.min(b.hw - 0.5, nx)); m.z = m.tz = Math.max(b.d0 + 0.5, Math.min(b.d1 - 0.5, nz)); if(m.mesh){ m.mesh.position.x = m.x; m.mesh.position.z = m.z; } }); }catch(e){} }, 60);
+    return r; }; }
 /* ══ 20261022g · THE WAR MAP. The world as the Republic sees it: where each power lies from the Republic, how it stands towards us, what the fighting
    has cost, the battles won, drawn and lost (a concession is a win, a stalemate a draw, a backfire a loss), the condition of the world (bread,
    convoys, rationing, the heat), how every power reads the bill now before the Houses, and the delegations that come to lobby. Each lobbying ask

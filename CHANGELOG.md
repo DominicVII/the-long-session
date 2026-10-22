@@ -4,6 +4,12 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261022k: a home that looks like a home; a clear doorway
+
+`20261022k` (on `20261022j`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+Your flat no longer wears the Capitol's coffered ceiling, chamber wainscot and ornate corners: plain ceiling, cream walls, a lower ceiling height. Anyone standing where you walk into a room steps aside a pace, so you do not enter staring at the back of a head. A full pass over all sixteen rooms found no script errors.
+
 ## 20261022j: the offices from the record; the seat you left is filled; the wire shows
 
 `20261022j` (on `20261022i`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
