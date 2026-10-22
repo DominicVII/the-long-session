@@ -4,6 +4,12 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261022h: a legible district
+
+`20261022h` (on `20261022g`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+The floating campaign desk, board and chairs and the old diner counter (the plain stage's props) no longer draw over the town's own shopfronts. Street trees carry their crowns above the shop signs. The HUD's place chip and Today's aims sit in the left dock, and both docks start below the toolbar so nothing sits over its buttons.
+
 ## 20261022g: the war map
 
 `20261022g` (on `20261022f`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
