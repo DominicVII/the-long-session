@@ -4,6 +4,12 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261022d: a clearer screen, your turn is yours, cabinet members answer, chairs face the front
+
+`20261022d` (on `20261022c`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+Declutter: the left panels now start below the toolbar instead of over it, the conversation log is capped at a short height with smaller text, the floor desk's box is shorter, and the wire is back as one quiet line above the bottom bar (the newest headline, then the next; click it for the Ledger). Your turn: while you type, or have words in a box, ambient talk, the unseen scenes and the sittings' beats all wait, so nothing speaks over you. Cabinet and council you chair: what you say is answered, live, by the member it is for (by name, by department, or whoever is next), within their own duties; and the session card now has a Call on button for each secretary. Chairs: in the press room and the caucus room the chairs faced the desk while the people sat facing the lectern, so they sat with the backrest in front of them; the chairs now face the front like the people, with the desk ahead of them.
+
 ## 20261022c: the offices, their holders and their duties
 
 `20261022c` (on `20261022b`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
