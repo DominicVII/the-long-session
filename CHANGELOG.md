@@ -4,6 +4,12 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261022f: the cabinet argues and the chair runs it
+
+`20261022f` (on `20261022e`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+In your own cabinet or council, secretaries report live on the matter before the room, colleagues answer each other by name in short exchanges (three turns at most), what you say is answered by the person it concerns and the thread is remembered. Nothing moves on by itself: you skip, press, challenge, raise a point of order or call the next order of business.
+
 ## 20261022e: wardrobe, kitchen, pantry, steps landing
 
 `20261022e` (on `20261022d`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
