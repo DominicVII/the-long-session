@@ -4,6 +4,12 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261023a: housekeeping
+
+`20261023a` (on `20261022k`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+A career that outgrows the browser's small store (localStorage) now saves to its larger one (IndexedDB) instead of failing, and says so once. Remembered lines are kept as lines: a whole reply stored as a memory is cut at a sentence (once on load, and from then on), which keeps saves smaller. In the repository: the eleven one-shot patch workflows (20260921e to 20261005a), their base64 payloads in build/, the 20260917n session-upload.html and the 20260921a MAXOPT status note move to archive/ with a README; nothing there runs. The README's build stamp and 'Now' section are brought up to date, and so are the stamp lines in GROKBOT-HANDOFF.md.
+
 ## 20261022k: a home that looks like a home; a clear doorway
 
 `20261022k` (on `20261022j`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.

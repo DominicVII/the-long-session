@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261022k">
+<meta name="onum-build" content="20261023a">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261022k";
+  var STAMP = "20261023a";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -10592,7 +10592,11 @@ setInterval(() => { try{ apTick(); }catch(e){} }, 4000);
 /* ══ 20261020a · what people hear, they half-remember: decaying, distorting NPC memory ══ */
 const MM_IMP = /\b(vote|bill|act|money|fund|budget|secret|between us|god|christ|church|family|wife|husband|son|daughter|war|strike|election|governor|president|senat|court|resign|scandal|bribe|promise|threat|secede|secession)\w*/i;
 const MM_EMO = /\b(hate|love|idiot|fool|liar|traitor|proud|afraid|furious|thank|sorry|never|disgrace|shame|wonderful|angry|worried)\w*/i;
-function mmStore(){ G.mm = G.mm || {v:1, by:{}, day:G.day || 0}; return G.mm; }
+function mmStore(){ G.mm = G.mm || {v:1, by:{}, day:G.day || 0};
+  /* housekeeping, once: a remembered line is a line, not a whole reply; long ones are cut at a sentence so the save stays small */
+  if(!G.mm.t2){ G.mm.t2 = 1; try{ Object.keys(G.mm.by).forEach(k => (G.mm.by[k] || []).forEach(x => { if(x){ x.text = mmClip(x.text, 320); x.orig = mmClip(x.orig, 200); } })); }catch(e){} }
+  return G.mm; }
+function mmClip(t, n){ t = String(t == null ? "" : t).replace(/\s+/g, " ").trim(); if(t.length <= n) return t; const c = t.slice(0, n), i = Math.max(c.lastIndexOf(". "), c.lastIndexOf("? "), c.lastIndexOf("! ")); return i > n * 0.5 ? c.slice(0, i + 1) : c.replace(/\s+\S*$/, "") + "\u2026"; }
 function mmAbout(text){
   try{ const it = (dkItems() || []).find(i => text.indexOf(i.title) >= 0); if(it) return it.title; }catch(e){}
   const caps = text.match(/\b([A-Z][a-z]+(?:\s[A-Z][a-z]+){0,3})\b/g); if(caps){ const c = caps.find(x => !/^(I|The|A|An|You|We|He|She|It|This|That|Did|Heads|Before|Precedent|Remember|On)$/.test(x)); if(c) return c; }
@@ -10613,8 +10617,8 @@ function mmAdd(id, text, about, role, src){
   if(id == null || id === "you") return;
   const S = mmStore(), L = S.by[id] = S.by[id] || [];
   const same = L.find(x => x.about === about && Math.abs((x.day || 0) - (G.day || 0)) < 30);
-  if(same){ same.reps++; same.s = clamp(same.s + 0.2, 0, 1); same.day = G.day; if(same.reps >= 3) same.cons = true; if(role === "speaker") same.text = text; return same; }
-  const m = {text, orig:text, about, day:G.day || 0, s:mmStrength(id, text, role), reps:1, cons:false, src:src || role, distorted:false};
+  if(same){ same.reps++; same.s = clamp(same.s + 0.2, 0, 1); same.day = G.day; if(same.reps >= 3) same.cons = true; if(role === "speaker") same.text = mmClip(text, 320); return same; }
+  text = mmClip(text, 320); const m = {text, orig:mmClip(text, 200), about, day:G.day || 0, s:mmStrength(id, text, role), reps:1, cons:false, src:src || role, distorted:false};
   L.push(m); if(L.length > 60){ L.sort((a, b) => b.s - a.s); L.length = 50; }
   return m;
 }
@@ -12319,6 +12323,7 @@ save = function(explicit, sync){
   const w1 = () => {
     let ok = svRawWrite(SAVE_KEY, S.raw);
     if(!ok){ for(const k of [SAVE_BEST_KEY, SAVE_BACKUP_KEY]){ try{ localStorage.removeItem(k); }catch(e){} ok = svRawWrite(SAVE_KEY, S.raw); if(ok) break; } }
+    if(!ok && ENG_IDB.db){ try{ engIdbPut(S.raw); ok = true; if(!G._idbOnly){ G._idbOnly = 1; note("Saved to the browser's larger store (the small one is full). Your career is kept.", false); } }catch(e){} }   /* a career too big for localStorage still saves */
     if(!ok) return svDone(S.base, S.explicit, false);
     SV.lastBody = S.body; try{ ENG.lastSave = {plain:S.json.length, stored:S.raw.length, at:Date.now()}; }catch(e){}
     svIdle(w2, S.explicit);

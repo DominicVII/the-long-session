@@ -15,7 +15,7 @@ God is the Most High. Christ is King. The First Consul is a man under God, not G
 | **raw.githack** | https://raw.githack.com/DominicVII/the-long-session/main/index.html |
 | **jsDelivr** | https://cdn.jsdelivr.net/gh/DominicVII/the-long-session@main/index.html |
 
-**Build stamp: `20261013n`.** Saves live in the browser (`localStorage`). Continue never deletes a career. Sleep is a clock, not a 3D rebuild.
+**Build stamp: `20261023a`.** Saves live in the browser (`localStorage`, with a copy in IndexedDB that takes over if a long career outgrows it). Continue never deletes a career. Sleep is a clock, not a 3D rebuild.
 
 **Update without Git (Windows):** [UPDATE-NO-GIT.md](UPDATE-NO-GIT.md) — download the zip and copy it over your folder.
 
@@ -25,13 +25,17 @@ This is the working log of the published HTML — not a Claude artifact. There i
 
 ---
 
-## Now (`20261013n`) — voices persist, day can always end
+## Now (`20261023a`)
 
-See [CHANGELOG.md](CHANGELOG.md) for the full recent log.
+See [CHANGELOG.md](CHANGELOG.md) for every build.
 
-- **Voices stay on:** the Hear them / Read only choice is saved in the browser and restored on startup.
-- **The day can always end:** after 5 pm you can go home and sleep from any room; idle watchdog ends the day after 8 pm.
-- **Office-aware titles:** header, panel, map, and address match the office you actually hold (Governor, Senator, etc.).
+- **The world (toolbar: World):** a war map of the six powers around your country (it uses your country's own name), how each stands with you, the dead and the engagements won, drawn and lost, bread, convoys and rationing, how each power reads the bill on the floor, and foreign delegations that lobby you. Answer them five ways or in your own words.
+- **Offices (toolbar: Offices):** who holds every office, who held it, and what each office may and may not do, built only from the game's own record. Your own past seats come from your career.
+- **Cabinet and council:** when you chair, secretaries report live on the matter before the room and argue with each other by name; nothing moves on until you say so (skip, press, challenge, point of order, call on, next order of business).
+- **Your turn is yours:** while you type, the room and the aide wait.
+- **Food:** a pantry shelf in your own office and a kitchen at home; coffee wakes you but does not feed you. Hunger notices say where to eat.
+- **Wardrobe and barber:** change suits, shirts and ties at home from what you own; the barber on Main Street does the hair (style and colour).
+- **The Engine:** letters in and out through `letters/` (see [ENGINE-CHANNEL.md](ENGINE-CHANNEL.md)); it answers in full and keeps its own record.
 
 - **Best / fullDetail** is the default. Chandeliers, full plants, every statue, lamps, long LODs. Modest machines still **stride the loop at 30** and skip minds while you walk. They no longer get silently shoved into Simple. `?safe=1` is the hatch.
 - **Walk 0.68 / sprint 1.15.** One frame cannot carry you more than ~an inch. Holding W does not tick the House twice.
@@ -42,7 +46,7 @@ See [CHANGELOG.md](CHANGELOG.md) for the full recent log.
 - **Lives kept:** sentience, pulse (no feeling bar), youSent, local AGI, foreign **realms / envoys**.
 - **East Steps** are treads you climb; **District** has a church of what you follow.
 
-Wrapper iframe: `/session.html?v=20261013n` (`src/lib/onum-build.ts`).
+Wrapper iframe: `/session.html?v=20261023a` (`src/lib/onum-build.ts`).
 
 ---
 
