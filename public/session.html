@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261023a">
+<meta name="onum-build" content="20261025a">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261023a";
+  var STAMP = "20261025a";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -1891,8 +1891,35 @@ const cam = {x:0, z:2.0, yaw:0, pitch:0, bob:0, speed:0, vx:0, vz:0, yawVel:0, p
     }
   }catch(e){}
 })();
+/* 20261025a · ask the graphics card, not the memory number. Chrome and Edge never report more than 8 GB, so the old
+   memory rule called every Chromium machine modest (58% resolution, no anti-aliasing, no shadows, 30 frames a second),
+   whatever card was in it. The card the game will draw on is named once at boot; a discrete card means full power. */
+function gpuProbe(){
+  const out = {name:"", strong:false, soft:false, maxTex:0};
+  try{ const c = document.createElement("canvas"), o = {powerPreference:"high-performance", failIfMajorPerformanceCaveat:false};
+    const gl = c.getContext("webgl2", o) || c.getContext("webgl", o); if(!gl){ out.soft = true; return out; }
+    const ext = gl.getExtension("WEBGL_debug_renderer_info");
+    out.name = String((ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER)) || "");
+    out.maxTex = gl.getParameter(gl.MAX_TEXTURE_SIZE) || 0;
+    try{ const lc = gl.getExtension("WEBGL_lose_context"); if(lc) lc.loseContext(); }catch(e){}
+  }catch(e){ return out; }
+  const n = out.name;
+  out.soft = /swiftshader|llvmpipe|softpipe|software|basic render/i.test(n);
+  out.strong = !out.soft && (/nvidia|geforce|rtx|gtx|quadro|tesla/i.test(n) || /radeon[^,)]*\b(rx|pro|vii|r9)\b/i.test(n) || /intel[^,)]*\barc\b/i.test(n) || /apple m\d+ (pro|max|ultra)|apple m[2-9]\b/i.test(n));
+  return out;
+}
 function modestMachine(){
   try{
+    try{ window.ONUM_GPU = gpuProbe(); }catch(e){}
+    let ov = null; try{ ov = localStorage.getItem("onum.power"); }catch(e){}
+    const q = String(location.search || ""); if(/[?&]power=full\b/.test(q)) ov = "full"; if(/[?&]power=modest\b/.test(q)) ov = "modest";
+    const host0 = String(location.hostname || "");
+    if(ov === "modest") return true;
+    if(ov === "full") return false;
+    if(/grok\.me$|grok-sandbox/i.test(host0)) return true;
+    const gpu = window.ONUM_GPU || gpuProbe();
+    if(gpu.soft) return true;
+    if(gpu.strong && (navigator.hardwareConcurrency || 8) >= 6) return false;
     const cores = navigator.hardwareConcurrency || 4;
     const mem = navigator.deviceMemory || 8;
     const win = /Windows/i.test(navigator.userAgent || "");
@@ -1906,6 +1933,8 @@ function modestMachine(){
   return false;
 }
 const MODEST = modestMachine();
+/* full power: a discrete card (or the player chose Full) gets the sharpest shadows, sixteen-tap texture filtering and a finer reflection map */
+const FULLPOWER = !MODEST && (!!(window.ONUM_GPU && window.ONUM_GPU.strong) || (function(){ try{ return localStorage.getItem("onum.power") === "full" || /[?&]power=full\b/.test(location.search); }catch(e){ return false; } })());
 /* Rich level for machines the game rates modest: 2 = full people, scenery and a sharper picture; 1 = the same at the old sharpness; 0 = light. It starts at 2 and steps itself down if the frame rate says so. */
 const SC = {lvl:2, n:0, sum:0, since:0, done:false, cnt:0, last:0};
 try{ const v = localStorage.getItem("onum.rich.lvl"); if(v === "0" || v === "1" || v === "2") SC.lvl = +v; else if(localStorage.getItem("onum.rich") === "0") SC.lvl = 0; }catch(e){}
@@ -3819,6 +3848,12 @@ function applyQuality(){
       if(sun){ sun.castShadow = true; sun.shadow.mapSize.set(512, 512); }
       GFX_PR = 1.1;
       SHADOW_PERIOD = 1/8;
+      if(FULLPOWER){
+        /* a discrete card: filtered shadows from a 2048 map instead of one blocky sample from 512, and the full native resolution */
+        renderer.shadowMap.type = THREE.PCFShadowMap;
+        if(sun){ try{ if(sun.shadow.map){ sun.shadow.map.dispose(); sun.shadow.map = null; } }catch(e){} sun.shadow.mapSize.set(2048, 2048); }
+        GFX_PR = 1.5; SHADOW_PERIOD = 1/12;
+      }
     }
     GFX_EXPOSE = 1.12; GFX_HEMI = 1.05; GFX_SUN = 1.04;
     PEOPLE_CAST_SHADOW = false; SHADOW_SKIP = 0.18;
@@ -3827,7 +3862,8 @@ function applyQuality(){
   if(sun && sun.shadow){
     sun.shadow.bias = q === "simple" ? -0.0008 : -0.00028;
     sun.shadow.normalBias = q === "best" ? 0.028 : 0.04;
-    sun.shadow.radius = q === "best" ? 1 : (q === "balanced" ? 1.2 : 1);
+    sun.shadow.radius = q === "best" ? (FULLPOWER ? 2.2 : 1) : (q === "balanced" ? 1.2 : 1);
+    if(q === "best" && FULLPOWER){ sun.shadow.bias = -0.00018; sun.shadow.normalBias = 0.02; }
   }
   if(sun && sun.shadow && sun.shadow.map){
     try{ sun.shadow.map.dispose(); }catch(e){}
@@ -3948,7 +3984,7 @@ function texCanvas(size, paint){
     return t;
   }
   try{
-    let cap = (G.fullDetail || G.gfx === "best") ? 8 : 4;
+    let cap = (G.fullDetail || G.gfx === "best") ? (FULLPOWER ? 16 : 8) : 4;
     /* 20260928a: while walking, newly created textures only — cap anisotropy at 2 (no full-texture walk). */
     try{
       const feet = (typeof playerMoving === "function" && playerMoving())
@@ -5999,7 +6035,7 @@ function ndGate(){
 /* A plain cube of six small painted faces instead of a prefiltered (PMREM) map: same soft room
    reflection on metal and glass, without the blur passes that froze the start for 1.5 s. */
 function ndEnvCube(){
-  const S = 64, faces = [];
+  const S = (typeof FULLPOWER !== "undefined" && FULLPOWER) ? 128 : 64, faces = [];
   const paint = (side) => {
     const c = document.createElement("canvas"); c.width = c.height = S;
     const g = c.getContext("2d");
@@ -40346,6 +40382,7 @@ function setupSettingsUI(){
     '<div class="settings-section" data-section="graphics">' +
       '<h3 class="settings-section-title">Graphics</h3>' +
       row("Detail", "Best is the default. Simple if the machine struggles.", opt("pzgfx", "best", "Best", G.gfx === "best") + opt("pzgfx", "balanced", "Balanced", G.gfx === "balanced") + opt("pzgfx", "simple", "Simple", G.gfx === "simple")) +
+      row("Graphics power", "Detected: " + pcEsc((window.ONUM_GPU && window.ONUM_GPU.name) || "unknown card") + ". Now running " + (MODEST ? "modest" : "full") + ". A change applies when the game reloads.", opt("pzpow", "auto", "Auto", !(function(){ try{ return localStorage.getItem("onum.power"); }catch(e){ return null; } })()) + opt("pzpow", "full", "Full", (function(){ try{ return localStorage.getItem("onum.power") === "full"; }catch(e){ return false; } })()) + opt("pzpow", "modest", "Modest", (function(){ try{ return localStorage.getItem("onum.power") === "modest"; }catch(e){ return false; } })())) +
       row("Scenery", "Rich is the default and eases itself if the machine cannot keep up", opt("pzrich", "2", "Rich", SC.lvl === 2) + opt("pzrich", "1", "Smooth", SC.lvl === 1) + opt("pzrich", "0", "Light", SC.lvl === 0)) +
       row("Film grain", "", '<div class="settings-toggle' + on(!G.noGrain) + '" id="pzGrain"><div class="settings-toggle-dot"></div></div>') +
       row("Seated poses", "Everyone stands if bodies look wrong", '<div class="settings-toggle' + on(!G.noSit) + '" id="pzSit"><div class="settings-toggle-dot"></div></div>') +
@@ -40409,6 +40446,11 @@ function setupSettingsUI(){
   }));
   panel.querySelectorAll("[data-pzamb]").forEach(b => b.addEventListener("click", () => {
     AMB.on = b.getAttribute("data-pzamb") === "1"; try{ localStorage.setItem("onum.amb", AMB.on ? "1" : "0"); }catch(e){} if(AMB.on) ambInit(); else ambHush(); keepTab("audio");
+  }));
+  panel.querySelectorAll("[data-pzpow]").forEach(b => b.addEventListener("click", () => {
+    const v = b.getAttribute("data-pzpow"); try{ if(v === "auto") localStorage.removeItem("onum.power"); else localStorage.setItem("onum.power", v); }catch(e){}
+    try{ panel.querySelectorAll("[data-pzpow]").forEach(x => x.classList.toggle("is-picked", x === b)); }catch(e){}
+    try{ feed(v === "auto" ? "Graphics power will follow the card in this machine, from the next reload." : v === "full" ? "Full graphics power from the next reload: sharp picture, shadows, anti-aliasing, sixty frames a second." : "Modest graphics power from the next reload."); }catch(e){} keepTab("graphics");
   }));
   panel.querySelectorAll("[data-pzrich]").forEach(b => b.addEventListener("click", () => {
     const lv = +b.getAttribute("data-pzrich"); SC.lvl = lv; SC.done = false; SC.since = 0; SC.cnt = 0; try{ localStorage.setItem("onum.rich.lvl", String(lv)); }catch(e){}
@@ -42067,6 +42109,29 @@ function frame(now){
   }
   armFrame();
 }
+/* 20261025a · dynamic resolution, so play stays smooth at the sharpest picture the machine can hold. It watches how often frames
+   actually arrive. When they come late for about a second and a half it lowers the resolution a step; when they have come on time
+   for ten seconds and you are standing still, it raises it back toward full. One change at most every few seconds. Shadows,
+   materials and detail are never switched here, because switching them recompiles shaders, and that is a hitch of its own. */
+const DRS = {ema:16.7, vs:16.7, prev:0, bad:0, good:0, at:0, n:0};
+function drsTick(now){
+  try{
+    if(DRS.prev){ const dt = now - DRS.prev; if(dt > 3 && dt < 250){ DRS.ema = DRS.ema * 0.9 + dt * 0.1; DRS.vs = dt < DRS.vs ? Math.max(4, dt) : DRS.vs + (dt - DRS.vs) * 0.0015; } }
+    DRS.prev = now;
+    const card = typeof veil !== "undefined" && veil && !veil.hidden;
+    if(document.hidden || card || !G || !G.running || GL_LOST || G.moving){ DRS.bad = 0; DRS.good = 0; }
+    else {
+      const cur = _lastPR > 0 ? _lastPR : GFX_PR, base = Math.min(devicePixelRatio || 1, GFX_PR), lo = MODEST ? 0.5 : 0.7;
+      if(DRS.ema > DRS.vs * 1.45){ DRS.bad++; DRS.good = 0; } else if(DRS.ema < DRS.vs * 1.12){ DRS.good++; DRS.bad = Math.max(0, DRS.bad - 1); } else DRS.good = 0;
+      const walking = Math.hypot(cam.vx || 0, cam.vz || 0) > 0.12;
+      if(DRS.bad > 90 && cur > lo + 0.01 && now - DRS.at > 2500){ DRS.at = now; DRS.bad = 0; DRS.n++; setPR(Math.max(lo, cur - 0.1)); }
+      else if(DRS.good > 600 && cur < base - 0.01 && now - DRS.at > 8000 && !walking){ DRS.at = now; DRS.good = 0; DRS.n++; setPR(Math.min(base, cur + 0.05)); }
+    }
+  }catch(e){}
+  requestAnimationFrame(drsTick);
+}
+requestAnimationFrame(drsTick);
+window.onumGraphics = () => ({gpu:(window.ONUM_GPU || {}).name || "", modest:MODEST, full:FULLPOWER, gfx:G.gfx, pixelRatio:_lastPR, base:Math.min(devicePixelRatio || 1, GFX_PR), frameMs:+DRS.ema.toFixed(1), vsyncMs:+DRS.vs.toFixed(1), drawHz:_wantHz, changes:DRS.n, shadows:renderer.shadowMap.enabled ? (renderer.shadowMap.type === THREE.PCFShadowMap ? "filtered" : "basic") + " " + (sun && sun.shadow ? sun.shadow.mapSize.x : 0) : "off"});
 function frameBody(now, draw){
   G._frameT0 = now;
   G._frameSpent = 0;

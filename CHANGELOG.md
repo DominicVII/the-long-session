@@ -4,6 +4,12 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261025a: full graphics power on a real graphics card; smooth by resolution
+
+`20261025a` (on `20261023a`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+The game called every Chrome and Edge machine 'modest' because those browsers never report more than 8 GB of memory, so most players got 58% resolution, no anti-aliasing, no shadows, plain tone and 30 frames a second whatever card they had. It now asks the graphics card: a discrete card (NVIDIA, AMD Radeon RX/Pro, Intel Arc, Apple M-series Pro/Max) runs at full power, a software renderer stays modest, and anything else falls back to the old rule. Full power adds filtered shadows from a 2048 map (instead of one sample from 512), sixteen-tap texture filtering, a finer reflection map, native resolution, sixty frames a second, the room lights, chandeliers and plants the modest path left out. A resolution governor keeps it smooth: frames arriving late for about a second and a half lower the resolution a step, ten seconds on time while you stand still raise it back. Settings, Graphics, Graphics power shows the card it found and lets you choose Auto, Full or Modest (from the next reload); ?power=full or ?power=modest in the address does the same. window.onumGraphics() reports what is running.
+
 ## 20261023a: housekeeping
 
 `20261023a` (on `20261022k`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
