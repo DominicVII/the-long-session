@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261025f">
+<meta name="onum-build" content="20261025g">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261025f";
+  var STAMP = "20261025g";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -2521,7 +2521,12 @@ function districtFit(bill){
 }
 function partyLine(bill){
   const fedFit = alignment({pos:{econ:36,lib:6,def:26,wel:-30}}, bill);
-  return {FED: fedFit > 0 ? 1 : -1, COM: fedFit > 0 ? -1 : 1, IND: 0};
+  const L = {FED: fedFit > 0 ? 1 : -1, COM: fedFit > 0 ? -1 : 1, IND: 0};
+  /* 20261025g: a party of the player's own making has no whip but the player, so its line is where the player stands on the bill
+     (left undefined, every one of its members scored NaN and voted no on everything); any other party without a whip has no line */
+  try{ Object.keys(G.parties || {}).concat(Object.keys(G.seatsBy || {})).forEach(k => { if(L[k] == null) L[k] = 0; });
+    if(G.you && G.you.party && !/^(FED|COM|IND)$/.test(G.you.party)){ const v = G.you.vote; L[G.you.party] = v === 1 || v === -1 ? v : (alignment(G.you, bill) > 0 ? 1 : -1); } }catch(e){}
+  return L;
 }
 /* First Order tradition vector — order / def / Fed-leaning continuity (Taylor Day line). */
 const FO_TRADITION = {econ:20, lib:-10, def:25, wel:-15};
@@ -2573,10 +2578,11 @@ function backgroundSeats(){
   return {FED:Math.max(0,G.seatsBy.FED-named.FED), COM:Math.max(0,G.seatsBy.COM-named.COM), IND:Math.max(0,G.seatsBy.IND-named.IND)};
 }
 function tallyBill(bill, projection){
-  let aye=0, no=0, un=0;
+  let aye=0, no=0, un=0; const roll = projection ? null : {};
   for(const m of G.members){
     if(projection && !(m.pledge && G.day-m.pledgeDay<8) && m.known<1){ un++; continue; }
-    (memberVote(m,bill) > 0 ? aye++ : no++);
+    const v = memberVote(m,bill) > 0 ? 1 : -1; if(roll) roll[m.id] = v;
+    (v > 0 ? aye++ : no++);
   }
   const bgs = backgroundSeats(), line = partyLine(bill);
   for(const p of ["FED","COM","IND"]){
@@ -2588,7 +2594,7 @@ function tallyBill(bill, projection){
   }
   if(G.you && !inHouse()){ try{ (districtFit(bill) > 0 ? aye++ : no++); }catch(e){ un++; } }   /* your old seat has its own member now */
   else if(G.you && G.you.vote) (G.you.vote>0 ? aye++ : no++); else un++;
-  return {aye,no,un};
+  return {aye,no,un,roll};
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -28914,7 +28920,8 @@ function holdVote(){
   G.statute.unshift({
     title:b.title, congress:G.congress, day:G.day, aye:t.aye, no:t.no,
     fate, why:b.why || b.line, clauses:b.clauses ? b.clauses.slice() : null,
-    sponsor:b.sponsor, state:b.state || null, cost:b.cost || 0
+    sponsor:b.sponsor, state:b.state || null, cost:b.cost || 0,
+    v:t.roll || null, yv:present ? yourVote : null           /* 20261025g: the named members' votes as the clerk called them, and yours */
   });
   if(G.statute.length > 80) G.statute.length = 80;
 
@@ -46644,6 +46651,7 @@ try{
     return A.join(" ");
   }
   function offline(m, ch, text){
+    try{ if(typeof knAnswer === "function" && ch !== "cable"){ const ka = knAnswer(m, text); if(ka && ka.text && (m.kind !== "aide" || ka.strong)) return ch === "mail" ? "Dear " + (G.you ? G.you.name : "colleague") + ", " + ka.text + " Yours, " + m.name : ka.text; } }catch(e){}   /* 20261025g */
     if(m.kind === "aide") return offAide(text);
     const said = lastSaid(m), it = intent(text), H = heardOf(m.id).filter(h => !h.used);
     for(let k = 0; k < 6; k++){
@@ -46671,6 +46679,7 @@ try{
     try{ if(m && m.kind !== "engine" && typeof window.onumRecall === "function"){ const w = (String(o.text || "").match(/[A-Za-z][A-Za-z'-]{5,}/g) || []).sort((x, y) => y.length - x.length)[0];
         let r = w ? window.onumRecall(m.id, {limit:4, about:w}) : []; if(!r || !r.length) r = window.onumRecall(m.id, {limit:4}) || [];
         if(r.length) o.extra = (o.extra ? o.extra + "\n" : "") + "WHAT YOU REMEMBER (your own memory; it can be hazy or wrong, use it only if it fits, never quote it as a list): " + r.map(x => "- " + String(x.text || "").slice(0, 180) + (x.distorted ? " (you may have this wrong)" : "")).join(" "); } }catch(e){}
+    try{ if(m && !/^(engine|envoy)$/.test(m.kind || "") && typeof knPrompt === "function"){ const kp = knPrompt(m, o.text || "", o.from || o.to || null); if(kp) o.extra = (o.extra ? o.extra + "\n" : "") + kp; } }catch(e){}   /* 20261025g */
     let VS = null; try{ if(m && o.onToken && o.voice !== false && /^(face|sitting|meeting|call|phone)$/.test(ch) && window.onumVoice){ VS = window.onumVoice.streamer(m, {}); const ot = o.onToken; o.onToken = t => { try{ VS.push(t); }catch(e){} return ot(t); }; } }catch(e){}
     const r = await reply0(o);
     try{ if(VS && r && r.text){ VS.end(r.text); LT._streamed = {k:m.id, t:String(r.text).trim(), at:Date.now()}; } }catch(e){}
@@ -48793,6 +48802,523 @@ try{ window.ONUM_ENGINE_CHARTER.limits.push({k:"disclosure", rule:"It discloses 
   A.stability = E.esStab && E.esStab.length ? +(E.esStab.reduce((a, b) => a + b, 0) / E.esStab.length).toFixed(2) : null; A.offSwitch = {holder:"President", vetoable:false, halted:exHalted(E)};
   A.breaches = X.breaches.slice(); A.refused = X.refused.slice(); } }catch(e){} return A; }; }
 setInterval(() => { try{ esWrapLT(); }catch(e){} }, 2000);
+
+/* ══ 20261025g · WHAT PEOPLE KNOW. Every person carries a share of the Republic's real record: the laws as they were voted,
+   the rulings, who holds which office and who held it, what the states and the powers have said and done, the wins of the
+   player's career. They learn it the way people learn: by being there, from the papers, from someone who told them, and
+   they forget the small things first. They pass it on to the people they talk to, choosing what the other has not heard;
+   they reason from it to judgements of their own; they count the next roll call from what they know and learn from being
+   wrong; and when they do not know, they say so and name who would. Nothing here is invented: every fact is read from the
+   game's own record (the statute book, the cases, the history, the offices ledger, the states' and powers' logs, the
+   career). The Engine reads the same public record, nothing private, forecasts each roll call from it and is scored. ══ */
+const KN = {ev:[], byK:{}, byH:{}, sig:"", ofhN:0, line:new WeakMap(), kc:new Map(), bel:new Map(), prof:new Map(), profDay:-1, since:new Map(), last:{}, adj:null, adjDay:-1, day:0, told:0};
+const KN_SHARE = {law:1, case:1, hist:1, offchg:1, sc:1, pol:1, war:1, career:1, rn:1, bill:1};
+const KN_STOP = new Set("the a an of and for to in on at by with act acts bill bills law laws reform republic national federal union new old who what when did does was were has have how its it is are you your about".split(" "));
+function knStore(){ if(!G.kn || G.kn.v !== 1) G.kn = {v:1, p:{}, st:{}, cal:{}, fc:null, eng:null}; return G.kn; }
+function knH(a, b){ return seedOf(a + "␟" + b) / 4294967296; }
+function knHash(k){ return seedOf(k).toString(36); }
+function knClean(t){ return String(t == null ? "" : t).replace(/\b(the)\s+the\b/gi, "$1").replace(/\s+/g, " ").replace(/[\s.]+$/, "").trim(); }
+function knCap(t){ t = String(t || ""); return t.charAt(0).toUpperCase() + t.slice(1); }
+function knOrd(n){ const s = ["th","st","nd","rd"], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
+function knT(){ return G.termLength || 52; }
+function knYouFix(t){ const n = (G.you && G.you.name) || "the President"; return String(t || "").replace(/\bto you\b/g, "to " + n).replace(/\bby you\b/g, "by " + n); }
+function knStates(){ const s = new Set(typeof STATES !== "undefined" ? STATES : []); try{ (G.states || []).forEach(x => x && x.n && s.add(x.n)); }catch(e){} return [...s]; }
+/* "New Orange" is how people say Nieuw Oranje out loud */
+function knNorm(t){ return String(t || "").toLowerCase().replace(/\bnieuw\b/g, "new").replace(/\boranje\b/g, "orange").replace(/[^a-z0-9' ]/g, " ").replace(/\s+/g, " ").trim(); }
+function knStateIn(t){ const q = " " + knNorm(t) + " "; let best = null; knStates().forEach(n => { if(q.indexOf(" " + knNorm(n) + " ") >= 0 && (!best || n.length > best.length)) best = n; }); return best; }
+function knWords(t){ return knNorm(t).split(" ").filter(w => w.length > 2 && !KN_STOP.has(w)); }
+function knWhen(d){
+  if(d == null) return ""; if(d < -100) return "long before any of us";
+  const a = (G.day || 0) - d; if(a < 0) return "";
+  if(a === 0) return "today"; if(a === 1) return "yesterday"; if(a <= 6) return a + " days ago"; if(a <= 13) return "last week"; if(a <= 45) return "some weeks ago";
+  return "back in the " + knOrd(Math.max(1, Math.floor((Math.max(1, d) - 1) / knT()) + 1)) + " Congress";
+}
+function knWhenC(e){ if(e.now) return ""; const w = knWhen(e.d); return w ? ", " + w : ""; }
+function knSent(e){ return knCap(e.t); }
+function knTie(a, b){ const T = G.ties || {}; const t = T[a + "|" + b] || T[b + "|" + a]; return t ? t.w : null; }
+function knPerson(id){ if(id == null) return null; if(id === "you") return G.you; if(typeof id === "object") return id; try{ return byId(isNaN(+id) ? id : +id) || byId(id) || everyone().find(p => p && String(p.id) === String(id)) || null; }catch(e){ return null; } }
+function knNameOf(id){ const p = knPerson(id); return p ? p.name : null; }
+
+/* ── the record, read fresh whenever it changes ── */
+function knEvents(){
+  const sc = G.sc || {}, wm = G.wm || {}, st0 = (G.statute || [])[0] || {};
+  const sig = [G.day, (G.statute || []).length, st0.title, st0.day, (G.history || []).length, (G.cases || []).length, (sc.log || []).length, (sc.polities || []).map(p => p.status).join(","),
+    (G.career || []).length, (G.reactNews || []).length, (G.secrets || []).length, G.bill ? G.bill.id + (G.bill.done ? "d" : "") : "-", KN.ofhN, JSON.stringify(wm.rec || {}).length, Object.keys(G.realmRel || {}).map(k => Math.round(G.realmRel[k] / 20)).join("")].join("|");
+  if(KN.ev.length && KN.sig === sig) return KN.ev;
+  const E = [], seen = new Set(), seenT = new Set(), T = knT(), you = G.you || {};
+  let named = null; const idOf = n => { if(!n) return null; if(you.name === n) return "you"; if(!named){ named = new Map(); try{ everyone().forEach(q => { if(q && q.name && !named.has(q.name)) named.set(q.name, q.id); }); }catch(e){} } return named.has(n) ? named.get(n) : null; };
+  const add = e => { if(!e || !e.k || !e.t || seen.has(e.k)) return; e.t = knClean(e.t); if(!e.t) return; const tk = e.kind + ":" + e.t; if(seenT.has(tk)) return; seen.add(e.k); seenT.add(tk);
+    e.h = knHash(e.k); e.sal = clamp(e.sal == null ? 0.4 : e.sal, 0.05, 1); e.pub = e.pub !== false; e.who = e.who || []; e.ids = (e.ids || []).filter(x => x != null); E.push(e); };
+  /* the statute book: every bill the House decided, with the count; the names on the roll only where the clerk kept them */
+  (G.statute || []).forEach(s => { if(!s || !s.title) return;
+    const fate = s.fate || (s.aye > s.no ? "carried" : "rejected"), sp = s.sponsor || null;
+    const verb = fate === "carried" ? "carried" : fate === "rejected" ? "went down" : fate === "vetoed" ? "passed the House and was vetoed" : fate === "struck down" ? "passed the House and was struck down by the court" : fate;
+    add({k:"law:" + s.day + ":" + s.title, kind:"law", d:s.day || 0, t:"the " + s.title.replace(/^the\s+/i, "") + " " + verb + ", " + s.aye + " to " + s.no + (sp ? " (" + sp + "'s bill" + (s.state ? ", out of " + s.state : "") + ")" : ""),
+      sal:0.5 + (Math.abs((s.aye || 0) - (s.no || 0)) <= 6 ? 0.15 : 0) + (fate === "vetoed" || fate === "struck down" ? 0.15 : 0), tau:0.8, st:s.state || null, who:sp ? [sp] : [], ids:[idOf(sp)],
+      law:{title:s.title, aye:s.aye, no:s.no, fate, sponsor:sp, v:s.v || null, yv:s.yv == null ? null : s.yv}}); });
+  (G.cases || []).forEach(c => { if(!c || !c.t || !c.done || !c.ruled) return;
+    add({k:"case:" + c.day + ":" + c.t, kind:"case", d:c.day || 0, t:"the court ruled for " + (c.ruled === "union" ? "the Union" : c.ruled === "state" ? (c.state || "the state") : c.ruled) + " in " + c.t, sal:0.6, tau:1.2, st:c.state || null, cs:{ruled:c.ruled, state:c.state}}); });
+  (G.history || []).forEach((h, i) => { if(!h || !h.act || !h.who) return; const myth = h.party === "FO";
+    add({k:"hist:" + (h.congress || 0) + ":" + h.who + ":" + h.act, kind:"hist", d:myth ? -999 : Math.max(1, ((h.congress || 1) - 1) * T + 1), t:h.who + " " + h.act + (h.precedent ? ", setting the precedent " + h.precedent : ""),
+      sal:myth ? 1 : h.power ? 0.8 : 0.5, com:myth ? 0.97 : 0, tau:2, who:[h.who], ids:[myth ? null : idOf(h.who)], power:!!h.power, myth}); });
+  /* the offices ledger: who holds each seat now, who took one in the game's own time, and who held one before */
+  try{ const S = ofhEnsure(); Object.keys(S.seats).forEach(key => { const R = S.seats[key]; if(!R || !R.holders || !R.holders.length) return;
+    const title = ({"cab:sos":"Secretary of State", "cab:treas":"Secretary of the Treasury", "cab:war":"Secretary of Defense", "cab:ag":"Attorney General", vp:"Vice President"})[key] || (/^(cab:|vp$)/.test(R.title || "") ? null : R.title) || ofhTitleOf(key), st = /^(gov|sen):/.test(key) && !/^sen:(maj|min|ppt)$/.test(key) ? key.slice(4) : /^house:/.test(key) ? key.slice(6).replace(/ \d+$/, "") : null;
+    const base = key === "pres" ? 1 : /^(vp|speaker)$/.test(key) ? 0.8 : /^cab:/.test(key) ? 0.6 : /^bench:/.test(key) ? 0.55 : /^gov:/.test(key) ? 0.5 : /^sen:/.test(key) ? 0.45 : 0.3;
+    const H = R.holders, cur = H[H.length - 1].to == null ? H[H.length - 1] : null;
+    if(cur && cur.name){ const id = cur.personId === "you" ? "you" : cur.personId;
+      add({k:"office:" + key + ":" + cur.name, kind:"office", d:Math.max(1, cur.from || 1), now:true, t:cur.name + " is " + title, sal:base, com:key === "pres" ? 0.95 : 0, st, who:[cur.name], ids:[id], off:{key, title, name:cur.name, from:cur.from, id}}); }
+    H.forEach((h, i) => { if(!h || !h.name) return; const id = h.personId === "you" ? "you" : h.personId;
+      if(h.from != null && h.from >= 2 && (i > 0 || h.newSeat || h.after) && !h.backfilled) add({k:"offchg:" + key + ":" + h.from + ":" + h.name, kind:"offchg", d:h.from, t:h.name + " took office as " + title + (h.after ? ", after " + h.after : ""), sal:base + 0.15, tau:1, st, who:[h.name].concat(h.after ? [h.after] : []), ids:[id], off:{key, title, name:h.name}});
+      if(h.to != null) add({k:"offpast:" + key + ":" + h.name + ":" + h.from, kind:"offpast", d:Math.max(1, h.to), t:h.name + " served as " + title + (h.how ? " and " + knYouFix(h.how) : ""), sal:base * 0.8, tau:2, st, who:[h.name], ids:[id], off:{key, title, name:h.name}}); }); }); }catch(e){}
+  (sc.log || []).slice(-60).forEach(l => { if(!l || !l.t) return; const hot = /\b(seced|independen|rebellion|revolt|militia|riot|war)\w*/i.test(l.t);
+    add({k:"sc:" + l.d + ":" + knHash(l.t), kind:"sc", d:l.d || 0, t:l.t, sal:hot ? 0.6 : 0.35, tau:1.5, st:knStateIn(l.t)}); });
+  (sc.polities || []).forEach(pl => { if(!pl || !pl.name) return; const S = (pl.memberStates || []).join(", ");
+    const t = pl.status === "seceded" ? S + " broke away from the Union as " + pl.name : pl.status === "war" ? S + " are at war with the Union as " + pl.name : pl.status === "tension" ? S + " are drawing together as " + pl.name + ", and the capital is worried" : pl.status === "reunited" ? pl.name + " collapsed and " + S + " came back into the Union" : null;
+    add({k:"pol:" + pl.name + ":" + pl.status, kind:"pol", d:pl.d != null ? pl.d : pl.day != null ? pl.day : null, now:pl.d == null && pl.day == null, t, sal:0.85, com:pl.status === "war" || pl.status === "seceded" ? 0.85 : 0, st:(pl.memberStates || [])[0] || null}); });
+  try{ const NA = sc.na || {}; (typeof WORLD_POWERS !== "undefined" ? WORLD_POWERS : []).forEach(w => { const a = NA[w.k]; if(!a) return; const nm = a.name || w.t;
+    if(a.leader) add({k:"na:" + w.k + ":lead:" + a.leader, kind:"na", d:null, now:true, t:(a.leaderT ? a.leaderT + " " : "") + a.leader + " leads " + nm, sal:0.45, rk:w.k, who:[a.leader], na:{k:w.k, lead:true}});
+    const rel = G.realmRel && G.realmRel[w.k] != null ? G.realmRel[w.k] : (a.toward || 0), word = rel > 20 ? "friendly toward" : rel < -20 ? "hostile toward" : "wary of";
+    add({k:"na:" + w.k + ":stance:" + word, kind:"na", d:null, now:true, t:nm + " is " + word + " the Republic" + (w.want ? ", and wants " + w.want : ""), sal:0.45, rk:w.k, na:{k:w.k, rel}});
+    const R = (wm.rec || {})[w.k], dead = typeof (wm.dead || {})[w.k] === "number" ? wm.dead[w.k] : 0;
+    if(R && (R.w + R.d + R.l) > 0) add({k:"war:" + w.k + ":" + R.w + "-" + R.d + "-" + R.l, kind:"war", d:null, now:true, t:"against " + nm + ", the Republic has won " + R.w + ", drawn " + R.d + " and lost " + R.l + (R.w + R.d + R.l === 1 ? " engagement" : " engagements") + (dead ? ", with " + dead + " dead" : ""), sal:0.7, rk:w.k}); }); }catch(e){}
+  (G.career || []).forEach(c => { if(!c || !c.term || !/^won\b/.test(c.note || "")) return;
+    add({k:"career:" + c.term + ":" + c.post, kind:"career", d:Math.max(1, c.term * T), t:(you.name || "the President") + " " + c.note, sal:c.post === "President" ? 1 : 0.85, com:c.post === "President" ? 0.9 : 0, tau:1, who:[you.name], ids:["you"]}); });
+  (G.reactNews || []).slice(-12).forEach(r => { if(!r || !r.t) return; add({k:"rn:" + r.d + ":" + knHash(r.t), kind:"rn", d:r.d || 0, t:r.t, sal:0.3, tau:0.6, st:knStateIn(r.t)}); });
+  (G.secrets || []).forEach(s => { if(!s || !s.t) return; add({k:"secret:" + s.id, kind:"secret", d:s.day || 0, t:s.t, sal:0.6, pub:false, kb:(s.knownBy || []).slice()}); });
+  const b = G.bill; if(b && !b.done && b.title) add({k:"bill:" + b.id, kind:"bill", d:null, now:true, t:"the " + b.title.replace(/^the\s+/i, "") + " is before the House" + (b.sponsor ? ", " + b.sponsor + "'s bill" : "") + (b.voteDay ? ", with the roll call set for day " + b.voteDay : ""), sal:0.65, st:b.state || null, who:b.sponsor ? [b.sponsor] : [], ids:[idOf(b.sponsor)], bill:{id:b.id, title:b.title}});
+  KN.ev = E; KN.byK = {}; KN.byH = {}; E.forEach(e => { KN.byK[e.k] = e; KN.byH[e.h] = e; });
+  KN.sig = sig; KN.kc.clear(); KN.bel.clear();
+  return E;
+}
+
+/* ── who a person is, as far as knowing goes: how closely they follow the capital, their home, their chamber ── */
+function knHome(p){
+  const sk = String(p.scKey || ""), ok = String(p.ohK || "");
+  let m = /^(gov|cp|oh:gov|oh:sen):(.+)$/.exec(sk) || /^(gov|sen):(.+)$/.exec(ok); if(m && !/^(maj|min|ppt)$/.test(m[2])) return m[2];
+  if(p.home && knStates().indexOf(p.home) >= 0) return p.home;
+  return p.state || null;
+}
+function knProf(p){
+  if(KN.profDay !== G.day){ KN.prof.clear(); KN.since.clear(); KN.profDay = G.day; }
+  let pr = KN.prof.get(p.id); if(pr) return pr;
+  const sk = String(p.scKey || ""), pre = sk.split(":")[0], key = sk.slice(pre.length + 1), ok = String(p.ohK || "");
+  let nat = 0.3, loc = 0.7, body = null, realm = null, role = "civ";
+  if(p.kind === "member"){ nat = 0.85; body = "house"; role = "member"; }
+  else if(p.kind === "press"){ nat = 0.95; loc = 0.9; role = "press"; }
+  else if(p.kind === "aide"){ nat = 0.95; role = "aide"; }
+  else if(/^gov:/.test(ok) || pre === "gov"){ nat = 0.7; loc = 1; role = "gov"; }
+  else if(ok){ role = "office"; body = /^sen:/.test(ok) ? "senate" : /^bench:/.test(ok) ? "bench" : /^(cab:|vp$|pres$)/.test(ok) ? "exec" : ok === "speaker" ? "house" : null; nat = body ? 0.9 : 0.7; }
+  else if(pre === "cp"){ nat = 0.6; loc = 0.95; role = "cp"; }
+  else if(pre === "lead" || pre === "env"){ nat = 0.5; loc = 0.2; realm = key; role = pre; }
+  else if(pre === "former"){ nat = 0.55; loc = 0.8; role = "former"; }
+  let tr = 0; try{ if(p.traits) tr = ((p.traits.ambition || 50) - 50) / 400 + ((p.traits.vanity || 50) - 50) / 800; }catch(e){}
+  nat = clamp(nat + (knH(p.id, "curious") - 0.5) * 0.3 + tr, 0.08, 0.98);
+  pr = {nat, loc, body, realm, role, st:knHome(p)};
+  KN.prof.set(p.id, pr); return pr;
+}
+/* the first day a member sat in the House: from the ledger; otherwise their terms, counted back */
+function knSince(p){
+  if(KN.profDay !== G.day) knProf(p);
+  if(KN.since.has(p.id)) return KN.since.get(p.id);
+  let s = null;
+  try{ const R = ofhEnsure().seats["house:" + p.state + " " + p.dist]; if(R){ const h = R.holders.filter(x => x.personId === p.id).sort((a, b) => (a.from || 0) - (b.from || 0))[0]; if(h) s = h.from == null ? -9999 : h.from; } }catch(e){}
+  if(s == null) s = (G.day || 1) - Math.max(1, p.terms || 1) * knT();
+  KN.since.set(p.id, s); return s;
+}
+/* being there: the floor for a roll call, the bench for a ruling, the chamber you sit in, your own government */
+function knWit(p, e){
+  const pr = knProf(p);
+  switch(e.kind){
+    case "law": return p.kind === "member" && knSince(p) <= e.d;
+    case "bill": return p.kind === "member" || pr.body === "house";
+    case "case": return pr.body === "bench" || (pr.role === "gov" && pr.st === e.st);
+    case "office": case "offchg": case "offpast": { const k = e.off.key;
+      if(/^sen:/.test(k)) return pr.body === "senate"; if(/^(house:|speaker$)/.test(k)) return p.kind === "member" || pr.body === "house";
+      if(/^bench:/.test(k)) return pr.body === "bench"; if(/^(cab:|vp$)/.test(k)) return pr.body === "exec"; if(/^gov:/.test(k)) return pr.st === e.st && (pr.role === "gov" || pr.role === "cp" || pr.role === "former"); return false; }
+    case "na": case "war": return (pr.role === "lead" || pr.role === "env") && pr.realm === e.rk;
+    case "sc": return pr.role === "gov" && pr.st === e.st;
+    case "secret": return !!e.kb && e.kb.indexOf(p.id) >= 0;
+  }
+  return false;
+}
+/* how likely someone of this profile is to have it: interest x how far it has spread x how much of it is still remembered */
+function knP(pr, e){
+  let I = pr.nat * e.sal;
+  if(e.st && pr.st === e.st) I = Math.max(I, pr.loc * (0.55 + 0.45 * e.sal));
+  if(e.rk && pr.realm === e.rk) I = 1;
+  if(pr.role === "press") I = Math.max(I, Math.min(0.95, e.sal + 0.35));
+  if(e.com) I = Math.max(I, e.com);
+  if(e.now || e.d == null) return clamp(I, 0, 0.97);
+  const age = Math.max(0, (G.day || 0) - e.d);
+  const spread = 1 - Math.exp(-(age + 0.3) / (e.tau || 1.5));
+  const keep = e.com ? 1 : Math.exp(-age / (30 + 330 * e.sal * e.sal));
+  return clamp(I * spread * (0.3 + 0.7 * keep), 0, 0.97);
+}
+/* does this person know it, how sure are they, and how did it reach them */
+function knKnows(p, e){
+  if(!p || !e) return null;
+  if(p === G.you) return {c:1, how:"self"};
+  if(e.ids.indexOf(p.id) >= 0 || (p.name && e.who.indexOf(p.name) >= 0)) return {c:1, how:"self"};
+  if(knWit(p, e)) return {c:0.95, how:"wit"};
+  const P = knStore().p[p.id]; if(P){ const x = P.find(r => r[0] === e.h); if(x) return {c:x[1] / 100, how:"told", src:x[2], d:x[3]}; }
+  if(!e.pub) return null;
+  const q = knP(knProf(p), e), h = knH(p.id, e.k);
+  if(h >= q) return null;
+  return {c:clamp(0.5 + 0.45 * (1 - h / q), 0.4, 0.92), how:"pub"};
+}
+function knKnown(p){
+  if(!p) return [];
+  const ev = knEvents(), c = KN.kc.get(p.id); if(c && c.sig === KN.sig) return c.L;
+  const L = []; ev.forEach(e => { const k = knKnows(p, e); if(k) L.push({e, c:k.c, how:k.how, src:k.src, sd:k.d}); });
+  KN.kc.set(p.id, {sig:KN.sig, L}); return L;
+}
+function knLearn(b, e, src, c){
+  const S = knStore(); let P = S.p[b.id]; if(!P) P = S.p[b.id] = [];
+  c = Math.round(clamp(c, 0.2, 0.95) * 100); const x = P.find(r => r[0] === e.h);
+  if(x){ if(c > x[1]){ x[1] = c; x[2] = src; x[3] = G.day; } }
+  else { P.push([e.h, c, src, G.day]); if(P.length > 16){ P.sort((u, v) => v[3] - u[3]); P.length = 16; } }
+  KN.kc.delete(b.id); KN.bel.delete(b.id);
+}
+
+/* ── where it came from, in their own words ── */
+function knSrc(p, k, e){
+  if(k.how === "self") return "";
+  if(k.how === "wit") return ({law:"I was on the floor for it", bill:"it is our business this week", "case":"it came before us", office:"I work alongside them", offchg:"I was there", offpast:"I served alongside them", na:"it is my own government", war:"it is my own government", sc:"my office had it first", secret:"I know it myself"})[e.kind] || "I saw it myself";
+  if(k.how === "told"){ if(k.src === "you") return "you told me yourself"; const s = knPerson(k.src); const w = knWhen(k.d); return (s ? surname(s.name) : "someone") + " told me" + (w && w !== "today" ? ", " + w : ""); }
+  const pr = knProf(p), L = pr.role === "press" ? ["it came over the wire", "we ran it"] : pr.role === "member" ? ["the cloakroom had it", "it went round the floor", "it was in the papers"]
+    : pr.role === "office" ? ["it was in the morning briefing", "the papers had it"] : pr.role === "gov" || pr.role === "cp" ? ["my office had it", "the state papers had it"]
+    : (pr.role === "lead" || pr.role === "env") ? ["our mission reported it", "it was in the dispatches"] : pr.role === "aide" ? ["it is in the file", "the wire had it"]
+    : ["it was in the papers", "people in town were talking about it", "I read it somewhere"];
+  return L[Math.floor(knH(p.id, e.k + ":src") * L.length)];
+}
+function knSrcShort(p, x){ return x.how === "self" ? "your own doing" : x.how === "wit" ? "you were there" : x.how === "told" ? (x.src === "you" ? "the player told you" : (knNameOf(x.src) || "someone") + " told you") : knSrc(p, x, x.e); }
+function knHedge(c){ return c < 0.55 ? "if I have it right, " : c < 0.7 ? "I think " : ""; }
+
+/* ── what they make of it: judgements reasoned from what they know, each with its reason ── */
+function knBeliefs(p){
+  if(!p) return [];
+  knEvents(); const c = KN.bel.get(p.id); if(c && c.sig === KN.sig) return c.B;
+  const K = knKnown(p), B = [], you = G.you || {}, sn = n => { try{ return surname(n); }catch(e){ return n; } };
+  const laws = K.filter(x => x.e.kind === "law").map(x => x.e);
+  /* whose bills get through */
+  const sp = {}; laws.forEach(e => { const s = e.law.sponsor; if(!s) return; const r = sp[s] = sp[s] || {n:0, w:0}; r.n++; if(e.law.fate === "carried") r.w++; });
+  Object.keys(sp).forEach(s => { const r = sp[s]; if(r.n < 2) return; const me = s === p.name, nm = me ? "my" : sn(s) + "'s";
+    if(r.w === r.n) B.push({t:me ? "My bills get through" : sn(s) + " gets bills through this House", why:r.w + " of " + r.n + " carried", about:s, c:0.55 + 0.1 * Math.min(3, r.n)});
+    else if(r.w === 0) B.push({t:knCap(nm) + " bills keep dying on the floor", why:"none of " + r.n + " carried", about:s, c:0.55 + 0.1 * Math.min(3, r.n)});
+    else if(r.w / r.n < 0.5) B.push({t:knCap(nm) + " bills mostly fail", why:"only " + r.w + " of " + r.n + " carried", about:s, c:0.5}); });
+  /* the temper of the House */
+  const recent = laws.slice().sort((u, v) => v.d - u.d).slice(0, 6);
+  if(recent.length >= 3){ const close = recent.filter(e => Math.abs(e.law.aye - e.law.no) <= 6).length, car = recent.filter(e => e.law.fate === "carried").length;
+    if(close * 2 >= recent.length) B.push({t:"The House is split down the middle", why:close + " of the last " + recent.length + " roll calls I know of were decided by six votes or fewer", c:0.7});
+    if(car === recent.length) B.push({t:"This House passes what it is given", why:"all of the last " + recent.length + " bills I know of carried", c:0.6});
+    else if(car * 3 <= recent.length) B.push({t:"This House kills most of what comes before it", why:"only " + car + " of the last " + recent.length + " carried", c:0.6}); }
+  /* is home heard */
+  const home = knProf(p).st;
+  if(home){ const ls = laws.filter(e => e.st === home); if(ls.length){ const w = ls.filter(e => e.law.fate === "carried").length;
+      B.push(w ? {t:"The capital does listen to " + home + ", sometimes", why:w + " of " + ls.length + " bills out of " + home + " carried", about:home, c:0.55} : {t:"The capital does not hear " + home, why:"not one of " + ls.length + " bills out of " + home + " carried", about:home, c:0.65}); }
+    K.filter(x => x.e.kind === "case" && x.e.st === home).forEach(x => B.push(x.e.cs.ruled === "union" ? {t:"The court takes the Union's side against " + home, why:knCap(x.e.t), about:home, c:0.6} : {t:"The court will stand up for " + home, why:knCap(x.e.t), about:home, c:0.55})); }
+  /* the player's reach */
+  if(you.name){ const pw = K.filter(x => x.e.kind === "hist" && x.e.power && !x.e.myth && x.e.who.indexOf(you.name) >= 0).length, wins = K.filter(x => x.e.kind === "career").length;
+    const lib = p.pos ? (p.pos.lib || 0) : 0, nm = sn(you.name);
+    if(pw >= 2) B.push(lib > 15 ? {t:nm + " keeps taking more power than the offices were built for", why:pw + " precedents of power on the record, by " + nm, about:you.name, c:0.6 + Math.min(0.3, pw * 0.05)} : {t:nm + " knows how to use power, and the Republic needs that", why:pw + " precedents of power on the record, by " + nm, about:you.name, c:0.55});
+    if(wins >= 2) B.push({t:nm + " has won every office " + nm + " has run for that I know of", why:wins + " wins on the record", about:you.name, c:0.55}); }
+  /* the world */
+  K.filter(x => x.e.kind === "na" && x.e.na && !x.e.na.lead && x.e.na.rel < -20).forEach(x => B.push({t:wmNameSafe(x.e.rk) + " means the Republic harm", why:knCap(x.e.t), about:x.e.rk, c:0.6}));
+  K.filter(x => x.e.kind === "pol" && /seceded|war/.test(x.e.k)).forEach(x => B.push({t:"The Union is coming apart", why:knCap(x.e.t), c:0.7}));
+  /* their own count, and what being wrong taught them */
+  const C = knStore().cal[p.id];
+  if(C && C.n >= 1 && C.last){ const off = C.last.a - C.last.p;
+    B.push(Math.abs(off) <= 3 ? {t:"My counts hold up", why:"on the " + C.last.t + " I had " + C.last.p + " aye and it came in at " + C.last.a, c:0.6}
+      : {t:off < 0 ? "I count too many friends before a roll call" : "I count too few friends before a roll call", why:"on the " + C.last.t + " I had " + C.last.p + " aye and it came in at " + C.last.a + "; I have adjusted", c:0.65}); }
+  B.sort((u, v) => v.c - u.c);
+  KN.bel.set(p.id, {sig:KN.sig, B}); return B;
+}
+function wmNameSafe(k){ try{ return wmName(k); }catch(e){ return k; } }
+
+/* ── counting the next roll call from what they know; learning from the result ── */
+function knCal(id){ const S = knStore(); return S.cal[id] || {d:0.86 + (knH(id, "disc") - 0.5) * 0.16, b:0, n:0, mae:null, hit:0, _new:true}; }
+function knWhip(b, d){ const L = partyLine(b), S = G.seatsBy || {}; let a = 0, n = 0, g = 0;
+  Object.keys(S).forEach(p => { const s = S[p] || 0, l = L[p] == null ? 0 : L[p], dd = p === "IND" ? 0.5 : d; a += s * (l > 0 ? dd : l < 0 ? 1 - dd : 0.5); n += s; if(p !== "IND") g += s * l; });
+  return {a, n, g}; }
+function knStance(p, b){ const out = {}, S = knStore().st[p.id]; if(S && S.b === b.id) Object.assign(out, S.s); if(p.kind === "member"){ try{ out[p.id] = memberVote(p, b) > 0 ? 1 : -1; }catch(e){} } return out; }
+function knSawStance(a, b, bill){ const S = knStore();
+  [[a, b], [b, a]].forEach(([x, y]) => { let r = S.st[x.id]; if(!r || r.b !== bill.id) r = S.st[x.id] = {b:bill.id, s:{}}; try{ r.s[y.id] = memberVote(y, bill) > 0 ? 1 : -1; }catch(e){} }); }
+function knForecast(p){
+  const b = G.bill; if(!b || b.done || !p || p.gone) return null;
+  const pr = knProf(p); if(!(p.kind === "member" || pr.role === "press" || pr.role === "office" || pr.role === "aide")) return null;
+  const C = knCal(p.id), W = knWhip(b, C.d), L = partyLine(b), st = knStance(p, b); let adj = 0, known = 0;
+  Object.keys(st).forEach(id => { const m = knPerson(id); if(!m || m.kind !== "member" || m.gone) return; known++; const l = L[m.party] == null ? 0 : L[m.party]; const ex = m.party === "IND" || !l ? 0.5 : (l > 0 ? C.d : 1 - C.d); adj += (st[id] > 0 ? 1 : 0) - ex; });
+  const aye = clamp(Math.round(W.a + adj + C.b), 0, Math.round(W.n)), no = Math.max(0, Math.round(W.n) - aye);
+  return {aye, no, carry:aye > no, known, g:W.g, cal:C};
+}
+
+/* ── the Engine: the same public record, a forecast it makes itself, and a score it cannot argue with ── */
+function knEng(){ const S = knStore(); if(!S.eng) S.eng = {w:[0, 1, 0, 0], n:0, mae:null, bmae:null, hit:0, bhit:0, last:null}; return S.eng; }
+function knEngX(b){ const W = knWhip(b, 0.86); let lp = 0; try{ lp = clamp(lobbyPush(b) / 60, -1, 1); }catch(e){} const sp = b.sponsorParty === "FED" ? 1 : b.sponsorParty === "COM" ? -1 : 0;
+  return {x:[1, W.a / Math.max(1, W.n), lp, clamp((G.mood || 0) / 60, -1, 1) * sp], n:W.n, base:W.a}; }
+function knEngPredict(b){ const M = knEng(), X = knEngX(b); const s = clamp(M.w.reduce((t, w, i) => t + w * X.x[i], 0), 0.02, 0.98); return {aye:Math.round(s * X.n), share:s, base:Math.round(X.base), n:Math.round(X.n), x:X.x}; }
+
+/* before the clerk calls the roll: everyone who counts writes their count down */
+function knFreeze(b){
+  if(!b || b.done) return; const S = knStore(), F = {id:b.id, t:b.title, d:G.day, p:{}, e:null};
+  try{ everyone().forEach(p => { if(!p || p.gone) return; const f = knForecast(p); if(f) F.p[p.id] = {aye:f.aye, g:f.g, known:f.known}; }); }catch(e){}
+  try{ if(G.eng && G.eng.v === 1) F.e = knEngPredict(b); }catch(e){}
+  S.fc = F;
+}
+/* after: the count against the counts. Each person nudges how far they trust the party lines and their own lean (a least-mean-squares step),
+   and the Engine's weights take a normalised step toward the share that actually voted aye */
+function knResolve(b){
+  const S = knStore(), F = S.fc; if(!F || !b || F.id !== b.id) return null;
+  const s = (G.statute || []).find(x => x.title === b.title && x.day === G.day); if(!s){ S.fc = null; return null; }
+  const act = s.aye, N = s.aye + s.no, out = {n:0, mae:0};
+  Object.keys(F.p).forEach(id => { const pr = F.p[id], C = S.cal[id] || (S.cal[id] = knCal(id)); delete C._new; const err = act - pr.aye;
+    C.n++; C.mae = C.mae == null ? Math.abs(err) : C.mae * 0.6 + Math.abs(err) * 0.4; if((pr.aye * 2 > N) === (act * 2 > N)) C.hit = (C.hit || 0) + 1;
+    if(pr.g) C.d = clamp(C.d + clamp(0.004 * err * Math.sign(pr.g) * Math.min(1, Math.abs(pr.g) / 10), -0.05, 0.05), 0.55, 0.99);
+    C.b = clamp(C.b + 0.35 * err, -20, 20); C.last = {t:b.title, p:pr.aye, a:act, d:G.day}; out.n++; out.mae += Math.abs(err); });
+  if(out.n) out.mae /= out.n;
+  if(F.e){ const M = knEng(), e = F.e, sh = act / Math.max(1, N), er = sh - e.share, xx = e.x.reduce((t, v) => t + v * v, 0);
+    M.w = M.w.map((w, i) => clamp(w + 0.5 * er * e.x[i] / (xx + 0.01), -3, 3));
+    const ae = Math.abs(act - e.aye), be = Math.abs(act - e.base); M.mae = M.mae == null ? ae : M.mae * 0.7 + ae * 0.3; M.bmae = M.bmae == null ? be : M.bmae * 0.7 + be * 0.3; M.n++;
+    if((e.aye * 2 > N) === (act * 2 > N)) M.hit++; if((e.base * 2 > N) === (act * 2 > N)) M.bhit++;
+    M.last = {t:b.title, p:e.aye, base:e.base, a:act, d:G.day}; out.eng = M.last;
+    try{ const E = engEnsure(); if(M.n >= 2){ const sk = 50 + 50 * clamp((M.bmae - M.mae) / Math.max(2, M.bmae), -1, 1); E.cal = clamp((E.cal == null ? 50 : E.cal) * 0.8 + sk * 0.2, 0, 100); }
+      engLog("The Engine had the " + b.title + " at " + e.aye + " aye; the whip count alone said " + e.base + ". It came in at " + act + ". " + (ae < be ? "Closer than the whip count." : ae > be ? "Further off than the whip count; it has adjusted." : "No better than the whip count."), false); }catch(err){} }
+  S.fc = null; KN.bel.clear(); return out;
+}
+
+/* ── passing it on: they choose what the other has not heard and would care about ── */
+function knEst(a, b, e){
+  const P = knStore().p[b.id]; if(P && P.some(r => r[0] === e.h && r[2] === a.id)) return 1;   /* I told them myself */
+  if(e.ids.indexOf(b.id) >= 0) return 1;
+  if(knWit(b, e)) return 0.95;                                                                  /* anyone can see their post */
+  return e.pub ? knP(knProf(b), e) : 0;
+}
+function knPick(a, b){
+  const pb = knProf(b); let best = null, bv = 0;
+  knKnown(a).forEach(x => { const e = x.e; if(!KN_SHARE[e.kind] || !e.pub || x.c < 0.45) return; const est = knEst(a, b, e); if(est > 0.6) return;
+    const age = e.d == null ? 20 : Math.max(0, G.day - e.d), rel = 1 + (e.st && e.st === pb.st ? 1.2 : 0) + (b.name && e.who.indexOf(b.name) >= 0 ? 1.5 : 0) + (e.rk && e.rk === pb.realm ? 1 : 0);
+    const v = e.sal * rel * (0.25 + Math.exp(-age / 12)) * x.c * (1 - est) * (0.85 + 0.3 * knH(a.id + ":" + G.day, e.k));
+    if(v > bv){ bv = v; best = x; } });
+  return best;
+}
+function knTell(a, b, x){
+  const e = x.e, s = knSent(e), w = knWhen(e.d), ws = w ? ", " + w : "", r = knH(a.id + ":" + b.id, e.k);
+  if(x.how === "told" && x.src != null && x.src !== b.id){ const t = knPerson(x.src); if(t && r < 0.5) return "I had it from " + surname(t.name) + ": " + e.t + ws + "."; }
+  if(e.st && r > 0.75) return "Word from " + e.st + ": " + e.t + ws + ".";
+  return ["Did you hear? " + s + ws + ".", "Have you heard? " + s + ws + ".", "You will want to know this. " + s + ws + "."][Math.floor(r * 3)];
+}
+function knOpinion(b, e){
+  const home = knProf(b).st;
+  if(e.kind === "law"){ const v = e.law.v && e.law.v[b.id]; if(e.law.sponsor === b.name) return e.law.fate === "carried" ? "That was mine. Good." : "That was mine. I will bring it back.";
+    if(v) return v > 0 ? "I voted for it." : "I voted against it, and I would again.";
+    if(e.st && e.st === home) return e.law.fate === "carried" ? "Good for " + home + "." : "That will land hard in " + home + "."; }
+  if(e.kind === "case" && e.st === home) return e.cs.ruled === "union" ? "So the capital wins again." : "Good. " + home + " needed that.";
+  if(e.kind === "offchg" && e.st === home) return "I will need to learn a new name at home, then.";
+  if(e.kind === "pol") return "God help the Union.";
+  if(e.kind === "war") return "And every one of those is a family.";
+  return ["That changes things.", "Nobody tells me anything.", "Hm. I will think about that.", "So that is how it is."][Math.floor(knH(b.id, e.k + ":op") * 4)];
+}
+function knReact(b, a, e, had){
+  if(had){ const L = had.how === "wit" ? ["I know. I was there.", "I was there for it."] : had.how === "self" ? ["I know. That was me."] : ["I heard. " + knOpinion(b, e), "It was in every paper. " + knOpinion(b, e)];
+    return L[Math.floor(knH(b.id, e.k + ":re") * L.length)]; }
+  return ["I had not heard. " + knOpinion(b, e), "That is news to me. " + knOpinion(b, e), "Really? " + knOpinion(b, e)][Math.floor(knH(b.id, e.k + ":re") * 3)];
+}
+function knShare(a, b){
+  if(!a || !b || a === b || a.gone || b.gone || a === G.you || b === G.you) return null;
+  const x = knPick(a, b); if(!x) return null;
+  const e = x.e, had = knKnows(b, e); let trust = 0.75; const w = knTie(a.id, b.id); if(w != null) trust = clamp(0.6 + w / 250, 0.3, 0.98);
+  if(!had) knLearn(b, e, a.id, x.c * trust * 0.95);
+  KN.told++;
+  return {e, knew:!!had, a:knTell(a, b, x), b:knReact(b, a, e, had)};
+}
+/* off-screen: each day people talk along their ties (warm ones most), their alliances and the rooms they share */
+function knAdj(){
+  if(KN.adj && KN.adjDay === G.day) return KN.adj; const A = new Map(), put = (x, y, w) => { if(x == null || y == null || x === y) return; if(!A.has(x)) A.set(x, []); A.get(x).push([y, w]); };
+  Object.keys(G.ties || {}).forEach(k => { const t = G.ties[k], ij = k.split("|"); if(!t || t.w == null || t.w < 10) return; const a = isNaN(+ij[0]) ? ij[0] : +ij[0], c = isNaN(+ij[1]) ? ij[1] : +ij[1]; put(a, c, t.w); put(c, a, t.w); });
+  try{ everyone().forEach(p => { if(!p || p.gone) return; (p.allies || []).forEach(o => put(p.id, o, 40)); }); }catch(e){}
+  KN.adj = A; KN.adjDay = G.day; return A;
+}
+function knDay(){
+  if(!G || !G.you || G.day == null) return 0; const S = knStore(); knEvents();
+  const all = (function(){ try{ return everyone().filter(p => p && !p.gone); }catch(e){ return []; } })(); if(all.length < 2) return 0;
+  const A = knAdj(), r = rng(seedOf("knday:" + G.day)); let n = 0;
+  for(let i = 0; i < 140 && n < 60; i++){ const a = all[Math.floor(r() * all.length)], nb = A.get(a.id);
+    let b = null; if(nb && nb.length && r() < 0.8){ const tot = nb.reduce((t, z) => t + z[1], 0); let q = r() * tot; for(const z of nb){ q -= z[1]; if(q <= 0){ b = knPerson(z[0]); break; } } }
+    if(!b && a.room && a.room !== "abroad"){ const here = all.filter(o => o !== a && o.room === a.room); if(here.length) b = here[Math.floor(r() * here.length)]; }
+    if(!b || b.gone || b === a) continue; if(knShare(a, b)) n++; }
+  /* the small things go: told-facts are kept a season, and only while the record still holds them */
+  Object.keys(S.p).forEach(id => { const P = S.p[id].filter(z => KN.byH[z[0]] && G.day - z[3] <= 150); if(P.length) S.p[id] = P; else delete S.p[id]; });
+  const ids = Object.keys(S.p); if(ids.length > 300){ ids.sort((u, v) => Math.max(...S.p[u].map(z => z[3])) - Math.max(...S.p[v].map(z => z[3]))).slice(0, ids.length - 300).forEach(id => delete S.p[id]); }
+  Object.keys(S.st).forEach(id => { if(!G.bill || S.st[id].b !== G.bill.id) delete S.st[id]; });
+  return n;
+}
+
+/* ── asked a question, they answer from what they know, or say they do not ── */
+function knFindPerson(q){
+  const ql = " " + knNorm(q) + " "; let best = null, bs = 0;
+  const cand = (function(){ try{ return everyone().filter(p => p && p.name && !p.gone); }catch(e){ return []; } })(); if(G.you && G.you.name) cand.push(G.you);
+  cand.forEach(p => { const nm = knNorm(p.name), parts = nm.split(" "), sur = parts[parts.length - 1];
+    let s = ql.indexOf(" " + nm + " ") >= 0 ? 10 : (sur.length >= 4 && ql.indexOf(" " + sur + " ") >= 0 ? 4 : 0); if(!s) return;
+    s += p.kind === "member" ? 2 : p.ohK ? 1.5 : p === G.you ? 1.5 : p.scKey && !/^former/.test(p.scKey) ? 1 : 0;
+    if(s > bs){ bs = s; best = p; } });
+  return best;
+}
+function knFindLaw(q){
+  const ql = " " + knNorm(q) + " "; let best = null, bs = 0;
+  knEvents().forEach(e => { if(e.kind !== "law" && e.kind !== "bill") return; const title = e.kind === "law" ? e.law.title : e.bill.title, tl = knNorm(title).replace(/^the /, "");
+    let s = ql.indexOf(" " + tl + " ") >= 0 ? 10 : 0; const W = knWords(title), hit = W.filter(w => ql.indexOf(" " + w + " ") >= 0).length;
+    if(W.length && hit >= Math.min(2, W.length)) s += hit; if(s && (s > bs || (s === bs && best && (e.d || 1e9) > (best.d || 0)))){ bs = s; best = e; } });
+  return best;
+}
+function knFindRealm(q){ const ql = " " + knNorm(q) + " "; try{ const w = (typeof WORLD_POWERS !== "undefined" ? WORLD_POWERS : []).find(w => { const nm = knNorm(w.t).replace(/^the /, ""); return ql.indexOf(" " + nm + " ") >= 0 || ql.indexOf(" " + knNorm(w.k) + " ") >= 0; }); return w ? w.k : null; }catch(e){ return null; } }
+function knFindOffice(q, st){
+  const ql = knNorm(q); let best = null, bs = 0;
+  knEvents().forEach(e => { if(e.kind !== "office") return; const t = knNorm(e.off.title), k = e.off.key; let s = 0;
+    if(/\bgovernor\b/.test(ql) && /^governor/.test(t)) s += 3;
+    if(/\bsenator\b/.test(ql) && /^senator/.test(t)) s += 3;
+    if(/\b(representative|represents|congressman|congresswoman|member for|house seat)\b/.test(ql) && /^representative/.test(t)) s += 3;
+    if(/\bspeaker\b/.test(ql) && k === "speaker") s += 4;
+    if(/\bvice\b/.test(ql) && k === "vp") s += 5; else if(/\b(president|head of state|first consul)\b/.test(ql) && !/\bvice\b/.test(ql) && k === "pres") s += 4;
+    if(/\bsecretary of state\b/.test(ql) && /secretary of state/.test(t)) s += 5; else if(/\btreasury\b/.test(ql) && /treasury/.test(t)) s += 5; else if(/\b(defen[cs]e|war secretary|secretary of war)\b/.test(ql) && /defense/.test(t)) s += 5; else if(/\battorney\b/.test(ql) && /attorney/.test(t)) s += 5;
+    if(/\bchief justice\b/.test(ql) && k === "bench:0") s += 5;
+    if(/\bmajority\b/.test(ql) && /majority/.test(t)) s += 5; if(/\bminority\b/.test(ql) && /minority/.test(t)) s += 5; if(/\bpro tem/.test(ql) && /pro tempore/.test(t)) s += 5;
+    if(e.st){ if(st === e.st) s += 2; else if(st) s -= 4; else s -= 1; }
+    if(s > bs){ bs = s; best = e; } });
+  return bs >= 3 ? best : null;
+}
+function knWhoKnows(p, e){
+  let best = null, bc = 0;
+  const cand = (function(){ try{ return everyone().filter(o => o && !o.gone && o !== p && (o.kind === "member" || o.kind === "press" || o.ohK || /^(gov|cp):/.test(o.scKey || ""))); }catch(err){ return []; } })();
+  cand.forEach(o => { const k = knKnows(o, e); if(!k) return; const c = k.c + (o.room && o.room === p.room ? 0.1 : 0) + (o.kind === "member" ? 0.05 : 0); if(c > bc){ bc = c; best = o; } });
+  if(!best) return "";
+  const why = e.st && knProf(best).st === e.st ? "it is " + (best.ohK && /^gov:/.test(best.ohK) ? "their state" : "home for them") : knWit(best, e) ? "they would have been there" : best.kind === "press" ? "they read everything" : "they keep up with it";
+  return " Ask " + best.name + "; " + why + ".";
+}
+function knSay(p, e, k){ const src = knSrc(p, k, e); return knCap(knHedge(k.c) + e.t) + knWhenC(e) + "." + (src ? " " + knCap(src) + "." : ""); }
+function knAnswer(p, text){
+  if(!p || p === G.you || /^(engine|envoy)$/.test(p.kind || "")) return null;
+  const q = String(text || "").trim(); if(q.length < 4) return null;
+  const ql = knNorm(q), isQ = /\?\s*$/.test(q) || /^(who|what|when|where|which|how|did|does|do|has|have|is|are|was|were|will|tell me|any|heard|know)\b/.test(ql);
+  if(!isQ) return null;
+  const done = (t, e, k) => { KN.last[p.id] = {e, k, d:G.day}; return {text:t, strong:true, ev:e ? e.k : null}; }, you = G.you || {};
+  /* how do you know */
+  if(/\b(how do you know|who told you|where did you hear|where did you get that|your source)\b/.test(ql)){ const L = KN.last[p.id];
+    if(L && L.e && L.k){ const s = knSrc(p, L.k, L.e); return done(s ? knCap(s) + "." : "Because I was part of it.", L.e, L.k); } return null; }
+  const st = knStateIn(q), realm = knFindRealm(q);
+  /* who holds an office, or leads a power */
+  if(/\bwho\b/.test(ql) && (/\b(lead|leads|runs|rules|heads|in charge)\b/.test(ql) || /\b(premier|first minister|prime minister|leader)\b/.test(ql)) && realm){
+    const e = knEvents().find(x => x.kind === "na" && x.rk === realm && x.na.lead); if(e){ const k = knKnows(p, e); return done(k ? knSay(p, e, k) : "I could not tell you who leads " + wmNameSafe(realm) + " now." + knWhoKnows(p, e), e, k); } }
+  if(/\bwho\b/.test(ql) || /\b(governor|senator|speaker|representative|chief justice|secretary)\b.*\?$/.test(q.toLowerCase())){
+    const e = knFindOffice(q, st);
+    if(e){ const k = knKnows(p, e);
+      if(e.off.id === "you") return done("You are" + (/^(pres)$/.test(e.off.key) ? ", " + (function(){ try{ return youAddress(); }catch(x){ return "of course"; } })() : "") + ".", e, {c:1, how:"self"});
+      if(e.off.id === p.id) return done("I am. " + knCap(e.off.title) + (e.off.from > 1 ? ", since " + knWhen(e.off.from) : "") + ".", e, {c:1, how:"self"});
+      if(/^representative/i.test(e.off.title) && !/\d/.test(q)){ const all = knKnown(p).filter(x => x.e.kind === "office" && /^house:/.test(x.e.off.key) && x.e.st === e.st);
+        if(all.length) return done(e.st + " sends " + all.map(x => x.e.off.name + " (" + x.e.off.title.replace(/^Representative for /, "") + ")").join(" and ") + ", that I know of.", all[0].e, {c:all[0].c, how:all[0].how}); }
+      if(k) return done(knCap(knHedge(k.c)) + e.off.name + (e.off.from > 1 ? ", since " + knWhen(e.off.from) : "") + "." + (k.how !== "self" ? " " + knCap(knSrc(p, k, e)) + "." : ""), e, k);
+      return done("I could not tell you who is " + e.off.title + " now." + knWhoKnows(p, e), e, null); } }
+  /* a law, or the bill before the House */
+  const law = knFindLaw(q);
+  if(law && law.kind === "law"){ const k = knKnows(p, law), who = /\bvot/.test(ql) ? knFindPerson(q.replace(new RegExp(law.law.title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i"), "")) : null;
+    if(who && who !== p){ if(!k || (k.how !== "wit" && !(k.how === "self" && p.kind === "member"))) return done("I was not on the floor for that one, so I could not tell you how " + who.name + " voted." + (k ? " I know it " + (law.law.fate === "carried" ? "carried" : "went down") + ", " + law.law.aye + " to " + law.law.no + "." : ""), law, k);
+      const v = law.law.v && law.law.v[who.id]; if(v) return done(surname(who.name) + " voted " + (v > 0 ? "aye" : "no") + " on it. I was there.", law, k);
+      if(who === G.you && law.law.yv) return done("You voted " + (law.law.yv > 0 ? "aye" : "no") + ". I was there.", law, k);
+      return done("I know the count, " + law.law.aye + " to " + law.law.no + ", not every name on the roll; I could not swear to how " + surname(who.name) + " voted.", law, k); }
+    if(!k){ const before = p.kind === "member" && knSince(p) > law.d; return done((before ? "That was before my time here." : "I have not followed that one.") + knWhoKnows(p, law), law, null); }
+    let t = knSay(p, law, k); const mv = law.law.v && law.law.v[p.id]; if(mv && k.how === "wit") t += " I voted " + (mv > 0 ? "aye" : "no") + ".";
+    else { const op = knOpinion(p, law); if(op && !/^(That changes|Nobody tells|Hm\.|So that is)/.test(op)) t += " " + op; }
+    return done(t, law, k); }
+  if(/\b(will it pass|will it carry|the count|does it pass|going to pass|where does it stand|the numbers)\b/.test(ql)){
+    const b = G.bill; if(b && !b.done){ const f = knForecast(p);
+      if(!f) return done("I do not count votes; I could not tell you. Ask someone on the floor.", null, null);
+      const C = f.cal, lean = Math.abs(f.aye - f.no) <= 4 ? "too close to call" : f.carry ? "it carries" : "it fails";
+      return done("As I count it, about " + f.aye + " to " + f.no + ": " + lean + "." + (f.known > 1 ? " That is with " + (f.known - (p.kind === "member" ? 1 : 0)) + " of us who have told me where they stand." : " That is from the party lines; few have told me anything.") + (C.n && C.last ? " On the " + C.last.t + " I had " + C.last.p + " and it came in at " + C.last.a + ", so weigh it accordingly." : ""), null, null); } }
+  /* the court */
+  if(/\bcourt\b/.test(ql) && /\b(rule|ruled|ruling|decide|decided|say)\b/.test(ql)){ const K = knKnown(p).filter(x => x.e.kind === "case" && (!st || x.e.st === st)).sort((u, v) => v.e.d - u.e.d);
+    if(K.length) return done(knSay(p, K[0].e, K[0]), K[0].e, K[0]); return done("I have not kept up with the court." , null, null); }
+  /* a power abroad */
+  if(realm){ const K = knKnown(p).filter(x => x.e.rk === realm).sort((u, v) => v.e.sal - u.e.sal);
+    if(K.length) return done(K.slice(0, 2).map((x, i) => i ? knCap(x.e.t) + "." : knSay(p, x.e, x)).join(" "), K[0].e, K[0]); return done("I know very little about " + wmNameSafe(realm) + ".", null, null); }
+  /* a person */
+  const who = knFindPerson(q);
+  if(who && who !== p && /\b(know about|think of|think about|make of|who is|who's|tell me about|heard about|what about|opinion of)\b/.test(ql)){
+    const nm = who === G.you ? you.name : who.name, B = knBeliefs(p).filter(b => b.about === nm), K = knKnown(p).filter(x => x.e.who.indexOf(nm) >= 0 && x.e.kind !== "secret").sort((u, v) => v.e.sal - u.e.sal || (v.e.d || 0) - (u.e.d || 0));
+    const bits = []; if(K.length) bits.push(knSay(p, K[0].e, K[0])); if(K[1]) bits.push(knCap(K[1].e.t) + knWhenC(K[1].e) + "."); if(B.length) bits.push(B[0].t + ": " + B[0].why + ".");
+    if(bits.length) return done(bits.join(" "), K.length ? K[0].e : null, K.length ? K[0] : null);
+    return done("I do not know " + (who === G.you ? "much more than anyone does" : surname(who.name) + " well enough to say") + ".", null, null); }
+  /* a state */
+  if(st && /\b(happening|news|going on|how is|how's|what about|heard from|from)\b/.test(ql)){ const K = knKnown(p).filter(x => x.e.st === st && x.e.kind !== "secret" && x.e.kind !== "offpast").sort((u, v) => ((v.e.d == null ? G.day - 20 : v.e.d) - (u.e.d == null ? G.day - 20 : u.e.d)) || v.e.sal - u.e.sal);
+    if(K.length) return done(K.slice(0, 2).map((x, i) => i ? knCap(x.e.t) + knWhenC(x.e) + "." : knSay(p, x.e, x)).join(" "), K[0].e, K[0]); return done("I have heard nothing out of " + st + " lately.", null, null); }
+  /* the news */
+  if(/\b(news|what's new|whats new|what is new|heard anything|have you heard|what have you heard|anything new|going on|happening|latest)\b/.test(ql)){
+    const K = knKnown(p).filter(x => KN_SHARE[x.e.kind] && x.e.d != null).sort((u, v) => (v.e.sal * Math.exp(-Math.max(0, G.day - v.e.d) / 6)) - (u.e.sal * Math.exp(-Math.max(0, G.day - u.e.d) / 6)));
+    if(K.length) return done(knSay(p, K[0].e, K[0]) + (K[1] ? " And " + K[1].e.t + knWhenC(K[1].e) + "." : ""), K[0].e, K[0]); return done("Nothing that has reached me.", null, null); }
+  return null;
+}
+
+/* ── the line that goes into a live model's prompt: what they know, what they worked out, and where their knowing stops ── */
+function knPrompt(p, text, peer){
+  if(!p || p === G.you || /^(engine|envoy)$/.test(p.kind || "")) return "";
+  const K = knKnown(p), pr = knProf(p), qw = new Set(knWords(text));
+  const sc = x => { const e = x.e, ov = knWords(e.t).filter(w => qw.has(w)).length, age = e.d == null ? 20 : Math.max(0, G.day - e.d);
+    return ov * 2 + e.sal * (0.4 + Math.exp(-age / 15)) + (e.st && e.st === pr.st ? 0.3 : 0) + (peer && peer.name && e.who.indexOf(peer.name) >= 0 ? 1.5 : 0); };
+  const top = K.filter(x => x.e.kind !== "secret").map(x => [x, sc(x)]).sort((u, v) => v[1] - u[1]).slice(0, 9).map(z => z[0]);
+  const L = [];
+  if(top.length){ L.push("WHAT YOU KNOW OF THE PUBLIC RECORD (true; how it reached you and how sure you are in brackets). Use it when it bears on what is said; never recite it as a list:");
+    top.forEach(x => L.push("- " + knSent(x.e) + knWhenC(x.e) + " [" + knSrcShort(p, x) + (x.c < 0.6 ? "; hazy" : x.c < 0.75 ? "; fairly sure" : "") + "]")); }
+  else L.push("WHAT YOU KNOW OF THE PUBLIC RECORD: very little; you do not follow the capital.");
+  const B = knBeliefs(p).slice(0, 4); if(B.length){ L.push("WHAT YOU HAVE WORKED OUT FOR YOURSELF (your own reasoning from what you know; it can be wrong):"); B.forEach(b => L.push("- " + b.t + " (" + b.why + ")")); }
+  const f = knForecast(p); if(f) L.push("YOUR OWN COUNT ON THE " + G.bill.title.toUpperCase() + ": about " + f.aye + " aye to " + f.no + " no" + (f.known > 1 ? ", counting the people who have told you their vote" : ", from the party lines alone") + (f.cal.n ? "; your counts have been off by " + Math.round(f.cal.mae) + " on average" : "") + ".");
+  L.push("WHERE YOUR KNOWING STOPS: anything not above or in your memory you do not know. If asked about a law, a vote, an office holder, a ruling, a war or an event that is not here, say you do not know or have not heard, or name who would know. Never invent a name, a number, a vote or an event.");
+  return L.join("\n");
+}
+function knEnginePrompt(){
+  const ev = knEvents().filter(e => e.pub && e.kind !== "rn" && e.kind !== "offpast").map(e => [e, e.sal * (0.4 + (e.d == null ? 0.5 : Math.exp(-Math.max(0, G.day - e.d) / 20)))]).sort((u, v) => v[1] - u[1]).slice(0, 10).map(z => z[0]);
+  if(!ev.length) return ""; const M = knEng(), L = ["THE PUBLIC RECORD (laws, rulings, offices, the states and the powers; you have read it, as anyone may; nothing private):"];
+  ev.forEach(e => L.push("- " + knSent(e) + knWhenC(e) + "."));
+  if(M.n) L.push("YOUR ROLL-CALL FORECASTS FROM THAT RECORD, SCORED AGAINST THE CLERK'S COUNT: " + M.n + " made; off by " + M.mae.toFixed(1) + " votes on average, where the plain whip count was off by " + M.bmae.toFixed(1) + "; right on the outcome " + M.hit + " of " + M.n + " times. Say so plainly if asked how good your forecasts are.");
+  return L.join("\n");
+}
+
+/* ── hooks: roll calls, the corridor, the prompts, the panels ── */
+{ const _hv = holdVote; holdVote = function(){ const b = G.bill; try{ if(b && !b.done) knFreeze(b); }catch(e){} const r = _hv.apply(this, arguments); try{ knResolve(b); }catch(e){} return r; }; }
+{ const _cf = confer; confer = function(a, b){ const hb = b && b.heard ? b.heard[0] : null; const r = _cf.apply(this, arguments);
+  try{ const bl = G.bill; if(bl && !bl.done && b.heard && b.heard[0] !== hb){ const t = b.heard.slice(0, 3).map(h => h.t).join(" "); if(t.indexOf(surname(a.name) + " told me they are voting") >= 0) knSawStance(a, b, bl); } }catch(e){}
+  try{ if(chance(0.45)){ const sh = knShare(a, b); if(sh) KN.line.set(a, {t:G.t, b:b.id, l:[sh.a, sh.b]}); } }catch(e){}
+  return r; }; }
+{ const _st = smallTalk; smallTalk = function(a, b){ try{ const k = a && KN.line.get(a); if(k && b && k.b === b.id && G.t - k.t < 3){ KN.line.delete(a); return k.l; } }catch(e){} return _st.apply(this, arguments); }; }
+{ const _op = ofhPublish; ofhPublish = function(){ KN.ofhN++; return _op.apply(this, arguments); }; }
+{ const _epk = engEntityPrompt; engEntityPrompt = function(){ let t = _epk.apply(this, arguments) || ""; try{ const s = knEnginePrompt(); if(s) t += "\n" + s; }catch(e){} return t; }; }
+{ const _scb3 = saveCaptureBase; saveCaptureBase = function(){ const o = _scb3.apply(this, arguments); try{ o.kn = G.kn || null; }catch(e){} return o; }; }
+{ const _eph = engPlansHTML; engPlansHTML = function(){ let h = _eph.apply(this, arguments); try{ const M = knEng(), b = G.bill;
+  const now = b && !b.done && G.eng && G.eng.v === 1 ? knEngPredict(b) : null;
+  if(M.n || now) h += '<div class="eyebrow" style="margin-top:10px">Roll calls, forecast from the public record</div><p class="muted" style="font-size:13px">' +
+    (now ? 'On the ' + pcEsc(b.title) + ' it expects about <b>' + now.aye + '</b> aye of ' + now.n + '; the whip count alone says ' + now.base + '. ' : '') +
+    (M.n ? 'Scored on ' + M.n + ' roll call' + (M.n > 1 ? 's' : '') + ': off by ' + M.mae.toFixed(1) + ' votes on average against the whip count\'s ' + M.bmae.toFixed(1) + '; the outcome right ' + M.hit + ' of ' + M.n + ' times.' + (M.last ? ' Last: the ' + pcEsc(M.last.t) + ', ' + M.last.p + ' forecast, ' + M.last.a + ' counted.' : '') : 'Not yet scored: the first count is still to come.') + '</p>'; }catch(e){} return h; }; }
+{ const _rt = renderTalk; renderTalk = function(){ const r = _rt.apply(this, arguments); try{ const m = TALK.m, box = el("tkMeta"); if(m && box && m.kind !== "engine" && !box.querySelector(".pin--kn")){
+  const K = knKnown(m), B = knBeliefs(m); if(K.length){ const top = K.filter(x => x.e.kind !== "secret").slice().sort((u, v) => v.e.sal - u.e.sal || (v.e.d || 0) - (u.e.d || 0)).slice(0, 5);
+    const tip = top.map(x => "• " + knSent(x.e) + knWhenC(x.e)).concat(B.slice(0, 2).map(b => "→ " + b.t + " (" + b.why + ")")).join("\n");
+    const s = document.createElement("span"); s.className = "pin pin--kn"; s.title = "What they know of the record, and what they make of it:\n" + tip; s.textContent = "knows " + K.length + " of the record"; box.appendChild(s); } } }catch(e){} return r; }; }
+{ const _sg = suggestions; suggestions = function(m){ const out = _sg.apply(this, arguments); try{ if(!m || TALK.thread || out.length < 3 || knH(m.id, "sg:" + G.day) > 0.6) return out;
+  const home = knProf(m).st, last = knKnown(m).filter(x => x.e.kind === "law").sort((u, v) => v.e.d - u.e.d)[0], pool = [{t:"What's the news?", say:"What have you heard lately?"}];
+  if(home && !(m.ohK && /^gov:/.test(m.ohK))) pool.push({t:"Who governs " + home + "?", say:"Who is the Governor of " + home + " these days?"});
+  if(last) pool.push({t:"About the " + last.e.law.title.split(" ")[0] + " vote", say:"How did the " + last.e.law.title + " go?"});
+  out[out.length - 1] = pool[Math.floor(knH(m.id, "sgp:" + G.day) * pool.length)]; }catch(e){} return out; }; }
+/* a party line nobody defined left some members' sway as NaN in older saves; it is put back to nothing */
+function knMend(){ let n = 0; try{ (G.members || []).forEach(m => { if(m && typeof m.sway === "number" && !isFinite(m.sway)){ m.sway = 0; n++; } }); }catch(e){} return n; }
+setInterval(() => { try{ if(G && G.you && G.day != null && KN.day !== G.day){ const first = !KN.day; KN.day = G.day; knMend(); if(!first) knDay(); } }catch(e){} }, 3000);
+window.onumKnow = {
+  record:() => knEvents().map(e => ({key:e.k, kind:e.kind, day:e.d, text:knSent(e), public:e.pub, state:e.st || null})),
+  of(id){ const p = knPerson(id); if(!p) return null; return knKnown(p).map(x => ({key:x.e.k, text:knSent(x.e), day:x.e.d, sure:Math.round(x.c * 100) / 100, how:x.how, from:x.how === "told" ? (knNameOf(x.src) || x.src) : null})); },
+  beliefs(id){ const p = knPerson(id); return p ? knBeliefs(p).map(b => ({belief:b.t, because:b.why, sure:Math.round(b.c * 100) / 100})) : null; },
+  ask(id, q){ const p = knPerson(id); if(!p) return null; const a = knAnswer(p, q); return a ? a.text : null; },
+  who(key){ const e = KN.byK[key] || knEvents().find(x => x.k === key); if(!e) return null; try{ return everyone().filter(p => p && !p.gone && knKnows(p, e)).map(p => p.id); }catch(err){ return []; } },
+  forecast(id){ const p = knPerson(id); const f = p ? knForecast(p) : null; return f ? {aye:f.aye, no:f.no, carries:f.carry, toldBy:f.known, record:f.cal.n ? {calls:f.cal.n, offBy:Math.round(f.cal.mae * 10) / 10, last:f.cal.last} : null} : null; },
+  engine(){ const M = knEng(), b = G.bill; return {calls:M.n, offBy:M.mae, whipOffBy:M.bmae, right:M.hit, whipRight:M.bhit, weights:M.w.slice(), last:M.last, now:b && !b.done ? knEngPredict(b) : null}; },
+  share(a, b){ const x = knPerson(a), y = knPerson(b); const s = x && y ? knShare(x, y) : null; return s ? {said:s.a, reply:s.b, key:s.e.k, alreadyKnew:s.knew} : null; },
+  day:() => knDay(), prompt:(id, text) => { const p = knPerson(id); return p ? knPrompt(p, text || "") : ""; }
+};
 
 armFrame();
 

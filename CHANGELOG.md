@@ -4,6 +4,12 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261025g: what people know
+
+`20261025g` (on `20261025f`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+Every person now carries a share of the game's real record (laws with their counts, court rulings, history and precedents, who holds and held each office, the states' and powers' news, war records, the player's career), learned by being there, from the papers or from someone who told them, and forgotten small-things-first. They pass facts on in the corridor and along their ties (choosing what the other has not heard), reason from them to judgements with stated reasons, count the next roll call and learn from the result, and answer questions from what they know or say they do not and name who would. The live-model prompt carries what each person knows and where their knowing stops; the Engine reads the public record, forecasts each roll call and is scored against the whip count. Fix: members of a party the player founded had no party line, scored NaN and voted no on everything; their line is now the player's stance. The clerk now records each named member's vote on the roll.
+
 ## 20261025f: hair with volume and strands
 
 `20261025f` (on `20261025e`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
