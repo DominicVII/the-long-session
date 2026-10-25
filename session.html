@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261025h">
+<meta name="onum-build" content="20261025i">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261025h";
+  var STAMP = "20261025i";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -28821,7 +28821,11 @@ function holdVote(){
   }
   G.you.vote = present ? yourVote : null;
   const t = tallyBill(b, false);
-  const passed = t.aye > t.no;
+  const housePassed = t.aye > t.no;
+  /* 20261025i: what the House carries goes to the Senate, seat by seat, before it can reach the President */
+  let sen = null; try{ if(housePassed && typeof lxSenate === "function") sen = lxSenate(b); }catch(e){ sen = null; }
+  b._sen = sen;
+  const passed = housePassed && (!sen || sen.ok);
   const line = partyLine(b)[G.you.party];
 
   const kept = [], broke = [];
@@ -28885,7 +28889,7 @@ function holdVote(){
   G.you.record.defections += broke.length;
 
   /* the other two branches get their say */
-  let fate = passed ? "carried" : "rejected", extra = "";
+  let fate = passed ? "carried" : housePassed ? "senate" : "rejected", extra = sen ? "<p><strong>The Senate " + (sen.ok ? "concurred" : "rejected it") + ", " + sen.aye + " to " + sen.no + (sen.tie ? ", the Vice President breaking the tie" : "") + ".</strong></p>" : "";
   if(passed){
     const v = execVeto(b, t); b._veto = v ? {by:v.by, override:!!v.override} : null;   /* 20261025h: the statute book keeps it */
     if(v){
@@ -28928,9 +28932,9 @@ function holdVote(){
   try{
     feed("ROLL CALL — " + b.title + ". The clerk rises. Galleries lean.");
     note("Roll call: " + b.title + " — " + t.aye + " aye, " + t.no + " no" + (present ? (yourVote>0 ? ", you aye" : ", you no") : inHouse() ? ", you absent" : "") + ".", true);
-    journal("Roll call on " + b.title + ": " + (passed ? "carried" : "rejected") + " " + t.aye + "–" + t.no +
+    journal("Roll call on " + b.title + ": " + (housePassed ? "carried" : "rejected") + " " + t.aye + "–" + t.no + (sen ? "; Senate " + (sen.ok ? "passed" : "rejected") + " " + sen.aye + "–" + sen.no : "") +
       (present ? (" · you " + (yourVote>0?"aye":"no")) : inHouse() ? " · you not voting" : "") + ".");
-    pushWireScrap("Floor", b.title + " — " + (passed ? "CARRIED" : "REJECTED") + " " + t.aye + "–" + t.no);
+    pushWireScrap("Floor", b.title + " — " + (housePassed ? "CARRIED" : "REJECTED") + " " + t.aye + "–" + t.no);
     if(G.room === "floor"){
       feed(passed ? "Cheers from one side, silence from the other — then the other way round."
                   : "A groan under the gallery. Somebody drops a pencil like a gavel.");
@@ -28942,7 +28946,7 @@ function holdVote(){
   }catch(err){}
   card.innerHTML =
     '<div class="eyebrow">Roll call no. ' + (400+b.id) + ' · ' + hhmm() + '</div>' +
-    '<h1>' + (passed ? "The bill is passed." : "The bill is rejected.") + '</h1>' +
+    '<h1>' + (passed ? "The bill is passed." : housePassed ? "The House passed it. The Senate did not." : "The bill is rejected.") + '</h1>' +
     '<p class="dream">' + b.title + '</p>' +
     '<div class="count"><div class="c-aye"><i>Ayes</i><b>'+t.aye+'</b></div>' +
       '<div class="c-no"><i>Noes</i><b>'+t.no+'</b></div>' +
@@ -37120,7 +37124,7 @@ window.onumSession.callon = cabCallOn;
   const mk = () => { if(el0 && el0.isConnected) return el0; el0 = document.createElement("div"); el0.id = "hmWire"; el0.title = "The wire. Click to read the Ledger.";
     el0.style.cssText = "position:fixed;left:8px;right:8px;z-index:10049;background:#12151a;color:#d8d2bf;border:1px solid #3a424d;border-radius:6px;padding:3px 10px;font:12px/1.3 system-ui,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;opacity:.95";
     el0.addEventListener("click", () => { try{ if(G.you && veil.hidden) paperCard(); }catch(e){} }); document.body.appendChild(el0); return el0; };
-  const place = () => { const w = mk(); const tops = ["hmBar", "ndFd"].map(id => document.getElementById(id)).filter(e => { if(!e || e.hidden) return false; const cs = getComputedStyle(e), r = e.getBoundingClientRect(); return cs.display !== "none" && cs.visibility !== "hidden" && r.width > 0 && r.height > 0; }).map(e => e.getBoundingClientRect().top); const top = tops.length ? Math.min.apply(null, tops) : innerHeight; w.style.bottom = Math.max(4, Math.round(innerHeight - top + 4)) + "px"; };
+  const place = () => { const w = mk(); const tops = ["hmBar", "ndFd"].map(id => document.getElementById(id)).filter(e => { if(!e || e.hidden || (e.closest && e.closest("#sxDock"))) return false; const cs = getComputedStyle(e), r = e.getBoundingClientRect(); return cs.display !== "none" && cs.visibility !== "hidden" && r.width > 0 && r.height > 0; }).map(e => e.getBoundingClientRect().top); const top = tops.length ? Math.min.apply(null, tops) : innerHeight; w.style.bottom = Math.max(4, Math.round(innerHeight - top + 4)) + "px"; };
   const tick = () => { try{ const w = mk(); if(!G || !G.running || !G.you || !veil.hidden){ w.style.display = "none"; return; } let H = []; try{ H = makeHeadlines(); }catch(e){} if(!H.length){ w.style.display = "none"; return; } w.style.display = "block"; const h = H[i++ % H.length]; const txt = String(h[0]).toUpperCase() + "  " + String(h[1]).replace(/<[^>]+>/g, ""); if(txt !== last){ w.innerHTML = '<b style="color:#c9a24a;letter-spacing:.12em;font-size:10px;margin-right:8px">THE WIRE</b>'; w.appendChild(document.createTextNode(String(h[0]).toUpperCase() + "  " + String(h[1]).replace(/<[^>]+>/g, ""))); last = txt; } place(); }catch(e){} };
   setInterval(tick, 7000); setInterval(() => { try{ place(); }catch(e){} }, 1500); setTimeout(tick, 1500);
 })();
@@ -48812,7 +48816,7 @@ setInterval(() => { try{ esWrapLT(); }catch(e){} }, 2000);
    game's own record (the statute book, the cases, the history, the offices ledger, the states' and powers' logs, the
    career). The Engine reads the same public record, nothing private, forecasts each roll call from it and is scored. ══ */
 const KN = {ev:[], byK:{}, byH:{}, sig:"", ofhN:0, line:new WeakMap(), kc:new Map(), bel:new Map(), prof:new Map(), profDay:-1, since:new Map(), last:{}, adj:null, adjDay:-1, day:0, told:0};
-const KN_SHARE = {law:1, case:1, hist:1, offchg:1, sc:1, pol:1, war:1, career:1, rn:1, bill:1};
+const KN_SHARE = {law:1, case:1, hist:1, offchg:1, sc:1, pol:1, war:1, career:1, rn:1, bill:1, ovr:1, sact:1};
 const KN_STOP = new Set("the a an of and for to in on at by with act acts bill bills law laws reform republic national federal union new old who what when did does was were has have how its it is are you your about".split(" "));
 function knStore(){ if(!G.kn || G.kn.v !== 1) G.kn = {v:1, p:{}, st:{}, cal:{}, fc:null, eng:null}; return G.kn; }
 function knH(a, b){ return seedOf(a + "␟" + b) / 4294967296; }
@@ -48842,7 +48846,7 @@ function knNameOf(id){ const p = knPerson(id); return p ? p.name : null; }
 /* ── the record, read fresh whenever it changes ── */
 function knEvents(){
   const sc = G.sc || {}, wm = G.wm || {}, st0 = (G.statute || [])[0] || {};
-  const sig = [G.day, (G.statute || []).length, st0.title, st0.day, (G.history || []).length, (G.cases || []).filter(c => c && c.done).length + "/" + (G.cases || []).length, (G.statute || []).map(s => (s.fate || "?").charAt(0)).join(""), (sc.log || []).length, (sc.polities || []).map(p => p.status).join(","),
+  const sig = [G.day, (G.statute || []).length, st0.title, st0.day, (G.history || []).length, (G.cases || []).filter(c => c && c.done).length + "/" + (G.cases || []).length, (G.statute || []).map(s => (s.fate || "?").charAt(0) + (s.ovr && s.ovr.done ? "o" : "")).join(""), ((G.lx && G.lx.sacts) || []).length, (sc.log || []).length, (sc.polities || []).map(p => p.status).join(","),
     (G.career || []).length, (G.reactNews || []).length, (G.secrets || []).length, G.bill ? G.bill.id + (G.bill.done ? "d" : "") : "-", KN.ofhN, JSON.stringify(wm.rec || {}).length, Object.keys(G.realmRel || {}).map(k => Math.round(G.realmRel[k] / 20)).join("")].join("|");
   if(KN.ev.length && KN.sig === sig) return KN.ev;
   const E = [], seen = new Set(), seenT = new Set(), T = knT(), you = G.you || {};
@@ -48852,10 +48856,13 @@ function knEvents(){
   /* the statute book: every bill the House decided, with the count; the names on the roll only where the clerk kept them */
   (G.statute || []).forEach(s => { if(!s || !s.title) return;
     const fate = s.fate || (s.aye > s.no ? "carried" : "rejected"), sp = s.sponsor || null;
-    const verb = fate === "carried" ? "carried" : fate === "rejected" ? "went down" : fate === "vetoed" ? "passed the House and was vetoed" : fate === "struck down" ? "passed the House and was struck down by the court" : fate;
-    add({k:"law:" + s.day + ":" + s.title, kind:"law", d:s.day || 0, t:"the " + s.title.replace(/^the\s+/i, "") + " " + verb + ", " + s.aye + " to " + s.no + (sp ? " (" + sp + "'s bill" + (s.state ? ", out of " + s.state : "") + ")" : ""),
+    const verb = fate === "carried" ? "carried" : fate === "rejected" ? "went down" : fate === "vetoed" ? "passed the House and was vetoed" : fate === "struck down" ? "passed the House and was struck down by the court" : fate === "senate" ? "passed the House and failed in the Senate" : fate;
+    add({k:"law:" + s.day + ":" + s.title, kind:"law", d:s.day || 0, t:"the " + s.title.replace(/^the\s+/i, "") + " " + verb + (s.aye != null ? ", " + s.aye + " to " + s.no + " in the House" : " without a recorded roll call") + (s.sen ? ", " + s.sen.aye + " to " + s.sen.no + " in the Senate" : "") + (sp ? " (" + sp + "'s bill" + (s.state ? ", out of " + s.state : "") + ")" : ""),
       sal:0.5 + (Math.abs((s.aye || 0) - (s.no || 0)) <= 6 ? 0.15 : 0) + (fate === "vetoed" || fate === "struck down" ? 0.15 : 0), tau:0.8, st:s.state || null, who:sp ? [sp] : [], ids:[idOf(sp)],
       law:{title:s.title, aye:s.aye, no:s.no, fate, sponsor:sp, v:s.v || null, yv:s.yv == null ? null : s.yv}}); });
+  (G.statute || []).forEach(s => { if(!s || !s.ovr || !s.ovr.done || s.ovr.none || s.ovr.aye == null) return;
+    add({k:"ovr:" + s.day + ":" + s.title, kind:"ovr", d:s.ovr.d || s.day, t:"the House " + (s.ovr.ok ? "overrode the veto of the " : "failed to override the veto of the ") + s.title + ", " + s.ovr.aye + " to " + s.ovr.no + (s.ovr.ok ? "" : ", short of the " + s.ovr.need + " it needed"), sal:0.75, tau:0.8, st:s.state || null}); });
+  ((G.lx && G.lx.sacts) || []).forEach(a => { if(!a || !a.st) return; add({k:"sact:" + a.d + ":" + a.st + ":" + a.t, kind:"sact", d:a.d, t:a.st + (a.ok ? " passed its " : " threw out its ") + a.t, sal:0.35, tau:1.2, st:a.st}); });
   (G.cases || []).forEach(c => { if(!c || !c.t || !c.done || !c.ruled) return;
     add({k:"case:" + c.day + ":" + c.t, kind:"case", d:c.day || 0, t:"the court ruled for " + (c.ruled === "union" ? "the Union" : c.ruled === "state" ? (c.state || "the state") : c.ruled === "plaintiff" ? ((c.lx && c.lx.plaintiff) || "the plaintiff") : c.ruled) + " in " + c.t + (c.lx && c.lx.held ? ", " + (c.lx.held === "struck" ? "striking section " + c.lx.sec + " of the " + c.lx.act : "upholding the " + c.lx.act) + ", " + c.lx.count : ""), sal:0.6, tau:1.2, st:c.state || null, cs:{ruled:c.ruled, state:c.state}}); });
   (G.history || []).forEach((h, i) => { if(!h || !h.act || !h.who) return; const myth = h.party === "FO";
@@ -49658,7 +49665,8 @@ function lxHistHTML(s){
   const st = lxStatus(s), rows = [];
   rows.push("Filed by " + (s.sponsor || "the leadership") + (s.state ? ", out of " + s.state : "") + ".");
   if(s.aye != null) rows.push("House roll call, day " + s.day + ": " + s.aye + " aye, " + s.no + " no" + (s.yv ? " (you voted " + (s.yv > 0 ? "aye" : "no") + ")" : "") + ".");
-  if(s.v){ const ay = [], no = []; Object.keys(s.v).forEach(id => { const m = knPerson(id); if(m) (s.v[id] > 0 ? ay : no).push(surname(m.name)); }); rows.push("On the roll by name — aye: " + (ay.join(", ") || "none") + "; no: " + (no.join(", ") || "none") + ". The other seats were counted by party."); }
+  if(s.v){ const ay = [], no = [], P = Object.keys(s.v).map(id => knPerson(id)).filter(Boolean), cnt = {}; P.forEach(m => { const k = surname(m.name); cnt[k] = (cnt[k] || 0) + 1; });
+    Object.keys(s.v).forEach(id => { const m = knPerson(id); if(m) (s.v[id] > 0 ? ay : no).push(cnt[surname(m.name)] > 1 ? m.name : surname(m.name)); }); rows.push("On the roll by name — aye: " + (ay.join(", ") || "none") + "; no: " + (no.join(", ") || "none") + ". The other seats were counted by party."); }
   else rows.push("The clerk did not keep the names on the roll for this one; only the count is recorded.");
   const cs = (G.cases || []).filter(c => c.lx && c.lx.act === s.title);
   return '<div class="eyebrow" style="margin-top:12px">Where it stands</div><p>' + pcEsc(st.t) + '</p>' +
@@ -49789,6 +49797,170 @@ setInterval(sxDockTick, 300);
 try{ new MutationObserver(() => sxDockTick()).observe(veil, {attributes:true, attributeFilter:["class", "hidden"]}); }catch(e){}
 /* while you chair a cabinet or council, a seated member you click is called on in the meeting, not taken aside */
 { const _ot = openTalk; openTalk = function(m){ try{ const S = sxdSession(); if(m && S && S.chairId === "you" && (S.kind === "cabinet_meeting" || S.kind === "governor_council") && (S.seats || []).some(x => String(x.personId) === String(m.id)) && window.onumSession && typeof window.onumSession.callon === "function"){ window.onumSession.callon(m.id); return; } }catch(e){} return _ot.apply(this, arguments); }; }
+
+/* ══ 20261025i · THE ROAD A BILL TRAVELS. A bill is referred to the committee whose field it mostly touches; the committee's
+   members offer amendments in markup (to strike the section they mind most, to cut the money) and vote on them and on the
+   report, and you vote with them when you sit there. What the House carries goes to the Senate, voted seat by seat in the
+   same reckoning the docket shows, the Vice President breaking a tie, before it can reach the President. Acts passed on the
+   towns' petitions enter the statute book with the petitions as their text, and the bills before the state legislatures are
+   written out as law too. ══ */
+const LX_CM_AX = {econ:"ways", lib:"judic", def:"armed", wel:"health"};
+function lxNoise(a, b){ return knH(a, b) - 0.5; }
+function lxRoad(b){
+  if(!b || b.done || !b.title || !b.pos) return null;
+  if(b.road) return b.road;
+  const ax = ["econ", "lib", "def", "wel"].sort((u, v) => Math.abs(b.pos[v] || 0) - Math.abs(b.pos[u] || 0))[0];
+  const k = LX_CM_AX[ax] || "ways", c = COMMITTEES.find(x => x.k === k) || COMMITTEES[0], ch = (function(){ try{ return cmtChair(k); }catch(e){ return null; } })();
+  const R = b.road = {cmte:k, t:c.t, chair:ch ? ch.name : null, ref:G.day, mark:Math.max(G.day, (b.voteDay || G.day + 2) - 1), props:[], done:false};
+  const mem = (function(){ try{ return cmtMembers(k).filter(m => m && !m.gone); }catch(e){ return []; } })();
+  let D = null; try{ D = lxDoc(b); }catch(e){}
+  const ops = D ? D.secs.filter(x => x.k === "op" && !/^a first call|^the whole of it/.test(x.clause || "")) : [];
+  const conv = m => (m.traits && m.traits.conviction) || 50;
+  const opp = mem.filter(m => alignment(m, b) < -8).sort((u, v) => conv(v) - conv(u));
+  if(opp[0] && ops.length){ const x = ops.slice().sort((u, v) => ((v.claim && v.claim[2]) || 0) - ((u.claim && u.claim[2]) || 0) || v.n - u.n)[0];
+    R.props.push({k:"strike", ci:x.ci, sec:x.n, head:x.short || x.head, by:opp[0].name, byId:opp[0].id}); }
+  const hawk = mem.filter(m => m.pos && m.pos.econ > 20 && alignment(m, b) < 10 && (!opp[0] || m !== opp[0])).sort((u, v) => v.pos.econ - u.pos.econ)[0];
+  if(hawk && b.cost && !b.soft) R.props.push({k:"cut", by:hawk.name, byId:hawk.id});
+  return R;
+}
+/* the committee votes: the members the game names, you if you sit there, and the committee's other seats by their party's line */
+function lxCmVote(b, score, line, youVote){
+  const R = b.road, named = (function(){ try{ return cmtMembers(R.cmte).filter(m => m && !m.gone); }catch(e){ return []; } })();
+  const y = G.you, youOn = !!(y && y.committee === R.cmte && (function(){ try{ return heldOffice() === "house"; }catch(e){ return false; } })());
+  let aye = 0, no = 0; const by = {};
+  named.forEach(m => { const v = score(m) > 0 ? 1 : -1; by[m.id] = v; v > 0 ? aye++ : no++; });
+  if(youOn && (youVote === 1 || youVote === -1)){ by.you = youVote; youVote > 0 ? aye++ : no++; }
+  const rest = Math.max(0, (typeof CMT !== "undefined" ? CMT.seats : 8) - named.length - (youOn ? 1 : 0));
+  if(rest){ let maj = "FED"; try{ maj = majorityParty(); }catch(e){} const min = maj === "FED" ? "COM" : "FED", nMaj = Math.ceil(rest * 0.55), L = partyLine(b);
+    [[maj, nMaj], [min, rest - nMaj]].forEach(([p, n]) => { for(let i = 0; i < n; i++){ const l = line(L[p] || 0, p, i); l > 0 ? aye++ : no++; } }); }
+  return {aye, no, by, unnamed:rest};
+}
+function lxMarkup(b){
+  const R = lxRoad(b); if(!R || R.done) return null;
+  const n = (b.clauses || []).length || 3, out = [];
+  R.props.forEach((p, i) => {
+    const key = b.title + ":am" + i;
+    const v = lxCmVote(b, m => -alignment(m, b) * 0.6 + (m.party === b.sponsorParty ? -15 : 6) + lxNoise(m.id, key) * 20, (l, pt, j) => l ? -l : (knH(pt + j, key) < 0.5 ? 1 : -1), p.you);
+    p.aye = v.aye; p.no = v.no; p.adopted = v.aye > v.no; p.d = G.day;
+    if(p.adopted){ if(p.k === "strike"){ b.strk = b.strk || []; if(b.strk.indexOf(p.ci) < 0) b.strk.push(p.ci); if(b.pos) Object.keys(b.pos).forEach(k => b.pos[k] = Math.round(b.pos[k] * (1 - 0.5 / n))); }
+      else if(p.k === "cut"){ b.soft = true; if(b.pos) Object.keys(b.pos).forEach(k => b.pos[k] = Math.round(b.pos[k] * 0.8)); } }
+    const what = p.k === "strike" ? "strike section " + p.sec + " (" + String(p.head).toLowerCase() + ")" : "cut the appropriation by a third";
+    (b.amends = b.amends || []).push({d:G.day, by:p.by, what, aye:v.aye, no:v.no, adopted:p.adopted, where:"committee"});
+    out.push(surname(p.by) + "'s amendment to " + what + " is " + (p.adopted ? "adopted" : "rejected") + ", " + v.aye + " to " + v.no);
+  });
+  const rv = lxCmVote(b, m => alignment(m, b) * 0.6 + (m.party === b.sponsorParty ? 12 : -4) + lxNoise(m.id, b.title + ":rep") * 20, (l, pt, j) => l ? l : (knH(pt + j, b.title + ":rep") < 0.5 ? 1 : -1), R.youReport);
+  R.report = {aye:rv.aye, no:rv.no, fav:rv.aye > rv.no, d:G.day}; R.done = true;
+  (G.members || []).forEach(m => { if(m && !m.gone) m.sway = (m.sway || 0) + (R.report.fav ? 1.5 : -1.5) * (m.party === b.sponsorParty ? 0.5 : 1); });
+  try{ LX.docs.delete(lxKey(b)); }catch(e){}
+  try{ const line = "The Committee on " + R.t + " marks up the " + b.title + (out.length ? ": " + out.join("; ") : ", with no amendments offered") + ". Reported " + (R.report.fav ? "favourably" : "unfavourably") + ", " + rv.aye + " to " + rv.no + ".";
+    feed(line, "news"); journal(line); }catch(e){}
+  return R;
+}
+/* the Senate: two seats a State, each senator reckoned exactly as the docket shows them leaning; undecided ones vote their party; a tie goes to the Vice President */
+function lxSenate(b){
+  const y = G.you, k = (function(){ try{ return heldOffice(); }catch(e){ return null; } })(), out = {aye:0, no:0, by:{}, names:{}, ok:false, tie:false, d:G.day}, L = partyLine(b);
+  (G.states || []).forEach(S => { const row = [];
+    for(let i = 0; i < 2; i++){
+      const r = rng(seedOf("sen:" + S.n + i + ":" + (G.term || 1)));
+      const p = S.lean + (r() * 40 - 20) > 8 ? "FED" : S.lean + (r() * 40 - 20) < -8 ? "COM" : "IND";
+      const a = dkStateLean(S, {pos:b.pos}) + (r() * 50 - 25) + (p === "FED" ? 8 : p === "COM" ? -8 : 0) * (b.pos ? Math.sign(b.pos.econ || 1) : 1);
+      let v;
+      if(k === "senate" && y && S.n === y.state && i === 0){ v = b.senateVote === "aye" ? 1 : b.senateVote === "nay" ? -1 : (alignment(y, b) > 0 ? 1 : -1); out.you = v; }
+      else if(Math.abs(a) < 10){ const l = L[p] || 0; v = l ? l : (r() < 0.5 ? 1 : -1); }
+      else v = a > 0 ? 1 : -1;
+      row.push(v); v > 0 ? out.aye++ : out.no++;
+    }
+    out.by[S.n] = row; });
+  try{ (OH.list || []).forEach(p => { if(p && p.ohK && /^sen:/.test(p.ohK) && !/^sen:(maj|min|ppt)$/.test(p.ohK)){ const st = p.ohK.slice(4); if(out.by[st]) out.names[st] = p.name; } }); }catch(e){}
+  if(out.aye === out.no){ out.tie = true; let vv = 1; try{ vv = (G.exec && G.exec.you ? alignment(G.you, b) : alignment(G.exec, b)) > 0 ? 1 : -1; }catch(e){} out.vp = vv; vv > 0 ? out.aye++ : out.no++; }
+  out.ok = out.aye > out.no;
+  return out;
+}
+/* ── the petitions' acts: written from the petitions themselves ── */
+function lxOrgDoc(src){
+  const O = src.org || {}, T = O.towns || [], N = (typeof ORG_NEEDS !== "undefined" && ORG_NEEDS[O.need]) || {t:"the towns' needs", want:"help"};
+  const D = {key:lxKey(src), title:src.title, src, dom:null, prior:null, congress:knOrd(lxCongNo(src.day)), no:"H.R. " + (seedOf(src.title + src.day) % 900 + 100), secs:[], cites:[]};
+  D.longTitle = "To answer the petitions of the towns named in it for " + N.t + ", and for other purposes."; D.enact = "Be it enacted by the Senate and House of Representatives of " + lxCountry() + " in Congress assembled,";
+  const add = (head, sub, plain, ex) => { D.secs.push(Object.assign({n:D.secs.length + 1, head, sub, plain}, ex || {})); };
+  add("Short title", ["This Act may be cited as the " + src.title + "."], "The name it goes by.", {k:"title"});
+  add("Findings", ["The Congress finds that—"].concat(T.map((t, i) => "(" + (i + 1) + ") the town of " + t.town + ", in " + t.state + ", petitioned through its mayor" + (t.mayor ? ", " + t.mayor + "," : "") + " for " + (N.want || N.t) + ";")).concat(T.length ? [] : ["(1) towns in more than one State petitioned for " + N.t + "."]), "Which towns asked, and for what.", {k:"find"});
+  add("Grants", ["(a) Grants.— The Secretary of the Treasury shall pay to each town named below the sum set against its name, to be spent on " + N.t + " and on nothing else:"].concat(T.map((t, i) => "(" + (i + 1) + ") " + t.town + ", " + t.state + " — " + money(t.cost || 0) + ";")).concat(["(b) Account.— Each mayor shall account to the Secretary within one year for every guilder paid."]), "Each petitioning town gets what it asked for, and must account for it.", {k:"op"});
+  add("Authorization of appropriations", ["There is authorized to be appropriated " + money(src.cost || T.reduce((a, t) => a + (t.cost || 0), 0)) + " to carry out this Act, from the general fund."], "What it costs in all.", {k:"approp"});
+  add("Effective date", ["This Act takes effect on enactment."], "It applies at once.", {k:"eff"});
+  return D;
+}
+{ const _lxd = lxDoc; lxDoc = function(ref){ try{ const s = lxSource(ref); if(s && s.org){ const c = LX.docs.get(lxKey(s)); if(c && c.key === "org") return c.doc; const d = lxOrgDoc(s); LX.docs.set(lxKey(s), {key:"org", doc:d}); return d; } }catch(e){} return _lxd.apply(this, arguments); }; }
+{ const _ofa = orgFedAct; orgFedAct = function(){ const O = orgEnsure(), n0 = (O.acts || []).length, open0 = (O.fed || []).filter(p => p && p.status === "open"); const r = _ofa.apply(this, arguments);
+  try{ (O.acts || []).slice(n0).forEach(a => { const k = Object.keys(ORG_NEEDS).find(x => ORG_NEEDS[x].act === a.title), N = ORG_NEEDS[k] || {};
+      const towns = open0.filter(p => p.need === k && p.status !== "open").map(p => ({town:p.townName, state:p.state, mayor:p.mayor, cost:p.cost}));
+      let sp = null; try{ sp = reactHolder("speaker"); }catch(e){}
+      G.statute = G.statute || []; G.statute.unshift({title:a.title, congress:G.congress, day:a.day || G.day, aye:null, no:null, fate:"carried", why:"Petitions from " + towns.length + " towns in " + new Set(towns.map(t => t.state)).size + " States asked the Congress for " + (N.t || "help") + ".", clauses:null, sponsor:sp && sp.name ? sp.name : "the Speaker", state:null, cost:a.cost, org:{need:k, towns}, pos:N.pos ? Object.assign({}, N.pos) : null});
+      if(G.statute.length > 80) G.statute.length = 80; }); }catch(e){} return r; }; }
+/* ── the state legislatures' bills, written out ── */
+const LX_SB = {
+  "Levee and Drainage Bill":(P, st) => [["Drainage districts", ["(a) Formation.— A drainage district may be formed in any watershed of " + st + " on the petition of a majority of the landowners in it.", "(b) Assessment.— The cost of the works shall be assessed on the land benefited, in proportion to the benefit."], "Landowners in a watershed can band together and pay for drainage in proportion to what they gain."], ["Levees", ["(a) Height.— Levees on the rivers of " + st + " shall be raised to the highest water of the last " + P.n(30, 100, 10) + " years."], "The state's levees go up to the worst flood in living memory."]],
+  "Right to Organise Bill":(P, st) => [["Right to organise", ["(a) Right.— Workers in " + st + " may form unions and bargain collectively through representatives of their own choosing.", "(b) Dismissal.— No employer shall dismiss a worker for joining a union, on pain of a fine of up to " + money(P.n(1, 5) * 100) + "."], "Workers may unionise, and can't be fired for it."], ["Labour board", ["(a) Board.— A State labour board of " + P.n(3, 5) + " members shall hear complaints under this Act and may order reinstatement."], "A state board hears complaints and can order a worker rehired."]],
+  "Tolls and Turnpikes Bill":(P, st) => [["Turnpike charters", ["(a) Charter.— The Governor may charter companies to build and keep turnpikes in " + st + ".", "(b) Tolls.— Tolls shall be those set in the charter, reviewed every " + P.n(3, 7) + " years."], "Private companies can build toll roads, at tolls fixed in their charters."], ["Land for the roads", ["(a) Taking.— Land for a chartered turnpike may be taken by eminent domain, on payment of its value as assessed."], "Land for the roads can be taken, with payment."]],
+  "Constabulary Powers Bill":(P, st) => [["State constabulary", ["(a) Force.— There is established a State constabulary of " + P.n(100, 600, 50) + " officers with power to arrest anywhere in " + st + ".", "(b) Search.— A constable may search premises on a warrant from any magistrate, or without one in hot pursuit."], "A statewide police force with powers of arrest and search."], ["Persons arrested", ["(a) Hearing.— A person arrested shall be brought before a magistrate within " + P.n(24, 96, 24) + " hours."], "Anyone arrested sees a magistrate within a set time."]],
+  "Common Schools Bill":(P, st) => [["Common schools", ["(a) Schools.— A common school, free to every child, shall be kept in every township of " + st + ".", "(b) Tax.— A State school tax of " + P.n(1, 4) + " mills on the guilder of assessed property shall be laid to keep them."], "A free school in every township, paid for by a property tax."], ["Superintendents", ["(a) Inspection.— A superintendent in each county shall inspect the schools every term."], "Each county gets a school inspector."]],
+  "Land Enclosure Bill":(P, st) => [["Enclosure", ["(a) Petition.— Common grazing land in " + st + " may be enclosed on the petition of the owners of two thirds of its value.", "(b) Compensation.— Every commoner who loses a right of grazing shall be compensated in land or money."], "Common land can be fenced off by the larger owners, with the commoners compensated."], ["Commissioners", ["(a) Division.— " + P.n(3, 5) + " enclosure commissioners shall divide the land and settle the compensation."], "Commissioners divide the land."]],
+  "Militia Reorganisation Bill":(P, st) => [["Organisation", ["(a) Regiments.— The militia of " + st + " shall be organised in regiments by county, under officers commissioned by the Governor.", "(b) Enrolment.— Every able-bodied resident from eighteen to " + P.n(40, 50, 5) + " shall be enrolled; a person who objects in conscience may be excused on payment of a fee."], "Every able-bodied adult is enrolled in county regiments, with a paid exemption for conscience."], ["Muster and arms", ["(a) Muster.— The militia shall muster " + P.n(1, 4) + " times a year, and its arms be kept in county armories."], "Regular musters; arms kept in county armories."]],
+  "Free Assembly Bill":(P, st) => [["Assembly", ["(a) Right.— The people of " + st + " may assemble peaceably in any public place without a licence.", "(b) Dispersal.— A gathering may be dispersed only on the written order of a magistrate after a riot has begun."], "People can gather in public without a licence, and can only be broken up after a riot starts."], ["Damages", ["(a) Damages.— A person unlawfully dispersed may recover damages of up to " + money(P.n(1, 5) * 100) + " from the officer responsible."], "Those unlawfully broken up can sue the officer."]]
+};
+function lxStateDoc(st, b){
+  if(!b || !b.t) return null; const f = LX_SB[b.t]; const P = lxParams("sb:" + st + ":" + b.t + ":" + (b.due || 0));
+  const D = {key:"sb:" + st + ":" + b.t, title:b.t, src:b, dom:null, prior:null, congress:"", no:"State of " + st, secs:[], cites:[]};
+  D.longTitle = "A bill before the legislature of " + st + "."; D.enact = "Be it enacted by the People of the State of " + st + ", represented in the Legislature,";
+  const add = (head, sub, plain, ex) => { D.secs.push(Object.assign({n:D.secs.length + 1, head, sub, plain}, ex || {})); };
+  add("Short title", ["This Act may be cited as the " + b.t.replace(/ Bill$/, " Act") + " of " + st + "."], "The name it goes by.", {k:"title"});
+  (f ? f(P, st) : [["Provision", ["(a) " + b.t + "."], b.t + "."]]).forEach(s => add(s[0], s[1], s[2], {k:"op"}));
+  (b.amend || []).forEach((a, i) => add("Amendment agreed at open hours", ["(" + String.fromCharCode(97 + i) + ") " + a.title + (a.from ? ", offered by " + a.from : "") + "."], "An amendment you agreed to at open hours, attached to the bill.", {k:"op"}));
+  add("Effective date", ["This Act takes effect " + (b.soft ? "as amended on its return from the Governor, " : "") + "on the Governor's signature."], "When it applies.", {k:"eff"});
+  return D;
+}
+/* the docket's state bill reads its text */
+{ const _dp2 = dkProvisions; dkProvisions = function(it){ try{ if(it && it.kind === "state bill"){ const D = lxStateDoc(G.you.state, Object.assign({amend:((G.states || []).find(s => s.n === G.you.state) || {}).amend}, it.sb)); if(D) return D.secs.map(x => "Sec. " + x.n + ". " + x.head + ". " + x.sub.join(" ")); } }catch(e){} return _dp2.apply(this, arguments); }; }
+{ const _dr2 = dkProvisionsRich; dkProvisionsRich = function(it){ try{ if(it && it.kind === "state bill"){ const D = lxStateDoc(G.you.state, Object.assign({amend:((G.states || []).find(s => s.n === G.you.state) || {}).amend}, it.sb)); if(D) return D.secs.map(x => '<li>' + pcEsc("Sec. " + x.n + ". " + x.head + ". " + x.sub.join(" ")) + '<br><span class="muted" style="font-size:12px">' + pcEsc(x.plain) + '</span></li>').join(""); } }catch(e){} return _dr2.apply(this, arguments); }; }
+/* the states' own decisions are kept in the book */
+{ const _rsb = resolveStateBills; resolveStateBills = function(news){ const mine = []; const r = _rsb.call(this, mine);
+  try{ mine.forEach(t => { const m = /^(.+?) (passed|threw out) its (.+)\.$/.exec(t); if(m){ const L = lxStore(); (L.sacts = L.sacts || []).unshift({st:m[1], t:m[3], d:G.day, ok:m[2] === "passed"}); if(L.sacts.length > 60) L.sacts.length = 60; } }); }catch(e){}
+  if(news) mine.forEach(t => news.push(t)); return r; }; }
+/* ── the road, in the book and on the docket ── */
+function lxRoadRows(s){
+  const R = s.road, out = []; if(!R) return out;
+  out.push("Referred to the Committee on " + R.t + (R.chair ? " (chair: " + R.chair + ")" : "") + " on day " + R.ref + ".");
+  (s.amends || []).filter(a => a.where === "committee").forEach(a => out.push("In markup, day " + a.d + ": " + a.by + "'s amendment to " + a.what + " was " + (a.adopted ? "adopted" : "rejected") + ", " + a.aye + " to " + a.no + "."));
+  if(R.report) out.push("Reported " + (R.report.fav ? "favourably" : "unfavourably") + ", " + R.report.aye + " to " + R.report.no + ".");
+  else out.push("Markup set for day " + R.mark + ".");
+  (s.amends || []).filter(a => a.where !== "committee").forEach(a => out.push("On the floor, day " + a.d + ": " + a.by + " moved to " + a.what + "."));
+  return out;
+}
+function lxSenRow(s){ const S = s.sen; if(!S) return null; const y = G.you || {}, mine = S.by && S.by[y.state];
+  return "Senate, day " + S.d + ": " + (S.ok ? "passed" : "rejected") + ", " + S.aye + " to " + S.no + (S.tie ? " (the Vice President broke a tie)" : "") + "." + (mine ? " " + y.state + "'s senators: " + mine.map(v => v > 0 ? "aye" : "no").join(" and ") + (S.names[y.state] ? " (" + S.names[y.state] + " in the first seat)" : "") + "." : ""); }
+{ const _hh = lxHistHTML; lxHistHTML = function(s){ let h = _hh.apply(this, arguments); try{ const extra = lxRoadRows(s), sr = lxSenRow(s);
+    if(extra.length){ const R = extra.map(r => '<li>' + pcEsc(r) + '</li>').join(""); h = h.replace(/(<ul style="margin:4px 0 0 18px"><li>[^<]*<\/li>)/, (m0) => m0 + R); }
+    if(sr) h = h.replace(/(The clerk did not keep[^<]*<\/li>|On the roll by name[^<]*<\/li>)/, (m0) => m0 + "<li>" + pcEsc(sr) + "</li>"); }catch(e){} return h; }; }
+{ const _ls = lxStatus; lxStatus = function(s){ if(s && s.fate === "senate"){ const st = {t:"Passed the House, " + s.aye + " to " + s.no + ", on day " + s.day + "; " + (s.sen ? "the Senate rejected it, " + s.sen.aye + " to " + s.sen.no + (s.sen.tie ? " (the Vice President broke a tie)" : "") : "it died in the Senate") + ".", k:"failed", force:false, later:[]}; return st; }
+  const r = _ls.apply(this, arguments); try{ if(s && s.sen && s.sen.ok && r && r.t) r.t = r.t.replace(/(on day \d+\.)/, "$1 The Senate concurred, " + s.sen.aye + " to " + s.sen.no + "."); if(s && s.org && r) r.t = r.t.replace("Passed the House, without a recorded count, on day " + s.day + ".", "Passed by Congress on the towns' petitions on day " + s.day + "; no roll call was recorded."); }catch(e){} return r; }; }
+/* the docket shows the committee stage, with your vote if you sit on it */
+function lxCmHTML(b){
+  const R = lxRoad(b); if(!R) return ""; const y = G.you || {}, on = y.committee === R.cmte && (function(){ try{ return heldOffice() === "house"; }catch(e){ return false; } })();
+  return '<div class="eyebrow" style="margin-top:10px">In committee</div><p class="muted" style="margin:2px 0">Referred to the Committee on ' + pcEsc(R.t) + (R.chair ? ' (chair: ' + pcEsc(R.chair) + ')' : '') + '. ' + (R.done ? 'Marked up on day ' + R.report.d + '; reported ' + (R.report.fav ? 'favourably' : 'unfavourably') + ', ' + R.report.aye + ' to ' + R.report.no + '.' : 'Markup on day ' + R.mark + '.' + (on ? ' You sit on this committee: your votes below are cast at the markup.' : '')) + '</p>' +
+    (R.props.length ? R.props.map((p, i) => '<div class="whip__row"><span class="whip__n">' + pcEsc(surname(p.by)) + '</span><span class="whip__w">moves to ' + pcEsc(p.k === "strike" ? "strike section " + p.sec + " (" + String(p.head).toLowerCase() + ")" : "cut the appropriation by a third") + (R.done ? ' · ' + (p.adopted ? 'adopted' : 'rejected') + ' ' + p.aye + '–' + p.no : '') + '</span>' +
+      (on && !R.done ? '<span class="whip__b"><button type="button" class="btn ' + (p.you === 1 ? '' : 'btn--ghost') + '" style="padding:2px 8px;font-size:12px" data-lxam="' + i + ':1">Aye</button><button type="button" class="btn ' + (p.you === -1 ? '' : 'btn--ghost') + '" style="padding:2px 8px;font-size:12px" data-lxam="' + i + ':-1">No</button></span>' : '') + '</div>').join("") : '<p class="muted" style="margin:2px 0">No amendments offered.</p>') +
+    (on && !R.done ? '<div class="whip__row"><span class="whip__n">Report</span><span class="whip__w">to the House, favourably</span><span class="whip__b"><button type="button" class="btn ' + (R.youReport === 1 ? '' : 'btn--ghost') + '" style="padding:2px 8px;font-size:12px" data-lxam="r:1">Aye</button><button type="button" class="btn ' + (R.youReport === -1 ? '' : 'btn--ghost') + '" style="padding:2px 8px;font-size:12px" data-lxam="r:-1">No</button></span></div>' : '');
+}
+document.addEventListener("click", e => { const t = e.target && e.target.closest ? e.target.closest("[data-lxam]") : null; if(!t || !G.bill || !G.bill.road) return; e.preventDefault(); e.stopPropagation();
+  const [i, v] = t.getAttribute("data-lxam").split(":"), R = G.bill.road; if(R.done) return; if(i === "r") R.youReport = +v; else if(R.props[+i]) R.props[+i].you = +v;
+  const box = t.closest(".lx-cm"); if(box) box.innerHTML = lxCmHTML(G.bill); }, true);
+{ const _dc3 = dkCard; dkCard = function(i){ const r = _dc3.apply(this, arguments); try{ const it = dkItems()[i || 0]; if(it && it.kind === "bill" && it.b === G.bill && G.bill && !G.bill.done){ const say = el("dkSay"); if(say && !card.querySelector(".lx-cm")){ const d = document.createElement("div"); d.className = "lx-cm"; d.innerHTML = lxCmHTML(G.bill); say.parentNode.insertBefore(d, say); } } }catch(e){} return r; }; }
+/* the calendar: refer every new bill, mark it up the day before the floor; carry the road and the Senate into the book */
+setInterval(() => { try{ const b = G && G.bill; if(b && !b.done && G.you){ const R = lxRoad(b); if(R && !R.done && G.day >= R.mark) lxMarkup(b); } }catch(e){} }, 2500);
+{ const _hv3 = holdVote; holdVote = function(){ const b = G.bill, n0 = (G.statute || []).length; try{ if(b && !b.done){ lxRoad(b); if(b.road && !b.road.done) lxMarkup(b); } }catch(e){}
+  const r = _hv3.apply(this, arguments);
+  try{ const s = G.statute && G.statute[0]; if(b && s && s.title === b.title && G.statute.length > n0){ s.road = b.road || null; s.sen = b._sen || null; s.amends = (b.amends || []).slice(); s.strk = (b.strk || []).slice(); s.soft = !!b.soft; LX.docs.delete(lxKey(s));
+      if(b._sen){ const line = "The Senate " + (b._sen.ok ? "passes" : "rejects") + " the " + b.title + ", " + b._sen.aye + " to " + b._sen.no + (b._sen.tie ? ", the Vice President breaking the tie" : "") + "."; note(line, true); pushWireScrap("Senate", b.title + " — " + (b._sen.ok ? "PASSED" : "REJECTED") + " " + b._sen.aye + "–" + b._sen.no); } } }catch(e){}
+  return r; }; }
 
 armFrame();
 

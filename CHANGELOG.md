@@ -4,6 +4,12 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261025i: committees, the Senate, petition acts and state bills
+
+`20261025i` (on `20261025h`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+Every bill is referred to the committee whose field it most touches (Ways and Means, Judiciary, Armed Services, Health and Labor); its members offer amendments in markup (to strike the section they mind most, to cut the money) and vote on them and on the report, the committee's unnamed seats by party line, and you vote with them from the docket when you sit there; the markup is held the day before the floor and changes the text that is voted on. What the House carries goes to the Senate, two seats a State, each senator reckoned exactly as the docket shows them leaning, a tie broken by the Vice President; only what both carry reaches the President, and a bill the Senate rejects is recorded as such. Acts passed on the towns' petitions enter the statute book with the petitions as their text (each town, its mayor and its grant), and bills before the state legislatures are written out as law, with amendments agreed at open hours attached; the states' own decisions are kept. The statute book shows the whole road: referral, markup, report, House roll call, Senate, President, override, courts. People know about Senate defeats, override votes and the states' acts. The wire no longer rides up over the meeting panel.
+
 ## 20261025h: the statute book, vetoes that go back to the House, suits that are decided, one meeting panel
 
 `20261025h` (on `20261025g`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
