@@ -4,6 +4,12 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261025j: amendments are voted; the reports of the bench
+
+`20261025j` (on `20261025i`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+An amendment moved on the floor is put to the House and decided by its count: the named members by where they stand on the bill and their party, the other seats by their party's line; only an adopted amendment changes the text that goes to the final vote. Yours come from the docket's Move to strike and Amend buttons, which are shown only to members of the House (2 influence; a lost amendment costs a point of standing); before the final vote a member who opposes the bill may move to strike what they mind most. Every outcome and count is kept in the act's history. The statute book has a second shelf, the reports of the high bench: every ruling on an act of Congress with its ground, count, the justice who wrote for the Court and the one who dissented, and the pending suits; the authors rotate among the majority.
+
 ## 20261025i: committees, the Senate, petition acts and state bills
 
 `20261025i` (on `20261025h`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.

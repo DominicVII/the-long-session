@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261025i">
+<meta name="onum-build" content="20261025j">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261025i";
+  var STAMP = "20261025j";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -49627,7 +49627,8 @@ function lxDecide(c, youVote){
     const sc = (L.str - 0.45) * 1.6 + lean * 0.7 + prec + noise; return {name:j.name, strike:sc > 0, chief:i === 0}; });
   if(youVote != null) votes.push({name:G.you.name, strike:!youVote, you:true});
   const st = votes.filter(v => v.strike), up = votes.filter(v => !v.strike), struck = st.length > up.length, maj = struck ? st : up, min = struck ? up : st;
-  const author = maj.find(v => v.chief) || maj.find(v => !v.you) || maj[0], diss = min.find(v => !v.you) || min[0];
+  const pickOf = (L, k) => { const nv = L.filter(v => !v.you); return nv.length ? nv[Math.floor(knH(c.t, k) * nv.length)] : L[0]; };
+  const author = (maj.some(v => v.chief) && knH(c.t, "chief") < 0.35) ? maj.find(v => v.chief) : pickOf(maj, "auth"), diss = min.length ? pickOf(min, "diss") : null;
   const s = (G.statute || []).find(x => x.title === L.act && (L.aday == null || Math.abs((x.day || 0) - L.aday) <= 1));
   const op = (author.you ? "You wrote for the Court" : "Justice " + author.name + " wrote for the Court") + ": " + (struck ? "Section " + L.sec + " of the " + L.act + " (" + String(L.head).toLowerCase() + ") " + T.phrase + ", and is invalid." + (prior && prior.lx.held === "struck" ? " We said as much in " + prior.t + "." : "") + " Under the Act's own severability section the rest of it stands."
     : "The challenge to section " + L.sec + " of the " + L.act + " fails. " + T.up + (prior && prior.lx.held === "upheld" ? " We held the same in " + prior.t + "." : prior ? " We do not read " + prior.t + " to require otherwise." : ""));
@@ -49932,7 +49933,7 @@ function lxRoadRows(s){
   (s.amends || []).filter(a => a.where === "committee").forEach(a => out.push("In markup, day " + a.d + ": " + a.by + "'s amendment to " + a.what + " was " + (a.adopted ? "adopted" : "rejected") + ", " + a.aye + " to " + a.no + "."));
   if(R.report) out.push("Reported " + (R.report.fav ? "favourably" : "unfavourably") + ", " + R.report.aye + " to " + R.report.no + ".");
   else out.push("Markup set for day " + R.mark + ".");
-  (s.amends || []).filter(a => a.where !== "committee").forEach(a => out.push("On the floor, day " + a.d + ": " + a.by + " moved to " + a.what + "."));
+  (s.amends || []).filter(a => a.where !== "committee").forEach(a => out.push("On the floor, day " + a.d + ": " + a.by + " moved to " + a.what + (a.aye != null ? "; " + (a.adopted ? "adopted" : "rejected") + ", " + a.aye + " to " + a.no : "") + "."));
   return out;
 }
 function lxSenRow(s){ const S = s.sen; if(!S) return null; const y = G.you || {}, mine = S.by && S.by[y.state];
@@ -49961,6 +49962,73 @@ setInterval(() => { try{ const b = G && G.bill; if(b && !b.done && G.you){ const
   try{ const s = G.statute && G.statute[0]; if(b && s && s.title === b.title && G.statute.length > n0){ s.road = b.road || null; s.sen = b._sen || null; s.amends = (b.amends || []).slice(); s.strk = (b.strk || []).slice(); s.soft = !!b.soft; LX.docs.delete(lxKey(s));
       if(b._sen){ const line = "The Senate " + (b._sen.ok ? "passes" : "rejects") + " the " + b.title + ", " + b._sen.aye + " to " + b._sen.no + (b._sen.tie ? ", the Vice President breaking the tie" : "") + "."; note(line, true); pushWireScrap("Senate", b.title + " — " + (b._sen.ok ? "PASSED" : "REJECTED") + " " + b._sen.aye + "–" + b._sen.no); } } }catch(e){}
   return r; }; }
+
+/* ══ 20261025j · AMENDMENTS ARE VOTED, AND THE BENCH KEEPS ITS REPORTS. An amendment moved on the floor (yours from the docket,
+   or a member's before the final vote) is put to the House and decided by its count: the named members by where they stand
+   and their party, the other seats by their party's line; only an adopted amendment changes the text. The statute book has
+   a second shelf, the reports of the high bench: every ruling with its holding, its count, its author and its dissent. ══ */
+function lxHouseVote(b, scoreNamed, lineOf, youVote){
+  let aye = 0, no = 0; const named = {}, by = {};
+  (G.members || []).filter(m => m && !m.gone).forEach(m => { named[m.party] = (named[m.party] || 0) + 1; const v = scoreNamed(m) > 0 ? 1 : -1; by[m.id] = v; v > 0 ? aye++ : no++; });
+  if(G.you && G.you.party) named[G.you.party] = (named[G.you.party] || 0) + 1;
+  Object.keys(G.seatsBy || {}).forEach(p => { const n = Math.max(0, (G.seatsBy[p] || 0) - (named[p] || 0)); if(!n) return; const l = lineOf(p); const share = p === "IND" || !l ? 0.5 : (l > 0 ? 0.86 : 0.14); const a = Math.round(n * share); aye += a; no += n - a; });
+  if(youVote === 1 || youVote === -1){ youVote > 0 ? aye++ : no++; }
+  return {aye, no, by};
+}
+/* a weakening amendment: those against the bill are for it, the sponsor's side against it, the parties by their line on the bill turned round */
+function lxFloorAmend(b, p, youVote){
+  const key = b.title + ":fl:" + (p.k === "strike" ? p.ci : "cut") + ":" + p.by, L = partyLine(b);
+  const v = lxHouseVote(b, m => (m.name === p.by ? 50 : 0) - alignment(m, b) * 0.6 + (m.party === b.sponsorParty ? -15 : 6) + lxNoise(m.id, key) * 20, pt => -(L[pt] || 0), youVote);
+  const n = (b.clauses || []).length || 3, ok = v.aye > v.no;
+  if(ok){ if(p.k === "strike"){ b.strk = b.strk || []; if(b.strk.indexOf(p.ci) < 0) b.strk.push(p.ci); if(b.pos) Object.keys(b.pos).forEach(k => b.pos[k] = Math.round(b.pos[k] * (1 - 0.5 / n))); }
+    else { b.soft = true; if(b.pos) Object.keys(b.pos).forEach(k => b.pos[k] = Math.round(b.pos[k] * 0.8)); } }
+  const what = p.k === "strike" ? "strike section " + p.sec + " (" + String(p.head).toLowerCase() + ")" : "cut the appropriation by a third";
+  (b.amends = b.amends || []).push({d:G.day, by:p.by, what, aye:v.aye, no:v.no, adopted:ok, where:"floor"});
+  try{ LX.docs.delete(lxKey(b)); }catch(e){}
+  return {ok, aye:v.aye, no:v.no, what};
+}
+function lxInHouse(){ try{ return inHouse(); }catch(e){ return false; } }
+/* your amendments from the docket go to a vote */
+{ const _ds2 = dkStrike; dkStrike = function(it, i){ const b = dkBillRef(it);
+  if(i >= 100 && b && b === G.bill && !b.done){ if(!lxInHouse()) return "Only a member of the House can move an amendment on its floor.";
+    if((G.you.influence || 0) < 2) return "Moving an amendment costs 2 influence.";
+    const ci = i - 100, D = lxDoc(b), x = D && D.secs.find(s => s.k === "op" && s.ci === ci); if(!x) return "";
+    if((b.amends || []).some(a => a.where === "floor" && a.by === G.you.name && a.what.indexOf("section " + x.n + " ") >= 0)) return "You have moved that once already; the House has answered.";
+    G.you.influence = clamp((G.you.influence || 0) - 2, 0, 100);
+    const r = lxFloorAmend(b, {k:"strike", ci, sec:x.n, head:x.short || x.head, by:G.you.name}, 1);
+    try{ feed("Your amendment to " + r.what + " of the " + b.title + " is " + (r.ok ? "adopted" : "rejected") + ", " + r.aye + " to " + r.no + ".", r.ok ? "good" : "bad"); }catch(e){}
+    if(!r.ok) G.you.standing = clamp((G.you.standing || 0) - 1, 0, 100);
+    return "The House divides on your amendment to " + r.what + ": " + (r.ok ? "adopted" : "rejected") + ", " + r.aye + " to " + r.no + "." + (r.ok ? " The text that goes to the vote no longer has it." : " The text stands as reported."); }
+  return _ds2.apply(this, arguments); }; }
+{ const _da2 = dkAmend; dkAmend = function(it){ const b = dkBillRef(it);
+  if(b && b === G.bill && !b.done && b.cost && !b.soft){ if(!lxInHouse()) return "Only a member of the House can move an amendment on its floor.";
+    const r = lxFloorAmend(b, {k:"cut", by:G.you.name}, 1);
+    try{ feed("Your amendment to " + r.what + " of the " + b.title + " is " + (r.ok ? "adopted" : "rejected") + ", " + r.aye + " to " + r.no + ".", r.ok ? "good" : "bad"); }catch(e){}
+    return "The House divides on your amendment to " + r.what + ": " + (r.ok ? "adopted" : "rejected") + ", " + r.aye + " to " + r.no + "."; }
+  return _da2.apply(this, arguments); }; }
+/* the strike buttons are only for those who can move them */
+{ const _dc4 = dkClauseHTML; dkClauseHTML = function(it){ let h = _dc4.apply(this, arguments); try{ if(!lxInHouse()) h = h.replace(/ <button type="button" class="btn btn--ghost" style="padding:1px 6px;font-size:11px" data-dk(strike|amend)="[^"]*">[^<]*<\/button>/g, ""); }catch(e){} return h; }; }
+/* before the final vote, a member who opposes the bill may move to strike what they mind most */
+{ const _hv4 = holdVote; holdVote = function(){ const b = G.bill;
+  try{ if(b && !b.done){ lxRoad(b); if(b.road && !b.road.done) lxMarkup(b); } }catch(e){}
+  try{ if(b && !b.done && !b.flDone){ b.flDone = true; const D = lxDoc(b), ops = D ? D.secs.filter(x => x.k === "op" && !x.struckAmend && !/^a first call|^the whole of it/.test(x.clause || "")) : [];
+      const opp = (G.members || []).filter(m => m && !m.gone && alignment(m, b) < -15).sort((u, v) => alignment(u, b) - alignment(v, b))[0];
+      if(opp && ops.length && knH(b.title, "floor") < 0.6){ const x = ops.slice().sort((u, v) => ((v.claim && v.claim[2]) || 0) - ((u.claim && u.claim[2]) || 0) || v.n - u.n)[0];
+        const r = lxFloorAmend(b, {k:"strike", ci:x.ci, sec:x.n, head:x.short || x.head, by:opp.name}, lxInHouse() ? (alignment(G.you, b) < 0 ? 1 : -1) : null);
+        try{ const line = "Before the final vote, " + opp.name + " moves to " + r.what + " of the " + b.title + ": " + (r.ok ? "adopted" : "rejected") + ", " + r.aye + " to " + r.no + "."; feed(line, "news"); journal(line); }catch(e){} } } }catch(e){}
+  return _hv4.apply(this, arguments); }; }
+/* the reports of the high bench */
+function lxReportsHTML(){
+  const C = (G.cases || []).filter(c => c && c.done && c.lx && c.lx.held).sort((u, v) => (v.dday || v.day) - (u.dday || u.day));
+  const P = (G.cases || []).filter(c => c && !c.done && c.lx);
+  return '<div class="eyebrow">The reports of the high bench</div><h1>Every ruling on an act of Congress</h1><p class="muted">What was challenged, on what ground, how the bench divided, who wrote for it and who dissented. Later benches cite these.</p>' +
+    '<div class="card__actions" style="justify-content:flex-start"><button type="button" class="btn btn--ghost" style="padding:3px 9px;font-size:12px" data-lxbook="all">Back to the acts</button></div>' +
+    (P.length ? '<div class="eyebrow" style="margin-top:8px">Pending</div>' + P.map(c => '<div class="muted" style="font-size:13px;margin:3px 0">· <b>' + pcEsc(c.t) + '</b>, filed day ' + c.day + ': section ' + c.lx.sec + ' (' + pcEsc(String(c.lx.head).toLowerCase()) + '), on ' + pcEsc(LX_TH[c.lx.th].t) + '.</div>').join("") : '') +
+    (C.length ? C.map(c => '<div style="margin:8px 0;padding:6px 10px;border-left:3px solid ' + (c.lx.held === "struck" ? "#a33" : "#3a7") + '"><b>' + pcEsc(c.t) + '</b> <span class="muted" style="font-size:12px">· decided day ' + (c.dday || "?") + ' · ' + pcEsc(c.lx.count || "") + ' · ' + (c.lx.held === "struck" ? "section " + c.lx.sec + " struck" : "upheld") + ' · on ' + pcEsc(LX_TH[c.lx.th].t) + '</span><div style="font-size:13px;margin-top:3px">' + pcEsc(c.lx.op || "") + '</div><button type="button" class="btn btn--ghost" style="padding:2px 8px;font-size:12px;margin-top:3px" data-lxopen="' + pcEsc((c.lx.aday != null ? c.lx.aday : "") + ":" + c.lx.act) + '">Read the ' + pcEsc(c.lx.act) + ' ▸</button></div>').join("") : '<p class="muted">No act of Congress has been decided by the bench yet.</p>') +
+    '<div class="card__actions"><button type="button" class="btn btn--ghost" id="lxClose">Close</button></div>';
+}
+{ const _lb = lxBook; lxBook = function(f){ if(f === "cases"){ lxOpen(lxReportsHTML()); return; } _lb.apply(this, arguments); try{ const C = document.getElementById("lxCardEl"); const row = C && C.querySelector(".card__actions"); if(row && !row.querySelector('[data-lxbook="cases"]')){ const b = document.createElement("button"); b.type = "button"; b.className = "btn btn--ghost"; b.style.cssText = "padding:3px 9px;font-size:12px"; b.setAttribute("data-lxbook", "cases"); b.textContent = "Rulings of the bench " + (G.cases || []).filter(c => c && c.done && c.lx && c.lx.held).length; row.appendChild(b); } }catch(e){} }; }
+window.onumStatute.rulings = () => (G.cases || []).filter(c => c && c.done && c.lx && c.lx.held).map(c => ({case:c.t, decided:c.dday || null, act:c.lx.act, section:c.lx.sec, ground:LX_TH[c.lx.th].t, held:c.lx.held, count:c.lx.count, opinion:c.lx.op}));
 
 armFrame();
 
