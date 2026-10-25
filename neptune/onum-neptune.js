@@ -2641,8 +2641,7 @@
       const hy = (i) => lodD[i] * (st.lod > i ? 0.92 : 1);
       setLod(state.lod != null ? state.lod : d == null ? st.lod < 0 ? 0 : st.lod : d < hy(0) ? 0 : d < hy(1) ? 1 : d < hy(2) ? 2 : 3);
       const sitT = state.sitting ? 1 : 0;
-      st.sit += (sitT - st.sit) * Math.min(1, dt * 5);
-      if (dt === 0 || state.snap) st.sit = sitT;
+      st.sit += (sitT - st.sit) * Math.min(1, dt * 2.6);
       if (st.lod >= 3) {
         const sp = st.sit >= 0.5;
         if (proxySit.visible !== sp) {
@@ -2662,8 +2661,11 @@
           rig.getWorldScale(s3);
           st.sc = s3.z || 1;
         }
-        const vL = Math.max(0, vel) / st.sc, stepL = (0.4 + 0.22 * Math.min(1.6, Math.max(0, vel))) / st.sc;
+        const turn = Math.abs(state.turn || 0), pivot = vel < 0.12 ? clamp2((turn - 0.5) / 1.2) : 0;
+        st.pivot = (st.pivot || 0) + (pivot - (st.pivot || 0)) * Math.min(1, dt * 6);
+        const vEff = Math.max(vel, 0.32 * st.pivot), vL = Math.max(0, vEff) / st.sc, stepL = (0.4 + 0.22 * Math.min(1.6, Math.max(0, vEff))) / st.sc;
         st.SL = 2 * stepL;
+        st.sweep = vEff > 1e-3 ? clamp2(Math.max(0, vel) / vEff) : 1;
         if (vL > 0.02) st.ph += dt * vL / st.SL * Math.PI * 2;
       } else st.ph += dt * (speed > 0.05 ? speed / 1.25 * Math.PI * 2 * 0.5 : 0);
       const w = Math.min(1, st.walk), ph = st.ph, t = st.t;
@@ -2679,7 +2681,7 @@
       torso.rotation.x = 0.04 * w + breath * 8e-3;
       torso.scale.set(1 + breath * 6e-3, 1, 1 + breath * 0.01);
       if (planted) {
-        const duty = 0.62, SLf = duty * (st.SL || 1), A2 = 0.45, Bn = 0.43, yA = 0.04 + (fem ? 0.012 : 0), hipJ = hips.position.y - 0.03, ramp = clamp2(Math.max(0, vel) / 0.12);
+        const duty = 0.62, SLf = duty * (st.SL || 1), A2 = 0.45, Bn = 0.43, yA = 0.04 + (fem ? 0.012 : 0), hipJ = hips.position.y - 0.03, ramp = clamp2(Math.max(0, vel, 0.32 * (st.pivot || 0)) / 0.12);
         for (const L of legs) {
           const s = L.sx < 0 ? 1 : -1;
           let u = ((ph - Math.PI / 2) / (Math.PI * 2) + (s > 0 ? 0 : 0.5)) % 1;
@@ -2694,7 +2696,7 @@
             yf = yA + 0.065 * Math.sin(Math.PI * q2);
             toe = 0.35 * Math.sin(Math.PI * Math.min(1, q2 * 1.6)) * (1 - q2);
           }
-          zf *= ramp;
+          zf *= ramp * (st.sweep != null ? st.sweep : 1);
           yf = mix2(yA, yf, ramp);
           toe *= ramp;
           const dz = zf, dy = yf - hipJ, d2 = clamp2(Math.hypot(dz, dy), 0.25, A2 + Bn - 1e-4);

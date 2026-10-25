@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261025d">
+<meta name="onum-build" content="20261025e">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261025d";
+  var STAMP = "20261025e";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -43510,6 +43510,15 @@ try{
       if(u._gvT){ const dtt = (now - u._gvT) / 1000; if(dtt > 0.002 && dtt < 1.0){ const sp = Math.min(3, Math.hypot(x - u._gvX, z - u._gvZ) / dtt); u._gv = (u._gv || 0) * 0.7 + sp * 0.3; } else u._gv = 0; }
       u._gvT = now; u._gvX = x; u._gvZ = z;
       return (u._gv || 0) < 0.04 ? 0 : u._gv; }catch(e){ return null; } };
+  /* how fast the body is turning (rad/s), so a turn on the spot is stepped round */
+  const nepTurn = g => { try{ const u = g.userData, now = performance.now(), a = g.rotation.y; let tr = 0;
+      if(u._trT){ const dtt = (now - u._trT) / 1000; if(dtt > 0.002 && dtt < 1.0){ let da = a - u._trA; da = Math.atan2(Math.sin(da), Math.cos(da)); u._tr = (u._tr || 0) * 0.7 + (da / dtt) * 0.3; } }
+      u._trT = now; u._trA = a; return u._tr || 0; }catch(e){ return 0; } };
+  /* eye contact: the person you are talking with looks at you; anyone standing close, not walking, glances your way */
+  const NEP_EYE = new THREE.Vector3();
+  const nepLook = (p, c) => { try{ if(!p || p === G.you || !c) return null; const d = Math.hypot(cam.x - p.x, cam.z - p.z);
+      const talking = TALK.open && TALK.m === p, idle = (p._gw || 0) < 0.1;
+      if(!(talking && d < 6) && !(idle && d < 2.4)) return null; c.getWorldPosition(NEP_EYE); return NEP_EYE; }catch(e){ return null; } };
   const nepCarry = g => { try{ const cy = g.userData._cy; if(!cy || !cy.grp || !cy.grp.visible || !cy.nep || cy.kind === "none") return null; return {side:cy.side, pose:cy.kind, sip:cy.sip || 0}; }catch(e){ return null; } };
   const nepDressInfo = p => { const nat = NEP.nation();
     const st = p.state || (p.kind === "you" && G.you && G.you.state) || (G.country && G.country.name) || "home";
@@ -43548,7 +43557,7 @@ try{
       n.traverse(m => { if(hooked || !m.isMesh) return; hooked = true;
         m.onBeforeRender = function(r, s, cam){ const t = performance.now(), dt = Math.min(0.1, (t - last)/1000); last = t; if(dt <= 0) return;
           try{ h.update(dt, {camera:cam, sitting: p.kind === "you" ? !!(G.you && G.you.sitting) : !!(p.sitting && !G.noSit && !G.plainSit),
-            moving: !!p.moving || !!p.walking, speed: nepStride(p), velocity: nepGround(p, g), talking: !!p.talking || !!(TALK.open && TALK.m === p) || !!(p.say && p.sayT > 0), carry: nepCarry(g)}); }catch(e){} }; });
+            moving: !!p.moving || !!p.walking, speed: nepStride(p), velocity: nepGround(p, g), turn: nepTurn(g), lookAt: nepLook(p, cam), talking: !!p.talking || !!(TALK.open && TALK.m === p) || !!(p.say && p.sayT > 0), carry: nepCarry(g)}); }catch(e){} }; });
     }catch(e){ if(!NEP._warned){ NEP._warned = true; console.warn("NEPTUNE character", e); } }
     return g;
   };

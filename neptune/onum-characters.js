@@ -694,7 +694,7 @@ export function makeCharacter(THREE, opts = {}) {
     const lodD = opts.lodDistances || [3.5, 10, 30];
     const hy = (i) => lodD[i] * (st.lod > i ? 0.92 : 1.0);   // 8% hysteresis: no flicker at a band edge
     setLod(state.lod != null ? state.lod : d == null ? (st.lod < 0 ? 0 : st.lod) : d < hy(0) ? 0 : d < hy(1) ? 1 : d < hy(2) ? 2 : 3);
-    const sitT = state.sitting ? 1 : 0; st.sit += (sitT - st.sit) * Math.min(1, dt * 5); if (dt === 0 || state.snap) st.sit = sitT;
+    const sitT = state.sitting ? 1 : 0; st.sit += (sitT - st.sit) * Math.min(1, dt * 2.6);   // lowering into a chair or rising takes most of a second if (dt === 0 || state.snap) st.sit = sitT;
     if (st.lod >= 3) { const sp = st.sit >= 0.5; if (proxySit.visible !== sp) { proxySit.visible = sp; proxy.visible = !sp; } return; }
     const sit = st.sit, seatH = state.seatHeight ?? 0.46, desk = state.desk ? 1 : 0;
     const speed = sit > 0.5 ? 0 : state.speed != null ? state.speed : (state.moving ? 1.35 : 0);
@@ -704,8 +704,10 @@ export function makeCharacter(THREE, opts = {}) {
     const vel = state.velocity, planted = vel != null && sit < 0.5;
     if (planted) {
       if (!st.sc) { const s3 = new T.Vector3(); root.updateMatrixWorld(true); rig.getWorldScale(s3); st.sc = s3.z || 1; }
-      const vL = Math.max(0, vel) / st.sc, stepL = (0.40 + 0.22 * Math.min(1.6, Math.max(0, vel))) / st.sc;
-      st.SL = 2 * stepL; if (vL > 0.02) st.ph += dt * vL / st.SL * Math.PI * 2;
+      const turn = Math.abs(state.turn || 0), pivot = vel < 0.12 ? clamp((turn - 0.5) / 1.2) : 0;   // turning on the spot: step round, do not spin on frozen feet
+      st.pivot = (st.pivot || 0) + (pivot - (st.pivot || 0)) * Math.min(1, dt * 6);
+      const vEff = Math.max(vel, 0.32 * st.pivot), vL = Math.max(0, vEff) / st.sc, stepL = (0.40 + 0.22 * Math.min(1.6, Math.max(0, vEff))) / st.sc;
+      st.SL = 2 * stepL; st.sweep = vEff > 1e-3 ? clamp(Math.max(0, vel) / vEff) : 1; if (vL > 0.02) st.ph += dt * vL / st.SL * Math.PI * 2;
     } else st.ph += dt * (speed > 0.05 ? speed / 1.25 * Math.PI * 2 * 0.5 : 0);
     const w = Math.min(1, st.walk), ph = st.ph, t = st.t;
     const breath = Math.sin(t * 1.5);
@@ -721,13 +723,13 @@ export function makeCharacter(THREE, opts = {}) {
     torso.scale.set(1 + breath * 0.006, 1, 1 + breath * 0.01);
     // legs
     if (planted) {
-      const duty = 0.62, SLf = duty * (st.SL || 1), A = 0.45, Bn = 0.43, yA = 0.04 + (fem ? 0.012 : 0), hipJ = hips.position.y - 0.03, ramp = clamp(Math.max(0, vel) / 0.12);   // the stride fades with the real speed, so a slow walk still plants its feet
+      const duty = 0.62, SLf = duty * (st.SL || 1), A = 0.45, Bn = 0.43, yA = 0.04 + (fem ? 0.012 : 0), hipJ = hips.position.y - 0.03, ramp = clamp(Math.max(0, vel, 0.32 * (st.pivot || 0)) / 0.12);   // the stride fades with the real speed, so a slow walk still plants its feet
       for (const L of legs) { const s = L.sx < 0 ? 1 : -1;
         let u = ((ph - Math.PI / 2) / (Math.PI * 2) + (s > 0 ? 0 : 0.5)) % 1; if (u < 0) u += 1;
         let zf, yf, toe = 0;
         if (u < duty) { zf = SLf / 2 - SLf * (u / duty); yf = yA; }                               // stance: the foot stays where it landed
         else { const q = (u - duty) / (1 - duty), e = q * q * (3 - 2 * q); zf = -SLf / 2 + SLf * e; yf = yA + 0.065 * Math.sin(Math.PI * q); toe = 0.35 * Math.sin(Math.PI * Math.min(1, q * 1.6)) * (1 - q); }  // swing: lift, carry forward, set down
-        zf *= ramp; yf = mix(yA, yf, ramp); toe *= ramp;
+        zf *= ramp * (st.sweep != null ? st.sweep : 1); yf = mix(yA, yf, ramp); toe *= ramp;   // stepping in place lifts the feet without sweeping them
         const dz = zf, dy = yf - hipJ, d = clamp(Math.hypot(dz, dy), 0.25, A + Bn - 1e-4);
         const phi = Math.atan2(dz, -dy), beta = Math.acos(clamp((A * A + d * d - Bn * Bn) / (2 * A * d), -1, 1)), kappa = Math.PI - Math.acos(clamp((A * A + Bn * Bn - d * d) / (2 * A * Bn), -1, 1));
         L.hp.rotation.x = -(phi + beta); L.kn.rotation.x = kappa; L.an.rotation.x = (phi + beta) - kappa + toe; L.hp.rotation.z = -hips.rotation.z; }

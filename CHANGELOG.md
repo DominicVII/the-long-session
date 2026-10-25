@@ -4,6 +4,12 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261025e: stepping turns, a human pace into a chair, eye contact
+
+`20261025e` (on `20261025d`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+Turning on the spot steps round: the turn rate is measured from the drawn body and the feet lift alternately (about 7 cm) without sweeping, instead of the whole figure spinning on frozen feet. Lowering into a chair or rising out of one eases over most of a second instead of snapping in a fifth. The person you are talking with looks at you, and anyone standing close who is not walking glances your way; the head follows through the neck, inside its natural range.
+
 ## 20261025d: feet that stay on the floor; faces with a jaw
 
 `20261025d` (on `20261025c`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
