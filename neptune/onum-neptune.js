@@ -1399,7 +1399,7 @@
   }
   function deepenSkin(c) {
     if (MODE === "game") {
-      const l = (c.r + c.g + c.b) / 3, k = 1.55 + 0.35 * Math.max(0, l - 0.45) / 0.45;
+      const l = (c.r + c.g + c.b) / 3, k = 1.55 + 0.55 * Math.max(0, l - 0.45) / 0.45;
       c.r = Math.pow(c.r, k);
       c.g = Math.pow(c.g, k + 0.12);
       c.b = Math.pow(c.b, k + 0.16);
@@ -1773,8 +1773,8 @@
       const A = f.asym, eyY = nx < 0 ? A.eyeL : A.eyeR, nxs = nx - A.nose * sstep2(0.25, -0.3, ny);
       r -= 0.045 * G2(ax - 0.34, ny - 0.11 - eyY, 0.15) * fr;
       r += 0.05 * Math.exp(-(((ny - 0.27) / 0.075) ** 2)) * sstep2(0.62, 0.1, ax) * fr * f.brow;
-      const nw = 0.07 * f.bridge + 0.075 * sstep2(0.12, -0.24, ny) * f.wing;
-      const na = ny > -0.24 ? mix2(0.015, 0.15 * f.nose, sstep2(0.2, -0.2, ny)) : 0.15 * f.nose * sstep2(-0.33, -0.24, ny);
+      const nw = 0.088 * f.bridge + 0.075 * sstep2(0.12, -0.24, ny) * f.wing;
+      const na = ny > -0.24 ? mix2(0.015, 0.135 * f.nose, sstep2(0.2, -0.2, ny)) : 0.135 * f.nose * sstep2(-0.33, -0.24, ny);
       r += (na + 0.035 * f.hook * G2(0, ny + 0.02, 0.11)) * Math.exp(-((nxs / nw) ** 2)) * fr;
       r += 0.04 * f.tip * G2(nxs / 1.3, ny + 0.19 - f.up, 0.065) * fr;
       r += 0.035 * f.wing * G2(Math.abs(nxs) - 0.12 * f.wing, ny + 0.22, 0.07) * fr;
@@ -1791,6 +1791,11 @@
       let x = nx * r, y = ny * r, z = nz * r;
       const jaw = ny < 0 ? mix2(1, f.jaw * 0.92, sstep2(-0.15, -0.9, ny)) : 1;
       x *= jaw;
+      if (ny < -0.3) {
+        const sq = sstep2(-0.3, -0.75, ny) * (1 - 0.45 * sstep2(-0.86, -1, ny));
+        x *= 1 + (f.fem ? 0.13 : 0.22) * sq;
+      }
+      if (ny < -0.8) y *= mix2(1, 0.95, sstep2(-0.8, -1, ny));
       if (nz < 0) z *= 1.08 - 0.25 * sstep2(-0.2, -0.8, ny);
       if (ny < -0.55 && nz < 0.3) z *= mix2(1, 0.75, sstep2(-0.55, -0.95, ny) * sstep2(0.3, -0.4, nz));
       out[0] = x * hw;
@@ -2142,7 +2147,7 @@
     const headPivot = new T.Group();
     headPivot.position.set(0, 0.1, 0);
     head.add(headPivot);
-    const shape = headShape(S.face);
+    const shape = headShape(Object.assign({ fem }, S.face));
     const headMat = headSkinMat(S, q);
     add(headPivot, sphereGeo(QQ.head[0], QQ.head[1], shape), headMat);
     const eyeW = stdMat("eyeW", { color: lin(13813951), roughness: 0.06 }), irisM = irisMat(S.eye), pupM = stdMat("pupil", { color: 328965, roughness: 0.1 });
@@ -2226,10 +2231,10 @@
     mouthIn.scale.set(0.019, 15e-4, 6e-3);
     const teeth = add(headPivot, cached(geoCache, "teeth", () => new T.BoxGeometry(0.026, 6e-3, 0.01)), stdMat("teeth", { color: lin(14735818), roughness: 0.3 }), mp.x, mp.y + 5e-4, mp.z - 95e-4, faceFine);
     const lipU = add(headPivot, cached(geoCache, "lipU" + q, () => lipGeo(true)), lipM, mp.x, mp.y + 36e-4, mp.z - 48e-4, faceFine);
-    lipU.scale.set(0.0225 * S.face.mouthW, 42e-4 * S.face.lip, 62e-4);
+    lipU.scale.set(0.0225 * S.face.mouthW, 49e-4 * S.face.lip, 84e-4);
     lipU.rotation.z = A.mouth;
     const lipL = add(headPivot, cached(geoCache, "lipL" + q, () => lipGeo(false)), lipM, mp.x, mp.y - 42e-4, mp.z - 54e-4, faceFine);
-    lipL.scale.set(0.0205 * S.face.mouthW, 52e-4 * S.face.lip, 66e-4);
+    lipL.scale.set(0.0205 * S.face.mouthW, 62e-4 * S.face.lip, 92e-4);
     lipL.rotation.z = A.mouth;
     for (const sx of [-1, 1]) {
       const p = surf(shape, sx * 0.085 + A.nose, -0.265, 0.95);
@@ -2649,7 +2654,18 @@
       const sit = st.sit, seatH = (_a = state.seatHeight) != null ? _a : 0.46, desk = state.desk ? 1 : 0;
       const speed = sit > 0.5 ? 0 : state.speed != null ? state.speed : state.moving ? 1.35 : 0;
       st.walk += (clamp2(speed / 1.35, 0, 1.6) - st.walk) * Math.min(1, dt * 6);
-      st.ph += dt * (speed > 0.05 ? speed / 1.25 * Math.PI * 2 * 0.5 : 0);
+      const vel = state.velocity, planted = vel != null && sit < 0.5;
+      if (planted) {
+        if (!st.sc) {
+          const s3 = new T.Vector3();
+          root.updateMatrixWorld(true);
+          rig.getWorldScale(s3);
+          st.sc = s3.z || 1;
+        }
+        const vL = Math.max(0, vel) / st.sc, stepL = (0.4 + 0.22 * Math.min(1.6, Math.max(0, vel))) / st.sc;
+        st.SL = 2 * stepL;
+        if (vL > 0.02) st.ph += dt * vL / st.SL * Math.PI * 2;
+      } else st.ph += dt * (speed > 0.05 ? speed / 1.25 * Math.PI * 2 * 0.5 : 0);
       const w = Math.min(1, st.walk), ph = st.ph, t = st.t;
       const breath = Math.sin(t * 1.5);
       const gT = state.gesture === true ? 1 : typeof state.gesture === "number" ? state.gesture : state.gesture ? 1 : state.talking ? 0.35 + 0.35 * Math.max(0, Math.sin(t * 0.7)) : 0;
@@ -2662,7 +2678,33 @@
       torso.rotation.y = -Math.sin(ph) * 0.13 * w;
       torso.rotation.x = 0.04 * w + breath * 8e-3;
       torso.scale.set(1 + breath * 6e-3, 1, 1 + breath * 0.01);
-      for (const L of legs) {
+      if (planted) {
+        const duty = 0.62, SLf = duty * (st.SL || 1), A2 = 0.45, Bn = 0.43, yA = 0.04 + (fem ? 0.012 : 0), hipJ = hips.position.y - 0.03, ramp = clamp2(Math.max(0, vel) / 0.12);
+        for (const L of legs) {
+          const s = L.sx < 0 ? 1 : -1;
+          let u = ((ph - Math.PI / 2) / (Math.PI * 2) + (s > 0 ? 0 : 0.5)) % 1;
+          if (u < 0) u += 1;
+          let zf, yf, toe = 0;
+          if (u < duty) {
+            zf = SLf / 2 - SLf * (u / duty);
+            yf = yA;
+          } else {
+            const q2 = (u - duty) / (1 - duty), e = q2 * q2 * (3 - 2 * q2);
+            zf = -SLf / 2 + SLf * e;
+            yf = yA + 0.065 * Math.sin(Math.PI * q2);
+            toe = 0.35 * Math.sin(Math.PI * Math.min(1, q2 * 1.6)) * (1 - q2);
+          }
+          zf *= ramp;
+          yf = mix2(yA, yf, ramp);
+          toe *= ramp;
+          const dz = zf, dy = yf - hipJ, d2 = clamp2(Math.hypot(dz, dy), 0.25, A2 + Bn - 1e-4);
+          const phi = Math.atan2(dz, -dy), beta = Math.acos(clamp2((A2 * A2 + d2 * d2 - Bn * Bn) / (2 * A2 * d2), -1, 1)), kappa = Math.PI - Math.acos(clamp2((A2 * A2 + Bn * Bn - d2 * d2) / (2 * A2 * Bn), -1, 1));
+          L.hp.rotation.x = -(phi + beta);
+          L.kn.rotation.x = kappa;
+          L.an.rotation.x = phi + beta - kappa + toe;
+          L.hp.rotation.z = -hips.rotation.z;
+        }
+      } else for (const L of legs) {
         const s = L.sx < 0 ? 1 : -1, a = Math.sin(ph) * s;
         L.hp.rotation.x = -a * 0.42 * w + (1 - w) * (L.sx < 0 ? 0.02 : -0.02) * Math.sin(t * 0.35);
         L.kn.rotation.x = Math.max(0, Math.cos(ph) * s) * 0.9 * w + 0.03;

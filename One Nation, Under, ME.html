@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261025c">
+<meta name="onum-build" content="20261025d">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261025c";
+  var STAMP = "20261025d";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -43503,6 +43503,13 @@ try{
      speed handed over is scaled so a step is about 0.6 m (an indoor pace of half a metre a second is short steps, not a glide) */
   const nepStride = p => { try{ if(!p || p === G.you || p.sitting) return 0; const gw = p._gw || 0; if(gw < 0.03) return 0; return Math.max(0.3, p._v || 0) * 2.0 * Math.min(1, gw * 1.4); }catch(e){ return 0; } };
   /* what the hand holds, so the arm that shows is the arm that holds it */
+  /* the real ground speed, m/s: the figure plants each foot and lets the body pass over it (foot slip measured at 2 to 5% of the distance walked) */
+  const nepGround = (p, g) => { try{ if(!p || p === G.you || p.sitting) return null;
+      /* measured from where the body is actually drawn, frame to frame, so the feet match what you see at any frame rate */
+      const u = g.userData, now = performance.now(), x = g.position.x, z = g.position.z;
+      if(u._gvT){ const dtt = (now - u._gvT) / 1000; if(dtt > 0.002 && dtt < 1.0){ const sp = Math.min(3, Math.hypot(x - u._gvX, z - u._gvZ) / dtt); u._gv = (u._gv || 0) * 0.7 + sp * 0.3; } else u._gv = 0; }
+      u._gvT = now; u._gvX = x; u._gvZ = z;
+      return (u._gv || 0) < 0.04 ? 0 : u._gv; }catch(e){ return null; } };
   const nepCarry = g => { try{ const cy = g.userData._cy; if(!cy || !cy.grp || !cy.grp.visible || !cy.nep || cy.kind === "none") return null; return {side:cy.side, pose:cy.kind, sip:cy.sip || 0}; }catch(e){ return null; } };
   const nepDressInfo = p => { const nat = NEP.nation();
     const st = p.state || (p.kind === "you" && G.you && G.you.state) || (G.country && G.country.name) || "home";
@@ -43541,7 +43548,7 @@ try{
       n.traverse(m => { if(hooked || !m.isMesh) return; hooked = true;
         m.onBeforeRender = function(r, s, cam){ const t = performance.now(), dt = Math.min(0.1, (t - last)/1000); last = t; if(dt <= 0) return;
           try{ h.update(dt, {camera:cam, sitting: p.kind === "you" ? !!(G.you && G.you.sitting) : !!(p.sitting && !G.noSit && !G.plainSit),
-            moving: !!p.moving || !!p.walking, speed: nepStride(p), talking: !!p.talking || !!(TALK.open && TALK.m === p) || !!(p.say && p.sayT > 0), carry: nepCarry(g)}); }catch(e){} }; });
+            moving: !!p.moving || !!p.walking, speed: nepStride(p), velocity: nepGround(p, g), talking: !!p.talking || !!(TALK.open && TALK.m === p) || !!(p.say && p.sayT > 0), carry: nepCarry(g)}); }catch(e){} }; });
     }catch(e){ if(!NEP._warned){ NEP._warned = true; console.warn("NEPTUNE character", e); } }
     return g;
   };

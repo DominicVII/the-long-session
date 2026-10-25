@@ -38,7 +38,7 @@ const DEEPEN = 1.55;
 function deepen(c) { if (MODE === 'game') { c.r = Math.pow(c.r, DEEPEN); c.g = Math.pow(c.g, DEEPEN); c.b = Math.pow(c.b, DEEPEN); } return c; }
 function lin(hex) { const c = new T.Color(hex); return MODE === 'linear' ? c.convertSRGBToLinear() : deepen(c); }
 // skin needs more of the way: raw, the light tones carried so much green and blue that they lit up white
-function deepenSkin(c) { if (MODE === 'game') { const l = (c.r + c.g + c.b) / 3, k = 1.55 + 0.35 * Math.max(0, l - 0.45) / 0.45; c.r = Math.pow(c.r, k); c.g = Math.pow(c.g, k + 0.12); c.b = Math.pow(c.b, k + 0.16); } return c; }   // light tones get the most correction, deep tones the least
+function deepenSkin(c) { if (MODE === 'game') { const l = (c.r + c.g + c.b) / 3, k = 1.55 + 0.55 * Math.max(0, l - 0.45) / 0.45; c.r = Math.pow(c.r, k); c.g = Math.pow(c.g, k + 0.12); c.b = Math.pow(c.b, k + 0.16); } return c; }   // light tones get the most correction, deep tones the least
 function linSkin(hex) { const c = new T.Color(hex); return MODE === 'linear' ? c.convertSRGBToLinear() : deepenSkin(c); }
 function texEnc(t) { if (MODE === 'linear') { if ('colorSpace' in t && T.SRGBColorSpace) t.colorSpace = T.SRGBColorSpace; else t.encoding = T.sRGBEncoding; } return t; }
 
@@ -216,8 +216,8 @@ function headShape(f) {
     const A = f.asym, eyY = nx < 0 ? A.eyeL : A.eyeR, nxs = nx - A.nose * sstep(0.25, -0.3, ny);
     r -= 0.045 * G2(ax - 0.34, ny - 0.11 - eyY, 0.15) * fr;                                 // eye sockets
     r += 0.05 * Math.exp(-(((ny - 0.27) / 0.075) ** 2)) * sstep(0.62, 0.1, ax) * fr * f.brow; // brow ridge
-    const nw = 0.07 * f.bridge + 0.075 * sstep(0.12, -0.24, ny) * f.wing;
-    const na = ny > -0.24 ? mix(0.015, 0.15 * f.nose, sstep(0.2, -0.2, ny)) : 0.15 * f.nose * sstep(-0.33, -0.24, ny);
+    const nw = 0.088 * f.bridge + 0.075 * sstep(0.12, -0.24, ny) * f.wing;   // a bridge with some breadth, not a blade
+    const na = ny > -0.24 ? mix(0.015, 0.135 * f.nose, sstep(0.2, -0.2, ny)) : 0.135 * f.nose * sstep(-0.33, -0.24, ny);
     r += (na + 0.035 * f.hook * G2(0, ny + 0.02, 0.11)) * Math.exp(-((nxs / nw) ** 2)) * fr;   // nose (bridge, hook)
     r += 0.04 * f.tip * G2(nxs / 1.3, ny + 0.19 - f.up, 0.065) * fr;                       // tip bulb / upturn
     r += 0.035 * f.wing * G2(Math.abs(nxs) - 0.12 * f.wing, ny + 0.22, 0.07) * fr;                                    // nostril wings
@@ -235,6 +235,9 @@ function headShape(f) {
     let x = nx * r, y = ny * r, z = nz * r;
     const jaw = ny < 0 ? mix(1, f.jaw * 0.92, sstep(-0.15, -0.9, ny)) : 1;
     x *= jaw;
+    // a sphere tapers to a point at the bottom; a jaw does not. Square the lower face out and blunt the chin.
+    if (ny < -0.3) { const sq = sstep(-0.3, -0.75, ny) * (1 - 0.45 * sstep(-0.86, -1.0, ny)); x *= 1 + (f.fem ? 0.13 : 0.22) * sq; }
+    if (ny < -0.8) y *= mix(1, 0.95, sstep(-0.8, -1.0, ny));
     if (nz < 0) z *= 1.08 - 0.25 * sstep(-0.2, -0.8, ny);                                // skull back / neck
     if (ny < -0.55 && nz < 0.3) z *= mix(1, 0.75, sstep(-0.55, -0.95, ny) * sstep(0.3, -0.4, nz));
     out[0] = x * hw; out[1] = y * hh; out[2] = z * hd; return out;
@@ -410,7 +413,7 @@ export function makeCharacter(THREE, opts = {}) {
   add(neckG, gb('neck', () => limb(-0.1, [0.058, 0.055, 0.052], seg)), skinM);
   const head = new T.Group(); head.position.set(0, 0.07, 0.012); neckG.add(head);
   const headPivot = new T.Group(); headPivot.position.set(0, 0.10, 0); head.add(headPivot);
-  const shape = headShape(S.face);
+  const shape = headShape(Object.assign({ fem }, S.face));
   const headMat = headSkinMat(S, q);
   add(headPivot, sphereGeo(QQ.head[0], QQ.head[1], shape), headMat);
   // eyes
@@ -459,9 +462,9 @@ export function makeCharacter(THREE, opts = {}) {
   mouthIn.scale.set(0.019, 0.0015, 0.006);
   const teeth = add(headPivot, cached(geoCache, 'teeth', () => new T.BoxGeometry(0.026, 0.006, 0.01)), stdMat('teeth', { color: lin(0xe0d9ca), roughness: 0.3 }), mp.x, mp.y + 0.0005, mp.z - 0.0095, faceFine);
   const lipU = add(headPivot, cached(geoCache, 'lipU' + q, () => lipGeo(true)), lipM, mp.x, mp.y + 0.0036, mp.z - 0.0048, faceFine);
-  lipU.scale.set(0.0225 * S.face.mouthW, 0.0042 * S.face.lip, 0.0062); lipU.rotation.z = A.mouth;
+  lipU.scale.set(0.0225 * S.face.mouthW, 0.0049 * S.face.lip, 0.0084); lipU.rotation.z = A.mouth;
   const lipL = add(headPivot, cached(geoCache, 'lipL' + q, () => lipGeo(false)), lipM, mp.x, mp.y - 0.0042, mp.z - 0.0054, faceFine);
-  lipL.scale.set(0.0205 * S.face.mouthW, 0.0052 * S.face.lip, 0.0066); lipL.rotation.z = A.mouth;
+  lipL.scale.set(0.0205 * S.face.mouthW, 0.0062 * S.face.lip, 0.0092); lipL.rotation.z = A.mouth;
   // nostrils
   for (const sx of [-1, 1]) { const p = surf(shape, sx * 0.085 + A.nose, -0.265, 0.95); const m = add(headPivot, mouthIn.geometry, stdMat('nostril', { color: 0x2a1410, roughness: 1 }), p.x, p.y + 0.002, p.z - 0.008, faceFine); m.scale.set(0.0035, 0.0018, 0.0045); m.rotation.y = sx * 0.4; }
   // ears
@@ -696,7 +699,14 @@ export function makeCharacter(THREE, opts = {}) {
     const sit = st.sit, seatH = state.seatHeight ?? 0.46, desk = state.desk ? 1 : 0;
     const speed = sit > 0.5 ? 0 : state.speed != null ? state.speed : (state.moving ? 1.35 : 0);
     st.walk += (clamp(speed / 1.35, 0, 1.6) - st.walk) * Math.min(1, dt * 6);
-    st.ph += dt * (speed > 0.05 ? speed / 1.25 * Math.PI * 2 * 0.5 : 0);
+    // planted gait: given the body's real ground speed (state.velocity, m/s), each foot locks to the floor through its stance
+    // and swings to the next footfall; hip and knee come from two-bone IK. The cycle runs at the rate the ground passes.
+    const vel = state.velocity, planted = vel != null && sit < 0.5;
+    if (planted) {
+      if (!st.sc) { const s3 = new T.Vector3(); root.updateMatrixWorld(true); rig.getWorldScale(s3); st.sc = s3.z || 1; }
+      const vL = Math.max(0, vel) / st.sc, stepL = (0.40 + 0.22 * Math.min(1.6, Math.max(0, vel))) / st.sc;
+      st.SL = 2 * stepL; if (vL > 0.02) st.ph += dt * vL / st.SL * Math.PI * 2;
+    } else st.ph += dt * (speed > 0.05 ? speed / 1.25 * Math.PI * 2 * 0.5 : 0);
     const w = Math.min(1, st.walk), ph = st.ph, t = st.t;
     const breath = Math.sin(t * 1.5);
     // gesture target
@@ -710,7 +720,18 @@ export function makeCharacter(THREE, opts = {}) {
     torso.rotation.y = -Math.sin(ph) * 0.13 * w; torso.rotation.x = 0.04 * w + breath * 0.008;
     torso.scale.set(1 + breath * 0.006, 1, 1 + breath * 0.01);
     // legs
-    for (const L of legs) { const s = L.sx < 0 ? 1 : -1, a = Math.sin(ph) * s;
+    if (planted) {
+      const duty = 0.62, SLf = duty * (st.SL || 1), A = 0.45, Bn = 0.43, yA = 0.04 + (fem ? 0.012 : 0), hipJ = hips.position.y - 0.03, ramp = clamp(Math.max(0, vel) / 0.12);   // the stride fades with the real speed, so a slow walk still plants its feet
+      for (const L of legs) { const s = L.sx < 0 ? 1 : -1;
+        let u = ((ph - Math.PI / 2) / (Math.PI * 2) + (s > 0 ? 0 : 0.5)) % 1; if (u < 0) u += 1;
+        let zf, yf, toe = 0;
+        if (u < duty) { zf = SLf / 2 - SLf * (u / duty); yf = yA; }                               // stance: the foot stays where it landed
+        else { const q = (u - duty) / (1 - duty), e = q * q * (3 - 2 * q); zf = -SLf / 2 + SLf * e; yf = yA + 0.065 * Math.sin(Math.PI * q); toe = 0.35 * Math.sin(Math.PI * Math.min(1, q * 1.6)) * (1 - q); }  // swing: lift, carry forward, set down
+        zf *= ramp; yf = mix(yA, yf, ramp); toe *= ramp;
+        const dz = zf, dy = yf - hipJ, d = clamp(Math.hypot(dz, dy), 0.25, A + Bn - 1e-4);
+        const phi = Math.atan2(dz, -dy), beta = Math.acos(clamp((A * A + d * d - Bn * Bn) / (2 * A * d), -1, 1)), kappa = Math.PI - Math.acos(clamp((A * A + Bn * Bn - d * d) / (2 * A * Bn), -1, 1));
+        L.hp.rotation.x = -(phi + beta); L.kn.rotation.x = kappa; L.an.rotation.x = (phi + beta) - kappa + toe; L.hp.rotation.z = -hips.rotation.z; }
+    } else for (const L of legs) { const s = L.sx < 0 ? 1 : -1, a = Math.sin(ph) * s;
       L.hp.rotation.x = -a * 0.42 * w + (1 - w) * (L.sx < 0 ? 0.02 : -0.02) * Math.sin(t * 0.35);
       L.kn.rotation.x = Math.max(0, Math.cos(ph) * s) * 0.9 * w + 0.03;
       L.an.rotation.x = -L.hp.rotation.x - L.kn.rotation.x + (Math.max(0, -Math.cos(ph) * s)) * 0.15 * w; L.hp.rotation.z = -hips.rotation.z; }

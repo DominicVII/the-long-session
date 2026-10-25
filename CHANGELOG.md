@@ -4,6 +4,12 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261025d: feet that stay on the floor; faces with a jaw
+
+`20261025d` (on `20261025c`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+The walk is now a planted gait. Each foot locks to the floor through its stance and swings to the next footfall; hip and knee angles come from two-bone IK against the leg lengths, the cycle runs at the rate the ground actually passes, and the ground speed is measured from where the body is drawn, frame to frame, so it holds at any frame rate. Measured foot slip went from 77 to 190 percent of the distance walked (the old sine swing) to 2 to 5 percent at every pace from a stroll (0.15 m/s) to a brisk walk (1.3 m/s); step length runs from 0.37 m to 0.65 m with speed. Faces: the lower face is squared out and the chin blunted (a sphere tapers to a point, a jaw does not; gentler on women), the nose has a bridge with breadth instead of a blade, lips are fuller and stand off the face, and fair skin carries more pigment.
+
 ## 20261025c: people walk, hold what they carry, and keep out of doorways
 
 `20261025c` (on `20261025b`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
