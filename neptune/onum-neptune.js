@@ -990,7 +990,6 @@
         break;
       case "stars_saltire":
         break;
-      // drawn by the saltire layout
       default:
         star(g, x, y, s);
     }
@@ -1385,9 +1384,31 @@
   }
   var MODE = "game";
   var matCaches = { game: /* @__PURE__ */ new Map(), linear: /* @__PURE__ */ new Map() };
+  var DEEPEN = 1.55;
+  function deepen(c) {
+    if (MODE === "game") {
+      c.r = Math.pow(c.r, DEEPEN);
+      c.g = Math.pow(c.g, DEEPEN);
+      c.b = Math.pow(c.b, DEEPEN);
+    }
+    return c;
+  }
   function lin(hex) {
     const c = new T.Color(hex);
-    return MODE === "linear" ? c.convertSRGBToLinear() : c;
+    return MODE === "linear" ? c.convertSRGBToLinear() : deepen(c);
+  }
+  function deepenSkin(c) {
+    if (MODE === "game") {
+      const l = (c.r + c.g + c.b) / 3, k = 1.55 + 0.35 * Math.max(0, l - 0.45) / 0.45;
+      c.r = Math.pow(c.r, k);
+      c.g = Math.pow(c.g, k + 0.12);
+      c.b = Math.pow(c.b, k + 0.16);
+    }
+    return c;
+  }
+  function linSkin(hex) {
+    const c = new T.Color(hex);
+    return MODE === "linear" ? c.convertSRGBToLinear() : deepenSkin(c);
   }
   function texEnc(t) {
     if (MODE === "linear") {
@@ -1445,9 +1466,9 @@
   }
   function headSkinMat(S, q) {
     const shadow = S.fem ? 0 : S.beard === "full" || S.beard === "short" ? 0.6 : S.beard === "stubble" ? 1 : 0.45;
-    const key = "headskin" + S.skin + (S.fem ? "f" : "m") + shadow + q + MODE;
+    const key = "headskin2" + S.skin + (S.fem ? "f" : "m") + shadow + q + MODE;
     return cached(matCache, key, () => {
-      const W = q === "high" ? 512 : q === "med" ? 256 : 128, H = W / 2, base = new T.Color(S.skin);
+      const W = q === "high" ? 512 : q === "med" ? 256 : 128, H = W / 2, base = deepenSkin(new T.Color(S.skin));
       const dark = (base.r + base.g + base.b) / 3 < 0.45;
       const hgt = new Float32Array(W * H), rgh = new Float32Array(W * H);
       const col = eqPaint(W, H, (nx, ny, nz, o, i) => {
@@ -1459,7 +1480,7 @@
         const pore = vn3(nx * 140, ny * 140, nz * 140, 7), pore2 = vn3(nx * 70, ny * 70, nz * 70, 8);
         const stub = vn3(nx * 220, ny * 220, nz * 220, 9);
         let r = base.r, g = base.g, b = base.b;
-        const rk = dark ? 0.5 : 1;
+        const rk = dark ? 0.5 : 1 + 0.9 * clamp2(((base.r + base.g + base.b) / 3 - 0.45) / 0.3);
         r *= 1 + 0.05 * red * rk;
         g *= 1 - 0.12 * red * rk;
         b *= 1 - 0.1 * red * rk;
@@ -1517,14 +1538,14 @@
   }
   function lidMat(S) {
     return cached(matCache, "lid" + S.skin + MODE, () => {
-      const m = new T.MeshStandardMaterial({ color: lin(hexMix(S.skin, 6961712, 0.12)), roughness: 0.5 });
+      const m = new T.MeshStandardMaterial({ color: linSkin(hexMix(S.skin, 6961712, 0.12)), roughness: 0.5 });
       gameSkin(m, S.skin);
       return m;
     });
   }
   function earMat(S) {
     return cached(matCache, "ear" + S.skin + MODE, () => {
-      const m = new T.MeshStandardMaterial({ color: lin(hexMix(S.skin, 12601920, 0.12)), roughness: 0.55 });
+      const m = new T.MeshStandardMaterial({ color: linSkin(hexMix(S.skin, 12601920, 0.16)), roughness: 0.55 });
       gameSkin(m, S.skin);
       return m;
     });
@@ -1533,7 +1554,7 @@
     return cached(matCache, "iris" + hex + MODE, () => {
       const S2 = 64, c = document.createElement("canvas");
       c.width = c.height = S2;
-      const g = c.getContext("2d"), base = new T.Color(hex);
+      const g = c.getContext("2d"), base = deepen(new T.Color(hex));
       const id = g.createImageData(S2, S2);
       for (let y = 0; y < S2; y++) for (let x = 0; x < S2; x++) {
         const dx = (x + 0.5) / S2 * 2 - 1, dy = (y + 0.5) / S2 * 2 - 1, r = Math.hypot(dx, dy), a = Math.atan2(dy, dx);
@@ -1550,14 +1571,14 @@
     });
   }
   function hairShellMat(S, q) {
-    return cached(matCache, "hairshell" + S.style + S.hair + (S.fem ? 1 : 0) + q + MODE, () => {
-      const W = q === "high" ? 512 : 256, H = W / 2, base = new T.Color(S.hair);
+    return cached(matCache, "hairshell2" + S.style + S.hair + (S.fem ? 1 : 0) + q + MODE, () => {
+      const W = q === "high" ? 512 : 256, H = W / 2, base = deepen(new T.Color(S.hair));
       const hgt = new Float32Array(W * H);
       const col = eqPaint(W, H, (nx, ny, nz, o, i) => {
         const { m } = hairMask(S.style, nx, ny, nz, S.fem);
         const strand = vn3(nx * 6, ny * 90, nz * 6, 11) * 0.6 + vn3(nx * 3, ny * 40, nz * 3, 12) * 0.4;
         const brk = vn3(nx * 60, ny * 60, nz * 60, 13);
-        const a = sstep2(0.42, 0.58, m + (brk - 0.5) * 0.35 + (strand - 0.5) * 0.15);
+        const a = sstep2(0.44, 0.56, m + (brk - 0.5) * 0.16 + (strand - 0.5) * 0.1);
         const k = 0.78 + strand * 0.42;
         o[i] = base.r * k;
         o[i + 1] = base.g * k;
@@ -1711,7 +1732,7 @@
   function skinMat(hex, q) {
     return cached(matCache, "skin" + hex + q, () => {
       const m = new T.MeshStandardMaterial({
-        color: lin(hex),
+        color: linSkin(hex),
         roughness: 0.52,
         metalness: 0,
         normalMap: skinNormal(q === "high" ? 512 : 256),
@@ -1761,14 +1782,14 @@
       r -= 0.03 * G2(ax - 0.28, ny + 0.16, 0.12) * fr * (1 - age * 0.3);
       r += 0.07 * G2(nx * 0.9, (ny + 0.47) * 1.3, 0.26) * fr;
       r -= 0.025 * G2(nx, ny + 0.6, 0.08) * fr;
-      r += 0.07 * f.chin * G2(nx * 1.4, ny + 0.8, 0.2) * fr;
+      r += 0.06 * f.chin * G2(nx * 0.95, ny + 0.8, 0.22) * fr;
       r -= 0.04 * G2(ax - 0.84, ny - 0.22, 0.22);
       r -= age * 0.018 * G2(ax - 0.3, ny + 0.02, 0.07) * fr;
       r -= age * 0.022 * G2((ax - 0.2 - -(ny + 0.3) * 0.35) * 2.4, ny + 0.32, 0.14) * fr * sstep2(0.1, 0.16, ax);
       r += age * 0.03 * G2(ax - 0.5, ny + 0.62, 0.16);
       if (ny > 0.38 && ny < 0.75) r -= age * 5e-3 * Math.pow(Math.abs(Math.sin(ny * 48)), 6) * fr;
       let x = nx * r, y = ny * r, z = nz * r;
-      const jaw = ny < 0 ? mix2(1, f.jaw * 0.86, sstep2(-0.15, -0.9, ny)) : 1;
+      const jaw = ny < 0 ? mix2(1, f.jaw * 0.92, sstep2(-0.15, -0.9, ny)) : 1;
       x *= jaw;
       if (nz < 0) z *= 1.08 - 0.25 * sstep2(-0.2, -0.8, ny);
       if (ny < -0.55 && nz < 0.3) z *= mix2(1, 0.75, sstep2(-0.55, -0.95, ny) * sstep2(0.3, -0.4, nz));
@@ -1881,7 +1902,6 @@
       case "consular":
         Object.assign(U, { main: 10165038, accent: 15259043, trim: 15259043, outfit: fem ? "skirt_suit" : "suit_tie", tie: 15259043, shirt: 15984324 });
         break;
-      // NO7 colours (session.html oranje7FlagTex)
       default:
         Object.assign(U, { main: hm(dark, 1053208, 0.4), outfit: fem ? "skirt_suit" : "suit_tie", tie: U.accent });
     }
@@ -2194,8 +2214,8 @@
       const m = add(headPivot, tg, browM, 0, 0, 0, faceFine);
       m.userData.browSide = sx;
     }
-    const lipCol = hexMix(S.skin, fem ? 10504786 : 9329234, fem ? 0.3 : 0.2);
-    const lipM = stdMat("lip" + lipCol + MODE, { color: lin(lipCol), roughness: 0.38 });
+    const lipCol = hexMix(S.skin, fem ? 10501704 : 9326152, fem ? 0.36 : 0.26);
+    const lipM = stdMat("lip2" + lipCol + MODE, { color: linSkin(lipCol), roughness: 0.38 });
     const mp = surf(shape, 0, -0.47, 0.88);
     const mouthIn = add(headPivot, cached(geoCache, "mouthIn", () => new T.SphereGeometry(1, 16, 10)), stdMat("mouthIn", { color: 1705991, roughness: 0.9 }), mp.x, mp.y - 25e-4, mp.z - 7e-3, faceFine);
     mouthIn.scale.set(0.019, 15e-4, 6e-3);
@@ -2309,7 +2329,12 @@
     let skirt = null;
     const jlen = bottom === "dress" ? -0.06 : -0.17;
     if (jacket) {
-      const jp = tp.filter((a) => a[0] <= 0.51).map((a) => ring(a, 1.06, 0.012));
+      const jp = tp.filter((a) => a[0] <= 0.51).map((a) => {
+        const r = ring(a, 1.06, 0.012);
+        const pad = sstep2(0.36, 0.43, a[0]) * sstep2(0.5, 0.465, a[0]);
+        r.w = Math.max(r.w, mix2(r.w, shX + (fem ? 0.022 : 0.03), pad));
+        return r;
+      });
       jp.push({ y: 0.535, w: 0.072, d: 0.066 });
       jp.unshift({ y: jlen, w: tp[0][1] * 1.08 + 0.014, d: tp[0][2] * 1.06 + 0.012 });
       add(torso, gb("jacket" + jlen, () => loft(jp, seg)), suitM);
@@ -2371,7 +2396,7 @@
       const sh = new T.Group();
       sh.position.set(sx * shX, shoulderY, -5e-3);
       torso.add(sh);
-      add(sh, gb("shoulderBall", () => weld(new T.SphereGeometry(0.058, 16, 12))), sleeve).scale.set(1, 0.9, 1);
+      add(sh, gb("shoulderBall", () => weld(new T.SphereGeometry(0.058, 16, 12))), sleeve, 0, -0.014, 0).scale.set(1, 0.66, 1);
       add(sh, gb("upArm", () => limb(0.3, [0.057, 0.052, 0.046, 0.042], seg)), sleeve);
       const el = new T.Group();
       el.position.y = -0.3;
@@ -2701,7 +2726,7 @@
       }
       st.blink = Math.max(0, st.blink - dt);
       const bl = st.blink > 0 ? Math.sin((1 - st.blink / 0.14) * Math.PI) : 0;
-      for (const l of lids) l.rotation.x = l.userData.up > 0 ? mix2(-0.36 + S.face.lidDrop, 0.4, bl) + st.lookPitch * 0.3 : mix2(0.5, 0.4, bl);
+      for (const l of lids) l.rotation.x = l.userData.up > 0 ? mix2(-0.24 + S.face.lidDrop, 0.4, bl) + st.lookPitch * 0.3 : mix2(0.37, 0.3, bl);
       for (const e of eyes) {
         e.rotation.y = st.lookYaw * 0.3;
         e.rotation.x = st.lookPitch * 0.4;

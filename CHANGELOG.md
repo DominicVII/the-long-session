@@ -4,6 +4,12 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261025b: people that look like people
+
+`20261025b` (on `20261025a`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+The people you see are Neptune's figures (neptune/onum-characters.js). Their colours were used as raw numbers, which washed everything pale: a claret suit read pink, tan skin read white. People's colours are now taken most of the way to true colour (cloth and hair by one curve, skin by a stronger one that corrects light tones most), so suits are navy, charcoal, claret and brown, and skin is skin. Fair skin shows blood in the cheeks, nose and ears; lips are rosier and drawn from the skin. Resting eyelids cover the top of the iris and meet the bottom of it, an almond rather than a stare. Jackets are padded out over the tops of the sleeves, the line a tailored shoulder has, instead of balloons above it. Jaws are broader and chins rounder. Hairlines are less ragged. The bundled copy for file:// play (onum-neptune.js) is rebuilt from the module, and both are now loaded with the build stamp so a changed figure is never served from an old cache. The game's own fallback figure (drawn only if Neptune's cannot load) gets a flatter, realistic torso, real limb thickness, small shoulder caps, lips coloured from the skin and a lash line.
+
 ## 20261025a: full graphics power on a real graphics card; smooth by resolution
 
 `20261025a` (on `20261023a`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.

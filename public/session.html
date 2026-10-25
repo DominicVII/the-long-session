@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261025a">
+<meta name="onum-build" content="20261025b">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261025a";
+  var STAMP = "20261025b";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -4498,6 +4498,7 @@ function makeBones(spec){
 /* One body geometry per frame+outfit. Everyone else reuses it and we scale
    the root — that is what "one model, unique faces" actually means here. */
 const BODY_CANON_H = 1.70, BODY_CANON_B = 1.00;
+const TORSO_DZ = 0.74;   /* a torso is about three quarters as deep as it is wide */
 const SKIN_GEO = new Map();
 function sharedSkin(spec, key){
   let geo = SKIN_GEO.get(key);
@@ -4553,13 +4554,16 @@ function skinnedBody(spec){
       let wOwn = 1, wOther = 0, other = own;
       if(t < 0.28){ wOther = 0.5 - t/0.56; wOwn = 1 - wOther; other = par; }
       else if(t > 0.72){ wOther = (t - 0.72)/0.56; wOwn = 1 - wOther; other = chi; }
+      /* a torso is wider than it is deep: seg.dz flattens the ring front to back (R is the depth axis on an upright bone) */
+      const dzk = seg.dz || 1, bulge = seg.bulge ? Math.sin(t * Math.PI) * seg.bulge : 0, radB = rad * (1 + bulge);
       for(let k=0;k<RING;k++){
         const a = k/RING*Math.PI*2;
-        const ca = Math.cos(a)*rad, sa = Math.sin(a)*rad;
+        const ca = Math.cos(a)*radB*dzk, sa = Math.sin(a)*radB;
         pos.push(cx + R[0]*ca + F[0]*sa, cy + R[1]*ca + F[1]*sa, cz + R[2]*ca + F[2]*sa);
-        const nx = R[0]*Math.cos(a) + F[0]*Math.sin(a);
-        const ny = R[1]*Math.cos(a) + F[1]*Math.sin(a);
-        const nz = R[2]*Math.cos(a) + F[2]*Math.sin(a);
+        const enx = Math.cos(a) / dzk, eny = Math.sin(a), enl = Math.hypot(enx, eny) || 1;
+        const nx = (R[0]*enx + F[0]*eny) / enl;
+        const ny = (R[1]*enx + F[1]*eny) / enl;
+        const nz = (R[2]*enx + F[2]*eny) / enl;
         nrm.push(nx, ny, nz);
         uv.push(k/RING, t);
         si.push(own, other, 0, 0);
@@ -6834,7 +6838,16 @@ function njFaceColors(g, fem){
     const sx = n.x >= 0 ? 1 : -1;
     /* cheeks: blood close to the surface */
     const ch = bump(sx * 0.56, -0.10, 0.80, 0.17) * (fem ? 1.25 : 1);
-    r += 0.055 * ch; gg -= 0.045 * ch; b -= 0.040 * ch;
+    r += 0.075 * ch; gg -= 0.060 * ch; b -= 0.050 * ch;
+    /* eye sockets: the skin dips and shades around the eye, deepest at the inner corner */
+    const so = bump(sx * 0.30, 0.05, 0.92, 0.10), ic = bump(sx * 0.16, 0.02, 0.97, 0.05);
+    r -= 0.075 * so + 0.05 * ic; gg -= 0.080 * so + 0.055 * ic; b -= 0.055 * so + 0.035 * ic;
+    /* round the mouth the skin runs rosier; the chin and the tip of the nose catch the most blood */
+    const mo = bump(0, -0.30, 0.95, 0.09), cn = bump(0, -0.62, 0.78, 0.10);
+    r += 0.04 * mo + 0.03 * cn; gg -= 0.04 * mo + 0.02 * cn; b -= 0.035 * mo + 0.02 * cn;
+    /* the temples and the sides of the jaw sit in the face's own shadow */
+    const te = Math.max(0, Math.abs(n.x) - 0.62) * 0.25;
+    r -= te; gg -= te; b -= te * 0.8;
     /* nose and the middle of the face run a little warm */
     const no = bump(0, -0.05, 1, 0.11);
     r += 0.035 * no; gg -= 0.025 * no; b -= 0.03 * no;
@@ -6860,6 +6873,19 @@ function njFaceColors(g, fem){
   return g;
 }
 const NJ_HEADSKIN = new Map();
+/* lips are the skin they grow from, darker and rosier, and a little wet */
+const NJ_LIPS = new Map();
+function njLipMat(skin, fem){
+  const base = skin && skin.color ? skin.color : new THREE.Color(0xc08e64), key = base.getHexString() + (fem ? "f" : "m");
+  if(NJ_LIPS.has(key)) return NJ_LIPS.get(key);
+  const c = base.clone(), hsl = {}; c.getHSL(hsl);
+  const dark = hsl.l < 0.35;
+  c.setRGB(c.r * (dark ? 0.80 : 0.84), c.g * (dark ? 0.60 : 0.56), c.b * (dark ? 0.60 : 0.57));
+  if(fem) c.lerp(new THREE.Color(dark ? 0x6a2c2c : 0xa8484c), 0.18);
+  const m = new THREE.MeshStandardMaterial({color:c, roughness:0.42, metalness:0});
+  m.envMapIntensity = 0.2; m._shared = true; NJ_LIPS.set(key, m);
+  return m;
+}
 function njHeadSkin(skin){
   if(!skin) return skin;
   let m = NJ_HEADSKIN.get(skin.uuid);
@@ -15654,21 +15680,21 @@ function buildPerson(p){
       anR:{parent:"knR",  pos:[0, -shin, 0]}
     },
     segs:[
-      {a:"hips",  b:"spineB", r0:H*0.118*B, r1:H*0.112*B, mat:0},
-      {a:"spineB",b:"chestB", r0:H*0.112*B, r1:H*0.132*B, mat:0},
-      {a:"chestB",b:"neckB",  r0:H*0.132*B, r1:H*0.062*B, mat:0},
+      {a:"hips",  b:"spineB", r0:H*0.118*B, r1:H*0.110*B, mat:0, dz:TORSO_DZ},
+      {a:"spineB",b:"chestB", r0:H*0.110*B, r1:H*0.130*B, mat:0, dz:TORSO_DZ, bulge:fem ? 0.04 : 0.03},
+      {a:"chestB",b:"neckB",  r0:H*0.130*B, r1:H*0.060*B, mat:0, dz:TORSO_DZ},
       {a:"neckB", b:"headB",  r0:H*0.050,   r1:H*0.048,   mat:2, rings:3},
-      {a:"shL", b:"elL", r0:H*0.062*B, r1:H*0.052*B, mat:0},
-      {a:"elL", b:"wrL", r0:H*0.052*B, r1:H*0.042*B, mat:0},
-      {a:"shR", b:"elR", r0:H*0.062*B, r1:H*0.052*B, mat:0},
-      {a:"elR", b:"wrR", r0:H*0.052*B, r1:H*0.042*B, mat:0},
-      {a:"hpL", b:"knL", r0:H*0.080*B, r1:H*0.062*B, mat:1},
-      {a:"knL", b:"anL", r0:H*0.062*B, r1:H*0.046*B, mat:1},
-      {a:"hpR", b:"knR", r0:H*0.080*B, r1:H*0.062*B, mat:1},
-      {a:"knR", b:"anR", r0:H*0.062*B, r1:H*0.046*B, mat:1}
+      {a:"shL", b:"elL", r0:H*0.044*B, r1:H*0.036*B, mat:0, bulge:0.06},
+      {a:"elL", b:"wrL", r0:H*0.036*B, r1:H*0.027*B, mat:0, bulge:0.05},
+      {a:"shR", b:"elR", r0:H*0.044*B, r1:H*0.036*B, mat:0, bulge:0.06},
+      {a:"elR", b:"wrR", r0:H*0.036*B, r1:H*0.027*B, mat:0, bulge:0.05},
+      {a:"hpL", b:"knL", r0:H*0.064*B, r1:H*0.044*B, mat:1, bulge:0.05},
+      {a:"knL", b:"anL", r0:H*0.044*B, r1:H*0.032*B, mat:1, bulge:0.06},
+      {a:"hpR", b:"knR", r0:H*0.064*B, r1:H*0.044*B, mat:1, bulge:0.05},
+      {a:"knR", b:"anR", r0:H*0.044*B, r1:H*0.032*B, mat:1, bulge:0.06}
     ]
   };
-  const bodyKey = (fem ? "f" : "m") + "|" + (W.jacket ? "j" : "-") + "|" + (W.bottom || "t");
+  const bodyKey = "v2|" + (fem ? "f" : "m") + "|" + (W.jacket ? "j" : "-") + "|" + (W.bottom || "t");
   const built = sharedSkin(spec, bodyKey);
   const skinnable = m => {
     if(!G._skinMats) G._skinMats = new Map();
@@ -15696,7 +15722,7 @@ function buildPerson(p){
   const BN = built.bones;
   /* Frames that reproduce the old local spaces exactly, so every piece of
      detail below keeps the offsets it was authored with. */
-  const pelvis = new THREE.Group(); BN.hips.add(pelvis);
+  const pelvis = new THREE.Group(); pelvis.scale.z = Math.min(1, TORSO_DZ + 0.12); BN.hips.add(pelvis);
   const waistMat = W.bottom === "trousers" ? suit2 : (W.jacket ? suit : shirt);
   M(PG.waist, waistMat, pelvis, 0, H*0.035, 0, H*(fem?0.245:0.235)*B, H*0.13, H*0.150*B);
   if(W.bottom === "trousers")   /* belt */
@@ -15705,6 +15731,7 @@ function buildPerson(p){
   /* torso: shirt or blouse underneath, then waistcoat, then the jacket */
   const spine = new THREE.Group();
   spine.position.y = -torsoLen*0.72;
+  spine.scale.z = TORSO_DZ;            /* lapels, buttons and shirt front sit on the flatter chest */
   BN.chestB.add(spine);
   const _nSway = [], _nIris = [];
   /* Layers must actually nest: shirt inside waistcoat inside jacket, or
@@ -15804,8 +15831,8 @@ function buildPerson(p){
     M(PG.sph, tie, spine, 0, torsoLen*0.895, H*0.060*B, H*0.014, H*0.017, H*0.009, false);
   }
   /* shoulders */
-  M(PG.sph, torsoMat, spine, -shHalf*0.76, torsoLen*0.905, 0, H*(fem?0.046:0.052)*B, H*0.036, H*0.054*B, false);
-  M(PG.sph, torsoMat, spine,  shHalf*0.76, torsoLen*0.905, 0, H*(fem?0.046:0.052)*B, H*0.036, H*0.054*B, false);
+  M(PG.sph, torsoMat, spine, -shHalf*0.80, torsoLen*0.885, 0, H*(fem?0.036:0.042)*B, H*0.026, H*0.050*B, false);
+  M(PG.sph, torsoMat, spine,  shHalf*0.80, torsoLen*0.885, 0, H*(fem?0.036:0.042)*B, H*0.026, H*0.050*B, false);
 
   /* neck and head — skull + face plate matched to body frame / morphs */
   const headG = new THREE.Group();
@@ -15820,8 +15847,8 @@ function buildPerson(p){
   const skullPool = fem ? SKULLS_FEM : SKULLS_MASC;
   const skull = new THREE.Mesh(skullPool[(p.id||0) % skullPool.length], njHeadSkin(skin));
   /* Head scale tracks body build + face morphs so it does not float off the neck */
-  const headW = hu * (fem ? 0.91 : 0.97) * fw * (0.96 + 0.06*B);
-  const headH = hu * (fem ? 0.94 : 0.99) * (0.98 + 0.04*bh);
+  const headW = hu * (fem ? 0.93 : 0.99) * fw * (0.96 + 0.06*B);
+  const headH = hu * (fem ? 0.89 : 0.93) * (0.98 + 0.04*bh);
   const headD = hu * (fem ? 0.96 : 1.00) * (0.97 + 0.05*jw);
   skull.position.set(0, hu*0.455, -hu*0.015);
   skull.scale.set(headW, headH, headD);
@@ -15892,9 +15919,13 @@ function buildPerson(p){
   M(PG.sph, skin, headG,  hu*0.15*fw, hu*(0.56 + 0.02*bh), hu*0.44,
     hu*0.12*browS, hu*(0.032*bh), hu*0.048, false);
   /* lips with volume — same forward nudge as eyes/brow, see above */
-  const lipM = matCol(fem ? 0x9a5a58 : 0x8a5550, .55);
-  const mouth = M(PG.sph, lipM, headG, 0, hu*(0.275 + 0.01*lf), hu*0.455, hu*(0.095*lf), hu*(0.028*lf), hu*0.032, false);
-  const _nLow = M(PG.sph, lipM, headG, 0, hu*(0.255 + 0.01*lf), hu*0.460, hu*(0.088*lf), hu*(0.034*lf), hu*0.030, false);
+  const lipM = njLipMat(skin, fem);
+  const mouth = M(PG.sph, lipM, headG, 0, hu*(0.268 + 0.01*lf), hu*0.452, hu*(0.090*lf), hu*(0.024*lf), hu*0.030, false);
+  const _nLow = M(PG.sph, lipM, headG, 0, hu*(0.250 + 0.01*lf), hu*0.456, hu*(0.084*lf), hu*(0.030*lf), hu*0.029, false);
+  /* the lash line: a thin dark rim along each upper lid is most of what makes an eye read as an eye */
+  const lash = matCol(0x1a120d, .7);
+  M(PG.sph, lash, headG, -eyeX3, hu*0.512, hu*0.512, hu*0.070, hu*0.008, hu*0.016, false);
+  M(PG.sph, lash, headG,  eyeX3, hu*0.512, hu*0.512, hu*0.070, hu*0.008, hu*0.016, false);
   const _nBrow = nmBrows(M, hair, headG, hu, fw, bh, eyeX3, fem);
   nmFaceAge(M, headG, hu, skin, L, fem, headW);
   /* upper eyelids shade the modeled eyes and keep them from looking pasted on */
@@ -16004,12 +16035,12 @@ function buildPerson(p){
     const up = side < 0 ? BN.shL : BN.shR;
     const lo = side < 0 ? BN.elL : BN.elR;
     if(W.jacket)
-      M(PG.arm2, suit2, lo, 0, -foreArm*0.86, 0, H*0.054*B, foreArm*0.16, H*0.054*B, false);
+      M(PG.arm2, suit2, lo, 0, -foreArm*0.86, 0, H*0.033*B, foreArm*0.16, H*0.033*B, false);
     else
-      M(PG.arm2, shirt, lo, 0, -foreArm*0.45, 0, H*0.058*B, foreArm*0.22, H*0.058*B, false); /* rolled sleeve */
-    M(PG.arm2, shirt, lo, 0, -foreArm - H*0.006, 0, H*0.046*B, H*0.020, H*0.046*B, false);
+      M(PG.arm2, shirt, lo, 0, -foreArm*0.45, 0, H*0.040*B, foreArm*0.22, H*0.040*B, false); /* rolled sleeve */
+    M(PG.arm2, shirt, lo, 0, -foreArm - H*0.006, 0, H*0.029*B, H*0.020, H*0.029*B, false);
     /* a hand with a palm and a thumb reads far better than a blob */
-    const hand = M(PG.sph, skin, lo, 0, -foreArm - H*0.028, 0, H*0.038*B, H*0.052, H*0.024*B);
+    const hand = M(PG.sph, skin, lo, 0, -foreArm - H*0.030, 0, H*0.030*B, H*0.050, H*0.017*B);
     M(PG.sph, skin, lo, side*H*0.024*B, -foreArm - H*0.020, H*0.006,
       H*0.013*B, H*0.026, H*0.013*B, false);                       /* thumb */
     const _fg = (G.gfx === "simple" || (MODEST && SC.lvl < 1)) ? null : nmFingers(M, lo, skin, side, foreArm, H, B);
@@ -16024,7 +16055,7 @@ function buildPerson(p){
     const lo = side < 0 ? BN.knL : BN.knR;
     const foot = side < 0 ? BN.anL : BN.anR;
     if(!bare)      /* trouser break over the shoe */
-      M(PG.leg2, suit2, lo, 0, -shin*0.92, 0, H*0.068*B, shin*0.18, H*0.070*B, false);
+      M(PG.leg2, suit2, lo, 0, -shin*0.92, 0, H*0.046*B, shin*0.18, H*0.048*B, false);
     if(W.shoe === "heel"){
       M(PG.box, shoeM, foot, 0, H*0.014, H*0.030, H*0.050*B, H*0.028, H*0.125);
       M(PG.sph, shoeM, foot, 0, H*0.014, H*0.090, H*0.044*B, H*0.026, H*0.045, false);
@@ -43562,11 +43593,11 @@ try{
   /* 20261012u: ES modules cannot load from file:// (Play.bat / double-click), so Neptune never ran there and every
      person was the game's boxy fallback figure. The same modules ship pre-bundled as a classic script for that case. */
   const nepClassic = () => new Promise((ok, no) => { if(window.ONUM_NEPTUNE) return ok(window.ONUM_NEPTUNE);
-    const s2 = document.createElement("script"); s2.src = base + "onum-neptune.js";
+    const s2 = document.createElement("script"); s2.src = base + "onum-neptune.js?v=" + (function(){ try{ return document.querySelector('meta[name="onum-build"]').content; }catch(e){ return ""; } })();   /* the build stamp, so a changed figure is never served from cache */
     s2.onload = () => window.ONUM_NEPTUNE ? ok(window.ONUM_NEPTUNE) : no(new Error("onum-neptune.js empty"));
     s2.onerror = () => no(new Error("onum-neptune.js missing")); document.head.appendChild(s2); });
   (location.protocol === "file:" ? nepClassic().then(b => [b.chars, b.flags, b.mats])
-    : Promise.all([import(base + "onum-characters.js"), import(base + "onum-flags.js"), import(base + "onum-materials.js")])
+    : Promise.all([import(base + "onum-characters.js?v=" + (function(){ try{ return document.querySelector('meta[name="onum-build"]').content; }catch(e){ return ""; } })()), import(base + "onum-flags.js"), import(base + "onum-materials.js")])
       .catch(e => { console.warn("NEPTUNE: module import failed, using the bundled copy", e); return nepClassic().then(b => [b.chars, b.flags, b.mats]); })
   ).then(([c, f, m]) => {
     NEP.mods = {chars:c, flags:f, mats:m};
