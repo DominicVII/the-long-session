@@ -4,6 +4,12 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261025f: hair with volume and strands
+
+`20261025f` (on `20261025e`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+Hair has volume: more at the crown and over the top than at the hairline, so a head is no longer a painted cap on an egg (short cuts stay close). A loose outer layer of strands, alpha-cut a few millimetres out and drawn only up close, breaks the outline and the hairline the way real hair does. The strand texture runs the way combed hair runs, front to back over the top and back along the sides, instead of in horizontal dashes.
+
 ## 20261025e: stepping turns, a human pace into a chair, eye contact
 
 `20261025e` (on `20261025d`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.

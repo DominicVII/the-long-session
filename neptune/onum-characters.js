@@ -117,12 +117,14 @@ function irisMat(hex) { return cached(matCache, 'iris' + hex + MODE, () => {
   return new T.MeshStandardMaterial({ map: t, roughness: 0.2 }); }); }
 // hair shell material: strand albedo variation + alpha mask hairline (alphaTest: no sorting issues)
 function hairShellMat(S, q) {
-  return cached(matCache, 'hairshell2' + S.style + S.hair + (S.fem ? 1 : 0) + q + MODE, () => {
+  return cached(matCache, 'hairshell3' + S.style + S.hair + (S.fem ? 1 : 0) + q + MODE, () => {
     const W = q === 'high' ? 512 : 256, H = W / 2, base = deepen(new T.Color(S.hair));
     const hgt = new Float32Array(W * H);
     const col = eqPaint(W, H, (nx, ny, nz, o, i) => {
       const { m } = hairMask(S.style, nx, ny, nz, S.fem);
-      const strand = vn3(nx * 6, ny * 90, nz * 6, 11) * 0.6 + vn3(nx * 3, ny * 40, nz * 3, 12) * 0.4;
+      // combed hair runs front to back: across the top the strands are lines of constant x, down the sides lines of constant y
+      const sc = mix(nx, ny, sstep(0.55, 0.9, Math.abs(nx))), al = (nz + ny) * 0.5;
+      const strand = vn3(sc * 90, al * 6, 0, 11) * 0.6 + vn3(sc * 40, al * 3, 0, 12) * 0.4;
       const brk = vn3(nx * 60, ny * 60, nz * 60, 13);
       const a = sstep(0.44, 0.56, m + (brk - 0.5) * 0.16 + (strand - 0.5) * 0.10);
       const k = 0.78 + strand * 0.42; o[i] = base.r * k; o[i + 1] = base.g * k; o[i + 2] = base.b * k; o[i + 3] = a; hgt[i / 4] = strand;
@@ -132,6 +134,24 @@ function hairShellMat(S, q) {
     const mk = cv => new T.CanvasTexture(cv);
     return new T.MeshStandardMaterial({ map: texEnc(mk(toCanvas(W, H, col))), alphaMap: mk(toCanvas(W, H, alpha)), alphaTest: 0.5, normalMap: mk(toCanvas(W, H, nrm)),
       normalScale: new T.Vector2(0.5, 0.5), roughness: 0.6, metalness: 0, side: T.FrontSide });
+  });
+}
+// the loose outer strands: fine vertical breaks in an alpha cut-out, a shade lighter and darker than the body of the hair
+function hairFuzzMat(S, q) {
+  return cached(matCache, 'hairfuzz' + S.style + S.hair + (S.fem ? 1 : 0) + q + MODE, () => {
+    const W = q === 'high' ? 512 : 256, H = W / 2, base = deepen(new T.Color(S.hair));
+    const col = eqPaint(W, H, (nx, ny, nz, o, i) => {
+      const { m } = hairMask(S.style, nx, ny, nz, S.fem);
+      const sc = mix(nx, ny, sstep(0.55, 0.9, Math.abs(nx))), al = (nz + ny) * 0.5;
+      const fine = vn3(sc * 220, al * 10, 0, 21) * 0.65 + vn3(sc * 420, al * 18, 0, 22) * 0.35;
+      const clump = vn3(sc * 30, al * 4, 0, 23);
+      const a = sstep(0.56, 0.6, fine * 0.8 + clump * 0.35) * sstep(0.48, 0.62, m);
+      const k = 0.85 + fine * 0.4; o[i] = base.r * k; o[i + 1] = base.g * k; o[i + 2] = base.b * k; o[i + 3] = a;
+    });
+    const alpha = new Float32Array(W * H * 4); for (let i = 0; i < W * H; i++) { const a = col[i * 4 + 3]; alpha[i * 4] = alpha[i * 4 + 1] = alpha[i * 4 + 2] = a; alpha[i * 4 + 3] = 1; col[i * 4 + 3] = 1; }
+    const mk = cv => new T.CanvasTexture(cv);
+    const m = new T.MeshStandardMaterial({ map: texEnc(mk(toCanvas(W, H, col))), alphaMap: mk(toCanvas(W, H, alpha)), alphaTest: 0.5, roughness: 0.55, metalness: 0, side: T.DoubleSide });
+    m.name = 'onumc:hairfuzz'; return m;
   });
 }
 // lips: cupid's bow on the upper lip, fuller lower lip, tapered corners (unit size; scaled by the caller)
@@ -477,9 +497,18 @@ export function makeCharacter(THREE, opts = {}) {
   // hair shell: geometry gives volume, a painted alpha mask gives a clean, strand-broken hairline
   let hairShell = null;
   if (S.style !== 'bald') {
+    // hair has volume: more at the crown and over the top than at the hairline, so the head is not a cap on an egg
+    const shortCut = S.style === 'buzz' || S.style === 'caesar' || S.style === 'bald_fringe';
+    const hk = (nx, ny, nz, m, t) => 1 + 0.006 + t * 1.6 * sstep(0, 0.6, m) + (shortCut ? 0.006 : 0.024) * sstep(0.2, 0.85, ny) * sstep(-0.7, 0.3, nz) * sstep(0.2, 0.7, m);
     const hs = sphereGeo(QQ.head[0] + 8, QQ.head[1] + 8, (nx, ny, nz, o) => { shape(nx, ny, nz, o); const { m, t } = hairMask(S.style, nx, ny, nz, fem);
-      const k = m > 0.001 ? 1 + 0.004 + t * sstep(0, 0.7, m) : 0.95; o[0] *= k; o[1] *= k; o[2] *= k; return o; });
+      const k = m > 0.001 ? hk(nx, ny, nz, m, t) : 0.95; o[0] *= k; o[1] *= k; o[2] *= k; return o; });
     hairShell = add(headPivot, hs, hairShellMat(S, q));
+    // a loose outer layer of strands: alpha-cut, a few millimetres out, it breaks the outline and the hairline the way real hair does
+    if (q !== 'low') {
+      const fz = sphereGeo(QQ.head[0] + 8, QQ.head[1] + 8, (nx, ny, nz, o) => { shape(nx, ny, nz, o); const { m, t } = hairMask(S.style, nx, ny, nz, fem);
+        const k = m > 0.001 ? hk(nx, ny, nz, m, t) + (shortCut ? 0.004 : 0.009) : 0.95; o[0] *= k; o[1] *= k; o[2] *= k; return o; });
+      add(headPivot, fz, hairFuzzMat(S, q), 0, 0, 0, faceFine);
+    }
     if (S.style === 'bun') { const b = add(headPivot, earB, hairM, 0, 0.06, -0.1); b.scale.set(0.038, 0.034, 0.034); }
     if (S.style === 'long') { const lg = gb('longhair', () => loft([{ y: 0, w: .085, d: .03 }, { y: -0.08, w: .095, d: .03 }, { y: -0.2, w: .1, d: .025 }, { y: -0.25, w: .085, d: .015 }], seg));
       add(headPivot, lg, hairM, 0, -0.04, -0.07).rotation.x = 0.1; }

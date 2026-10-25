@@ -1571,12 +1571,13 @@
     });
   }
   function hairShellMat(S, q) {
-    return cached(matCache, "hairshell2" + S.style + S.hair + (S.fem ? 1 : 0) + q + MODE, () => {
+    return cached(matCache, "hairshell3" + S.style + S.hair + (S.fem ? 1 : 0) + q + MODE, () => {
       const W = q === "high" ? 512 : 256, H = W / 2, base = deepen(new T.Color(S.hair));
       const hgt = new Float32Array(W * H);
       const col = eqPaint(W, H, (nx, ny, nz, o, i) => {
         const { m } = hairMask(S.style, nx, ny, nz, S.fem);
-        const strand = vn3(nx * 6, ny * 90, nz * 6, 11) * 0.6 + vn3(nx * 3, ny * 40, nz * 3, 12) * 0.4;
+        const sc = mix2(nx, ny, sstep2(0.55, 0.9, Math.abs(nx))), al = (nz + ny) * 0.5;
+        const strand = vn3(sc * 90, al * 6, 0, 11) * 0.6 + vn3(sc * 40, al * 3, 0, 12) * 0.4;
         const brk = vn3(nx * 60, ny * 60, nz * 60, 13);
         const a = sstep2(0.44, 0.56, m + (brk - 0.5) * 0.16 + (strand - 0.5) * 0.1);
         const k = 0.78 + strand * 0.42;
@@ -1605,6 +1606,34 @@
         metalness: 0,
         side: T.FrontSide
       });
+    });
+  }
+  function hairFuzzMat(S, q) {
+    return cached(matCache, "hairfuzz" + S.style + S.hair + (S.fem ? 1 : 0) + q + MODE, () => {
+      const W = q === "high" ? 512 : 256, H = W / 2, base = deepen(new T.Color(S.hair));
+      const col = eqPaint(W, H, (nx, ny, nz, o, i) => {
+        const { m: m2 } = hairMask(S.style, nx, ny, nz, S.fem);
+        const sc = mix2(nx, ny, sstep2(0.55, 0.9, Math.abs(nx))), al = (nz + ny) * 0.5;
+        const fine = vn3(sc * 220, al * 10, 0, 21) * 0.65 + vn3(sc * 420, al * 18, 0, 22) * 0.35;
+        const clump = vn3(sc * 30, al * 4, 0, 23);
+        const a = sstep2(0.56, 0.6, fine * 0.8 + clump * 0.35) * sstep2(0.48, 0.62, m2);
+        const k = 0.85 + fine * 0.4;
+        o[i] = base.r * k;
+        o[i + 1] = base.g * k;
+        o[i + 2] = base.b * k;
+        o[i + 3] = a;
+      });
+      const alpha = new Float32Array(W * H * 4);
+      for (let i = 0; i < W * H; i++) {
+        const a = col[i * 4 + 3];
+        alpha[i * 4] = alpha[i * 4 + 1] = alpha[i * 4 + 2] = a;
+        alpha[i * 4 + 3] = 1;
+        col[i * 4 + 3] = 1;
+      }
+      const mk = (cv) => new T.CanvasTexture(cv);
+      const m = new T.MeshStandardMaterial({ map: texEnc(mk(toCanvas(W, H, col))), alphaMap: mk(toCanvas(W, H, alpha)), alphaTest: 0.5, roughness: 0.55, metalness: 0, side: T.DoubleSide });
+      m.name = "onumc:hairfuzz";
+      return m;
     });
   }
   function lipGeo(upper) {
@@ -2262,16 +2291,30 @@
     }
     let hairShell = null;
     if (S.style !== "bald") {
+      const shortCut = S.style === "buzz" || S.style === "caesar" || S.style === "bald_fringe";
+      const hk = (nx, ny, nz, m, t) => 1 + 6e-3 + t * 1.6 * sstep2(0, 0.6, m) + (shortCut ? 6e-3 : 0.024) * sstep2(0.2, 0.85, ny) * sstep2(-0.7, 0.3, nz) * sstep2(0.2, 0.7, m);
       const hs = sphereGeo(QQ.head[0] + 8, QQ.head[1] + 8, (nx, ny, nz, o) => {
         shape(nx, ny, nz, o);
         const { m, t } = hairMask(S.style, nx, ny, nz, fem);
-        const k = m > 1e-3 ? 1 + 4e-3 + t * sstep2(0, 0.7, m) : 0.95;
+        const k = m > 1e-3 ? hk(nx, ny, nz, m, t) : 0.95;
         o[0] *= k;
         o[1] *= k;
         o[2] *= k;
         return o;
       });
       hairShell = add(headPivot, hs, hairShellMat(S, q));
+      if (q !== "low") {
+        const fz = sphereGeo(QQ.head[0] + 8, QQ.head[1] + 8, (nx, ny, nz, o) => {
+          shape(nx, ny, nz, o);
+          const { m, t } = hairMask(S.style, nx, ny, nz, fem);
+          const k = m > 1e-3 ? hk(nx, ny, nz, m, t) + (shortCut ? 4e-3 : 9e-3) : 0.95;
+          o[0] *= k;
+          o[1] *= k;
+          o[2] *= k;
+          return o;
+        });
+        add(headPivot, fz, hairFuzzMat(S, q), 0, 0, 0, faceFine);
+      }
       if (S.style === "bun") {
         const b = add(headPivot, earB, hairM, 0, 0.06, -0.1);
         b.scale.set(0.038, 0.034, 0.034);
