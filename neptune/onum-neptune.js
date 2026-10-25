@@ -2125,8 +2125,13 @@
     const heavy = clamp2((B - 1) * 4);
     const tp = fem ? [[-0.09, 0.175, 0.115], [0, 0.172, 0.112], [0.1, 0.132, 0.095], [0.2, 0.14, 0.1], [0.29, 0.155, 0.118, 0.018], [0.36, 0.152, 0.108, 0.01], [0.42, 0.152, 0.096], [0.46, 0.128, 0.084], [0.495, 0.088, 0.066], [0.53, 0.055, 0.055]] : [[-0.09, 0.165, 0.11], [0, 0.163, 0.108], [0.12, 0.15 + 0.015 * heavy, 0.105 + 0.035 * heavy, 0.02 * heavy], [0.25, 0.165 + 0.01 * heavy, 0.115 + 0.02 * heavy, 0.01 * heavy], [0.35, 0.172, 0.118], [0.42, 0.172, 0.108], [0.465, 0.145, 0.092], [0.495, 0.1, 0.072], [0.53, 0.058, 0.058]];
     const ring = (a, k = 1, dk = 0) => ({ y: a[0], w: a[1] * k + dk, d: a[2] * k + dk, z: a[3] || 0 });
-    add(torso, gb("torso", () => loft(tp.map((a) => ring(a)), seg)), jacket || vest ? shirtM : longB ? dressM : shirtM);
     const shoulderY = 0.44, shX = fem ? 0.162 : 0.185;
+    add(torso, gb("torso2", () => loft(tp.map((a) => {
+      const r = ring(a);
+      const pad = sstep2(0.36, 0.43, a[0]) * sstep2(0.5, 0.465, a[0]);
+      r.w = Math.max(r.w, mix2(r.w, shX + 0.012, pad));
+      return r;
+    }), seg)), jacket || vest ? shirtM : longB ? dressM : shirtM);
     const neckG = new T.Group();
     neckG.position.set(0, 0.5, -5e-3);
     torso.add(neckG);
@@ -2396,7 +2401,7 @@
       const sh = new T.Group();
       sh.position.set(sx * shX, shoulderY, -5e-3);
       torso.add(sh);
-      add(sh, gb("shoulderBall", () => weld(new T.SphereGeometry(0.058, 16, 12))), sleeve, 0, -0.014, 0).scale.set(1, 0.66, 1);
+      add(sh, gb("shoulderBall", () => weld(new T.SphereGeometry(0.058, 16, 12))), sleeve, -sx * 0.01, -0.012, 0).scale.set(0.92, 0.82, 1);
       add(sh, gb("upArm", () => limb(0.3, [0.057, 0.052, 0.046, 0.042], seg)), sleeve);
       const el = new T.Group();
       el.position.y = -0.3;
@@ -2667,7 +2672,32 @@
       for (const A2 of arms) {
         const s = A2.sx < 0 ? -1 : 1, swing = Math.sin(ph) * s * 0.38 * w;
         let shx = swing + Math.sin(t * 0.6 + A2.sx) * 0.015, shz = A2.sx * (0.07 + 0.01 * B), elx = -0.12 - 0.25 * w * Math.max(0, -swing * 2) - 0.05;
-        if (A2.sx > 0 && gs > 0.01) {
+        const C2 = state.carry && state.carry.side === A2.sx && sit < 0.5 ? state.carry : null;
+        if (C2) {
+          const sip = clamp2(C2.sip || 0);
+          if (C2.pose === "briefcase") {
+            shx = swing * 0.35;
+            shz = A2.sx * 0.11;
+            elx = -0.05;
+          } else if (C2.pose === "folder") {
+            shx = -0.08 + swing * 0.3;
+            shz = A2.sx * 0.05;
+            elx = -0.38;
+          } else if (C2.pose === "notebook") {
+            shx = -0.48;
+            shz = -A2.sx * 0.26;
+            elx = -1.42;
+          } else if (C2.pose === "cup") {
+            shx = mix2(-0.24, -0.98, sip);
+            shz = -A2.sx * mix2(0.08, 0.62, sip);
+            elx = mix2(-1.42, -2.32, sip);
+          } else if (C2.pose === "phone") {
+            shx = -0.52;
+            shz = -A2.sx * 0.16;
+            elx = -1.62;
+          }
+          A2.wr.rotation.set(C2.pose === "cup" ? -(shx + elx) : C2.pose === "phone" ? -(shx + elx) * 0.4 + 0.5 : 0, 0, 0);
+        } else if (A2.sx > 0 && gs > 0.01) {
           const osc = Math.sin(t * 3.1) * 0.25 + Math.sin(t * 1.7) * 0.15;
           shx = mix2(shx, -0.55 + osc * 0.3, gs);
           shz = mix2(shz, 0.35 + osc * 0.15, gs);
@@ -2680,7 +2710,8 @@
         A2.sh.rotation.x = shx;
         A2.sh.rotation.z = shz;
         A2.el.rotation.x = elx;
-        for (let k = 0; k < A2.fingers.length - 1; k++) A2.fingers[k].rotation.x = -0.25 - (A2.sx > 0 ? -gs * 0.2 : 0.15);
+        const grip = C2 ? C2.pose === "briefcase" ? -1.25 : -0.9 : null;
+        for (let k = 0; k < A2.fingers.length - 1; k++) A2.fingers[k].rotation.x = grip != null ? grip : -0.25 - (A2.sx > 0 ? -gs * 0.2 : 0.15);
       }
       if (sit > 1e-3) {
         const hipSit = seatH / (body.scale.y * root.scale.y) + 0.115, kh = hipSit - 0.03, L = 0.505, phi = Math.acos(clamp2(kh / L, -1, 1));
@@ -2751,7 +2782,7 @@
     }
     setLod(0);
     update(0, {});
-    root.userData = { pin: root.userData.pin || null, opts: opts0, THREE, uniform: S.uniform || null, onum: true, H: S.height, spec: S, update, setLod, meshCount: meshes.length + 1, parts: { hips, torso, head, arms, legs } };
+    root.userData = { pin: root.userData.pin || null, opts: opts0, THREE, uniform: S.uniform || null, onum: true, H: S.height, spec: S, update, setLod, meshCount: meshes.length + 1, parts: { hips, torso, head, arms, legs, wrists: arms.map((a) => ({ sx: a.sx, wr: a.wr })) } };
     const handle = { group: root, update, spec: S, setLod, uniform: S.uniform || null, dispose: () => disposeCharacter(root) };
     root.userData.handle = handle;
     return handle;

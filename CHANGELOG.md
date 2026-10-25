@@ -4,6 +4,12 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261025c: people walk, hold what they carry, and keep out of doorways
+
+`20261025c` (on `20261025b`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+People glided because the figure that is drawn (Neptune's) only walks when told the person is moving, and the game never told it: it kept its own gait in other fields. The drawn figure now gets the real walking speed, scaled to a step of about 0.6 m, eased in and out with the game's gait, so hips, knees and ankles hinge and arms swing as people go. Carried things hung from the hidden rig's hand while the visible arm did something else, which is why a cup floated up to a mouth and a briefcase drifted beside a hand: now the cup, briefcase, folder, notebook, phone and umbrella sit in the visible hand, the arm is posed for each (a cup held in front and lifted to the mouth with the wrist keeping it level, a briefcase hanging at the side with the fingers closed on the handle, a notebook open in front of the chest), and the other hand still talks. Some fifteen ways of moving a person into a room set the room and nothing else, leaving them standing in the doorway; anyone who turns up in a doorway, outside the walls or nowhere at all is now given a proper place the moment you see them (seated members keep their seats). Shoulders are rounded caps over the sleeve, and a shirt shoulder fills out like the jacket's, so no blocks above the arms.
+
 ## 20261025b: people that look like people
 
 `20261025b` (on `20261025a`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.

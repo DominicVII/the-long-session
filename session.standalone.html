@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261025b">
+<meta name="onum-build" content="20261025c">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261025b";
+  var STAMP = "20261025c";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -16331,6 +16331,12 @@ function wrapPi(a){
   return a;
 }
 function animatePerson(p, dt){
+  /* 20261025c · the first time someone is drawn in a room, they must be standing somewhere real: about fifteen ways of
+     moving a person into a room set the room and nothing else, and left them on whatever spot they had (often (0, 0),
+     the front doorway). In a doorway, outside the walls or nowhere at all: give them a proper place, at once. */
+  try{ if(p._seenIn !== p.room){ p._seenIn = p.room; if(p !== G.you && !p.kStand && !p._sxBrought && !p.sitting && p.seatX == null && p.seatIdx == null && ROOMS[p.room]){   /* a seated or seat-holding member keeps the seat */ const b = roomBox(p.room);
+      const open = !!ROOMS[p.room].open, bad = !isFinite(p.x) || !isFinite(p.z) || (!open && (Math.abs(p.x) > b.hw - 0.2 || p.z < b.d0 + 0.2 || p.z > b.d1 - 0.2)) || !!doorZone(p.room, p.x, p.z);   /* the street and the steps run past their nominal box */
+      if(bad){ placeInRoom(p); p.sitting = false; if(p.mesh){ p.mesh.position.x = p.x; p.mesh.position.z = p.z; } } } } }catch(e){}
   animatePerson0(p, dt);
   p._animAt = performance.now(); if(p.mesh && p.mesh.userData) p.mesh.userData._posed = true;
   try{ if(p.mesh && p.mesh.parent === peopleGroup){ peopleExtra(p, dt); carryFrame(p, dt); bodyFrame(p, dt); } }catch(e){}
@@ -34919,6 +34925,9 @@ function carryBuild(p, u){
   const hy = arm.hand.position.y, lo = arm.lo, mk = (geo, col, rough, mtl) => new THREE.Mesh(geo, matCol(col, rough == null ? .7 : rough, mtl || 0));
   const put = (par, geo, col, x, y, z, sx, sy, sz, rough, mtl) => { const m = mk(geo, col, rough, mtl); m.position.set(x, par === g ? y - hy : y, z); m.scale.set(sx, sy, sz); par.add(m); return m; };
   const g = new THREE.Group(); g.visible = false; g.position.y = hy; lo.add(g); T.grp = g;
+  /* Neptune's figure is the one drawn: the object goes in its hand, not the hidden rig's (that was the floating cup and the gliding briefcase) */
+  let nwr = null; try{ const W2 = u.nep && u.nep.group && u.nep.group.userData.parts && u.nep.group.userData.parts.wrists; if(W2){ const w = W2.find(a => a.sx === side); if(w) nwr = w.wr; } }catch(e){}
+  if(nwr){ lo.remove(g); g.position.set(0, -0.05, 0); nwr.add(g); T.nep = true; T.nwr = nwr; }
   if(kind === "folder"){
     const c = [0xd8c48a, 0x2f4a66, 0x7a2a2a, 0xcfc7b0][id % 4];
     put(g, UNIT.box, c, 0, hy - 0.11, 0.075, 0.022, 0.30, 0.23); put(g, UNIT.box, 0xf3ecd9, side * -0.002, hy - 0.115, 0.08, 0.026, 0.28, 0.21, .9);
@@ -34937,7 +34946,7 @@ function carryBuild(p, u){
   }
   /* the umbrella, furled, for the wet days; only some people have one */
   if(id % 5 === 1 && kind !== "briefcase"){
-    const hand2 = arm.hand, u2 = new THREE.Group(); u2.visible = false; lo.add(u2); T.umb = u2;
+    const hand2 = arm.hand, u2 = new THREE.Group(); u2.visible = false; (T.nwr || lo).add(u2); T.umb = u2;
     put(u2, UNIT.cyl, 0x8a6a4a, 0, hy + 0.0, 0.0, 0.03, 0.10, 0.03, .5); put(u2, UNIT.cyl, 0x1c2230, 0, hy - 0.30, 0.0, 0.07, 0.44, 0.07, .8); put(u2, UNIT.cyl, 0x9aa0a8, 0, hy - 0.58, 0.0, 0.012, 0.14, 0.012, .3, .8); u2.position.z = 0.015; u2.rotation.x = -0.1;
   }
   return T;
@@ -34960,16 +34969,16 @@ function carryFrame(p, dt){
   const a = T.arm, k = T.kind;
   if(k === "briefcase"){ a.up.rotation.x = a.up.rotation.x * 0.3 + 0.04; a.lo.rotation.x = -0.1; a.up.rotation.z += T.side * 0.02; }
   else if(k === "folder" && !moving && !speaking){ a.up.rotation.x = -0.1; a.lo.rotation.x = -0.28; }
-  else if(k === "notebook" && !speaking){ a.up.rotation.x = -0.32; a.lo.rotation.x = -1.15; a.up.rotation.z = T.side * -0.14; T.grp.rotation.x = 0.35; }
+  else if(k === "notebook" && !speaking){ a.up.rotation.x = -0.32; a.lo.rotation.x = -1.15; a.up.rotation.z = T.side * -0.14; T.grp.rotation.x = T.nep ? 1.25 : 0.35; }
   else if(k === "cup" && !speaking){
     const sip = (t % 16) < 2.2 ? Math.sin(((t % 16) / 2.2) * Math.PI) : 0;
     a.up.rotation.x = -0.35 - sip * 0.5; a.lo.rotation.x = -1.35 - sip * 0.55; a.up.rotation.z = T.side * -0.12;
-    T.grp.rotation.x = -(a.up.rotation.x + a.lo.rotation.x);
+    T.sip = sip; T.grp.rotation.x = T.nep ? 0 : -(a.up.rotation.x + a.lo.rotation.x);
     if(sip > 0.1 && u.headG) u.headG.rotation.x = lerp(u.headG.rotation.x, 0.02 - sip * 0.14, 0.3);   /* blended toward a pose, never added to: the idle pose pulls back every frame, so an added tilt ran away */
   } else if(k === "phone"){
     const on = (t % 26) < 8 && !speaking && !talking && !moving;
     T.grp.visible = on;
-    if(on){ a.up.rotation.x = -0.6; a.lo.rotation.x = -1.2; a.up.rotation.z = T.side * -0.1; T.grp.rotation.x = -(a.up.rotation.x + a.lo.rotation.x) + 0.85; if(u.headG) u.headG.rotation.x = lerp(u.headG.rotation.x, 0.3, 0.25); }
+    if(on){ a.up.rotation.x = -0.6; a.lo.rotation.x = -1.2; a.up.rotation.z = T.side * -0.1; T.grp.rotation.x = T.nep ? 0.35 : -(a.up.rotation.x + a.lo.rotation.x) + 0.85; if(u.headG) u.headG.rotation.x = lerp(u.headG.rotation.x, 0.3, 0.25); }
   }
 }
 
@@ -43490,6 +43499,11 @@ try{
      20261012u fallback: NEPTUNE.fullFigure = false keeps the game's own figure and only re-colours its clothes for a
      decreed uniform (uniformLook) with Neptune's insignia + lapel pin as overlays on the game's bones (dressGameRig). */
   const _buildPerson = buildPerson;
+  /* the legs walk at the pace the body actually moves: the game's own gait weight eases it in and out, and the
+     speed handed over is scaled so a step is about 0.6 m (an indoor pace of half a metre a second is short steps, not a glide) */
+  const nepStride = p => { try{ if(!p || p === G.you || p.sitting) return 0; const gw = p._gw || 0; if(gw < 0.03) return 0; return Math.max(0.3, p._v || 0) * 2.0 * Math.min(1, gw * 1.4); }catch(e){ return 0; } };
+  /* what the hand holds, so the arm that shows is the arm that holds it */
+  const nepCarry = g => { try{ const cy = g.userData._cy; if(!cy || !cy.grp || !cy.grp.visible || !cy.nep || cy.kind === "none") return null; return {side:cy.side, pose:cy.kind, sip:cy.sip || 0}; }catch(e){ return null; } };
   const nepDressInfo = p => { const nat = NEP.nation();
     const st = p.state || (p.kind === "you" && G.you && G.you.state) || (G.country && G.country.name) || "home";
     return NEP.mods.chars.dressFor({homeFlag:{type:nepGov(), seed:nepHash(st)}}, nat); };
@@ -43527,7 +43541,7 @@ try{
       n.traverse(m => { if(hooked || !m.isMesh) return; hooked = true;
         m.onBeforeRender = function(r, s, cam){ const t = performance.now(), dt = Math.min(0.1, (t - last)/1000); last = t; if(dt <= 0) return;
           try{ h.update(dt, {camera:cam, sitting: p.kind === "you" ? !!(G.you && G.you.sitting) : !!(p.sitting && !G.noSit && !G.plainSit),
-            moving: !!p.moving || !!p.walking, talking: !!p.talking}); }catch(e){} }; });
+            moving: !!p.moving || !!p.walking, speed: nepStride(p), talking: !!p.talking || !!(TALK.open && TALK.m === p) || !!(p.say && p.sayT > 0), carry: nepCarry(g)}); }catch(e){} }; });
     }catch(e){ if(!NEP._warned){ NEP._warned = true; console.warn("NEPTUNE character", e); } }
     return g;
   };

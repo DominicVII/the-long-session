@@ -403,8 +403,8 @@ export function makeCharacter(THREE, opts = {}) {
   const tp = fem ? [[-0.09, .175, .115], [0, .172, .112], [0.10, .132, .095], [0.2, .14, .1], [0.29, .155, .118, .018], [0.36, .152, .108, .01], [0.42, .152, .096], [0.46, .128, .084], [0.495, .088, .066], [0.53, .055, .055]]
     : [[-0.09, .165, .11], [0, .163, .108], [0.12, .15 + .015 * heavy, .105 + .035 * heavy, .02 * heavy], [0.25, .165 + .01 * heavy, .115 + .02 * heavy, .01 * heavy], [0.35, .172, .118], [0.42, .172, .108], [0.465, .145, .092], [0.495, .10, .072], [0.53, .058, .058]];
   const ring = (a, k = 1, dk = 0) => ({ y: a[0], w: a[1] * k + dk, d: a[2] * k + dk, z: a[3] || 0 });
-  add(torso, gb('torso', () => loft(tp.map(a => ring(a)), seg)), (jacket || vest) ? shirtM : (longB ? dressM : shirtM));
   const shoulderY = 0.44, shX = (fem ? 0.162 : 0.185);
+  add(torso, gb('torso2', () => loft(tp.map(a => { const r = ring(a); const pad = sstep(0.36, 0.43, a[0]) * sstep(0.50, 0.465, a[0]); r.w = Math.max(r.w, mix(r.w, shX + 0.012, pad)); return r; }), seg)), (jacket || vest) ? shirtM : (longB ? dressM : shirtM));
   // neck + head
   const neckG = new T.Group(); neckG.position.set(0, 0.5, -0.005); torso.add(neckG);
   add(neckG, gb('neck', () => limb(-0.1, [0.058, 0.055, 0.052], seg)), skinM);
@@ -555,7 +555,7 @@ export function makeCharacter(THREE, opts = {}) {
   const sleeve = jacket ? suitM : shirtM, arms = [];
   for (const sx of [-1, 1]) {
     const sh = new T.Group(); sh.position.set(sx * shX, shoulderY, -0.005); torso.add(sh);
-    add(sh, gb('shoulderBall', () => weld(new T.SphereGeometry(0.058, 16, 12))), sleeve, 0, -0.014, 0).scale.set(1, 0.66, 1);
+    add(sh, gb('shoulderBall', () => weld(new T.SphereGeometry(0.058, 16, 12))), sleeve, -sx * 0.01, -0.012, 0).scale.set(0.92, 0.82, 1.0);   // a rounded deltoid that caps the sleeve and runs into the shoulder
     add(sh, gb('upArm', () => limb(0.30, [0.057, 0.052, 0.046, 0.042], seg)), sleeve);
     const el = new T.Group(); el.position.y = -0.30; sh.add(el);
     add(el, gb('elbowBall', () => weld(new T.SphereGeometry(0.042, 12, 10))), sleeve);
@@ -717,13 +717,23 @@ export function makeCharacter(THREE, opts = {}) {
     // arms
     for (const A of arms) { const s = A.sx < 0 ? -1 : 1, swing = Math.sin(ph) * s * 0.38 * w;
       let shx = swing + Math.sin(t * 0.6 + A.sx) * 0.015, shz = A.sx * (0.07 + 0.01 * B), elx = -0.12 - 0.25 * w * Math.max(0, -swing * 2) - 0.05;
-      if (A.sx > 0 && gs > 0.01) {  // right arm gestures
+      const C = state.carry && state.carry.side === A.sx && sit < 0.5 ? state.carry : null;   // a hand that holds something is posed for it
+      if (C) {
+        const sip = clamp(C.sip || 0);
+        if (C.pose === 'briefcase') { shx = swing * 0.35; shz = A.sx * 0.11; elx = -0.05; }
+        else if (C.pose === 'folder') { shx = -0.08 + swing * 0.3; shz = A.sx * 0.05; elx = -0.38; }
+        else if (C.pose === 'notebook') { shx = -0.48; shz = -A.sx * 0.26; elx = -1.42; }   // held open in front of the chest
+        else if (C.pose === 'cup') { shx = mix(-0.24, -0.98, sip); shz = -A.sx * mix(0.08, 0.62, sip); elx = mix(-1.42, -2.32, sip); }   // all the way to the mouth
+        else if (C.pose === 'phone') { shx = -0.52; shz = -A.sx * 0.16; elx = -1.62; }
+        A.wr.rotation.set(C.pose === 'cup' ? -(shx + elx) : C.pose === 'phone' ? -(shx + elx) * 0.4 + 0.5 : 0, 0, 0);   // the wrist keeps a cup level all the way to the mouth
+      } else if (A.sx > 0 && gs > 0.01) {  // right arm gestures
         const osc = Math.sin(t * 3.1) * 0.25 + Math.sin(t * 1.7) * 0.15;
         shx = mix(shx, -0.55 + osc * 0.3, gs); shz = mix(shz, 0.35 + osc * 0.15, gs); elx = mix(elx, -1.25 - osc * 0.35, gs);
         A.wr.rotation.y = mix(0, -0.9, gs); A.wr.rotation.z = mix(0, 0.5 + osc * 0.3, gs);
       } else { A.wr.rotation.set(0, 0, 0); }
       A.sh.rotation.x = shx; A.sh.rotation.z = shz; A.el.rotation.x = elx;
-      for (let k = 0; k < A.fingers.length - 1; k++) A.fingers[k].rotation.x = -0.25 - (A.sx > 0 ? -gs * 0.2 : 0.15); }
+      const grip = C ? (C.pose === 'briefcase' ? -1.25 : -0.9) : null;   // fingers close round a handle or a cup
+      for (let k = 0; k < A.fingers.length - 1; k++) A.fingers[k].rotation.x = grip != null ? grip : -0.25 - (A.sx > 0 ? -gs * 0.2 : 0.15); }
     // sitting: thighs forward, shins down to the floor, hands on lap or desk (blended by st.sit)
     if (sit > 0.001) {
       const hipSit = seatH / (body.scale.y * root.scale.y) + 0.115, kh = hipSit - 0.03, L = 0.505, phi = Math.acos(clamp(kh / L, -1, 1));
@@ -765,7 +775,7 @@ export function makeCharacter(THREE, opts = {}) {
   }
   setLod(0);
   update(0, {});
-  root.userData = { pin: root.userData.pin || null, opts: opts0, THREE, uniform: S.uniform || null, onum: true, H: S.height, spec: S, update, setLod, meshCount: meshes.length + 1, parts: { hips, torso, head, arms, legs } };
+  root.userData = { pin: root.userData.pin || null, opts: opts0, THREE, uniform: S.uniform || null, onum: true, H: S.height, spec: S, update, setLod, meshCount: meshes.length + 1, parts: { hips, torso, head, arms, legs, wrists: arms.map(a => ({ sx: a.sx, wr: a.wr })) } };
   const handle = { group: root, update, spec: S, setLod, uniform: S.uniform || null, dispose: () => disposeCharacter(root) }; root.userData.handle = handle; return handle;
 }
 
