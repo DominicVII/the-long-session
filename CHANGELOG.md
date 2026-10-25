@@ -4,6 +4,12 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261025h: the statute book, vetoes that go back to the House, suits that are decided, one meeting panel
+
+`20261025h` (on `20261025g`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+Every bill and act is written out as law: long title, enacting clause, findings from why it was filed, definitions, a full section with subsections and figures for each of the 65 clauses the game draws, the amendments it makes to the earlier act on the same subject still in force (figure for figure, with that act a click away), the real cost and who pays, enforcement, judicial review, severability and effective date, each with a plain-words line. A Statutes button opens the statute book: every act the House decided with its status, roll call (names where the clerk kept them), signature or veto, the House's override vote, the courts' rulings and later amendments. The docket shows the real text, real cost and real sponsor, with Move to strike on each provision and Read the full text. Signing and vetoing are written into the book; a veto goes back to the House for a two-thirds override, counted from the members. Enacted acts draw suits against the sections open to challenge (takings, due process, the press, the States' reserved powers, coercive conditions, separation of powers, liberty of contract, uniformity, delegation, compelled labour, equal treatment, preemption) from States, groups and people; the bench decides each justice by justice on the claim, its strength and its own precedents, with an opinion and a dissent, and a struck section is marked in the act. Meetings: the session view, the floor desk and any step-by-step sitting (cabinet, briefing, press room) now sit in one panel at the top right under one header, with the meeting's transcript; a seated member clicked during a cabinet you chair is called on in the meeting.
+
 ## 20261025g: what people know
 
 `20261025g` (on `20261025f`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261025g">
+<meta name="onum-build" content="20261025h">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261025g";
+  var STAMP = "20261025h";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -28887,7 +28887,7 @@ function holdVote(){
   /* the other two branches get their say */
   let fate = passed ? "carried" : "rejected", extra = "";
   if(passed){
-    const v = execVeto(b, t);
+    const v = execVeto(b, t); b._veto = v ? {by:v.by, override:!!v.override} : null;   /* 20261025h: the statute book keeps it */
     if(v){
       if(v.override){
         extra = "<p><strong>" + execTitle() + " " + v.by + " vetoed it and the House overrode them</strong>, " +
@@ -48842,7 +48842,7 @@ function knNameOf(id){ const p = knPerson(id); return p ? p.name : null; }
 /* ── the record, read fresh whenever it changes ── */
 function knEvents(){
   const sc = G.sc || {}, wm = G.wm || {}, st0 = (G.statute || [])[0] || {};
-  const sig = [G.day, (G.statute || []).length, st0.title, st0.day, (G.history || []).length, (G.cases || []).length, (sc.log || []).length, (sc.polities || []).map(p => p.status).join(","),
+  const sig = [G.day, (G.statute || []).length, st0.title, st0.day, (G.history || []).length, (G.cases || []).filter(c => c && c.done).length + "/" + (G.cases || []).length, (G.statute || []).map(s => (s.fate || "?").charAt(0)).join(""), (sc.log || []).length, (sc.polities || []).map(p => p.status).join(","),
     (G.career || []).length, (G.reactNews || []).length, (G.secrets || []).length, G.bill ? G.bill.id + (G.bill.done ? "d" : "") : "-", KN.ofhN, JSON.stringify(wm.rec || {}).length, Object.keys(G.realmRel || {}).map(k => Math.round(G.realmRel[k] / 20)).join("")].join("|");
   if(KN.ev.length && KN.sig === sig) return KN.ev;
   const E = [], seen = new Set(), seenT = new Set(), T = knT(), you = G.you || {};
@@ -48857,7 +48857,7 @@ function knEvents(){
       sal:0.5 + (Math.abs((s.aye || 0) - (s.no || 0)) <= 6 ? 0.15 : 0) + (fate === "vetoed" || fate === "struck down" ? 0.15 : 0), tau:0.8, st:s.state || null, who:sp ? [sp] : [], ids:[idOf(sp)],
       law:{title:s.title, aye:s.aye, no:s.no, fate, sponsor:sp, v:s.v || null, yv:s.yv == null ? null : s.yv}}); });
   (G.cases || []).forEach(c => { if(!c || !c.t || !c.done || !c.ruled) return;
-    add({k:"case:" + c.day + ":" + c.t, kind:"case", d:c.day || 0, t:"the court ruled for " + (c.ruled === "union" ? "the Union" : c.ruled === "state" ? (c.state || "the state") : c.ruled) + " in " + c.t, sal:0.6, tau:1.2, st:c.state || null, cs:{ruled:c.ruled, state:c.state}}); });
+    add({k:"case:" + c.day + ":" + c.t, kind:"case", d:c.day || 0, t:"the court ruled for " + (c.ruled === "union" ? "the Union" : c.ruled === "state" ? (c.state || "the state") : c.ruled === "plaintiff" ? ((c.lx && c.lx.plaintiff) || "the plaintiff") : c.ruled) + " in " + c.t + (c.lx && c.lx.held ? ", " + (c.lx.held === "struck" ? "striking section " + c.lx.sec + " of the " + c.lx.act : "upholding the " + c.lx.act) + ", " + c.lx.count : ""), sal:0.6, tau:1.2, st:c.state || null, cs:{ruled:c.ruled, state:c.state}}); });
   (G.history || []).forEach((h, i) => { if(!h || !h.act || !h.who) return; const myth = h.party === "FO";
     add({k:"hist:" + (h.congress || 0) + ":" + h.who + ":" + h.act, kind:"hist", d:myth ? -999 : Math.max(1, ((h.congress || 1) - 1) * T + 1), t:h.who + " " + h.act + (h.precedent ? ", setting the precedent " + h.precedent : ""),
       sal:myth ? 1 : h.power ? 0.8 : 0.5, com:myth ? 0.97 : 0, tau:2, who:[h.who], ids:[myth ? null : idOf(h.who)], power:!!h.power, myth}); });
@@ -49320,6 +49320,476 @@ window.onumKnow = {
   day:() => knDay(), prompt:(id, text) => { const p = knPerson(id); return p ? knPrompt(p, text || "") : ""; }
 };
 
+/* ══ 20261025h · THE STATUTE BOOK. Every bill and act is written out as law is written: a long title and an enacting clause,
+   findings read from the record of why it was filed, definitions, one full section for every clause with its subsections and
+   its numbers, the amendments it makes to the earlier acts it builds on (with those acts a click away), the money it really
+   costs, enforcement, judicial review, severability and the day it takes effect; each section with what it does in plain words.
+   Signing and vetoing are written into the book, a veto goes back to the House for a two-thirds override, enacted laws draw
+   suits against the sections that are open to challenge, and the bench decides them justice by justice, on the claim, the
+   section and its own precedents. ══ */
+const LX = {docs:new Map(), sig:""};
+const LX_AG = {rail:"the Rail Board", levee:"the Corps of Engineers", tariff:"the Customs Service of the Treasury", school:"the Office of Education", navy:"the Secretary of Defense",
+  court:"the Chief Justice", land:"the General Land Office", bank:"the Secretary of the Treasury", labour:"the Labour Inspectorate", docks:"the Board of Harbours", health:"the Public Health Service",
+  press:"the Postmaster General", census:"the Census Office", gas:"the General Land Office", visa:"the Immigration Service", border:"the Federal Border Guard", natur:"the Immigration Service",
+  aid:"the Secretary of State", arms:"the Secretary of Defense", mandate:"the Office of Education", preempt:"the Attorney General"};
+const LX_PURPOSE = {rail:"charter and regulate an interstate rail line", levee:"raise and maintain flood works along the river reaches", tariff:"lay duties on imported iron and cloth and encourage domestic cargo",
+  school:"aid the schools of poor districts", navy:"enlarge the fleet and its yards", court:"enlarge and reorganize the federal courts", land:"open the public lands to settlement",
+  bank:"charter a central bank of the Republic", labour:"limit hours and secure safety in federally chartered works", docks:"improve the harbours and the customs", health:"establish county clinics",
+  press:"regulate postage for newspapers and the ownership of the press", census:"provide for an enumeration and the reapportionment of the House", gas:"lease and regulate the western gas fields",
+  visa:"provide for seasonal labour visas", border:"establish a federal border guard", natur:"reform the law of naturalization", aid:"provide grain and credit to a friendly power",
+  arms:"permit the sale of arms to a friendly power", mandate:"set a federal standard for the schools of the states", preempt:"replace the laws of the states with one federal rule"};
+const LX_FIND = {rail:"Freight that could move by rail moves by cart, at four times the cost, where no line has been laid.", levee:"The same reaches flood in most years, and the counties along them cannot pay to rebuild twice.",
+  tariff:"Foreign iron and cloth undersell the mills of the Republic in its own ports.", school:"Districts with little taxable property cannot keep their schools open on local rates alone.",
+  navy:"The fleet is smaller than the coast it is asked to keep.", court:"The federal courts are behind on their dockets by years.", land:"Public land lies unsurveyed and unworked while settlers wait for title.",
+  bank:"The notes of a hundred private banks pass at a hundred different discounts.", labour:"Men and women in federally chartered works are kept on the floor past twelve hours, and are hurt there.",
+  docks:"The deepwater berths silt up, and the customs cannot keep pace with the cargo.", health:"Counties of fewer than fifty thousand people are often a day's travel from a physician.",
+  press:"Postage decides which newspapers reach the country towns, and no one may say who owns them.", census:"The House is apportioned on a count that is out of date.",
+  gas:"The western fields are worked without lease, royalty or rule.", visa:"The harvest outruns the hands to bring it in.", border:"The crossings are kept by whoever happens to be standing there.",
+  natur:"Those who have made their lives here wait nine years to be citizens of it.", aid:"A friendly power has asked the Republic for help and its envoy waits for an answer.",
+  arms:"A friendly power has asked to buy arms from the Republic's arsenals.", mandate:"The schools of the states are held to no common measure.", preempt:"Forty-eight different rules govern the same trade across state lines."};
+const LX_DEF = {rail:[["line", "the railway, its stations, sidings and right of way chartered under this Act"], ["shipper", "any person who tenders freight for carriage on the line"]],
+  levee:[["reach", "a continuous stretch of riverbank between two gauging stations"], ["works", "levees, spillways, revetments and the land they stand on"]],
+  tariff:[["duty", "a tax laid on goods entering the Republic"], ["domestic cargo", "goods grown, mined or made within the Republic"]],
+  school:[["district", "a school district organized under the law of a State"], ["threshold", "the assessed property per enrolled pupil set under this Act"]],
+  navy:[["ship of the line", "a warship of the first or second rate"], ["yard", "a naval yard owned by the Republic"]],
+  court:[["high bench", "the highest court of the Republic"], ["circuit judge", "a judge of the federal courts below the high bench"]],
+  land:[["public land", "land owned by the Republic and not reserved to any use"], ["settler", "a person who enters, lives on and works a claim"]],
+  bank:[["specie", "gold and silver coin of the Republic"], ["note", "a promise to pay issued by the bank and payable to the bearer"]],
+  labour:[["chartered works", "any mill, yard, mine or line operating under a charter of the Republic"], ["floor", "any room or yard in which work is done"]],
+  docks:[["bonded warehouse", "a store in which goods are held under customs seal until duty is paid"], ["deepwater port", "a port with a channel of not less than thirty feet"]],
+  health:[["county", "a county as organized under the law of a State"], ["clinic", "a place where a licensed physician sees patients at public expense"]],
+  press:[["newspaper", "a publication issued at least weekly and carrying general news"], ["owner", "any person holding a tenth or more of a newspaper's shares or profits"]],
+  census:[["enumeration", "the count of every person living in the Republic"], ["apportionment", "the division of the seats of the House among the States"]],
+  gas:[["field", "a body of natural gas lying under public land"], ["royalty", "the share of the value of gas paid to the Republic"]],
+  visa:[["seasonal worker", "a foreign national admitted to work a harvest"], ["employer", "any person who hires a seasonal worker"]],
+  border:[["crossing", "any road, ford, rail line or harbour by which a person may enter the Republic"], ["papers", "a passport, visa or certificate of citizenship"]],
+  natur:[["resident", "a person lawfully living in the Republic"], ["veteran", "a person honourably discharged from the forces of the Republic"]],
+  aid:[["recipient", "the friendly power named in this Act"], ["credit", "a loan on terms set by the Secretary of the Treasury"]],
+  arms:[["arms", "rifles, ordnance, ammunition and their parts"], ["realm", "the friendly power named in this Act"]],
+  mandate:[["standard", "the federal school standard set under this Act"], ["monitor", "an officer of the Republic appointed under this Act"]],
+  preempt:[["federal rule", "the rule set out in this Act and the regulations made under it"], ["state law", "any statute, regulation or ordinance of a State or its subdivisions"]]};
+/* each clause, written out: heading, subsections, plain words, and the challenge it is open to [theory, who sues, strength] */
+const LX_CL = {
+  "a federal charter for the line":(P, X) => ["Federal charter", ["(a) Charter.— There is chartered a body corporate, the " + X.STn + " Line Company, to build and operate the line between the termini named by " + X.AG + ".", "(b) Capital.— The company may issue stock to " + P.money(2, 8) + " and no more without a further Act.", "(c) Visitation.— " + X.AGc + " may inspect the company's books at any time."], "The Republic charters one company to build and run the line, caps its stock, and can inspect its books.", null],
+  "freight rates fixed for ten years":(P, X) => ["Freight rates", ["(a) Rates fixed.— The rate for freight on the line shall not exceed " + P.n(2, 6) + " stuivers a ton-mile for ten years from the day the line opens.", "(b) No preference.— The company shall charge every shipper the same rate for the same carriage.", "(c) Penalty.— A rate charged above the limit is recoverable by the shipper threefold."], "Rates are capped for ten years, and every shipper pays the same.", ["contract", "group", 0.35, "The Chamber of Commerce"]],
+  "land taken by eminent domain along the route":(P, X) => ["Right of way", ["(a) Taking.— " + X.AGc + " may take, by eminent domain, a strip not more than " + P.n(100, 300, 50) + " feet wide along the route surveyed.", "(b) Compensation.— The owner shall be paid the value of the land as assessed by three commissioners, one chosen by the owner.", "(c) Possession.— Possession may be taken on deposit of the assessed value with the court."], "Land along the route can be taken for the line, with payment set by commissioners.", ["takings", "person", 0.55, "a landowner along the route"]],
+  "levees raised four feet along the whole reach":(P, X) => ["Levee works", ["(a) Raising.— " + X.AGc + " shall raise the levees four feet along every reach from the falls to the sea.", "(b) Standard.— Every levee raised shall be built to withstand the highest water recorded in the last " + P.n(30, 100, 10) + " years.", "(c) Order of work.— The reaches that flooded most recently shall be raised first."], "The levees go up four feet everywhere on the river, worst-flooded reaches first.", null],
+  "the works let to the lowest bidder":(P, X) => ["Contracts", ["(a) Bidding.— Every contract for the works shall be let by sealed bid to the lowest responsible bidder.", "(b) Bond.— Each contractor shall post a bond of " + P.n(10, 25) + " per cent of the contract.", "(c) Publication.— The bids received shall be published in full."], "The work goes to the cheapest sealed bid, with a bond, and the bids are published.", null],
+  "a standing fund for the next one":(P, X) => ["Flood reserve", ["(a) Fund.— There is established in the Treasury a Flood Reserve Fund.", "(b) Deposits.— " + P.n(5, 15) + " per cent of each year's appropriation for the works shall be paid into the Fund and not spent on them.", "(c) Use.— The Fund may be drawn only on a declaration by " + X.AG + " that a reach has failed."], "A slice of every year's money is set aside for the next flood.", null],
+  "a duty on imported iron and cloth":(P, X) => ["Duties", ["(a) Iron.— There shall be laid on pig and bar iron entering the Republic a duty of " + P.n(10, 40, 5) + " per cent of its value.", "(b) Cloth.— There shall be laid on woven cloth a duty of " + P.n(10, 35, 5) + " per cent of its value.", "(c) Collection.— " + X.AGc + " shall collect the duties at the port of entry."], "Imported iron and cloth pay a duty at the port.", ["uniformity", "group", 0.2, "The farm co-ops"]],
+  "a rebate for ports handling domestic cargo":(P, X) => ["Port rebate", ["(a) Rebate.— A port that handles more domestic cargo than foreign in a year shall be rebated " + P.n(5, 20) + " per cent of the duties it collected.", "(b) Certification.— " + X.AGc + " shall certify the tonnage of each port by the first day of the year."], "Ports that ship mostly the Republic's own goods get part of the duty back.", ["uniformity", "state", 0.45, null]],
+  "a schedule reviewed every third year":(P, X) => ["Review of the schedule", ["(a) Review.— Every third year " + X.AG + " shall report to the House on the effect of the duties.", "(b) Adjustment.— " + X.AGc + " may raise or lower any duty by not more than " + P.n(5, 15) + " per cent without a further Act."], "The duties are reviewed every three years, and can be adjusted a little without a new law.", ["delegation", "group", 0.4, "The Chamber of Commerce"]],
+  "a federal grant for every district under a threshold":(P, X) => ["Grants to districts", ["(a) Grant.— " + X.AGc + " shall pay to every district whose assessed property per pupil is below " + P.money(1, 4) + " a grant for each pupil enrolled.", "(b) Amount.— The grant shall be " + P.money(0.02, 0.1, 0.01) + " a pupil a year.", "(c) Use.— The grant shall be spent on teachers, books and the upkeep of school buildings, and on nothing else."], "Poor districts get money for each pupil, to be spent only on teachers, books and buildings.", null],
+  "attendance made a condition of the grant":(P, X) => ["Condition of attendance", ["(a) Condition.— No district shall receive a grant under this Act unless the State has in force a law requiring the attendance of children from seven to " + P.n(12, 15) + " years.", "(b) Proof.— The State shall certify attendance each year to " + X.AG + "."], "A district only gets the money if its State makes children attend school.", ["spending", "state", 0.5, null]],
+  "a national examination nobody asked for":(P, X) => ["National examination", ["(a) Examination.— " + X.AGc + " shall set an examination in reading, writing and arithmetic, to be sat by every pupil in a grant-receiving district at the age of " + P.n(10, 13) + ".", "(b) Publication.— The results shall be published by district."], "Every pupil in a funded district sits one national examination, and the results are published.", ["states", "state", 0.35, null]],
+  "six new ships of the line":(P, X) => ["New construction", ["(a) Authorization.— " + X.AGc + " shall lay down six ships of the line within " + P.n(2, 5) + " years.", "(b) Design.— Each ship shall carry not fewer than " + P.n(60, 90, 10) + " guns."], "Six new warships are ordered.", null],
+  "a permanent yard at the deepwater port":(P, X) => ["Permanent yard", ["(a) Yard.— There is established a permanent naval yard at the deepwater port named by " + X.AG + ".", "(b) Land.— Land for the yard may be purchased or taken under the law of eminent domain."], "A permanent naval yard is built at a deepwater port.", ["takings", "person", 0.3, "the owners of the harbour land"]],
+  "conscription for the yards if the yards fall behind":(P, X) => ["Labour for the yards", ["(a) Conscription.— If " + X.AG + " certifies that construction is more than " + P.n(3, 9) + " months behind, able-bodied men of eighteen to forty living within fifty miles of the yard may be called to work in it.", "(b) Pay.— Those called shall be paid the prevailing wage.", "(c) Term.— No one shall be held more than " + P.n(6, 18) + " months."], "If the yards fall behind, men nearby can be called up to work in them, at the going wage.", ["servitude", "person", 0.65, "a man called up for the yards"]],
+  "two new seats on the high bench":(P, X) => ["Enlargement of the high bench", ["(a) Seats.— The high bench shall consist of the Chief Justice and six associate justices.", "(b) Appointment.— The two new seats shall be filled by the " + X.EXEC + " with the advice and consent of the Senate."], "The high bench grows from five justices to seven.", ["separation", "member", 0.45, "a member of the House"]],
+  "circuit judges appointed for life":(P, X) => ["Tenure of circuit judges", ["(a) Tenure.— Circuit judges shall hold office during good behaviour.", "(b) Removal.— A circuit judge may be removed only on impeachment."], "Circuit judges serve for life unless impeached.", null],
+  "review of every act passed since the last Congress":(P, X) => ["Review of recent acts", ["(a) Review.— The high bench shall review, on its own motion, every Act passed since the opening of the last Congress.", "(b) Report.— The bench shall report to the House within " + P.n(6, 18) + " months which of them it holds invalid."], "The high bench must review every recent law and report which it thinks invalid.", ["separation", "member", 0.6, "a member of the House"]],
+  "public land opened to settlement at a shilling an acre":(P, X) => ["Settlement", ["(a) Entry.— Any settler may enter up to " + P.n(80, 320, 80) + " acres of surveyed public land at one shilling an acre.", "(b) Residence.— Title passes after five years' residence and cultivation."], "Settlers can claim public land cheaply and own it after five years of living on and working it.", null],
+  "timber rights reserved to the Republic":(P, X) => ["Timber reserved", ["(a) Reservation.— The standing timber on land entered under this Act remains the property of the Republic.", "(b) Cutting.— Timber may be cut only under licence from " + X.AG + "."], "The trees on settled land still belong to the Republic.", ["takings", "person", 0.3, "a settler on the new land"]],
+  "the survey paid for out of the sale":(P, X) => ["Survey", ["(a) Survey.— " + X.AGc + " shall survey the land before it is opened.", "(b) Cost.— The cost of the survey shall be met from the price paid on entry."], "The land sales pay for the survey.", null],
+  "a charter for a central bank of the Republic":(P, X) => ["Charter of the bank", ["(a) Charter.— There is chartered the Bank of " + X.CCs + ", with capital of " + P.money(5, 20) + ".", "(b) Directors.— " + P.n(5, 9) + " directors, of whom " + X.EXEC + " shall appoint two.", "(c) Deposits.— The revenues of the Republic shall be deposited in the bank."], "A central bank is chartered and holds the Republic's money.", ["states", "state", 0.3, null]],
+  "note issue limited by specie held":(P, X) => ["Notes", ["(a) Limit.— The bank shall not have notes outstanding of more than " + P.n(2, 4) + " times the specie it holds.", "(b) Redemption.— Every note shall be paid in specie on demand at the bank."], "The bank can only print notes up to a multiple of the gold and silver it holds.", null],
+  "the charter reviewed in twenty years":(P, X) => ["Term of the charter", ["(a) Term.— The charter expires twenty years from its grant unless renewed by Act.", "(b) Winding up.— On expiry the bank shall have " + P.n(2, 5) + " years to wind up its affairs."], "The bank's charter runs out in twenty years unless renewed.", null],
+  "a ten-hour day in federally chartered works":(P, X) => ["Hours of labour", ["(a) Limit.— No person shall be employed in chartered works more than ten hours in a day or " + P.n(54, 60, 6) + " hours in a week.", "(b) Overtime.— Work past the limit in an emergency shall be paid at time and a half."], "In works chartered by the Republic, the working day is limited to ten hours.", ["contract", "group", 0.5, "The Chamber of Commerce"]],
+  "inspection with the power to close a floor":(P, X) => ["Inspection", ["(a) Inspectors.— " + X.AGc + " shall appoint inspectors with the right to enter chartered works at any hour.", "(b) Closing.— An inspector who finds a danger to life may close the floor until it is made safe.", "(c) Appeal.— The owner may appeal a closing to the circuit court within " + P.n(3, 10) + " days."], "Inspectors can enter any chartered works and shut a dangerous floor.", ["dueprocess", "group", 0.35, "The Chamber of Commerce"]],
+  "penalties paid to the injured, not the treasury":(P, X) => ["Penalties", ["(a) Penalty.— An employer who breaks this Act shall pay a penalty of up to " + P.money(0.5, 3, 0.5) + ".", "(b) To the injured.— Every penalty shall be paid to the person injured, or to their family."], "Fines go to the injured worker or their family, not to the government.", null],
+  "dredging to thirty feet":(P, X) => ["Dredging", ["(a) Depth.— " + X.AGc + " shall dredge the main channel of the deepwater port to thirty feet at low water.", "(b) Upkeep.— The depth shall be kept by dredging every " + P.n(2, 5) + " years."], "The harbour channel is dug to thirty feet and kept there.", null],
+  "a bonded warehouse district":(P, X) => ["Bonded district", ["(a) District.— A bonded warehouse district is established at the port.", "(b) Duty deferred.— Goods stored in the district pay no duty until they leave it for the Republic.", "(c) Term.— No goods may be held in bond longer than " + P.n(1, 3) + " years."], "Goods can sit in bonded warehouses without paying duty until they enter the country.", null],
+  "customs officers doubled":(P, X) => ["Customs officers", ["(a) Number.— The customs officers at every port of entry shall be doubled within " + P.n(6, 18) + " months.", "(b) Search.— An officer may search any vessel, vehicle or package entering the port."], "The number of customs officers doubles, with power to search anything coming in.", ["dueprocess", "group", 0.3, "The civil liberties union"]],
+  "a clinic in every county under fifty thousand":(P, X) => ["County clinics", ["(a) Clinics.— " + X.AGc + " shall open a clinic in every county with fewer than fifty thousand people.", "(b) Staffing.— Each clinic shall have at least one licensed physician and " + P.n(1, 3) + " nurses."], "Every small county gets a public clinic with a doctor.", null],
+  "physicians' fees set by schedule":(P, X) => ["Fees", ["(a) Schedule.— " + X.AGc + " shall publish a schedule of fees for each kind of visit and treatment.", "(b) Limit.— No physician paid under this Act shall charge more than the schedule."], "Doctors paid under the act charge set fees.", ["contract", "group", 0.4, "The bar association"]],
+  "the whole thing funded out of the tariff":(P, X) => ["Funding", ["(a) Source.— The clinics shall be paid for out of the revenue of the duties on imports.", "(b) Priority.— The clinics' appropriation is a first charge on that revenue after the costs of collection."], "The clinics are paid for from import duties, before anything else.", null],
+  "postal rates for newspapers cut by half":(P, X) => ["Newspaper postage", ["(a) Rate.— The postage on newspapers shall be one half of the rate in force on the day this Act is passed.", "(b) Country towns.— Newspapers carried to towns of fewer than " + P.n(2, 10) + " thousand people go free."], "Mailing newspapers costs half as much; small towns get them free.", null],
+  "a register of who owns what":(P, X) => ["Register of owners", ["(a) Register.— Every newspaper shall file with " + X.AG + " the name of every owner.", "(b) Publication.— The register shall be open to the public.", "(c) Penalty.— A newspaper that does not file may be refused the mails."], "Every newspaper must say publicly who owns it, or lose the post.", ["press", "group", 0.5, "The Wire"]],
+  "penalties for a knowingly false report":(P, X) => ["False reports", ["(a) Offence.— Whoever publishes a report they know to be false, about a public officer, shall be fined up to " + P.money(0.5, 2, 0.5) + ".", "(b) Truth.— Truth is a complete defence."], "Knowingly printing a lie about an official is fined; the truth is always a defence.", ["press", "group", 0.7, "The Wire"]],
+  "a full enumeration in the third year":(P, X) => ["Enumeration", ["(a) Count.— " + X.AGc + " shall count every person in the Republic in the third year of each decade.", "(b) Duty to answer.— Every head of household shall answer the enumerator truly."], "Everyone is counted every ten years.", null],
+  "reapportionment to follow within one session":(P, X) => ["Reapportionment", ["(a) Seats.— Within one session of the count, the seats of the House shall be divided among the States in proportion to their people.", "(b) Districts.— Each State shall draw its districts within " + P.n(3, 9) + " months."], "After the count, House seats are redivided among the States by population.", ["states", "state", 0.3, null]],
+  "the count published in full":(P, X) => ["Publication", ["(a) Publication.— The count shall be published in full, by county.", "(b) Privacy.— No return naming a person shall be published for " + P.n(50, 100, 10) + " years."], "The census results are published county by county; personal returns stay private.", null],
+  "a federal lease on the western fields":(P, X) => ["Leases", ["(a) Lease.— " + X.AGc + " may lease the western fields for terms of " + P.n(10, 30, 5) + " years.", "(b) Bidding.— Leases shall go to the highest responsible bidder."], "The western gas fields are leased out by auction.", null],
+  "royalties split with the states":(P, X) => ["Royalties", ["(a) Royalty.— Every lessee shall pay a royalty of " + P.n(8, 20) + " per cent of the value of the gas.", "(b) Division.— Half of each royalty shall be paid to the State in which the field lies."], "Half the royalties go to the State where the gas is.", null],
+  "a price cap on lighting in the cities":(P, X) => ["Price of light", ["(a) Cap.— No company shall charge more than " + P.n(1, 4) + " stuivers for a thousand feet of lighting gas in a city of more than fifty thousand people.", "(b) Review.— " + X.AGc + " may revise the cap once a year."], "City gas for lighting has a capped price.", ["takings", "group", 0.45, "The Chamber of Commerce"]],
+  "harvest visas doubled for two seasons":(P, X) => ["Harvest visas", ["(a) Number.— The number of seasonal visas shall be twice that of the last season, for two seasons.", "(b) Term.— A seasonal visa runs " + P.n(4, 8) + " months."], "Twice as many harvest visas for two seasons.", null],
+  "employers to post a bond for each worker":(P, X) => ["Employer bond", ["(a) Bond.— An employer shall post a bond of " + P.money(0.05, 0.3, 0.05) + " for each seasonal worker.", "(b) Forfeit.— The bond is forfeit if the worker is not paid or is not returned home at the end of the season."], "Employers put up a bond for each worker, lost if the worker is cheated.", null],
+  "the visa tied to one employer, not the worker":(P, X) => ["Employer named", ["(a) One employer.— A seasonal visa names one employer, and the worker may work for no other.", "(b) Ending.— If the employment ends the visa ends with it."], "A worker's visa is tied to one employer; leaving the job ends the visa.", ["dueprocess", "group", 0.5, "The civil liberties union"]],
+  "a federal border guard of four thousand":(P, X) => ["Border Guard", ["(a) Establishment.— There is established the Federal Border Guard, of four thousand officers.", "(b) Command.— The Guard is commanded by an officer appointed by the " + X.EXEC + "."], "A federal border force of four thousand is created.", null],
+  "detention for anyone without papers at a crossing":(P, X) => ["Detention at crossings", ["(a) Detention.— Any person found at a crossing without papers may be detained.", "(b) Hearing.— A person detained shall be brought before a magistrate within " + P.n(3, 14) + " days.", "(c) Release.— A person who shows a right to be in the Republic shall be released at once."], "Anyone at a crossing without papers can be held until a magistrate sees them.", ["dueprocess", "group", 0.65, "The civil liberties union"]],
+  "the guard paid for by a levy on the border states":(P, X) => ["Cost of the Guard", ["(a) Levy.— The cost of the Guard shall be met by a levy on the border States, in proportion to the length of their borders.", "(b) Collection.— " + X.AGc + " shall assess the levy each year."], "The border States pay for the Guard.", ["equal", "state", 0.55, null]],
+  "citizenship after five years, not nine":(P, X) => ["Residence", ["(a) Period.— A resident may be naturalized after five years' residence.", "(b) Proof.— Residence may be proved by any two witnesses who are citizens."], "Citizenship after five years instead of nine.", null],
+  "an oath and a civics test in any language":(P, X) => ["Oath and test", ["(a) Oath.— Every applicant shall swear to support the Charter of the Republic.", "(b) Test.— Every applicant shall answer " + P.n(10, 25, 5) + " questions on the Charter and the laws, in any language they choose."], "New citizens take an oath and a civics test, in their own language.", null],
+  "the fee waived for veterans of the Republic":(P, X) => ["Veterans", ["(a) Fee.— No fee shall be charged to a veteran applying for naturalization.", "(b) Period.— A veteran may be naturalized after " + P.n(1, 3) + " years' residence."], "Veterans become citizens free and sooner.", null],
+  "grain and credit to an ally abroad":(P, X) => ["Assistance to " + X.REALM, ["(a) Grain.— " + X.AGc + " shall deliver to " + X.REALM + " grain to the value of " + P.money(0.5, 4, 0.5) + ".", "(b) Credit.— The Treasury may lend " + X.REALM + " up to " + P.money(1, 6) + " at not less than " + P.n(2, 5) + " per cent."], "Grain is sent and a loan offered to " + X.REALM + ".", null],
+  "the money spent on Republic farms and ships":(P, X) => ["Domestic purchase", ["(a) Grain.— All grain delivered under this Act shall be bought from farms in the Republic.", "(b) Carriage.— It shall be carried in ships registered in the Republic."], "The aid money is spent on the Republic's own farms and ships.", null],
+  "a report to this House every quarter":(P, X) => ["Reports", ["(a) Report.— " + X.AGc + " shall report to the House every quarter on what has been sent and lent, and to whom."], "The House gets a report every three months.", null],
+  "arms sold at cost to a friendly realm":(P, X) => ["Sale of arms", ["(a) Sale.— " + X.AGc + " may sell to " + X.REALM + " arms from the arsenals of the Republic at their cost, to a total of " + P.money(0.5, 5, 0.5) + "."], "Arms are sold at cost to " + X.REALM + ".", null],
+  "an attaché posted with every shipment":(P, X) => ["Attaché", ["(a) Attaché.— An officer of the Republic shall accompany every shipment and report on its use."], "An officer goes with each shipment to watch how it is used.", null],
+  "the sale suspended if the realm goes to war":(P, X) => ["Suspension", ["(a) Suspension.— All sales shall stop on the day " + X.REALM + " goes to war with any power, and shall not resume without a further Act."], "Sales stop the moment the buyer goes to war.", null],
+  "every state to meet a federal school standard":(P, X) => ["Federal standard", ["(a) Standard.— " + X.AGc + " shall set a standard of instruction which every State shall meet within " + P.n(2, 5) + " years.", "(b) Report.— Each State shall report its progress each year."], "Every State must bring its schools up to a federal standard.", ["states", "state", 0.65, null]],
+  "no new money to meet it":(P, X) => ["No appropriation", ["(a) Cost.— The States shall meet the standard from their own revenues; nothing in this Act appropriates money to them."], "The States pay for it themselves.", ["spending", "state", 0.55, null]],
+  "a federal monitor in any state that falls behind":(P, X) => ["Monitors", ["(a) Monitor.— Where a State falls behind the standard, " + X.AG + " may appoint a monitor with power to direct its schools.", "(b) Term.— A monitor serves until the State meets the standard."], "A federal monitor can take over a State's schools if it falls behind.", ["states", "state", 0.7, null]],
+  "one federal rule replacing forty-eight state ones":(P, X) => ["One rule", ["(a) Rule.— The trade covered by this Act shall be governed by the rule set out in this Act and by no other.", "(b) Regulations.— " + X.AGc + " shall make regulations under it within " + P.n(6, 18) + " months."], "One federal rule replaces all the States' rules on this trade.", ["preempt", "state", 0.45, null]],
+  "state laws in conflict declared void":(P, X) => ["Conflicting state law", ["(a) Void.— Any state law in conflict with the federal rule is void to the extent of the conflict."], "State laws that conflict with the federal rule stop applying.", ["preempt", "state", 0.5, null]],
+  "no state may set a stricter standard":(P, X) => ["Ceiling", ["(a) Ceiling.— No State shall set a standard stricter than the federal rule."], "States may not go further than the federal rule.", ["preempt", "state", 0.6, null]],
+  "the whole of it to take effect in one session, not three":(P, X) => ["Effect in one session", ["(a) Timing.— Every section of this Act takes effect within one session of its enactment, and not in stages."], "All of it happens at once, within a session, not phased in over three.", null]
+};
+function lxFirstCall(town){ return (P, X) => ["First call on the money", ["(a) Priority.— Of the money appropriated by this Act, " + X.AG + " shall first meet the needs of " + town + " and the counties around it.", "(b) Extent.— Not less than " + P.n(10, 30, 5) + " per cent of the appropriation shall be spent there."], town + " and its neighbours are served first, with a guaranteed share.", ["equal", "state", 0.35, null]]; }
+/* a clause nobody wrote a section for still gets one, read from its own words */
+function lxGeneric(cl, X){ return ["Provision", ["(a) In general.— " + knCap(cl) + ".", "(b) Administration.— " + X.AGc + " shall carry out this section and make regulations under it."], knCap(cl) + ".", null]; }
+function lxParams(seed){ const r = rng(seedOf(seed)); return {
+  n(lo, hi, step){ step = step || 1; return lo + Math.round(r() * (hi - lo) / step) * step; },
+  money(lo, hi, step){ step = step || 0.5; const v = lo + Math.round(r() * (hi - lo) / step) * step; return money(v * 1000); } }; }
+function lxDomainOf(s){
+  if(s.domain) return s.domain;
+  const C = s.clauses || []; let best = null, bn = 0;
+  (typeof BILL_DOMAIN !== "undefined" ? BILL_DOMAIN : []).forEach(d => { const n = d.cl.filter(c => C.indexOf(c) >= 0).length; if(n > bn){ bn = n; best = d.k; } });
+  return best;
+}
+function lxCountry(){ return String((G.country && G.country.name) || "the Republic").replace(/^The\s+/, "the "); }
+function lxCongNo(d){ return Math.max(1, Math.floor((Math.max(1, d || G.day || 1) - 1) / (G.termLength || 52)) + 1); }
+/* the record behind an act, wherever it is: the bill on the calendar, the statute book, or the President's desk */
+function lxSource(ref){
+  if(!ref) return null;
+  if(ref.clauses && ref.title) return ref;
+  const t = typeof ref === "string" ? ref : ref.title; if(!t) return null;
+  const S = (G.statute || []).filter(s => s.title === t);
+  if(ref.day != null){ const x = S.find(s => s.day === ref.day) || S.find(s => Math.abs(s.day - ref.day) <= 1); if(x) return x; }
+  if(S.length) return S[0];
+  if(G.bill && G.bill.title === t) return G.bill;
+  return null;
+}
+function lxKey(s){ return (s.day != null ? s.day : "cal") + ":" + s.title; }
+/* the earlier act on the same subject still on the books: what a new bill on it really amends */
+function lxPrior(src, dom){
+  if(!dom) return null; const d0 = src.done || src.fate ? (src.day || G.day) : G.day + 1;
+  return (G.statute || []).filter(s => s !== src && s.title !== src.title && (s.day || 0) < d0 && (s.fate === "carried") && !(s.lxStruck && s.lxStruck.whole) && lxDomainOf(s) === dom).sort((a, b) => b.day - a.day)[0] || null;
+}
+function lxDoc(ref){
+  const src = lxSource(ref); if(!src) return null;
+  const key = lxKey(src) + "|" + (src.clauses || []).length + "|" + (src.strk || []).join(",") + "|" + ((src.lxStruck && src.lxStruck.secs) || []).join(",") + "|" + (src.soft ? 1 : 0) + "|" + (G.statute || []).length;
+  const c = LX.docs.get(lxKey(src)); if(c && c.key === key) return c.doc;
+  const dom = lxDomainOf(src), ag = LX_AG[dom] || "the Secretary concerned", EXEC = (function(){ try{ return execTitle(); }catch(e){ return "President"; } })();
+  const town = src.town || ((/^In ([A-Z][\w' -]+?),/.exec(src.why || "") || [])[1]) || null, st = src.state || null;
+  const realm = src.realmT || (function(){ const m = /^Cabled from ([^:]+):/.exec(src.why || ""); return m ? m[1] : null; })() || "the friendly power";
+  const X = {AG:ag, AGc:knCap(ag), ST:st, STn:st || "Republic", TOWN:town, REALM:realm, EXEC, CC:lxCountry(), CCs:lxCountry().replace(/^the\s+/i, "")};
+  const prior = lxPrior(src, dom), pc = prior ? (prior.clauses || []) : [];
+  const D = {key:lxKey(src), title:src.title, src, dom, prior, congress:knOrd(lxCongNo(src.day)), no:"H.R. " + (src.id || (seedOf(src.title) % 900 + 100)), secs:[], cites:[]};
+  D.longTitle = "To " + (LX_PURPOSE[dom] || "provide for the matters named in it") + (town ? ", with first regard to " + town : "") + ", and for other purposes.";
+  D.enact = "Be it enacted by the Senate and House of Representatives of " + X.CC + " in Congress assembled,";
+  const S = D.secs, add = (head, sub, plain, extra) => { const s = Object.assign({n:S.length + 1, head, sub, plain}, extra || {}); S.push(s); return s; };
+  add("Short title", ["This Act may be cited as the " + src.title + "."], "The name it goes by. It changes nothing by itself.", {k:"title"});
+  const F = []; String(src.why || "").split(/(?<=[.!?])\s+/).filter(Boolean).forEach(x => F.push(x.replace(/\s+$/, "")));
+  if(LX_FIND[dom]) F.push(LX_FIND[dom]);
+  add("Findings", ["The Congress finds that—"].concat(F.map((f, i) => "(" + (i + 1) + ") " + f)), "Why it was filed, in the sponsor's words and the record's.", {k:"find"});
+  const defs = (LX_DEF[dom] || []).concat([["administering office", ag], ["State", "a State of the Union"]]);
+  add("Definitions", ["In this Act—"].concat(defs.map((d, i) => "(" + (i + 1) + ") “" + d[0] + "” means " + d[1] + ";")), "What its words mean, so a court reads them the same way twice.", {k:"def"});
+  const strk = src.strk || [], judged = (src.lxStruck && src.lxStruck.secs) || [];
+  (src.clauses || []).forEach((cl, ci) => {
+    const P = lxParams("lx:" + src.title + ":" + ci);
+    const f = LX_CL[cl] || (/^a first call on the money for /.test(cl) ? lxFirstCall(cl.replace(/^a first call on the money for /, "").replace(/ and the counties around it$/, "")) : null);
+    const r = f ? f(P, X) : lxGeneric(cl, X);
+    const ext = {k:"op", ci, clause:cl, claim:r[3], short:r[0], struckAmend:strk.indexOf(ci) >= 0};
+    const pi = pc.indexOf(cl);
+    if(prior && pi >= 0 && !/^a first call/.test(cl) && cl !== "the whole of it to take effect in one session, not three"){
+      /* the same provision already stands in the earlier act: this bill amends it, figure for figure */
+      const pn = 4 + pi, PP = lxParams("lx:" + prior.title + ":" + pi), old = (f ? f(PP, X) : lxGeneric(cl, X))[1], diffs = [];
+      r[1].forEach((t, j) => { if(old[j] && old[j] !== t){ const a = (old[j].match(/(\d+(?:[.,]\d+)?(?:\s*(?:per cent|feet|years?|months?|days?|guns|acres|stuivers|questions|nurses|directors|times))?|ƒ\d+(?:\.\d+)?[km]?)/g) || []), b = (t.match(/(\d+(?:[.,]\d+)?(?:\s*(?:per cent|feet|years?|months?|days?|guns|acres|stuivers|questions|nurses|directors|times))?|ƒ\d+(?:\.\d+)?[km]?)/g) || []);
+          const ks = a.map((v, i2) => b[i2] && b[i2] !== v ? i2 : -1).filter(i2 => i2 >= 0); if(ks.length) diffs.push("in subsection " + t.slice(0, 3) + ", " + ks.map(k => "by striking “" + a[k] + "” and inserting “" + b[k] + "”").join(", and ")); else diffs.push("by amending subsection " + t.slice(0, 3) + " to read as follows: “" + t + "”"); } });
+      ext.amends = {title:prior.title, day:prior.day, sec:pn};
+      add("Amendment of section " + pn + " of the " + prior.title + " (" + r[0].toLowerCase() + ")", diffs.length ? ["Section " + pn + " of the " + prior.title + " is amended—"].concat(diffs.map((d, i) => "(" + (i + 1) + ") " + d + (i < diffs.length - 1 ? ";" : "."))) : ["Section " + pn + " of the " + prior.title + " is re-enacted without change, and shall apply also to the matters in this Act."],
+        diffs.length ? "The earlier act already does this. This changes its figures: " + r[2].replace(/\.$/, "") + "." : "The earlier act already does this, and this applies it again here.", ext);
+    } else add(r[0], r[1], r[2], ext);
+  });
+  if(prior){ D.cites.push({title:prior.title, day:prior.day, why:"amended"}); }
+  /* a court that struck down an earlier act on this subject is answered in the text */
+  const lost = (G.cases || []).filter(c => c && c.done && c.lx && c.lx.dom === dom && c.lx.held === "struck" && (c.dday || c.day) <= (src.day || G.day)).slice(-1)[0];
+  if(lost){ D.cites.push({case:c2t(lost), why:"answered"}); add("Response to " + c2t(lost), ["(a) Finding.— In " + c2t(lost) + " the high bench held that section " + lost.lx.sec + " of the " + lost.lx.act + " " + LX_TH[lost.lx.th].phrase + ".", "(b) Remedy.— This Act is to be read so as to meet that holding, and nothing in it revives the section the bench struck."], "The last law on this was partly struck down in court; this one says it has been written to survive that ruling.", {k:"resp"}); }
+  const cost = src.cost || 0, soft = src.soft ? Math.round(cost * 0.67) : cost;
+  add("Authorization of appropriations", cost ? ["(a) In general.— There is authorized to be appropriated " + money(soft) + " to carry out this Act" + (src.soft ? " (reduced by amendment on the floor from " + money(cost) + ")" : "") + ".", "(b) Source.— The sums shall be met from " + (/treasury|tariff|levy/.test(src.pays || "") ? src.pays : /districts that lose the subsidy/.test(src.pays || "") ? "the subsidies now paid to the districts named by the Secretary, which shall cease" : "the general fund") + "."] : ["No money is appropriated by this Act."],
+    cost ? "It costs " + money(soft) + ", paid by " + (src.pays || "the general fund") + "." : "It spends nothing.", {k:"approp"});
+  add("Administration and enforcement", ["(a) Regulations.— " + X.AGc + " shall make regulations to carry out this Act within " + lxParams("lx:" + src.title + ":adm").n(90, 270, 30) + " days.", "(b) Officers.— " + X.AGc + " may appoint the officers needed to carry it out.", "(c) Penalty.— Whoever knowingly breaks a regulation made under this Act shall be fined, and each day of the breach is a separate offence."], "Who runs it, and what happens to those who break it.", {k:"adm"});
+  add("Judicial review", ["(a) Standing.— Any State, and any person aggrieved by an action taken under this Act, may bring an action in the circuit court to set it aside.", "(b) Time.— An action shall be brought within " + lxParams("lx:" + src.title + ":jr").n(60, 180, 30) + " days of the action complained of.", "(c) Constitutionality.— An action that challenges this Act under the Charter shall be heard first by the high bench, which shall advance it on its docket."], "Who can sue over it, how soon, and that a challenge to the Act itself goes straight to the high bench.", {k:"jr"});
+  add("Severability", ["If any section of this Act is held invalid, the remainder of the Act, and the application of the section to other persons and circumstances, shall not be affected."], "If a court strikes one section, the rest still stands.", {k:"sev"});
+  const landmark = (src.clauses || []).indexOf("the whole of it to take effect in one session, not three") >= 0;
+  add("Effective date", [landmark ? "This Act takes effect on enactment, subject to section " + (S.findIndex(s => s.clause === "the whole of it to take effect in one session, not three") + 1) + "." : "This Act takes effect " + ["on enactment.", "ninety days after enactment.", "on the first day of the next fiscal year."][seedOf(src.title) % 3]], "When it starts to apply to anyone.", {k:"eff"});
+  judged.forEach(n => { const s = S.find(x => x.n === n); if(s) s.struckCourt = src.lxStruck; });
+  LX.docs.set(lxKey(src), {key, doc:D}); return D;
+}
+function c2t(c){ return c.t; }
+/* the theories a section can be challenged on, how a justice weighs them (axis and sign of the lean that favours striking), and the words of the holding */
+const LX_TH = {
+  takings:{t:"takings", phrase:"takes private property for public use without just compensation", ax:"econ", sg:1, up:"The compensation section answers the claim: the owner is paid what the land is worth, and that is all the Charter asks."},
+  dueprocess:{t:"due process", phrase:"deprives persons of liberty without due process of law", ax:"lib", sg:1, up:"A hearing is provided, and the Charter asks for a fair procedure, not for none at all."},
+  press:{t:"freedom of the press", phrase:"abridges the freedom of the press", ax:"lib", sg:1, up:"The section reaches only what is knowingly false or plainly commercial, and the press was never free to do that."},
+  states:{t:"the reserved powers of the States", phrase:"commandeers the governments of the States in matters the Charter leaves to them", ax:"econ", sg:1, up:"The Union acts on its own officers and its own money; it does not order a State's legislature to do anything."},
+  spending:{t:"conditions on federal money", phrase:"attaches a condition to federal money so coercive that the States have no real choice", ax:"econ", sg:1, up:"A State that does not want the condition may decline the money; an offer is not a command."},
+  separation:{t:"the separation of powers", phrase:"trespasses on the independence of the judicial power", ax:"lib", sg:1, up:"Congress may make the courts and set their size; that is what the Charter gives it to do."},
+  contract:{t:"liberty of contract", phrase:"interferes with the liberty of contract beyond any public need", ax:"econ", sg:1, up:"The rule serves the safety and fair dealing of the public, and contracts are made subject to such rules."},
+  uniformity:{t:"uniformity of duties", phrase:"lays duties that are not uniform throughout the Union", ax:"econ", sg:1, up:"The duty is the same at every port; a rebate for what a port carries is not a different duty."},
+  delegation:{t:"delegation of the legislative power", phrase:"hands the legislative power to an officer of the Executive without a rule to guide it", ax:"econ", sg:1, up:"The Act sets the limits within which the officer may move; filling in figures within them is not making law."},
+  servitude:{t:"compelled labour", phrase:"compels personal labour without consent", ax:"lib", sg:1, up:"The Republic may call on its people for public work in a time of need, at a fair wage and for a fixed term."},
+  equal:{t:"equal treatment of the States", phrase:"singles out some States for burdens or favours the others do not share", ax:"lib", sg:1, up:"Congress may spend where the need is, and need is not the same everywhere."},
+  preempt:{t:"the limits of federal power", phrase:"voids state law beyond the powers the Charter gives the Union", ax:"econ", sg:1, up:"Where Congress may make the rule, its rule is the law of the land and a State's contrary law must give way."}
+};
+/* ── where an act stands: the House, the President, the override, the bench ── */
+function lxAct(s){ return (G.lastActs || []).find(a => a.title === s.title && Math.abs((a.day || 0) - (s.day || 0)) <= 1) || null; }
+function lxStore(){ if(!G.lx || G.lx.v !== 1) G.lx = {v:1, init:false, n:0}; return G.lx; }
+function lxStatus(s){
+  const out = [], cnt = s.aye != null && s.no != null ? s.aye + " to " + s.no : "without a recorded count";
+  if(s.fate === "rejected"){ out.push("Failed in the House, " + cnt + ", on day " + s.day + "."); return {t:out.join(" "), k:"failed", force:false}; }
+  out.push("Passed the House, " + cnt + ", on day " + s.day + ".");
+  if(s.fate === "struck down"){ out.push("Struck down by the court before it took effect."); return {t:out.join(" "), k:"struck", force:false}; }
+  if(s.veto){ out.push(s.veto.override ? "Vetoed by " + s.veto.by + "; the House overrode the veto." : "Vetoed by " + s.veto.by + "."); }
+  if(s.exec){ out.push(s.exec.act === "signed" ? "Signed by " + s.exec.by + (s.exec.d ? " on day " + s.exec.d : "") + "." : "Vetoed by " + s.exec.by + (s.exec.d ? " on day " + s.exec.d : "") + "."); }
+  if(s.ovr && s.ovr.none) out.push("No override was attempted.");
+  else if(s.ovr && s.ovr.done) out.push(s.ovr.ok ? "The House overrode the veto, " + s.ovr.aye + " to " + s.ovr.no + " (two thirds was " + s.ovr.need + ")." : "The House failed to override, " + s.ovr.aye + " to " + s.ovr.no + "; two thirds was " + s.ovr.need + ". The veto stands.");
+  else if(s.ovr) out.push("The veto goes back to the House; it votes on an override on day " + s.ovr.due + ", and needs two thirds.");
+  const a = lxAct(s), pending = s.fate === "carried" && !s.exec && !s.veto && a && !a.signed && !a.vetoed && G.exec && G.exec.you;
+  if(pending) out.push("Awaiting the President's signature.");
+  let k = s.fate === "vetoed" ? "vetoed" : pending ? "pending" : "law";
+  if(s.lxStruck){ const ss = s.lxStruck; out.push(ss.whole ? "Held invalid as a whole in " + ss.cases.join(", ") + "." : "Section" + (ss.secs.length > 1 ? "s " : " ") + ss.secs.join(", ") + " held invalid in " + ss.cases.join(", ") + "; the rest stands."); if(ss.whole) k = "struck"; }
+  const later = (G.statute || []).filter(x => x !== s && x.fate === "carried" && (x.day || 0) > (s.day || 0)).filter(x => { const d = lxDoc(x); return d && d.prior === s; });
+  if(later.length) out.push("Amended by the " + later.map(x => x.title).join(", the ") + ".");
+  return {t:out.join(" "), k, force:k === "law", later};
+}
+/* the clerk's book, the President's pen, the House's answer to a veto */
+function lxSync(){
+  if(!G || !G.you || !G.statute) return; const L = lxStore(), first = !L.init;
+  (G.lastActs || []).forEach(a => { const s = (G.statute || []).find(x => x.title === a.title && Math.abs((x.day || 0) - (a.day || 0)) <= 1); if(!s) return;
+    const by = G.exec && G.exec.you ? (execTitleSafe() + " " + G.you.name) : (G.exec && G.exec.name) || "the President";
+    if(a.signed && !s.exec) s.exec = {act:"signed", by, d:first ? null : G.day};
+    if(a.vetoed && (!s.exec || s.exec.act !== "vetoed")){ s.exec = {act:"vetoed", by, d:first && !a.vetoD ? null : G.day}; if(s.fate === "carried") s.fate = "vetoed";
+      if(!s.ovr && first && G.day - (s.day || 0) > 10){ s.ovr = {done:true, ok:false, none:true}; }
+      if(!s.ovr){ s.ovr = {due:G.day + 1, done:false}; try{ feed("The veto of the " + s.title + " goes back to the House with the President's message. It votes on an override on day " + s.ovr.due + "; it needs two thirds.", "news"); }catch(e){} } } });
+  L.init = true;
+  (G.statute || []).forEach(s => { if(s.ovr && !s.ovr.done && G.day >= s.ovr.due) lxOverride(s); });
+}
+function execTitleSafe(){ try{ return execTitle(); }catch(e){ return "President"; } }
+function lxOverride(s){
+  const a = lxAct(s) || {}, pos = a.pos || s.pos; if(!pos){ s.ovr.done = true; s.ovr.ok = false; s.ovr.aye = s.aye; s.ovr.no = s.no; s.ovr.need = Math.ceil((s.aye + s.no) * 2 / 3); return; }
+  const pseudo = {id:"ovr:" + s.title, title:s.title, pos:Object.assign({}, pos), sponsor:s.sponsor, sponsorParty:s.sponsorParty || null, domain:lxDomainOf(s), done:false, clauses:s.clauses || []};
+  const yv = G.you.vote, pl = (G.members || []).map(m => [m, m.pledge, m.pledgeDay]); let t = null;
+  try{ G.you.vote = -1; (G.members || []).forEach(m => { m.pledge = null; }); t = tallyBill(pseudo, false); }catch(e){ t = null; }
+  finally{ G.you.vote = yv; pl.forEach(([m, p, d]) => { m.pledge = p; m.pledgeDay = d; }); }
+  if(!t){ s.ovr.done = true; return; }
+  const need = Math.ceil((t.aye + t.no) * 2 / 3), ok = t.aye >= need;
+  Object.assign(s.ovr, {done:true, d:G.day, aye:t.aye, no:t.no, need, ok, v:t.roll || null});
+  if(ok){ s.fate = "carried"; s.overridden = true; G.you.standing = clamp((G.you.standing || 0) - 6, 0, 100); G.you.influence = clamp((G.you.influence || 0) - 4, 0, 100); }
+  else { G.you.influence = clamp((G.you.influence || 0) + 2, 0, 100); }
+  try{ const line = ok ? "The House overrides the veto of the " + s.title + ", " + t.aye + " to " + t.no + " (two thirds was " + need + "). It is law without the President's signature." : "The House fails to override the veto of the " + s.title + ": " + t.aye + " to " + t.no + ", short of the " + need + " it needed. The veto stands.";
+    note(line, true); journal(line); pushWireScrap("Floor", s.title + " — override " + (ok ? "CARRIED" : "FAILS") + " " + t.aye + "–" + t.no); }catch(e){}
+}
+/* ── the courts: suits against the sections open to challenge, decided justice by justice ── */
+function lxPlaintiff(s, cl, D){
+  const kind = cl.claim[1];
+  if(kind === "group") return {name:cl.claim[3], state:null, pk:"group"};
+  if(kind === "member"){ const m = (G.members || []).filter(x => x && !x.gone).sort((u, v) => (alignment(u, {pos:s.pos || {econ:0, lib:0, def:0, wel:0}}) || 0) - (alignment(v, {pos:s.pos || {econ:0, lib:0, def:0, wel:0}}) || 0))[0]; return m ? {name:m.name, state:m.state, pk:"member", id:m.id} : null; }
+  if(kind === "person"){ const st = s.state || pick(knStates()); let nm = "A citizen"; try{ nm = newName(st); }catch(e){} return {name:nm, state:st, pk:"person", who:cl.claim[3]}; }
+  /* a State: the one the act is aimed at, or the one that likes it least; never the State it favours, on a claim of favour */
+  const pos = s.pos || (lxAct(s) || {}).pos || {econ:0, lib:0, def:0, wel:0}; let cand = (G.states || []).slice();
+  if(cl.claim[0] === "equal" && s.state) cand = cand.filter(x => x.n !== s.state);
+  const tgt = s.target && cl.claim[0] !== "equal" ? cand.find(x => x.n === s.target) : null;
+  const low = cand.sort((u, v) => dkStateLean(u, {pos}) - dkStateLean(v, {pos})).slice(0, 4), S2 = tgt || low[Math.floor(Math.random() * low.length)]; return S2 ? {name:S2.n, state:S2.n, pk:"state"} : null;
+}
+function lxSue(s){
+  const D = lxDoc(s); if(!D) return 0; let n = 0;
+  const ops = D.secs.filter(x => x.k === "op" && x.claim && !x.struckAmend).sort((u, v) => v.claim[2] - u.claim[2]);
+  for(const x of ops){ if(n >= 2) break; if(Math.random() > x.claim[2] * 0.8) continue;
+    const P = lxPlaintiff(s, x, D); if(!P) continue; const t = P.name + " v. the Union (" + s.title + ")"; if((G.cases || []).some(c => c.t === t)) continue;
+    G.cases = G.cases || []; G.cases.push({t, state:P.state || "", day:G.day, voted:[], lx:{act:s.title, aday:s.day, sec:x.n, head:x.short || x.head, th:x.claim[0], str:x.claim[2], plaintiff:P.name, pk:P.pk, who:P.who || null, dom:D.dom}});
+    n++; try{ feed((P.pk === "state" ? "The attorney general of " + P.name + " has" : P.name + (P.who ? ", " + P.who + "," : "") + " has") + " sued to strike section " + x.n + " of the " + s.title + " (" + x.head.toLowerCase() + "), saying it " + LX_TH[x.claim[0]].phrase + ".", "news"); }catch(e){} }
+  return n;
+}
+/* a case filed by the old paths, on an act it names, is read against that act's own sections */
+function lxEnrich(c){
+  if(!c || c.lx || c.dual != null) return; const m = /\(([^()]+)\)\s*$/.exec(c.t || ""); if(!m) return;
+  const s = (G.statute || []).find(x => x.title === m[1]) || (G.statute || []).find(x => m[1].indexOf(x.title) >= 0); if(!s) return; const D = lxDoc(s); if(!D) return;
+  const want = c.state ? ["states", "spending", "preempt", "equal", "uniformity"] : null;
+  const x = D.secs.filter(y => y.k === "op" && y.claim && (!want || want.indexOf(y.claim[0]) >= 0)).sort((u, v) => v.claim[2] - u.claim[2])[0] || D.secs.find(y => y.k === "op");
+  if(!x) return; const th = x.claim ? x.claim[0] : "states";
+  c.lx = {act:s.title, aday:s.day, sec:x.n, head:x.short || x.head, th, str:x.claim ? x.claim[2] : 0.35, plaintiff:(c.t.split(" v. ")[0] || c.state || "the plaintiff"), pk:c.state ? "state" : "group", dom:D.dom};
+}
+function lxBench(){ const J = (G.court && G.court.length ? G.court : []).filter(j => j && j.name && !(G.you && j.name === G.you.name)); return J; }
+function lxDecide(c, youVote){
+  const L = c.lx, T = LX_TH[L.th] || LX_TH.states, J = lxBench(); if(!J.length && youVote == null) return null;
+  const prior = (G.cases || []).filter(x => x !== c && x.done && x.lx && x.lx.th === L.th && x.lx.held).sort((u, v) => (v.dday || v.day) - (u.dday || u.day))[0];
+  const prec = prior ? (prior.lx.held === "struck" ? 0.18 : -0.18) : 0;
+  const votes = J.map((j, i) => { const lean = clamp(((j.pos && j.pos[T.ax]) || 0) * T.sg / 60, -1, 1), noise = (knH(j.name, c.t) - 0.5) * 0.3;
+    const sc = (L.str - 0.45) * 1.6 + lean * 0.7 + prec + noise; return {name:j.name, strike:sc > 0, chief:i === 0}; });
+  if(youVote != null) votes.push({name:G.you.name, strike:!youVote, you:true});
+  const st = votes.filter(v => v.strike), up = votes.filter(v => !v.strike), struck = st.length > up.length, maj = struck ? st : up, min = struck ? up : st;
+  const author = maj.find(v => v.chief) || maj.find(v => !v.you) || maj[0], diss = min.find(v => !v.you) || min[0];
+  const s = (G.statute || []).find(x => x.title === L.act && (L.aday == null || Math.abs((x.day || 0) - L.aday) <= 1));
+  const op = (author.you ? "You wrote for the Court" : "Justice " + author.name + " wrote for the Court") + ": " + (struck ? "Section " + L.sec + " of the " + L.act + " (" + String(L.head).toLowerCase() + ") " + T.phrase + ", and is invalid." + (prior && prior.lx.held === "struck" ? " We said as much in " + prior.t + "." : "") + " Under the Act's own severability section the rest of it stands."
+    : "The challenge to section " + L.sec + " of the " + L.act + " fails. " + T.up + (prior && prior.lx.held === "upheld" ? " We held the same in " + prior.t + "." : prior ? " We do not read " + prior.t + " to require otherwise." : ""));
+  const dis = diss ? (diss.you ? " You dissented." : " Justice " + diss.name + " dissented: " + (struck ? T.up : "the section " + T.phrase + ", and the Court should have said so.")) : "";
+  c.done = true; c.dday = G.day; c.ruled = struck ? (c.state ? "state" : "plaintiff") : "union";
+  Object.assign(L, {held:struck ? "struck" : "upheld", count:maj.length + "–" + min.length, op:op + dis, author:author.name});
+  if(struck && s){ const ss = s.lxStruck = s.lxStruck || {secs:[], cases:[], whole:false}; if(ss.secs.indexOf(L.sec) < 0) ss.secs.push(L.sec); if(ss.cases.indexOf(c.t) < 0) ss.cases.push(c.t);
+    const D = lxDoc(s), nOps = D ? D.secs.filter(x => x.k === "op").length : 3; ss.whole = ss.secs.length * 2 > nOps; LX.docs.delete(lxKey(s)); }
+  try{ const S = (G.states || []).find(x => x.n === c.state); if(S) S.unrest = clamp((S.unrest || 0) + (struck ? -3 : 4), 0, 100); }catch(e){}
+  try{ feed("The high bench, " + maj.length + " to " + min.length + ", " + (struck ? "strikes section " + L.sec + " of the " + L.act : "upholds section " + L.sec + " of the " + L.act) + " in " + c.t + ".", struck ? "news" : "news"); journal("Court: " + c.t + " — " + (struck ? "section " + L.sec + " struck" : "upheld") + ", " + maj.length + "–" + min.length + "."); }catch(e){}
+  return {struck, count:L.count, op:L.op};
+}
+function lxDay(){
+  if(!G || !G.you) return; lxSync();
+  (G.cases || []).forEach(lxEnrich);
+  (G.statute || []).forEach(s => { if(s.lxSued || s.fate !== "carried" || G.day - (s.day || 0) > 30 || G.day - (s.day || 0) < 1) return; const st = lxStatus(s); if(st.k !== "law") return; s.lxSued = G.day; lxSue(s); });
+}
+/* ── reading it ── */
+function lxSecHTML(D, x){
+  const strikeA = x.struckAmend, court = x.struckCourt;
+  return '<div class="lx-sec" style="margin:10px 0;' + (strikeA ? "opacity:.55;" : "") + '"><div style="font:600 14px Georgia,serif"><span style="color:#7a5a12">Sec. ' + x.n + '.</span> ' + pcEsc(x.head) + '.</div>' +
+    x.sub.map(t => '<div style="margin:3px 0 0 14px;' + (strikeA ? 'text-decoration:line-through;' : '') + '">' + pcEsc(t) + '</div>').join("") +
+    (x.amends ? '<div style="margin:4px 0 0 14px"><button type="button" class="btn btn--ghost" style="padding:2px 8px;font-size:12px" data-lxopen="' + pcEsc(x.amends.day + ":" + x.amends.title) + '">Read the ' + pcEsc(x.amends.title) + ' ▸</button></div>' : '') +
+    (strikeA ? '<div class="muted" style="margin:3px 0 0 14px;font-size:12px">Struck on the floor before passage.</div>' : '') +
+    (court ? '<div style="margin:3px 0 0 14px;font-size:12px;color:#8a1d1d">Held invalid in ' + pcEsc(court.cases.join(", ")) + '. Not in force.</div>' : '') +
+    '<div class="muted" style="margin:3px 0 0 14px;font-size:12px"><i>In plain words:</i> ' + pcEsc(x.plain) + '</div></div>';
+}
+function lxDocHTML(D){
+  return '<div class="lx-doc" style="background:#fffdf6;color:#1d1d1d;border:1px solid #cdbf9a;border-radius:6px;padding:14px 16px;font:14px/1.45 Georgia,serif">' +
+    '<div style="text-align:center;font:12px system-ui;letter-spacing:.08em;color:#6b5a2e">' + pcEsc(D.congress.toUpperCase()) + ' CONGRESS · ' + pcEsc(D.no) + '</div>' +
+    '<div style="text-align:center;font:700 18px Georgia,serif;margin:6px 0">AN ACT</div><div style="text-align:center;font-style:italic">' + pcEsc(D.longTitle) + '</div>' +
+    '<p style="margin:12px 0 4px"><i>' + pcEsc(D.enact) + '</i></p>' + D.secs.map(x => lxSecHTML(D, x)).join("") + '</div>';
+}
+function lxHistHTML(s){
+  const st = lxStatus(s), rows = [];
+  rows.push("Filed by " + (s.sponsor || "the leadership") + (s.state ? ", out of " + s.state : "") + ".");
+  if(s.aye != null) rows.push("House roll call, day " + s.day + ": " + s.aye + " aye, " + s.no + " no" + (s.yv ? " (you voted " + (s.yv > 0 ? "aye" : "no") + ")" : "") + ".");
+  if(s.v){ const ay = [], no = []; Object.keys(s.v).forEach(id => { const m = knPerson(id); if(m) (s.v[id] > 0 ? ay : no).push(surname(m.name)); }); rows.push("On the roll by name — aye: " + (ay.join(", ") || "none") + "; no: " + (no.join(", ") || "none") + ". The other seats were counted by party."); }
+  else rows.push("The clerk did not keep the names on the roll for this one; only the count is recorded.");
+  const cs = (G.cases || []).filter(c => c.lx && c.lx.act === s.title);
+  return '<div class="eyebrow" style="margin-top:12px">Where it stands</div><p>' + pcEsc(st.t) + '</p>' +
+    '<div class="eyebrow" style="margin-top:8px">Legislative history</div><ul style="margin:4px 0 0 18px">' + rows.map(r => '<li>' + pcEsc(r) + '</li>').join("") + '</ul>' +
+    (cs.length ? '<div class="eyebrow" style="margin-top:8px">In the courts</div>' + cs.map(c => '<div style="margin:6px 0;padding:6px 10px;border-left:3px solid ' + (c.lx.held === "struck" ? "#a33" : c.lx.held ? "#3a7" : "#c9a24a") + '"><b>' + pcEsc(c.t) + '</b> <span class="muted">· filed day ' + c.day + ' · challenges section ' + c.lx.sec + ' (' + pcEsc(String(c.lx.head).toLowerCase()) + ') on ' + pcEsc(LX_TH[c.lx.th].t) + '</span>' +
+      (c.lx.held ? '<div style="font-size:13px;margin-top:3px">Decided day ' + (c.dday || "?") + ', ' + pcEsc(c.lx.count) + ': ' + pcEsc(c.lx.op) + '</div>' : '<div class="muted" style="font-size:13px">Pending before the high bench.</div>') + '</div>').join("") : "") +
+    (st.later.length ? '<div class="eyebrow" style="margin-top:8px">Amended by</div>' + st.later.map(x => '<button type="button" class="btn btn--ghost" style="margin:2px" data-lxopen="' + pcEsc(lxKey(x)) + '">' + pcEsc(x.title) + ' ▸</button>').join("") : "");
+}
+function lxFind(key){ if(key === "cal") return G.bill || null; const i = String(key).indexOf(":"), d = String(key).slice(0, i), t = String(key).slice(i + 1); return (G.statute || []).find(s => s.title === t && String(s.day) === d) || (G.statute || []).find(s => s.title === t) || (G.bill && G.bill.title === t ? G.bill : null); }
+let lxWasRunning = null;
+function lxShut(){ const V = document.getElementById("lxVeil"); if(!V || V.hidden) return; V.hidden = true; G.running = lxWasRunning === null ? G.running : lxWasRunning; lxWasRunning = null; }
+function lxOpen(h){
+  let V = document.getElementById("lxVeil"); if(!V){ V = document.createElement("div"); V.id = "lxVeil"; V.className = "veil"; V.style.zIndex = "10060"; V.hidden = true; V.innerHTML = '<div class="card lx-card" id="lxCardEl" style="width:min(820px,100%)"></div>'; document.body.appendChild(V);
+    V.addEventListener("click", e => { if(e.target === V) lxShut(); }); document.addEventListener("keydown", e => { if(e.key === "Escape" && !V.hidden){ e.preventDefault(); e.stopImmediatePropagation(); lxShut(); } }, true); }
+  if(V.hidden){ lxWasRunning = G.running; } G.running = false; const C = V.firstChild; C.innerHTML = h; V.hidden = false; V.scrollTop = 0; C.scrollTop = 0;
+  const c = C.querySelector("#lxClose"); if(c) c.onclick = () => lxShut(); }
+function lxCard(ref){
+  const s = typeof ref === "string" ? lxFind(ref) : ref; const D = s ? lxDoc(s) : null;
+  if(!D){ lxOpen('<h1>Not in the book</h1><p class="muted">The clerk has no text for that.</p><div class="card__actions"><button type="button" class="btn btn--ghost" data-lxbook="all">The statute book</button><button type="button" class="btn btn--ghost" id="lxClose">Close</button></div>'); return; }
+  const live = s === G.bill;
+  lxOpen('<div class="eyebrow">' + (live ? "On the calendar · roll call day " + (s.voteDay || "?") : "The statute book") + '</div><h1>' + pcEsc(s.title) + '</h1>' +
+    (live ? '<p class="muted">Before the House. Sponsored by ' + pcEsc(s.sponsor || "the leadership") + (s.state ? ', out of ' + pcEsc(s.state) : '') + '.' + (D.prior ? ' It amends the ' + pcEsc(D.prior.title) + ', which is in force.' : '') + '</p>' : lxHistHTML(s)) +
+    '<div class="eyebrow" style="margin-top:12px">The text</div>' + lxDocHTML(D) +
+    '<div class="card__actions"><button type="button" class="btn btn--ghost" data-lxbook="all">The statute book</button><button type="button" class="btn btn--ghost" id="lxClose">Close</button></div>');
+}
+function lxBook(f){
+  f = f || "all"; const S = (G.statute || []).slice(), rows = S.map(s => ({s, st:lxStatus(s)})).filter(r => f === "all" || r.st.k === f || (f === "law" && r.st.k === "pending"));
+  const cnt = k => S.filter(s => lxStatus(s).k === k).length, chip = (k, t) => '<button type="button" class="btn ' + (f === k ? '' : 'btn--ghost') + '" style="padding:3px 9px;font-size:12px" data-lxbook="' + k + '">' + t + '</button>';
+  const pend = (G.lastActs || []).filter(a => !(G.statute || []).some(s => s.title === a.title && Math.abs((s.day || 0) - (a.day || 0)) <= 1));
+  lxOpen('<div class="eyebrow">The statute book · ' + pcEsc(lxCountry()) + '</div><h1>Every act this House has decided</h1><p class="muted">Each with its full text, its roll call, what the President did with it, what the courts made of it, and the acts that amended it.</p>' +
+    '<div class="card__actions" style="flex-wrap:wrap;justify-content:flex-start">' + chip("all", "All " + S.length) + chip("law", "In force " + (cnt("law") + cnt("pending"))) + chip("failed", "Failed " + cnt("failed")) + chip("vetoed", "Vetoed " + cnt("vetoed")) + chip("struck", "Struck down " + cnt("struck")) + '</div>' +
+    (G.bill && !G.bill.done ? '<div style="margin:8px 0;padding:8px 10px;border-left:3px solid #c9a24a"><b>On the calendar:</b> ' + pcEsc(G.bill.title) + ' <button type="button" class="btn btn--ghost" style="padding:2px 8px;font-size:12px" data-lxopen="cal">Read it ▸</button></div>' : '') +
+    rows.map(r => '<div style="margin:6px 0;padding:6px 10px;border-left:3px solid ' + ({law:"#3a7", pending:"#c9a24a", failed:"#888", vetoed:"#a63", struck:"#a33"})[r.st.k] + '"><b>' + pcEsc(r.s.title) + '</b> <span class="muted" style="font-size:12px">· day ' + r.s.day + ' · ' + pcEsc(r.s.sponsor || "") + '</span><div style="font-size:13px">' + pcEsc(r.st.t) + '</div><button type="button" class="btn btn--ghost" style="padding:2px 8px;font-size:12px;margin-top:3px" data-lxopen="' + pcEsc(lxKey(r.s)) + '">Read the act ▸</button></div>').join("") +
+    (pend.length ? '<div class="eyebrow" style="margin-top:10px">Passed by Congress without a recorded roll call</div>' + pend.map(a => '<div class="muted" style="font-size:13px">· ' + pcEsc(a.title) + ', day ' + a.day + (a.signed ? ', signed' : a.vetoed ? ', vetoed' : ', awaiting signature') + '. The clerk kept the title and the day; no text was entered.</div>').join("") : '') +
+    '<div class="card__actions"><button type="button" class="btn btn--ghost" id="lxClose">Close</button></div>');
+}
+document.addEventListener("click", e => { const t = e.target && e.target.closest ? e.target.closest("[data-lxopen],[data-lxbook]") : null; if(!t) return; e.preventDefault(); e.stopPropagation();
+  try{ if(t.hasAttribute("data-lxopen")) lxCard(t.getAttribute("data-lxopen")); else lxBook(t.getAttribute("data-lxbook")); }catch(err){ try{ console.warn("lx", err); }catch(e2){} } }, true);
+/* ── the docket reads the real text, the real cost and the real sponsor ── */
+{ const _dp = dkProvisions; dkProvisions = function(it){ try{ if(it && it.kind !== "case" && it.kind !== "state bill"){ const D = lxDoc(it.src || it.b || {title:it.title, day:it.day}); if(D) return D.secs.map(x => "Sec. " + x.n + ". " + x.head + ". " + x.sub.join(" ")); } }catch(e){} return _dp.apply(this, arguments); }; }
+{ const _dr = dkProvisionsRich; dkProvisionsRich = function(it){ try{ if(it && it.kind !== "case" && it.kind !== "state bill"){ const D = lxDoc(it.src || it.b || {title:it.title, day:it.day}); if(D) return D.secs.map(x => '<li>' + pcEsc("Sec. " + x.n + ". " + x.head + ". " + x.sub.join(" ")) + '<br><span class="muted" style="font-size:12px">' + pcEsc(x.plain) + '</span></li>').join(""); } }catch(e){} return _dr.apply(this, arguments); }; }
+{ const _dc = dkClauseHTML; dkClauseHTML = function(it){ try{ if(it && it.kind !== "case" && it.kind !== "state bill"){ const D = lxDoc(it.src || it.b || {title:it.title, day:it.day}); if(D){ const b = dkBillRef(it) || {}, edit = it.kind === "bill" && b === G.bill;
+      return D.secs.map(x => '<li' + (x.struckAmend ? ' style="text-decoration:line-through;opacity:.6"' : '') + '><b>Sec. ' + x.n + '. ' + pcEsc(x.head) + '.</b> ' + pcEsc(x.sub.join(" ")) + '<br><span class="muted" style="font-size:12px">' + pcEsc(x.plain) + '</span>' +
+        (edit && x.k === "op" && !x.struckAmend ? ' <button type="button" class="btn btn--ghost" style="padding:1px 6px;font-size:11px" data-dkstrike="' + (100 + x.ci) + '">Move to strike</button>' : '') +
+        (edit && x.k === "approp" && !b.soft && b.cost ? ' <button type="button" class="btn btn--ghost" style="padding:1px 6px;font-size:11px" data-dkamend="1">Amend: cut it by a third</button>' : '') +
+        (x.amends ? ' <button type="button" class="btn btn--ghost" style="padding:1px 6px;font-size:11px" data-lxopen="' + pcEsc(x.amends.day + ":" + x.amends.title) + '">Read the ' + pcEsc(x.amends.title) + '</button>' : '') + '</li>').join("") +
+        '<li style="list-style:none;margin-top:6px"><button type="button" class="btn btn--ghost" style="padding:2px 8px;font-size:12px" data-lxopen="' + (b === G.bill ? "cal" : pcEsc(lxKey(D.src))) + '">Read the full text ▸</button></li>'; } } }catch(e){} return _dc.apply(this, arguments); }; }
+{ const _ds = dkStrike; dkStrike = function(it, i){ if(i >= 100){ const b = dkBillRef(it); if(!b || !b.clauses) return ""; const ci = i - 100; b.strk = b.strk || []; if(b.strk.indexOf(ci) < 0) b.strk.push(ci);
+    const n = b.clauses.length || 3; if(b.pos) Object.keys(b.pos).forEach(k => b.pos[k] = Math.round(b.pos[k] * (1 - 0.5 / n))); G.you.influence = clamp((G.you.influence || 0) - 2, 0, 100);
+    (b.amends = b.amends || []).push({d:G.day, by:G.you.name, what:"struck the provision on " + b.clauses[ci]}); LX.docs.delete(lxKey(b));
+    try{ feed("You move to strike the provision on " + b.clauses[ci] + " from the " + b.title + "."); }catch(e){} return "Moved to strike: " + b.clauses[ci] + ". The count moves."; } return _ds.apply(this, arguments); }; }
+{ const _da = dkAmend; dkAmend = function(it){ const r = _da.apply(this, arguments); try{ const b = dkBillRef(it); if(b){ (b.amends = b.amends || []).push({d:G.day, by:G.you.name, what:"cut the appropriation by a third"}); LX.docs.delete(lxKey(b)); } }catch(e){} return r; }; }
+{ const _dcl = dkCostLine; dkCostLine = function(it){ try{ const s = it && it.kind !== "case" ? (it.src || dkBillRef(it) || lxSource({title:it.title, day:it.day})) : null; if(s && s.cost){ const c = s.soft ? Math.round(s.cost * 0.67) : s.cost; return "Cost: " + money(c) + (s.soft ? " (cut by amendment from " + money(s.cost) + ")" : "") + ", paid by " + (s.pays || "the general fund") + "."; } }catch(e){} return _dcl.apply(this, arguments); }; }
+{ const _di = dkItems; dkItems = function(){ const L = _di.apply(this, arguments); try{ L.forEach(it => { if(it.kind !== "act") return; const s = lxSource({title:it.title, day:+(/day (\d+)/.exec(it.line || "") || [])[1] || null}); if(!s) return; it.src = s; it.sponsor = s.sponsor || it.sponsor; it.line = lxStatus(s).t; }); }catch(e){} return L; }; }
+{ const _dcard = dkCard; dkCard = function(i){ const r = _dcard.apply(this, arguments); try{ const acts = card.querySelector(".card__actions:last-of-type"); if(acts && !card.querySelector("[data-lxbook]")){ const b = document.createElement("button"); b.type = "button"; b.className = "btn btn--ghost"; b.setAttribute("data-lxbook", "all"); b.textContent = "The statute book"; acts.insertBefore(b, acts.firstChild);
+    const it = dkItems()[i || 0]; const src = it ? (it.src || (it.b === G.bill ? G.bill : null) || lxSource({title:it.title})) : null; if(src && it.kind !== "case" && it.kind !== "state bill"){ const f = document.createElement("button"); f.type = "button"; f.className = "btn"; f.setAttribute("data-lxopen", src === G.bill ? "cal" : lxKey(src)); f.textContent = "Read the full text"; acts.insertBefore(f, acts.firstChild); } } }catch(e){} return r; }; }
+{ const _bs = billSheet; billSheet = function(b){ let h = _bs.apply(this, arguments); try{ if(b) h += '<div class="card__actions"><button type="button" class="btn btn--ghost" data-lxopen="' + (b === G.bill ? "cal" : pcEsc(lxKey(b))) + '">Read the full text ▸</button><button type="button" class="btn btn--ghost" data-lxbook="all">The statute book</button></div>'; }catch(e){} return h; }; }
+/* the bench: suits on the act's own sections, decided justice by justice; you keep your one vote when you sit on it */
+{ const _oca = orgCourtAct; orgCourtAct = function(){ try{ let k = null; try{ k = roleKey(); }catch(e){}
+    (G.cases || []).forEach(c => { if(!c || c.done) return; lxEnrich(c); if(!c.lx) return; if(k === "bench" && c.state !== (G.you && G.you.state)) return; if(G.day - (c.day || 0) < 4 || !chance(0.35)) return; lxDecide(c, null); }); }catch(e){} return _oca.apply(this, arguments); }; }
+{ const _br = benchRule; benchRule = function(c, forUnion){ try{ lxEnrich(c); if(c && c.lx && c.dual == null){ try{ reactEmit("ruling", {t:c.t, forUnion, state:c.state, dual:false}); }catch(e){} const r = lxDecide(c, !!forUnion); G.you.standing = clamp(G.you.standing + 1, 0, 100);
+      return r ? (r.struck === !forUnion ? "The bench is with you, " + r.count + ". " : "You are outvoted, " + r.count + ". ") + r.op : _br.apply(this, arguments); } }catch(e){} return _br.apply(this, arguments); }; }
+/* the statute book keeps what each act was, so its text can be read for good */
+{ const _hv2 = holdVote; holdVote = function(){ const b = G.bill, n0 = (G.statute || []).length; const r = _hv2.apply(this, arguments);
+  try{ const s = G.statute && G.statute[0]; if(b && s && s.title === b.title && G.statute.length > n0){ Object.assign(s, {id:b.id, domain:b.domain || null, pos:b.pos ? Object.assign({}, b.pos) : null, stakes:b.stakes || null, pays:b.pays || null, helps:b.helps || null, town:b.town || null, sponsorParty:b.sponsorParty || null, kind:b.kind || null, realmT:b.realmT || null, target:b.target || null, strk:(b.strk || []).slice(), soft:!!b.soft, amends:(b.amends || []).slice(), veto:b._veto || null}); } }catch(e){} return r; }; }
+{ const _scb4 = saveCaptureBase; saveCaptureBase = function(){ const o = _scb4.apply(this, arguments); try{ o.lx = G.lx || null; }catch(e){} return o; }; }
+setTimeout(() => { try{ const bar = document.getElementById("uiToolbar"); if(bar && !document.getElementById("uiStatuteBtn")){ const b = document.createElement("button"); b.type = "button"; b.id = "uiStatuteBtn"; b.title = "Every act the House has decided: full text, roll call, veto, courts, amendments"; b.textContent = "Statutes"; b.setAttribute("data-lxbook", "all"); const d = document.getElementById("uiDocketBtn"); bar.insertBefore(b, d ? d.nextSibling : bar.children[1] || null); } }catch(e){} }, 1800);
+setInterval(() => { try{ if(G && G.you){ lxSync(); if(lxStore().day !== G.day){ lxStore().day = G.day; lxDay(); } } }catch(e){} }, 2500);
+window.onumStatute = {book:() => (G.statute || []).map(s => ({title:s.title, day:s.day, status:lxStatus(s).t, kind:lxStatus(s).k})), text:(t, d) => { const D = lxDoc(lxSource({title:t, day:d})); return D ? {title:D.title, longTitle:D.longTitle, amends:D.prior ? D.prior.title : null, sections:D.secs.map(x => ({n:x.n, head:x.head, text:x.sub, plain:x.plain, challengeable:x.claim ? LX_TH[x.claim[0]].t : null}))} : null; },
+  cases:() => (G.cases || []).filter(c => c.lx).map(c => ({case:c.t, act:c.lx.act, section:c.lx.sec, on:LX_TH[c.lx.th].t, held:c.lx.held || "pending", count:c.lx.count || null, opinion:c.lx.op || null})), open:k => lxCard(k), openBook:f => lxBook(f)};
+
+/* ══ 20261025h · ONE PLACE FOR A MEETING. A cabinet, a council, a briefing, the press room, the floor or any step-by-step
+   sitting is run from one panel at the top right and nowhere else: the session view, the floor desk (who is next, raise
+   your hand, speak) and the sitting's own card all sit in that one frame, under one header with one Hide, the world stays
+   in view, and what is said in the meeting is written into it. ══ */
+const SXD = {min:false, log:[], key:"", seen:0, home:null};
+(function(){ const st = document.createElement("style"); st.id = "sxDockCss"; const P = "#sxDock>#veil.sitx";
+  st.textContent = "#sxDock{position:fixed;right:8px;top:84px;z-index:62;width:min(460px,calc(100vw - 16px));max-height:calc(100vh - 160px);overflow:auto;background:#121419;border:2px solid #c9a24a;border-radius:8px;box-shadow:0 6px 24px #000;display:flex;flex-direction:column}" +
+    "#sxDock>#ndSess{position:static !important;width:auto !important;max-width:none !important;max-height:none !important;border:0 !important;border-radius:0 !important;box-shadow:none !important;overflow:visible !important;flex:none}" +
+    "#sxDock>#ndFd{position:static !important;transform:none !important;width:auto !important;max-width:none !important;max-height:none !important;border:0 !important;border-top:1px solid #c9a24a !important;border-radius:0 !important;box-shadow:none !important;flex:none;font-size:13px}#sxDock>#ndFd textarea{min-height:38px;font-size:14px}" +
+    P + "{position:static !important;inset:auto !important;display:block !important;padding:0 !important;background:none !important;backdrop-filter:none !important;-webkit-backdrop-filter:none !important;width:auto !important;max-height:none !important;overflow:visible !important;z-index:auto !important;border-top:1px solid #c9a24a;flex:none}" +
+    P + " #card{width:auto !important;max-width:none !important;max-height:none !important;overflow:visible !important;border:0 !important;border-radius:0 !important;box-shadow:none !important;padding:10px 12px 12px !important;font-size:13px;animation:none !important;transform:none !important}" +
+    P + " #card h1{font-size:22px;margin:4px 0 6px}" + P + " .sx-grid{grid-template-columns:1fr !important;gap:8px}" + P + " .sx-lines{max-height:none}" + P + " .sx-moves .btn{max-width:none;flex:1 1 100%;padding:6px 8px;font-size:12px}" +
+    "#sxDock.min>#veil,#sxDock.min>#ndFd .fd-body{display:none !important}" +
+    "#sxDockHead{display:flex;justify-content:space-between;align-items:center;gap:6px;padding:7px 10px;background:#121419;color:#ffe08a;font:700 15px Georgia,serif;border-bottom:1px solid #c9a24a;position:sticky;top:0;z-index:2;flex:none}#sxDockHead button{background:#2a2d35;color:#fff;border:1px solid #6b6f7a;border-radius:4px;font:12px system-ui;cursor:pointer}" +
+    "#ndSess .nsx-log{margin:6px 0 2px;border-top:1px solid #3a3d46;padding-top:5px;max-height:190px;overflow:auto}#ndSess .nsx-log div{margin:3px 0;color:#e8e2d0;font-size:12.5px}#ndSess .nsx-log b{color:#ffe08a}" +
+    "#ndSess .nsx-say{display:flex;gap:5px;margin-top:5px}#ndSess .nsx-say input{flex:1;background:#000;color:#fff;border:1px solid #6b6f7a;border-radius:4px;padding:4px}#ndSess .nsx-say button{background:#ffe08a;color:#111;border:0;border-radius:4px;font-weight:700;cursor:pointer;padding:3px 8px}";
+  document.head.appendChild(st); })();
+function sxdSession(){ const S = window.ONUM_SESSION; return S && (S.open === true || S.active === true || (S.open == null && S.active == null && (S.seats || S.floor || S.roll))) ? S : null; }
+/* what is said while a session sits is kept for its panel */
+{ const _tl = tlog; tlog = function(who, line, kind){ const r = _tl.apply(this, arguments); try{ const S = sxdSession(); if(S && line && (kind === "talk" || kind === "you" || kind === "session" || kind === "sit")){
+    const k = String(S.kind || "") + "|" + String(S.bodyId || S.title || "") + "|" + String(S.procedure || ""); if(k !== SXD.key){ SXD.key = k; SXD.log = []; }
+    const nm = typeof who === "string" ? who : (who && who.name) || ""; SXD.log.push({who:nm || "", t:String(line).replace(/<[^>]+>/g, "").slice(0, 320)}); if(SXD.log.length > 40) SXD.log.shift(); SXD.seen++; } }catch(e){} return r; }; }
+function sxdLogHTML(){ return SXD.log.slice(-8).map(l => '<div><b>' + pcEsc(l.who || "—") + '</b> ' + pcEsc(l.t) + '</div>').join(""); }
+/* the layout manager placed these on their own with inline rules; inside the one panel they flow */
+function sxdClear(e){ ["position", "top", "left", "right", "bottom", "width", "max-width", "max-height", "overflow", "transform", "margin", "box-sizing"].forEach(k => e.style.removeProperty(k)); e.classList.remove("hm-p"); const x = e.querySelector(":scope>.hmX"); if(x) x.remove(); }
+function sxDockTick(){
+  try{
+    let D = document.getElementById("sxDock"); if(!D){ D = document.createElement("div"); D.id = "sxDock"; D.setAttribute("role", "region"); D.setAttribute("aria-label", "Meeting"); document.body.appendChild(D); }
+    let hd = document.getElementById("sxDockHead"); if(!hd){ hd = document.createElement("div"); hd.id = "sxDockHead"; hd.innerHTML = "<span></span><button type=\"button\">Hide</button>"; hd.lastChild.onclick = () => { SXD.min = !SXD.min; sxDockTick(); }; D.appendChild(hd); }
+    const ns = document.getElementById("ndSess"), fd = document.getElementById("ndFd"), sit = !veil.hidden && veil.classList.contains("sitx");
+    if(sit && veil.parentNode !== D){ if(!SXD.home) SXD.home = {p:veil.parentNode, n:veil.nextSibling}; sxdClear(veil); }
+    if(!sit && veil.parentNode === D){ const h = SXD.home; if(h && h.p) h.p.insertBefore(veil, h.n && h.n.parentNode === h.p ? h.n : null); else document.body.appendChild(veil); }
+    const want = [hd, ns, sit ? veil : null, fd].filter(Boolean), opened = sit && !SXD.sitWas; SXD.sitWas = sit;
+    want.forEach((e, i) => { if(e !== hd && e.parentNode !== D) sxdClear(e); if(D.children[i] !== e) D.insertBefore(e, D.children[i] || null); });
+    if(opened) setTimeout(() => { try{ D.scrollTop = Math.max(0, veil.offsetTop - 8); }catch(e){} }, 60);
+    const fdOn = !!(fd && !fd.hidden && getComputedStyle(fd).display !== "none"), any = !!(ns || fdOn || sit);
+    D.style.display = any ? "" : "none";
+    hd.style.display = !ns && any ? "" : "none";
+    const S = typeof SIT !== "undefined" && SIT.on ? SIT.on : null, SS = sxdSession();
+    hd.firstChild.textContent = "⚖ " + ((S && S.D && (S.D.title || S.D.t)) || (SS && (SS.stageName || String(SS.kind || "").replace(/_/g, " "))) || "In session");
+    const min = ns ? !!(window.NEPTUNE_SESSIONVIEW && window.NEPTUNE_SESSIONVIEW.min) : SXD.min; hd.lastChild.textContent = min ? "Show" : "Hide"; D.classList.toggle("min", min);
+    /* the panel's own record of the meeting, and a voice for the chair */
+    if(ns && !ns.classList.contains("min")){ const body = ns.querySelector(".ns-body"); if(body){
+      let lg = body.querySelector(".nsx-log"); if(fdOn){ if(lg) lg.remove(); lg = null; } const SN = window.ONUM_SESSION || {};
+      if(!lg && !fdOn){ lg = document.createElement("div"); lg.className = "nsx-log"; body.appendChild(lg); lg.dataset.n = "-1"; }
+      if(lg && lg.dataset.n !== String(SXD.seen)){ lg.innerHTML = sxdLogHTML() || '<div style="color:#9a9384">Nothing said yet.</div>'; lg.dataset.n = String(SXD.seen); lg.scrollTop = lg.scrollHeight; }
+      if(SN.chairId === "you" && !fdOn && !body.querySelector("#nsxSay") && !body.querySelector(".nsx-say")){ const f = document.createElement("div"); f.className = "nsx-say";
+        f.innerHTML = '<input type="text" maxlength="300" placeholder="Speak to the room…"><button type="button">Say</button>'; body.appendChild(f);
+        const go = () => { const i = f.querySelector("input"), t = (i.value || "").trim(); if(!t) return; i.value = "";
+          let ok = false; try{ const OS = window.onumSession; if(OS && typeof OS.speak === "function"){ OS.speak(t); ok = true; } }catch(e){}
+          if(!ok){ try{ window.onumSessionEvent({action:"speak", actorId:"you", text:t}); }catch(e){} }
+          try{ tlog("You", t, "you"); }catch(e){} };
+        f.querySelector("button").onclick = go; f.querySelector("input").addEventListener("keydown", e => { e.stopPropagation(); if(e.key === "Enter"){ e.preventDefault(); go(); } }); } } }
+  }catch(e){}
+}
+setInterval(sxDockTick, 300);
+try{ new MutationObserver(() => sxDockTick()).observe(veil, {attributes:true, attributeFilter:["class", "hidden"]}); }catch(e){}
+/* while you chair a cabinet or council, a seated member you click is called on in the meeting, not taken aside */
+{ const _ot = openTalk; openTalk = function(m){ try{ const S = sxdSession(); if(m && S && S.chairId === "you" && (S.kind === "cabinet_meeting" || S.kind === "governor_council") && (S.seats || []).some(x => String(x.personId) === String(m.id)) && window.onumSession && typeof window.onumSession.callon === "function"){ window.onumSession.callon(m.id); return; } }catch(e){} return _ot.apply(this, arguments); }; }
+
 armFrame();
 
 })();
@@ -49340,7 +49810,7 @@ armFrame();
     {s:"#hail", d:"R", n:"Wants a word", talk:1},
     {s:"#apToast", d:"R", n:"Stops you", talk:1},
     {s:"#kClock", d:"R", n:"Clock", noX:1, small:1},
-    {s:"#ndSess", d:"R", n:"Session"},
+    {s:"#sxDock", d:"R", n:"Meeting"},
     {s:"#feed", d:"R", n:"Feed"},
     {s:".hud", d:"L", n:"Place", noX:1, small:1},
     {s:"#aimsHud", d:"L", n:"Aims", noX:1, small:1},
@@ -49451,7 +49921,7 @@ armFrame();
     const barH = game && vis(bar) ? bar.getBoundingClientRect().height + 6 : 0;
     const bottomLimit = Ht - Math.max(bandB, barH + 4);
     const out = {L:[], R:[], T:[], B:[]};
-    for(const r of REG){ if(r.chip) continue; document.querySelectorAll(r.s).forEach(e => { if(e.closest("#hmBar") || !vis(e)) return; if(out[r.d].some(x => x.e === e || x.e.contains(e))) return; out[r.d].push({e, r}); }); }
+    for(const r of REG){ if(r.chip) continue; document.querySelectorAll(r.s).forEach(e => { if(e.closest("#hmBar") || (e.id !== "sxDock" && e.closest("#sxDock")) || !vis(e)) return; if(out[r.d].some(x => x.e === e || x.e.contains(e))) return; out[r.d].push({e, r}); }); }
     const stack = (list, side) => {
       let y = PAD;
       { const tb = document.getElementById("uiToolbar"); if(tb && vis(tb)) y = Math.max(y, Math.round(tb.getBoundingClientRect().bottom) + GAP); }   /* below the toolbar, never over it */
