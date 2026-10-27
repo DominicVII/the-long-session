@@ -4,6 +4,12 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261027c: who did it — the House, the Senate, the bench, or you
+
+`20261027c` (on `20261027b`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
+
+The record of precedents gave every precedent to you by name, including ones the House or the bench set. The House overriding a veto, the turn to a new form of state, a constitutional amendment, a ruling left unenforced and the high bench's ruling on two offices are now credited to the House or the bench (an amendment notes it was carried on your motion). Precedents you set yourself say so: the ticker reads 'You, as President, 4th Congress', and what people know names the office you held. Old saves are mended on load. The statute book marks your own bills as 'your bill, filed as Senator from Nieuw Oranje' (or whatever office you held that day) instead of a bare name, marks your signatures and vetoes '(you)', and labels every other name as the sponsor. Docket and calendar sponsors read '(you)' when it is you. A career line says 'won a seat in the Senate', not 'won the Senate'. Only a member of the House can file a House bill: from any other office, an ally files your bill at your request and carries it as sponsor, and the bill's findings say so. Your own bills come out of your State in your voice, not from the member the draft was first drawn for. The docket's leanings name the parties (Federalist, Commonwealth, Second Order) instead of their codes. A State passes an engine-house subsidy or charter law, then waits a season before another.
+
 ## 20261027b: votes that follow the parties, committees that kill bills, the President's ten days, laws that work only once they are law
 
 `20261027b` (on `20261027a`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
