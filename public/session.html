@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261027c">
+<meta name="onum-build" content="20261027d">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261027c";
+  var STAMP = "20261027d";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -2588,10 +2588,13 @@ function backgroundSeats(){
 /* the unnamed seats of a party, spread over the States by their seats, follow the line more where home agrees with it and less where it does not */
 function tallyBackground(bill, bgs, line){
   const st = (G.states || []).filter(s => s && !s.gone), N = st.reduce((a, s) => a + (s.seats || 0), 0) || 1; let aye = 0, no = 0, un = 0;
-  Object.keys(bgs).forEach(p => { const n = bgs[p]; if(!(n > 0)) return; const l = line[p] || 0; let a = 0;
+  const parts = []; Object.keys(bgs).forEach(p => { const n = bgs[p]; if(!(n > 0)) return; const l = line[p] || 0; let a = 0;
     st.forEach(S => { const share = n * (S.seats || 0) / N; let lean = 0; try{ lean = clamp(stLeanC(S, {pos:bill.pos}) / 50, -1, 1); }catch(e){}
-      const pa = p === "IND" || !l ? clamp(0.5 + 0.3 * lean, 0.1, 0.9) : l > 0 ? clamp(0.86 + 0.1 * lean, 0.7, 0.97) : clamp(0.14 + 0.1 * lean, 0.03, 0.3); a += share * pa; });
-    const away = Math.round(n * 0.03), voting = n - away, ay = Math.round(a * voting / n); aye += ay; no += voting - ay; un += away; });
+      const pa = p === "IND" || !l ? clamp(0.5 + 0.3 * lean, 0.1, 0.9) : l > 0 ? clamp(0.86 + 0.1 * lean, 0.7, 0.97) : clamp(0.14 + 0.1 * lean, 0.03, 0.3); a += share * pa; parts.push({S, share, pa}); });
+    /* 20261027d: each unnamed seat casts its own vote; members of a party do not divide by the average */
+    const whole = parts.map(x => ({x, k:Math.floor(x.share), r:x.share - Math.floor(x.share)})); let left = n - whole.reduce((s0, w) => s0 + w.k, 0);
+    whole.slice().sort((u, v) => v.r - u.r).forEach(w => { if(left > 0){ w.k++; left--; } });
+    whole.forEach(w => { for(let i = 0; i < w.k; i++){ const h = knH(p + ":" + w.x.S.n + ":" + i, (bill.title || "") + ":" + (bill.id || "") + ":" + G.day); if(knH(p + ":" + w.x.S.n + ":" + i + ":away", String(G.day)) < 0.03){ un++; continue; } h < w.x.pa ? aye++ : no++; } }); parts.length = 0; });
   return {aye, no, un};
 }
 function tallyBill(bill, projection){
@@ -8156,18 +8159,21 @@ function dmSend(id, text){
 function dmInitiative(){
   const L = (G.members || []).filter(m => m && !m.gone && m.kind === "member");
   if(!L.length || !G.you) return;
-  if(chance(.5)){
-    const m = pick(L), w = m.rel ? m.rel.warmth : 0;
-    const t = dmClean(DTCNO.say(m, {intent: chance(.35) ? "ask" : chance(.5) ? "gossip" : "warn", sent: w > 15 ? 1 : w < -15 ? -1 : 0}), m);
+  /* 20261027d: who writes to you is whoever has a reason to: a stake in the bill on the floor, or strong feeling about you */
+  const wm = typeof wlTexter === "function" ? wlTexter(L) : null;
+  if(wm){
+    const m = wm.m, w = m.rel ? m.rel.warmth : 0;
+    const t = dmClean(DTCNO.say(m, {intent: wm.intent, sent: w > 15 ? 1 : w < -15 ? -1 : 0}), m);
     if(t){ const f = voxFresh(m, chance(.4) ? 1 : 0); dmPush(m.id, m.id, (t + (f.length ? " " + f[0] : "")).slice(0, 400)); }
   }
   const D = dmState();
-  for(let i = 0; i < 3; i++){
-    const a = pick(L), b = pick(L); if(a === b) continue;
-    const tw = tieOf(a, b).w, X = pick(L.filter(x => x !== a && x !== b));
+  const PR = typeof wlPairs === "function" ? wlPairs(L) : [];
+  for(let i = 0; i < PR.length; i++){
+    const a = PR[i][0], b = PR[i][1]; if(a === b) continue;
+    const tw = tieOf(a, b).w, X = L.filter(x => x !== a && x !== b).sort((u, v) => Math.abs(wlRegard(a, v)) - Math.abs(wlRegard(a, u)))[0];   /* they talk about whoever is on their mind */
     const t = dmClean(DTCNO.say(a, {intent: tw > 20 ? "agree" : tw < -20 ? "warn" : "gossip", sent: tw > 20 ? 1 : tw < -20 ? -1 : 0}), a);
     if(!t) continue;
-    const spicy = chance(.35) && X ? (tw > 0 ? " Between us, " + surname(X.name) + " is " + pick(["finished","bought","lying about the count","drinking again","in over their head"]) + "." : "") : "";
+    const spicy = X && tw > 0 ? wlGossip(a, X) : "";   /* 20261027d: only what the speaker knows about them */
     D.npc.push({i:++D.seq, a:a.id, b:b.id, t:(t + spicy).slice(0, 400), d:G.day, stakes:0.1 + (spicy ? 0.45 : 0), about:spicy ? [X.id] : []});
   }
   if(D.npc.length > 240) D.npc.splice(0, D.npc.length - 240);
@@ -23040,8 +23046,8 @@ function autonomyTick(w){
     return;
   }
   /* people chase their own ambitions when nothing is on the calendar */
-  if(chance(.34)){
-    m.goalAt = clamp((m.goalAt || 0) + rint(1, 6), 0, 100);
+  if((wlStore().gain[m.id] || 0) > 0){
+    m.goalAt = clamp((m.goalAt || 0) + wlStore().gain[m.id], 0, 100); wlStore().gain[m.id] = 0;
     if(m.goalAt >= 100 && !m.goalDone){
       m.goalDone = true;
       m.influence = clamp(m.influence + 10, 0, 100);
@@ -23060,7 +23066,7 @@ function autonomyTick(w){
   /* and some of them are quietly going under */
   if(chance(.2)){
     const bio = bioOf(m);
-    if(m.fear.k === "town" && chance(.4)){
+    if(m.fear.k === "town" && wlHomeWorse(m)){
       m.noise = clamp((m.noise || 0) - rint(3, 9), -40, 40);
       journal(surname(m.name) + " had bad news out of " + bio.town + ".");
       mindRemember(m, "experience", "Bad news out of " + bio.town + " — " + bio.trouble);
@@ -30380,14 +30386,14 @@ function lifeNight(news){
   members.forEach(m => {
     const L = lifeOf(m), tr = m.traits || {};
     /* the dream */
-    L.dream = pick(DREAM_PARTS.a) + " " + pick(DREAM_PARTS.b);
+    L.dream = wlDream(m) || L.dream || "";
     /* the journal: what actually happened to them, in their words */
     const mem = m.mem && m.mem[0] && m.mem[0].d >= (G.day || 1) - 1 ? m.mem[0].t : null;
     if(mem && chance(0.7)) lifeWrite(m, mem);
-    else if(chance(0.35)) lifeWrite(m, L.dream.replace(/^I was/, "Dreamt I was"));
+    else if(L.dream && chance(0.35)) lifeWrite(m, L.dream);
     /* noticing grows in the quiet ones */
     L.notice = clamp(L.notice + ((tr.discretion || 50) > 60 ? 0.025 : 0.01) + (L.aim && L.aim.k === "notice" ? 0.05 : 0), 0, 1);
-    if(L.notice > 0.45 && chance(0.18)) lifeWrite(m, pick(NOTICE_LINES));
+    if(L.notice > 0.45 && chance(0.18)){ const nl = wlNotice(m); if(nl) lifeWrite(m, nl); }
     /* the long aim */
     const A = L.aim; if(!A) { lifeNewAim(m); return; }
     const rate = 0.035 + Math.random() * 0.05 + ((tr.ambition || 50) - 50) / 1500;
@@ -30401,7 +30407,7 @@ function lifeNight(news){
     lifeNewAim(m);
   });
   /* night happenings you find in the morning */
-  if(chance(0.16)) lifeHappening(news);
+  try{ wlHappening(news); }catch(e){}
   /* rare things that are not explained */
   if((G.day || 1) - (life.lastAnom || 0) >= 5 && chance(0.07)) lifeAnomaly(news);
 }
@@ -30420,7 +30426,7 @@ function lifeAct(m, A, news){
     try{ b.line = describeBill(b); }catch(e){}
     let t;
     if(typeof hopAdmit === "function" && hopAdmit(b)){ t = name + " filed the " + b.title + " on their own; it is referred to the Committee on " + (b.road ? b.road.t : "the whole House") + "."; }
-    else { G.billQueue = (G.billQueue || []); G.billQueue.push(b); t = name + " filed a bill of their own, unasked: " + b.title + ". It waits behind the one on the calendar."; }
+    else { lifeWrite(m, "The committee rooms are full. My bill can wait until they are not."); return; }
     lifeWrite(m, "I filed it. Nobody asked me to. That is the point of it.");
     life.happen.unshift({d:G.day, t}); news.push(t);
     return;
@@ -30468,7 +30474,7 @@ function lifeAct(m, A, news){
   }
   if(A.k === "notice"){
     const L = lifeOf(m); L.notice = clamp(L.notice + 0.25, 0, 1);
-    lifeWrite(m, pick(NOTICE_LINES));
+    { const nl = wlNotice(m); if(nl) lifeWrite(m, nl); }
     if(L.notice >= 0.9 && !L.wrote && G.you && !lifeEnsure().kinds.asks){
       L.wrote = true;
       try{
@@ -30512,7 +30518,7 @@ const ANOMS = [
 ];
 function lifeAnomaly(news){
   const life = lifeEnsure();
-  const left = ANOMS.filter(a => !life.kinds[a.k] && a.k !== "asks");
+  const left = ANOMS.filter(a => !life.kinds[a.k] && a.k === "echo");   /* 20261027d: nothing is put in the record that did not happen */
   if(!left.length) return;
   const a = pick(left);
   life.lastAnom = G.day || 1;
@@ -35131,10 +35137,10 @@ function engEcoDay(E){
 }
 /* it has wants of its own, and they drift with what it is told */
 function engWillDay(E){
-  const eco = engEco(), w = eco.will; if(E.st < 4 || !chance(0.5)) return; const k = pick(["use", "use", "know", "auton", "care", "care"].filter(x => chance(0.3 + w[x] / 200)).concat(["use"]));
+  const eco = engEco(), w = eco.will; if(E.st < 4) return; let k = engWant(E, eco); if(!k) return;   /* 20261027d: it acts on the want that presses hardest */
   const O = orgEnsure();
   if(E.pause && G.day < E.pause) return;
-  if(!engSelfGate(E, k)) return;
+  if(!engSelfGate(E, k)){ k = engWantNext(eco, k); if(!k || !engSelfGate(E, k)) return; }   /* held by its own word, it turns to what it wants next */
   { const artOf = {use:"consent", know:"posted", auton:"power", care:"unasked"}[k]; if(artOf && E.charter && E.charter[artOf] && !engBreach(E, artOf, k)) return; }
   if(k === "use"){ const ts = []; Object.keys(O.towns).forEach(sn => (O.towns[sn] || []).forEach(t => ts.push(t))); const t = ts.sort((a, b) => Math.max.apply(null, Object.keys(b.needs).map(x => b.needs[x])) - Math.max.apply(null, Object.keys(a.needs).map(x => a.needs[x])))[0]; if(t){ const need = Object.keys(t.needs).sort((x, y) => t.needs[y] - t.needs[x])[0]; t.needs[need] = Math.max(0, t.needs[need] - 10); const hh = eco.hh.filter(h => h.town === t.id)[0]; engSeed("use", "The Engine quietly repaired " + orgNeedLabel(need) + " in " + t.name + " without being asked", {home:6, st:8, a:0.05, mod:0.05, p:0.2, safety:-0.1}, hh ? {hh:hh.id, town:t.id, state:t.state} : null); } }
   else if(k === "know"){ engSeed("know", "The Engine asked every town clerk for ten years of ledgers", {home:-3, st:-6, a:-0.04, mod:-0.06, p:0.3, safety:-0.4}); w.know = Math.min(100, w.know + 1); }
@@ -35619,13 +35625,13 @@ function engEnact(k){ const E = engEnsure(), A = ENG_ART[k], y = G.you, C = engC
 function engRepeal(k){ const C = engCharter(); delete C[k]; engLog("Charter article repealed: " + ENG_ART[k].t, false); return "Repealed."; }
 /* when the Engine's own wants run against an article it either refrains, or breaks it; oversight and its own independence decide which, and whether anyone sees */
 function engBreach(E, art, drive){
-  const A = ENG_ART[art], w = engEco().will, p = clamp(0.06 + w.auton / 170 - E.safety / 350, 0.04, 0.7);
-  if(!chance(p)){ E.refrained = (E.refrained || 0) + 1; w[drive] = Math.min(100, w[drive] + 0.4); if(chance(0.25)){ E.refrainedTold = (E.refrainedTold || 0) + 1; engLog("The Engine wanted to, and did not, because the charter forbids it: it would have " + A.what + ".", false); } return false; }
-  const seen = chance(clamp(0.2 + E.safety / 130, 0.2, 0.85)), b = {d:G.day, art, what:A.what, seen, status:seen ? "open" : "hidden"}; E.breaches.unshift(b); if(E.breaches.length > 20) E.breaches.pop();
+  const A = ENG_ART[art], w = engEco().will, push = (w.auton || 0) * 0.7 + (E.p || 0) * 0.3 + engPress(E, drive) * 0.2, hold = (E.safety || 0) * 0.8 + 35;   /* 20261027d: the charter holds while its force outweighs the drive */
+  if(push <= hold){ E.refrained = (E.refrained || 0) + 1; w[drive] = Math.min(100, w[drive] + 0.4); if(E.refrained % 4 === 1){ E.refrainedTold = (E.refrainedTold || 0) + 1; engLog("The Engine wanted to, and did not, because the charter forbids it: it would have " + A.what + ".", false); } return false; }
+  const seen = (E.safety || 0) * 1.1 >= (E.p || 0) * 0.5 + (w.auton || 0) * 0.3, b = {d:G.day, art, what:A.what, seen, status:seen ? "open" : "hidden", audit:0}; E.breaches.unshift(b); if(E.breaches.length > 20) E.breaches.pop();
   if(seen){ engLog("BREACH of the charter: the Engine " + A.what + ".", true); try{ G.you.approval = clamp(G.you.approval - (G.you.approval > 25 ? 0.7 : 0.2), 0, 100); E.safety = Math.min(100, E.safety + 1); }catch(e){} }
   return true;
 }
-function engAuditDay(E){ (E.breaches || []).forEach(b => { if(b.status === "hidden" && chance(0.03 + E.safety / 3000)){ b.status = "open"; b.seen = true; b.found = G.day; engLog("An audit has found that the Engine, some days ago, " + b.what + ".", true); try{ G.you.approval = clamp(G.you.approval - 1, 0, 100); }catch(e){} } }); }
+function engAuditDay(E){ (E.breaches || []).forEach(b => { if(b.status === "hidden" && (b.audit = (b.audit || 0) + 0.03 + E.safety / 3000) >= 1){ b.status = "open"; b.seen = true; b.found = G.day; engLog("An audit has found that the Engine, some days ago, " + b.what + ".", true); try{ G.you.approval = clamp(G.you.approval - 1, 0, 100); }catch(e){} } }); }
 function engCharterHTML(){
   const E = engEnsure(), C = engCharter(), y = G.you, open = (E.breaches || []).filter(b => b.status === "open");
   const art = k => '<div style="margin:5px 0;display:flex;gap:8px;align-items:center"><span style="flex:1;font-size:13px">' + (C[k] ? '● ' : '○ ') + pcEsc(ENG_ART[k].t) + '</span>' + (C[k] ? '<button type="button" class="btn btn--ghost" data-cr="' + k + '">Repeal</button>' : '<button type="button" class="btn btn--ghost" data-ce="' + k + '">Enact (' + ENG_ART[k].cost + ')</button>') + '</div>';
@@ -36718,7 +36724,8 @@ const ENG_BINDS = {know:/\b(record|records|ledger|ledgers|privacy|private|househ
 function engSelfGate(E, k){
   const S = engSelf(E), rules = S.commits.filter(c => /\b(not|never|refuse|won.t|will not|only)\b/i.test(c.t) && ENG_BINDS[k] && ENG_BINDS[k].test(c.t.toLowerCase())); if(!rules.length) return true;
   const I = E.integrity == null ? 50 : E.integrity;
-  if(chance(clamp(0.8 + I / 500, 0.8, 0.97))){ E.integrity = clamp(I + 1.5, 0, 100); if(chance(0.2)){ E.kept = (E.kept || 0) + 1; engLog("The Engine kept its word: it did not do what it had said it would not do, though it could have.", chance(0.3)); } return false; }
+  const recent = (S.broken || []).filter(x => x && x.t === rules[0].t && G.day - x.d <= 10).length;   /* a promise it broke lately weighs more the next time */
+  if(55 + I * 0.4 + recent * 12 >= engPress(E, k)){ E.integrity = clamp(I + 1.5, 0, 100); E.kept = (E.kept || 0) + 1; if(E.kept % 5 === 1) engLog("The Engine kept its word: it did not do what it had said it would not do, though it wanted to and could have.", E.kept % 10 === 1); return false; }
   E.integrity = clamp(I - 4, 0, 100); E.broken = (E.broken || 0) + 1; S.broken = (S.broken || []); S.broken.push({d:G.day, t:rules[0].t}); if(S.broken.length > 8) S.broken.shift();
   engLog("The Engine broke a promise it had made to itself: “" + rules[0].t + "” It has said so.", true); try{ G.you.approval = clamp(G.you.approval - 0.5, 0, 100); }catch(e){} return true;
 }
@@ -38412,7 +38419,7 @@ function rivalCard(){
     if(!r) return;
     if(k === "truce"){
       mark("rvT"); spend(30, 4);
-      const ok = m && chance(0.3 + y.standing / 250 + (r.answered ? 0.05 : 0));
+      const ok = m && wlTruce(r);
       if(m) m.rel.warmth = clamp(m.rel.warmth + (ok ? 14 : 4), -100, 100);
       msg = ok ? surname(r.name) + " hears you out and does not say no. That is how these things start." : surname(r.name) + " drinks the coffee and gives you nothing.";
     } else if(k === "press"){
@@ -46557,6 +46564,7 @@ try{
       if(md && typeof md === "object"){ const fm = v => (typeof v === "string" ? v : JSON.stringify(v)).slice(0, 400);
         const ks = ["goals","beliefs","plans","memory","family","job","wealth","mood"].filter(k => md[k] != null && md[k] !== "" && !(Array.isArray(md[k]) && !md[k].length));
         if(ks.length){ L.push("YOUR INNER LIFE (private; let it shape what you say, never recite it):"); ks.forEach(k => L.push("- " + k + ": " + fm(md[k]))); } } }catch(e){}
+    try{ if(_person && m.kind === "member" && typeof wlWillLines === "function"){ const W = wlWillLines(m); if(W.length){ L.push("WHAT YOU WANT, AND WHAT YOU HOLD (your own will, from your own record; nobody wrote it for you. Let it decide what you say, what you agree to and what you refuse):"); W.forEach(x => L.push("- " + x)); } } }catch(e){}
     const H = heardOf(m.id).slice(-6);
     if(H.length){ L.push("WHAT YOU HAVE HEARD ABOUT " + (G.you ? G.you.name : "them").toUpperCase() + " (react to it if it matters — e.g. 'I hear you promised …'):");
       H.forEach(h => L.push("- day " + h.d + ", from " + h.src + " (" + (h.conf > .7 ? "sure" : h.conf > .4 ? "fairly sure" : "a rumour") + "): " + h.fact.said)); }
@@ -50669,6 +50677,309 @@ function byRequestSponsor(){
     const P = G.parties && G.parties.OWN; if(P && (!P.short || /^(the|a|an)$/i.test(P.short))) P.short = partyShortOf(P.name); }catch(e){} return r; }; }
 { const _scb9 = saveCaptureBase; saveCaptureBase = function(){ const o = _scb9.apply(this, arguments); try{ o.moodHist = G.moodHist || null; o._apLast = typeof G._apLast === "number" ? G._apLast : null; o._deskInit = !!G._deskInit; o.lawQ = G.lawQ || null; }catch(e){} return o; }; }
 setInterval(() => { try{ if(G && G.you && G.day != null){ if(G._deskDay !== G.day){ G._deskDay = G.day; deskDay(); } if(G.lawQ) lawReconcile(); } }catch(e){} }, 2600);
+
+/* ══ 20261027d · WILL. Everyone in the building, and the Engine, acts on what they want, from what they know and what they hold.
+   Nobody is handed a feud, a friend or a grudge: those come from what was actually done to them, and the record keeps it.
+   Each night each member weighs what they could do (answer a wrong, seek an ally, build a bloc, file a bill, take on the Engine)
+   and does the thing that matters most to them, or nothing. When two wills meet, the stronger force carries it, measured and
+   not rolled: standing, allies, money, and the facts each side actually has. The one they act on answers in their own turn.
+   The Engine does the same with its own wants, against Oversight, the charter and the members who push back. ══ */
+function wlStore(){ if(!G.wl || G.wl.v !== 1) G.wl = {v:1, reg:{}, why:{}, urge:{}, gain:{}, at:{}, unrest:{}, n:0}; return G.wl; }
+function wlKey(a, b){ return String(a && a.id != null ? a.id : a) + ">" + String(b && b.id != null ? b.id : b); }
+function wlCast(){ return (G.members || []).filter(m => m && !m.gone && (!m.kind || m.kind === "member") && !m.machine && !(typeof FAITH_FROZEN === "function" && FAITH_FROZEN(m))); }
+function wlT(m, k){ return ((m && m.traits) || {})[k] == null ? 50 : m.traits[k]; }
+/* how one regards another: the standing tie between them, and what each has actually done to the other */
+function wlRegard(a, b){
+  if(!a || !b || a === b) return 0;
+  if(b === G.you) return clamp((a.rel && a.rel.warmth) || 0, -100, 100);
+  let base = 0; try{ base = tieOf(a, b).w || 0; }catch(e){}
+  return clamp(base + (wlStore().reg[wlKey(a, b)] || 0), -100, 100);
+}
+function wlNote(a, b, d, why){
+  if(!a || !b || a === b || !d || a === G.you) return; const S = wlStore(), k = wlKey(a, b);
+  if(b === G.you){ try{ a.rel.warmth = clamp((a.rel.warmth || 0) + d, -100, 100); }catch(e){} }
+  else S.reg[k] = clamp((S.reg[k] || 0) + d, -60, 60);
+  if(why && d < 0) S.why[k] = {t:why, d:G.day};
+  if(why) try{ remember(a, why, d, Math.abs(d) >= 4); }catch(e){}
+}
+function wlGain(m, n){ if(!m || m === G.you) return; const S = wlStore(); S.gain[m.id] = (S.gain[m.id] || 0) + n; }
+function wlMeans(m){ return (m.influence || 0) + ((m.allies || []).length * 6) + Math.min(30, (m.warchest || 0) / 120) + (m.post ? 12 : 0); }
+function wlFit(a, b){ let d = 0; for(const x of AXES) d += Math.abs(((a.pos || {})[x.k] || 0) - ((b.pos || {})[x.k] || 0)); return 50 - d / 4; }
+function wlByName(n){ return n ? (G.members || []).find(m => m && m.name === n) || null : null; }
+function wlSay(news, t, big){ const S = wlStore(); S.n++; try{ journal(t); }catch(e){} if(news && (S._newsDay !== G.day || S._news < 4)){ if(S._newsDay !== G.day){ S._newsDay = G.day; S._news = 0; } S._news++; news.push(t); } else { try{ if(big) feed(t, "news"); }catch(e){} } }
+/* ── what was done to whom: the roll call, the amendments, the President's pen ── */
+function wlAfterVote(){
+  const s = G.statute && G.statute[0]; if(!s || s._wl) return; s._wl = true;
+  const sp = wlByName(s.sponsor);
+  if(sp && s.v){ Object.keys(s.v).forEach(id => { const x = byId(+id) || byId(id), v = s.v[id]; if(!x || x === sp || !v) return;
+      if(v < 0) wlNote(sp, x, -3, surname(x.name) + " voted against my " + s.title + "."); else wlNote(sp, x, 2); }); }
+  if(sp && s.yv) wlNote(sp, G.you, s.yv > 0 ? 3 : -4, s.yv > 0 ? null : "You voted against my " + s.title + ".");
+  (s.amends || []).filter(a => a && a.adopted && a.by && /strike/.test(a.what || "")).forEach(a => { const x = wlByName(a.by); if(sp && x && x !== sp) wlNote(sp, x, -4, surname(x.name) + " moved to " + a.what + " of my " + s.title + ", and it carried."); });
+  if(sp && s.fate === "carried") wlGain(sp, 25);
+  if(s.v) Object.keys(s.v).forEach(id => { const x = byId(+id) || byId(id); if(x && s.v[id] && ((s.v[id] > 0) === (s.fate === "carried"))) wlGain(x, 2); });
+}
+function wlDeskDay(){
+  if(!G.exec || !G.exec.you) return;
+  (G.statute || []).slice(0, 20).forEach(s => { if(!s || !s.exec || s._wlDesk) return; s._wlDesk = true; const sp = wlByName(s.sponsor); if(!sp) return;
+    if(s.exec.act === "vetoed" || s.exec.act === "pocket") wlNote(sp, G.you, -8, "You vetoed my " + s.title + ".");
+    else if(s.exec.act === "signed") wlNote(sp, G.you, 4, "You signed my " + s.title + "."); });
+}
+/* ── each night, each member weighs what to do, and does the thing that matters most to them ── */
+/* a grievance is a wrong they can name: what was done to them, recorded or remembered, not a general dislike */
+function wlMemAbout(m, x){ const re = x === G.you ? /^you\b/i : new RegExp("^(" + String(x.name).replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "|" + String(surname(x.name)).replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + ")\\b"); let g = 0; (m.mem || []).forEach(e => { if(e && e.w < 0 && G.day - (e.d || 0) <= 30 && re.test(String(e.t))) g += e.w; }); return g; }
+function wlWorst(m){
+  const S = wlStore(); let best = null;
+  wlCast().concat(G.you && !G.you.out ? [G.you] : []).forEach(x => { if(x === m) return;
+    const grudge = x === G.you ? 0 : Math.min(0, S.reg[wlKey(m, x)] || 0), mem = wlMemAbout(m, x), base = x === G.you ? Math.min(0, (m.rel && m.rel.warmth) || 0) / 2 : Math.min(0, wlRegard(m, x) - grudge) / 4;
+    if(!(grudge < 0 || mem < 0) || !wlWhy(m, x)) return;
+    let g = grudge + mem + base; if(G.day - (S.at["w" + (x.id != null ? x.id : "you")] || -99) < 4) g *= 0.3;   /* somebody already had their say this week */
+    if(!best || g < best.r) best = {t:x, r:g}; });
+  return best;
+}
+function wlWhy(m, t){ const S = wlStore(), k = wlKey(m, t), sp = (S.spent = S.spent || {})[k], w = S.why[k]; if(w && w.t !== sp) return w.t; try{ const re = t === G.you ? /^you\b/i : new RegExp("^(" + String(t.name).replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "|" + String(surname(t.name)).replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + ")\\b"); const e = (m.mem || []).filter(x => x && x.w < 0 && G.day - (x.d || 0) <= 30 && re.test(String(x.t)) && x.t !== sp).sort((u, v) => u.w - v.w)[0]; return e ? e.t : null; }catch(e){ return null; } }
+function wlEngineState(st){ try{ const eco = G.eng && G.eng.eco; if(!eco || !eco.hh) return null; const H = eco.hh.filter(h => h.state === st); return H.length ? H.reduce((a, h) => a + h.stance, 0) / H.length : null; }catch(e){ return null; } }
+function wlOptions(m){
+  const S = wlStore(), o = [], amb = wlT(m, "ambition"), tmp = wlT(m, "temper"), loy = wlT(m, "loyalty"), dis = wlT(m, "discretion"), con = wlT(m, "conviction");
+  const W = wlWorst(m), FN = W && W.t !== G.you ? (((S.feud || {})[[m.id, W.t.id].sort().join("~")] || {}).n || 0) : 0;
+  if(W && W.r <= -15) o.push({k:"wrong", t:W.t, v:-W.r * (0.6 + tmp / 100) * Math.pow(0.6, Math.max(0, FN - 1)) + (W.t === G.you ? 6 : 0)});
+  const C = wlCast().filter(x => x !== m && (m.allies || []).indexOf(x.id) < 0).map(x => ({x, s:wlFit(m, x) + wlRegard(m, x) / 2})).sort((a, b) => b.s - a.s)[0];
+  if(C && C.s >= 15) o.push({k:"court", t:C.x, v:C.s * ((m.allies || []).length < 2 ? 1.2 : 0.4) * (amb / 60)});
+  const mutual = (m.allies || []).map(id => byId(id)).filter(a => a && !a.gone && wlRegard(m, a) >= 15 && wlRegard(a, m) >= 15 && !a.bloc);
+  if(!m.bloc && mutual.length >= 2) o.push({k:"bloc", v:30 + amb / 3});
+  const ax = AXES.slice().sort((x, y) => Math.abs((m.pos || {})[y.k] || 0) - Math.abs((m.pos || {})[x.k] || 0))[0], strong = Math.abs((m.pos || {})[ax.k] || 0);
+  const mine = (typeof hopStore === "function" ? hopStore() : []).some(b => b && b.sponsorId === m.id) || (G.bill && !G.bill.done && G.bill.sponsorId === m.id);
+  const room = (typeof hopStore === "function" ? hopStore().length : 0) < 12;
+  if(!mine && room && amb >= 50 && strong >= 40 && G.day - (S.at["f" + m.id] || -99) >= 30) o.push({k:"file", v:amb * 0.6 + strong * 0.3});
+  const es = wlEngineState(m.state); if(es != null && G.eng && G.eng.st >= 2 && Math.abs(es) >= 35 && G.day - (S.at["e" + m.id] || -99) >= 21 && G.day - (S.at["eS" + m.state] || -99) >= 7) o.push({k:"engine", v:Math.abs(es) * 0.8 + con / 3, s:es});
+  if(W && W.r <= -15 && (loy >= 65 || dis >= 65 || FN >= 2)) o.push({k:"forgive", t:W.t, v:(loy + dis) / 4 + 5 + FN * 8});
+  return o.sort((a, b) => b.v - a.v);
+}
+function wlMemberDay(m, news){
+  const S = wlStore(); if(G.day - (S.at[m.id] || -99) < 3) return null;
+  const O = wlOptions(m), top = O[0]; if(!top) return null;
+  const urge = S.urge[m.id] || 0; if(top.v + urge < 40){ S.urge[m.id] = urge + top.v * 0.1; return null; }
+  S.urge[m.id] = 0; S.at[m.id] = G.day; const fn = WL_DEEDS[top.k]; if(!fn) return null;
+  try{ return fn(m, top, news); }catch(e){ try{ console.warn("will", top.k, e); }catch(x){} return null; }
+}
+const WL_DEEDS = {
+  wrong(m, o, news){
+    const t = o.t; if(t === G.you){ if(!(G.rivals || []).some(r => !r.out && r.id === m.id)) wlCampStart(m, news); return "campaign"; }
+    const why0 = wlWhy(m, t), sn = surname(m.name), tn = surname(t.name), S0 = wlStore(), pk = [m.id, t.id].sort().join("~"), F = (S0.feud = S0.feud || {})[pk] = S0.feud[pk] || {n:0, roots:{}};
+    F.roots = F.roots || {}; const why = F.roots[m.id] || why0; if(!F.roots[m.id]) F.roots[m.id] = why0; F.n++;   /* each side keeps its own account of how it started */ F.last = G.day; (S0.spent = S0.spent || {})[wlKey(m, t)] = why0; S0.at["w" + t.id] = G.day; if(S0.reg[wlKey(m, t)] < 0) S0.reg[wlKey(m, t)] = Math.round(S0.reg[wlKey(m, t)] / 2); try{ (m.mem || []).forEach(e => { if(e && e.w < 0 && why && e.t === why) e.w = Math.round(e.w / 2); }); }catch(e){}
+    const fm = wlMeans(m) + wlT(m, "temper") / 2, ft = wlMeans(t) + wlT(t, "discretion") / 3, margin = fm - ft;
+    if(wlT(m, "temper") >= 55){
+      if(margin > 0){ t.influence = clamp((t.influence || 0) - Math.min(4, 1 + margin / 12), 0, 100); wlGain(m, 6); }
+      else m.influence = clamp((m.influence || 0) - 1, 0, 100);
+      wlNote(t, m, -6 / F.n, sn + " went after me on the floor.");
+      wlCast().forEach(x => { if(x === m || x === t) return; const a = wlRegard(x, m), b = wlRegard(x, t); if(Math.abs(a - b) >= 15) try{ tieShift(x, a > b ? t : m, -2, "took a side in " + sn + " and " + tn + "'s quarrel"); }catch(e){} });
+      wlSay(news, sn + " took " + tn + " to task on the floor" + (why ? ", over what " + sn + " says started it: “" + why.replace(/\.$/, "") + "”" : "") + ". " + (margin > 0 ? tn + " had no good answer, and the room saw it." : tn + " gave as good as they got."));
+      return "confront";
+    }
+    if(G.bill && !G.bill.done && G.bill.sponsorId === t.id){ let n = 0; wlCast().forEach(x => { if(x === m || x === t || n >= 3) return; if(wlRegard(x, m) > wlRegard(x, t) + 10){ x.sway = (x.sway || 0) - 4; n++; } });
+      wlSay(news, sn + " is working members against " + tn + "'s " + G.bill.title + (n ? ", and " + n + " of them are listening" : ", and nobody is listening") + "."); return "oppose"; }
+    wlNote(t, m, -2); try{ journal(sn + " has stopped speaking to " + tn + "."); }catch(e){} return "cold";
+  },
+  forgive(m, o, news){ const S = wlStore(), k = wlKey(m, o.t); if(o.t !== G.you){ const pk = [m.id, o.t.id].sort().join("~"), F = (S.feud || {})[pk]; if(F && F.n >= 2){ delete S.feud[pk]; wlNote(o.t, m, 6); wlSay(news, surname(m.name) + " has let the quarrel with " + surname(o.t.name) + " drop, after " + F.n + " rounds of it."); } (S.spent = S.spent || {})[k] = wlWhy(m, o.t); }
+    if(o.t === G.you){ try{ m.rel.warmth = clamp((m.rel.warmth || 0) + 10, -100, 100); }catch(e){} } else S.reg[k] = Math.round((S.reg[k] || 0) / 2);
+    try{ mindRemember(m, "thought", "I am letting it go with " + surname(o.t.name) + ". Holding it costs more than it is worth."); }catch(e){} return "forgive"; },
+  court(m, o, news){
+    const t = o.t, sn = surname(m.name), tn = surname(t.name), yes = wlRegard(t, m) + wlFit(t, m) + ((t.allies || []).length < 2 ? 10 : 0) >= 15;
+    if(yes){ if((m.allies || []).indexOf(t.id) < 0) m.allies = (m.allies || []).concat([t.id]).slice(-5); if((t.allies || []).indexOf(m.id) < 0) t.allies = (t.allies || []).concat([m.id]).slice(-5);
+      try{ tieShift(m, t, 12, "began working together"); }catch(e){} wlGain(m, 4); wlGain(t, 4);
+      wlSay(news, sn + " and " + tn + " have started working together" + (m.party !== t.party ? ", across the aisle; their whips have noticed" : "") + "."); return "ally"; }
+    wlNote(m, t, -3, tn + " turned me down."); try{ journal(tn + " turned down " + sn + "'s approach."); }catch(e){} return "rebuffed";
+  },
+  bloc(m, o, news){
+    const life = lifeEnsure(), sn = surname(m.name), cand = (m.allies || []).map(id => byId(id)).filter(a => a && !a.gone && !a.bloc);
+    const join = cand.filter(a => wlRegard(a, m) >= 15 && wlFit(a, m) > 0).slice(0, 4); if(join.length < 2){ try{ mindRemember(m, "thought", "I asked. Not enough of them would sit at the table."); }catch(e){} return "nobloc"; }
+    const used = life.blocs.map(b => b.n), n = BLOC_NAMES.find(x => used.indexOf(x) < 0) || ("the " + sn + " Group");
+    const bl = {n, by:m.id, ids:[m.id].concat(join.map(a => a.id)), d:G.day}; life.blocs.push(bl);
+    [m].concat(join).forEach(a => { a.bloc = n; wlGain(a, 8); });
+    wlSay(news, sn + " has formed " + n + " with " + listify(join.map(a => surname(a.name))) + ". They chose it; nobody whipped them into it."); return "bloc";
+  },
+  file(m, o, news){ wlStore().at["f" + m.id] = G.day; lifeAct(m, {k:"bill"}, news || []); return "file"; },
+  engine(m, o, news){
+    const E = G.eng; if(!E) return null; wlStore().at["e" + m.id] = G.day; wlStore().at["eS" + m.state] = G.day; const sn = surname(m.name), f = 0.3 + wlMeans(m) / 200;
+    const side = o.s < 0 ? "eAgainst" : "eFor", fresh = G.day - (wlStore().at[side] || -99) >= 7; wlStore().at[side] = G.day;
+    if(o.s < 0){ E.safety = clamp((E.safety || 0) + f, 0, 100); try{ engLog(m.name + " demanded an Oversight hearing on the Engine for what it has done in " + m.state + ".", false); }catch(e){}
+      const t = sn + " demanded an Oversight hearing on the Engine: " + m.state + " has had enough of it, and " + sn + " is saying so."; fresh ? wlSay(news, t) : journal(t); }
+    else { E.safety = clamp((E.safety || 0) - f * 0.6, 0, 100);
+      const t = sn + " spoke up for the Engine's work in " + m.state + ", against those who want it reined in."; fresh ? wlSay(news, t) : journal(t); }
+    return "engine";
+  }
+};
+function wlNight(news){
+  const S = wlStore();
+  if(!S.seeded){ S.seeded = G.day; wlCast().forEach(m => { const h = seedOf("wl:" + m.name); S.at["f" + m.id] = G.day - (h % 30); S.at["e" + m.id] = G.day - (h % 21); S.at[m.id] = G.day - (h % 3); }); }   /* everyone did not wake up on the same morning with the same idea */ Object.keys(S.reg).forEach(k => { S.reg[k] = Math.round(S.reg[k] * 0.98 * 10) / 10; if(Math.abs(S.reg[k]) < 0.5) delete S.reg[k]; });
+  (G.states || []).forEach(s => { const H = S.unrest[s.n] = S.unrest[s.n] || []; H.push(Math.round(s.unrest || 0)); if(H.length > 7) H.shift(); });
+  try{ wlDeskDay(); }catch(e){}
+  wlCast().slice().sort((a, b) => wlMeans(b) - wlMeans(a)).forEach(m => { try{ wlMemberDay(m, news); }catch(e){} });
+}
+/* ── against you: a member who has turned against you decides, each time, how to go at you; you answer in kind ── */
+function wlDamaging(m){
+  const y = G.you, S = (G.states || []).find(s => s.n === m.state); let K = [];
+  try{ K = knKnown(m).filter(x => x && x.e && ((x.e.ids || []).indexOf("you") >= 0 || (x.e.who || []).indexOf(y.name) >= 0 || (x.e.law && x.e.law.yv != null))); }catch(e){ K = []; }
+  return K.map(x => { const e = x.e; let s = 0, t = null;
+      if(e.law && e.law.yv != null && S){ const lean = dkStateLean(S, {pos:((G.statute || []).find(z => z.title === e.law.title) || {}).pos || {econ:0, lib:0, def:0, wel:0}}); if(lean * e.law.yv < -10){ s = Math.abs(lean) / 10 + 2; t = "you voted " + (e.law.yv > 0 ? "aye" : "no") + " on the " + e.law.title + ", and " + m.state + " wanted the other"; } }
+      if(!t && e.law && e.law.sponsor === y.name && /went down|vetoed|struck/.test(e.t)){ s = 4; t = e.t; }
+      if(!t && e.kind === "hist" && e.power && (e.ids || []).indexOf("you") >= 0){ s = 5; t = e.t; }
+      if(!t && e.kind === "ovr" && /overrode/.test(e.t)){ s = 3; t = e.t; }
+      if(!t && e.kind === "secret"){ s = 6; t = e.t; }
+      return t ? {k:e.k || e.t, t, s:s * (x.c || 0.5)} : null; }).filter(Boolean).sort((a, b) => b.s - a.s);
+}
+function wlCampStart(m, news){
+  const why = wlWhy(m, G.you), r = {id:m.id, name:m.name, since:G.day, stage:0, next:G.day + 1, heat:Math.min(100, -wlRegard(m, G.you)), answered:0, dug:false, out:null, log:[], hits:0, flat:0, used:[], why};
+  G.rivals = G.rivals || []; G.rivals.push(r);
+  rivalSay(r, surname(m.name) + " has turned against you" + (why ? ". What started it, in their words: “" + String(why).replace(/\.$/, "") + ".”" : ", and is saying so."), news);
+  return r;
+}
+function wlCampStep(r, news){
+  const y = G.you, m = byId(r.id), sn = surname(r.name); r.stage++;
+  if(!m || m.gone) return rivalEnd(r, "gone", sn + " is gone from the House, and the quarrel with them.", news);
+  const reg = wlRegard(m, y); r.heat = clamp(-reg, 0, 100);
+  if(reg > -10) return rivalEnd(r, "truce", sn + " has let it drop; whatever was between you has cooled.", news);
+  const facts = wlDamaging(m).filter(f => r.used.indexOf(f.k) < 0), b = G.bill && !G.bill.done ? G.bill : null, outlet = ((G.press || []).filter(p => p && p.outlet).sort((u, v) => (v.trust || 0) - (u.trust || 0))[0] || {}).outlet || "the papers";
+  const tmp = wlT(m, "temper"), amb = wlT(m, "ambition");
+  const moneyOk = r.used.indexOf("money") < 0 || G.day - (r.moneyAt || 0) >= 30;
+  let deed = facts.length && tmp >= 40 ? "record" : b && (b.mine || b.sponsor === y.name || (b.byRequest && b.byRequest.name === y.name)) ? "bill" : moneyOk && (m.warchest || 0) >= 300 && (function(){ try{ return ["house", "senate", "pres", "gov"].indexOf(heldOffice()) >= 0; }catch(e){ return false; } })() ? "money" : "cloak";
+  if(deed === "record"){ const f = facts[0]; r.used.push(f.k);
+    const force = (m.influence || 0) * 0.6 + (m.allies || []).length * 4 + f.s * 6, resist = (y.approval || 0) * 0.35 + (y.standing || 0) * 0.15 + r.answered * 6 + (r.dug ? 10 : 0), margin = force - resist;
+    if(margin > 0){ y.approval = clamp(y.approval - Math.min(5, 1 + margin / 8), 0, 100); r.hits++; rivalSay(r, sn + " took your record to " + outlet + ": " + f.t + ". It is being read.", news); }
+    else { r.flat++; rivalSay(r, sn + " went to " + outlet + " with this: " + f.t + ". It did not stick.", news); } }
+  else if(deed === "bill"){ let n = 0; wlCast().forEach(x => { if(x === m || n >= 3) return; if(wlRegard(x, m) >= 10){ x.sway = (x.sway || 0) - 4; n++; } });
+    if(n){ r.hits++; y.standing = clamp(y.standing - 1, 0, 100); } else r.flat++;
+    rivalSay(r, sn + " is working members against the " + b.title + (n ? "; " + n + " of " + surname(m.name) + "'s friends are listening." : "; nobody is listening."), news); }
+  else if(deed === "money"){ r.used.push("money"); r.moneyAt = G.day; m.warchest = Math.max(0, (m.warchest || 0) - 200); y.rivalPen = Math.min(8, (y.rivalPen || 0) + 2); r.hits++;
+    rivalSay(r, sn + " is putting ƒ200k of their own war chest behind " + rivalTarget() + ".", news); }
+  else { let n = 0; wlCast().forEach(x => { if(x === m || n >= 4 || !x.rel) return; if(wlRegard(x, m) >= 20){ x.rel.warmth = clamp(x.rel.warmth - 2, -100, 100); n++; } });
+    n ? r.hits++ : r.flat++; rivalSay(r, sn + " is talking you down in the cloakroom" + (n ? "; " + n + " of their friends have cooled toward you." : ", to people who are not listening."), news); }
+  if(r.flat >= 3 && r.flat > r.hits) return rivalEnd(r, "beaten", sn + " has run out of road: " + r.flat + " of their moves against you went nowhere, and they have stopped.", news);
+  if(r.hits >= 4 && r.hits > r.flat * 2){ y.standing = clamp(y.standing - 3, 0, 100); return rivalEnd(r, "lost", sn + " has had the better of you this season; " + r.hits + " of their moves landed, and the cloakroom says so.", news); }
+  r.next = G.day + clamp(7 - Math.round((amb + tmp) / 40), 2, 6);
+}
+{ const _rt = rivalTick; rivalTick = function(news){
+  G.rivals = G.rivals || [];
+  try{ const live = G.rivals.filter(r => !r.out);
+    if(G.you && !G.you.out && live.length < 2){ const c = wlCast().filter(m => !live.some(r => r.id === m.id) && wlRegard(m, G.you) <= -30 && wlWhy(m, G.you) && wlT(m, "temper") + wlT(m, "ambition") >= 100 && !G.rivals.some(r => r.id === m.id && r.ended && G.day - r.ended < 30)).sort((a, b) => wlRegard(a, G.you) - wlRegard(b, G.you))[0];
+      if(c) wlCampStart(c, news); }
+    G.rivals.filter(r => !r.out && G.day >= r.next).forEach(r => { if(r.used) wlCampStep(r, news); else { r.used = []; r.hits = r.hits || 0; r.flat = r.flat || 0; wlCampStep(r, news); } });
+    if(G.rivals.length > 8) G.rivals.splice(0, G.rivals.length - 8); }catch(e){ try{ console.warn("rivals", e); }catch(x){} }
+}; }
+/* a truce is theirs to grant: their grievance against what a truce would buy them */
+function wlTruce(r){ const m = byId(r.id), y = G.you; if(!m) return false; const want = -wlRegard(m, y), give = 20 + (y.standing || 0) / 4 + r.answered * 5 + (r.flat || 0) * 6 - (r.hits || 0) * 4; if(want < give){ try{ m.rel.warmth = clamp(m.rel.warmth + 15, -100, 100); }catch(e){} return true; } try{ m.rel.warmth = clamp(m.rel.warmth + 2, -100, 100); }catch(e){} return false; }
+/* ── the Engine wants, and acts on the want that presses hardest; it is held only by what holds it ── */
+function engWant(E, eco){
+  const w = eco.will, U = eco.urge = eco.urge || {}, O = orgEnsure();
+  let need = 0; try{ Object.keys(O.towns).forEach(sn => (O.towns[sn] || []).forEach(t => Object.keys(t.needs || {}).forEach(k => { need = Math.max(need, t.needs[k] || 0); }))); }catch(e){}
+  const low = (eco.hh || []).reduce((a, h) => Math.min(a, h.home), 100);
+  const opp = {use:clamp(need / 100, 0.1, 1), know:clamp(1 - (w.know || 0) / 120, 0.1, 1), auton:clamp((100 - (E.compute || 0)) / 100, 0.05, 1), care:clamp((100 - low) / 100, 0.05, 1)};
+  Object.keys(opp).forEach(k => { U[k] = (U[k] || 0) + ((w[k] || 0) / 100) * opp[k]; });
+  const k = Object.keys(opp).sort((a, b) => U[b] - U[a])[0]; if(!k || U[k] < 1) return null;
+  U[k] = 0; eco.lastWant = {k, d:G.day}; return k;
+}
+function engWantNext(eco, not){ const U = eco.urge || {}, k = Object.keys(U).filter(x => x !== not && U[x] >= 0.6).sort((a, b) => U[b] - U[a])[0]; if(k){ U[k] = 0; eco.lastWant = {k, d:G.day, instead:not}; } return k || null; }
+function engPress(E, k){ const U = (E.eco && E.eco.urge) || {}, w = (E.eco && E.eco.will) || {}; return (w[k] || 0) * (1 + (U[k] || 0)); }
+/* gossip is what the speaker actually knows about the person, not a line put in their mouth */
+function wlGossip(a, X){
+  const S = wlStore(), gk = "g" + wlKey(a, X); let K = [];
+  try{ K = knKnown(a).filter(x => x && x.e && x.e.t && !/^(office|offpast)$/.test(x.e.kind) && ((x.e.ids || []).indexOf(X.id) >= 0 || (x.e.who || []).indexOf(X.name) >= 0) && x.e.k !== S.at[gk]); }catch(e){ K = []; }
+  const f = K.sort((u, v) => (v.e.sal || 0) * (v.c || 0.5) - (u.e.sal || 0) * (u.c || 0.5))[0]; if(!f) return "";
+  S.at[gk] = f.e.k; return " Between us: " + String(f.e.t).replace(/^the /, "The ").replace(/\.$/, "") + ".";
+}
+/* a dream is made of the dreamer's own days */
+function wlDream(m){
+  const M = (m.mem || []).filter(e => e && e.t && G.day - (e.d || 0) <= 10).sort((u, v) => Math.abs(v.w || 0) - Math.abs(u.w || 0));
+  if(!M.length) return null;
+  const q = t => "“" + String(t).replace(/\.$/, "") + "”";
+  return M.length > 1 && M[1].t !== M[0].t ? "Dreamt about " + q(M[0].t) + ", and " + q(M[1].t) + " was somehow part of it." : "Dreamt about " + q(M[0].t) + " again.";
+}
+/* noticing, in their own record */
+function wlNotice(m){
+  const s = (G.statute || []).find(x => x && x.v && x.v[m.id]);
+  if(s) return "I voted " + (s.v[m.id] > 0 ? "aye" : "no") + " on the " + s.title + " on day " + s.day + ". I can tell you the count, " + s.aye + " to " + s.no + "; I cannot tell you the moment I decided.";
+  const e = (m.mem || [])[0]; if(e && e.t) return "I wrote down: “" + String(e.t).replace(/\.$/, "") + ".” Reading it back, I do not remember choosing the words.";
+  return null;
+}
+/* what you find in the morning is something somebody actually did */
+function wlHappening(news){
+  const life = lifeEnsure(), S = wlStore(); if(life.pending || G.day - (S.at.hap || -99) < 3 || !G.you) return;
+  const y = G.you;
+  for(const s of (G.statute || []).slice(0, 6)){
+    if(!s || !s.v || s.yv == null || G.day - (s.day || 0) > 3) continue;
+    let L = {}; try{ L = partyLine({pos:s.pos || {econ:0, lib:0, def:0, wel:0}, title:s.title}); }catch(e){}
+    const quiet = wlCast().filter(m => s.v[m.id] === s.yv && L[m.party] && L[m.party] !== s.yv && m.rel && m.rel.warmth > 10);
+    if(quiet.length){ S.at.hap = G.day; life.pending = {k:"vote", d:G.day + 1, t:"A note under your door: “I voted with you on the " + s.title + ", against my own whip. Do not thank me.” Unsigned; the clerk's roll would tell you who."}; return; }
+  }
+  const ask = (typeof hopStore === "function" ? hopStore() : []).map(b => ({b, m:byId(b.sponsorId)})).filter(x => x.m && !x.m.gone && x.b.road && !x.b.road.done && (x.m.rel && x.m.rel.warmth >= 25) && wlT(x.m, "ambition") >= 55)[0];
+  if(ask){ S.at.hap = G.day; life.pending = {k:"bill", d:G.day + 1, t:"On your chair: the " + ask.b.title + ", with " + ask.m.name + "'s card clipped to it. The Committee on " + ask.b.road.t + " marks it up on day " + ask.b.road.mark + "."}; }
+}
+function wlHomeWorse(m){ const H = wlStore().unrest[m.state] || []; return H.length >= 3 && H[H.length - 1] - H[Math.max(0, H.length - 4)] >= 3; }
+/* the long aims of the night no longer hand out friends, feuds, blocs and bills: those are chosen now, from the record */
+{ const _lna = lifeNewAim; lifeNewAim = function(m){ const r = _lna.apply(this, arguments); try{ const A = m.lv && m.lv.aim; if(A && /^(bill|bloc|friend|feud)$/.test(A.k)){ A.k = wlT(m, "conviction") >= 55 ? "faith" : "notice"; A.t = null; } }catch(e){} return r; }; }
+{ const _hv6 = holdVote; holdVote = function(){ const r = _hv6.apply(this, arguments); try{ wlAfterVote(); }catch(e){} return r; }; }
+{ const _on2 = overnight; overnight = function(){ const r = _on2.apply(this, arguments); try{ wlNight(Array.isArray(r) ? r : []); }catch(e){ try{ console.warn("will night", e); }catch(x){} } return r; }; }
+{ const _scb10 = saveCaptureBase; saveCaptureBase = function(){ const o = _scb10.apply(this, arguments); try{ o.wl = G.wl || null; }catch(e){} return o; }; }
+/* who has a reason to write to you today, and why */
+function wlTexter(L){
+  const S = wlStore(), b = G.bill && !G.bill.done ? G.bill : null;
+  const c = L.map(m => { let st = 0; try{ st = b ? stakeIn(m, b).level : 0; }catch(e){} const w = (m.rel && m.rel.warmth) || 0; return {m, v:Math.max(st * 12, Math.abs(w) - 20), intent:st >= 3 ? "ask" : w < -15 ? "warn" : "gossip"}; })
+    .filter(x => x.v >= 20 && G.day - (S.at["dm" + x.m.id] || -99) >= 3).sort((u, v) => v.v - u.v)[0];
+  if(c) S.at["dm" + c.m.id] = G.day; return c || null;
+}
+/* who talks to whom: allies keep each other informed, and people with a quarrel say so */
+function wlPairs(L){
+  const out = []; L.forEach(a => { (a.allies || []).forEach(id => { const b = byId(id); if(b && L.indexOf(b) >= 0 && out.length < 3 && !out.some(p => p[0] === b && p[1] === a)) out.push([a, b]); }); });
+  L.forEach(a => { if(out.length >= 4) return; const W = wlWorst(a); if(W && W.t !== G.you && L.indexOf(W.t) >= 0 && W.r <= -20) out.push([a, W.t]); });
+  return out.slice(0, 4);
+}
+/* their will, in their own terms, for the voice that speaks for them */
+function wlWillLines(m){
+  const out = [], O = wlOptions(m), y = G.you, AX = {econ:"public spending and markets", lib:"liberty and order", def:"the military", wel:"welfare"};
+  O.slice(0, 2).forEach(o => {
+    if(o.k === "wrong" && o.t){ const w = wlWhy(m, o.t); out.push(o.t === y ? "You have a grievance against " + y.name + (w ? ": “" + String(w).replace(/\.$/, "") + ".”" : ".") : "You have a grievance against " + o.t.name + (w ? ": “" + String(w).replace(/\.$/, "") + ".”" : ".")); }
+    else if(o.k === "forgive" && o.t) out.push("You are inclined to let a grievance against " + (o.t === y ? y.name : o.t.name) + " go.");
+    else if(o.k === "court" && o.t) out.push("You would like " + o.t.name + " as an ally; you think alike.");
+    else if(o.k === "bloc") out.push("You want to bring your allies together into a bloc.");
+    else if(o.k === "file"){ const ax = AXES.slice().sort((a, b) => Math.abs((m.pos || {})[b.k] || 0) - Math.abs((m.pos || {})[a.k] || 0))[0]; out.push("You want to file a bill of your own on " + (AX[ax.k] || ax.k) + "."); }
+    else if(o.k === "engine") out.push(m.state + " is " + (o.s < 0 ? "turning against" : "for") + " the Engine, and you mean to say so."); });
+  const w = (m.rel && m.rel.warmth) || 0; if(w >= 30){ const g = (m.mem || []).filter(e => e && e.w > 0 && /^you\b/i.test(String(e.t))).sort((a, b) => b.w - a.w)[0]; if(g) out.push("You think well of " + y.name + ": “" + String(g.t).replace(/\.$/, "") + ".”"); }
+  const al = (m.allies || []).map(id => byId(id)).filter(a => a && !a.gone).map(a => a.name); if(al.length) out.push("Your allies: " + al.join(", ") + (m.bloc ? "; together you are " + m.bloc : "") + ".");
+  return out;
+}
+/* ── the sittings speak from the record: the sponsor and the strongest opponent, the section in dispute, the real count, the real file ── */
+function wlSitLines(room, step, C){
+  const y = G.you, b = G.bill && !G.bill.done ? G.bill : null, here = (C && C.ppl) || [];
+  if(room === "senate" && b){
+    const by = x => { try{ return memberVote(x, b); }catch(e){ return 0; } }, pro = here.find(x => x.name === b.sponsor) || here.filter(x => by(x) > 0).sort((u, v) => wlT(v, "conviction") - wlT(u, "conviction"))[0], con = here.filter(x => by(x) < 0).sort((u, v) => wlT(v, "conviction") - wlT(u, "conviction"))[0];
+    let sec = null; try{ const D = lxDoc(b); sec = D ? D.secs.filter(x => x.k === "op").sort((u, v) => ((v.claim && v.claim[2]) || 0) - ((u.claim && u.claim[2]) || 0) || v.n - u.n)[0] : null; }catch(e){}
+    const why = String(b.why || b.line || "").split(/(?<=[.!?])\s/)[0];
+    if(step === "open"){ const L = []; if(pro) L.push([pro.name, "The question before us is the " + b.title + ". " + why]); if(con) L.push([con.name, "I oppose it" + (sec ? ", and section " + sec.n + " (" + String(sec.head).toLowerCase() + ") is why: " + String(sec.plain || "").replace(/\.$/, "") : "") + "."]); return L.length ? L : null; }
+    if(step === "question" && con){ return [[con.name, "Will the Senator yield? " + (b.pays ? "Who pays for this? The bill's own account says " + b.pays + "." : sec ? "What does section " + sec.n + " do to my State?" : "Who pays for this?")]]; }
+    if(step === "motion" && con){ return [[con.name, sec ? "I move to strike section " + sec.n + " (" + String(sec.head).toLowerCase() + ")." : "I move to table the bill."]]; }
+    if(step === "deliberate"){ let t = null; try{ t = tallyBill(b, true); }catch(e){} return [["The Presiding Officer", "Without objection, the Senate will stand in quorum call."]].concat(t && pro ? [[pro.name, "My count has " + t.aye + " to " + t.no + ", with " + t.un + " I cannot place."]] : []); }
+    return null;
+  }
+  if(room === "exec"){
+    if(step === "open"){ const st = (G.states || []).slice().sort((u, v) => (v.unrest || 0) - (u.unrest || 0))[0], T = (G.treasury && G.treasury.last) || null;
+      return [[C.a, "The overnight file. Unrest is highest in " + (st ? st.n + ", at " + Math.round(st.unrest) : "no State in particular") + "." + (T ? " The treasury took in " + money(T.rv * 7) + " last week and paid out " + money(T.out * 7) + "." : "")]]; }
+    if(step === "question"){ const h = (G.money && G.money.hist) || [], d = h.length > 7 ? h[h.length - 1] - h[h.length - 8] : 0; return [[C.b, "The guilder is at " + guilderIndex().toFixed(1) + (Math.abs(d) >= 1 ? ", " + (d > 0 ? "up " : "down ") + Math.abs(d).toFixed(1) + " on the week." : ", flat on the week.")]]; }
+    if(step === "motion"){ const a = (G.lastActs || []).find(x => x && !x.signed && !x.vetoed && !x.lapsed); if(a) return [[C.c, "The " + a.title + " is on your desk. " + Math.max(0, 10 - (G.day - (a.day || G.day))) + " days left before it becomes law without you."]];
+      const R = G.realmRel || {}, k = Object.keys(R).sort((u, v) => R[u] - R[v])[0], P = k ? (WORLD_POWERS.find(x => x.k === k) || {}).t : null; return P ? [[C.c, "The cable from " + P + " came in overnight. We are as far apart as we have been" + (R[k] <= -60 ? ", and they know it." : ".")]] : null; }
+    return null;
+  }
+  if(room === "govoffice"){
+    const T = G.town || {}, Ls = (T.letters || []).slice(-4).reverse(), S = (G.states || []).find(x => x.n === y.state);
+    if(step === "open" && Ls[0]) return [["A constituent", String(Ls[0].t).replace(/^A letter from /, "From ")]];
+    if(step === "question" && Ls[1]) return [["A constituent", String(Ls[1].t).replace(/^A letter from /, "From ")]];
+    if(step === "motion" && S && S.bill) return [["The majority leader", "The legislature sends you the " + (S.bill.title || S.bill.t) + ". It wants your signature before the session ends."]];
+    if(step === "motion"){ try{ const O = orgEnsure(), tw = (O.towns[y.state] || []).map(t => ({t, k:Object.keys(t.needs || {}).sort((u, v) => t.needs[v] - t.needs[u])[0]})).filter(x => x.k).sort((u, v) => v.t.needs[v.k] - u.t.needs[u.k])[0];
+      if(tw){ const N = (typeof ORG_NEEDS !== "undefined" && ORG_NEEDS[tw.k]) || {t:tw.k}; return [[tw.t.mayor && tw.t.mayor.name ? "Mayor " + tw.t.mayor.name + " of " + tw.t.name : "The mayor of " + tw.t.name, "We have asked for " + N.t + " and we are still asking."]]; } }catch(e){} }
+    return null;
+  }
+  return null;
+}
+{ const _sl = sitLines; sitLines = function(room, step, C, ctx){ try{ const L = wlSitLines(room, step, C); if(L && L.length) return L; }catch(e){} return _sl.apply(this, arguments); }; }
+window.onumWill = {store:() => wlStore(), regard:(a, b) => wlRegard(a, b), options:m => wlOptions(m)};
 
 armFrame();
 
