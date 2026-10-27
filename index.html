@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261027a">
+<meta name="onum-build" content="20261027b">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261027a";
+  var STAMP = "20261027b";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -2442,8 +2442,8 @@ function agesSecrets(news){
       G.you.standing = clamp(G.you.standing - 9, 0, 100);
       if(outlet) outlet.trust = clamp(outlet.trust - 4, 0, 100);
       G.members.forEach(m => { if(m.rel.warmth < 5) remember(m, "It came out. " + s.t, -7); });
-      hearsAll("It was in " + (outlet ? outlet.outlet : "the papers") + ": " + s.t.toLowerCase());
-      news.push((outlet ? outlet.outlet : "The wire") + " has the story: " + s.t.toLowerCase());
+      hearsAll("It was in " + (outlet ? outlet.outlet : "the papers") + ": " + s.t);
+      news.push((outlet ? outlet.outlet : "The wire") + " has the story: " + s.t + ".");
       note("It got out: " + s.t, true);
     }
   }
@@ -2519,13 +2519,17 @@ function districtFit(bill){
   for(const a of AXES) s += -Math.abs(G.you.district[a.k] - bill.pos[a.k]) / 4 + 12;
   return clamp(s, -100, 100);
 }
+/* 20261027b: a party whips for a bill when it moves policy toward the party's platform, against when it moves policy away,
+   and leaves it to conscience when it hardly moves either way; the two parties have platforms of their own */
+const PARTY_PLATFORM = {FED:{econ:36, lib:6, def:26, wel:-30}, COM:{econ:-34, lib:12, def:-20, wel:32}};
+function sqFit(pos, bill){ const bp = (bill && bill.pos) || {}; let d = 0; for(const a of AXES) d += Math.abs(pos[a.k] || 0) - Math.abs((pos[a.k] || 0) - (bp[a.k] || 0)); return d / 4; }
 function partyLine(bill){
-  const fedFit = alignment({pos:{econ:36,lib:6,def:26,wel:-30}}, bill);
-  const L = {FED: fedFit > 0 ? 1 : -1, COM: fedFit > 0 ? -1 : 1, IND: 0};
+  const ff = sqFit(PARTY_PLATFORM.FED, bill), cf = sqFit(PARTY_PLATFORM.COM, bill);
+  const L = {FED: Math.abs(ff) < 2 ? 0 : ff > 0 ? 1 : -1, COM: Math.abs(cf) < 2 ? 0 : cf > 0 ? 1 : -1, IND: 0};
   /* 20261025g: a party of the player's own making has no whip but the player, so its line is where the player stands on the bill
      (left undefined, every one of its members scored NaN and voted no on everything); any other party without a whip has no line */
   try{ Object.keys(G.parties || {}).concat(Object.keys(G.seatsBy || {})).forEach(k => { if(L[k] == null) L[k] = 0; });
-    if(G.you && G.you.party && !/^(FED|COM|IND)$/.test(G.you.party)){ const v = G.you.vote; L[G.you.party] = v === 1 || v === -1 ? v : (alignment(G.you, bill) > 0 ? 1 : -1); } }catch(e){}
+    if(G.you && G.you.party && !/^(FED|COM|IND)$/.test(G.you.party)){ const v = G.you.vote; L[G.you.party] = v === 1 || v === -1 ? v : (sqFit(G.you.pos || {}, bill) > 0 ? 1 : -1); } }catch(e){}
   return L;
 }
 /* First Order tradition vector — order / def / Fed-leaning continuity (Taylor Day line). */
@@ -2564,7 +2568,9 @@ function memberVote(m, bill){
   const line = partyLine(bill)[m.party];
   let net = 0;
   try{ net = netVoteLean(m, bill) * 48; }catch(e){}
-  const score = alignment(m,bill)*0.9 + line*(m.traits.loyalty-30)*0.6 + m.rel.warmth*0.12
+  /* 20261027b: measured against leaving the law as it is, not against nothing */
+  let sq = 0; try{ sq = alignmentRaw(m, {pos:{econ:0, lib:0, def:0, wel:0}}); }catch(e){}
+  const score = (alignment(m,bill) - sq)*0.9 + line*(m.traits.loyalty-30)*0.6 + m.rel.warmth*0.12
               + lobbyPush(bill)*(1 - m.traits.conviction/140)
               + (m.sway || 0)
               + net
@@ -2583,7 +2589,7 @@ function backgroundSeats(){
 function tallyBackground(bill, bgs, line){
   const st = (G.states || []).filter(s => s && !s.gone), N = st.reduce((a, s) => a + (s.seats || 0), 0) || 1; let aye = 0, no = 0, un = 0;
   Object.keys(bgs).forEach(p => { const n = bgs[p]; if(!(n > 0)) return; const l = line[p] || 0; let a = 0;
-    st.forEach(S => { const share = n * (S.seats || 0) / N; let lean = 0; try{ lean = clamp(dkStateLean(S, {pos:bill.pos}) / 50, -1, 1); }catch(e){}
+    st.forEach(S => { const share = n * (S.seats || 0) / N; let lean = 0; try{ lean = clamp(stLeanC(S, {pos:bill.pos}) / 50, -1, 1); }catch(e){}
       const pa = p === "IND" || !l ? clamp(0.5 + 0.3 * lean, 0.1, 0.9) : l > 0 ? clamp(0.86 + 0.1 * lean, 0.7, 0.97) : clamp(0.14 + 0.1 * lean, 0.03, 0.3); a += share * pa; });
     const away = Math.round(n * 0.03), voting = n - away, ay = Math.round(a * voting / n); aye += ay; no += voting - ay; un += away; });
   return {aye, no, un};
@@ -2595,7 +2601,8 @@ function tallyBill(bill, projection){
     if(projection && !(m.pledge && G.day-m.pledgeDay<8) && m.known<1){ un++; continue; }
     /* some are not on the floor: the less punctual, the likelier */
     if(!projection){ const pu = typeof m.punctual === "number" ? clamp(m.punctual > 1 ? m.punctual / 100 : m.punctual, 0, 1) : 0.85;
-      if(m.room === "away" || knH(m.id, (bill.title || "") + ":" + G.day) < 0.015 + (1 - pu) * 0.12){ if(roll) roll[m.id] = 0; un++; continue; } }
+      /* 20261027b: members come back for a roll call; a few miss it, the unpunctual and the travelling more often */
+      const ab = knH(m.id, (bill.title || "") + ":" + G.day); if((m.room === "away" && ab < 0.35) || ab < 0.01 + (1 - pu) * 0.05){ if(roll) roll[m.id] = 0; un++; continue; } }
     const v = memberVote(m,bill) > 0 ? 1 : -1; if(roll) roll[m.id] = v;
     (v > 0 ? aye++ : no++);
   }
@@ -3021,7 +3028,7 @@ function ensureParties(){
       const nm = G.own.name || "Your party";
       if(!G.parties.OWN){
         G.parties.OWN = {
-          id:"OWN", name:nm, short:nm.split(/\s+/)[0] || "Own",
+          id:"OWN", name:nm, short:partyShortOf(nm),
           color:G.own.color || unusedPartyColor(), colorDark:G.own.colorDark || null,
           born:G.own.born || G.congress || 1, core:false
         };
@@ -8543,21 +8550,18 @@ function dkCongress(it){
 }
 function dkSenate(it){
   const by = {};
-  (G.states || []).forEach(S => { for(let i = 0; i < 2; i++){
-    const r = rng(seedOf("sen:" + S.n + i + ":" + (G.term || 1)));
-    let p = S.lean + (r() * 40 - 20) > 8 ? "FED" : S.lean + (r() * 40 - 20) < -8 ? "COM" : "IND"; p = (typeof senParty === "function" && senParty(S.n, i)) || p;
-    const a = dkStateLean(S, it) + (r() * 50 - 25) + (p === "FED" ? 8 : p === "COM" ? -8 : 0) * (it.pos ? Math.sign(it.pos.econ || 1) : 1);
-    const o = by[p] || (by[p] = {aye:0, no:0, un:0}); Math.abs(a) < 10 ? o.un++ : a > 0 ? o.aye++ : o.no++;
-  } });
+  (G.states || []).forEach(S => { for(let i = 0; i < 2; i++){ const L = senLean(S, i, it), o = by[L.p] || (by[L.p] = {aye:0, no:0, un:0}); Math.abs(L.a) < 8 ? o.un++ : L.a > 0 ? o.aye++ : o.no++; } });
   return by;
 }
 function dkStatehouse(S, it){
-  const by = {}, n = Math.max(20, (S.seats || 6) * 6);
+  /* 20261027b: a legislator votes with their party unless home pulls hard the other way; a free vote where the parties have no line */
+  const by = {}, n = Math.max(20, (S.seats || 6) * 6), L = slLine(it), lean = clamp(stLeanC(S, it) / 50, -1, 1), push = it.sb ? (it.sb.pushed || 0) : 0;
   for(let i = 0; i < n; i++){
     const r = rng(seedOf("leg:" + S.n + i + ":" + it.title));
-    const p = S.lean + (r() * 70 - 35) > 6 ? "FED" : S.lean + (r() * 70 - 35) < -6 ? "COM" : "IND";
-    const a = dkStateLean(S, it) * (p === "IND" ? 0.5 : 1) + (r() * 60 - 30) + (S.bill && S.bill.pushed ? S.bill.pushed : 0);
-    const o = by[p] || (by[p] = {aye:0, no:0, un:0}); Math.abs(a) < 9 ? o.un++ : a > 0 ? o.aye++ : o.no++;
+    const x = r(), fed = clamp(0.48 + S.lean / 110, 0.12, 0.84), ind = 0.06;
+    const p = x < fed ? "FED" : x < fed + ind ? "IND" : "COM";   /* a dominant party, never the whole chamber */
+    const a = (L[p] || 0) * 30 + lean * 22 + (r() * 50 - 25) + push * 0.6;
+    const o = by[p] || (by[p] = {aye:0, no:0, un:0}); Math.abs(a) < 6 ? o.un++ : a > 0 ? o.aye++ : o.no++;
   }
   return by;
 }
@@ -8614,7 +8618,7 @@ function dkItems(){
         : [{t:c.dual != null ? "Rule for the House" : "Rule for the Union", run(){ return benchRule(c, true); }}, {t:c.dual != null ? "Rule for the member" : "Rule for the state", run(){ return benchRule(c, false); }}];
       out.push(it); }); }
   if(k === "pres"){ (G.lastActs || []).filter(a => !a.signed && !a.vetoed).slice(0, 3).forEach(a => {
-      const it = {kind:"act", title:a.title, line:"Passed by the House and Senate on day " + a.day + ".", sponsor:"Congress", pos:a.pos || {econ:0, lib:0, def:0, wel:0}, body:"Congress", national:true};
+      const it = {kind:"act", title:a.title, line:"Passed by the House and Senate on day " + a.day + ". If you neither sign nor veto it, it becomes law without your signature on day " + ((a.day || G.day) + 10) + "; if the Congress ends first, it dies unsigned.", sponsor:"Congress", pos:a.pos || {econ:0, lib:0, def:0, wel:0}, body:"Congress", national:true};
       it.by = dkCongress(it);
       it.acts = [{t:"Sign it", run(){ a.signed = true; y.approval = clamp(y.approval + 2, 0, 100); reactAct(a.title, a.pos, true); feed(execTitle() + " " + surname(y.name) + " signed the " + a.title + ".", "good"); return "Signed, with eleven pens."; }},
         {t:"Veto it", run(){ a.vetoed = true; y.standing = clamp(y.standing - 3, 0, 100); y.influence = clamp(y.influence + 3, 0, 100); reactAct(a.title, a.pos, false); feed(execTitle() + " " + surname(y.name) + " vetoed the " + a.title + ".", "bad"); return "Vetoed. The House can override with two thirds."; }}];
@@ -19032,8 +19036,8 @@ function worldTick(news){
   if(Math.random() < 0.08){
     const nxt = drawn(WORLD_WARS, Math.random);
     w.war = nxt.k; w.last = nxt.t;
-    if(news) news.push("Abroad: " + nxt.t + ".");
-    else try{ feed("Abroad: " + nxt.t + "."); }catch(e){}
+    if(news) news.push("Abroad: " + String(nxt.t).replace(/\.$/, "") + ".");
+    else try{ feed("Abroad: " + String(nxt.t).replace(/\.$/, "") + "."); }catch(e){}
   }
   /* The war is real. The House does not go to it. Casualties are out there.
      A member's kin, rarely. Not a stack of empty desks. */
@@ -23069,7 +23073,7 @@ function secretly(a, b){
   if(!chance(.35)) return;
   G.secrets.push({
     id:Date.now() + Math.floor(Math.random()*999),
-    t: surname(a.name) + " threatened " + surname(b.name) + " over " + (G.bill ? G.bill.title : "a vote"),
+    t: surname(a.name) + " threatened " + surname(b.name) + " over " + (G.bill ? "the " + String(G.bill.title).replace(/^the /i, "") : "a vote"),
     about:a.id, knownBy:[a.id, b.id], exposure:2, day:G.day
   });
 }
@@ -28982,7 +28986,7 @@ function holdVote(){
   el("okVote").addEventListener("click", () => {
     walkNow();
     G.you.vote = null;
-    note((passed?"Passed":"Failed") + ": " + b.title + " — " + t.aye + " to " + t.no + ".", true);
+    note((passed ? "Passed" : housePassed ? "Passed the House, failed in the Senate" : "Failed") + ": " + b.title + " — " + t.aye + " to " + t.no + (sen ? " in the House, " + sen.aye + " to " + sen.no + " in the Senate" : "") + ".", true);
     feed("The clerk closes the book on " + b.title + ". The building exhales and starts the next argument.");
     laterHouse(() => {
       try{ paintTicker(); }catch(e){}
@@ -29155,10 +29159,10 @@ function overnight(){
       switchParty(m, to);
       news.push(m.name + " left the " + partyName(from) + " and now sits with the " + partyName(to) + ".");
     }
-    if(chance(.03) && m.terms > 6){
-      m.gone = true; moved(); G.seatsBy[m.party]--;
-      accolade(m, "Retired undefeated.");
-      news.push(m.name + " announced they will not seek another term.");
+    if(!m.retiring && m.kind !== "envoy" && chance(.004) && m.terms > 6){
+      /* 20261027b: they serve until the election; the seat opens then, not tonight */
+      m.retiring = G.day;
+      news.push(m.name + " announced they will not seek another term, and will serve until the election.");
     }
   });
   if(!MODEST){
@@ -29168,12 +29172,8 @@ function overnight(){
   }
   const angry = G.donors.filter(d => d.angry).length;
   if(angry && chance(.5)) news.push(angry + " of your donors have stopped returning calls.");
-  if(chance(.35)) news.push(pick([
-    "A poll has the country moving " + (G.mood>0?"toward the Federalists":"toward the Commonwealth") + ".",
-    "The leadership scheduled three suspension votes for next week.",
-    "A committee chair spent the evening on television.",
-    "Two freshmen filed a bill nobody asked for."
-  ]));
+  /* 20261027b: the overnight line is drawn from the record (the week's polls, the committee calendar), not invented */
+  try{ const c = nightColour(); if(c) news.push(c); }catch(e){}
   /* Personal overnight fallout from today's helped / hurt / ignored. */
   try{
     const M = G.dayMark;
@@ -29393,6 +29393,7 @@ function election(){
   try{ npcLadder(null); }catch(e){ if(window.console) console.warn("npcLadder", e); }
   G.members.forEach(m => {
     if(m.kind === "envoy"){ kept.push(m); return; }
+    if(m.retiring){ accolade(m, "Retired undefeated after " + m.terms + " terms."); results.push({m, win:false, by:0, retired:true}); G.seatsBy[m.party]--; m.gone = true; return; }
     const partySwing = m.party==="FED" ? swing : m.party==="COM" ? -swing : 0;
     const personal = (m.rel.warmth>40?2:0) + m.influence/8 + (m.post?4:0) + (m.backed||0) + (function(){ try{ return (kinRunScore(m).score - 50) / 10; }catch(e){ return 0; } })();
     m.backed = 0;
@@ -29478,7 +29479,7 @@ function election(){
       if(G.court && G.court.length) G.court[0] = {name:you.name, by:"the states", pos:you.pos, you:true};
       note("Elected to the bench.", true);
     } else note("Elected to " + OFFICES[seeking].t + ".", true);
-    G.career.push({term:G.term, post:OFFICES[seeking].short, note:"won the " + OFFICES[seeking].t});
+    G.career.push({term:G.term, post:OFFICES[seeking].short, note:"won " + OFFICES[seeking].t});
   }
   try{ if(midTerm){} else if(youWon){ achieve(seeking !== "house" && !incumbent ? "higher" : "reelect"); careerWon(seeking); } else achieve("steps"); }catch(e){}
   if(youWon && !midTerm){
@@ -29496,7 +29497,7 @@ function election(){
 
   const rows = results.slice().sort((a,b)=>b.by-a.by).map(r =>
     '<div><span>'+r.m.name+' <span class="chip chip--'+(r.m.party==="FED"?"fed":r.m.party==="COM"?"com":"ind")+'">'+r.m.party+'</span></span>' +
-    '<b class="'+(r.win?"win":"lose")+'">'+(r.win?"held +"+r.by:"lost")+'</b><b>'+(r.m.post?postTitle(r.m.post):"")+'</b></div>').join("");
+    '<b class="'+(r.win?"win":"lose")+'">'+(r.win?"held +"+r.by:r.retired?"retired":"lost")+'</b><b>'+(r.m.post?postTitle(r.m.post):"")+'</b></div>').join("");
 
   card.innerHTML =
     '<div class="eyebrow">General election · the ' + G.congress + 'th Congress</div>' +
@@ -30403,16 +30404,19 @@ function lifeAct(m, A, news){
   const life = lifeEnsure();
   const name = surname(m.name);
   if(A.k === "bill"){
-    if((G.billQueue || []).some(b => b.npc)) { lifeWrite(m, "My bill is ready. The calendar is not."); return; }
+    if((G.billQueue || []).some(b => b.npc) || (typeof hopStore === "function" && hopStore().some(x => x && x.npc && x.sponsorId === m.id))) { lifeWrite(m, "My bill is ready. The calendar is not."); return; }
+    const keepS = new Map((G.members || []).map(x => [x, x.sway]));
     const b = makeBill();
+    keepS.forEach((v, x) => { x.sway = v; });
     const ax = AXES.slice().sort((x, y) => Math.abs((m.pos || {})[y.k] || 0) - Math.abs((m.pos || {})[x.k] || 0))[0];
     for(const a of AXES) b.pos[a.k] = Math.round(b.pos[a.k] * 0.4);
     b.pos[ax.k] = Math.round(clamp(((m.pos || {})[ax.k] || 0) * 1.4, -85, 85));
     b.sponsor = m.name; b.sponsorParty = m.party; b.sponsorId = m.id; b.npc = true;
     try{ b.line = describeBill(b); }catch(e){}
-    G.billQueue = (G.billQueue || []); G.billQueue.push(b);
+    let t;
+    if(typeof hopAdmit === "function" && hopAdmit(b)){ t = name + " filed the " + b.title + " on their own; it is referred to the Committee on " + (b.road ? b.road.t : "the whole House") + "."; }
+    else { G.billQueue = (G.billQueue || []); G.billQueue.push(b); t = name + " filed a bill of their own, unasked: " + b.title + ". It waits behind the one on the calendar."; }
     lifeWrite(m, "I filed it. Nobody asked me to. That is the point of it.");
-    const t = name + " filed a bill of their own, unasked: " + b.title + ". It waits behind the one on the calendar.";
     life.happen.unshift({d:G.day, t}); news.push(t);
     return;
   }
@@ -30963,7 +30967,8 @@ function billFlavor(b){
     b.why = (b.why || "") + " The newcomer wards are watching the clerk's count.";
   } else if(d === "aid" || d === "arms"){
     b.kind = "foreign";
-    try{ const rs = realmEnsure(); const r = pick(rs); b.realm = r.k; b.realmT = r.t; b.realmWant = r.want; }catch(e){ b.realmT = "an ally abroad"; }
+    /* 20261027b: nobody files aid or arms for a power the Union is at war with, or barely speaking to */
+    try{ const rs0 = realmEnsure(), rel = G.realmRel || {}, foe = G.conflict && G.conflict.war ? G.conflict.k : null; const rs = rs0.filter(x => x.k !== foe && (rel[x.k] || 0) > -30); const r = pick(rs.length ? rs : rs0); b.realm = r.k; b.realmT = r.t; b.realmWant = r.want; }catch(e){ b.realmT = "an ally abroad"; }
     const rn = (b.realmT || "the Allies").replace(/^the /, "");
     b.title = d === "aid" ? pick(["Aid to " + rn + " Act", rn + " Grain and Credit Act", "Foreign Assistance (" + rn + ") Act"])
                           : pick(["Arms to " + rn + " Act", rn + " Arms Sale Act", "Friendly Realms Arms Act"]);
@@ -35919,7 +35924,7 @@ function inqDiscovered(n, silent){
   if(silent) return; S.log.unshift({d:G.day, id:n.id}); if(S.log.length > 40) S.log.pop();
   try{ feed("The Academy: " + n.name + " is settled."); }catch(e){}
   if(n.effort >= 5){ try{ pushWireScrap("The Academy", n.name + ": " + n.blurb.split(/(?<=[.!?])\s/)[0]); }catch(e){} }
-  if(n.effort >= 7){ try{ note("A discovery that will change the Republic: " + n.name + ". " + n.blurb, true); }catch(e){} }
+  if(n.effort >= 7 && G.day - (S.bigNote == null ? -999 : S.bigNote) >= 21){ S.bigNote = G.day; try{ note("A discovery that will change the Republic: " + n.name + ". " + n.blurb, true); }catch(e){} }
 }
 function inqKnows(m, id){ const S = G.inq; if(!S || !S.done[id]) return false; const n = INQ_BY[id]; if(inqFieldOf(m) === n.f) return true; const days = G.day - S.done[id]; return days >= 8 + (seedOf("ik:" + (m.id || m.name) + id) % 10); }
 function inqVoice(m){
@@ -38336,17 +38341,18 @@ function rivalAdvance(r, news){
     y.standing = clamp(y.standing - 2, 0, 100);
     const b = G.bill && !G.bill.done ? G.bill : null;
     rivalSay(r, b ? sn + " is whipping against " + b.title + " door to door, and telling people it is about " + you + "."
-                  : sn + " took the committee seat " + you + " wanted, and thanked the Speaker in public.", news);
+                  : rivalOffice() === "house" ? sn + " took the committee seat " + you + " wanted, and thanked the Speaker in public."
+                  : sn + " is telling the cloakroom that nothing " + you + " sends up will get a hearing while " + sn + " has a say.", news);
   } else if(r.stage === 4){
     y.rivalPen = Math.min(8, Math.round(r.heat / 8));
-    rivalSay(r, sn + " is raising money for a challenger in " + y.state + " " + (y.dist || "") + ". The first mailer is already out.", news);
+    rivalSay(r, sn + " is raising money for " + rivalTarget() + ". The first mailer is already out.", news);
   } else {
     const me = y.approval * 0.6 + y.standing * 0.4 + (r.dug ? 8 : 0) + r.answered * 3 + rint(-10, 10);
     const them = 44 + r.heat * 0.15;
     if(me >= them){
       y.approval = clamp(y.approval + 4, 0, 100); y.rivalPen = 0;
       m.rel.warmth = Math.max(m.rel.warmth, -5);
-      rivalEnd(r, "beaten", sn + " dropped the challenger and asked, quietly, for a seat on one of " + you + "'s committees. The town noticed who blinked.", news);
+      rivalEnd(r, "beaten", sn + " dropped the challenger and asked, quietly, " + (rivalOffice() === "house" ? "for a seat on one of " + you + "'s committees" : "for a meeting with " + you + "'s office") + ". The town noticed who blinked.", news);
     } else {
       y.standing = clamp(y.standing - 4, 0, 100); y.approval = clamp(y.approval - 3, 0, 100);
       rivalEnd(r, "lost", sn + " has the better of " + you + " this season. The cloakroom has started saying it out loud.", news);
@@ -49574,12 +49580,15 @@ function lxStatus(s){
   out.push("Passed the House, " + cnt + ", on day " + s.day + ".");
   if(s.fate === "struck down"){ out.push("Struck down by the court before it took effect."); return {t:out.join(" "), k:"struck", force:false}; }
   if(s.veto){ out.push(s.veto.override ? "Vetoed by " + s.veto.by + "; the House overrode the veto." : "Vetoed by " + s.veto.by + "."); }
-  if(s.exec){ out.push(s.exec.act === "signed" ? "Signed by " + s.exec.by + (s.exec.d ? " on day " + s.exec.d : "") + "." : "Vetoed by " + s.exec.by + (s.exec.d ? " on day " + s.exec.d : "") + "."); }
-  if(s.ovr && s.ovr.none) out.push("No override was attempted.");
+  if(s.exec){ out.push(s.exec.act === "signed" ? "Signed by " + s.exec.by + (s.exec.d ? " on day " + s.exec.d : "") + "."
+      : s.exec.act === "lapsed" ? "Became law without the signature of " + s.exec.by + " on day " + s.exec.d + ", ten days after Congress presented it."
+      : s.exec.act === "pocket" ? "Pocket-vetoed: " + s.exec.by + " held it unsigned when the Congress ended on day " + s.exec.d + ", and it died."
+      : "Vetoed by " + s.exec.by + (s.exec.d ? " on day " + s.exec.d : "") + "."); }
+  if(s.ovr && s.ovr.none) out.push(s.ovr.pocket ? "A pocket veto cannot be overridden." : "No override was attempted.");
   else if(s.ovr && s.ovr.done) out.push(s.ovr.ok ? "The House overrode the veto, " + s.ovr.aye + " to " + s.ovr.no + " (two thirds was " + s.ovr.need + ")." : "The House failed to override, " + s.ovr.aye + " to " + s.ovr.no + "; two thirds was " + s.ovr.need + ". The veto stands.");
   else if(s.ovr) out.push("The veto goes back to the House; it votes on an override on day " + s.ovr.due + ", and needs two thirds.");
   const a = lxAct(s), pending = s.fate === "carried" && !s.exec && !s.veto && a && !a.signed && !a.vetoed && G.exec && G.exec.you;
-  if(pending) out.push("Awaiting the President's signature.");
+  if(pending) out.push("Awaiting the President's signature: " + Math.max(0, 10 - (G.day - (a.day || G.day))) + " days left before it becomes law without one.");
   let k = s.fate === "vetoed" ? "vetoed" : pending ? "pending" : "law";
   if(s.lxStruck){ const ss = s.lxStruck; out.push(ss.whole ? "Held invalid as a whole in " + ss.cases.join(", ") + "." : "Section" + (ss.secs.length > 1 ? "s " : " ") + ss.secs.join(", ") + " held invalid in " + ss.cases.join(", ") + "; the rest stands."); if(ss.whole) k = "struck"; }
   const later = (G.statute || []).filter(x => x !== s && x.fate === "carried" && (x.day || 0) > (s.day || 0)).filter(x => { const d = lxDoc(x); return d && d.prior === s; });
@@ -49592,7 +49601,7 @@ function lxSync(){
   (G.lastActs || []).forEach(a => { const s = (G.statute || []).find(x => x.title === a.title && Math.abs((x.day || 0) - (a.day || 0)) <= 1); if(!s) return;
     const by = G.exec && G.exec.you ? (execTitleSafe() + " " + G.you.name) : (G.exec && G.exec.name) || "the President";
     if(a.signed && !s.exec) s.exec = {act:"signed", by, d:first ? null : G.day};
-    if(a.vetoed && (!s.exec || s.exec.act !== "vetoed")){ s.exec = {act:"vetoed", by, d:first && !a.vetoD ? null : G.day}; if(s.fate === "carried") s.fate = "vetoed";
+    if(a.vetoed && (!s.exec || (s.exec.act !== "vetoed" && s.exec.act !== "pocket"))){ s.exec = {act:"vetoed", by, d:first && !a.vetoD ? null : G.day}; if(s.fate === "carried") s.fate = "vetoed";
       if(!s.ovr && first && G.day - (s.day || 0) > 10){ s.ovr = {done:true, ok:false, none:true}; }
       if(!s.ovr){ s.ovr = {due:G.day + 1, done:false}; try{ feed("The veto of the " + s.title + " goes back to the House with the President's message. It votes on an override on day " + s.ovr.due + "; it needs two thirds.", "news"); }catch(e){} } } });
   L.init = true;
@@ -49836,7 +49845,7 @@ function lxRoad(b){
   if(!b || b.done || !b.title || !b.pos) return null;
   if(b.road) return b.road;
   const ax = ["econ", "lib", "def", "wel"].sort((u, v) => Math.abs(b.pos[v] || 0) - Math.abs(b.pos[u] || 0))[0];
-  const k = LX_CM_AX[ax] || "ways", c = COMMITTEES.find(x => x.k === k) || COMMITTEES[0], ch = (function(){ try{ return cmtChair(k); }catch(e){ return null; } })();
+  const k = (b.domain && lxCmDom(b.domain)) || (b.kind === "immig" ? "judic" : null) || LX_CM_AX[ax] || "ways", c = COMMITTEES.find(x => x.k === k) || COMMITTEES[0], ch = (function(){ try{ return cmtChair(k); }catch(e){ return null; } })();
   const R = b.road = {cmte:k, t:c.t, chair:ch ? ch.name : null, ref:G.day, mark:Math.max(G.day, (b.voteDay || G.day + 2) - 1), props:[], done:false};
   const mem = (function(){ try{ return cmtMembers(k).filter(m => m && !m.gone); }catch(e){ return []; } })();
   let D = null; try{ D = lxDoc(b); }catch(e){}
@@ -49856,9 +49865,11 @@ function lxCmVote(b, score, line, youVote){
   let aye = 0, no = 0; const by = {};
   named.forEach(m => { const v = score(m) > 0 ? 1 : -1; by[m.id] = v; v > 0 ? aye++ : no++; });
   if(youOn && (youVote === 1 || youVote === -1)){ by.you = youVote; youVote > 0 ? aye++ : no++; }
-  const rest = Math.max(0, (typeof CMT !== "undefined" ? CMT.seats : 8) - named.length - (youOn ? 1 : 0));
-  if(rest){ let maj = "FED"; try{ maj = majorityParty(); }catch(e){} const min = maj === "FED" ? "COM" : "FED", nMaj = Math.ceil(rest * 0.55), L = partyLine(b);
-    [[maj, nMaj], [min, rest - nMaj]].forEach(([p, n]) => { for(let i = 0; i < n; i++){ const l = line(L[p] || 0, p, i); l > 0 ? aye++ : no++; } }); }
+  /* 20261027b: the committee's seats are shared out as the House is, the majority holding a majority of them;
+     the members the game names fill their party's share and the rest of each share votes its party's line */
+  const q = lxCmQuota(), have = {}; named.forEach(m => { have[m.party] = (have[m.party] || 0) + 1; }); if(youOn) have[y.party] = (have[y.party] || 0) + 1;
+  let rest = 0; const L = partyLine(b);
+  Object.keys(q).forEach(p => { const n = Math.max(0, q[p] - (have[p] || 0)); rest += n; for(let i = 0; i < n; i++){ const l = line(L[p] || 0, p, i); l > 0 ? aye++ : no++; } });
   return {aye, no, by, unnamed:rest};
 }
 function lxMarkup(b){
@@ -49866,7 +49877,7 @@ function lxMarkup(b){
   const n = (b.clauses || []).length || 3, out = [];
   R.props.forEach((p, i) => {
     const key = b.title + ":am" + i;
-    const v = lxCmVote(b, m => -alignment(m, b) * 0.6 + (m.party === b.sponsorParty ? -15 : 6) + lxNoise(m.id, key) * 20, (l, pt, j) => l ? -l : (knH(pt + j, key) < 0.5 ? 1 : -1), p.you);
+    const v = lxCmVote(b, m => -lxCmLean(m, b) + (m.party === b.sponsorParty ? -6 : 3) + lxNoise(m.id, key) * 10, (l, pt, j) => l ? -l : (knH(pt + j, key) < 0.5 ? 1 : -1), p.you);
     p.aye = v.aye; p.no = v.no; p.adopted = v.aye > v.no; p.d = G.day;
     if(p.adopted){ if(p.k === "strike"){ b.strk = b.strk || []; if(b.strk.indexOf(p.ci) < 0) b.strk.push(p.ci); if(b.pos) Object.keys(b.pos).forEach(k => b.pos[k] = Math.round(b.pos[k] * (1 - 0.5 / n))); }
       else if(p.k === "cut"){ b.soft = true; if(b.pos) Object.keys(b.pos).forEach(k => b.pos[k] = Math.round(b.pos[k] * 0.8)); } }
@@ -49874,7 +49885,7 @@ function lxMarkup(b){
     (b.amends = b.amends || []).push({d:G.day, by:p.by, what, aye:v.aye, no:v.no, adopted:p.adopted, where:"committee"});
     out.push(surname(p.by) + "'s amendment to " + what + " is " + (p.adopted ? "adopted" : "rejected") + ", " + v.aye + " to " + v.no);
   });
-  const rv = lxCmVote(b, m => alignment(m, b) * 0.6 + (m.party === b.sponsorParty ? 12 : -4) + lxNoise(m.id, b.title + ":rep") * 20, (l, pt, j) => l ? l : (knH(pt + j, b.title + ":rep") < 0.5 ? 1 : -1), R.youReport);
+  const rv = lxCmVote(b, m => lxCmLean(m, b) + (m.party === b.sponsorParty ? 4 : 0) + lxNoise(m.id, b.title + ":rep") * 6, (l, pt, j) => l ? l : (knH(pt + j, b.title + ":rep") < 0.5 ? 1 : -1), R.youReport);
   R.report = {aye:rv.aye, no:rv.no, fav:rv.aye > rv.no, d:G.day}; R.done = true;
   (G.members || []).forEach(m => { if(m && !m.gone) m.sway = (m.sway || 0) + (R.report.fav ? 1.5 : -1.5) * (m.party === b.sponsorParty ? 0.5 : 1); });
   try{ LX.docs.delete(lxKey(b)); }catch(e){}
@@ -49884,16 +49895,12 @@ function lxMarkup(b){
 }
 /* the Senate: two seats a State, each senator reckoned exactly as the docket shows them leaning; undecided ones vote their party; a tie goes to the Vice President */
 function lxSenate(b){
-  const y = G.you, k = (function(){ try{ return heldOffice(); }catch(e){ return null; } })(), out = {aye:0, no:0, by:{}, names:{}, ok:false, tie:false, d:G.day}, L = partyLine(b);
+  const y = G.you, k = (function(){ try{ return heldOffice(); }catch(e){ return null; } })(), out = {aye:0, no:0, by:{}, names:{}, ok:false, tie:false, d:G.day};
   (G.states || []).forEach(S => { const row = [];
     for(let i = 0; i < 2; i++){
-      const r = rng(seedOf("sen:" + S.n + i + ":" + (G.term || 1)));
-      let p = S.lean + (r() * 40 - 20) > 8 ? "FED" : S.lean + (r() * 40 - 20) < -8 ? "COM" : "IND"; p = (typeof senParty === "function" && senParty(S.n, i)) || p;
-      const a = dkStateLean(S, {pos:b.pos}) + (r() * 50 - 25) + (p === "FED" ? 8 : p === "COM" ? -8 : 0) * (b.pos ? Math.sign(b.pos.econ || 1) : 1) + (b.senShift || 0);
       let v;
       if(k === "senate" && y && S.n === y.state && i === 0){ v = b.senateVote === "aye" ? 1 : b.senateVote === "nay" ? -1 : (alignment(y, b) > 0 ? 1 : -1); out.you = v; }
-      else if(Math.abs(a) < 10){ const l = L[p] || 0; v = l ? l : (r() < 0.5 ? 1 : -1); }
-      else v = a > 0 ? 1 : -1;
+      else { const L = senLean(S, i, b); v = L.v; }
       row.push(v); v > 0 ? out.aye++ : out.no++;
     }
     out.by[S.n] = row; });
@@ -50004,7 +50011,7 @@ function lxHouseVote(b, scoreNamed, lineOf, youVote){
 /* a weakening amendment: those against the bill are for it, the sponsor's side against it, the parties by their line on the bill turned round */
 function lxFloorAmend(b, p, youVote){
   const key = b.title + ":fl:" + (p.k === "strike" ? p.ci : "cut") + ":" + p.by, L = partyLine(b);
-  const v = lxHouseVote(b, m => (m.name === p.by ? 50 : 0) - alignment(m, b) * 0.6 + (m.party === b.sponsorParty ? -15 : 6) + lxNoise(m.id, key) * 20, pt => -(L[pt] || 0), youVote);
+  const v = lxHouseVote(b, m => (m.name === p.by ? 50 : 0) - lxFit(m, b) * 0.6 + (m.party === b.sponsorParty ? -15 : 6) + lxNoise(m.id, key) * 20, pt => -(L[pt] || 0), youVote);
   const n = (b.clauses || []).length || 3, ok = v.aye > v.no;
   if(ok){ if(p.k === "strike"){ b.strk = b.strk || []; if(b.strk.indexOf(p.ci) < 0) b.strk.push(p.ci); if(b.pos) Object.keys(b.pos).forEach(k => b.pos[k] = Math.round(b.pos[k] * (1 - 0.5 / n))); }
     else { b.soft = true; if(b.pos) Object.keys(b.pos).forEach(k => b.pos[k] = Math.round(b.pos[k] * 0.8)); } }
@@ -50309,8 +50316,10 @@ function tsDay(){ const T = tsStore(), rv = tsRevenue(), out = tsOutlay(), d = r
   if(G.day % 7 === 0){ const line = "TREASURY · balance " + money(T.bal) + "; the week took in " + money(rv * 7) + " and paid out " + money(out * 7) + ". The guilder stands at " + (G.money ? G.money.index.toFixed(1) : "?") + "."; T.log.unshift({d:G.day, t:line.replace(/^TREASURY · /, "")}); if(T.log.length > 12) T.log.length = 12; try{ feed(line, "news"); }catch(e){} }
   return T.last; }
 /* the guilder is pulled back toward par and pushed by the balance; it no longer sits pinned at its ceiling */
-{ const _dg = driftGuilder; driftGuilder = function(news){ const r = _dg.apply(this, arguments); try{ const M = G.money, T = tsStore(), last = M.index; let v = last - (last - 100) * 0.035 + clamp(((T.last && T.last.d) || 0) * 0.04, -1.2, 0.8) + clamp(-T.bal / 4000, -1, 0.4);
-    M.index = clamp(Math.round(v * 10) / 10, 42, 190); if(M.hist && M.hist.length) M.hist[M.hist.length - 1] = M.index; }catch(e){} return r; }; }
+{ const _dg = driftGuilder; driftGuilder = function(news){ const b0 = G.money ? G.money.index : 100, n0 = news ? news.length : 0; const r = _dg.apply(this, arguments); try{ const M = G.money, T = tsStore(), last = M.index; let v = last - (last - 100) * 0.035 + clamp(((T.last && T.last.d) || 0) * 0.04, -1.2, 0.8) + clamp(-T.bal / 4000, -1, 0.4);
+    M.index = clamp(Math.round(v * 10) / 10, 42, 190); if(M.hist && M.hist.length) M.hist[M.hist.length - 1] = M.index;
+    if(news){ for(let i = news.length - 1; i >= n0; i--) if(/^The guilder (firmed|slipped) to /.test(news[i])) news.splice(i, 1);
+      const d = M.index - b0; if(Math.abs(d) > 1.1) news.push("The guilder " + (d > 0 ? "firmed to " : "slipped to ") + M.index.toFixed(1) + " on the index" + (d < -1.6 ? ". Everything your campaign buys just got dearer." : ".")); } }catch(e){} return r; }; }
 /* ── every Senate seat named, its party kept, a third elected each Congress ── */
 function senStore(){
   if(G.sen && G.sen.v === 1) return G.sen; const S = G.sen = {v:1, seats:{}};
@@ -50412,6 +50421,215 @@ function formerPrune(){
 { const _idm2 = idMend; idMend = function(){ const r = _idm2.apply(this, arguments); try{ r.press = pressMend(); r.pruned = formerPrune(); }catch(e){} return r; }; }
 { const _scb8 = saveCaptureBase; saveCaptureBase = function(){ const o = _scb8.apply(this, arguments); try{ o.hopper = (G.hopper || []).map(b => Object.assign({}, b)); }catch(e){} return o; }; }
 setInterval(() => { try{ if(G && G.you && G.day != null && G._hopDay !== G.day){ const first = G._hopDay == null; G._hopDay = G.day; if(!first){ hopDay(); if(G.day % 7 === 0) formerPrune(); } } }catch(e){} }, 2700);
+
+/* ══ 20261027b · THE ROAD, KEPT HONEST. A bill its committee reports unfavourably dies there; a member may try to discharge their
+   own with the signatures of a majority of the House. Titles are unique and properly cased, and a member's own bill goes to
+   committee like anyone's. The Senate and the statehouses vote as parties, with members breaking where home pulls hard the
+   other way. A State does not pass the same law twice; it may repeal one its people have turned against. An act the President
+   leaves on the desk ten days becomes law without a signature, and one left unsigned when the Congress ends is pocket-vetoed.
+   The overnight lines come from the record; the national mood and approval settle back toward where the country is. ══ */
+function partyShortOf(nm){ const w = String(nm || "").replace(/^(the|a|an)\s+/i, "").trim(); if(!w) return "Own"; const parts = w.split(/\s+/); return parts.length <= 2 ? w : parts[0]; }
+function rivalOffice(){ try{ return heldOffice() || "house"; }catch(e){ return "house"; } }
+function rivalTarget(){
+  const y = G.you, k = rivalOffice(), you = surname(y.name);
+  if(k === "pres") return "whoever stands against " + you + " for " + execTitleSafe() + " at the next election";
+  if(k === "senate") return "a challenger for " + you + "'s Senate seat in " + y.state;
+  if(k === "gov") return "a challenger for the Governor's chair in " + y.state;
+  if(k === "bench") return "a campaign to have " + you + " removed from the bench";
+  return "a challenger in " + y.state + " " + (y.dist || "");
+}
+/* the committee that has the subject, not the one whose axis is loudest */
+function lxCmDom(d){ return ({rail:"ways", levee:"ways", tariff:"ways", school:"health", navy:"armed", court:"judic", land:"ways", bank:"ways", labour:"health", docks:"ways", health:"health", press:"judic", census:"judic", gas:"ways", visa:"judic", border:"judic", natur:"judic", aid:"ways", arms:"armed", mandate:"health", preempt:"judic"})[d] || null; }
+/* ── titles: unique, and cased as titles ── */
+function lxTitleCase(t){ const minor = /^(and|of|the|for|to|in|on|a|an|by|with|at|or)$/i; return String(t || "").split(" ").map((w, i) => i > 0 && minor.test(w) ? w.toLowerCase() : w.replace(/^([a-z])/, c => c.toUpperCase())).join(" "); }
+function billTitlesInUse(){
+  const s = new Set(), add = t => { if(t) s.add(String(t).toLowerCase()); };
+  if(G.bill) add(G.bill.title); (G.billQueue || []).forEach(b => add(b && b.title)); (G.hopper || []).forEach(b => add(b && b.title));
+  (G.statute || []).forEach(x => add(x && x.title)); ((G.lx && G.lx.died) || []).forEach(x => add(x && x.t)); return s;
+}
+{ const _mb = makeBill; makeBill = function(){
+  const used = billTitlesInUse(); let b = null;
+  for(let i = 0; i < 6; i++){ b = _mb.apply(this, arguments); if(!b || !b.title) return b; b.title = lxTitleCase(b.title); const key = b.title.toLowerCase(); if(!used.has(key)) break;
+    const prior = (G.statute || []).find(x => x && x.title && x.title.toLowerCase() === key && x.fate === "carried");
+    if(prior && !/ Amendments (Act|Bill)$/.test(b.title)){ const t2 = b.title.replace(/ (Act|Bill)$/, " Amendments $1"); if(t2 !== b.title && !used.has(t2.toLowerCase())){ b.title = t2; b.amendsAct = prior.title; break; } } }
+  if(b && b.kind === "foreign" && /^the /i.test(b.realmT || "")){ const rn = b.realmT.replace(/^the /i, ""); b.title = b.title.replace(new RegExp("^(Arms|Aid) to " + rn.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + " "), "$1 to the " + rn + " "); }
+  if(b && b.title && used.has(b.title.toLowerCase())){ let n = 2; while(used.has((b.title + " (No. " + n + ")").toLowerCase())) n++; b.title += " (No. " + n + ")"; }
+  return b; }; }
+/* a member's bill enters the hopper like any other */
+function hopAdmit(b){
+  if(!b || typeof hopStore !== "function") return false; const H = hopStore(); if(H.length >= 16) return false;
+  b.filed = G.day; b.voteDay = null; b.hop = true; try{ lxRoad(b); }catch(e){}
+  if(b.road){ b.road.mark = G.day + 3 + (seedOf(b.title + G.day) % 10); b.road.ref = G.day; }
+  H.push(b); return true;
+}
+/* a live bill keeps the floor: two callers asking for the next bill in the same moment must not throw one away */
+{ const _nbq = nextBillOrQueued; nextBillOrQueued = function(){ if(G.bill && !G.bill.done && G.bill.title) return G.bill; return _nbq.apply(this, arguments); }; }
+/* ── an unfavourable report is the end of a bill, unless a majority of the House signs to discharge it ── */
+function lxCommitteeKill(b){
+  const R = b.road, L = lxStore(); L.died = L.died || []; const need = Math.floor((G.seats || 183) / 2) + 1;
+  if(b.mine && lxInHouse()){
+    let sig = 0; try{ const t = tallyBill(b, false); sig = t.aye + (G.you.vote ? 0 : 1); }catch(e){}
+    b.discharge = {d:G.day, sig, need, ok:sig >= need};
+    if(b.discharge.ok){ b.discharged = true;
+      try{ note("Your discharge petition on the " + b.title + " has " + sig + " signatures, a majority of the House (" + need + " needed). The bill comes out of the Committee on " + R.t + " and keeps its day on the calendar.", true); }catch(e){}
+      return false; }
+    try{ note("Your discharge petition on the " + b.title + " has " + sig + " signatures; it needed " + need + ". The bill stays in the Committee on " + R.t + ".", true); }catch(e){}
+  }
+  b.done = true; b.died = G.day;
+  L.died.unshift({t:b.title, d:G.day, cmte:R.t, why:"reported unfavourably, " + R.report.aye + " to " + R.report.no + (b.discharge ? "; the discharge petition had " + b.discharge.sig + " of the " + b.discharge.need + " signatures it needed" : ""), sponsor:b.sponsor}); if(L.died.length > 40) L.died.length = 40;
+  try{ note("The " + b.title + " dies in the Committee on " + R.t + ", reported unfavourably " + R.report.aye + " to " + R.report.no + ". It will not come to the floor.", true); pushWireScrap("Committee", b.title + " — DIES IN COMMITTEE " + R.report.aye + "–" + R.report.no); }catch(e){}
+  /* the next bill takes the floor once this moment has passed, so a roll call in progress never lands on it */
+  setTimeout(() => { try{ if(G.bill === b){ G.bill = nextBillOrQueued(); try{ paintTicker(); }catch(e){} } }catch(e){} }, 0);
+  return true;
+}
+{ const _mk2 = lxMarkup; lxMarkup = function(b, quiet){ const R = _mk2.apply(this, arguments);
+  try{ if(!quiet && b && b === G.bill && !b.done && !b.discharged && b.road && b.road.done && b.road.report && !b.road.report.fav) lxCommitteeKill(b); }catch(e){}
+  return R; }; }
+/* ── the Senate: party first, home second, the senator's own place third ── */
+function senLean(S, i, it){
+  const r = rng(seedOf("sen:" + S.n + i + ":" + (G.term || 1)));
+  let p = S.lean + (r() * 40 - 20) > 8 ? "FED" : S.lean + (r() * 40 - 20) < -8 ? "COM" : "IND"; p = (typeof senParty === "function" && senParty(S.n, i)) || p;
+  const ideo = r() * 30 - 15;
+  let L = {}; const nom = !!(it && /^Nomination of /.test(it.title || ""));
+  if(nom){ /* a nominee is judged as a person: how far from the party's platform, with the President's party behind them */
+    Object.keys(PARTY_PLATFORM).forEach(k => { let d = 0; for(const x of AXES) d += Math.abs((PARTY_PLATFORM[k][x.k] || 0) - ((it.pos || {})[x.k] || 0)); const f = 48 - d / 4; L[k] = f > 22 ? 1 : f < 8 ? -1 : 0; });
+    const ep = G.exec ? (G.exec.you ? G.you.party : G.exec.party) : null; if(ep) L[ep] = 1; }
+  else { try{ if(it && it.pos) L = partyLine(it); }catch(e){} }
+  const l = L[p] || 0; let lean = 0; try{ lean = clamp(stLeanC(S, it) / 50, -1, 1); }catch(e){}
+  const q = rng(seedOf("senv:" + S.n + i + ":" + ((it && it.title) || "") + ":" + (G.term || 1)))() * 24 - 12;
+  const a = l * 28 + lean * (nom ? 8 : 20) + ideo + q + (nom ? 10 : 0) + ((it && it.senShift) || 0);   /* the Senate defers to the President on the President's own officers, short of a nominee it cannot stomach */
+  const v = Math.abs(a) < 8 ? (l || (lean > 0 ? 1 : lean < 0 ? -1 : (q >= 0 ? 1 : -1))) : a > 0 ? 1 : -1;
+  return {p, a, v, l};
+}
+/* how far a bill moves the law toward a member, measured from the law as it stands */
+function lxFit(m, b){ let sq = 0; try{ sq = alignmentRaw(m, {pos:{econ:0, lib:0, def:0, wel:0}}); }catch(e){} return alignment(m, b) - sq; }
+/* twenty-five seats a committee: thirteen to the majority, the rest by each party's share of the House */
+function lxCmQuota(){
+  const S = G.seatsBy || {}, ps = Object.keys(S).filter(p => (S[p] || 0) > 0); let maj = "FED"; try{ maj = majorityParty(); }catch(e){}
+  const q = {}; q[maj] = 13; const others = ps.filter(p => p !== maj), tot = others.reduce((a, p) => a + S[p], 0) || 1;
+  const raw = others.map(p => ({p, x:12 * S[p] / tot})); raw.forEach(r => { q[r.p] = Math.floor(r.x); });
+  let left = 12 - raw.reduce((a, r) => a + Math.floor(r.x), 0); raw.slice().sort((u, v) => (v.x - Math.floor(v.x)) - (u.x - Math.floor(u.x))).forEach(r => { if(left > 0){ q[r.p]++; left--; } });
+  return q;
+}
+/* a member votes in committee as they would on the floor */
+function lxCmLean(m, b){ let v = 0; try{ v = memberVote(m, b); }catch(e){ v = lxFit(m, b) > 0 ? 1 : -1; } return v * 20; }
+/* a State's pull on a national question, measured from the Union's average so that home pulls both ways */
+function stLeanC(S, it){
+  if(!it || !it.pos) return dkStateLean(S, it);
+  const k = JSON.stringify(it.pos); let c = stLeanC._c;
+  if(!c || c.k !== k || c.d !== G.day){ const st = (G.states || []).filter(x => x && !x.gone); c = stLeanC._c = {k, d:G.day, m:st.length ? st.reduce((a, x) => a + dkStateLean(x, it), 0) / st.length : 0}; }
+  return dkStateLean(S, it) - c.m;
+}
+/* the parties' lines on a state bill: where the party stands on the bill's own question; none where it has no settled view */
+function slLine(it){
+  try{ if(it && it.pos) return partyLine(it); }catch(e){}
+  const b = it && it.sb; if(!b) return {};
+  const d = b.dir > 0 ? 1 : -1, ln = p => { const w = (PARTY_PLATFORM[p] || {})[b.axis] || 0; return Math.abs(w) < 10 ? 0 : Math.sign(w) * d; };
+  return {FED:ln("FED"), COM:ln("COM"), IND:0};
+}
+/* ── the President's desk ── */
+function deskAct(a){ return (G.statute || []).find(x => x && x.title === a.title && Math.abs((x.day || 0) - (a.day || 0)) <= 1) || null; }
+function deskDay(){
+  if(!G.exec || !G.exec.you || !G.you) return 0; let n = 0; const by = execTitleSafe() + " " + G.you.name, first = !G._deskInit; G._deskInit = true;
+  (G.lastActs || []).forEach(a => { if(!a || a.signed || a.vetoed || a.lapsed || G.day - (a.day || G.day) < 10) return;
+    const s = deskAct(a); a.signed = true; a.lapsed = G.day; if(s && !s.exec) s.exec = {act:"lapsed", by, d:G.day}; n++;
+    try{ const line = "The " + a.title + " becomes law without the President's signature: ten days have passed since Congress presented it" + (first ? " (counted from day " + a.day + ")" : "") + "."; note(line, true); }catch(e){} });
+  return n;
+}
+function deskPocket(){
+  if(!G.exec || !G.exec.you || !G.you) return 0; let n = 0; const by = execTitleSafe() + " " + G.you.name;
+  (G.lastActs || []).forEach(a => { if(!a || a.signed || a.vetoed || a.lapsed) return; const s = deskAct(a);
+    a.vetoed = true; a.pocket = G.day; n++;
+    if(s){ s.exec = {act:"pocket", by, d:G.day}; if(s.fate === "carried") s.fate = "vetoed"; s.ovr = {done:true, ok:false, none:true, pocket:true}; }
+    try{ note("The Congress ends with the " + a.title + " still unsigned on the President's desk. It is pocket-vetoed, and cannot be overridden.", true); }catch(e){} });
+  return n;
+}
+{ const _el2 = election; election = function(){ try{ deskPocket(); }catch(e){} return _el2.apply(this, arguments); }; }
+/* ── the overnight line: the week's polls, the committee calendar; nothing that did not happen ── */
+function nightColour(){
+  const H = G.moodHist = Array.isArray(G.moodHist) ? G.moodHist : []; H.push({d:G.day, v:Math.round(G.mood || 0)}); while(H.length > 30) H.shift();
+  if(knH("col", String(G.day)) > 0.45) return null; const opts = [];
+  const wk = H.find(x => x.d >= G.day - 7); if(wk && Math.abs((G.mood || 0) - wk.v) >= 6) opts.push("The week's polls have the country moving toward the " + ((G.mood || 0) > wk.v ? "Federalists" : "Commonwealth") + ".");
+  const hb = (G.hopper || []).filter(b => b && b.road && !b.road.done && b.road.chair && b.road.mark > G.day);
+  const said = G._colSaid = G._colSaid || {}; const hb2 = hb.filter(b => !(said[b.title] > G.day - 10));
+  if(hb2.length){ const b = hb2[Math.floor(knH("tv", String(G.day)) * hb2.length)]; said[b.title] = G.day; opts.push("On the committee calendar: the Committee on " + b.road.t + " has the " + b.title + " down for markup on day " + b.road.mark + "; its chair, " + b.road.chair + ", has not said which way it will go."); }
+  const rep = (G.hopper || []).filter(b => b && b.reported); if(rep.length > 1) opts.push(rep.length + " bills reported by their committees are waiting for the floor; the oldest is the " + rep.slice().sort((x, y) => x.reported - y.reported)[0].title + ".");
+  return opts.length ? opts[Math.floor(knH("colp", String(G.day)) * opts.length)] : null;
+}
+/* the national mood settles back between shocks */
+{ const _on = overnight; overnight = function(){ const r = _on.apply(this, arguments); try{ G.mood = clamp((G.mood || 0) * 0.96, -60, 60); }catch(e){} return r; }; }
+/* one line in the journal for one thing */
+function jDup(text){ try{ const J = G.journal || []; for(let i = 0; i < Math.min(10, J.length); i++){ const e = J[i]; if(e && e.t === text && (e.d === G.day || e.day === G.day)) return true; } }catch(e){} return false; }
+{ const _nt = note; note = function(text){ if(jDup(text)) return; return _nt.apply(this, arguments); }; }
+{ const _jr = journal; journal = function(text){ if(jDup(text)) return; return _jr.apply(this, arguments); }; }
+/* approval: above where the country is, each gain is worth less */
+{ const _sd = standDay; standDay = function(){ const y = G.you;
+  try{ if(y && typeof G._apLast === "number"){ const T = standTarget(), d = y.approval - G._apLast; if(d > 0 && y.approval > T.approval){ const room = clamp((100 - G._apLast) / Math.max(1, 100 - T.approval), 0.15, 1); y.approval = G._apLast + d * room; } } }catch(e){}
+  const r = _sd.apply(this, arguments); try{ G._apLast = G.you.approval; }catch(e){} return r; }; }
+/* ── the States' own law: what is in force, what was refused lately, and what may be repealed ── */
+function stLaws(s){
+  if(s.laws && typeof s.laws === "object") return s.laws; const laws = s.laws = {};
+  try{ ((lxStore().sacts) || []).filter(x => x && x.st === s.n).slice().reverse().forEach(x => { if(!x.ok) return; if(/ Repeal Bill$/.test(x.t)) delete laws[x.t.replace(/ Repeal Bill$/, " Bill")]; else laws[x.t] = x.d; }); }catch(e){}
+  return laws;
+}
+function stPick(s, b){
+  const laws = stLaws(s), A = ((lxStore().sacts) || []).filter(x => x && x.st === s.n), recentNo = t => A.some(x => x.t === t && !x.ok && G.day - x.d < 90);
+  const fresh = STATE_BILLS.filter(x => !laws[x.t] && !recentNo(x.t));
+  const rep = Object.keys(laws).filter(t => G.day - laws[t] >= 120).map(t => STATE_BILLS.find(x => x.t === t)).filter(Boolean)
+    .filter(x => !recentNo(x.t.replace(/ Bill$/, " Repeal Bill")) && dkStateLean(s, {sb:{axis:x.axis, dir:x.dir}}) < -10);
+  const r = knH("sb:" + s.n, String(G.day));
+  if(rep.length && (r < 0.35 || !fresh.length)){ const x = rep[Math.floor(knH("sbr:" + s.n, String(G.day)) * rep.length)], t = x.t.replace(/ Bill$/, " Repeal Bill");
+    return {t, title:t, axis:x.axis, dir:-x.dir, ind:-x.ind, unrest:-x.unrest, repeal:true, of:x.t, ofDay:laws[x.t], due:b.due, pushed:0}; }
+  if(fresh.some(x => x.t === b.t)) return b;
+  if(!fresh.length) return null;
+  const x = fresh[Math.floor(r * fresh.length)]; return Object.assign({}, x, {title:x.t, due:b.due, pushed:0});
+}
+{ const _ssb = seedStateBills; seedStateBills = function(){ const before = new Map((G.states || []).map(s => [s, s.bill])); const r = _ssb.apply(this, arguments);
+  try{ (G.states || []).forEach(s => { const b = s.bill; if(b && before.get(s) !== b) s.bill = stPick(s, b); }); }catch(e){} return r; }; }
+{ const _rsb2 = resolveStateBills; resolveStateBills = function(news){ const pend = (G.states || []).map(s => [s, s.bill]); const r = _rsb2.apply(this, arguments);
+  try{ const A = lxStore().sacts || []; pend.forEach(([s, b]) => { if(!b || s.bill === b) return; const e = A.find(x => x.st === s.n && x.t === b.title && x.d === G.day); if(!e || !e.ok) return;
+      const laws = stLaws(s); if(b.repeal) delete laws[b.of]; else laws[b.title] = G.day; }); }catch(e){} return r; }; }
+{ const _lsd = lxStateDoc; lxStateDoc = function(st, b){
+  if(b && b.repeal && b.of){ const act = b.of.replace(/ Bill$/, " Act");
+    const D = {key:"sb:" + st + ":" + b.t, title:b.t, src:b, dom:null, prior:null, congress:"", no:"State of " + st, secs:[], cites:[]};
+    D.longTitle = "A bill before the legislature of " + st + " to repeal the " + act + "."; D.enact = "Be it enacted by the People of the State of " + st + ", represented in the Legislature,";
+    const add = (head, sub, plain, ex) => { D.secs.push(Object.assign({n:D.secs.length + 1, head, sub, plain}, ex || {})); };
+    add("Short title", ["This Act may be cited as the " + b.t.replace(/ Bill$/, " Act") + " of " + st + "."], "The name it goes by.", {k:"title"});
+    add("Repeal", ["(a) Repeal.— The " + act + " of " + st + (b.ofDay ? ", passed by the Legislature on day " + b.ofDay + "," : "") + " is repealed.", "(b) Savings.— Nothing in this Act undoes anything lawfully done under the repealed Act before this Act takes effect."], "The earlier act comes off the state's books; what was done under it stands.", {k:"op"});
+    add("Effective date", ["This Act takes effect on the Governor's signature."], "When it applies.", {k:"eff"});
+    return D; }
+  return _lsd.apply(this, arguments); }; }
+/* ── an act does its work when it becomes law: signed, left to lapse into law, or carried over a veto; a vetoed act does none ── */
+function lawQ(){ if(!G.lawQ || typeof G.lawQ !== "object") G.lawQ = {}; return G.lawQ; }
+function lawSnap(b){ const o = {}; ["id", "title", "kind", "realm", "realmT", "restrict", "target", "state", "sponsor", "sponsorParty"].forEach(k => { if(b[k] != null) o[k] = b[k]; }); o.pos = b.pos ? Object.assign({}, b.pos) : {econ:0, lib:0, def:0, wel:0}; return o; }
+const LAW_FX = {bc:null, bh:null};
+{ const _bc = billConsequences; LAW_FX.bc = _bc; billConsequences = function(b, passed, yourVote){ if(!passed || !b || !b.kind || !b.title) return _bc.apply(this, arguments); const Q = lawQ(); Q[b.title] = Object.assign(Q[b.title] || {d:G.day}, {bc:{b:lawSnap(b), yv:yourVote}}); }; }
+{ const _bh = billHitsStates; LAW_FX.bh = _bh; billHitsStates = function(b, passed){ if(!passed || !b || !b.title) return _bh.apply(this, arguments); const Q = lawQ(); Q[b.title] = Object.assign(Q[b.title] || {d:G.day}, {bh:{b:lawSnap(b)}}); }; }
+function lawSettle(t, ok){ const Q = lawQ(), e = Q[t]; if(!e) return; delete Q[t];
+  if(e.bc) try{ LAW_FX.bc(e.bc.b, ok, e.bc.yv); }catch(x){}
+  if(e.bh && ok) try{ LAW_FX.bh(e.bh.b, true); }catch(x){} }
+function lawReconcile(){
+  const Q = lawQ(), mine = !!(G.exec && G.exec.you); let n = 0;
+  Object.keys(Q).forEach(t => { const e = Q[t], s = (G.statute || []).find(x => x && x.title === t && Math.abs((x.day || 0) - (e.d || 0)) <= 1), a = (G.lastActs || []).find(x => x && x.title === t);
+    let ok = null;
+    if(s && s.exec && s.exec.act === "pocket") ok = false;
+    else if(s && s.overridden) ok = true;
+    else if(s && s.exec && (s.exec.act === "signed" || s.exec.act === "lapsed")) ok = true;
+    else if(a && a.signed && !a.vetoed) ok = true;
+    else if(s && s.ovr && s.ovr.done && !s.ovr.ok) ok = false;
+    else if(!mine && s && s.fate === "carried") ok = true;
+    else if(!mine && s && s.fate === "vetoed") ok = false;
+    else if(!s && G.day - (e.d || G.day) > 30) ok = false;
+    if(ok !== null){ lawSettle(t, ok); n++; } });
+  return n;
+}
+{ const _hv5 = holdVote; holdVote = function(){ const r = _hv5.apply(this, arguments); try{ lawReconcile(); }catch(e){} return r; }; }
+/* ── old saves: the text of the record, mended ── */
+{ const _idm3 = idMend; idMend = function(){ const r = _idm3.apply(this, arguments);
+  try{ (G.career || []).forEach(c => { if(c && typeof c.note === "string") c.note = c.note.replace(/^won the the /, "won the "); });
+    const P = G.parties && G.parties.OWN; if(P && (!P.short || /^(the|a|an)$/i.test(P.short))) P.short = partyShortOf(P.name); }catch(e){} return r; }; }
+{ const _scb9 = saveCaptureBase; saveCaptureBase = function(){ const o = _scb9.apply(this, arguments); try{ o.moodHist = G.moodHist || null; o._apLast = typeof G._apLast === "number" ? G._apLast : null; o._deskInit = !!G._deskInit; o.lawQ = G.lawQ || null; }catch(e){} return o; }; }
+setInterval(() => { try{ if(G && G.you && G.day != null){ if(G._deskDay !== G.day){ G._deskDay = G.day; deskDay(); } if(G.lawQ) lawReconcile(); } }catch(e){} }, 2600);
 
 armFrame();
 
