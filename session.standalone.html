@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261030l">
+<meta name="onum-build" content="20261030m">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261030l";
+  var STAMP = "20261030m";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -39715,11 +39715,20 @@ addEventListener("keydown", e => {
     /* Catch / deliver / seated voice / live glass — all without pad or PICK arming */
     if(CATCH.on && CATCH.current){ e.preventDefault(); catchNow(); return; }
     if(CATCH.on && CATCH.pieces && CATCH.pieces.length && !CATCH.current){ e.preventDefault(); deliverAssembledSpeech(); return; }
-    /* 20261030l: seated press chair + reporter in focus → E calls on them (openTalk→callon), never glass seek/"Ask for the floor" */
-    { const fP = (G.you && G.you.sitting) ? focusThing() : null, S = window.ONUM_SESSION;
-      if(fP && fP.type === "person" && fP.ref && S && S.kind === "press_conference" && S.chairId === "you" && fP.ref !== G.you &&
-         (fP.ref.kind === "press" || (S.seats || []).some(x => String(x.personId) === String(fP.ref.id) && String(x.personId) !== "you"))){
-        e.preventDefault(); openTalk(fP.ref); return; } }
+    /* 20261030m: seated press chair + person in focus → E calls on the FOCUSED person (direct callon, else openTalk); never falls to glass/seek */
+    { const fP = (G.you && G.you.sitting) ? focusThing() : null;
+      const S1 = window.ONUM_SESSION || null, S2 = (typeof SSN !== "undefined" && SSN) ? SSN : null;
+      const sKind = (S2 && S2.kind) || (S1 && S1.kind), sChair = (S2 && S2.chairId) || (S1 && S1.chairId);
+      if(fP && fP.type === "person" && fP.ref && fP.ref !== G.you && sKind === "press_conference" && (sChair === "you" || (S1 && S1.chairId === "you"))){
+        e.preventDefault();
+        const r = fP.ref, rid = String(r.id);
+        let ok = r.kind === "press" || !!r.outlet;
+        if(!ok){ try{ ok = [].concat((S1 && S1.seats) || [], (S2 && S2.seats) || []).some(x => x && String(x.personId) === rid && rid !== "you"); }catch(_){} }
+        if(!ok){ try{ ok = ((typeof hereNow === "function" ? hereNow() : []) || []).concat(G.press || []).some(p => p && p.kind === "press" && String(p.id) === rid); }catch(_){} }
+        let done = false;
+        if(ok && window.onumSession && typeof window.onumSession.callon === "function"){ try{ done = window.onumSession.callon(r.id) !== false; }catch(_){ done = false; } }
+        if(!done) openTalk(r);
+        return; } }
     if((typeof seatVoiceAvailable === "function") && seatVoiceAvailable()){
       e.preventDefault();
       refreshPicks();
