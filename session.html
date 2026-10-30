@@ -48725,47 +48725,54 @@ function wmPressureFromBill(b){ const v = wmBillView(b); const worst = Object.ke
 /* the map, as one SVG. Land masses are loose shapes (the world is a sketch from here), lines show relations, size and ring show heat. */
 function wmSVG(sel){
   const w = worldEnsure(), W = wmStore(), C = G.conflict;
-  /* 20261030r geography: each power is a hand-drawn landmass (capes, bays, fjords), not a scaled blob. The outline is authored per key
-     and roughened by a seeded midpoint walk, so the coast is crinkled but fixed. Centres are unchanged (clicks and labels stay put).
-     The Salt Isles are an archipelago; the shelf is a wide soft stroke under the coast (shallow water). */
-  const WM_SHAPE = {
-    rep:[[-70,-20],[-55,-42],[-30,-38],[-18,-54],[5,-44],[12,-28],[24,-30],[30,-44],[46,-52],[66,-38],[78,-14],[68,2],[82,18],[62,30],[52,50],[42,68],[30,52],[14,44],[-8,54],[-30,46],[-38,58],[-52,48],[-66,34],[-60,16],[-82,4]],
-    pale:[[-64,-6],[-52,-28],[-36,-22],[-30,-44],[-16,-26],[-4,-46],[8,-28],[24,-42],[38,-22],[56,-32],[68,-12],[54,6],[64,24],[42,34],[22,26],[4,40],[-16,30],[-40,38],[-58,22],[-74,10]],
-    reach:[[-58,-12],[-46,-34],[-22,-40],[-2,-30],[20,-46],[46,-38],[60,-18],[86,-12],[64,4],[60,24],[38,40],[16,34],[2,46],[-12,28],[-26,22],[-40,34],[-60,18]],
-    marches:[[-50,-34],[-26,-46],[4,-36],[28,-48],[52,-28],[46,-6],[60,10],[50,32],[26,42],[4,34],[-16,50],[-40,40],[-48,22],[-72,16],[-84,2],[-60,-4],[-64,-20]],
-    horn:[[-56,-24],[-30,-38],[-6,-30],[18,-42],[48,-30],[64,-12],[58,8],[44,24],[20,30],[0,24],[-22,32],[-44,34],[-80,42],[-62,30],[-60,10],[-72,-6]],
-    rift:[[-56,-18],[-40,-40],[-14,-32],[6,-50],[32,-38],[58,-32],[66,-8],[50,10],[62,28],[36,38],[14,28],[-6,44],[-26,30],[-48,38],[-62,20],[-50,4],[-70,-6]],
-    isles:[[-44,-16],[-24,-28],[2,-20],[26,-30],[46,-14],[38,6],[48,20],[20,22],[0,30],[-22,20],[-46,18],[-54,2]]
-  };
-  const WM_ISLETS = {isles:[[-62,-40,13],[56,42,15],[74,-28,8]], rep:[[-88,-30,6],[70,62,5]], pale:[[76,-26,6]], horn:[[-100,30,5],[60,36,6]], marches:[[-90,-18,6]], rift:[[-6,-62,5]], reach:[[96,-2,6]]};
-  const rough = (pts, sd, amp) => { let r = sd; const rnd = () => (r = (r * 16807) % 2147483647) / 2147483647 - 0.5; let a = pts;
-    for(let lv = 0; lv < 3; lv++){ const b = []; for(let i = 0; i < a.length; i++){ const p = a[i], q = a[(i + 1) % a.length], dx = q[0] - p[0], dy = q[1] - p[1], L = Math.hypot(dx, dy) || 1, o = rnd() * L * amp;
-      b.push(p, [(p[0] + q[0]) / 2 - dy / L * o, (p[1] + q[1]) / 2 + dx / L * o]); } a = b; }
-    return a; };
-  const poly = (a, cx, cy) => "M" + a.map(p => (cx + p[0]).toFixed(1) + " " + (cy + p[1]).toFixed(1)).join("L") + "Z";
-  const islet = (x, y, rr, sd) => { const n = 9, pts = []; let r = sd; for(let i = 0; i < n; i++){ r = (r * 16807) % 2147483647; const t = i / n * Math.PI * 2, f = 0.7 + 0.5 * (r / 2147483647); pts.push([Math.cos(t) * rr * f, Math.sin(t) * rr * f * 0.75]); } return poly(rough(pts, sd + 3, 0.22), x, y); };
-  const coast = k => { const g = WM_GEO[k]; let sd = 7; for(const ch of k) sd = (sd * 31 + ch.charCodeAt(0)) % 9973;
-    const S = k === "isles" ? 1.15 : 1.38, sh = WM_SHAPE[k].map(p => [p[0] * S, p[1] * S]); let d = poly(rough(sh, sd + 1, 0.26), g.x, g.y);
-    (WM_ISLETS[k] || []).forEach((t, i) => { d += islet(g.x + t[0] * S, g.y + t[1] * S, t[2], sd + 17 * (i + 1)); });
-    return d; };
-  const land = (k, c) => { const d = coast(k); return '<path d="' + d + '" fill="#1a3a4e" stroke="#16364a" stroke-width="16" stroke-linejoin="round" opacity=".55"/><path d="' + d + '" fill="none" stroke="#1f4a60" stroke-width="6" stroke-linejoin="round" opacity=".8"/>' +
-    '<path d="' + d + '" fill="' + c + '" stroke="#2b2f36" stroke-width="1.5" stroke-linejoin="round"/>'; };
+  /* 20261030s geography: ONE continent. The mainland outline is drawn once; each power is its Voronoi share of it (centres
+     unchanged, so labels and clicks stay put), and the borders between them are narrow straits cut through the land. Shared
+     borders are roughened with a seed taken from the border itself, so both neighbours get the same crinkled edge. The Salt
+     Isles are a chain of four islands off the south-east coast. */
+  const sRnd = sd => { let r = (Math.abs(Math.round(sd)) % 2147483646) + 1; return () => (r = (r * 16807) % 2147483647) / 2147483647 - 0.5; };
+  const roughEdge = (p, q, amp, lv) => { const flip = p[0] > q[0] || (p[0] === q[0] && p[1] > q[1]), a0 = flip ? q : p, b0 = flip ? p : q, rnd = sRnd(a0[0] * 7919 + a0[1] * 104729 + b0[0] * 31 + b0[1] * 17);
+    let a = [a0, b0]; for(let l = 0; l < lv; l++){ const b = [a[0]]; for(let i = 0; i < a.length - 1; i++){ const u = a[i], v = a[i + 1], dx = v[0] - u[0], dy = v[1] - u[1], L = Math.hypot(dx, dy) || 1, o = rnd() * L * amp;
+      b.push([(u[0] + v[0]) / 2 - dy / L * o, (u[1] + v[1]) / 2 + dx / L * o], v); } a = b; }
+    return flip ? a.reverse() : a; };
+  const pathOf = pts => "M" + pts.map(p => p[0].toFixed(1) + " " + p[1].toFixed(1)).join("L") + "Z";
+  const roughRing = (pts, amp, lv) => { let out = []; for(let i = 0; i < pts.length; i++){ const e = roughEdge(pts[i], pts[(i + 1) % pts.length], amp, lv); out = out.concat(e.slice(0, -1)); } return out; };
+  const MAIN = [[18,52],[70,14],[128,22],[196,0],[262,6],[300,-12],[352,0],[396,14],[430,56],[470,96],[520,98],[566,110],[612,138],[640,178],[628,214],[640,246],[600,262],[560,246],[520,258],[480,250],[452,282],[432,322],[440,366],[420,410],[392,440],[350,452],[300,446],[262,420],[236,380],[214,336],[170,318],[124,326],[78,310],[34,288],[4,252],[-14,212],[6,176],[-12,140],[2,98]];
+  const mainPts = roughRing(MAIN, 0.3, 4), mainD = pathOf(mainPts);
+  const SITES = ["rep", "reach", "horn", "pale", "marches", "rift"];
+  const cellOf = k => { let poly = [[-40,-24],[680,-24],[680,480],[-40,480]]; const a = WM_GEO[k];
+    SITES.forEach(o => { if(o === k) return; const b = WM_GEO[o], wa = 1, wb = 1, t = wa / (wa + wb), m = [a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t], n = [b.x - a.x, b.y - a.y];
+      const inside = p => (p[0] - m[0]) * n[0] + (p[1] - m[1]) * n[1] <= 0, out = [];
+      for(let i = 0; i < poly.length; i++){ const P = poly[i], Q = poly[(i + 1) % poly.length], ip = inside(P), iq = inside(Q);
+        if(ip) out.push(P); if(ip !== iq){ const dp = (P[0] - m[0]) * n[0] + (P[1] - m[1]) * n[1], dq = (Q[0] - m[0]) * n[0] + (Q[1] - m[1]) * n[1], t2 = dp / (dp - dq); out.push([P[0] + (Q[0] - P[0]) * t2, P[1] + (Q[1] - P[1]) * t2]); } }
+      poly = out; });
+    return roughRing(poly.map(p => [Math.round(p[0] * 2) / 2, Math.round(p[1] * 2) / 2]), 0.24, 4); };
+  const ISLES = [[0,0,30],[-52,-14,16],[48,22,19],[16,56,14],[-30,40,10]];
+  const isleD = () => { const g = WM_GEO.isles; return ISLES.map((t, i) => { const n = 10, pts = []; const r = sRnd(97 + i * 13); for(let a = 0; a < n; a++){ const th = a / n * Math.PI * 2, f = 0.78 + 0.45 * (r() + 0.5); pts.push([g.x + t[0] + Math.cos(th) * t[2] * f, g.y + t[1] + Math.sin(th) * t[2] * f * 0.72]); } return pathOf(roughRing(pts, 0.25, 3)); }).join(""); };
+  const WATER = "#0e1a24";
+  const defs = '<defs><clipPath id="wmMain"><path d="' + mainD + '"/></clipPath>' + SITES.map(k => '<clipPath id="wmC-' + k + '"><path d="' + pathOf(cellOf(k)) + '"/></clipPath>').join("") + '</defs>';
+  const shelf = '<path d="' + mainD + isleD() + '" fill="#1a3a4e" stroke="#16364a" stroke-width="18" stroke-linejoin="round" opacity=".55"/><path d="' + mainD + isleD() + '" fill="none" stroke="#1f4a60" stroke-width="7" stroke-linejoin="round" opacity=".85"/>';
+  /* one power's share: fill, a relation-coloured rim just inside its coast and straits, then the strait water over its border */
+  const land = (k, c, rim, rw) => { if(k === "isles"){ const d = isleD(); return '<circle cx="' + WM_GEO.isles.x + '" cy="' + WM_GEO.isles.y + '" r="64" fill="transparent"/><path d="' + d + '" fill="' + c + '" stroke="' + (rim || "#2b2f36") + '" stroke-width="' + (rw || 1.5) + '" stroke-linejoin="round"/>'; }
+    const d = pathOf(cellOf(k)); return '<g clip-path="url(#wmMain)"><g clip-path="url(#wmC-' + k + ')"><path d="' + d + '" fill="' + c + '"/><path d="' + mainD + '" fill="none" stroke="' + (rim || "#2b2f36") + '" stroke-width="' + ((rw || 1.5) * 2 + 6) + '" opacity=".95"/><path d="' + d + '" fill="none" stroke="' + (rim || "#2b2f36") + '" stroke-width="' + ((rw || 1.5) * 2 + 6) + '" stroke-linejoin="round"/></g><path d="' + d + '" fill="none" stroke="' + WATER + '" stroke-width="6" stroke-linejoin="round"/></g>'; };
   let s = '<svg viewBox="-40 -24 720 504" role="img" aria-label="War map of the world" style="width:100%;max-height:64vh;background:#0e1a24;border-radius:8px;border:1px solid #2b3946">';
-  s += '<rect x="-40" y="-24" width="720" height="504" fill="#0e1a24"/>';
-  s += '<g stroke="#16293a" stroke-width=".6" opacity=".7">' + [0,1,2,3,4,5,6,7].map(i => '<line x1="' + (-40 + i * 100) + '" y1="-24" x2="' + (-40 + i * 100) + '" y2="480"/>').join("") + [0,1,2,3,4].map(i => '<line x1="-40" y1="' + (-24 + i * 110) + '" x2="680" y2="' + (-24 + i * 110) + '"/>').join("") + '</g>' + '<g fill="#3d5a6e" font-size="8" font-family="Georgia,serif" opacity=".8">' + [[440,120,"42"],[230,300,"18"],[640,60,"66"],[30,380,"51"],[430,460,"88"],[200,20,"37"],[650,270,"74"]].map(t => '<text x="' + t[0] + '" y="' + t[1] + '">' + t[2] + '</text>').join("") + '</g>';
+  s += '<rect x="-40" y="-24" width="720" height="504" fill="#0e1a24"/>' + defs + shelf + '<g>';
+  s += '<g stroke="#16293a" stroke-width=".6" opacity=".7">' + [0,1,2,3,4,5,6,7].map(i => '<line x1="' + (-40 + i * 100) + '" y1="-24" x2="' + (-40 + i * 100) + '" y2="480"/>').join("") + [0,1,2,3,4].map(i => '<line x1="-40" y1="' + (-24 + i * 110) + '" x2="680" y2="' + (-24 + i * 110) + '"/>').join("") + '</g>' + '<g fill="#3d5a6e" font-size="8" font-family="Georgia,serif" opacity=".8">' + [[440,120,"42"],[230,300,"18"],[640,60,"66"],[30,380,"51"],[430,460,"88"],[200,20,"37"],[650,270,"74"]].map(t => '<text x="' + t[0] + '" y="' + t[1] + '">' + t[2] + '</text>').join("") + '</g></g>';
   /* rivalries: dashed lines between neighbours who are each other's enemies */
   const done = {}; Object.keys(REALM_RIVAL).forEach(a => { const b = REALM_RIVAL[a], key = [a, b].sort().join("-"); if(done[key]) return; done[key] = 1; s += '<line x1="' + WM_GEO[a].x + '" y1="' + WM_GEO[a].y + '" x2="' + WM_GEO[b].x + '" y2="' + WM_GEO[b].y + '" stroke="#8a6d9a" stroke-width="1.2" stroke-dasharray="4 5" opacity=".7"/>'; });
-  /* lines from the capital: colour is how they stand with us, weight is the heat of the quarrel */
+  /* lines from the capital: colour is how they stand with us, weight is the heat of the quarrel (20261030s: drawn over the land, across the straits, clear of the labels) */
+  let rel = "";
   WORLD_POWERS.forEach(P => { const g = WM_GEO[P.k], v = wmRel(P.k), foe = w.foe === P.k, hot = C && C.k === P.k, wt = 1.5 + (foe ? Math.round((w.heat || 0) / 25) : 0) + (hot ? 2 : 0);
-    s += '<line x1="' + WM_GEO.rep.x + '" y1="' + WM_GEO.rep.y + '" x2="' + g.x + '" y2="' + g.y + '" stroke="' + wmColor(v, 1) + '" stroke-width="' + wt + '" opacity=".85"' + (hot ? ' stroke-dasharray="2 4"' : "") + '/>'; });
-  s += land("rep", "#2d4d3a") + '<text x="' + WM_GEO.rep.x + '" y="' + (WM_GEO.rep.y - 4) + '" text-anchor="middle" fill="#f4f1e8" font-size="15" font-weight="700" font-family="Georgia,serif">' + pcEsc(wmHome().short) + '</text><text x="' + WM_GEO.rep.x + '" y="' + (WM_GEO.rep.y + 14) + '" text-anchor="middle" fill="#cfd8c8" font-size="11">' + pcEsc(wmHome().cap || "the capital") + '</text>';
+    const ax = WM_GEO.rep.x + (g.x - WM_GEO.rep.x) * 0.3, ay = WM_GEO.rep.y + (g.y - WM_GEO.rep.y) * 0.3, bx = WM_GEO.rep.x + (g.x - WM_GEO.rep.x) * 0.72, by = WM_GEO.rep.y + (g.y - WM_GEO.rep.y) * 0.72;
+    rel += '<line x1="' + ax.toFixed(1) + '" y1="' + ay.toFixed(1) + '" x2="' + bx.toFixed(1) + '" y2="' + by.toFixed(1) + '" stroke-linecap="round" pointer-events="none" stroke="' + wmColor(v, 1) + '" stroke-width="' + wt + '" opacity=".85"' + (hot ? ' stroke-dasharray="2 4"' : "") + '/>'; });
+  s += land("rep", "#2d4d3a", "#6fa07e", 1.5) + '<text x="' + WM_GEO.rep.x + '" y="' + (WM_GEO.rep.y - 4) + '" text-anchor="middle" fill="#f4f1e8" font-size="15" font-weight="700" font-family="Georgia,serif">' + pcEsc(wmHome().short) + '</text><text x="' + WM_GEO.rep.x + '" y="' + (WM_GEO.rep.y + 14) + '" text-anchor="middle" fill="#cfd8c8" font-size="11">' + pcEsc(wmHome().cap || "the capital") + '</text>';
   WORLD_POWERS.forEach(P => { const g = WM_GEO[P.k], v = wmRel(P.k), dead = W.dead[P.k] || 0, on = sel === P.k, foe = w.foe === P.k, open = W.asks.filter(a => a.k === P.k && a.status === "open").length;
-    s += '<g data-wm="' + P.k + '" style="cursor:pointer" tabindex="0" role="button" aria-label="' + pcEsc(cap(P.t)) + ', ' + realmRelLabel(v) + '">' + land(P.k, on ? "#6b5a2e" : "#4a4b3b").replace('stroke="#2b2f36" stroke-width="1.5"', 'stroke="' + (on ? "#ffe08a" : wmColor(v, 1)) + '" stroke-width="' + (on ? 3 : 2) + '"');
+    s += '<g data-wm="' + P.k + '" style="cursor:pointer" tabindex="0" role="button" aria-label="' + pcEsc(cap(P.t)) + ', ' + realmRelLabel(v) + '">' + land(P.k, on ? "#6b5a2e" : "#4a4b3b", on ? "#ffe08a" : wmColor(v, 1), on ? 2.5 : 1.6);
     s += '<text x="' + g.x + '" y="' + (g.y - 4) + '" text-anchor="middle" fill="#f4f1e8" font-size="12.5" font-weight="700">' + pcEsc(cap(P.t.replace(/^the /, ""))) + '</text><text x="' + g.x + '" y="' + (g.y + 11) + '" text-anchor="middle" fill="' + wmColor(v, 1) + '" font-size="11">' + realmRelLabel(v) + ' ' + (v > 0 ? "+" : "") + Math.round(v) + '</text>';
     if(foe) s += '<circle cx="' + (g.x + 42) + '" cy="' + (g.y - 30) + '" r="8" fill="#c8453b"/><text x="' + (g.x + 42) + '" y="' + (g.y - 26) + '" text-anchor="middle" fill="#fff" font-size="11" font-weight="700">!</text>';
     if(dead) s += '<text x="' + g.x + '" y="' + (g.y + 26) + '" text-anchor="middle" fill="#e8a49c" font-size="10.5">' + dead + ' dead</text>';
     if(open) s += '<circle cx="' + (g.x - 42) + '" cy="' + (g.y - 30) + '" r="9" fill="#ffe08a"/><text x="' + (g.x - 42) + '" y="' + (g.y - 26) + '" text-anchor="middle" fill="#111" font-size="11" font-weight="700">' + open + '</text>';
     s += '</g>'; });
+  s += rel;
   s += '<text x="-28" y="458" fill="#6f8798" font-size="10.5">Line colour: how they stand with us. Heavy line: the quarrel is hot. Dashed purple: rivals.</text><text x="-28" y="473" fill="#6f8798" font-size="10.5">Gold badge: delegations waiting. Red !: the quarrel of the day. Click a power for its detail.</text></svg>';
   return s;
 }
