@@ -182,3 +182,10 @@ Verdict: lids, lash line, lips and ears now read at Senate mid-shot. Faces still
 - Skin: low-frequency distant mottle in map_fragment (no pore grid revival).
 - Plants: ball core removed entirely (fronds only).
 - Gaps: eye/brow proportions, neck-collar join, East Steps bronze ball, HUD hst1d (not reproduced). Room-distance faces still MISS -> ac.
+
+## 20261030ac
+- Eyes: iris 0.0063->0.0076, pupil 0.0022->0.0029, lashes ~2x thicker. Brows ~1.6x thicker, 55% darker than hair.
+- Hair: cards lie flat (lift 0.06-0.18 rad, was 0.35-0.75), wider, darker strand tint, roughness .88; shell roughness .9 (de-gloss).
+- Skin: saturation x0.66 (was 0.80), hue -0.02; grazing-edge darkening stronger (0.58/0.52/0.52), shadow SSS warmth reduced.
+- Collar: thicker soft roll (tube 0.011) over the neck join.
+- Verdict: still MISS at room distance (crown card tips stick up, skin still warm/pink, neck still plain) -> ad.
