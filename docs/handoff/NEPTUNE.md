@@ -62,3 +62,11 @@ Boot fix (20261030d): 30a–30c shipped an entity-decoded main script (entity te
 - Floor desk: #sxDock.fd-on is a bottom band (left/right 8px, above hmBar, max ~20vh, row layout), not a right column.
 - "Stops you" toast hides Talk while onumTalkOwner() is truthy.
 - JUPITER engine untouched; onumTalkOwner unchanged.
+
+## 20261030h (NEPTUNE: desk really at the bottom)
+- Root cause of 30g FAIL: onumHud layout() docks #sxDock as "R" with inline !important styles, which beat the #sxDock.fd-on stylesheet. layout() now routes #sxDock to the bottom band whenever it holds a visible #ndFd: full width (8px sides), max 20vh, bottom edge just above the topmost fixed bottom strip (wire / Say aloud bar). The bar is no longer squeezed sideways. Centre of view stays clear.
+- Chairing: Pass / Interject / Call on next are always on the desk (greyed with a reason when they don't apply); press "Hands up" pick row kept. Action row now sits above the reply box so the band never clips it.
+- Talk: reply box (#tkOwn) and head never shrink; only #tkActs scrolls (min 96px). Fixes More-open crushed reply box.
+- 55px band under canvas: not reproduced headless at 1280x720 (canvas bottom meets the wire strip); no talk/desk CSS change found that resizes #scene.
+- Headless: boot clears; press conference desk measured x8 y499 w1264 h144 at 1280x720 (bar top 677).
+- JUPITER ssnTick/hold/pass/callon untouched.
