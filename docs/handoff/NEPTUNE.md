@@ -326,3 +326,12 @@ Verdict: lids, lash line, lips and ears now read at Senate mid-shot. Faces still
 - Eyes/brows: brow material 0.55 -> 0.78 toward black.
 - No render-loop/SSAO edits. QA clean (no ap): eye lock 4/4, pinned idle 9.3% f0->f1. cmp-*-as-vs-at in qa-30at.
 - Verdict: FAIL - livelier, still figurine read at 6-10 m. Next Neptune: au.
+
+## 20261030au (on at 3175ca4)
+- Brighter sclera (eyeW 0xeee8e0); brow tube mass x2.3 (was 1.9).
+- Resting finger curl -0.62 - 0.16*k (no mitts); rest elbow bend -0.3.
+- Jacket collar roll (half torus behind neck); jacket sleeve hem ring thicker than shirt cuff.
+- Trouser crease strips on thigh + shin; dark sole/welt box under men's shoes (foot contact).
+- Neptune visuals only; no main render loop / SSAO edits (JUPITER ap).
+- QA /workspace/neptune-qa-30au (copy qa-30au/): stamp 20261030au, no errors, idle pin 6.7% f0-f1. cmp-*-at-vs-au.png.
+- Verdict: **FAIL** - floor still reads figurine/diorama at 6-10 m. Not done: hair part line/crown contrast, seated mix (scene-driven), weight shift, face AO/SSS. Next: **av**.
