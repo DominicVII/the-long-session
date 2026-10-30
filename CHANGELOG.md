@@ -4,6 +4,15 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261030o: look = collide (furniture fixes), press Cancel / panel teardown, court nametags, no slide-through unstick
+
+- **Collide follows Neptune's furniture fixes (n).** Bodies collide from PHYS boxes scanned off the live meshes; the scan ran at 250 ms / 1.8 s after a build, while `neptune/onum-furniture-fixes.js` moves props on render frames (sometimes later). PHYS now rescans whenever `ONUM_FF.log` changes, and meshes under a hidden parent (in-wall bench ledge, coat in the plant) no longer collide. Verified: office sofa (added) collides at (-2.35, 5.4); Senate desk/chair moved out of the Court door, no collider left in the door; visitor-office back-wall props collide at their pulled-in spot.
+- **House benches:** `seatFor` (chamber seating) still used the old 1.45 pitch, sitting the outer row at x 8.4 in the wall; now 1.38, the same as the built benches (outer row x 8.12).
+- **NPC slide:** unstick's last resort "put through" teleported a stuck body to its target even across a wall or out of the room. Now only if the target is in-room (or a door), not inside a wall/prop, and the line to it crosses no wall; otherwise it retargets to a clear point.
+- **Press Cancel:** with nothing typed, Cancel now dismisses the sitting (same teardown as Walk out) and you stay in the room; it does not auto-reopen until you leave and return. With text typed it still just clears the text.
+- **Lingering press panel / stale nametags:** a 200 ms watcher (ignores open cards and walking) closes a session that belongs to another room, hides the floor desk, removes the session panel when no session is published, and blanks all nametags on room change (Court no longer shows corridor names).
+- East Steps: walk probe found no stick and the stump stays unarmed on walk-by (arms only on interact); no change.
+
 ## 20261030m: press chair — E calls on the focused person, not the queue head
 
 Seated press-conference chair with a person in focus: E resolves the session from ONUM_SESSION and live SSN, calls onumSession.callon on the focused person (reporter by kind/outlet/seat/room press), falling back to openTalk; always returns before seated-voice/glass so it never seeks the floor. Chip call-on (queue head), walk-out, Speak/Cancel and floordesk UI unchanged.
