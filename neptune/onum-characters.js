@@ -590,8 +590,8 @@ export function makeCharacter(THREE, opts = {}) {
   // --- clothing on torso ---
   const jlen = bottom === 'dress' ? -0.06 : -0.17;
   if (jacket) {
-    const jp = tp.filter(a => a[0] <= 0.51).map(a => { const r = ring(a, 1.06, 0.012); const pad = sstep(0.36, 0.43, a[0]) * sstep(0.50, 0.465, a[0]); r.w = Math.max(r.w, mix(r.w, shX + (fem ? 0.022 : 0.03) - 0.05 * sstep(0.44, 0.5, a[0]), pad)); return r; }); jp.push({ y: 0.535, w: 0.072, d: 0.066 }); jp.unshift({ y: jlen, w: tp[0][1] * 1.08 + 0.014, d: tp[0][2] * 1.06 + 0.012 });
-    add(torso, gb('jacket' + jlen, () => loft(jp, seg)), suitM);
+    const jp = tp.filter(a => a[0] <= 0.51).map(a => { const r = ring(a, 1.06, 0.012); const pad = sstep(0.36, 0.43, a[0]) * sstep(0.50, 0.465, a[0]); r.w = Math.max(r.w, mix(r.w, shX + (fem ? 0.022 : 0.03) - 0.05 * sstep(0.44, 0.5, a[0]), pad)); return r; }); jp.push({ y: 0.535, w: 0.072, d: 0.066 }); jp.unshift({ y: jlen, w: tp[0][1] * 1.15 + 0.026, d: tp[0][2] * 1.12 + 0.022 });   /* 20261030an: jacket hem flares off the hips */
+    add(torso, gb('jacketF' + jlen, () => loft(jp, seg)), suitM);
     // shirt V + lapels
     const vz = (y) => { let a = tp[0]; for (const t of tp) if (t[0] <= y) a = t; return a[2] * 1.06 + 0.012 + (a[3] || 0); };
     const vtop = 0.465, vbot = fem ? 0.2 : 0.17;
@@ -653,7 +653,7 @@ export function makeCharacter(THREE, opts = {}) {
     add(hp, gb('thigh' + bottom, () => limb(0.45, bottom === 'trousers' ? [0.085, 0.08, 0.068, 0.058] : [0.075, 0.068, 0.055, 0.045], seg)), legM);
     const kn = new T.Group(); kn.position.y = -0.45; hp.add(kn);
     add(kn, gb('knee' + bottom, () => weld(new T.SphereGeometry(bottom === 'trousers' ? 0.056 : 0.045, 12, 10))), legM);
-    add(kn, gb('shin' + bottom, () => limb(0.43, bottom === 'trousers' ? [0.056, 0.054, 0.05, 0.052] : [0.045, 0.05, 0.036, 0.03], seg)), legM);
+    add(kn, gb('shinB' + bottom, () => limb(0.43, bottom === 'trousers' ? [0.057, 0.053, 0.052, 0.066] : [0.045, 0.05, 0.036, 0.03], seg)), legM);
     const an = new T.Group(); an.position.y = -0.43; kn.add(an);
     const shoe = add(an, gb('shoe' + (fem ? 'f' : 'm'), () => fem
       ? loft([{ y: -0.02, w: .03, d: .028, z: -0.01 }, { y: -0.05, w: .036, d: .11, z: 0.035 }, { y: -0.062, w: .036, d: .115, z: 0.035 }], 14, 3)
