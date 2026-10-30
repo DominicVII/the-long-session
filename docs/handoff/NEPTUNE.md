@@ -189,3 +189,9 @@ Verdict: lids, lash line, lips and ears now read at Senate mid-shot. Faces still
 - Skin: saturation x0.66 (was 0.80), hue -0.02; grazing-edge darkening stronger (0.58/0.52/0.52), shadow SSS warmth reduced.
 - Collar: thicker soft roll (tube 0.011) over the neck join.
 - Verdict: still MISS at room distance (crown card tips stick up, skin still warm/pink, neck still plain) -> ad.
+
+## 20261030ad
+- Head albedo (headskin3): painted eye sockets, under-brow, cheek hollow, temple and under-jaw shade.
+- Irises 45% darker. Neck uses its own skin material at 0.8x (jaw shadow). Crown strand cards (ny>0.72) are 0.45x length.
+- Runtime skin: saturation x0.54, hue -0.025, lightness x0.9 (cooler, darker).
+- QA: front-on Senate shots at 7 m and 4 m (qa-30ad/after-senate-front7/4). Eyes, brows and nose now read on the near face; the low-poly stylised silhouette still reads toy -> ae.
