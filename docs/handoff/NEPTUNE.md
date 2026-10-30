@@ -218,3 +218,12 @@ Verdict: lids, lash line, lips and ears now read at Senate mid-shot. Faces still
 - Not done: real shadow maps on people, hair-cap edge break.
 - QA: qa-30ag (+ backup /workspace/neptune-qa-30ag).
 - ag (MARS af folds): tiled w30Cloth suit map dropped (camo), so folds come from the shader on USE_UV. Light hair shells and fuzz are 0.78x, which breaks far white domes. Collar ring bigger and higher (r .06, y .514) over the neck join. Painted brow and lash marks stronger (0.66 / 0.6) for far rows.
+
+## 20261030ah
+- Stance varies per person, seeded from S.phase. Standing idle gets a weight shift (hip x and roll, opposite torso roll), slouch or upright, chest width ±5%, head tilt and turn, and different arm rests (shoulder spread and elbow bend).
+- A soft radial contact shadow sits under every character (`onumc-contact`, basic material, no depth write, at every LOD).
+- The hair shell outline is broken up with seeded radial noise: 3 mm on short cuts, 11 mm otherwise. The cards follow it. This removes the smooth domes.
+- Skin gets micro and mid-scale normal bump on USE_MAP, and specular is cut to 0.55 direct / 0.65 indirect so it looks less plastic.
+- Everything from ag is kept.
+- MARS ag folds: fingers are 1.28x thicker and 1.08x longer. Cloth fold crease goes 0.16 -> 0.3, plus a tight elbow/waist bunching band (0.22). Painted brow and lash weights are now 0.8 / 0.72. QA adds face-front2..5 at 2.2 m along each NPC's facing.
+- Verdict: FAIL, still reads as a diorama. Next is ai.
