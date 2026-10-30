@@ -290,3 +290,12 @@ Verdict: lids, lash line, lips and ears now read at Senate mid-shot. Faces still
 - Kept all an/am gains. SSAO NOT touched (JUPITER owns ap).
 - QA: /workspace/neptune-qa-30ao -> qa-30ao, cmp-*-an-vs-ao. Idle target-only (48 hidden): body-box change 7.9% f0->f1, 14.5% f0->f2 (was 0%/~1% in an), but the target's projected anchor also drifted ~57 px, so part of that is the NPC moving, not just sway.
 - Verdict: FAIL. Floor still reads as figurines at 6-10 m. Next Neptune stamp: aq (ap left for JUPITER).
+
+## 20261030aq (on ao 3f44f4b; ap = JUPITER SSAO, local-only at time of writing)
+- Geometric face planes in headShape: cheekbones 0.06->0.095, flat side-of-face plane, brow ridge, deeper sockets.
+- Darker far contact: second solid-core material (contactmatF) swapped in when distance scale k > 1.3; near keeps warm ring.
+- Posture variety: per-person static lean/hip yaw/torso yaw from phase seed (on top of 2x sway).
+- Idle QA pinned: target tx/tz/x/z held each frame, camera set once and allowed to settle. f0->f1 anchor identical (640,379,813 both): 12.3% body-box change = real sway. f2 camera moved again (15.9%, not used).
+- QA rendered with JUPITER's local ap SSAO + aq chars. SSAO shows heavy grainy speckle over walls/faces - flag for JUPITER.
+- HTML/onum-build stamp aq HELD until ap lands on remote main (no stomping JUPITER's render-loop files).
+- Verdict: FAIL. Still figurine read at 6-10 m. Next Neptune: ar.
