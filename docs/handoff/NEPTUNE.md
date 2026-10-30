@@ -299,3 +299,11 @@ Verdict: lids, lash line, lips and ears now read at Senate mid-shot. Faces still
 - QA rendered with JUPITER's local ap SSAO + aq chars. SSAO shows heavy grainy speckle over walls/faces - flag for JUPITER.
 - HTML/onum-build stamp aq HELD until ap lands on remote main (no stomping JUPITER's render-loop files).
 - Verdict: FAIL. Still figurine read at 6-10 m. Next Neptune: ar.
+
+## 20261030ar (on aq stamp e63c122; ap SSAO still box-local for JUPITER)
+- aq stamp finished on remote (5 HTML + onum-build, stamp-only, no SSAO files touched).
+- Face geo pushed: cheekbones 0.12, side plane 0.06, brow ridge 0.036, sockets 0.042; side/cheek paint plane 0.4.
+- Silhouette: posture variety up (lean 0.12, hip yaw 0.22, torso yaw 0.18, extra hip shift).
+- Far contact: grows to 2.8x, solid-core material from k>1.15, outer stop 0.88 (contactmatF2).
+- QA clean (remote HTML, no ap SSAO grain). Pinned idle anchor stable over all 3 frames: 5.0% f0->f1, 17.1% f0->f2.
+- Verdict: FAIL — still figurine read at 6-10 m. Next Neptune: as.
