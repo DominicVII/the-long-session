@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261030b">
+<meta name="onum-build" content="20261030c">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261030b";
+  var STAMP = "20261030c";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -26169,7 +26169,7 @@ function showChat(m){
 async function converse(m, text){
   if(!m || chatCtl) return;
   /* 20261013p: they came to you, or are speaking to you: the talk opens on their line, then your reply goes in */
-  try{ if((!TALK.open || TALK.m !== m) && (m.wantsWord || (m.sayTo === "you" && m.sayT > 0))) openTalk(m); }catch(e){}
+  try{ if((!TALK.open || TALK.m !== m) && m && m.sayTo === "you" && m.sayT > 0 && !m.wantsWord) openTalk(m); }catch(e){}
   m.chat = m.chat || [];
   m.chat.push({role:"user", content:text});
   appendMsg("you", text);
@@ -48005,7 +48005,7 @@ try{
    (an object keyed by id is accepted too), plus a CustomEvent 'onum-polity-change' (detail: one polity, or {id|name, removed:true}
    to dissolve it). 'onum-polities-updated' / 'onum-secession' are also heard. window.onumPolityApply(p) applies one directly.
    Effect: member states are recoloured in the nation's flag colour, a heavy border is drawn around its territory, its flag
-   (neptune/onum-flags.js drawFlag(govType, seed = hash(name))) and name sit on the map, and the state panel shows the
+   (../neptune/onum-flags.js drawFlag(govType, seed = hash(name))) and name sit on the map, and the state panel shows the
    nation, its leader and form of government. Guarded: any failure leaves the stock Union map untouched. */
 try{
   const PO = window.NEPTUNE_POLITIES = {ver:"20261013g", list:new Map(), flags:new Map()};
@@ -51129,7 +51129,7 @@ function wlSitLines(room, step, C){
 { const _sl = sitLines; sitLines = function(room, step, C, ctx){ try{ const L = wlSitLines(room, step, C); if(L && L.length) return L; }catch(e){} return _sl.apply(this, arguments); }; }
 window.onumWill = {store:() => wlStore(), regard:(a, b) => wlRegard(a, b), options:m => wlOptions(m)};
 
-/* ══ 20261030a · SESSIONS AND OPEN TALK, OPTIMISED.
+/* ══ 20261030c · SESSIONS AND OPEN TALK, OPTIMISED.
    Press conference is an ONUM_SESSION (not the step-by-step sitting): the President opens,
    reporters raise hands into the queue, you call on one, their question waits with no timeout,
    you answer, then the next hand. Open talk no longer auto-opens when someone wants a word
@@ -51348,22 +51348,25 @@ window.onumWill = {store:() => wlStore(), regard:(a, b) => wlRegard(a, b), optio
     /* ── open talk: no auto-open on wantsWord; LiveTalk is the one reply path ── */
     { const _cv = converse;
       converse = async function(m, text){
-        /* only auto-open if they are mid-line to you and you already engaged — never yank open for a hail */
-        try{ if((!TALK.open || TALK.m !== m) && m && m.sayTo === "you" && m.sayT > 0 && !m.wantsWord) openTalk(m); }catch(e){}
         if(!m || !text) return;
-        /* LiveTalk first when available */
         try{
           const LT = window.onumLiveTalk;
-          if(LT && LT.reply && TALK.open && TALK.m === m){
-            if(typeof tkOwnSay === "function"){ return tkOwnSay(m, text); }
+          if(LT && LT.reply && TALK.open && TALK.m === m && typeof tkOwnSay === "function"){
+            return tkOwnSay(m, text);
           }
         }catch(e){}
-        return _cv.apply(this, arguments);
+        /* hold wantsWord so the legacy converse body cannot yank-open talk for a hail */
+        var held = null;
+        try{
+          if(m.wantsWord && (!TALK.open || TALK.m !== m)){ held = m.wantsWord; m.wantsWord = null; }
+        }catch(e){}
+        try{ return await _cv.apply(this, arguments); }
+        finally { try{ if(held && m && !m.wantsWord) m.wantsWord = held; }catch(e){} }
       };
     }
 
-    console.log("JUPITER 20261030a: press conference session + open-talk path");
-  }catch(e){ try{ console.warn("JUPITER 20261030a", e); }catch(x){} }
+    console.log("JUPITER 20261030c: press session + wantsWord hold (on Neptune 30b tip)");
+  }catch(e){ try{ console.warn("JUPITER 20261030c", e); }catch(x){} }
 })();
 
 
