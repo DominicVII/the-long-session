@@ -1570,7 +1570,20 @@
       return new T.MeshStandardMaterial({ map: t, roughness: 0.2 });
     });
   }
-  function hairShellMat(S, q) {
+  // 20261030ab: hair strand cards. Alpha-cut clumps of strands, each its own tone, laid on the hair surface and lifted at the tips:
+// a broken, layered outline at room distance instead of a solid painted shell.
+function hairCardMat(S) {
+  return cached(matCache, 'haircard' + S.hair + MODE, () => {
+    const c = document.createElement('canvas'); c.width = 64; c.height = 128; const x = c.getContext('2d');
+    const base = deepen(new T.Color(S.hair)); let sd = 13; const r = () => { sd = (sd * 16807) % 2147483647; return sd / 2147483647; };
+    for (let i = 0; i < 60; i++) { const px = 4 + r() * 56, w = 0.8 + r() * 1.6, len = 70 + r() * 58, v = 0.7 + r() * 0.6;
+      x.strokeStyle = 'rgb(' + Math.min(255, base.r * 255 * v | 0) + ',' + Math.min(255, base.g * 255 * v | 0) + ',' + Math.min(255, base.b * 255 * v | 0) + ')';
+      x.lineWidth = w; x.beginPath(); x.moveTo(px, 0); x.quadraticCurveTo(px + (r() - 0.5) * 10, len * 0.5, px + (r() - 0.5) * 14, len); x.stroke(); }
+    const t = texEnc(new T.CanvasTexture(c));
+    return new T.MeshStandardMaterial({ color: 0xffffff, map: t, alphaTest: 0.45, side: T.DoubleSide, roughness: 0.55, metalness: 0 });
+  });
+}
+function hairShellMat(S, q) {
     return cached(matCache, "hairshell3" + S.style + S.hair + (S.fem ? 1 : 0) + q + MODE, () => {
       const W = q === "high" ? 512 : 256, H = W / 2, base = deepen(new T.Color(S.hair));
       const hgt = new Float32Array(W * H);
@@ -2315,7 +2328,23 @@
         });
         add(headPivot, fz, hairFuzzMat(S, q), 0, 0, 0, faceFine);
       }
-      if (S.style === "bun") {
+    // 20261030ab: strand cards over the shell (every quality: this is what reads at room distance)
+    if (S.style !== 'buzz' && S.style !== 'bald_fringe') {
+      const cardG = cached(geoCache, 'hcard', () => new T.PlaneGeometry(1, 1).translate(0, -0.45, 0)), cm = hairCardMat(S);
+      let sd = 7 + ((S.hair * 31 + S.skin) % 100000); const rr = () => { sd = (sd * 16807) % 2147483647; return sd / 2147483647; };
+      const Z = new T.Vector3(0, 0, 1), n = new T.Vector3(), o = [0, 0, 0], N = S.style === 'caesar' ? 36 : q === 'low' ? 56 : 84;
+      for (let i = 0, tries = 0; i < N && tries < N * 6; tries++) {
+        let nx = rr() * 2 - 1, ny = -0.15 + rr() * 1.15, nz = rr() * 2 - 1; const l = Math.hypot(nx, ny, nz); nx /= l; ny /= l; nz /= l;
+        const { m, t } = hairMask(S.style, nx, ny, nz, fem); if (m < 0.7) continue; i++;
+        shape(nx, ny, nz, o); const k = hk(nx, ny, nz, m, t) + 0.002;
+        const c = add(headPivot, cardG, cm, o[0] * k, o[1] * k, o[2] * k); c.castShadow = false;
+        n.set(o[0], o[1], o[2]).normalize(); c.quaternion.setFromUnitVectors(Z, n);
+        const L = (S.style === 'caesar' ? 0.022 : 0.034) + rr() * 0.028;
+        c.rotateZ(Math.atan2(nx, ny) * 0.0 + (rr() - 0.5) * 0.7 + (nz < 0 ? Math.PI : 0) * 0); c.rotateX(-0.35 - rr() * 0.4);
+        c.scale.set(0.022 + rr() * 0.02, L, 1);
+      }
+    }
+    if (S.style === 'bun') {
         const b = add(headPivot, earB, hairM, 0, 0.06, -0.1);
         b.scale.set(0.038, 0.034, 0.034);
       }
