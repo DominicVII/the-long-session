@@ -234,3 +234,14 @@ Verdict: lids, lash line, lips and ears now read at Senate mid-shot. Faces still
 - Idle motion adds a slow hip sway, a torso yaw drift, deeper breathing and a head fidget, each seeded per person.
 - The QA face-front cams now look for the onum head under the NPC and read its world facing. It is still unreliable: face-front2 still lands on the back of a distant NPC.
 - Verdict: FAIL, next is aj.
+
+## 20261030aj
+- Contact shadows are darker and larger: the radial core goes 0.6 -> 0.88 alpha, with a 0.62 mid stop and a 0.26 outer stop. Scale goes 0.78x0.6 -> 1.05x0.85, cache key contactmat2.
+- Fold geometry: three torus fold rings per arm (above the elbow, below the elbow, and wrist bunching above the cuff), on top of the shader creases.
+- Fingers: 1.5x thick and 1.1x long. They splay (rotation x (k-1.5)*0.09) and are spaced 1.12x, so they read as separate digit volumes.
+- Brows: tube geometry is 1.4x thicker. Painted brow and lash weights go 0.8/0.72 -> 1.0/0.9.
+- Lighting: the body key in x30ClothShader goes 0.5..1.18 -> 0.4..1.26 (cache aj30cloth). The skin key goes 0.7..1.12 -> 0.58..1.2. People only, so sconces and the Capitol are untouched.
+- QA face-front cams now find the nearest onum root and aim at the eye midpoint (pupil/iris meshes) from the head centre. The ai head-direction read was the fallback.
+- QA: qa-30aj (+ backup /workspace/neptune-qa-30aj).
+- QA: the Senate floor is populated (floor9 shows about 30 NPCs) and all four face-front cams locked on by the eyes (face-front2..5).
+- Verdict: FAIL. Faces read better and fingers and folds now show, but the bodies are still stiff, clay-like figurines with helmet hair at 6–10 m. Next is ak: hair mass (cards to volume), skin AO under the brow, nose, hairline and chin, attached cuffs and torso taper, and a stronger rim.
