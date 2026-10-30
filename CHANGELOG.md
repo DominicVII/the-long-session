@@ -4,6 +4,10 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261030m: press chair — E calls on the focused person, not the queue head
+
+Seated press-conference chair with a person in focus: E resolves the session from ONUM_SESSION and live SSN, calls onumSession.callon on the focused person (reporter by kind/outlet/seat/room press), falling back to openTalk; always returns before seated-voice/glass so it never seeks the floor. Chip call-on (queue head), walk-out, Speak/Cancel and floordesk UI unchanged.
+
 ## 20261030l: press chair — E on a focused reporter calls on them
 
 Seated press-conference chair with a reporter in focus: E now routes to openTalk→onumSession.callon before seated-voice/glass handling, so it no longer seeks the floor (NOW YOU). Chip call-on, E-while-seated, floordesk UI unchanged.
