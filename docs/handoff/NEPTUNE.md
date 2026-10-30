@@ -147,3 +147,11 @@ Presentation only; no collision, room mesh/load paths, NPC placement or JUPITER 
 - **Sconces:** bowl emissive 0.78→0.46 (exterior/Capitol glare).
 - Amenities module has no plants; office plants are `propPlant` → covered.
 - Gaps for y: faces still stylised geometry (no lids/lip mesh detail); skin hue a touch orange under amber fill; exterior Capitol blowout only partly addressed (exposure); gate still one sand map for all blocks.
+
+## 20261030y — skin microdetail, de-orange, exterior exposure, gate = Capitol sandstone
+
+- **Skin:** shader now also injects at `map_fragment` (head skin, USE_MAP): per-texel pore darkening (~18% of texels −14%), low-frequency capillary mottle (rosy/olive), 14% desaturation with a slight cool shift. Albedo hue nudged to rose (h −0.012, s ×0.80 — was ×1.12 on x). Shadow bleed tint more crimson, less orange. Program key `y30skin`.
+- **Exterior exposure:** `toneMappingExposure ×0.84` when `R.open` (outdoor rooms).
+- **District gate:** bare-white stone now lerps to the Capitol limestone #e0c9a2 (0.62) instead of 0xd2b48a, so gate and Capitol columns share one sandstone; bold courses from x kept.
+- **Sconce decor bowls:** emissive 0.6→0.42.
+- Gaps for z: no eyelid/lip/ear geometry (needs onum-characters.js head edit + bundle regen); gate vs Capitol not yet shot in one frame; plant fronds good, could add second leaf species.
