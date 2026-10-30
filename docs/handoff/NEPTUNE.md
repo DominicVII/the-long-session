@@ -119,3 +119,10 @@ Presentation only; no collision, room mesh/load paths, NPC placement or JUPITER 
 - War map: home short name trimmed, never blank.
 - No collide data, props, or JUPITER systems touched. Shots: /workspace/tls/qa-30u (before-/after-*, cmp.jpg).
 - Gaps: Capitol/East Steps columns still read pure white (no sandstone tint yet); normal relief is not shown on modest (tier 1) machines; corridor sconce glare not retuned; NPC cloth not retextured.
+
+## 20261030v — realism pass 2 (look only)
+- Stone: flat-colour whites (rough >= 0.5, non-metal) become sandstone/limewash with stone grain; flat greys get slight warmth + stone grain. Runtime pass `nmPeoplePass` (2.5 s, once per material) also tints the District / VISTA-GATES bare-white meshes to sandstone with stone maps, and `onum:limestone` from pure white to #e0c9a2. Gate arch at East Steps now reads as grained sandstone (qa-30v/fogcmp.jpg).
+- Cloth: game cloth roughness >= 0.9, weave normal 0.35→0.55, crease roughness map now on modest machines too, soft env sheen 0.16. Character-module suits (flat colour + weave normal + ORM) get weave x1.35 and sheen 0.14.
+- Skin: warmer under-skin emissive (subsurface stand-in) and roughness ≥ 0.6 (less wax) on nmSkin and onumc:skin/headskin.
+- Sconces: emissive 1.0/0.72 → 0.62/0.48, amber 0xf2b872; sconce point light 0.48→0.42 warmer.
+- Gaps: faces only subtly changed (no real SSS shader); corridor marble pillars kept (textured marble, untouched); outdoor sky/fog colour varies run to run so wide outdoor before/after are not like-for-like; perf of the 2.5 s traverse is unmeasured on a real modest machine.
