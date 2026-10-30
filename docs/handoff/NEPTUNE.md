@@ -256,3 +256,13 @@ Verdict: lids, lash line, lips and ears now read at Senate mid-shot. Faces still
 - Verdict: FAIL. Heads are fuller and shoulders rounder, but faces still read as carved and bodies as stiff figurines at 6–10 m. Next is al.
 - MARS aj -> al (on top of ak). Faces still look like clay at rug distance; eyes and brows only read at about 2 m. Hair still reads as helmet shells. Bodies look stiff, and the cuff rings and splayed fingers read as diorama parts. Foot blobs are only partial on floor9. Idle can't be shown in stills, so al needs a short frame-sequence or GIF capture. Senate population and face-front eye lock PASS; keep both.
 - al plan: an additive dark contact decal (multiply blend, 1.4 m footprint, near-black core) that reads on the red rug; much larger painted eye-socket and brow marks scaled for 8 m (or an LOD impostor feature boost); hair silhouette from an inflated soft hull, not cards; drop the fold torus rings for sleeve-taper geometry; curl the fingers into a relaxed hand, not splayed; multi-frame QA for idle.
+
+## 20261030al
+- Contact shadows (contactmat3): near-black core (0.97/0.85/0.42) at 1.45x1.2.
+- Eyes and brows at 8 m: the painted brow band is wider (0.032 -> 0.05) and the lash/eye band too (0.022 -> 0.038). New dark eye-socket mass (0.35), weights 1.15/1.05. Brow tubes are 1.9x thick.
+- Hair: strand cards are now near-LOD only (faceFine). At mid-far range the silhouette is the soft lobed mass, with the lobe amplitude raised 0.016 -> 0.026.
+- Sleeves: the aj torus fold rings are removed. The upper arm and forearm are tapered (0.062 -> 0.041, 0.047 -> 0.031). The cuff sits flush on the wrist (r .0325/.031 at y -0.25).
+- Fingers are relaxed and curled (rest x -0.35-0.12k, idle -0.55-0.1k), not splayed, at 1.32x thick.
+- Cloth (al30cloth): vertical drape folds, heavier toward the hem, plus a hem weight shadow.
+- QA: qa-30al (+ backup /workspace/neptune-qa-30al). The Senate floor is populated and face-front2..5 locked on by the eyes. idle-f0..f2 are three frames 450 ms apart: about 7.5k pixels change in the person band. That shows motion, but walkers could account for it as well as idle.
+- Verdict: FAIL. Contact shadows are still hard to see on the red rug from 9 m, because the rug's own darkness masks them. Bodies still read as figurines. Next is am: a screen-space or AO pass, rug-relative contact shadows (lighten the ring around them), and higher-poly heads at mid LOD.
