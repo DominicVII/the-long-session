@@ -91,7 +91,7 @@ function headSkinMat(S, q) {
       { const E = (v, w) => Math.exp(-(v / w) * (v / w));   /* 20261030ae: painted feature marks in the head albedo itself, so they survive every LOD tier and 6-10 m */
         const ybw = E(ny - 0.255 - 0.03 * (0.3 - Math.abs(ax - 0.3)), 0.032) * sstep(0.07, 0.13, ax) * sstep(0.5, 0.42, ax) * fr, yln = E(ny - 0.135, 0.022) * sstep(0.2, 0.25, ax) * sstep(0.45, 0.4, ax) * fr;
         const yns = E(ax - 0.1, 0.03) * sstep(0.06, -0.04, ny) * sstep(-0.32, -0.22, ny) * fr, yun = G2(nx, ny + 0.32, 0.06) * fr, ylp = E(ny + 0.47, 0.02) * sstep(0.2, 0.12, ax) * fr, yul = G2(nx * 0.5, ny + 0.58, 0.05) * fr;
-        const yk = 1 - 0.66 * ybw - 0.6 * yln - 0.22 * yns - 0.22 * yun - 0.38 * ylp - 0.18 * yul; r *= yk; g *= yk * 0.97; b *= yk * 0.96; }
+        const yk = 1 - 0.8 * ybw - 0.72 * yln - 0.22 * yns - 0.22 * yun - 0.38 * ylp - 0.18 * yul; r *= yk; g *= yk * 0.97; b *= yk * 0.96; }
       const m = 1 + mott * 0.06 - sstep(0.7, 0.9, freck) * 0.05 * (dark ? 0.3 : 1);
       r *= m; g *= m; b *= m;
       const bs = beard * (0.55 + 0.45 * sstep(0.35, 0.75, stub));
@@ -418,7 +418,7 @@ export function makeCharacter(THREE, opts = {}) {
   // getting update() calls at every LOD (hooking a rig mesh froze LOD 3: rig hidden -> hook never ran again)
   const hook = new T.Mesh(cached(geoCache, 'hook', () => new T.BufferGeometry().setAttribute('position', new T.Float32BufferAttribute([0, 1, 0, 0.001, 1, 0, 0, 1.001, 0], 3))),
     cached(matCache, 'hookmat', () => new T.MeshBasicMaterial({ colorWrite: false, depthWrite: false, depthTest: false }))); hook.frustumCulled = false; hook.name = 'onumc-hook';
-  root.add(hook); root.add(body); body.add(rig);
+  root.add(hook); root.add(body); { /* 20261030ah: soft contact shadow so people sit on the rug, not float on it */ const cg = cached(geoCache, "contact", () => new T.PlaneGeometry(1, 1).rotateX(-Math.PI / 2)), cm = cached(matCache, "contactmat", () => { const c = document.createElement("canvas"); c.width = c.height = 64; const g = c.getContext("2d"), gr = g.createRadialGradient(32, 32, 2, 32, 32, 31); gr.addColorStop(0, "rgba(0,0,0,0.6)"); gr.addColorStop(0.45, "rgba(0,0,0,0.32)"); gr.addColorStop(1, "rgba(0,0,0,0)"); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); return new T.MeshBasicMaterial({ name: "onumc:contact", map: new T.CanvasTexture(c), color: 0, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }); }); const cs = new T.Mesh(cg, cm); cs.position.y = 0.006; cs.scale.set(0.78, 1, 0.6); cs.renderOrder = 1; cs.castShadow = false; cs.name = "onumc-contact"; root.add(cs); } body.add(rig);
   root.name = 'onum-character'; const meshes = [], faceFine = [], bodyFine = [];
   const add = (parent, geo, mat, x = 0, y = 0, z = 0, list) => { const m = new T.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true;
     parent.add(m); meshes.push(m); if (list) list.push(m); return m; };
@@ -521,7 +521,7 @@ export function makeCharacter(THREE, opts = {}) {
   if (S.style !== 'bald') {
     // hair has volume: more at the crown and over the top than at the hairline, so the head is not a cap on an egg
     const shortCut = S.style === 'buzz' || S.style === 'caesar' || S.style === 'bald_fringe';
-    const hk = (nx, ny, nz, m, t) => 1 + 0.006 + t * 1.6 * sstep(0, 0.6, m) + (shortCut ? 0.006 : 0.024) * sstep(0.2, 0.85, ny) * sstep(-0.7, 0.3, nz) * sstep(0.2, 0.7, m);
+    const hk = (nx, ny, nz, m, t) => (shortCut ? 0.003 : 0.011) * m * Math.sin(nx * 23 + ny * 17) * Math.sin(nz * 19 - ny * 29) + 1 + 0.006 + t * 1.6 * sstep(0, 0.6, m) + (shortCut ? 0.006 : 0.024) * sstep(0.2, 0.85, ny) * sstep(-0.7, 0.3, nz) * sstep(0.2, 0.7, m);
     const hs = sphereGeo(QQ.head[0] + 8, QQ.head[1] + 8, (nx, ny, nz, o) => { shape(nx, ny, nz, o); const { m, t } = hairMask(S.style, nx, ny, nz, fem);
       const k = m > 0.001 ? hk(nx, ny, nz, m, t) : 0.95; o[0] *= k; o[1] *= k; o[2] *= k; return o; });
     hairShell = add(headPivot, hs, hairShellMat(S, q));
@@ -639,7 +639,7 @@ export function makeCharacter(THREE, opts = {}) {
     if (QQ.fingers) {
       const fg = cached(geoCache, 'finger', () => limb(0.075, [0.0085, 0.008, 0.007, 0.006], 8));
       for (let k = 0; k < 4; k++) { const f = new T.Group(); f.position.set(0, -0.09, (k - 1.5) * 0.019); f.rotation.y = 0; wr.add(f);
-        const m = add(f, fg, skinM, 0, 0, 0, faceFine); m.scale.set(1, [0.9, 1, 0.97, 0.78][k], 1); f.rotation.z = -sx * 0.12; fingers.push(f); }
+        const m = add(f, fg, skinM, 0, 0, 0, faceFine); m.scale.set(1.28, [0.9, 1, 0.97, 0.78][k] * 1.08, 1.28);   /* 20261030ah: thicker fingers read as fingers, not nubs */ f.rotation.z = -sx * 0.12; fingers.push(f); }
       const th = new T.Group(); th.position.set(sx * -0.0, -0.03, 0.03); th.rotation.set(-0.6, 0, -sx * 0.3); wr.add(th);
       add(th, fg, skinM, 0, 0, 0, faceFine).scale.set(1.15, 0.75, 1.15); fingers.push(th);
     }
@@ -777,7 +777,7 @@ export function makeCharacter(THREE, opts = {}) {
       st.SL = 2 * stepL; st.sweep = vEff > 1e-3 ? clamp(Math.max(0, vel) / vEff) : 1; if (vL > 0.02) st.ph += dt * vL / st.SL * Math.PI * 2;
     } else st.ph += dt * (speed > 0.05 ? speed / 1.25 * Math.PI * 2 * 0.5 : 0);
     const w = Math.min(1, st.walk), ph = st.ph, t = st.t;
-    const breath = Math.sin(t * 1.5);
+    const breath = Math.sin(t * 1.5); const pz = S.phase || 0, PV1 = Math.sin(pz * 1.7), PV2 = Math.sin(pz * 2.3 + 1), PV3 = Math.sin(pz * 3.1 + 2), PV4 = Math.sin(pz * 0.7 + 3), iw = 1 - w;   /* 20261030ah: per-person stance */
     // gesture target
     const gT = state.gesture === true ? 1 : typeof state.gesture === 'number' ? state.gesture : state.gesture ? 1 : (state.talking ? 0.35 + 0.35 * Math.max(0, Math.sin(t * 0.7)) : 0);
     st.gest += (gT * (1 - w * 0.7) - st.gest) * Math.min(1, dt * 3);
@@ -787,7 +787,7 @@ export function makeCharacter(THREE, opts = {}) {
     hips.position.x = (1 - w) * Math.sin(t * 0.35) * 0.012;
     hips.rotation.y = Math.sin(ph) * 0.09 * w; hips.rotation.z = (1 - w) * Math.sin(t * 0.35) * 0.02;
     torso.rotation.y = -Math.sin(ph) * 0.13 * w; torso.rotation.x = 0.04 * w + breath * 0.008;
-    torso.scale.set(1 + breath * 0.006, 1, 1 + breath * 0.01);
+    torso.scale.set(1 + breath * 0.006, 1, 1 + breath * 0.01); hips.position.x += iw * 0.024 * PV1; hips.rotation.z += iw * 0.045 * PV1; torso.rotation.z = -iw * 0.035 * PV1; torso.rotation.x += iw * 0.05 * PV2; torso.scale.x *= 1 + 0.05 * PV3;   /* 20261030ah: weight shift, slouch, chest width */
     // legs
     if (planted) {
       const duty = 0.62, SLf = duty * (st.SL || 1), A = 0.45, Bn = 0.43, yA = 0.04 + (fem ? 0.012 : 0), hipJ = hips.position.y - 0.03, ramp = clamp(Math.max(0, vel, 0.32 * (st.pivot || 0)) / 0.12);   // the stride fades with the real speed, so a slow walk still plants its feet
@@ -807,6 +807,7 @@ export function makeCharacter(THREE, opts = {}) {
     // arms
     for (const A of arms) { const s = A.sx < 0 ? -1 : 1, swing = Math.sin(ph) * s * 0.38 * w;
       let shx = swing + Math.sin(t * 0.6 + A.sx) * 0.015, shz = A.sx * (0.07 + 0.01 * B), elx = -0.12 - 0.25 * w * Math.max(0, -swing * 2) - 0.05;
+      shz += iw * A.sx * 0.035 * (1 + PV4); elx -= iw * 0.18 * (1 + (A.sx > 0 ? PV3 : PV2));   /* 20261030ah: arm rest variety */
       const C = state.carry && state.carry.side === A.sx && sit < 0.5 ? state.carry : null;   // a hand that holds something is posed for it
       if (C) {
         const sip = clamp(C.sip || 0);
@@ -844,7 +845,7 @@ export function makeCharacter(THREE, opts = {}) {
     st.lookYaw += (ly - st.lookYaw) * Math.min(1, dt * 4); st.lookPitch += (lp - st.lookPitch) * Math.min(1, dt * 4);
     neckG.rotation.y = st.lookYaw * 0.4; head.rotation.y = st.lookYaw * 0.6 + Math.sin(t * 0.43) * 0.04;
     head.rotation.x = st.lookPitch + Math.sin(t * 0.31) * 0.02 - torso.rotation.x + (state.talking ? Math.sin(t * 2.3) * 0.035 : 0);
-    head.rotation.z = Math.sin(t * 0.27) * 0.025;
+    head.rotation.z = Math.sin(t * 0.27) * 0.025 + 0.05 * PV2; head.rotation.y += 0.2 * PV4 * (state.lookAt ? 0.3 : 1);   /* 20261030ah: head tilt/turn variety */
     if (st.lod > 1) return;
     // blink
     st.nextBlink -= dt; if (st.nextBlink <= 0) { st.blink = 0.14; st.nextBlink = 2 + rr() * 4; }
