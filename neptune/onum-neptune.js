@@ -2427,8 +2427,8 @@ function hairShellMat(S, q) {
         return r;
       });
       jp.push({ y: 0.535, w: 0.072, d: 0.066 });
-      jp.unshift({ y: jlen, w: tp[0][1] * 1.08 + 0.014, d: tp[0][2] * 1.06 + 0.012 });
-      add(torso, gb("jacket" + jlen, () => loft(jp, seg)), suitM);
+      jp.unshift({ y: jlen, w: tp[0][1] * 1.15 + 0.026, d: tp[0][2] * 1.12 + 0.022 });   /* 20261030an: jacket hem flares off the hips */
+      add(torso, gb("jacketF" + jlen, () => loft(jp, seg)), suitM);
       const vz = (y) => {
         let a = tp[0];
         for (const t of tp) if (t[0] <= y) a = t;
@@ -2534,7 +2534,7 @@ function hairShellMat(S, q) {
       kn.position.y = -0.45;
       hp.add(kn);
       add(kn, gb("knee" + bottom, () => weld(new T.SphereGeometry(bottom === "trousers" ? 0.056 : 0.045, 12, 10))), legM);
-      add(kn, gb("shin" + bottom, () => limb(0.43, bottom === "trousers" ? [0.056, 0.054, 0.05, 0.052] : [0.045, 0.05, 0.036, 0.03], seg)), legM);
+      add(kn, gb("shinB" + bottom, () => limb(0.43, bottom === "trousers" ? [0.057, 0.053, 0.052, 0.066] : [0.045, 0.05, 0.036, 0.03], seg)), legM);
       const an = new T.Group();
       an.position.y = -0.43;
       kn.add(an);
