@@ -307,3 +307,13 @@ Verdict: lids, lash line, lips and ears now read at Senate mid-shot. Faces still
 - Far contact: grows to 2.8x, solid-core material from k>1.15, outer stop 0.88 (contactmatF2).
 - QA clean (remote HTML, no ap SSAO grain). Pinned idle anchor stable over all 3 frames: 5.0% f0->f1, 17.1% f0->f2.
 - Verdict: FAIL — still figurine read at 6-10 m. Next Neptune: as.
+
+## 20261030as (on ar 39d93e5; ap SSAO still box-local for JUPITER)
+- Structural, not number nudges:
+  - Per-person head size (0.88-1.12) and shape (x 0.9-1.06, y 0.93-1.09) on headPivot; shoulder/body width 0.86-1.16.
+  - vC(): hair value pushed 30% away from mid; suit/uniform value pushed 6-30% per person (dark darker, light lighter).
+  - Nose projection 0.112 -> 0.14; ears 1.15x1.6 larger and turned 1.35 -> 1.1 rad so they read from the front.
+  - Facing variety: standing rig yaw up to +-0.55 rad per person.
+- Kept all ar/aq/ao gains. No render-loop/SSAO edits.
+- QA (remote HTML, no SSAO): eye lock 4/4, pinned idle anchor stable, 8.9% f0->f1. cmp-*-ar-vs-as in qa-30as.
+- Verdict: FAIL - visible variety, still figurine read at 6-10 m. Next Neptune: at.
