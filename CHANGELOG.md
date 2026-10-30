@@ -4,6 +4,10 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261030l: press chair — E on a focused reporter calls on them
+
+Seated press-conference chair with a reporter in focus: E now routes to openTalk→onumSession.callon before seated-voice/glass handling, so it no longer seeks the floor (NOW YOU). Chip call-on, E-while-seated, floordesk UI unchanged.
+
 ## 20261027d: will — the members and the Engine act on what they want, against whoever wants otherwise
 
 `20261027d` (on `20261027c`). Keeps NEPTUNE-UNIFORMS and NEPTUNE-CLARITY verbatim; `public/session.html` keeps its `../neptune/` path.
