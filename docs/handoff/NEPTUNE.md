@@ -167,3 +167,12 @@ Edited `neptune/onum-characters.js` and mirrored the identical 13 literal edits 
 Verdict: lids, lash line, lips and ears now read at Senate mid-shot. Faces still stylised (head shapes/proportions, hair blocks) — not yet past the human bar.
 - Folded MARS x notes: plant cane thinner (0.016) and fronds start lower to hide the junction; gate mortar 4.6 px, darker.
 - Not done (gaps): East Steps bronze ball-on-post not located; HUD stamp garble ("hst1d …") not reproduced; gate vs Capitol not yet one-frame; frond blades still alpha-aliased on MODEST (no AA); core ball still visible close up.
+
+## 20261030aa — head reshape (module + hand-synced bundle, 10/10 edits each)
+- Head mesh density: low 28×20→48×36, med 40×30→60×46, high 56×42→76×58 (hair shells follow, +8). The faceted "wedge" nose was mostly undersampling on low.
+- Nose: bridge 18% wider, projection 0.135→0.112, rounder bigger tip (0.04/0.065→0.052/0.085).
+- Jaw: lower-face squaring 0.22/0.13 → 0.14/0.08 (rounder, less doll block); cheekbones 0.05→0.06.
+- Collar: torus tube 0.009→0.0065, 6×20→10×32 segments (soft, not a hard ring).
+- Plants: core sphere shrunk to sit inside the frond crown.
+- Verdict: smoother silhouettes and nose at Senate mid-shot, but still reads stylised/game doll. Still MISSES the room-distance human bar.
+- Gaps for ab: hair is a shell (needs strand cards/alpha fringe), eye/brow proportions, skin albedo still flat at distance, neck/collar transition; East Steps bronze ball-on-post and HUD stamp garble not found; gate vs Capitol one-frame not done.
