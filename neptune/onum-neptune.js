@@ -1353,7 +1353,7 @@
   var SHIRTS = [15921386, 14673647, 15985888, 15328496, 16777215];
   var TIES = [8003371, 2046571, 2902578, 5917210, 3811914, 9054746];
   var EYES = [5913892, 4008472, 7031338, 4874352, 5598026, 3088408, 8022602, 3820124];
-  var Q = { low: { seg: 14, head: [62, 48], fingers: true, tex: "low" }, med: { seg: 20, head: [72, 56], fingers: true, tex: "med" }, high: { seg: 28, head: [76, 58], fingers: true, tex: "high" } };
+  var Q = { low: { seg: 20, head: [62, 48], fingers: true, tex: "low" }, med: { seg: 24, head: [72, 56], fingers: true, tex: "med" }, high: { seg: 28, head: [76, 58], fingers: true, tex: "high" } };
   function mulberry323(a) {
     return function() {
       a |= 0;
@@ -2760,7 +2760,7 @@ function hairShellMat(S, q) {
       hips.rotation.z = (1 - w) * Math.sin(t * 0.35) * 0.02;
       torso.rotation.y = -Math.sin(ph) * 0.13 * w;
       torso.rotation.x = 0.04 * w + breath * 8e-3;
-      torso.scale.set(1 + breath * 6e-3, 1, 1 + breath * 0.01); hips.position.x += iw * 0.024 * PV1; hips.rotation.z += iw * 0.045 * PV1; torso.rotation.z = -iw * 0.035 * PV1; torso.rotation.x += iw * 0.05 * PV2; torso.scale.x *= 1 + 0.05 * PV3;   /* 20261030ah: weight shift, slouch, chest width */
+      torso.scale.set(1 + breath * 6e-3, 1, 1 + breath * 0.01); hips.position.x += iw * 0.024 * PV1; hips.rotation.z += iw * 0.045 * PV1; torso.rotation.z = -iw * 0.035 * PV1; torso.rotation.x += iw * 0.05 * PV2; torso.scale.x *= 1 + 0.05 * PV3; hips.position.x += iw * 0.009 * Math.sin(t * 0.23 + pz); torso.rotation.y += iw * 0.03 * Math.sin(t * 0.17 + pz * 2); torso.rotation.x += breath * 0.007;   /* 20261030ai: idle sway + breath */   /* 20261030ah: weight shift, slouch, chest width */
       if (planted) {
         const duty = 0.62, SLf = duty * (st.SL || 1), A2 = 0.45, Bn = 0.43, yA = 0.04 + (fem ? 0.012 : 0), hipJ = hips.position.y - 0.03, ramp = clamp2(Math.max(0, vel, 0.32 * (st.pivot || 0)) / 0.12);
         for (const L of legs) {
@@ -2874,7 +2874,7 @@ function hairShellMat(S, q) {
       neckG.rotation.y = st.lookYaw * 0.4;
       head.rotation.y = st.lookYaw * 0.6 + Math.sin(t * 0.43) * 0.04;
       head.rotation.x = st.lookPitch + Math.sin(t * 0.31) * 0.02 - torso.rotation.x + (state.talking ? Math.sin(t * 2.3) * 0.035 : 0);
-      head.rotation.z = Math.sin(t * 0.27) * 0.025 + 0.05 * PV2; head.rotation.y += 0.2 * PV4 * (state.lookAt ? 0.3 : 1);   /* 20261030ah: head tilt/turn variety */
+      head.rotation.z = Math.sin(t * 0.27) * 0.025 + 0.05 * PV2; head.rotation.y += 0.2 * PV4 * (state.lookAt ? 0.3 : 1);   /* 20261030ah: head tilt/turn variety */ head.rotation.y += 0.05 * Math.sin(t * 0.13 + pz * 3); head.rotation.x += 0.015 * Math.sin(t * 0.21 + pz);   /* 20261030ai: fidget */
       if (st.lod > 1) return;
       st.nextBlink -= dt;
       if (st.nextBlink <= 0) {
