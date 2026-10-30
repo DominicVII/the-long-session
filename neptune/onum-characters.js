@@ -12,7 +12,7 @@ const HAIRS = [0x14100d, 0x2f2318, 0x4a3728, 0x6b5540, 0x8b7355, 0x5c3218, 0x1f1
 const SHIRTS = [0xf2f0ea, 0xdfe6ef, 0xf3ece0, 0xe9e4f0, 0xffffff];
 const TIES = [0x7a1f2b, 0x1f3a6b, 0x2c4a32, 0x5a4a1a, 0x3a2a4a, 0x8a2a1a];
 const EYES = [0x5a3d24, 0x3d2a18, 0x6b4a2a, 0x4a6070, 0x556b4a, 0x2f2018, 0x7a6a4a, 0x3a4a5c];
-const Q = { low: { seg: 14, head: [62, 48], fingers: true, tex: 'low' }, med: { seg: 20, head: [72, 56], fingers: true, tex: 'med' }, high: { seg: 28, head: [76, 58], fingers: true, tex: 'high' } };
+const Q = { low: { seg: 20, head: [62, 48], fingers: true, tex: 'low' }, med: { seg: 24, head: [72, 56], fingers: true, tex: 'med' }, high: { seg: 28, head: [76, 58], fingers: true, tex: 'high' } };
 
 // ---------- utils ----------
 function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a);
@@ -787,7 +787,7 @@ export function makeCharacter(THREE, opts = {}) {
     hips.position.x = (1 - w) * Math.sin(t * 0.35) * 0.012;
     hips.rotation.y = Math.sin(ph) * 0.09 * w; hips.rotation.z = (1 - w) * Math.sin(t * 0.35) * 0.02;
     torso.rotation.y = -Math.sin(ph) * 0.13 * w; torso.rotation.x = 0.04 * w + breath * 0.008;
-    torso.scale.set(1 + breath * 0.006, 1, 1 + breath * 0.01); hips.position.x += iw * 0.024 * PV1; hips.rotation.z += iw * 0.045 * PV1; torso.rotation.z = -iw * 0.035 * PV1; torso.rotation.x += iw * 0.05 * PV2; torso.scale.x *= 1 + 0.05 * PV3;   /* 20261030ah: weight shift, slouch, chest width */
+    torso.scale.set(1 + breath * 0.006, 1, 1 + breath * 0.01); hips.position.x += iw * 0.024 * PV1; hips.rotation.z += iw * 0.045 * PV1; torso.rotation.z = -iw * 0.035 * PV1; torso.rotation.x += iw * 0.05 * PV2; torso.scale.x *= 1 + 0.05 * PV3; hips.position.x += iw * 0.009 * Math.sin(t * 0.23 + pz); torso.rotation.y += iw * 0.03 * Math.sin(t * 0.17 + pz * 2); torso.rotation.x += breath * 0.007;   /* 20261030ai: idle sway + breath */   /* 20261030ah: weight shift, slouch, chest width */
     // legs
     if (planted) {
       const duty = 0.62, SLf = duty * (st.SL || 1), A = 0.45, Bn = 0.43, yA = 0.04 + (fem ? 0.012 : 0), hipJ = hips.position.y - 0.03, ramp = clamp(Math.max(0, vel, 0.32 * (st.pivot || 0)) / 0.12);   // the stride fades with the real speed, so a slow walk still plants its feet
@@ -845,7 +845,7 @@ export function makeCharacter(THREE, opts = {}) {
     st.lookYaw += (ly - st.lookYaw) * Math.min(1, dt * 4); st.lookPitch += (lp - st.lookPitch) * Math.min(1, dt * 4);
     neckG.rotation.y = st.lookYaw * 0.4; head.rotation.y = st.lookYaw * 0.6 + Math.sin(t * 0.43) * 0.04;
     head.rotation.x = st.lookPitch + Math.sin(t * 0.31) * 0.02 - torso.rotation.x + (state.talking ? Math.sin(t * 2.3) * 0.035 : 0);
-    head.rotation.z = Math.sin(t * 0.27) * 0.025 + 0.05 * PV2; head.rotation.y += 0.2 * PV4 * (state.lookAt ? 0.3 : 1);   /* 20261030ah: head tilt/turn variety */
+    head.rotation.z = Math.sin(t * 0.27) * 0.025 + 0.05 * PV2; head.rotation.y += 0.2 * PV4 * (state.lookAt ? 0.3 : 1);   /* 20261030ah: head tilt/turn variety */ head.rotation.y += 0.05 * Math.sin(t * 0.13 + pz * 3); head.rotation.x += 0.015 * Math.sin(t * 0.21 + pz);   /* 20261030ai: fidget */
     if (st.lod > 1) return;
     // blink
     st.nextBlink -= dt; if (st.nextBlink <= 0) { st.blink = 0.14; st.nextBlink = 2 + rr() * 4; }
