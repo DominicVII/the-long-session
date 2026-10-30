@@ -442,19 +442,19 @@ export function makeCharacter(THREE, opts = {}) {
   const lids = [], eyes = [], A = S.face.asym;
   for (const sx of [-1, 1]) {
     const ey = 0.11 + (sx < 0 ? A.eyeL : A.eyeR);
-    const sp = surf(shape, sx * 0.33, ey, 0.94); const c = new T.Vector3(sp.x, sp.y, sp.z - 0.0082);
+    const sp = surf(shape, sx * 0.33, ey, 0.94); const c = new T.Vector3(sp.x, sp.y, sp.z - 0.0089);
     const eg = new T.Group(); eg.position.copy(c); headPivot.add(eg); eyes.push(eg);
-    add(eg, cached(geoCache, 'eyeball' + q, () => weld(new T.SphereGeometry(0.0118, 20, 14))), eyeW, 0, 0, 0, faceFine);
-    add(eg, cached(geoCache, 'iris', () => new T.CircleGeometry(0.0057, 24)), irisM, 0, 0, 0.0113, faceFine);
-    add(eg, cached(geoCache, 'pupil', () => new T.CircleGeometry(0.0022, 14)), pupM, 0, 0, 0.0116, faceFine);
+    add(eg, cached(geoCache, 'eyeball' + q, () => weld(new T.SphereGeometry(0.0127, 20, 14))), eyeW, 0, 0, 0, faceFine);
+    add(eg, cached(geoCache, 'iris', () => new T.CircleGeometry(0.0063, 24)), irisM, 0, 0, 0.0122, faceFine);
+    add(eg, cached(geoCache, 'pupil', () => new T.CircleGeometry(0.0022, 14)), pupM, 0, 0, 0.0125, faceFine);
     for (const up of [1, -1]) {   // eyelids: skin shells that hug the eyeball, with a lash line on the edge
       const lg = new T.Group(); lg.position.copy(c); lg.rotation.z = -sx * (S.face.tilt + (up > 0 ? 0 : 0.05)); headPivot.add(lg);
       const lr = new T.Group(); lg.add(lr);
-      add(lr, cached(geoCache, 'lid' + up, () => weld(new T.SphereGeometry(0.01265, 24, 10, 0, Math.PI * 2, up > 0 ? 0 : Math.PI * 0.5, Math.PI * 0.5))), lidMat(S), 0, 0, 0, faceFine);
-      const lash = add(lr, cached(geoCache, 'lash' + up, () => { const g = new T.TorusGeometry(0.0127, up > 0 ? 0.00075 : 0.0004, 4, 20, Math.PI * 0.9);
+      add(lr, cached(geoCache, 'lid' + up, () => weld(new T.SphereGeometry(0.0136, 24, 10, 0, Math.PI * 2, up > 0 ? 0 : Math.PI * 0.5, Math.PI * 0.5))), lidMat(S), 0, 0, 0, faceFine);
+      const lash = add(lr, cached(geoCache, 'lash' + up, () => { const g = new T.TorusGeometry(0.0137, up > 0 ? 0.0013 : 0.0006, 4, 20, Math.PI * 0.9);
         g.rotateZ(Math.PI * 0.05); g.rotateX(Math.PI / 2 * (up > 0 ? -1 : -1)); return g; }), lashM, 0, 0, 0, faceFine);
       // crease above upper lid
-      if (up > 0) { const cr = add(lg, cached(geoCache, 'crease', () => { const g = new T.TorusGeometry(0.0134, 0.0005, 4, 16, Math.PI * 0.7); g.rotateZ(Math.PI * 0.15); return g; }),
+      if (up > 0) { const cr = add(lg, cached(geoCache, 'crease', () => { const g = new T.TorusGeometry(0.0144, 0.0008, 4, 16, Math.PI * 0.7); g.rotateZ(Math.PI * 0.15); return g; }),
         stdMat('crease' + S.skin, { color: lin(hexMix(S.skin, 0x3a2018, 0.35)), roughness: 0.7 }), 0, 0.0005, 0.0015, faceFine); cr.rotation.x = -0.35; }
       lr.userData.up = up; lids.push(lr);
     }
@@ -467,7 +467,7 @@ export function makeCharacter(THREE, opts = {}) {
     const xs = [0.10 + BR.gap, 0.24, 0.38, 0.47 + 0.08 * BR.len];
     const ys = [0.235, 0.27 + 0.03 * BR.arch, 0.275 + 0.035 * BR.arch, 0.235 - 0.03 * BR.tail];
     const pts = xs.map((x, i) => { const y = ys[i] + by; const p = surf(shape, sx * x, y, Math.sqrt(Math.max(0.05, 1 - x * x - y * y))); return p.add(p.clone().normalize().multiplyScalar(0.0012)); });
-    const curve = new T.CatmullRomCurve3(pts), tub = 14, rad = 6, base = (fem ? 0.0022 : 0.0031) * BR.thick;
+    const curve = new T.CatmullRomCurve3(pts), tub = 14, rad = 6, base = (fem ? 0.0029 : 0.0041) * BR.thick;
     const tg = new T.TubeGeometry(curve, tub, base, rad); const P = tg.attributes.position;
     for (let i = 0; i <= tub; i++) { const cp = curve.getPointAt(i / tub), tt = i / tub, k = mix(1, 0.3, Math.pow(tt, 1.6)) * (tt < 0.08 ? 0.8 : 1);
       for (let j = 0; j <= rad; j++) { const vi = i * (rad + 1) + j; const ox = P.getX(vi) - cp.x, oy = P.getY(vi) - cp.y, oz = P.getZ(vi) - cp.z;
@@ -475,20 +475,20 @@ export function makeCharacter(THREE, opts = {}) {
     weld(tg); const m = add(headPivot, tg, browM, 0, 0, 0, faceFine); m.userData.browSide = sx;
   }
   // lips + mouth
-  const lipCol = hexMix(S.skin, fem ? 0xa03e48 : 0x8e4e48, fem ? 0.36 : 0.26);
+  const lipCol = hexMix(S.skin, fem ? 0xa03e48 : 0x8e4e48, fem ? 0.5 : 0.4);
   const lipM = stdMat('lip2' + lipCol + MODE, { color: linSkin(lipCol), roughness: 0.38 });
   const mp = surf(shape, 0, -0.47, 0.88);
   const mouthIn = add(headPivot, cached(geoCache, 'mouthIn', () => new T.SphereGeometry(1, 16, 10)), stdMat('mouthIn', { color: 0x1a0807, roughness: 0.9 }), mp.x, mp.y - 0.0025, mp.z - 0.007, faceFine);
-  mouthIn.scale.set(0.019, 0.0015, 0.006);
+  mouthIn.scale.set(0.021, 0.0024, 0.006);
   const teeth = add(headPivot, cached(geoCache, 'teeth', () => new T.BoxGeometry(0.026, 0.006, 0.01)), stdMat('teeth', { color: lin(0xe0d9ca), roughness: 0.3 }), mp.x, mp.y + 0.0005, mp.z - 0.0095, faceFine);
   const lipU = add(headPivot, cached(geoCache, 'lipU' + q, () => lipGeo(true)), lipM, mp.x, mp.y + 0.0036, mp.z - 0.0048, faceFine);
-  lipU.scale.set(0.0225 * S.face.mouthW, 0.0049 * S.face.lip, 0.0084); lipU.rotation.z = A.mouth;
+  lipU.scale.set(0.0225 * S.face.mouthW, 0.0058 * S.face.lip, 0.0088); lipU.rotation.z = A.mouth;
   const lipL = add(headPivot, cached(geoCache, 'lipL' + q, () => lipGeo(false)), lipM, mp.x, mp.y - 0.0042, mp.z - 0.0054, faceFine);
-  lipL.scale.set(0.0205 * S.face.mouthW, 0.0062 * S.face.lip, 0.0092); lipL.rotation.z = A.mouth;
+  lipL.scale.set(0.0205 * S.face.mouthW, 0.0072 * S.face.lip, 0.0096); lipL.rotation.z = A.mouth;
   // nostrils
   for (const sx of [-1, 1]) { const p = surf(shape, sx * 0.085 + A.nose, -0.265, 0.95); const m = add(headPivot, mouthIn.geometry, stdMat('nostril', { color: 0x2a1410, roughness: 1 }), p.x, p.y + 0.002, p.z - 0.008, faceFine); m.scale.set(0.0035, 0.0018, 0.0045); m.rotation.y = sx * 0.4; }
   // ears
-  const earG = cached(geoCache, 'ear', () => { const g = new T.TorusGeometry(0.016, 0.0045, 8, 18, Math.PI * 1.55); g.rotateZ(-Math.PI * 0.28); return weld(g); });
+  const earG = cached(geoCache, 'ear', () => { const g = new T.TorusGeometry(0.016, 0.0058, 8, 18, Math.PI * 1.55); g.rotateZ(-Math.PI * 0.28); return weld(g); });
   const earB = cached(geoCache, 'earb', () => weld(new T.SphereGeometry(1, 14, 10)));
   const earM = earMat(S);
   for (const sx of [-1, 1]) { const p = surf(shape, sx, -0.02, -0.08);
