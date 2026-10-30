@@ -209,3 +209,12 @@ Verdict: lids, lash line, lips and ears now read at Senate mid-shot. Faces still
 - Skin shader: fixed view-space key direction (upper camera-left) with a 0.7 shadow side to 1.12 lit side. Skin only, so sconces and sandstone are untouched.
 - Not done: shoulder slope and hands (torso/hand geometry untouched). AO is painted plus shaded, not true screen-space AO.
 - QA: qa-30af (+ backup /workspace/neptune-qa-30af).
+
+## 20261030ag
+- Torso: shoulder pad tapers off from y .44 to .50, so shoulders slope (shirt and jacket). Male waist narrower (taper). Deltoid ball flatter and lower; arms angled 0.1 rad.
+- Hands: fingers and thumb on every quality tier (low too), shown at LOD 0-1 (under 10 m) via faceFine. No more mitts across the rug.
+- Cloth: x30ClothShader on the wool/cloth pass: world-space room key (0.66 shade to 1.1 lit) plus UV fold creases (cache key ag30cloth).
+- Skin key moved from view space to world space (same room key direction as cloth).
+- Not done: real shadow maps on people, hair-cap edge break.
+- QA: qa-30ag (+ backup /workspace/neptune-qa-30ag).
+- ag (MARS af folds): tiled w30Cloth suit map dropped (camo), so folds come from the shader on USE_UV. Light hair shells and fuzz are 0.78x, which breaks far white domes. Collar ring bigger and higher (r .06, y .514) over the neck join. Painted brow and lash marks stronger (0.66 / 0.6) for far rows.
