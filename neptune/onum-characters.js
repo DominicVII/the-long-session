@@ -12,7 +12,7 @@ const HAIRS = [0x14100d, 0x2f2318, 0x4a3728, 0x6b5540, 0x8b7355, 0x5c3218, 0x1f1
 const SHIRTS = [0xf2f0ea, 0xdfe6ef, 0xf3ece0, 0xe9e4f0, 0xffffff];
 const TIES = [0x7a1f2b, 0x1f3a6b, 0x2c4a32, 0x5a4a1a, 0x3a2a4a, 0x8a2a1a];
 const EYES = [0x5a3d24, 0x3d2a18, 0x6b4a2a, 0x4a6070, 0x556b4a, 0x2f2018, 0x7a6a4a, 0x3a4a5c];
-const Q = { low: { seg: 14, head: [28, 20], fingers: false, tex: 'low' }, med: { seg: 20, head: [40, 30], fingers: true, tex: 'med' }, high: { seg: 28, head: [56, 42], fingers: true, tex: 'high' } };
+const Q = { low: { seg: 14, head: [48, 36], fingers: false, tex: 'low' }, med: { seg: 20, head: [60, 46], fingers: true, tex: 'med' }, high: { seg: 28, head: [76, 58], fingers: true, tex: 'high' } };
 
 // ---------- utils ----------
 function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a);
@@ -236,12 +236,12 @@ function headShape(f) {
     const A = f.asym, eyY = nx < 0 ? A.eyeL : A.eyeR, nxs = nx - A.nose * sstep(0.25, -0.3, ny);
     r -= 0.045 * G2(ax - 0.34, ny - 0.11 - eyY, 0.15) * fr;                                 // eye sockets
     r += 0.05 * Math.exp(-(((ny - 0.27) / 0.075) ** 2)) * sstep(0.62, 0.1, ax) * fr * f.brow; // brow ridge
-    const nw = 0.088 * f.bridge + 0.075 * sstep(0.12, -0.24, ny) * f.wing;   // a bridge with some breadth, not a blade
-    const na = ny > -0.24 ? mix(0.015, 0.135 * f.nose, sstep(0.2, -0.2, ny)) : 0.135 * f.nose * sstep(-0.33, -0.24, ny);
+    const nw = 0.104 * f.bridge + 0.085 * sstep(0.12, -0.24, ny) * f.wing;   // a bridge with some breadth, not a blade
+    const na = ny > -0.24 ? mix(0.012, 0.112 * f.nose, sstep(0.2, -0.2, ny)) : 0.112 * f.nose * sstep(-0.33, -0.24, ny);
     r += (na + 0.035 * f.hook * G2(0, ny + 0.02, 0.11)) * Math.exp(-((nxs / nw) ** 2)) * fr;   // nose (bridge, hook)
-    r += 0.04 * f.tip * G2(nxs / 1.3, ny + 0.19 - f.up, 0.065) * fr;                       // tip bulb / upturn
+    r += 0.052 * f.tip * G2(nxs / 1.2, ny + 0.19 - f.up, 0.085) * fr;                       // tip bulb / upturn
     r += 0.035 * f.wing * G2(Math.abs(nxs) - 0.12 * f.wing, ny + 0.22, 0.07) * fr;                                    // nostril wings
-    r += 0.05 * f.cheek * (1 + (nx < 0 ? -A.cheek : A.cheek)) * G2(ax - 0.46, ny + 0.03, 0.2) * fr;                           // cheekbones
+    r += 0.06 * f.cheek * (1 + (nx < 0 ? -A.cheek : A.cheek)) * G2(ax - 0.46, ny + 0.03, 0.2) * fr;                           // cheekbones
     r -= 0.03 * G2(ax - 0.28, ny + 0.16, 0.12) * fr * (1 - age * 0.3);                  // under-cheek hollow
     r += 0.07 * G2(nx * 0.9, (ny + 0.47) * 1.3, 0.26) * fr;                              // muzzle
     r -= 0.025 * G2(nx, ny + 0.6, 0.08) * fr;                                           // groove under lip
@@ -256,7 +256,7 @@ function headShape(f) {
     const jaw = ny < 0 ? mix(1, f.jaw * 0.92, sstep(-0.15, -0.9, ny)) : 1;
     x *= jaw;
     // a sphere tapers to a point at the bottom; a jaw does not. Square the lower face out and blunt the chin.
-    if (ny < -0.3) { const sq = sstep(-0.3, -0.75, ny) * (1 - 0.45 * sstep(-0.86, -1.0, ny)); x *= 1 + (f.fem ? 0.13 : 0.22) * sq; }
+    if (ny < -0.3) { const sq = sstep(-0.3, -0.75, ny) * (1 - 0.45 * sstep(-0.86, -1.0, ny)); x *= 1 + (f.fem ? 0.08 : 0.14) * sq; }
     if (ny < -0.8) y *= mix(1, 0.95, sstep(-0.8, -1.0, ny));
     if (nz < 0) z *= 1.08 - 0.25 * sstep(-0.2, -0.8, ny);                                // skull back / neck
     if (ny < -0.55 && nz < 0.3) z *= mix(1, 0.75, sstep(-0.55, -0.95, ny) * sstep(0.3, -0.4, nz));
@@ -573,7 +573,7 @@ export function makeCharacter(THREE, opts = {}) {
     if (neck === 'scarf') { const b = add(torso, cached(geoCache, 'scarf', () => new T.TorusGeometry(0.06, 0.016, 8, 20)), tieM, 0, 0.47, 0.01); b.rotation.x = 1.4; }
   }
   // collar
-  const col = add(torso, cached(geoCache, 'collar', () => new T.TorusGeometry(0.052, 0.009, 6, 20)), shirtM, 0, 0.505, 0.0); col.rotation.x = Math.PI / 2 - 0.25;
+  const col = add(torso, cached(geoCache, 'collar', () => new T.TorusGeometry(0.054, 0.0065, 10, 32)), shirtM, 0, 0.505, 0.0); col.rotation.x = Math.PI / 2 - 0.25;
   // skirt / dress lower
   if (bottom !== 'trousers') {
     // per-person copy: its vertices are skinned to the two thigh bones every frame (see skinSkirt)
