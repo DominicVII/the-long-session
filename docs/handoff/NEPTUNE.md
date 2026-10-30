@@ -273,3 +273,12 @@ Verdict: lids, lash line, lips and ears now read at Senate mid-shot. Faces still
 - Mid-range heads: head grid goes low 62x48 -> 84x64, med 72x56 -> 92x70, high 76x58 -> 100x76.
 - Idle QA: picks a standing NPC (no tx/tz target) and hides other onum roots, then takes 3 frames 450 ms apart. 26 roots were hidden, but two figures were still in frame (they are not onum roots). Diff is 4.5k px in the person band. Idle is still not proven on its own.
 - Verdict: FAIL. The contact halo shows on floor9 near the camera. Faces and bodies still read as figurines at 6–10 m. Next is an: a cheap screen-space AO post pass, a non-onum figure hide for idle, a standalone idle diff around the projected head bbox, and real cloth silhouette breakup (jacket hem flare, trouser break).
+
+## 20261030an
+- Jacket hem flares off the hips (hem ring w x1.15+0.026, d x1.12+0.022; geo key jacketF).
+- Trousers break at the shoe: the shin's bottom radius goes 0.052 -> 0.066 (geo key shinB).
+- Screen-space AO: NOT done. The game renders with a bare renderer.render(scene, camera): no EffectComposer, no depth target. Real SSAO means changing the shared main render loop, which is outside NEPTUNE's ownership, so it needs a JUPITER/owner call. Until then, am's under-form shading stands in.
+- Idle QA: the hide now covers onum roots and every everyone() figure object. The diff is measured only inside the target NPC's projected head-to-feet box.
+- Idle result: 48 figures were hidden and only the target stayed in frame. Within the target's body box (160x105 px), f0->f1 changed 0 px and f0->f2 changed 160 px (about 1%). The sway is real but too small to read on screen at that distance. ao should double the hip/torso sway amplitude.
+- Contact at mid/far is not changed in an (the ring only reads near the camera).
+- Verdict: FAIL. Next is ao: an owner call on SSAO in the main render loop, distance-scaled contact shadows, bigger idle amplitude, and face planes.
