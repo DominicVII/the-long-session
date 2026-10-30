@@ -227,3 +227,10 @@ Verdict: lids, lash line, lips and ears now read at Senate mid-shot. Faces still
 - Everything from ag is kept.
 - MARS ag folds: fingers are 1.28x thicker and 1.08x longer. Cloth fold crease goes 0.16 -> 0.3, plus a tight elbow/waist bunching band (0.22). Painted brow and lash weights are now 0.8 / 0.72. QA adds face-front2..5 at 2.2 m along each NPC's facing.
 - Verdict: FAIL, still reads as a diorama. Next is ai.
+
+## 20261030ai
+- Body segments go up from 14 to 20 (low) and from 20 to 24 (med), giving rounder silhouettes at 6–30 m.
+- Bodies get a harder world-space key (x0.5 to x1.18), part-edge AO (x0.7 at grazing angles) and a warm rim light on the key side. All of this is in x30ClothShader, so the lamps are untouched.
+- Idle motion adds a slow hip sway, a torso yaw drift, deeper breathing and a head fidget, each seeded per person.
+- The QA face-front cams now look for the onum head under the NPC and read its world facing. It is still unreliable: face-front2 still lands on the back of a distant NPC.
+- Verdict: FAIL, next is aj.
