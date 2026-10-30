@@ -1492,7 +1492,7 @@
       { const E = (v, w) => Math.exp(-(v / w) * (v / w));   /* 20261030ae: painted feature marks in the head albedo itself, so they survive every LOD tier and 6-10 m */
         const ybw = E(ny - 0.255 - 0.03 * (0.3 - Math.abs(ax - 0.3)), 0.032) * sstep2(0.07, 0.13, ax) * sstep2(0.5, 0.42, ax) * fr, yln = E(ny - 0.135, 0.022) * sstep2(0.2, 0.25, ax) * sstep2(0.45, 0.4, ax) * fr;
         const yns = E(ax - 0.1, 0.03) * sstep2(0.06, -0.04, ny) * sstep2(-0.32, -0.22, ny) * fr, yun = G2(nx, ny + 0.32, 0.06) * fr, ylp = E(ny + 0.47, 0.02) * sstep2(0.2, 0.12, ax) * fr, yul = G2(nx * 0.5, ny + 0.58, 0.05) * fr;
-        const yk = 1 - 0.8 * ybw - 0.72 * yln - 0.22 * yns - 0.22 * yun - 0.38 * ylp - 0.18 * yul; r *= yk; g *= yk * 0.97; b *= yk * 0.96; }
+        const yk = 1 - 1.0 * ybw - 0.9 * yln - 0.22 * yns - 0.22 * yun - 0.38 * ylp - 0.18 * yul; r *= yk; g *= yk * 0.97; b *= yk * 0.96; }
         const m2 = 1 + mott * 0.06 - sstep2(0.7, 0.9, freck) * 0.05 * (dark ? 0.3 : 1);
         r *= m2;
         g *= m2;
@@ -2127,7 +2127,7 @@ function hairShellMat(S, q) {
     hook.frustumCulled = false;
     hook.name = "onumc-hook";
     root.add(hook);
-    root.add(body); { /* 20261030ah: soft contact shadow so people sit on the rug, not float on it */ const cg = cached(geoCache, "contact", () => new T.PlaneGeometry(1, 1).rotateX(-Math.PI / 2)), cm = cached(matCache, "contactmat", () => { const c = document.createElement("canvas"); c.width = c.height = 64; const g = c.getContext("2d"), gr = g.createRadialGradient(32, 32, 2, 32, 32, 31); gr.addColorStop(0, "rgba(0,0,0,0.6)"); gr.addColorStop(0.45, "rgba(0,0,0,0.32)"); gr.addColorStop(1, "rgba(0,0,0,0)"); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); return new T.MeshBasicMaterial({ name: "onumc:contact", map: new T.CanvasTexture(c), color: 0, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }); }); const cs = new T.Mesh(cg, cm); cs.position.y = 0.006; cs.scale.set(0.78, 1, 0.6); cs.renderOrder = 1; cs.castShadow = false; cs.name = "onumc-contact"; root.add(cs); }
+    root.add(body); { /* 20261030ah: soft contact shadow so people sit on the rug, not float on it */ const cg = cached(geoCache, "contact", () => new T.PlaneGeometry(1, 1).rotateX(-Math.PI / 2)), cm = cached(matCache, "contactmat2", () => { const c = document.createElement("canvas"); c.width = c.height = 64; const g = c.getContext("2d"), gr = g.createRadialGradient(32, 32, 2, 32, 32, 31); gr.addColorStop(0, "rgba(0,0,0,0.88)"); gr.addColorStop(0.3, "rgba(0,0,0,0.62)"); gr.addColorStop(0.65, "rgba(0,0,0,0.26)");   /* 20261030aj: darker contact core */ gr.addColorStop(1, "rgba(0,0,0,0)"); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); return new T.MeshBasicMaterial({ name: "onumc:contact", map: new T.CanvasTexture(c), color: 0, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }); }); const cs = new T.Mesh(cg, cm); cs.position.y = 0.006; cs.scale.set(1.05, 1, 0.85);   /* 20261030aj: larger, reads under feet at 7-9 m */ cs.renderOrder = 1; cs.castShadow = false; cs.name = "onumc-contact"; root.add(cs); }
     body.add(rig);
     root.name = "onum-character";
     const meshes = [], faceFine = [], bodyFine = [];
@@ -2260,7 +2260,7 @@ function hairShellMat(S, q) {
         const p = surf(shape, sx * x, y, Math.sqrt(Math.max(0.05, 1 - x * x - y * y)));
         return p.add(p.clone().normalize().multiplyScalar(12e-4));
       });
-      const curve = new T.CatmullRomCurve3(pts), tub = 14, rad = 6, base = (fem ? 47e-4 : 64e-4) * BR.thick;
+      const curve = new T.CatmullRomCurve3(pts), tub = 14, rad = 6, base = (fem ? 47e-4 : 64e-4) * BR.thick * 1.4;   /* 20261030aj: brows read across the rug */
       const tg = new T.TubeGeometry(curve, tub, base, rad);
       const P = tg.attributes.position;
       for (let i = 0; i <= tub; i++) {
@@ -2492,7 +2492,7 @@ function hairShellMat(S, q) {
       const el = new T.Group();
       el.position.y = -0.3;
       sh.add(el);
-      add(el, gb("elbowBall", () => weld(new T.SphereGeometry(0.042, 12, 10))), sleeve);
+      add(el, gb("elbowBall", () => weld(new T.SphereGeometry(0.042, 12, 10))), sleeve); /* 20261030aj: real elbow/wrist fold geometry */ for (const [fy, fr2, ft] of [[0.018, 0.045, 0.0075], [-0.02, 0.043, 0.0065], [-0.205, 0.036, 0.006]]) { const fm = add(el, cached(geoCache, 'foldr' + fy, () => new T.TorusGeometry(fr2, ft, 6, 18)), sleeve, 0, fy, 0.002); fm.rotation.set(Math.PI / 2 + 0.35 * Math.sign(fy + 0.001), 0, 0); }
       add(el, gb("foreArm", () => limb(0.25, [0.042, 0.04, 0.034], seg)), sleeve);
       const cuff = add(el, cached(geoCache, "cuff", () => new T.CylinderGeometry(0.031, 0.031, 0.02, 14)), shirtM, 0, -0.245, 0);
       const wr = new T.Group();
@@ -2509,7 +2509,7 @@ function hairShellMat(S, q) {
           f.rotation.y = 0;
           wr.add(f);
           const m = add(f, fg, skinM, 0, 0, 0, faceFine);
-          m.scale.set(1.28, [0.9, 1, 0.97, 0.78][k] * 1.08, 1.28);   /* 20261030ah: thicker fingers read as fingers, not nubs */
+          m.scale.set(1.5, [0.9, 1, 0.97, 0.78][k] * 1.1, 1.38); f.rotation.x = (k - 1.5) * 0.09; f.position.z *= 1.12;   /* 20261030aj: distinct splayed digits */   /* 20261030ah: thicker fingers read as fingers, not nubs */
           f.rotation.z = -sx * 0.12;
           fingers.push(f);
         }
