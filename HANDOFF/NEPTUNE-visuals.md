@@ -54,3 +54,11 @@ For MARS QA: reopen the same NPC within 22s (no stale lines); Esc / Done / walk-
 `window.onumTalkOwner` now: `SIT.on` → "sit"; `PROC.on` → "proc" (any phase); truthy `SSN` or `ONUM_SESSION.stage` not "idle" → "session"; prior sxdSession seated/floor/held/typing check kept as fallback. All cross-owner reads typeof/try-guarded. Presentation/guard only — ssnTick/hold/pass/callon untouched.
 
 Boot fix (20261030d): 30a–30c shipped an entity-decoded main script (entity text in esc maps decoded by the GitHub MCP push transport → `"""`, 23 lines) → SyntaxError, boot stuck on "Building the chamber…". Rewrote all 23 entity literals as JS `\x26` escapes (e.g. `"\x26quot;"`) so the transport cannot decode them; all script blocks pass node --check; headless boot reaches past #boot. Never push an entity-decoded copy.
+
+## 20261030g (NEPTUNE talk/desk presentation)
+- Talk: labelled **More ▾ (n)** in the talk head (#tkMore) hides actions past the first four (exits + question answers always shown); panel lifts above Say aloud bar / wire strip (fitTalk), actions never shrink.
+- One Esc closes talk even from a focused reply/wire input (capture-phase, only while talk open and no modal veil).
+- Reply box + wire draft cleared on every closeTalk and fresh open.
+- Floor desk: #sxDock.fd-on is a bottom band (left/right 8px, above hmBar, max ~20vh, row layout), not a right column.
+- "Stops you" toast hides Talk while onumTalkOwner() is truthy.
+- JUPITER engine untouched; onumTalkOwner unchanged.
