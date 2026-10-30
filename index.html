@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261030f">
+<meta name="onum-build" content="20261030g">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261030f";
+  var STAMP = "20261030g";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -49850,7 +49850,7 @@ setInterval(sxDockTick, 300);
 try{ new MutationObserver(() => sxDockTick()).observe(veil, {attributes:true, attributeFilter:["class", "hidden"]}); }catch(e){}
 /* while you chair a cabinet or council, a seated member you click is called on in the meeting, not taken aside */
 { const _ot = openTalk; openTalk = function(m){ try{ const S = sxdSession(); if(m && S && S.chairId === "you" && (S.kind === "cabinet_meeting" || S.kind === "governor_council") && (S.seats || []).some(x => String(x.personId) === String(m.id)) && window.onumSession && typeof window.onumSession.callon === "function"){ window.onumSession.callon(m.id); return; } }catch(e){} return _ot.apply(this, arguments); }; }
-/* NEPTUNE-TALKREWORK BEGIN — 20261030b; owner gate 20261030d (JUPITER contract: SIT.on → sit; PROC.on → proc; truthy SSN or ONUM_SESSION.stage!=="idle" → session; sxdSession seated check as fallback): one conversation surface per mode (UI/presentation + safe gates only; JUPITER's engine untouched).
+/* NEPTUNE-TALKREWORK BEGIN — 20261030b; owner gate 20261030d; More/Esc/draft/bottom desk 20261030g (JUPITER contract: SIT.on → sit; PROC.on → proc; truthy SSN or ONUM_SESSION.stage!=="idle" → session; sxdSession seated check as fallback): one conversation surface per mode (UI/presentation + safe gates only; JUPITER's engine untouched).
    Open talk: one pipeline (owner gate → existing chain → one opening), TALK.seq on every delayed line, a clean close that never leaves
    TALK.open stuck, one reply box (tkOwn → LiveTalk when up, offline otherwise), a Done (Esc) button, Live/Offline chip, portrait,
    secondary actions behind "More", duplicate lines dropped. Sessions: the floor desk is the one place to speak; the session view's own
@@ -49859,6 +49859,9 @@ try{
   const TR = window.NEPTUNE_TALKREWORK = {live:null, liveAt:0, moreOpen:false};
   const sv = f => { try{ return f(); }catch(e){ return null; } };
   /* who owns the conversation right now. strict=true also counts any open sitting/procedure (for unsolicited greetings). */
+  /* 20261030g: every close and every fresh open starts with an empty reply box and wire */
+  function clearDrafts(){ ["tkOwnIn", "wireIn"].forEach(id => { try{ const i = document.getElementById(id); if(i){ i.value = ""; try{ i.dispatchEvent(new Event("input")); }catch(e){} } }catch(e){} }); }
+  TR.clearDrafts = clearDrafts;
   window.onumTalkOwner = function(strict){
     try{ if(typeof SIT !== "undefined" && SIT.on) return "sit"; }catch(e){}
     try{ if(typeof PROC !== "undefined" && PROC.on) return "proc"; }catch(e){}  /* always when PROC is on */
@@ -49885,6 +49888,7 @@ try{
           return;
         }
         if(m && TALK.open && TALK.m && TALK.m !== m){ try{ closeTalk(); }catch(e){} }
+        clearDrafts(); TR.moreOpen = false;
       }catch(e){}
       const r = _inner.apply(this, arguments);
       try{ if(TALK.open && TALK.m === m) decorate(); }catch(e){}
@@ -49893,7 +49897,7 @@ try{
   /* ---- close: whatever a wrapper throws, the state is reset ---- */
   { const _c = closeTalk; closeTalk = function(){
       let r; try{ r = _c.apply(this, arguments); }catch(e){ try{ console.warn("closeTalk", e); }catch(x){} }
-      finally{ try{ TALK.open = false; TALK.m = null; TALK.huddle = null; TALK.seq = (TALK.seq || 0) + 1; TR.moreOpen = false;
+      finally{ try{ TALK.open = false; TALK.m = null; TALK.huddle = null; TALK.seq = (TALK.seq || 0) + 1; TR.moreOpen = false; clearDrafts();
         const t = el("talk"); if(t) t.classList.remove("is-open", "tk-more"); const b0 = el("tkOwn"); if(b0) b0.hidden = true;
         try{ wireHome(); }catch(e){} try{ picksDirty = true; }catch(e){} }catch(e){} }
       return r; }; }
@@ -49917,7 +49921,12 @@ try{
     ".tk-chip.live{background:#1f6b3a;color:#fff;border-color:#1f6b3a}.tk-chip.off{background:#2b2f37;color:#fff;border-color:#2b2f37}" +
     ".tk-done{background:#111;color:#fff;border:1px solid #111;border-radius:4px;padding:5px 10px;font:700 12px system-ui;cursor:pointer}" +
     ".tk-port{flex:none;width:48px;height:48px;border-radius:50%;overflow:hidden;border:2px solid #c9a24a;background:#2a2f3a;color:#fff;font:700 16px system-ui;display:flex;align-items:center;justify-content:center}.tk-port canvas{width:48px;height:48px}" +
-    ".talk .tk-x{display:none!important}.talk.tk-more .tk-x{display:flex!important}.tk-morebtn{border-style:dotted!important}" +
+    ".talk .tk-x,.talk .tkg-x{display:none!important}.talk.tk-more .tk-x{display:flex!important}.talk.tk-more .tkg-x{display:block!important}" +
+    ".tk-morerow{display:flex;justify-content:flex-end;margin:0}#tkMore{background:#111;color:#fff;border:1px solid #111;border-radius:4px;padding:5px 12px;font:700 12px system-ui;letter-spacing:.06em;text-transform:uppercase;cursor:pointer}#tkMore[aria-expanded=true]{background:#fff;color:#111}" +
+    ".talk.is-open>*{flex:0 1 auto;min-height:0;overflow:auto}.talk.is-open>.talk__head,.talk.is-open>#tkSay{flex:none;overflow:visible}.talk.is-open>#tkActs{flex:0 0 auto;max-height:40vh;overflow:auto}" +
+    "#sxDock.fd-on{left:8px!important;right:8px!important;top:auto!important;bottom:var(--fdB,50px)!important;width:auto!important;max-width:none!important;max-height:max(150px,20vh)!important;flex-direction:row!important;align-items:stretch;overflow:hidden!important}" +
+    "#sxDock.fd-on>*{min-width:0;overflow:auto!important;max-height:max(146px,calc(20vh - 4px))!important}#sxDock.fd-on>#sxDockHead{flex:none;position:static;flex-direction:column;justify-content:flex-start;border-bottom:0;border-right:1px solid #c9a24a;max-width:150px}" +
+    "#sxDock.fd-on>#ndSess,#sxDock.fd-on>#veil.sitx{flex:1 1 38%;border-top:0!important;border-right:1px solid #c9a24a}#sxDock.fd-on>#ndFd{flex:1 1 62%;border-top:0!important}#sxDock.fd-on>#ndFd .fd-log{max-height:48px}" +
     ".pin--with{background:#3a2f0c;color:#ffe08a;border:1px solid #c9a24a;padding:1px 6px;border-radius:3px}" +
     ".msg--narr{font-style:italic;font-size:12px;color:var(--ink-3,#666);border-left:2px dashed var(--line,#999);padding-left:8px}" +
     ".msg--huddle{border-left:3px solid #c9a24a;padding-left:8px;background:color-mix(in srgb,#c9a24a 10%,transparent)}.msg--huddle b{color:#8a6a1a}" +
@@ -49944,21 +49953,43 @@ try{
     liveProbe(); paintChip();
     const own = el("tkOwn"); T.classList.toggle("tk-one", !!(own && !own.hidden));
     try{ const H = TALK.huddle, meta = el("tkMeta"); if(H && meta && !meta.querySelector(".pin--with")){ const s = document.createElement("span"); s.className = "pin pin--with"; s.textContent = "with " + surname(H.o.name); meta.appendChild(s); } }catch(e){}
-    /* secondary actions behind More: the first four and every exit stay out; answering a question shows all */
-    try{ const box = el("tkActs"); if(box){ const old = box.querySelector(".tk-morebtn"); if(old) old.remove();
-      const bs = [...box.querySelectorAll(".talk__btn")]; bs.forEach(b => b.classList.remove("tk-x"));
-      const answering = TALK.thread && TALK.beat === 0;
-      if(!answering){ const extra = bs.filter(b => !b.classList.contains("talk__btn--exit")).slice(4);
-        if(extra.length >= 2){ extra.forEach(b => b.classList.add("tk-x")); const mb = document.createElement("button"); mb.type = "button"; mb.className = "talk__btn tk-morebtn tk-nonum";
-          mb.textContent = TR.moreOpen ? "Less \u25B4" : "More \u25BE (" + extra.length + ")"; mb.onclick = () => { TR.moreOpen = !TR.moreOpen; decorate(); try{ picksDirty = true; }catch(e){} };
-          const ex = box.querySelector(".talk__btn--exit"); box.insertBefore(mb, ex || null); } }
-      T.classList.toggle("tk-more", !!TR.moreOpen); } }catch(e){}
+    /* 20261030g: secondary actions behind a labelled More. Primary = first four + every exit (+ every answer while a question is put).
+       Works on the regrouped .tkg sections; the More button sits in its own row at the top of the actions so it is never clipped. */
+    try{ const box = el("tkActs"); if(box){ T.querySelectorAll(".tk-morerow").forEach(x => x.remove());
+      const bs = [...box.querySelectorAll(".talk__btn")]; bs.forEach(b => b.classList.remove("tk-x")); box.querySelectorAll(".tkg").forEach(g => g.classList.remove("tkg-x"));
+      const answering = !!(TALK.thread && (TALK.beat === 0 || TALK.beat === 1));
+      const extra = answering ? [] : bs.filter(b => !b.classList.contains("talk__btn--exit")).slice(4);
+      if(extra.length >= 1){ extra.forEach(b => b.classList.add("tk-x"));
+        box.querySelectorAll(".tkg").forEach(g => { const gb = [...g.querySelectorAll(".talk__btn")]; if(gb.length && gb.every(b => b.classList.contains("tk-x"))) g.classList.add("tkg-x"); });
+        const row = document.createElement("div"); row.className = "tk-morerow tk-nonum";
+        const mb = document.createElement("button"); mb.type = "button"; mb.id = "tkMore"; mb.className = "tk-morebtn tk-nonum"; mb.setAttribute("aria-expanded", TR.moreOpen ? "true" : "false");
+        mb.textContent = TR.moreOpen ? "Less \u25B4" : "More \u25BE (" + extra.length + ")"; mb.title = TR.moreOpen ? "Hide the other things you can do" : "Other things you can do here";
+        mb.onclick = ev => { try{ ev.preventDefault(); ev.stopPropagation(); }catch(x){} TR.moreOpen = !TR.moreOpen; decorate(); try{ picksDirty = true; }catch(e){} };
+        row.appendChild(mb); const top = document.getElementById("tkTop"); if(top) top.insertBefore(row, top.firstChild); else box.insertBefore(row, box.firstChild); }
+      T.classList.toggle("tk-more", !!TR.moreOpen && extra.length > 0); } }catch(e){}
+    try{ fitTalk(); }catch(e){}
     try{ picksDirty = true; }catch(e){}
   }
   TR.decorate = decorate;
+  /* 20261030g: the open talk panel ends above the Say aloud bar (hmBar), so its actions are never under it */
+  function fitTalk(){ const T = el("talk"); if(!T) return; if(!T.classList.contains("is-open")){ T.style.removeProperty("bottom"); return; }
+    T.style.removeProperty("bottom"); const tr = T.getBoundingClientRect(); let top = Infinity;
+    /* the Say aloud bar and any fixed strip docked along the bottom (the wire) */
+    [document.getElementById("hmBar"), ...document.querySelectorAll("body > *")].forEach(e => { try{ if(!e || e === T || T.contains(e) || e.contains(T) || e.hidden) return; const cs = getComputedStyle(e); if(cs.display === "none" || cs.visibility === "hidden" || cs.position !== "fixed") return;
+      const r = e.getBoundingClientRect(); if(r.height > 0 && r.height < 90 && r.width > innerWidth * 0.5 && r.top > innerHeight * 0.75) top = Math.min(top, r.top); }catch(x){} });
+    if(!isFinite(top)) return; const ov = Math.ceil(tr.bottom - top + 6);
+    if(ov > 0) T.style.setProperty("bottom", ov + "px", "important"); }
+  TR.fitTalk = fitTalk; addEventListener("resize", () => { try{ fitTalk(); }catch(e){} });
   { const _rt = renderTalk; renderTalk = function(){ const r = _rt.apply(this, arguments); try{ if(TALK.open) decorate(); }catch(e){} return r; }; }
   /* Esc in the in-talk wire closes like Esc anywhere else; Enter (not typing) puts you in the reply box */
-  try{ el("wireIn").addEventListener("keydown", e => { if(e.key === "Escape" && TALK.open){ e.preventDefault(); const i = e.target; const v = (i.value || "").trim(); i.blur(); if(!v) closeTalk(); } }); }catch(e){}
+  /* 20261030g: one Esc closes the talk, even with the reply box or the wire focused. Capture phase, only while talk is open and no
+     modal card (veil) is over it; when talk is closed Esc is untouched for every other panel. */
+  addEventListener("keydown", e => { try{ if(e.key !== "Escape" || !TALK.open) return;
+      if(typeof veil !== "undefined" && veil && !veil.hidden && !veil.classList.contains("sitx")) return;
+      const t = el("talk"); if(!t || !t.classList.contains("is-open")) return;
+      e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
+      try{ const a = document.activeElement; if(a && a !== document.body && a.blur) a.blur(); }catch(x){}
+      closeTalk(); }catch(x){} }, true);
   addEventListener("keydown", e => { try{ if(e.key !== "Enter" || e.ctrlKey || e.metaKey || e.altKey || !TALK.open || typingInField(e)) return; if(typeof veil !== "undefined" && !veil.hidden) return; const i = el("tkOwnIn"); if(i && !el("tkOwn").hidden){ e.preventDefault(); i.focus(); } }catch(x){} });
   /* ghost-state watchdog: the flag and the panel always agree */
   setInterval(() => { try{ const t = el("talk"); if(!t) return; const on = t.classList.contains("is-open");
@@ -49968,7 +49999,9 @@ try{
   const isMe = x => x === "you" || sv(() => G.you && String(x) === String(G.you.id));
   function deskTick(){ try{
       const D = document.getElementById("ndFd"), dock = document.getElementById("sxDock"); const on = !!(D && !D.hidden && getComputedStyle(D).display !== "none");
-      if(dock) dock.classList.toggle("fd-on", on); if(!on) return;
+      if(dock) dock.classList.toggle("fd-on", on);
+      if(dock && on){ try{ const hb = document.getElementById("hmBar"); const hv = hb && !hb.hidden && getComputedStyle(hb).display !== "none"; dock.style.setProperty("--fdB", (hv ? Math.ceil(innerHeight - hb.getBoundingClientRect().top + 6) : 8) + "px"); }catch(e){} }
+      if(!on) return;
       const S = window.ONUM_SESSION || {}, body = D.querySelector(".fd-body"); if(!body) return;
       let A = D.querySelector(".fd-acts"); if(!A){ A = document.createElement("div"); A.className = "fd-acts"; const row = D.querySelector(".fd-row"); if(row) row.parentNode.insertBefore(A, row.nextSibling); else body.appendChild(A); }
       const turn = isMe(S.floorId) || isMe(S.offer), chair = S.chairId === "you", fl = S.floorId != null && !isMe(S.floorId), press = /press/.test(String(S.kind || ""));
@@ -49991,7 +50024,10 @@ try{
         H.querySelectorAll("[data-hand]").forEach(b => b.onclick = () => { if(OSc("callon", b.getAttribute("data-hand")) === undefined){ try{ console.warn("press: onumSession.callon missing (JUPITER)"); }catch(e){} } }); }
       else if(H) H.remove();
     }catch(e){} }
-  setInterval(deskTick, 400); addEventListener("onum-session", () => setTimeout(deskTick, 0));
+  setInterval(deskTick, 400);
+  /* 20261030g: a "stops you" toast offers no Talk while a sitting/procedure/session owns the conversation (openTalk would refuse it) */
+  setInterval(() => { try{ const w = document.getElementById("apToast"); if(!w) return; const b = w.querySelector('[data-ap="talk"]'); if(!b) return;
+      const busy = !!window.onumTalkOwner(); if(b.hidden !== busy){ b.hidden = busy; b.style.display = busy ? "none" : ""; } }catch(e){} }, 250); addEventListener("onum-session", () => setTimeout(deskTick, 0));
   addEventListener("keydown", e => { try{ if(e.key !== " " || typingInField(e)) return; const D = document.getElementById("ndFd"); if(!D || D.hidden) return;
       const un = [...D.querySelectorAll(".fd-l")].filter(l => l._full && !l._done && l.querySelector(".t") && l.querySelector(".t").textContent !== l._full); if(!un.length) return;
       e.preventDefault(); e.stopImmediatePropagation(); un.forEach(l => { l._done = true; l.querySelector(".t").textContent = l._full; }); }catch(x){} }, true);
