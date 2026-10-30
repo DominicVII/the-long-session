@@ -176,3 +176,9 @@ Verdict: lids, lash line, lips and ears now read at Senate mid-shot. Faces still
 - Plants: core sphere shrunk to sit inside the frond crown.
 - Verdict: smoother silhouettes and nose at Senate mid-shot, but still reads stylised/game doll. Still MISSES the room-distance human bar.
 - Gaps for ab: hair is a shell (needs strand cards/alpha fringe), eye/brow proportions, skin albedo still flat at distance, neck/collar transition; East Steps bronze ball-on-post and HUD stamp garble not found; gate vs Capitol one-frame not done.
+
+## 20261030ab
+- Hair: strand cards (alpha-tested canvas strand texture, 36/56/84 cards by style/tier) over the shell on ALL tiers; fringe reads cut-out. Gap: cards read spiky/pale; shell still glossy underneath.
+- Skin: low-frequency distant mottle in map_fragment (no pore grid revival).
+- Plants: ball core removed entirely (fronds only).
+- Gaps: eye/brow proportions, neck-collar join, East Steps bronze ball, HUD hst1d (not reproduced). Room-distance faces still MISS -> ac.
