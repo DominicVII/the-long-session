@@ -32,3 +32,20 @@ Neptune helpers: ndYou() (title: onumAddressYou -> onumPlayerOffice -> legacy; N
 5. Apartment: wardrobe (ONUM_WARDROBE/onumWear) + mirror (style editor 'home' mode: everything except haircut, which stays at the barber), furniture, warm light, family photos, rug, coat rack. Pantry/kitchen (ONUM_PANTRY, onumEat, shelves/fridge, spoiled greyed). "For my apartment" at Vons/bakery if JUPITER's shop lacks it. Evening family scene.
 6. Daily flow: morning coffee + paper with ledger headlines, staff asks, hallway run-ins.
 Open: a pale top-left panel in headless screenshots, probably just the wall; low priority.
+
+## 20261030b — talk / sessions, one surface each (Neptune; follows JUPITER 20261030a)
+Shipped (UI, presentation, and safe gates only; no engine rewrites):
+- Open talk now runs as one pipeline. NEPTUNE-TALKREWORK's outer openTalk (JUPITER's press redirect and the cabinet callon still run first) works in this order: already talking to them → focus the reply box, no second opening; owner gate (`window.onumTalkOwner()`) → no talk over SIT, PROC (you have the floor) or a session where you're seated and holding or have the floor, and a desk/feed note says why; talking to someone else → clean close first; then the existing chain; then decorate.
+- `TALK.seq` is a token per open/close. The kinLine 1.4s and the fwLive and NPCV 9s/22s timers all check it, so reopening someone no longer leaks old lines. Huddle timers were already per-object.
+- The opening is spoken once. The fwLive live line is written as text, not spoken a second time, and it's dropped if you've already replied.
+- closeTalk is wrapped with try/finally. It always resets TALK.open/m/huddle/seq, the panel class and tkOwn, then calls wireHome. A 1s watchdog keeps TALK.open in step with the panel's is-open.
+- Dedupe: appendMsg skips the same kind+who+text within 2s. tlog drops "talk" lines repeated within 2s (setSay+appendMsg).
+- The CV poll went from 600ms to 2.5s. setSay and appendMsg now kick cvScan (150ms debounce).
+- Talk panel: opaque, max-height min(52%,520px), with a portrait (onumFamilyTree.portrait), Live/Offline chip (onumLiveTalk.available, probed every 20s) and a Done (Esc) button. tkOwn is the single reply box (it goes to LiveTalk, or offline improvise). The in-talk wire hides its input, Send, Mic and To while tkOwn is shown; Stop and state stay. Enter (when you're not typing) focuses the reply box, and Esc in the wire closes. After the first 4 actions the rest go behind "More ▾ (n)". Exits always show, and every answer to a question always shows.
+- Huddle: the "You step into…" line is now narration (.msg--narr). The second voice's lines are .msg--huddle (gold rule), and a "with X" pin sits in the meta. The old `tkMeta.textContent +=` was wiping the chips and is gone.
+- Number keys skip .tk-nonum, #tkOwn and #wire buttons, so primary choices only.
+- hmBar's Ctrl/Meta capture no longer swallows Ctrl+Enter (Vox send).
+- nearGreet now also checks onumTalkOwner(true). The war-map envoy call won't hide the veil or open talk over a sitting.
+- Floor desk: a .fd-acts row has Pass (onumSession.pass), Interject (interject(text||"Point of order!"); it never takes the floor) and a "You chair" chip with "Call on <next>". For press_conference (chair) it shows a "Hands up" pick row from the queue that calls callon(id). Space finishes all word-by-word lines when you're not typing. While the desk is up, #sxDock gets .fd-on and the session view's own speak box (#nsxSay / .nsx-say) hides, so there's one place to speak.
+For JUPITER: no new contract is required. Optional asks: (1) an `onum-talk-owner` event or a field on ONUM_SESSION, so the owner gate needn't infer "seated" from seats; (2) S.hands (array of ids) for press if the queue ever stops being the hands list.
+For MARS QA: reopen the same NPC within 22s (no stale lines); Esc / Done / walk-away (no ghost TALK.open); huddle styling; More toggle plus number keys; Ctrl+C/V in tkOwn, wire, hmSay and the desk; a press conference (hands row → callon → question waits); cabinet chair (Call on next); sitting gate (clicking a member while seated in a session shows a note and opens no talk).
