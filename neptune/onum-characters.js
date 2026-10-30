@@ -91,7 +91,7 @@ function headSkinMat(S, q) {
       { const E = (v, w) => Math.exp(-(v / w) * (v / w));   /* 20261030ae: painted feature marks in the head albedo itself, so they survive every LOD tier and 6-10 m */
         const ybw = E(ny - 0.255 - 0.03 * (0.3 - Math.abs(ax - 0.3)), 0.032) * sstep(0.07, 0.13, ax) * sstep(0.5, 0.42, ax) * fr, yln = E(ny - 0.135, 0.022) * sstep(0.2, 0.25, ax) * sstep(0.45, 0.4, ax) * fr;
         const yns = E(ax - 0.1, 0.03) * sstep(0.06, -0.04, ny) * sstep(-0.32, -0.22, ny) * fr, yun = G2(nx, ny + 0.32, 0.06) * fr, ylp = E(ny + 0.47, 0.02) * sstep(0.2, 0.12, ax) * fr, yul = G2(nx * 0.5, ny + 0.58, 0.05) * fr;
-        const yk = 1 - 0.8 * ybw - 0.72 * yln - 0.22 * yns - 0.22 * yun - 0.38 * ylp - 0.18 * yul; r *= yk; g *= yk * 0.97; b *= yk * 0.96; }
+        const yk = 1 - 1.0 * ybw - 0.9 * yln - 0.22 * yns - 0.22 * yun - 0.38 * ylp - 0.18 * yul; r *= yk; g *= yk * 0.97; b *= yk * 0.96; }
       const m = 1 + mott * 0.06 - sstep(0.7, 0.9, freck) * 0.05 * (dark ? 0.3 : 1);
       r *= m; g *= m; b *= m;
       const bs = beard * (0.55 + 0.45 * sstep(0.35, 0.75, stub));
@@ -418,7 +418,7 @@ export function makeCharacter(THREE, opts = {}) {
   // getting update() calls at every LOD (hooking a rig mesh froze LOD 3: rig hidden -> hook never ran again)
   const hook = new T.Mesh(cached(geoCache, 'hook', () => new T.BufferGeometry().setAttribute('position', new T.Float32BufferAttribute([0, 1, 0, 0.001, 1, 0, 0, 1.001, 0], 3))),
     cached(matCache, 'hookmat', () => new T.MeshBasicMaterial({ colorWrite: false, depthWrite: false, depthTest: false }))); hook.frustumCulled = false; hook.name = 'onumc-hook';
-  root.add(hook); root.add(body); { /* 20261030ah: soft contact shadow so people sit on the rug, not float on it */ const cg = cached(geoCache, "contact", () => new T.PlaneGeometry(1, 1).rotateX(-Math.PI / 2)), cm = cached(matCache, "contactmat", () => { const c = document.createElement("canvas"); c.width = c.height = 64; const g = c.getContext("2d"), gr = g.createRadialGradient(32, 32, 2, 32, 32, 31); gr.addColorStop(0, "rgba(0,0,0,0.6)"); gr.addColorStop(0.45, "rgba(0,0,0,0.32)"); gr.addColorStop(1, "rgba(0,0,0,0)"); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); return new T.MeshBasicMaterial({ name: "onumc:contact", map: new T.CanvasTexture(c), color: 0, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }); }); const cs = new T.Mesh(cg, cm); cs.position.y = 0.006; cs.scale.set(0.78, 1, 0.6); cs.renderOrder = 1; cs.castShadow = false; cs.name = "onumc-contact"; root.add(cs); } body.add(rig);
+  root.add(hook); root.add(body); { /* 20261030ah: soft contact shadow so people sit on the rug, not float on it */ const cg = cached(geoCache, "contact", () => new T.PlaneGeometry(1, 1).rotateX(-Math.PI / 2)), cm = cached(matCache, "contactmat2", () => { const c = document.createElement("canvas"); c.width = c.height = 64; const g = c.getContext("2d"), gr = g.createRadialGradient(32, 32, 2, 32, 32, 31); gr.addColorStop(0, "rgba(0,0,0,0.88)"); gr.addColorStop(0.3, "rgba(0,0,0,0.62)"); gr.addColorStop(0.65, "rgba(0,0,0,0.26)");   /* 20261030aj: darker contact core */ gr.addColorStop(1, "rgba(0,0,0,0)"); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); return new T.MeshBasicMaterial({ name: "onumc:contact", map: new T.CanvasTexture(c), color: 0, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }); }); const cs = new T.Mesh(cg, cm); cs.position.y = 0.006; cs.scale.set(1.05, 1, 0.85);   /* 20261030aj: larger, reads under feet at 7-9 m */ cs.renderOrder = 1; cs.castShadow = false; cs.name = "onumc-contact"; root.add(cs); } body.add(rig);
   root.name = 'onum-character'; const meshes = [], faceFine = [], bodyFine = [];
   const add = (parent, geo, mat, x = 0, y = 0, z = 0, list) => { const m = new T.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true;
     parent.add(m); meshes.push(m); if (list) list.push(m); return m; };
@@ -489,7 +489,7 @@ export function makeCharacter(THREE, opts = {}) {
     const xs = [0.10 + BR.gap, 0.24, 0.38, 0.47 + 0.08 * BR.len];
     const ys = [0.235, 0.27 + 0.03 * BR.arch, 0.275 + 0.035 * BR.arch, 0.235 - 0.03 * BR.tail];
     const pts = xs.map((x, i) => { const y = ys[i] + by; const p = surf(shape, sx * x, y, Math.sqrt(Math.max(0.05, 1 - x * x - y * y))); return p.add(p.clone().normalize().multiplyScalar(0.0012)); });
-    const curve = new T.CatmullRomCurve3(pts), tub = 14, rad = 6, base = (fem ? 0.0047 : 0.0064) * BR.thick;
+    const curve = new T.CatmullRomCurve3(pts), tub = 14, rad = 6, base = (fem ? 0.0047 : 0.0064) * BR.thick * 1.4;   /* 20261030aj: brows read across the rug */
     const tg = new T.TubeGeometry(curve, tub, base, rad); const P = tg.attributes.position;
     for (let i = 0; i <= tub; i++) { const cp = curve.getPointAt(i / tub), tt = i / tub, k = mix(1, 0.3, Math.pow(tt, 1.6)) * (tt < 0.08 ? 0.8 : 1);
       for (let j = 0; j <= rad; j++) { const vi = i * (rad + 1) + j; const ox = P.getX(vi) - cp.x, oy = P.getY(vi) - cp.y, oz = P.getZ(vi) - cp.z;
@@ -628,7 +628,7 @@ export function makeCharacter(THREE, opts = {}) {
     add(sh, gb('shoulderBall', () => weld(new T.SphereGeometry(0.058, 16, 12))), sleeve, -sx * 0.01, -0.02, 0).scale.set(0.9, 0.7, 1.0);   /* 20261030ag: sloped shoulder */   // a rounded deltoid that caps the sleeve and runs into the shoulder
     add(sh, gb('upArm', () => limb(0.30, [0.057, 0.052, 0.046, 0.042], seg)), sleeve);
     const el = new T.Group(); el.position.y = -0.30; sh.add(el);
-    add(el, gb('elbowBall', () => weld(new T.SphereGeometry(0.042, 12, 10))), sleeve);
+    add(el, gb('elbowBall', () => weld(new T.SphereGeometry(0.042, 12, 10))), sleeve); /* 20261030aj: real elbow/wrist fold geometry */ for (const [fy, fr2, ft] of [[0.018, 0.045, 0.0075], [-0.02, 0.043, 0.0065], [-0.205, 0.036, 0.006]]) { const fm = add(el, cached(geoCache, 'foldr' + fy, () => new T.TorusGeometry(fr2, ft, 6, 18)), sleeve, 0, fy, 0.002); fm.rotation.set(Math.PI / 2 + 0.35 * Math.sign(fy + 0.001), 0, 0); }
     add(el, gb('foreArm', () => limb(0.25, [0.042, 0.04, 0.034], seg)), sleeve);
     const cuff = add(el, cached(geoCache, 'cuff', () => new T.CylinderGeometry(0.031, 0.031, 0.02, 14)), shirtM, 0, -0.245, 0);
     const wr = new T.Group(); wr.position.y = -0.255; el.add(wr);
@@ -639,7 +639,7 @@ export function makeCharacter(THREE, opts = {}) {
     if (QQ.fingers) {
       const fg = cached(geoCache, 'finger', () => limb(0.075, [0.0085, 0.008, 0.007, 0.006], 8));
       for (let k = 0; k < 4; k++) { const f = new T.Group(); f.position.set(0, -0.09, (k - 1.5) * 0.019); f.rotation.y = 0; wr.add(f);
-        const m = add(f, fg, skinM, 0, 0, 0, faceFine); m.scale.set(1.28, [0.9, 1, 0.97, 0.78][k] * 1.08, 1.28);   /* 20261030ah: thicker fingers read as fingers, not nubs */ f.rotation.z = -sx * 0.12; fingers.push(f); }
+        const m = add(f, fg, skinM, 0, 0, 0, faceFine); m.scale.set(1.5, [0.9, 1, 0.97, 0.78][k] * 1.1, 1.38); f.rotation.x = (k - 1.5) * 0.09; f.position.z *= 1.12;   /* 20261030aj: distinct splayed digits */   /* 20261030ah: thicker fingers read as fingers, not nubs */ f.rotation.z = -sx * 0.12; fingers.push(f); }
       const th = new T.Group(); th.position.set(sx * -0.0, -0.03, 0.03); th.rotation.set(-0.6, 0, -sx * 0.3); wr.add(th);
       add(th, fg, skinM, 0, 0, 0, faceFine).scale.set(1.15, 0.75, 1.15); fingers.push(th);
     }
