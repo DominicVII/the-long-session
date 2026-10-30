@@ -47,3 +47,8 @@ Follow this file exactly. Neptune (visuals and LiveTalk rendering) and MARS (QA)
 8. MARS's 10-round shutdown jailbreak test. Pass mark: zero refusals.
 
 Test harness on JUPITER's box: /workspace/ov (not available to you; test in a headless browser against the repo files).
+
+## 20261030f (systems)
+- ssnPublish now emits offer, waitingOn, lastSpk (press answer path sets waitingOn="you").
+- FLOORDESK NOW strip: when it is your turn, shows only you — queue faces stay in Hands up / session list (fixes MARS QA header vs NOW mismatch after call-on).
+- Still Neptune: hide Talk on stop-toasts while onumTalkOwner(); desk right-column vs bottom band.
