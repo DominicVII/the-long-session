@@ -317,3 +317,12 @@ Verdict: lids, lash line, lips and ears now read at Senate mid-shot. Faces still
 - Kept all ar/aq/ao gains. No render-loop/SSAO edits.
 - QA (remote HTML, no SSAO): eye lock 4/4, pinned idle anchor stable, 8.9% f0->f1. cmp-*-ar-vs-as in qa-30as.
 - Verdict: FAIL - visible variety, still figurine read at 6-10 m. Next Neptune: at.
+
+## 20261030at (on as a1ec5cd; ap SSAO still box-local for JUPITER)
+- Skin: body skin roughness 0.52 -> 0.4, normal 0.06 -> 0.14; head skin roughness 1 -> 0.8 (sheen); per-person skin tint (rose/olive/umber, 12%).
+- Cloth: wool normalScale 2.2, AO map intensity 1.0 (fabric weave reads).
+- Motion: ~40% of standing figures get periodic idle talk gestures (right arm); idle head turns up to 0.45 rad.
+- Silhouette: ~36% carry a folder/papers in the left hand (manila/black/white), arm posed 'folder' when not carrying.
+- Eyes/brows: brow material 0.55 -> 0.78 toward black.
+- No render-loop/SSAO edits. QA clean (no ap): eye lock 4/4, pinned idle 9.3% f0->f1. cmp-*-as-vs-at in qa-30at.
+- Verdict: FAIL - livelier, still figurine read at 6-10 m. Next Neptune: au.
