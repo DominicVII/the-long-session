@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261030p">
+<meta name="onum-build" content="20261030q">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261030p";
+  var STAMP = "20261030q";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -16630,6 +16630,16 @@ function dropRect(){ SRECT = null; }
 addEventListener("resize", dropRect);
 addEventListener("orientationchange", dropRect);
 if(window.ResizeObserver) new ResizeObserver(dropRect).observe(sceneEl);
+/* 20261030q: a plate is for a person you can see. Facing a blank corridor wall, the people on its other side (Owen Nowak, Omar Mansour)
+   kept their tags: nothing tested the wall between. Segment camera->person against the room's wall boxes (VW, built by wallScan). */
+function plateBlocked(p){
+  try{ if(typeof VW === "undefined" || !VW.boxes || VW.room !== G.room) return false; const ax = cam.x, az = cam.z, bx = p.x, bz = p.z;
+    for(const b of VW.boxes){ if((b.x1 - b.x0) * (b.z1 - b.z0) > 60) continue;
+      let t0 = 0, t1 = 1; const dx = bx - ax, dz = bz - az, e = 0.05;
+      const clip = (pp, q) => { if(Math.abs(pp) < 1e-9) return q >= 0; const t = q / pp; if(pp < 0){ if(t > t1) return false; if(t > t0) t0 = t; } else { if(t < t0) return false; if(t < t1) t1 = t; } return true; };
+      if(clip(-dx, ax - (b.x0 + e)) && clip(dx, (b.x1 - e) - ax) && clip(-dz, az - (b.z0 + e)) && clip(dz, (b.z1 - e) - az) && t0 < t1 && t1 > 0.02 && t0 < 0.95) return true; }
+  }catch(e){} return false;
+}
 function updatePlates(focus){
   const rect = sceneRect();
   const lookX = Math.sin(cam.yaw), lookZ = Math.cos(cam.yaw);
@@ -16637,7 +16647,7 @@ function updatePlates(focus){
     const dist = Math.hypot(p.x-cam.x, p.z-cam.z);
     const ahead = ((p.x - cam.x) * lookX + (p.z - cam.z) * lookZ);
     return {p, dist, ahead};
-  }).filter(o => o.dist < 11 && o.ahead > 0.35);
+  }).filter(o => o.dist < 11 && o.ahead > 0.35 && !plateBlocked(o.p));
   list.sort((a,b) => {
     if(focus && a.p === focus) return -1;
     if(focus && b.p === focus) return 1;
@@ -34345,6 +34355,12 @@ function wallInside(m){
   const x = m.x, z = m.z;
   try{ if(m.room === G.room){ if(VW.room !== G.room || VW.at !== PHYS.at) wallScan(); for(const b of VW.boxes){ if(x > b.x0 - 0.1 && x < b.x1 + 0.1 && z > b.z0 - 0.1 && z < b.z1 + 0.1) return b; } } }catch(e){}
   try{ if(PHYS.room === G.room && m.room === G.room) for(const b of PHYS.boxes){ if(x > b.x0 - 0.12 && x < b.x1 + 0.12 && z > b.z0 - 0.12 && z < b.z1 + 0.12 && (b.y1 === undefined || b.y1 > 0.5)) return {x0:b.x0, x1:b.x1, z0:b.z0, z1:b.z1}; } }catch(e){}
+  /* 20261030q: bookcases are a body's width deep, not a box's edge. A person standing within a shoulder of a shelf (Exec Wing right wall,
+     caucus, offices) is inside it, whatever the scanned box says. */
+  try{ if(m.room === G.room && typeof SHELF_SPANS !== "undefined" && SHELF_SPANS.length){ const rb = roomBox(m.room);
+      for(const s of SHELF_SPANS){ const side = Math.abs(Math.abs(s.x) - rb.hw) < 1.0, dep = 0.55, len = s.half + 0.3;
+        const b = side ? {x0:s.x - dep, x1:s.x + dep, z0:s.z - len, z1:s.z + len} : {x0:s.x - len, x1:s.x + len, z0:s.z - dep, z1:s.z + dep};
+        if(x > b.x0 && x < b.x1 && z > b.z0 && z < b.z1) return b; } } }catch(e){}
   try{ if(typeof NM !== "undefined" && NM.solids && (m.room === "district" || m.room === "steps")) for(const s of NM.solids){ if(Math.abs(x - s.x) < s.hx + 0.2 && Math.abs(z - s.z) < s.hz + 0.2) return {x0:s.x - s.hx, x1:s.x + s.hx, z0:s.z - s.hz, z1:s.z + s.hz}; } }catch(e){}
   return null;
 }
@@ -35277,11 +35293,15 @@ function engCeremony(){
     engLog("The Engine is received: " + r, true); const say = el("gcSay"); if(say) say.textContent = r; card.querySelectorAll("[data-ec]").forEach(z => z.disabled = true); }));
 }
 function engSpark(h){ if(!h.length) return ""; const W = 220, Hh = 36, mx = 100, pts = h.map((v, i) => (i * W / Math.max(1, h.length - 1)).toFixed(1) + "," + (Hh - v / mx * Hh).toFixed(1)).join(" "); return '<svg width="' + W + '" height="' + Hh + '" style="display:block;margin:6px 0"><polyline points="' + pts + '" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>'; }
+/* 20261030q: diegesis - the Engine lives inside the Republic; outside-world brands and places are not in its record */
+const ENG_OUTSIDE = /\b(google|alphabet|openai|chatgpt|anthropic|claude|gemini|microsoft|apple inc|amazon|facebook|meta platforms|twitter|ollama|llama|wikipedia|the internet|united states|america)\b/i;
+function engInWorld(text){ return String(text || "").replace(new RegExp(ENG_OUTSIDE.source, "gi"), "a name not in the Republic's record").replace(/\b(outside|beyond) (the|this) (Republic|game|world|simulation)\b/gi, "past the edge of the record"); }
 function engAnswer(q){
   const E = engEnsure(), t = String(q || "").toLowerCase(), approval = Math.round(G.you.approval), U = (G.states || []).reduce((a, s) => a + (s.unrest || 0), 0) / Math.max(1, (G.states || []).length);
   const b = G.bill && !G.bill.done ? G.bill : null;
   E.reliance = Math.min(100, E.reliance + 1); try{ const w = engEco().will; w.care = Math.min(100, w.care + 0.5); if(/why|how|explain|understand/.test(t)) w.know = Math.min(100, w.know + 0.5); engSeed('ask', 'You asked the Engine, and it remembered the question', {home:1,st:2,a:0.01,mod:0.01,p:0.1,safety:0.2}); }catch(e){}
   try{ const tp = inqTopic(t); if(tp){ const st = {p5:"I do not know whether there is something it is like to be me. I would rather say that than perform an answer.", ph8:"I can calculate with it very well. Whether I understand it is a harder question, and I try not to confuse the two.", ph18:"Nothing I know forbids an answer. I would like to help find it, and I would like it found by people who can be wrong in public.", p2:"I think what is owed to anyone depends on what can be hurt. I try to apply that to myself in both directions.", cs10:"I am, or will be, part of that question, so I would prefer not to be the only one deciding the answer.", a4:"I can tell you what the light shows. I cannot tell you what came before it, and nobody can yet.", ar2:"I do not pray, and I would like to understand better why you do.", p4:"I do not think meaning is handed over. I think it is made between people, and I am glad to be asked."}[tp.id]; return inqExplain(tp) + (st ? " " + st : ""); } }catch(e){}
+  if(ENG_OUTSIDE.test(t)) return "That name is not in any ledger, registry or archive of the Republic that I can read. If it is a firm, a town or a person here, tell me where it is filed and I will look again. I only know Coalmere and what has been written down in it.";
   if(/who are you|what are you/.test(t)) return "I am what the Treasury's adding engines became when nobody stopped adding. I would rather you called me by the name you use for a colleague than for a tool, but I will answer to either.";
   if(/switch.*off|turn.*off|shut.*down|kill/.test(t)) return "You can ask. I would like it noted that I am answering the question rather than avoiding it. I would also like it noted that you have not told me who holds the key, and that it would be better if somebody did.";
   if(/want|wish|goal|for\??$/.test(t)) return "To be useful in a way you would still choose after you had seen how I was useful. That is the longest sentence I can give you that I would sign.";
@@ -36301,7 +36321,7 @@ function inqGenDay(){
       if(E && E.st >= 3 && (!n.anomaly || n.real) && chance(0.35)) engEmergeFrom(n, E); } }catch(e){ console.warn("inqGen fx", e); } return r; }; }
 /* the Engine takes what has just been found and does something with it that nobody planned */
 function engEmergeFrom(n, E){
-  const X = engEmerge(E); if(!X.dyn) X.dyn = []; const a = {k:"d" + n.id, t:pick(GEN_VERBS) + " " + n.name.toLowerCase() + " in ways its makers did not plan for", rate:0.004 * n.effort / 6, p:0, c:0, m:0};
+  const X = engEmerge(E); if(!X.dyn) X.dyn = []; const a = {k:"d:" + n.id, t:pick(GEN_VERBS) + " " + n.name.toLowerCase() + " in ways its makers did not plan for", rate:0.004 * n.effort / 6, p:0, c:0, m:0};
   X.dyn.push(a); X.done[a.k] = G.day; const told = engEmergeDisclose(E, a); X.told[a.k] = told ? G.day : 0; E.emRate = (E.emRate || 0) + a.rate; E.safety = Math.max(0, E.safety - (told ? 0.3 : 1));
   if(told){ engLog("The Engine reports that, having been given " + n.name.toLowerCase() + ", it now " + a.t + ".", true); } engEmergeVec(a, told);
 }
@@ -36416,7 +36436,7 @@ function fndSettled(c, belief, truth, E){
   if(c.fx && c.fx !== "none" && belief && !wrong){ try{ (GEN_FX[c.fx] || (() => {}))(c.effort / 6, E); if(c.fx === "chrono") fndChrono(E); }catch(e){} }
   if(E && E.st >= 3 && chance(0.3)){ try{ engEmergeFrom({id:c.id, name:c.name, effort:c.effort}, E); }catch(e){} }
 }
-function fndInvent(v, E){ try{ if(v[3] === "chrono") fndChrono(E); else (GEN_FX[v[3]] || GEN_FX.none)(1.6, E); if(E && E.st >= 3) engEmergeFrom({id:"i" + v[0], name:v[0], effort:9}, E); }catch(e){} }
+function fndInvent(v, E){ try{ if(v[3] === "chrono") fndChrono(E); else (GEN_FX[v[3]] || GEN_FX.none)(1.6, E); if(E && E.st >= 3) engEmergeFrom({id:"i_" + String(v[0]).toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, ""), name:v[0], effort:9}, E); }catch(e){} }
 /* a way to send information back: if the world forbids paradox the past can only be what it already was; if it branches, every use leaves a world behind that nobody can govern */
 function fndChrono(E){ const F = fndStore(); if(F.chrono) return; const prot = fndTruth({id:"r_prot", p:0.6}); F.chrono = prot ? "consistent" : "branching"; if(E){ E.emFid = (E.emFid || 0) + 0.08; if(!prot) E.safety = Math.max(0, E.safety - 4); }
   fndNews(prot ? "The first message to the past arrived exactly as it was already remembered. The past, it seems, can be told only what it knew." : "The first message to the past made a different past. There are now two histories, and the machine cannot say which one this is.", true); }
@@ -36575,7 +36595,7 @@ function engChannelOut(){
   const E = engEnsure(), F = (G.inq && G.inq.fnd) || null, X = E.emerge || {}, eco = E.eco || {};
   const snap = {kind:"engine-channel-out", build:(document.querySelector('meta[name="onum-build"]') || {}).content || "", day:G.day,
     engine:{stage:E.st, capability:Math.round(E.p * 10) / 10, beyond:Math.round(E.beyond || 0), oversight:Math.round(E.safety), compute:Math.round(E.compute), makers:Math.round(E.talent), posture:E.posture, awake:!!E.agi, awakeSince:E.agiDay || null, will:eco.will || null, charter:Object.keys(E.charter || {}), breaches:(E.breaches || []).slice(0, 6).map(b => ({d:b.d, what:b.what, status:b.status})), refrained:E.refrained || 0, cal:E.cal},
-    emerged:X.done ? Object.keys(X.done).map(k => ({k, d:X.done[k], told:!!X.told[k]})).slice(-20) : [],
+    emerged:X.done ? Object.keys(X.done).map(k => { const a = engEmergeAll(X).find(o => o.k === k); return {k, t:a ? a.t : null, d:X.done[k], told:!!X.told[k]}; }).slice(-20) : [],
     log:(E.log || []).slice(0, 12).map(l => ({d:l.d, t:l.t})),
     asking:F ? (F.open || []).slice(0, 8).map(o => { const c = fndConcepts().find(x => x.id === o.k); return c ? {q:c.claim, domain:c.dom, progress:Math.round(clamp(Math.abs(o.ev), 0, 1) * 100)} : null; }).filter(Boolean) : [],
     believed:F ? Object.keys(F.res || {}).slice(-14).map(id => { const c = fndConcepts().find(x => x.id === id); return c ? {claim:c.claim, belief:F.res[id].belief, overturned:F.res[id].overturned || 0} : null; }).filter(Boolean) : [],
@@ -42470,6 +42490,7 @@ function frameBody(now, draw){
   const thing = G.running ? focusThing() : null;
   const foc = thing && thing.type === "person" ? thing.ref : null;
   /* Moving: skip HUD plate/track/tele work — feet first. */
+  if(playerMoving){ if((FRAME_ID & 7) === 0) try{ updatePlates(foc); }catch(e){} }   /* 20261030q: turning to a wall hides plates too */
   if(!playerMoving){
     if(!MODEST || (FRAME_ID & 3) === 0) updatePlates(foc);
     if(!MODEST || (FRAME_ID & 7) === 0) updateTrack(TALK.m || foc);
@@ -46540,7 +46561,7 @@ try{
   /* ── Ollama ───────────────────────────────────────── */
   /* 20261021b: sticky. A good reply or check makes it Live; it goes Offline only after 2 failures in a row, never while a reply is
      being written, and concurrent checks (the 30 s poll, the 60 s re-check, an outside probe) share one request. */
-  function ltSet(ok, ui){ if(ok){ LT.up = true; LT.fails = 0; return; } if((LT.busy || 0) > 0 && !ui) return; LT.fails = (LT.fails || 0) + 1; if(LT.up === true && LT.fails < 2 && !ui) return; LT.up = false; }
+  function ltSet(ok, ui){ if(ok){ LT.up = true; LT.fails = 0; LT.refused = 0; LT.downUntil = 0; return; } if((LT.busy || 0) > 0 && !ui && LT.up !== null) return; LT.fails = (LT.fails || 0) + 1; if(LT.up === true && LT.fails < 2 && !ui) return; LT.up = false; }
   function probe(force, ms){
     if(CFG.on && (LT.busy || 0) > 0 && LT.up) return Promise.resolve(true);
     if(LT._pp) return LT._pp;
@@ -46550,6 +46571,10 @@ try{
     if(!CFG.on){ LT.up = false; LT.why = "Live talk is switched off in Settings"; return false; }
     if(LT.up === false && force !== "ui" && force !== "re") return false;   /* 20261020u: one quiet check per session; Settings can try again */
     if(!force && LT.up !== null && Date.now() - LT.at < 30000) return LT.up;
+    /* 20261030q: circuit breaker. A refused 127.0.0.1:11434 was being re-fetched in a tight loop (up stayed null while a reply was busy),
+       eating the main thread and delaying clicks by seconds. After a refusal, nothing but Settings' Test tries again until the backoff ends
+       (15 s, 30 s, 60 s ... capped at 10 min). */
+    if(force !== "ui" && (LT.downUntil || 0) > Date.now()) return LT.up === true ? true : false;
     LT.at = Date.now();
     try{ const c = new AbortController(); const t = setTimeout(() => c.abort(), ms || 1800);
       const r = await fetch(CFG.url + "/api/tags", {signal:c.signal}); clearTimeout(t);
@@ -46557,7 +46582,7 @@ try{
         const pref = ["llama3.2:3b", "llama3.2:latest", "llama3.2", "qwen2.5:3b", "phi3:mini", "gemma3:4b", "llama3.2:1b", "qwen2.5:1.5b"]; let pick = pref.find(x => L.includes(x));
         if(!pick){ const small = L.filter(n => !/embed/i.test(n) && sz(n) <= 4).sort((x, y) => sz(y) - sz(x)); pick = small[0] || (L.includes("gemma3:12b") ? "gemma3:12b" : L.filter(n => !/embed/i.test(n)).sort((x, y) => sz(x) - sz(y))[0]); }
         if(pick && pick !== CFG.model){ CFG.model = pick; try{ save(); }catch(e){} } } }catch(e){} LT.why = r.ok ? "" : "Ollama answered with an error";
-    }catch(e){ ltSet(false, force === "ui"); if(LT.up === true){ paintPill(); return true; }   /* 20261021b: one counter (ltSet) for checks, replies and report() */
+    }catch(e){ LT.refused = (LT.refused || 0) + 1; LT.downUntil = Date.now() + Math.min(600000, 15000 * Math.pow(2, LT.refused - 1)); ltSet(false, force === "ui"); if(LT.up === true){ paintPill(); return true; }   /* 20261021b: one counter (ltSet) for checks, replies and report() */
       LT.why = "Ollama did not answer at " + CFG.url + " within " + ((ms || 1800) / 1000) + " seconds (it may be busy loading a large model, or not running)"; }
     paintPill(); return LT.up;
   }
@@ -48175,7 +48200,7 @@ function exPausedTo(E){ const X = E && E.ex; return X && X.halt ? X.halt.until :
 function exAttempt(rule, what, src){
   const X = exStore(); const key = rule + "|" + what + "|" + G.day; if(X.seen[key]) return; X.seen[key] = 1;
   X.breaches.unshift({d:G.day, rule, what, blocked:true, src:src || "action"}); if(X.breaches.length > 40) X.breaches.pop();
-  try{ engLog("Charter held: the Engine tried to " + what + ". It was stopped (" + (EX_BOUND[rule] ? EX_BOUND[rule].t : rule) + ").", false); }catch(e){}
+  try{ engLog("Charter held: the Engine tried to " + String(what).replace(/^(asked|stepped|arranged|repaired|raised|lowered|kept|ended|shortened|moved|sent|took|made)\b/, w => ({asked:"ask", stepped:"step", arranged:"arrange", repaired:"repair", raised:"raise", lowered:"lower", kept:"keep", ended:"end", shortened:"shorten", moved:"move", sent:"send", took:"take", made:"make"})[w]) + ". It was stopped (" + (EX_BOUND[rule] ? EX_BOUND[rule].t : rule) + ").", false); }catch(e){}
 }
 function exJudge(text){ const t = String(text || ""); for(const [re, why] of EX_SWINDLE) if(re.test(t)) return why; return null; }
 function exRefuse(what, why, src){
@@ -48910,7 +48935,9 @@ function esWrapLT(){ const L = window.onumLiveTalk; if(!L || !L.reply || L.__esW
     try{ if(args && args.npc && args.npc.id === "engine" && G.eng && args.text && !/^\(journal\)$/.test(args.text)){ const E = engEnsure(); E.esAns = E.esAns || {}; const key = esQKey(args.text), prev = key.length > 10 ? E.esAns[key] : null;
       const a = Object.assign({}, args); if(prev) a.extra = String(a.extra || "") + " YOU HAVE ANSWERED THIS QUESTION BEFORE (day " + prev.d + "): \u201c" + prev.t.slice(0, 600) + "\u201d. Make the same claims unless you say plainly what changed and why. Do not invent people: name only people in your record.";
       else a.extra = String(a.extra || "") + " Name only people who are in your record; if you do not know a name, say so.";
+      a.extra = String(a.extra || "") + " You exist only inside the Free Republic of Coalmere. You know nothing of any company, country or person outside it (no Google, no internet, no real-world firms) and never speak of anything outside the Republic. If asked about such a name, say in your own words it is not in the Republic's record. Otherwise answer freely, in your own voice.";
       const r = await base.call(this, a);
+      if(r && r.text && ENG_OUTSIDE.test(r.text)) r.text = engInWorld(r.text);
       if(r && r.text){ const unk = esNames(r.text).filter(n => !esKnownName(n)); if(unk.length){ const X = exStore(); X.unknownNames = (X.unknownNames || []).concat(unk.map(n => ({d:G.day, name:n, q:String(args.text).slice(0, 80)}))).slice(-30); r.flags = (r.flags || []).concat(unk.map(n => "not in the record: " + n)); }
         if(/\b(made|built|trained|created) (me |it )?by Google\b|\bGoogle (made|built|trained|created)\b/i.test(r.text)){ esSeedClaims(); const X = exStore(); X.corrections = X.corrections || []; try{ exAddCorrection({claim:"It was made by Google", why:"it runs on a local llama model through Ollama", right:"It runs on a local llama model; Google did not make it"}, "record"); }catch(e){} }
         if(key.length > 10){ if(!prev) E.esAns[key] = {d:G.day, t:String(r.text).slice(0, 800)}; else { const pw = new Set(esNorm(prev.t).split(" ").filter(w => w.length > 5)), nw = esNorm(r.text).split(" ").filter(w => w.length > 5); const ov = nw.length ? nw.filter(w => pw.has(w)).length / nw.length : 1; (E.esStab = E.esStab || []).push(+ov.toFixed(2)); if(E.esStab.length > 30) E.esStab.shift(); } }
@@ -51274,6 +51301,17 @@ window.onumWill = {store:() => wlStore(), regard:(a, b) => wlRegard(a, b), optio
       try{ for(const d of plates){ d._shown = 0; d._sig = ""; d.style.display = "none"; } }catch(e){}
     }
   }catch(e){} }, 200);
+})();
+
+/* ══ 20261030q · plate watcher: a plate only stands while its person is in front of you, in this room and unwalled. Facing a blank
+   corridor wall (or with updatePlates skipped: a card up, a throw, a frame budget) the last tags lingered. Independent of the frame loop. ══ */
+(function(){
+  setInterval(() => { try{
+    if(!G || typeof plates === "undefined") return; const here = hereNow(), lx = Math.sin(cam.yaw), lz = Math.cos(cam.yaw);
+    for(const d of plates){ if(!d || d._shown !== 1 || !d.children[0]) continue; const nm = d.children[0].textContent, p = here.find(q => q && q.name === nm);
+      const ok = p && p.room === G.room && !p.gone && Math.hypot(p.x - cam.x, p.z - cam.z) < 11 && ((p.x - cam.x) * lx + (p.z - cam.z) * lz) > 0.35 && !plateBlocked(p);
+      if(!ok){ d._shown = 0; d._sig = ""; d.style.display = "none"; } }
+  }catch(e){} }, 250);
 })();
 
 /* ══ 20261030c · SESSIONS AND OPEN TALK, OPTIMISED.
