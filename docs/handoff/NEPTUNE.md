@@ -266,3 +266,10 @@ Verdict: lids, lash line, lips and ears now read at Senate mid-shot. Faces still
 - Cloth (al30cloth): vertical drape folds, heavier toward the hem, plus a hem weight shadow.
 - QA: qa-30al (+ backup /workspace/neptune-qa-30al). The Senate floor is populated and face-front2..5 locked on by the eyes. idle-f0..f2 are three frames 450 ms apart: about 7.5k pixels change in the person band. That shows motion, but walkers could account for it as well as idle.
 - Verdict: FAIL. Contact shadows are still hard to see on the red rug from 9 m, because the rug's own darkness masks them. Bodies still read as figurines. Next is am: a screen-space or AO pass, rug-relative contact shadows (lighten the ring around them), and higher-poly heads at mid LOD.
+
+## 20261030am
+- Contact shadows (contactmat4): the dark core (0.97/0.88/0.5) now has a warm halo ring (rgba 255,226,196 at 0.28 -> 0.12), so the shadow reads against the dark red rug. Material colour is now white so the halo stays warm.
+- AO pass: directional ambient occlusion on skin (y30skin) and on bodies (am30cloth). World-down-facing normals fall to 0.55, so under the chin, under the arms, the jacket underside and the brow underside go into shade at every distance.
+- Mid-range heads: head grid goes low 62x48 -> 84x64, med 72x56 -> 92x70, high 76x58 -> 100x76.
+- Idle QA: picks a standing NPC (no tx/tz target) and hides other onum roots, then takes 3 frames 450 ms apart. 26 roots were hidden, but two figures were still in frame (they are not onum roots). Diff is 4.5k px in the person band. Idle is still not proven on its own.
+- Verdict: FAIL. The contact halo shows on floor9 near the camera. Faces and bodies still read as figurines at 6–10 m. Next is an: a cheap screen-space AO post pass, a non-onum figure hide for idle, a standalone idle diff around the projected head bbox, and real cloth silhouette breakup (jacket hem flare, trouser break).
