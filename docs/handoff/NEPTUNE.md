@@ -136,3 +136,14 @@ Presentation only; no collision, room mesh/load paths, NPC placement or JUPITER 
 - Sconces: amber frosted glass (color 0xd99a52, emissive 0xff9a3c).
 - Shots: /workspace/tls/qa-30w (before = v, after = w; cmp.jpg, cmp-people.jpg).
 - Gaps for x: faces still read smooth at mid distance (map is mottle, not geometry); the bright globe in front of the Exec inner door is a lamp, untouched; plants in onum-office-amenities not converted; textured marble corridor pillars untouched.
+
+## 20261030x — faces past mask, leaf cards, Exec globe, marble, gate courses
+
+- **Faces (MARS hard FAIL on w):** the flat warm emissive was the mask. Skin emissive cut to ~0.05; warmth now lives in a skin shader (`x30SkinShader`, onBeforeCompile on `onumc:skin|headskin`): red bleed into the shadow side, grazing-angle form falloff, peach-fuzz rim. Head normalScale ×4 (pores/relief read at mid-shot), roughness 0.56 oily sheen, slight saturation/darken. Faces now model in light at Senate mid-shot.
+- **Plants:** alpha-cut frond leaf cards (`x30FrondTex/Mat`, 9 MODEST / 13 full) arching from the pot; core spheres shrunk and darkened. Every machine, not Best only.
+- **Exec inner-door globe:** was the clearcoat (0.8) highlight of `onum:wood_panel` (onum-materials). Now satin: clearcoat ≤0.18, ccRough ≥0.55, env ≤0.45. Room fill moved off the door wall (R.d*0.42) and warmed to amber 0xffd9ae. Door leaf rough .86.
+- **Marble pillars:** `x30MarbleMat` — mottle, veins, grain canvas over TEX.marble, stone normal 0.55, rough 0.4, env 0.45.
+- **District gate:** sand map courses bold (3.2px mortar) with per-block tone.
+- **Sconces:** bowl emissive 0.78→0.46 (exterior/Capitol glare).
+- Amenities module has no plants; office plants are `propPlant` → covered.
+- Gaps for y: faces still stylised geometry (no lids/lip mesh detail); skin hue a touch orange under amber fill; exterior Capitol blowout only partly addressed (exposure); gate still one sand map for all blocks.
