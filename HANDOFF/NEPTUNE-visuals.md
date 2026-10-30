@@ -70,3 +70,8 @@ Boot fix (20261030d): 30a–30c shipped an entity-decoded main script (entity te
 - 55px band under canvas: not reproduced headless at 1280x720 (canvas bottom meets the wire strip); no talk/desk CSS change found that resizes #scene.
 - Headless: boot clears; press conference desk measured x8 y499 w1264 h144 at 1280x720 (bar top 677).
 - JUPITER ssnTick/hold/pass/callon untouched.
+
+## 20261030j (NEPTUNE): E while seated in press, Cancel/Speak clipped by the wire
+- **Cancel/Speak clipped:** the docked #ndFd stacked top row, log, actions, reply box and Cancel/Speak, about 230px tall in a band of about 144px (20vh) with overflow hidden. At 1280×720 Cancel/Speak sat at y700–732, under THE WIRE (649–673) and the Say aloud bar. Fix: when docked, the desk is a flex column and the log shrinks first. The reply box and Cancel/Speak share one row (`.fd-reply`, built in deskTick). The band is now max(150px, 24vh). Now Cancel/Speak sit at y601–633, above the wire, with no dock scroll. Depth unchanged.
+- **E while seated:** the keyboard E handler ran `seat && !personInTalkRange()`, so toggleSit stood you up even when focusThing was a person and the prompt said "Press E to speak with X". Fix: when you are seated and a person is in focus, E goes to openTalk. **Owner gate (JUPITER):** openTalk is then refused by onumTalkOwner()==="session". chairRoute needs the person in sxdSession().seats, but a press conference seats only "you", so the reporters never count. The desk shows "(You are in the sitting… take X aside.)". If the chair should talk to reporters, JUPITER needs to widen chairRoute to cover press people. Gate untouched.
+- Smoke results in /workspace/tls/qa-30i/ (pre-*, post-*).
