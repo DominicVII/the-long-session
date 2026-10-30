@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261030e">
+<meta name="onum-build" content="20261030f">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261030e";
+  var STAMP = "20261030f";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -11868,7 +11868,8 @@ function ssnChair(kind, ps){
 function ssnPublish(){
   if(!SSN){ window.ONUM_SESSION = null; }
   else window.ONUM_SESSION = {bodyId:SSN.bodyId, kind:SSN.kind, govType:SSN.govType, procedure:SSN.gov, stage:SSN.def.stages[SSN.si].id, stageName:SSN.def.stages[SSN.si].name,
-    chairId:SSN.chairId, floorId:SSN.floorId, seats:SSN.seats.map(s => ({seatId:s.seatId, personId:s.personId})), queue:SSN.queue.slice(),
+    chairId:SSN.chairId, floorId:SSN.floorId, offer:SSN.offer != null ? SSN.offer : null, waitingOn:SSN.waitingOn != null ? SSN.waitingOn : (SSN.offer != null ? SSN.offer : null), lastSpk:SSN.lastSpk != null ? SSN.lastSpk : null,
+    seats:SSN.seats.map(s => ({seatId:s.seatId, personId:s.personId})), queue:SSN.queue.slice(),
     clock:{remaining:Math.max(0, Math.round(SSN.remaining)), total:SSN.total, speaker:Math.max(0, Math.round(SSN.spk))}, motion:SSN.motion ? Object.assign({}, SSN.motion) : null,
     votes:Object.keys(SSN.votes).map(k => ({personId:isNaN(+k) ? k : +k, vote:SSN.votes[k]})), filibuster:!!SSN.fili, walkedOut:SSN.out.slice(), billId:SSN.billId};
   try{ window.dispatchEvent(new CustomEvent("onum-session", {detail:window.ONUM_SESSION})); }catch(e){}
@@ -47984,10 +47985,10 @@ try{
   function paint(){ try{ const s = S(); if(!s){ if(D && !(ta && ta.value.trim())){ D.hidden = true; } if(FD.held && !(ta && ta.value.trim())) hold(false); wasTurn = false; return; }
       if(!D) build(); D.hidden = false; const turn = myTurn(s), nx = nextIsMe(s);
       D.classList.toggle("turn", turn); if(turn) D.classList.remove("min");
-      const q = (s.queue || []).slice(0, 3);
+      const q = turn ? [] : (s.queue || []).slice(0, 3);   /* 20261030f: when you hold the floor, NOW is only you — waiting hands stay in Hands up / session list */
       D.querySelector(".fd-next").className = "fd-next" + (nx || turn ? " me" : "");
-      D.querySelector(".fd-next").innerHTML = '<b>' + (turn ? "Now: you" : "Up next") + '</b>' + (q.length ? q.map(id => { const p = per(id), por = p && (p.portrait || p.photo); const ini = (nameOf(id).match(/\b\w/g) || ["?"]).slice(0, 2).join("").toUpperCase();
-          return '<span class="fd-sp' + (isYou(id) ? " you" : "") + '"><i class="fd-av" style="background-color:' + colOf(id) + (por ? ";background-image:url(" + esc(por) + ")" : "") + '">' + (por ? "" : esc(ini)) + '</i>' + esc(nameOf(id)) + '</span>'; }).join("") : '<span class="fd-sp">nobody waiting</span>');
+      D.querySelector(".fd-next").innerHTML = '<b>' + (turn ? "Now: you" : "Up next") + '</b>' + (turn ? '<span class="fd-sp you">You</span>' : (q.length ? q.map(id => { const p = per(id), por = p && (p.portrait || p.photo); const ini = (nameOf(id).match(/\b\w/g) || ["?"]).slice(0, 2).join("").toUpperCase();
+          return '<span class="fd-sp' + (isYou(id) ? " you" : "") + '"><i class="fd-av" style="background-color:' + colOf(id) + (por ? ";background-image:url(" + esc(por) + ")" : "") + '">' + (por ? "" : esc(ini)) + '</i>' + esc(nameOf(id)) + '</span>'; }).join("") : '<span class="fd-sp">nobody waiting</span>'));
       const h = D.querySelector(".fd-hand"), fl = s.floorId != null && !isYou(s.floorId);
       h.textContent = turn ? "You have the floor" : (FD.seekSent || (s.queue || []).some(isYou)) ? "Hand raised" : fl ? "Interject" : "Raise hand"; h.disabled = turn || (s.queue || []).some(isYou);
       const cue = D.querySelector(".fd-cue"); cue.hidden = !turn; cue.textContent = "You have the floor \u2014 take your time.";
@@ -51240,9 +51241,9 @@ window.onumWill = {store:() => wlStore(), regard:(a, b) => wlRegard(a, b), optio
           if(!SSN || tok !== SSN._tok || !prKind()) return;
           prShow(p, out);
           /* floor to you for the answer — never times out */
-          SSN.floorId = "you"; SSN.offer = "you"; SSN._busy = 0;
+          SSN.floorId = "you"; SSN.offer = "you"; SSN.waitingOn = "you"; SSN._busy = 0;
           SS2.spkUntil = 0; SS2.hold = false;
-          if(typeof ss2Pub === "function") ss2Pub({waitingOn:"you", offer:"you"}); else ssnPublish();
+          ssnPublish();
           try{ note(p.name + " asked. The floor is yours."); }catch(e){}
         });
         return true;
@@ -51289,7 +51290,7 @@ window.onumWill = {store:() => wlStore(), regard:(a, b) => wlRegard(a, b), optio
         try{
           if(SSN && prKind() && e && (e.actorId === "you" || (G.you && e.actorId === G.you.id)) && e.action === "speak"){
             const st = ssnStage();
-            if(st && st.id === "questions"){ SSN.floorId = null; SSN.offer = null; SS2.gapUntil = Date.now() + 1200; if(typeof ss2Pub === "function") ss2Pub(); }
+            if(st && st.id === "questions"){ SSN.floorId = null; SSN.offer = null; SSN.waitingOn = null; SS2.gapUntil = Date.now() + 1200; ssnPublish(); }
             else if(st && st.id === "call"){ /* opening done → questions */ try{ ssnNext(); }catch(x){} }
             else if(st && st.id === "wrap"){ try{ ssnNext(); }catch(x){} }
           }
@@ -51303,7 +51304,7 @@ window.onumWill = {store:() => wlStore(), regard:(a, b) => wlRegard(a, b), optio
       window.onumSession.pass = function(){
         if(prKind()){
           const st = ssnStage();
-          if(st && st.id === "questions"){ SSN.floorId = null; SSN.offer = null; SSN.queue = (SSN.queue || []).filter(x => x !== "you"); SS2.hold = false; SS2.gapUntil = Date.now() + 800; if(typeof ss2Pub === "function") ss2Pub(); return true; }
+          if(st && st.id === "questions"){ SSN.floorId = null; SSN.offer = null; SSN.waitingOn = null; SSN.queue = (SSN.queue || []).filter(x => x !== "you"); SS2.hold = false; SS2.gapUntil = Date.now() + 800; ssnPublish(); return true; }
           if(st && (st.id === "call" || st.id === "wrap")){ try{ ssnNext(); }catch(e){} return true; }
         }
         return typeof _pass === "function" ? _pass.apply(this, arguments) : false;
@@ -51368,7 +51369,7 @@ window.onumWill = {store:() => wlStore(), regard:(a, b) => wlRegard(a, b), optio
       };
     }
 
-    console.log("JUPITER 20261030c: press session + wantsWord hold (on Neptune 30b tip)");
+    console.log("JUPITER 20261030f: press floor publish offer/waitingOn/lastSpk; NOW strip is you-only on your turn");
   }catch(e){ try{ console.warn("JUPITER 20261030c", e); }catch(x){} }
 })();
 
