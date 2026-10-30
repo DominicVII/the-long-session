@@ -12,7 +12,7 @@ const HAIRS = [0x14100d, 0x2f2318, 0x4a3728, 0x6b5540, 0x8b7355, 0x5c3218, 0x1f1
 const SHIRTS = [0xf2f0ea, 0xdfe6ef, 0xf3ece0, 0xe9e4f0, 0xffffff];
 const TIES = [0x7a1f2b, 0x1f3a6b, 0x2c4a32, 0x5a4a1a, 0x3a2a4a, 0x8a2a1a];
 const EYES = [0x5a3d24, 0x3d2a18, 0x6b4a2a, 0x4a6070, 0x556b4a, 0x2f2018, 0x7a6a4a, 0x3a4a5c];
-const Q = { low: { seg: 14, head: [48, 36], fingers: false, tex: 'low' }, med: { seg: 20, head: [60, 46], fingers: true, tex: 'med' }, high: { seg: 28, head: [76, 58], fingers: true, tex: 'high' } };
+const Q = { low: { seg: 14, head: [62, 48], fingers: false, tex: 'low' }, med: { seg: 20, head: [72, 56], fingers: true, tex: 'med' }, high: { seg: 28, head: [76, 58], fingers: true, tex: 'high' } };
 
 // ---------- utils ----------
 function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a);
@@ -67,7 +67,7 @@ function heightToNormal(W, H, h, str) { const n = new Float32Array(W * H * 4);
 // Cached per skin tone x sex x beard-shadow x quality (not per person) to keep memory flat.
 function headSkinMat(S, q) {
   const shadow = S.fem ? 0 : (S.beard === 'full' || S.beard === 'short') ? 0.6 : S.beard === 'stubble' ? 1 : 0.45;
-  const key = 'headskin4' + S.skin + (S.fem ? 'f' : 'm') + shadow + q + MODE;
+  const key = 'headskin5' + S.skin + (S.fem ? 'f' : 'm') + shadow + q + MODE;
   return cached(matCache, key, () => {
     const W = q === 'high' ? 512 : q === 'med' ? 256 : 128, H = W / 2, base = deepenSkin(new T.Color(S.skin));
     const dark = (base.r + base.g + base.b) / 3 < 0.45;
@@ -86,7 +86,8 @@ function headSkinMat(S, q) {
       const rk = dark ? 0.5 : 1 + 0.9 * clamp(((base.r + base.g + base.b) / 3 - 0.45) / 0.3);   // fair skin shows the blood in cheeks, nose and ears most
       r *= 1 + 0.05 * red * rk; g *= 1 - 0.12 * red * rk; b *= 1 - 0.10 * red * rk;
       r *= 1 - 0.10 * under; g *= 1 - 0.12 * under; b *= 1 - 0.06 * under; { const ysk = G2(ax - 0.33, ny - 0.12, 0.10) * fr, ybr = G2(ax - 0.30, ny - 0.215, 0.05) * fr, ych = G2(ax - 0.55, ny + 0.3, 0.13) * fr, yjw = sstep(-0.5, -0.85, ny) * sstep(-0.2, 0.3, nz), ytm = G2(ax - 0.75, ny - 0.15, 0.12) * fr;   /* 20261030ad: painted sockets, under-brow, cheek hollow, temple and under-jaw shade: the face holds its planes at 6-10 m */
-      const ysh = 1 - 0.42 * ysk - 0.22 * ybr - 0.14 * ych - 0.1 * ytm - 0.38 * yjw; r *= ysh; g *= ysh * 0.985; b *= ysh * 0.99; }
+      const yao = G2(ax - 0.17, ny - 0.1, 0.045) * fr + 0.8 * G2(ax - 0.15, ny + 0.34, 0.04) * fr + sstep(-0.62, -0.9, ny) * sstep(0.0, 0.4, nz) * 0.9;   /* 20261030af: crease occlusion (inner eye corners, nasolabial, under chin) */
+      const ysh = 1 - 0.3 * yao - 0.42 * ysk - 0.22 * ybr - 0.14 * ych - 0.1 * ytm - 0.38 * yjw; r *= ysh; g *= ysh * 0.985; b *= ysh * 0.99; }
       { const E = (v, w) => Math.exp(-(v / w) * (v / w));   /* 20261030ae: painted feature marks in the head albedo itself, so they survive every LOD tier and 6-10 m */
         const ybw = E(ny - 0.255 - 0.03 * (0.3 - Math.abs(ax - 0.3)), 0.032) * sstep(0.07, 0.13, ax) * sstep(0.5, 0.42, ax) * fr, yln = E(ny - 0.135, 0.022) * sstep(0.2, 0.25, ax) * sstep(0.45, 0.4, ax) * fr;
         const yns = E(ax - 0.1, 0.03) * sstep(0.06, -0.04, ny) * sstep(-0.32, -0.22, ny) * fr, yun = G2(nx, ny + 0.32, 0.06) * fr, ylp = E(ny + 0.47, 0.02) * sstep(0.2, 0.12, ax) * fr, yul = G2(nx * 0.5, ny + 0.58, 0.05) * fr;
@@ -267,7 +268,7 @@ function headShape(f) {
     r += 0.07 * G2(nx * 0.9, (ny + 0.47) * 1.3, 0.26) * fr;                              // muzzle
     r -= 0.025 * G2(nx, ny + 0.6, 0.08) * fr;                                           // groove under lip
     r += 0.06 * f.chin * G2(nx * 0.95, ny + 0.8, 0.22) * fr;                               // chin
-    r -= 0.04 * G2(ax - 0.84, ny - 0.22, 0.22);                                          // temples
+    r -= 0.04 * G2(ax - 0.84, ny - 0.22, 0.22); r += 0.045 * G2(ax - 0.78, ny + 0.42, 0.17) * sstep(-0.5, 0.2, nz) + 0.025 * G2(ax - 0.62, ny + 0.08, 0.16) * fr - 0.02 * G2(ax - 0.16, ny + 0.36, 0.05) * fr;   /* 20261030af: jaw angle, side-cheek volume, nasolabial crease: a face silhouette, not an egg */                                          // temples
     // age
     r -= age * 0.018 * G2(ax - 0.30, ny + 0.02, 0.07) * fr;                              // under-eye
     r -= age * 0.022 * G2((ax - 0.2 - (-(ny + 0.3)) * 0.35) * 2.4, (ny + 0.32), 0.14) * fr * sstep(0.1, 0.16, ax); // nasolabial
