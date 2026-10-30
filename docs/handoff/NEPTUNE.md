@@ -282,3 +282,11 @@ Verdict: lids, lash line, lips and ears now read at Senate mid-shot. Faces still
 - Idle result: 48 figures were hidden and only the target stayed in frame. Within the target's body box (160x105 px), f0->f1 changed 0 px and f0->f2 changed 160 px (about 1%). The sway is real but too small to read on screen at that distance. ao should double the hip/torso sway amplitude.
 - Contact at mid/far is not changed in an (the ring only reads near the camera).
 - Verdict: FAIL. Next is ao: an owner call on SSAO in the main render loop, distance-scaled contact shadows, bigger idle amplitude, and face planes.
+
+## 20261030ao (on an b47c69c)
+- Contact shadow grows with camera distance (per-mesh onBeforeRender, x1 at <=3.5 m up to x2.4 at >=10.5 m) so it reads mid/far on the rug. No main-loop change.
+- Idle sway doubled (hip shift/roll, torso roll/pitch/yaw).
+- Face planes: side-of-face and under-cheekbone plane darkening in head skin (cache key headskin7).
+- Kept all an/am gains. SSAO NOT touched (JUPITER owns ap).
+- QA: /workspace/neptune-qa-30ao -> qa-30ao, cmp-*-an-vs-ao. Idle target-only (48 hidden): body-box change 7.9% f0->f1, 14.5% f0->f2 (was 0%/~1% in an), but the target's projected anchor also drifted ~57 px, so part of that is the NPC moving, not just sway.
+- Verdict: FAIL. Floor still reads as figurines at 6-10 m. Next Neptune stamp: aq (ap left for JUPITER).
