@@ -1492,7 +1492,7 @@
       { const E = (v, w) => Math.exp(-(v / w) * (v / w));   /* 20261030ae: painted feature marks in the head albedo itself, so they survive every LOD tier and 6-10 m */
         const ybw = E(ny - 0.255 - 0.03 * (0.3 - Math.abs(ax - 0.3)), 0.032) * sstep2(0.07, 0.13, ax) * sstep2(0.5, 0.42, ax) * fr, yln = E(ny - 0.135, 0.022) * sstep2(0.2, 0.25, ax) * sstep2(0.45, 0.4, ax) * fr;
         const yns = E(ax - 0.1, 0.03) * sstep2(0.06, -0.04, ny) * sstep2(-0.32, -0.22, ny) * fr, yun = G2(nx, ny + 0.32, 0.06) * fr, ylp = E(ny + 0.47, 0.02) * sstep2(0.2, 0.12, ax) * fr, yul = G2(nx * 0.5, ny + 0.58, 0.05) * fr;
-        const yk = 1 - 0.66 * ybw - 0.6 * yln - 0.22 * yns - 0.22 * yun - 0.38 * ylp - 0.18 * yul; r *= yk; g *= yk * 0.97; b *= yk * 0.96; }
+        const yk = 1 - 0.8 * ybw - 0.72 * yln - 0.22 * yns - 0.22 * yun - 0.38 * ylp - 0.18 * yul; r *= yk; g *= yk * 0.97; b *= yk * 0.96; }
         const m2 = 1 + mott * 0.06 - sstep2(0.7, 0.9, freck) * 0.05 * (dark ? 0.3 : 1);
         r *= m2;
         g *= m2;
@@ -2127,7 +2127,7 @@ function hairShellMat(S, q) {
     hook.frustumCulled = false;
     hook.name = "onumc-hook";
     root.add(hook);
-    root.add(body);
+    root.add(body); { /* 20261030ah: soft contact shadow so people sit on the rug, not float on it */ const cg = cached(geoCache, "contact", () => new T.PlaneGeometry(1, 1).rotateX(-Math.PI / 2)), cm = cached(matCache, "contactmat", () => { const c = document.createElement("canvas"); c.width = c.height = 64; const g = c.getContext("2d"), gr = g.createRadialGradient(32, 32, 2, 32, 32, 31); gr.addColorStop(0, "rgba(0,0,0,0.6)"); gr.addColorStop(0.45, "rgba(0,0,0,0.32)"); gr.addColorStop(1, "rgba(0,0,0,0)"); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); return new T.MeshBasicMaterial({ name: "onumc:contact", map: new T.CanvasTexture(c), color: 0, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }); }); const cs = new T.Mesh(cg, cm); cs.position.y = 0.006; cs.scale.set(0.78, 1, 0.6); cs.renderOrder = 1; cs.castShadow = false; cs.name = "onumc-contact"; root.add(cs); }
     body.add(rig);
     root.name = "onum-character";
     const meshes = [], faceFine = [], bodyFine = [];
@@ -2314,7 +2314,7 @@ function hairShellMat(S, q) {
     let hairShell = null;
     if (S.style !== "bald") {
       const shortCut = S.style === "buzz" || S.style === "caesar" || S.style === "bald_fringe";
-      const hk = (nx, ny, nz, m, t) => 1 + 6e-3 + t * 1.6 * sstep2(0, 0.6, m) + (shortCut ? 6e-3 : 0.024) * sstep2(0.2, 0.85, ny) * sstep2(-0.7, 0.3, nz) * sstep2(0.2, 0.7, m);
+      const hk = (nx, ny, nz, m, t) => (shortCut ? 0.003 : 0.011) * m * Math.sin(nx * 23 + ny * 17) * Math.sin(nz * 19 - ny * 29) + 1 + 6e-3 + t * 1.6 * sstep2(0, 0.6, m) + (shortCut ? 6e-3 : 0.024) * sstep2(0.2, 0.85, ny) * sstep2(-0.7, 0.3, nz) * sstep2(0.2, 0.7, m);
       const hs = sphereGeo(QQ.head[0] + 8, QQ.head[1] + 8, (nx, ny, nz, o) => {
         shape(nx, ny, nz, o);
         const { m, t } = hairMask(S.style, nx, ny, nz, fem);
@@ -2509,7 +2509,7 @@ function hairShellMat(S, q) {
           f.rotation.y = 0;
           wr.add(f);
           const m = add(f, fg, skinM, 0, 0, 0, faceFine);
-          m.scale.set(1, [0.9, 1, 0.97, 0.78][k], 1);
+          m.scale.set(1.28, [0.9, 1, 0.97, 0.78][k] * 1.08, 1.28);   /* 20261030ah: thicker fingers read as fingers, not nubs */
           f.rotation.z = -sx * 0.12;
           fingers.push(f);
         }
@@ -2750,7 +2750,7 @@ function hairShellMat(S, q) {
         if (vL > 0.02) st.ph += dt * vL / st.SL * Math.PI * 2;
       } else st.ph += dt * (speed > 0.05 ? speed / 1.25 * Math.PI * 2 * 0.5 : 0);
       const w = Math.min(1, st.walk), ph = st.ph, t = st.t;
-      const breath = Math.sin(t * 1.5);
+      const breath = Math.sin(t * 1.5); const pz = S.phase || 0, PV1 = Math.sin(pz * 1.7), PV2 = Math.sin(pz * 2.3 + 1), PV3 = Math.sin(pz * 3.1 + 2), PV4 = Math.sin(pz * 0.7 + 3), iw = 1 - w;   /* 20261030ah: per-person stance */
       const gT = state.gesture === true ? 1 : typeof state.gesture === "number" ? state.gesture : state.gesture ? 1 : state.talking ? 0.35 + 0.35 * Math.max(0, Math.sin(t * 0.7)) : 0;
       st.gest += (gT * (1 - w * 0.7) - st.gest) * Math.min(1, dt * 3);
       const gs = st.gest;
@@ -2760,7 +2760,7 @@ function hairShellMat(S, q) {
       hips.rotation.z = (1 - w) * Math.sin(t * 0.35) * 0.02;
       torso.rotation.y = -Math.sin(ph) * 0.13 * w;
       torso.rotation.x = 0.04 * w + breath * 8e-3;
-      torso.scale.set(1 + breath * 6e-3, 1, 1 + breath * 0.01);
+      torso.scale.set(1 + breath * 6e-3, 1, 1 + breath * 0.01); hips.position.x += iw * 0.024 * PV1; hips.rotation.z += iw * 0.045 * PV1; torso.rotation.z = -iw * 0.035 * PV1; torso.rotation.x += iw * 0.05 * PV2; torso.scale.x *= 1 + 0.05 * PV3;   /* 20261030ah: weight shift, slouch, chest width */
       if (planted) {
         const duty = 0.62, SLf = duty * (st.SL || 1), A2 = 0.45, Bn = 0.43, yA = 0.04 + (fem ? 0.012 : 0), hipJ = hips.position.y - 0.03, ramp = clamp2(Math.max(0, vel, 0.32 * (st.pivot || 0)) / 0.12);
         for (const L of legs) {
@@ -2797,7 +2797,8 @@ function hairShellMat(S, q) {
       for (const A2 of arms) {
         const s = A2.sx < 0 ? -1 : 1, swing = Math.sin(ph) * s * 0.38 * w;
         let shx = swing + Math.sin(t * 0.6 + A2.sx) * 0.015, shz = A2.sx * (0.07 + 0.01 * B), elx = -0.12 - 0.25 * w * Math.max(0, -swing * 2) - 0.05;
-        const C2 = state.carry && state.carry.side === A2.sx && sit < 0.5 ? state.carry : null;
+        shz += iw * A2.sx * 0.035 * (1 + PV4); elx -= iw * 0.18 * (1 + (A2.sx > 0 ? PV3 : PV2));   /* 20261030ah: arm rest variety */
+      const C2 = state.carry && state.carry.side === A2.sx && sit < 0.5 ? state.carry : null;
         if (C2) {
           const sip = clamp2(C2.sip || 0);
           if (C2.pose === "briefcase") {
@@ -2873,7 +2874,7 @@ function hairShellMat(S, q) {
       neckG.rotation.y = st.lookYaw * 0.4;
       head.rotation.y = st.lookYaw * 0.6 + Math.sin(t * 0.43) * 0.04;
       head.rotation.x = st.lookPitch + Math.sin(t * 0.31) * 0.02 - torso.rotation.x + (state.talking ? Math.sin(t * 2.3) * 0.035 : 0);
-      head.rotation.z = Math.sin(t * 0.27) * 0.025;
+      head.rotation.z = Math.sin(t * 0.27) * 0.025 + 0.05 * PV2; head.rotation.y += 0.2 * PV4 * (state.lookAt ? 0.3 : 1);   /* 20261030ah: head tilt/turn variety */
       if (st.lod > 1) return;
       st.nextBlink -= dt;
       if (st.nextBlink <= 0) {
