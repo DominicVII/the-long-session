@@ -1466,7 +1466,7 @@
   }
   function headSkinMat(S, q) {
     const shadow = S.fem ? 0 : S.beard === "full" || S.beard === "short" ? 0.6 : S.beard === "stubble" ? 1 : 0.45;
-    const key = "headskin2" + S.skin + (S.fem ? "f" : "m") + shadow + q + MODE;
+    const key = "headskin3" + S.skin + (S.fem ? "f" : "m") + shadow + q + MODE;
     return cached(matCache, key, () => {
       const W = q === "high" ? 512 : q === "med" ? 256 : 128, H = W / 2, base = deepenSkin(new T.Color(S.skin));
       const dark = (base.r + base.g + base.b) / 3 < 0.45;
@@ -1486,7 +1486,8 @@
         b *= 1 - 0.1 * red * rk;
         r *= 1 - 0.1 * under;
         g *= 1 - 0.12 * under;
-        b *= 1 - 0.06 * under;
+        b *= 1 - 0.06 * under; { const ysk = G2(ax - 0.33, ny - 0.12, 0.10) * fr, ybr = G2(ax - 0.30, ny - 0.215, 0.05) * fr, ych = G2(ax - 0.55, ny + 0.3, 0.13) * fr, yjw = sstep2(-0.5, -0.85, ny) * sstep2(-0.2, 0.3, nz), ytm = G2(ax - 0.75, ny - 0.15, 0.12) * fr;   /* 20261030ad: painted sockets, under-brow, cheek hollow, temple and under-jaw shade: the face holds its planes at 6-10 m */
+      const ysh = 1 - 0.42 * ysk - 0.22 * ybr - 0.14 * ych - 0.1 * ytm - 0.38 * yjw; r *= ysh; g *= ysh * 0.985; b *= ysh * 0.99; }
         const m2 = 1 + mott * 0.06 - sstep2(0.7, 0.9, freck) * 0.05 * (dark ? 0.3 : 1);
         r *= m2;
         g *= m2;
@@ -1554,7 +1555,7 @@
     return cached(matCache, "iris" + hex + MODE, () => {
       const S2 = 64, c = document.createElement("canvas");
       c.width = c.height = S2;
-      const g = c.getContext("2d"), base = deepen(new T.Color(hex));
+      const g = c.getContext("2d"), base = deepen(new T.Color(hex)).multiplyScalar(0.55);
       const id = g.createImageData(S2, S2);
       for (let y = 0; y < S2; y++) for (let x = 0; x < S2; x++) {
         const dx = (x + 0.5) / S2 * 2 - 1, dy = (y + 0.5) / S2 * 2 - 1, r = Math.hypot(dx, dy), a = Math.atan2(dy, dx);
@@ -2182,7 +2183,7 @@ function hairShellMat(S, q) {
     const neckG = new T.Group();
     neckG.position.set(0, 0.5, -5e-3);
     torso.add(neckG);
-    add(neckG, gb("neck", () => limb(-0.1, [0.058, 0.055, 0.052], seg)), skinM);
+    add(neckG, gb("neck", () => limb(-0.1, [0.058, 0.055, 0.052], seg)), cached(matCache, "neckskin" + S.skin + q + MODE, () => { const m = skinM.clone(); m.color.multiplyScalar(0.8); return m; }));
     const head = new T.Group();
     head.position.set(0, 0.07, 0.012);
     neckG.add(head);
@@ -2339,7 +2340,7 @@ function hairShellMat(S, q) {
         shape(nx, ny, nz, o); const k = hk(nx, ny, nz, m, t) + 0.002;
         const c = add(headPivot, cardG, cm, o[0] * k, o[1] * k, o[2] * k); c.castShadow = false;
         n.set(o[0], o[1], o[2]).normalize(); c.quaternion.setFromUnitVectors(Z, n);
-        const L = (S.style === 'caesar' ? 0.022 : 0.034) + rr() * 0.028;
+        const L = ((S.style === 'caesar' ? 0.022 : 0.034) + rr() * 0.028) * (ny > 0.72 ? 0.45 : 1);   /* 20261030ad: short at the crown, no spikes */
         c.rotateZ(Math.atan2(nx, ny) * 0.0 + (rr() - 0.5) * 0.7 + (nz < 0 ? Math.PI : 0) * 0); c.rotateX(-0.06 - rr() * 0.12);   /* 20261030ac: lie flat with the comb, no frizz */
         c.scale.set(0.032 + rr() * 0.024, L, 1);
       }
