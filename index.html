@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261030r">
+<meta name="onum-build" content="20261030s">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261030r";
+  var STAMP = "20261030s";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -49965,6 +49965,41 @@ function sxDockTick(){
 }
 setInterval(sxDockTick, 300);
 try{ new MutationObserver(() => sxDockTick()).observe(veil, {attributes:true, attributeFilter:["class", "hidden"]}); }catch(e){}
+/* ══ 20261030s look · the meeting panel (session view, floor desk, Point of order, the sitting card) can be put away.
+   ✕ closes it completely; ⇥ parks it as a tab on the right edge. Either way a tab stays on the edge, so the meeting and
+   every action in it (Point of order included) is one click back. Presentation only: nothing in the session changes, the
+   panel is hidden with a class, not torn down. A new meeting opens the panel again. ══ */
+const SXP = {park:false, closed:false, key:""};
+(function(){ const st = document.createElement("style"); st.id = "sxParkCss";
+  st.textContent = "#sxDock.sx-park{display:none!important}" +
+    "#sxParkBar{position:fixed;z-index:70;display:none;gap:4px}#sxParkBar button{background:#000;color:#ffe08a;border:2px solid #ffe08a;border-radius:5px;font:700 13px system-ui;min-width:28px;height:26px;padding:0 7px;cursor:pointer;box-shadow:0 2px 8px #000}#sxParkBar button:hover,#sxParkBar button:focus-visible{background:#ffe08a;color:#000}" +
+    "#sxTab{position:fixed;right:0;top:38vh;z-index:70;display:none;writing-mode:vertical-rl;background:#121419;color:#ffe08a;border:2px solid #c9a24a;border-right:0;border-radius:8px 0 0 8px;padding:12px 6px;font:700 13px Georgia,serif;letter-spacing:.04em;cursor:pointer;box-shadow:-3px 3px 12px #000}" +
+    "#sxTab:hover,#sxTab:focus-visible{background:#ffe08a;color:#000}#sxTab.closed{padding:8px 5px;font-size:15px}";
+  document.head.appendChild(st); })();
+function sxParkTick(){
+  try{
+    const D = document.getElementById("sxDock"); if(!D) return;
+    let bar = document.getElementById("sxParkBar"), tab = document.getElementById("sxTab");
+    if(!bar){ bar = document.createElement("div"); bar.id = "sxParkBar";
+      bar.innerHTML = '<button type="button" data-p="park" title="Park the meeting on the right edge" aria-label="Park the meeting panel on the side">\u21e5</button><button type="button" data-p="close" title="Close the meeting panel" aria-label="Close the meeting panel">\u2715</button>';
+      bar.onclick = e => { const b = e.target.closest("button"); if(!b) return; if(b.dataset.p === "close"){ SXP.closed = true; SXP.park = true; } else { SXP.park = true; SXP.closed = false; } sxParkTick(); };
+      document.body.appendChild(bar); }
+    if(!tab){ tab = document.createElement("button"); tab.type = "button"; tab.id = "sxTab"; tab.title = "Open the meeting panel";
+      tab.onclick = () => { SXP.park = false; SXP.closed = false; sxParkTick(); }; document.body.appendChild(tab); }
+    const S = typeof sxdSession === "function" ? sxdSession() : null, sit = typeof SIT !== "undefined" && SIT.on ? 1 : 0;
+    const key = S ? String(S.kind || "") + "|" + String(S.bodyId || S.title || "") : sit ? "sit" : "";
+    if(key !== SXP.key){ SXP.key = key; SXP.park = false; SXP.closed = false; }
+    D.classList.toggle("sx-park", SXP.park);
+    const live = getComputedStyle(D).display !== "none" || SXP.park, shown = live && !SXP.park && D.style.display !== "none";
+    if(shown){ const r = D.getBoundingClientRect(); bar.style.display = "flex"; bar.style.top = Math.max(4, r.top - 30) + "px"; bar.style.left = Math.max(4, r.right - 66) + "px"; } else bar.style.display = "none";
+    const any = SXP.park && D.style.display !== "none";
+    tab.style.display = any ? "block" : "none"; tab.classList.toggle("closed", SXP.closed);
+    const t = (document.getElementById("sxDockHead") || {}).textContent || "";
+    tab.textContent = SXP.closed ? "\u2696" : "\u2696 " + (t.replace(/^\u2696\s*/, "").replace(/(Show|Hide)$/, "").trim() || "Meeting");
+    tab.setAttribute("aria-label", "Open the meeting panel");
+  }catch(e){}
+}
+setInterval(sxParkTick, 300);
 /* while you chair a cabinet or council, a seated member you click is called on in the meeting, not taken aside */
 { const _ot = openTalk; openTalk = function(m){ try{ const S = sxdSession(); if(m && S && S.chairId === "you" && (S.kind === "cabinet_meeting" || S.kind === "governor_council") && (S.seats || []).some(x => String(x.personId) === String(m.id)) && window.onumSession && typeof window.onumSession.callon === "function"){ window.onumSession.callon(m.id); return; } }catch(e){} return _ot.apply(this, arguments); }; }
 /* NEPTUNE-TALKREWORK BEGIN — 20261030b; owner gate 20261030d; More/Esc/draft/bottom desk 20261030g (JUPITER contract: SIT.on → sit; PROC.on → proc; truthy SSN or ONUM_SESSION.stage!=="idle" → session; sxdSession seated check as fallback): one conversation surface per mode (UI/presentation + safe gates only; JUPITER's engine untouched).
