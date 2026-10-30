@@ -112,3 +112,10 @@ Presentation only; no collision, room mesh/load paths, NPC placement or JUPITER 
 - War map: rival dashed lines now drawn over the land as 0.3–0.7 mid-segments (brighter #c9a2e0), with the capital relation lines.
 - Jagged Exec Wing door: not reproduced in headless shots (qa-30t/{before,after}-corridor-exec-door.png, exec-inside-door.png); left unchanged. Needs a MARS shot/angle if still seen.
 - Seen in QA, not fixed: war-map capital name label sometimes blank (wmHome().short) on some generated countries.
+
+## 20261030u — graphical/realism pass (look only)
+- Jagged doors: root cause was sub-native pixel ratio (0.85 on modest machines, antialias off there). `setPR` now floors at 1x on Best anywhere and Balanced on full GPUs. Simple unchanged.
+- Realism: flat-colour PBR materials (wood, stone, leather, paint) now carry their procedural roughness map, plus normal relief on tier 2. Matte surfaces get the room env light at low strength (soft falloff/sheen, less toy-flat). Skin pore normal 0.25→0.34.
+- War map: home short name trimmed, never blank.
+- No collide data, props, or JUPITER systems touched. Shots: /workspace/tls/qa-30u (before-/after-*, cmp.jpg).
+- Gaps: Capitol/East Steps columns still read pure white (no sandstone tint yet); normal relief is not shown on modest (tier 1) machines; corridor sconce glare not retuned; NPC cloth not retextured.
