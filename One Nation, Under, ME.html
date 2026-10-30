@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261030n">
+<meta name="onum-build" content="20261030o">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261030n";
+  var STAMP = "20261030o";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -7689,7 +7689,31 @@ function unstick(m, dt){
   s.t = 0; s.stage++;
   if(s.stage === 1){ const a = Math.random() * 6.283; m.x += Math.sin(a) * 0.3; m.z += Math.cos(a) * 0.3; }
   else if(s.stage === 2){ try{ const b = roomBox(m.room); m.tx = clamp(m.tx * 0.5, -b.hw * 0.8, b.hw * 0.8); m.tz = clamp((m.tz + (b.d0 + b.d1) / 2) / 2, b.d0, b.d1); }catch(e){} s.d = 1e9; }
-  else { m.x = m.tx; m.z = m.tz; if(m.mesh){ m.mesh.position.x = m.x; m.mesh.position.z = m.z; } m._stk = null; try{ console.info("unstick: put " + m.name + " through"); }catch(e){} }
+  else {
+    /* 20261030o: "put through" no longer slides a body through a wall or a prop: only if the target is clear and the
+       straight line to it crosses no wall; otherwise retarget to a clear spot on this side and try again. */
+    let ok = true;
+    try{ ok = unstickClear(m, m.tx, m.tz); }catch(e){}
+    if(ok){ m.x = m.tx; m.z = m.tz; if(m.mesh){ m.mesh.position.x = m.x; m.mesh.position.z = m.z; } try{ console.info("unstick: put " + m.name + " through"); }catch(e){} }
+    else { try{ const b = roomBox(m.room), dp = doorZone(m.room, m.x, m.z), c = dp ? doorClearPoint(m, dp) : null;
+      m.tx = c ? c.x : clamp(m.x * 0.6, -b.hw * 0.8, b.hw * 0.8); m.tz = c ? c.z : clamp((m.z + (b.d0 + b.d1) / 2) / 2, b.d0, b.d1); }catch(e){} }
+    m._stk = null;
+  }
+}
+function unstickClear(m, tx, tz){
+  if(m.room !== G.room) return true;
+  try{ const rb = roomBox(m.room); if((Math.abs(tx) > rb.hw + 0.05 || tz < rb.d0 - 0.05 || tz > rb.d1 + 0.05) && !doorZone(m.room, tx, tz)) return false; }catch(e){}
+  if(typeof wallInside === "function" && wallInside({room:m.room, x:tx, z:tz})) return false;
+  const seg = (b) => { /* slab test, segment (m.x,m.z)->(tx,tz) vs box */
+    let t0 = 0, t1 = 1; const dx = tx - m.x, dz = tz - m.z;
+    for(const [p, d, lo, hi] of [[m.x, dx, b.x0, b.x1], [m.z, dz, b.z0, b.z1]]){
+      if(Math.abs(d) < 1e-6){ if(p < lo || p > hi) return false; continue; }
+      let a = (lo - p) / d, c = (hi - p) / d; if(a > c){ const s = a; a = c; c = s; }
+      t0 = Math.max(t0, a); t1 = Math.min(t1, c); if(t0 > t1) return false;
+    }
+    return true; };
+  try{ if(typeof VW !== "undefined" && VW.room === G.room) for(const b of VW.boxes) if(seg(b)) return false; }catch(e){}
+  return true;
 }
 /* every drawn body has a pose; nobody stays in the bind pose */
 function poseGuard(){
@@ -8959,6 +8983,7 @@ function physScan(){
     roomGroup.updateMatrixWorld(true);
     roomGroup.traverse(o => {
       if(!o.isMesh || !o.visible || o.userData && o.userData.noCollide) return;
+      if(!physShown(o)) return;   /* 20261030o: a hidden parent (Neptune's in-wall ledge / coat) hides the collider too */
       bb.setFromObject(o);
       if(!isFinite(bb.min.x)) return;
       const w = bb.max.x - bb.min.x, d = bb.max.z - bb.min.z, h = bb.max.y - bb.min.y;
@@ -8968,8 +8993,14 @@ function physScan(){
       out.push({x0:bb.min.x, x1:bb.max.x, z0:bb.min.z, z1:bb.max.z});
     });
   }catch(e){}
-  PHYS.boxes = out.slice(0, 400); PHYS.room = G.room; PHYS.at = performance.now();
+  PHYS.boxes = out.slice(0, 400); PHYS.room = G.room; PHYS.at = performance.now(); PHYS.ff = physFFSig();
 }
+/* 20261030o: look = collide. neptune/onum-furniture-fixes.js moves/hides props on the first frames after a build
+   (sometimes after the 250 ms / 1.8 s scans, e.g. late furnish). Its log is the signal: any new fix -> rescan, so
+   bodies collide with the props where you SEE them, not where the room builder first put them. */
+function physShown(o){ for(let p = o.parent; p && p !== roomGroup; p = p.parent) if(p.visible === false) return false; return true; }
+function physFFSig(){ try{ const F = window.ONUM_FF; if(!F || !F.log) return ""; return F.log.length + "|" + (F.log[F.log.length - 1] || ""); }catch(e){ return ""; } }
+function physFFSync(){ if(PHYS.room !== G.room) return; const s = physFFSig(); if(s !== (PHYS.ff || "")) physScan(); }
 (function(){
   if(typeof buildRoom !== "function") return;
   const _b = buildRoom;
@@ -8979,6 +9010,7 @@ function physScan(){
    are walking TO never blocks you (that is where you sit). */
 function physCollide(m){
   if(!m || m.sitting || m.room !== G.room || PHYS.room !== G.room) return;
+  physFFSync();
   const R = 0.22, tx = m.tx ?? m.x, tz = m.tz ?? m.z;
   for(const b of PHYS.boxes){
     if(tx > b.x0 - 0.55 && tx < b.x1 + 0.55 && tz > b.z0 - 0.55 && tz < b.z1 + 0.55) continue;
@@ -25009,7 +25041,7 @@ function inSession(){
 function seatFor(i, party){
   const side = party === "COM" ? 1 : -1;
   const row = i % 5, col = Math.floor(i / 5) % 3;
-  return {x: side * (2.6 + row*1.45), z: 4.6 + col*2.3};
+  return {x: side * (2.6 + row*1.38), z: 4.6 + col*2.3};   /* 20261030o: same 1.38 pitch as the built benches (1.45 sat the outer row in the wall) */
 }
 function seatChamber(){
   let fed = 0, com = 0;
@@ -47995,7 +48027,11 @@ try{
   function seek(){ if(call("seek") === undefined) call("requestFloor"); }
   function send(){ const t = ta.value.trim(); if(!t) return; let ok = call("speak", t); if(ok === undefined){ try{ const i = document.getElementById("nsxSay"); if(i){ i.value = t; const b = document.getElementById("nsxSpeak"); if(b) b.click(); ok = true; } }catch(e){} }
     ta.value = ""; FD.seekSent = false; hold(false); line("you", t, false); paint(); }
-  function cancel(){ ta.value = ""; FD.seekSent = false; hold(false); try{ ta.blur(); }catch(e){} paint(); }
+  function cancel(){ const had = !!(ta.value && ta.value.trim()); ta.value = ""; FD.seekSent = false; hold(false); try{ ta.blur(); }catch(e){}
+    /* 20261030o: Cancel with nothing typed did nothing (Walk out was the only exit). Now: nothing typed = dismiss the sitting here
+       (same teardown as Walk out, but you stay in the room and it does not reopen until you leave and come back). */
+    if(!had){ try{ G._ssnDismiss = G.room; leaveSittingQuiet(); }catch(e){} }
+    paint(); }
   /* a line in the desk log, word by word; click finishes it */
   function line(id, text, aside){ if(!D) return; const L = D.querySelector(".fd-log"); const d = document.createElement("div"); d.className = "fd-l" + (aside ? " aside" : "");
     d.innerHTML = "<b>" + esc(nameOf(id)) + (aside ? "" : ":") + "</b> <span class=\"t\"></span>"; L.appendChild(d); while(L.children.length > 30) L.removeChild(L.firstChild);
@@ -51202,6 +51238,30 @@ function wlSitLines(room, step, C){
 }
 { const _sl = sitLines; sitLines = function(room, step, C, ctx){ try{ const L = wlSitLines(room, step, C); if(L && L.length) return L; }catch(e){} return _sl.apply(this, arguments); }; }
 window.onumWill = {store:() => wlStore(), regard:(a, b) => wlRegard(a, b), options:m => wlOptions(m)};
+
+/* ══ 20261030o · room change tears down room chrome: the press session panel (#ndSess / #ndFd) lingered over the
+   Statuary Corridor after Walk out (ssnTick bails while a card is up), and the Court showed corridor nametags
+   (plates only refresh while standing still). A watcher that ignores cards and walking: new room -> close a session
+   that belongs to another room, hide the desk, blank every plate. A dismissed (Cancel) sitting stays shut here. ══ */
+(function(){
+  try{
+    const _so = ssnOpen;
+    ssnOpen = function(o){ try{ if(G && G._ssnDismiss && G._ssnDismiss === G.room && !(o && o.auto === false)) return null; }catch(e){} return _so.apply(this, arguments); };
+  }catch(e){}
+  let lastRoom = null;
+  setInterval(() => { try{
+    if(!G) return;
+    if(typeof SSN !== "undefined" && SSN && SSN.room && SSN.room !== G.room){
+      ssnClose(); try{ const d = document.getElementById("ndFd"); if(d) d.hidden = true; }catch(e){} try{ const p = document.getElementById("ndSess"); if(p && !window.ONUM_SESSION) p.remove(); }catch(e){}
+    }
+    if(!window.ONUM_SESSION){ const p = document.getElementById("ndSess"); if(p) p.remove(); }
+    if(G.room !== lastRoom){
+      lastRoom = G.room;
+      if(G._ssnDismiss && G._ssnDismiss !== G.room) G._ssnDismiss = null;
+      try{ for(const d of plates){ d._shown = 0; d._sig = ""; d.style.display = "none"; } }catch(e){}
+    }
+  }catch(e){} }, 200);
+})();
 
 /* ══ 20261030c · SESSIONS AND OPEN TALK, OPTIMISED.
    Press conference is an ONUM_SESSION (not the step-by-step sitting): the President opens,
