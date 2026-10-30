@@ -155,3 +155,15 @@ Presentation only; no collision, room mesh/load paths, NPC placement or JUPITER 
 - **District gate:** bare-white stone now lerps to the Capitol limestone #e0c9a2 (0.62) instead of 0xd2b48a, so gate and Capitol columns share one sandstone; bold courses from x kept.
 - **Sconce decor bowls:** emissive 0.6→0.42.
 - Gaps for z: no eyelid/lip/ear geometry (needs onum-characters.js head edit + bundle regen); gate vs Capitol not yet shot in one frame; plant fronds good, could add second leaf species.
+
+## 20261030z — face geometry readable at mid-shot
+
+Edited `neptune/onum-characters.js` and mirrored the identical 13 literal edits into the generated `neptune/onum-neptune.js` (file:// bundle; no build tool in repo, so hand-regenerated, parity checked 13/13):
+- Eyes: eyeball r 0.0118→0.0127, iris 0.0057→0.0063, eye set 0.7 mm deeper; lids 0.01265→0.0136 shells; lash line 0.00075→0.0013 (upper), 0.0004→0.0006 (lower); crease 0.0134→0.0144, thicker.
+- Brows thicker (0.0022/0.0031 → 0.0029/0.0041).
+- Lips: colour mix toward lip red 0.36/0.26 → 0.50/0.40; lip height +18%, depth +5%; mouth line 0.019×0.0015 → 0.021×0.0024.
+- Ears: rim tube 0.0045→0.0058.
+- Skin pore shader softened (0.86→0.92) — y's pore grid read as a texture pattern at mid-shot.
+Verdict: lids, lash line, lips and ears now read at Senate mid-shot. Faces still stylised (head shapes/proportions, hair blocks) — not yet past the human bar.
+- Folded MARS x notes: plant cane thinner (0.016) and fronds start lower to hide the junction; gate mortar 4.6 px, darker.
+- Not done (gaps): East Steps bronze ball-on-post not located; HUD stamp garble ("hst1d …") not reproduced; gate vs Capitol not yet one-frame; frond blades still alpha-aliased on MODEST (no AA); core ball still visible close up.
