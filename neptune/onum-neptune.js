@@ -1576,11 +1576,11 @@ function hairCardMat(S) {
   return cached(matCache, 'haircard' + S.hair + MODE, () => {
     const c = document.createElement('canvas'); c.width = 64; c.height = 128; const x = c.getContext('2d');
     const base = deepen(new T.Color(S.hair)); let sd = 13; const r = () => { sd = (sd * 16807) % 2147483647; return sd / 2147483647; };
-    for (let i = 0; i < 60; i++) { const px = 4 + r() * 56, w = 0.8 + r() * 1.6, len = 70 + r() * 58, v = 0.7 + r() * 0.6;
+    for (let i = 0; i < 60; i++) { const px = 4 + r() * 56, w = 0.8 + r() * 1.6, len = 70 + r() * 58, v = 0.55 + r() * 0.4;
       x.strokeStyle = 'rgb(' + Math.min(255, base.r * 255 * v | 0) + ',' + Math.min(255, base.g * 255 * v | 0) + ',' + Math.min(255, base.b * 255 * v | 0) + ')';
       x.lineWidth = w; x.beginPath(); x.moveTo(px, 0); x.quadraticCurveTo(px + (r() - 0.5) * 10, len * 0.5, px + (r() - 0.5) * 14, len); x.stroke(); }
     const t = texEnc(new T.CanvasTexture(c));
-    return new T.MeshStandardMaterial({ color: 0xffffff, map: t, alphaTest: 0.45, side: T.DoubleSide, roughness: 0.55, metalness: 0 });
+    return new T.MeshStandardMaterial({ color: 0xffffff, map: t, alphaTest: 0.45, side: T.DoubleSide, roughness: 0.88, metalness: 0 });
   });
 }
 function hairShellMat(S, q) {
@@ -1615,7 +1615,7 @@ function hairShellMat(S, q) {
         alphaTest: 0.5,
         normalMap: mk(toCanvas(W, H, nrm)),
         normalScale: new T.Vector2(0.5, 0.5),
-        roughness: 0.6,
+        roughness: 0.9,
         metalness: 0,
         side: T.FrontSide
       });
@@ -2204,8 +2204,8 @@ function hairShellMat(S, q) {
       headPivot.add(eg);
       eyes.push(eg);
       add(eg, cached(geoCache, "eyeball" + q, () => weld(new T.SphereGeometry(0.0127, 20, 14))), eyeW, 0, 0, 0, faceFine);
-      add(eg, cached(geoCache, "iris", () => new T.CircleGeometry(63e-4, 24)), irisM, 0, 0, 0.0122, faceFine);
-      add(eg, cached(geoCache, "pupil", () => new T.CircleGeometry(22e-4, 14)), pupM, 0, 0, 0.0125, faceFine);
+      add(eg, cached(geoCache, "iris", () => new T.CircleGeometry(76e-4, 24)), irisM, 0, 0, 0.0122, faceFine);
+      add(eg, cached(geoCache, "pupil", () => new T.CircleGeometry(29e-4, 14)), pupM, 0, 0, 0.0125, faceFine);
       for (const up of [1, -1]) {
         const lg = new T.Group();
         lg.position.copy(c);
@@ -2215,7 +2215,7 @@ function hairShellMat(S, q) {
         lg.add(lr);
         add(lr, cached(geoCache, "lid" + up, () => weld(new T.SphereGeometry(0.0136, 24, 10, 0, Math.PI * 2, up > 0 ? 0 : Math.PI * 0.5, Math.PI * 0.5))), lidMat(S), 0, 0, 0, faceFine);
         const lash = add(lr, cached(geoCache, "lash" + up, () => {
-          const g = new T.TorusGeometry(0.0137, up > 0 ? 13e-4 : 6e-4, 4, 20, Math.PI * 0.9);
+          const g = new T.TorusGeometry(0.0137, up > 0 ? 25e-4 : 11e-4, 4, 20, Math.PI * 0.9);
           g.rotateZ(Math.PI * 0.05);
           g.rotateX(Math.PI / 2 * (up > 0 ? -1 : -1));
           return g;
@@ -2240,7 +2240,7 @@ function hairShellMat(S, q) {
         lids.push(lr);
       }
     }
-    const browM = hairMat(hexMix(S.hair, 0, 0.25), q);
+    const browM = hairMat(hexMix(S.hair, 0, 0.55), q);
     const BR = S.face.browShape;
     for (const sx of [-1, 1]) {
       const by = sx < 0 ? A.browL : A.browR;
@@ -2251,7 +2251,7 @@ function hairShellMat(S, q) {
         const p = surf(shape, sx * x, y, Math.sqrt(Math.max(0.05, 1 - x * x - y * y)));
         return p.add(p.clone().normalize().multiplyScalar(12e-4));
       });
-      const curve = new T.CatmullRomCurve3(pts), tub = 14, rad = 6, base = (fem ? 29e-4 : 41e-4) * BR.thick;
+      const curve = new T.CatmullRomCurve3(pts), tub = 14, rad = 6, base = (fem ? 47e-4 : 64e-4) * BR.thick;
       const tg = new T.TubeGeometry(curve, tub, base, rad);
       const P = tg.attributes.position;
       for (let i = 0; i <= tub; i++) {
@@ -2340,8 +2340,8 @@ function hairShellMat(S, q) {
         const c = add(headPivot, cardG, cm, o[0] * k, o[1] * k, o[2] * k); c.castShadow = false;
         n.set(o[0], o[1], o[2]).normalize(); c.quaternion.setFromUnitVectors(Z, n);
         const L = (S.style === 'caesar' ? 0.022 : 0.034) + rr() * 0.028;
-        c.rotateZ(Math.atan2(nx, ny) * 0.0 + (rr() - 0.5) * 0.7 + (nz < 0 ? Math.PI : 0) * 0); c.rotateX(-0.35 - rr() * 0.4);
-        c.scale.set(0.022 + rr() * 0.02, L, 1);
+        c.rotateZ(Math.atan2(nx, ny) * 0.0 + (rr() - 0.5) * 0.7 + (nz < 0 ? Math.PI : 0) * 0); c.rotateX(-0.06 - rr() * 0.12);   /* 20261030ac: lie flat with the comb, no frizz */
+        c.scale.set(0.032 + rr() * 0.024, L, 1);
       }
     }
     if (S.style === 'bun') {
@@ -2459,7 +2459,7 @@ function hairShellMat(S, q) {
         b.rotation.x = 1.4;
       }
     }
-    const col = add(torso, cached(geoCache, "collar", () => new T.TorusGeometry(0.054, 65e-4, 10, 32)), shirtM, 0, 0.505, 0);
+    const col = add(torso, cached(geoCache, "collar", () => new T.TorusGeometry(0.056, 0.011, 10, 32)), shirtM, 0, 0.505, 0);
     col.rotation.x = Math.PI / 2 - 0.25;
     if (bottom !== "trousers") {
       const rings = [{ y: 0.02, w: tp[0][1] * 1.02, d: tp[0][2] * 1.02 }];
