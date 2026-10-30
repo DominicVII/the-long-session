@@ -1353,7 +1353,7 @@
   var SHIRTS = [15921386, 14673647, 15985888, 15328496, 16777215];
   var TIES = [8003371, 2046571, 2902578, 5917210, 3811914, 9054746];
   var EYES = [5913892, 4008472, 7031338, 4874352, 5598026, 3088408, 8022602, 3820124];
-  var Q = { low: { seg: 20, head: [62, 48], fingers: true, tex: "low" }, med: { seg: 24, head: [72, 56], fingers: true, tex: "med" }, high: { seg: 28, head: [76, 58], fingers: true, tex: "high" } };
+  var Q = { low: { seg: 20, head: [84, 64], fingers: true, tex: "low" }, med: { seg: 24, head: [92, 70], fingers: true, tex: "med" }, high: { seg: 28, head: [100, 76], fingers: true, tex: "high" } };
   function mulberry323(a) {
     return function() {
       a |= 0;
@@ -2127,7 +2127,7 @@ function hairShellMat(S, q) {
     hook.frustumCulled = false;
     hook.name = "onumc-hook";
     root.add(hook);
-    root.add(body); { /* 20261030ah: soft contact shadow so people sit on the rug, not float on it */ const cg = cached(geoCache, "contact", () => new T.PlaneGeometry(1, 1).rotateX(-Math.PI / 2)), cm = cached(matCache, "contactmat3", () => { const c = document.createElement("canvas"); c.width = c.height = 64; const g = c.getContext("2d"), gr = g.createRadialGradient(32, 32, 2, 32, 32, 31); gr.addColorStop(0, "rgba(0,0,0,0.97)"); gr.addColorStop(0.35, "rgba(0,0,0,0.85)"); gr.addColorStop(0.7, "rgba(0,0,0,0.42)");   /* 20261030al: near-black contact core */   /* 20261030aj: darker contact core */ gr.addColorStop(1, "rgba(0,0,0,0)"); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); return new T.MeshBasicMaterial({ name: "onumc:contact", map: new T.CanvasTexture(c), color: 0, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }); }); const cs = new T.Mesh(cg, cm); cs.position.y = 0.006; cs.scale.set(1.45, 1, 1.2);   /* 20261030aj: larger, reads under feet at 7-9 m */ cs.renderOrder = 1; cs.castShadow = false; cs.name = "onumc-contact"; root.add(cs); }
+    root.add(body); { /* 20261030ah: soft contact shadow so people sit on the rug, not float on it */ const cg = cached(geoCache, "contact", () => new T.PlaneGeometry(1, 1).rotateX(-Math.PI / 2)), cm = cached(matCache, "contactmat4", () => { const c = document.createElement("canvas"); c.width = c.height = 64; const g = c.getContext("2d"), gr = g.createRadialGradient(32, 32, 2, 32, 32, 31); gr.addColorStop(0, "rgba(0,0,0,0.97)"); gr.addColorStop(0.3, "rgba(0,0,0,0.88)"); gr.addColorStop(0.55, "rgba(0,0,0,0.5)"); gr.addColorStop(0.72, "rgba(255,226,196,0.28)"); gr.addColorStop(0.88, "rgba(255,226,196,0.12)");   /* 20261030am: warm halo ring so the dark core reads against the red rug */   /* 20261030al: near-black contact core */   /* 20261030aj: darker contact core */ gr.addColorStop(1, "rgba(0,0,0,0)"); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); return new T.MeshBasicMaterial({ name: "onumc:contact", map: new T.CanvasTexture(c), color: 0xffffff, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }); }); const cs = new T.Mesh(cg, cm); cs.position.y = 0.006; cs.scale.set(1.45, 1, 1.2);   /* 20261030aj: larger, reads under feet at 7-9 m */ cs.renderOrder = 1; cs.castShadow = false; cs.name = "onumc-contact"; root.add(cs); }
     body.add(rig);
     root.name = "onum-character";
     const meshes = [], faceFine = [], bodyFine = [];
