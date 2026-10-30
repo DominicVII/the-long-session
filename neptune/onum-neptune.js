@@ -2203,7 +2203,7 @@ function vC(h, k) { const l = (((h >> 16) & 255) * 0.3 + ((h >> 8) & 255) * 0.59
     const shape = headShape(Object.assign({ fem }, S.face));
     const headMat = headSkinMat(S, q);
     add(headPivot, sphereGeo(QQ.head[0], QQ.head[1], shape), headMat);
-    const eyeW = stdMat("eyeW", { color: lin(13813951), roughness: 0.06 }), irisM = irisMat(S.eye), pupM = stdMat("pupil", { color: 328965, roughness: 0.1 });
+    const eyeW = stdMat("eyeW", { color: lin(15657184), roughness: 0.06 }) /* 20261030au: brighter sclera survives 6-10 m */, irisM = irisMat(S.eye), pupM = stdMat("pupil", { color: 328965, roughness: 0.1 });
     const lashM = stdMat("lash", { color: 788743, roughness: 0.7 });
     const lids = [], eyes = [], A = S.face.asym;
     for (const sx of [-1, 1]) {
@@ -2262,7 +2262,7 @@ function vC(h, k) { const l = (((h >> 16) & 255) * 0.3 + ((h >> 8) & 255) * 0.59
         const p = surf(shape, sx * x, y, Math.sqrt(Math.max(0.05, 1 - x * x - y * y)));
         return p.add(p.clone().normalize().multiplyScalar(12e-4));
       });
-      const curve = new T.CatmullRomCurve3(pts), tub = 14, rad = 6, base = (fem ? 47e-4 : 64e-4) * BR.thick * 1.9;   /* 20261030aj: brows read across the rug */
+      const curve = new T.CatmullRomCurve3(pts), tub = 14, rad = 6, base = (fem ? 47e-4 : 64e-4) * BR.thick * 2.3; /* 20261030au: heavier brow mass for rug distance */   /* 20261030aj: brows read across the rug */
       const tg = new T.TubeGeometry(curve, tub, base, rad);
       const P = tg.attributes.position;
       for (let i = 0; i <= tub; i++) {
@@ -2470,7 +2470,7 @@ function vC(h, k) { const l = (((h >> 16) & 255) * 0.3 + ((h >> 8) & 255) * 0.59
         b.rotation.x = 1.4;
       }
     }
-    const col = add(torso, cached(geoCache, "collar", () => new T.TorusGeometry(0.06, 0.012, 10, 32)), shirtM, 0, 0.514, 0);
+    const col = add(torso, cached(geoCache, "collar", () => new T.TorusGeometry(0.06, 0.012, 10, 32)), shirtM, 0, 0.514, 0); if (jacket) { const jc = add(torso, cached(geoCache, "aucollar", () => new T.TorusGeometry(0.078, 0.017, 8, 24, Math.PI)), suitM, 0, 0.5, -0.004); jc.rotation.x = -Math.PI / 2 + 0.3; }   /* 20261030au: jacket collar roll behind the neck breaks the slab top */
     col.rotation.x = Math.PI / 2 - 0.25;
     if (bottom !== "trousers") {
       const rings = [{ y: 0.02, w: tp[0][1] * 1.02, d: tp[0][2] * 1.02 }];
@@ -2496,7 +2496,7 @@ function vC(h, k) { const l = (((h >> 16) & 255) * 0.3 + ((h >> 8) & 255) * 0.59
       sh.add(el);
       add(el, gb("elbowBall", () => weld(new T.SphereGeometry(0.042, 12, 10))), sleeve);   /* 20261030al: aj torus fold rings removed (read as diorama parts); sleeve tapers instead */
       add(el, gb("foreArm2", () => limb(0.25, [0.047, 0.04, 0.031], seg)), sleeve);
-      const cuff = add(el, cached(geoCache, "cuff2", () => new T.CylinderGeometry(0.0325, 0.031, 0.024, 16)), shirtM, 0, -0.25, 0);   /* 20261030al: cuff flush on the wrist */   /* 20261030ak: cuff hugs the sleeve end, no floating ring */
+      const cuff = add(el, cached(geoCache, "cuff2", () => new T.CylinderGeometry(0.0325, 0.031, 0.024, 16)), shirtM, 0, -0.25, 0);   /* 20261030al: cuff flush on the wrist */   /* 20261030ak: cuff hugs the sleeve end, no floating ring */ if (jacket) add(el, cached(geoCache, "auhem", () => new T.CylinderGeometry(0.044, 0.045, 0.016, 18)), suitM, 0, -0.232, 0);   /* 20261030au: jacket sleeve hem reads thicker than shirt cuff */
       const wr = new T.Group();
       wr.position.y = -0.255;
       el.add(wr);
@@ -2511,7 +2511,7 @@ function vC(h, k) { const l = (((h >> 16) & 255) * 0.3 + ((h >> 8) & 255) * 0.59
           f.rotation.y = 0;
           wr.add(f);
           const m = add(f, fg, skinM, 0, 0, 0, faceFine);
-          m.scale.set(1.32, [0.9, 1, 0.97, 0.78][k] * 1.05, 1.25); f.rotation.x = -0.35 - 0.12 * k; f.position.z *= 0.96;   /* 20261030al: relaxed curled digits, not splayed */   /* 20261030aj: distinct splayed digits */   /* 20261030ah: thicker fingers read as fingers, not nubs */
+          m.scale.set(1.32, [0.9, 1, 0.97, 0.78][k] * 1.05, 1.25); f.rotation.x = -0.62 - 0.16 * k; /* 20261030au: resting finger curl, not mitts */ f.position.z *= 0.96;   /* 20261030al: relaxed curled digits, not splayed */   /* 20261030aj: distinct splayed digits */   /* 20261030ah: thicker fingers read as fingers, not nubs */
           f.rotation.z = -sx * 0.12;
           fingers.push(f);
         }
@@ -2523,7 +2523,7 @@ function vC(h, k) { const l = (((h >> 16) & 255) * 0.3 + ((h >> 8) & 255) * 0.59
         fingers.push(th);
       }
       sh.rotation.z = sx * 0.1;
-      el.rotation.x = -0.12;
+      el.rotation.x = -0.3; /* 20261030au: softer elbow bend at rest */
       arms.push({ sh, el, wr, fingers, sx }); if (sx < 0 && S.phase % 5 < 1.8) { const fk = (S.phase * 7 | 0) % 3; add(wr, cached(geoCache, 'atfolder', () => new T.BoxGeometry(0.016, 0.3, 0.23)), stdMat('atfolder' + fk, { color: lin([0xc9a86a, 0x24262e, 0xece6d6][fk]), roughness: 0.8 }), 0, -0.12, 0.05); }   /* 20261030at: folder/papers silhouette */
     }
     const legs = [], legM = bottom === "trousers" ? suitM : hoseM;
@@ -2542,6 +2542,8 @@ function vC(h, k) { const l = (((h >> 16) & 255) * 0.3 + ((h >> 8) & 255) * 0.59
       kn.add(an);
       const shoe = add(an, gb("shoe" + (fem ? "f" : "m"), () => fem ? loft([{ y: -0.02, w: 0.03, d: 0.028, z: -0.01 }, { y: -0.05, w: 0.036, d: 0.11, z: 0.035 }, { y: -0.062, w: 0.036, d: 0.115, z: 0.035 }], 14, 3) : loft([{ y: 0, w: 0.04, d: 0.05, z: 0 }, { y: -0.045, w: 0.05, d: 0.135, z: 0.045 }, { y: -0.075, w: 0.052, d: 0.14, z: 0.045 }], 16, 3.2)), shoeM);
       if (fem) add(an, cached(geoCache, "heel", () => new T.BoxGeometry(0.014, 0.05, 0.014)), shoeM, 0, -0.06, -0.06);
+      if (bottom === "trousers") { const crM = stdMat("aucrease", { color: 0x0a0a0c, roughness: 0.9 }); add(hp, cached(geoCache, "aucr1", () => new T.BoxGeometry(0.005, 0.42, 0.004)), crM, 0, -0.22, 0.074); add(kn, cached(geoCache, "aucr2", () => new T.BoxGeometry(0.005, 0.4, 0.004)), crM, 0, -0.2, 0.054); }   /* 20261030au: trouser crease reads at mid */
+      if (!fem) add(an, cached(geoCache, "ausole", () => new T.BoxGeometry(0.1, 0.012, 0.25)), stdMat("ausole", { color: 0x050404, roughness: 0.95 }), 0, -0.079, 0.042);   /* 20261030au: dark welt/sole plants the foot on the rug */
       legs.push({ hp, kn, an, sx });
     }
     if (fem) hips.position.y += 0.012;
