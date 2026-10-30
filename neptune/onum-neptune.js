@@ -1353,7 +1353,7 @@
   var SHIRTS = [15921386, 14673647, 15985888, 15328496, 16777215];
   var TIES = [8003371, 2046571, 2902578, 5917210, 3811914, 9054746];
   var EYES = [5913892, 4008472, 7031338, 4874352, 5598026, 3088408, 8022602, 3820124];
-  var Q = { low: { seg: 14, head: [62, 48], fingers: false, tex: "low" }, med: { seg: 20, head: [72, 56], fingers: true, tex: "med" }, high: { seg: 28, head: [76, 58], fingers: true, tex: "high" } };
+  var Q = { low: { seg: 14, head: [62, 48], fingers: true, tex: "low" }, med: { seg: 20, head: [72, 56], fingers: true, tex: "med" }, high: { seg: 28, head: [76, 58], fingers: true, tex: "high" } };
   function mulberry323(a) {
     return function() {
       a |= 0;
@@ -2179,13 +2179,13 @@ function hairShellMat(S, q) {
     const torso = new T.Group();
     hips.add(torso);
     const heavy = clamp2((B - 1) * 4);
-    const tp = fem ? [[-0.09, 0.175, 0.115], [0, 0.172, 0.112], [0.1, 0.132, 0.095], [0.2, 0.14, 0.1], [0.29, 0.155, 0.118, 0.018], [0.36, 0.152, 0.108, 0.01], [0.42, 0.152, 0.096], [0.46, 0.128, 0.084], [0.495, 0.088, 0.066], [0.53, 0.055, 0.055]] : [[-0.09, 0.165, 0.11], [0, 0.163, 0.108], [0.12, 0.15 + 0.015 * heavy, 0.105 + 0.035 * heavy, 0.02 * heavy], [0.25, 0.165 + 0.01 * heavy, 0.115 + 0.02 * heavy, 0.01 * heavy], [0.35, 0.172, 0.118], [0.42, 0.172, 0.108], [0.465, 0.145, 0.092], [0.495, 0.1, 0.072], [0.53, 0.058, 0.058]];
+    const tp = fem ? [[-0.09, 0.175, 0.115], [0, 0.172, 0.112], [0.1, 0.132, 0.095], [0.2, 0.14, 0.1], [0.29, 0.155, 0.118, 0.018], [0.36, 0.152, 0.108, 0.01], [0.42, 0.152, 0.096], [0.46, 0.128, 0.084], [0.495, 0.088, 0.066], [0.53, 0.055, 0.055]] : [[-0.09, 0.165, 0.11], [0, 0.163, 0.108], [0.12, 0.14 + 0.022 * heavy, 0.105 + 0.035 * heavy, 0.02 * heavy], [0.25, 0.165 + 0.01 * heavy, 0.115 + 0.02 * heavy, 0.01 * heavy], [0.35, 0.172, 0.118], [0.42, 0.172, 0.108], [0.465, 0.145, 0.092], [0.495, 0.1, 0.072], [0.53, 0.058, 0.058]];
     const ring = (a, k = 1, dk = 0) => ({ y: a[0], w: a[1] * k + dk, d: a[2] * k + dk, z: a[3] || 0 });
     const shoulderY = 0.44, shX = fem ? 0.162 : 0.185;
     add(torso, gb("torso2", () => loft(tp.map((a) => {
       const r = ring(a);
       const pad = sstep2(0.36, 0.43, a[0]) * sstep2(0.5, 0.465, a[0]);
-      r.w = Math.max(r.w, mix2(r.w, shX + 0.012, pad));
+      r.w = Math.max(r.w, mix2(r.w, shX + 0.012 - 0.05 * sstep2(0.44, 0.5, a[0]), pad));
       return r;
     }), seg)), jacket || vest ? shirtM : longB ? dressM : shirtM);
     const neckG = new T.Group();
@@ -2423,7 +2423,7 @@ function hairShellMat(S, q) {
       const jp = tp.filter((a) => a[0] <= 0.51).map((a) => {
         const r = ring(a, 1.06, 0.012);
         const pad = sstep2(0.36, 0.43, a[0]) * sstep2(0.5, 0.465, a[0]);
-        r.w = Math.max(r.w, mix2(r.w, shX + (fem ? 0.022 : 0.03), pad));
+        r.w = Math.max(r.w, mix2(r.w, shX + (fem ? 0.022 : 0.03) - 0.05 * sstep2(0.44, 0.5, a[0]), pad));
         return r;
       });
       jp.push({ y: 0.535, w: 0.072, d: 0.066 });
@@ -2487,7 +2487,7 @@ function hairShellMat(S, q) {
       const sh = new T.Group();
       sh.position.set(sx * shX, shoulderY, -5e-3);
       torso.add(sh);
-      add(sh, gb("shoulderBall", () => weld(new T.SphereGeometry(0.058, 16, 12))), sleeve, -sx * 0.01, -0.012, 0).scale.set(0.92, 0.82, 1);
+      add(sh, gb("shoulderBall", () => weld(new T.SphereGeometry(0.058, 16, 12))), sleeve, -sx * 0.01, -0.02, 0).scale.set(0.9, 0.7, 1);
       add(sh, gb("upArm", () => limb(0.3, [0.057, 0.052, 0.046, 0.042], seg)), sleeve);
       const el = new T.Group();
       el.position.y = -0.3;
@@ -2508,7 +2508,7 @@ function hairShellMat(S, q) {
           f.position.set(0, -0.09, (k - 1.5) * 0.019);
           f.rotation.y = 0;
           wr.add(f);
-          const m = add(f, fg, skinM, 0, 0, 0, bodyFine);
+          const m = add(f, fg, skinM, 0, 0, 0, faceFine);
           m.scale.set(1, [0.9, 1, 0.97, 0.78][k], 1);
           f.rotation.z = -sx * 0.12;
           fingers.push(f);
@@ -2517,10 +2517,10 @@ function hairShellMat(S, q) {
         th.position.set(sx * -0, -0.03, 0.03);
         th.rotation.set(-0.6, 0, -sx * 0.3);
         wr.add(th);
-        add(th, fg, skinM, 0, 0, 0, bodyFine).scale.set(1.15, 0.75, 1.15);
+        add(th, fg, skinM, 0, 0, 0, faceFine).scale.set(1.15, 0.75, 1.15);
         fingers.push(th);
       }
-      sh.rotation.z = sx * 0.06;
+      sh.rotation.z = sx * 0.1;
       el.rotation.x = -0.12;
       arms.push({ sh, el, wr, fingers, sx });
     }
