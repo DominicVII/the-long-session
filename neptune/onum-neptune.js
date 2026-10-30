@@ -1466,7 +1466,7 @@
   }
   function headSkinMat(S, q) {
     const shadow = S.fem ? 0 : S.beard === "full" || S.beard === "short" ? 0.6 : S.beard === "stubble" ? 1 : 0.45;
-    const key = "headskin3" + S.skin + (S.fem ? "f" : "m") + shadow + q + MODE;
+    const key = "headskin4" + S.skin + (S.fem ? "f" : "m") + shadow + q + MODE;
     return cached(matCache, key, () => {
       const W = q === "high" ? 512 : q === "med" ? 256 : 128, H = W / 2, base = deepenSkin(new T.Color(S.skin));
       const dark = (base.r + base.g + base.b) / 3 < 0.45;
@@ -1488,6 +1488,10 @@
         g *= 1 - 0.12 * under;
         b *= 1 - 0.06 * under; { const ysk = G2(ax - 0.33, ny - 0.12, 0.10) * fr, ybr = G2(ax - 0.30, ny - 0.215, 0.05) * fr, ych = G2(ax - 0.55, ny + 0.3, 0.13) * fr, yjw = sstep2(-0.5, -0.85, ny) * sstep2(-0.2, 0.3, nz), ytm = G2(ax - 0.75, ny - 0.15, 0.12) * fr;   /* 20261030ad: painted sockets, under-brow, cheek hollow, temple and under-jaw shade: the face holds its planes at 6-10 m */
       const ysh = 1 - 0.42 * ysk - 0.22 * ybr - 0.14 * ych - 0.1 * ytm - 0.38 * yjw; r *= ysh; g *= ysh * 0.985; b *= ysh * 0.99; }
+      { const E = (v, w) => Math.exp(-(v / w) * (v / w));   /* 20261030ae: painted feature marks in the head albedo itself, so they survive every LOD tier and 6-10 m */
+        const ybw = E(ny - 0.255 - 0.03 * (0.3 - Math.abs(ax - 0.3)), 0.032) * sstep2(0.07, 0.13, ax) * sstep2(0.5, 0.42, ax) * fr, yln = E(ny - 0.135, 0.022) * sstep2(0.2, 0.25, ax) * sstep2(0.45, 0.4, ax) * fr;
+        const yns = E(ax - 0.1, 0.03) * sstep2(0.06, -0.04, ny) * sstep2(-0.32, -0.22, ny) * fr, yun = G2(nx, ny + 0.32, 0.06) * fr, ylp = E(ny + 0.47, 0.02) * sstep2(0.2, 0.12, ax) * fr, yul = G2(nx * 0.5, ny + 0.58, 0.05) * fr;
+        const yk = 1 - 0.5 * ybw - 0.45 * yln - 0.22 * yns - 0.22 * yun - 0.38 * ylp - 0.18 * yul; r *= yk; g *= yk * 0.97; b *= yk * 0.96; }
         const m2 = 1 + mott * 0.06 - sstep2(0.7, 0.9, freck) * 0.05 * (dark ? 0.3 : 1);
         r *= m2;
         g *= m2;
@@ -1580,6 +1584,9 @@ function hairCardMat(S) {
     for (let i = 0; i < 60; i++) { const px = 4 + r() * 56, w = 0.8 + r() * 1.6, len = 70 + r() * 58, v = 0.55 + r() * 0.4;
       x.strokeStyle = 'rgb(' + Math.min(255, base.r * 255 * v | 0) + ',' + Math.min(255, base.g * 255 * v | 0) + ',' + Math.min(255, base.b * 255 * v | 0) + ')';
       x.lineWidth = w; x.beginPath(); x.moveTo(px, 0); x.quadraticCurveTo(px + (r() - 0.5) * 10, len * 0.5, px + (r() - 0.5) * 14, len); x.stroke(); }
+    { x.globalCompositeOperation = 'source-atop'; const gr = x.createLinearGradient(0, 0, 0, 128);   /* 20261030ae: fake anisotropic sheen band + dark roots: clumps read as hair, not slabs */
+      gr.addColorStop(0, 'rgba(0,0,0,0.45)'); gr.addColorStop(0.28, 'rgba(255,240,215,0.22)'); gr.addColorStop(0.42, 'rgba(255,240,215,0)'); gr.addColorStop(1, 'rgba(0,0,0,0.25)');
+      x.fillStyle = gr; x.fillRect(0, 0, 64, 128); x.globalCompositeOperation = 'source-over'; }
     const t = texEnc(new T.CanvasTexture(c));
     return new T.MeshStandardMaterial({ color: 0xffffff, map: t, alphaTest: 0.45, side: T.DoubleSide, roughness: 0.88, metalness: 0 });
   });
@@ -2092,7 +2099,7 @@ function hairShellMat(S, q) {
         ear: 0.9 + r() * 0.2,
         tilt: (r() - 0.5) * 0.12,
         browShape: { arch: r() * (fem ? 1.3 : 0.9), thick: fem ? 0.8 + r() * 0.4 : 0.9 + r() * 0.6, len: r(), tail: r(), gap: (r() - 0.5) * 0.04 },
-        asym: { eyeL: (r() - 0.5) * 0.02, eyeR: (r() - 0.5) * 0.02, browL: (r() - 0.5) * 0.02, browR: (r() - 0.5) * 0.02, nose: (r() - 0.5) * 0.03, cheek: (r() - 0.5) * 0.12, mouth: (r() - 0.5) * 0.06 }
+        asym: { eyeL: (r() - 0.5) * 0.04, eyeR: (r() - 0.5) * 0.04, browL: (r() - 0.5) * 0.05, browR: (r() - 0.5) * 0.05, nose: (r() - 0.5) * 0.05, cheek: (r() - 0.5) * 0.2, mouth: (r() - 0.5) * 0.1 }
       }),
       seed: o.seed >>> 0,
       phase: r() * 100,
