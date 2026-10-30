@@ -1353,7 +1353,7 @@
   var SHIRTS = [15921386, 14673647, 15985888, 15328496, 16777215];
   var TIES = [8003371, 2046571, 2902578, 5917210, 3811914, 9054746];
   var EYES = [5913892, 4008472, 7031338, 4874352, 5598026, 3088408, 8022602, 3820124];
-  var Q = { low: { seg: 14, head: [28, 20], fingers: false, tex: "low" }, med: { seg: 20, head: [40, 30], fingers: true, tex: "med" }, high: { seg: 28, head: [56, 42], fingers: true, tex: "high" } };
+  var Q = { low: { seg: 14, head: [48, 36], fingers: false, tex: "low" }, med: { seg: 20, head: [60, 46], fingers: true, tex: "med" }, high: { seg: 28, head: [76, 58], fingers: true, tex: "high" } };
   function mulberry323(a) {
     return function() {
       a |= 0;
@@ -1802,12 +1802,12 @@
       const A = f.asym, eyY = nx < 0 ? A.eyeL : A.eyeR, nxs = nx - A.nose * sstep2(0.25, -0.3, ny);
       r -= 0.045 * G2(ax - 0.34, ny - 0.11 - eyY, 0.15) * fr;
       r += 0.05 * Math.exp(-(((ny - 0.27) / 0.075) ** 2)) * sstep2(0.62, 0.1, ax) * fr * f.brow;
-      const nw = 0.088 * f.bridge + 0.075 * sstep2(0.12, -0.24, ny) * f.wing;
-      const na = ny > -0.24 ? mix2(0.015, 0.135 * f.nose, sstep2(0.2, -0.2, ny)) : 0.135 * f.nose * sstep2(-0.33, -0.24, ny);
+      const nw = 0.104 * f.bridge + 0.085 * sstep2(0.12, -0.24, ny) * f.wing;
+      const na = ny > -0.24 ? mix2(0.012, 0.112 * f.nose, sstep2(0.2, -0.2, ny)) : 0.112 * f.nose * sstep2(-0.33, -0.24, ny);
       r += (na + 0.035 * f.hook * G2(0, ny + 0.02, 0.11)) * Math.exp(-((nxs / nw) ** 2)) * fr;
-      r += 0.04 * f.tip * G2(nxs / 1.3, ny + 0.19 - f.up, 0.065) * fr;
+      r += 0.052 * f.tip * G2(nxs / 1.2, ny + 0.19 - f.up, 0.085) * fr;
       r += 0.035 * f.wing * G2(Math.abs(nxs) - 0.12 * f.wing, ny + 0.22, 0.07) * fr;
-      r += 0.05 * f.cheek * (1 + (nx < 0 ? -A.cheek : A.cheek)) * G2(ax - 0.46, ny + 0.03, 0.2) * fr;
+      r += 0.06 * f.cheek * (1 + (nx < 0 ? -A.cheek : A.cheek)) * G2(ax - 0.46, ny + 0.03, 0.2) * fr;
       r -= 0.03 * G2(ax - 0.28, ny + 0.16, 0.12) * fr * (1 - age * 0.3);
       r += 0.07 * G2(nx * 0.9, (ny + 0.47) * 1.3, 0.26) * fr;
       r -= 0.025 * G2(nx, ny + 0.6, 0.08) * fr;
@@ -1822,7 +1822,7 @@
       x *= jaw;
       if (ny < -0.3) {
         const sq = sstep2(-0.3, -0.75, ny) * (1 - 0.45 * sstep2(-0.86, -1, ny));
-        x *= 1 + (f.fem ? 0.13 : 0.22) * sq;
+        x *= 1 + (f.fem ? 0.08 : 0.14) * sq;
       }
       if (ny < -0.8) y *= mix2(1, 0.95, sstep2(-0.8, -1, ny));
       if (nz < 0) z *= 1.08 - 0.25 * sstep2(-0.2, -0.8, ny);
@@ -2430,7 +2430,7 @@
         b.rotation.x = 1.4;
       }
     }
-    const col = add(torso, cached(geoCache, "collar", () => new T.TorusGeometry(0.052, 9e-3, 6, 20)), shirtM, 0, 0.505, 0);
+    const col = add(torso, cached(geoCache, "collar", () => new T.TorusGeometry(0.054, 65e-4, 10, 32)), shirtM, 0, 0.505, 0);
     col.rotation.x = Math.PI / 2 - 0.25;
     if (bottom !== "trousers") {
       const rings = [{ y: 0.02, w: tp[0][1] * 1.02, d: tp[0][2] * 1.02 }];
