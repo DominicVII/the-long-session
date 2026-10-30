@@ -12,7 +12,7 @@ const HAIRS = [0x14100d, 0x2f2318, 0x4a3728, 0x6b5540, 0x8b7355, 0x5c3218, 0x1f1
 const SHIRTS = [0xf2f0ea, 0xdfe6ef, 0xf3ece0, 0xe9e4f0, 0xffffff];
 const TIES = [0x7a1f2b, 0x1f3a6b, 0x2c4a32, 0x5a4a1a, 0x3a2a4a, 0x8a2a1a];
 const EYES = [0x5a3d24, 0x3d2a18, 0x6b4a2a, 0x4a6070, 0x556b4a, 0x2f2018, 0x7a6a4a, 0x3a4a5c];
-const Q = { low: { seg: 14, head: [62, 48], fingers: false, tex: 'low' }, med: { seg: 20, head: [72, 56], fingers: true, tex: 'med' }, high: { seg: 28, head: [76, 58], fingers: true, tex: 'high' } };
+const Q = { low: { seg: 14, head: [62, 48], fingers: true, tex: 'low' }, med: { seg: 20, head: [72, 56], fingers: true, tex: 'med' }, high: { seg: 28, head: [76, 58], fingers: true, tex: 'high' } };
 
 // ---------- utils ----------
 function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a);
@@ -446,10 +446,10 @@ export function makeCharacter(THREE, opts = {}) {
   const torso = new T.Group(); hips.add(torso);
   const heavy = clamp((B - 1) * 4);
   const tp = fem ? [[-0.09, .175, .115], [0, .172, .112], [0.10, .132, .095], [0.2, .14, .1], [0.29, .155, .118, .018], [0.36, .152, .108, .01], [0.42, .152, .096], [0.46, .128, .084], [0.495, .088, .066], [0.53, .055, .055]]
-    : [[-0.09, .165, .11], [0, .163, .108], [0.12, .15 + .015 * heavy, .105 + .035 * heavy, .02 * heavy], [0.25, .165 + .01 * heavy, .115 + .02 * heavy, .01 * heavy], [0.35, .172, .118], [0.42, .172, .108], [0.465, .145, .092], [0.495, .10, .072], [0.53, .058, .058]];
+    : [[-0.09, .165, .11], [0, .163, .108], [0.12, .14 + .022 * heavy, .105 + .035 * heavy, .02 * heavy], [0.25, .165 + .01 * heavy, .115 + .02 * heavy, .01 * heavy], [0.35, .172, .118], [0.42, .172, .108], [0.465, .145, .092], [0.495, .10, .072], [0.53, .058, .058]];
   const ring = (a, k = 1, dk = 0) => ({ y: a[0], w: a[1] * k + dk, d: a[2] * k + dk, z: a[3] || 0 });
   const shoulderY = 0.44, shX = (fem ? 0.162 : 0.185);
-  add(torso, gb('torso2', () => loft(tp.map(a => { const r = ring(a); const pad = sstep(0.36, 0.43, a[0]) * sstep(0.50, 0.465, a[0]); r.w = Math.max(r.w, mix(r.w, shX + 0.012, pad)); return r; }), seg)), (jacket || vest) ? shirtM : (longB ? dressM : shirtM));
+  add(torso, gb('torso2', () => loft(tp.map(a => { const r = ring(a); const pad = sstep(0.36, 0.43, a[0]) * sstep(0.50, 0.465, a[0]); r.w = Math.max(r.w, mix(r.w, shX + 0.012 - 0.05 * sstep(0.44, 0.5, a[0]), pad)); return r; }), seg)), (jacket || vest) ? shirtM : (longB ? dressM : shirtM));
   // neck + head
   const neckG = new T.Group(); neckG.position.set(0, 0.5, -0.005); torso.add(neckG);
   add(neckG, gb('neck', () => limb(-0.1, [0.058, 0.055, 0.052], seg)), cached(matCache, 'neckskin' + S.skin + q + MODE, () => { const m = skinM.clone(); m.color.multiplyScalar(0.8); return m; }));   /* 20261030ad: the neck sits in the jaw's shadow */
@@ -590,7 +590,7 @@ export function makeCharacter(THREE, opts = {}) {
   // --- clothing on torso ---
   const jlen = bottom === 'dress' ? -0.06 : -0.17;
   if (jacket) {
-    const jp = tp.filter(a => a[0] <= 0.51).map(a => { const r = ring(a, 1.06, 0.012); const pad = sstep(0.36, 0.43, a[0]) * sstep(0.50, 0.465, a[0]); r.w = Math.max(r.w, mix(r.w, shX + (fem ? 0.022 : 0.03), pad)); return r; }); jp.push({ y: 0.535, w: 0.072, d: 0.066 }); jp.unshift({ y: jlen, w: tp[0][1] * 1.08 + 0.014, d: tp[0][2] * 1.06 + 0.012 });
+    const jp = tp.filter(a => a[0] <= 0.51).map(a => { const r = ring(a, 1.06, 0.012); const pad = sstep(0.36, 0.43, a[0]) * sstep(0.50, 0.465, a[0]); r.w = Math.max(r.w, mix(r.w, shX + (fem ? 0.022 : 0.03) - 0.05 * sstep(0.44, 0.5, a[0]), pad)); return r; }); jp.push({ y: 0.535, w: 0.072, d: 0.066 }); jp.unshift({ y: jlen, w: tp[0][1] * 1.08 + 0.014, d: tp[0][2] * 1.06 + 0.012 });
     add(torso, gb('jacket' + jlen, () => loft(jp, seg)), suitM);
     // shirt V + lapels
     const vz = (y) => { let a = tp[0]; for (const t of tp) if (t[0] <= y) a = t; return a[2] * 1.06 + 0.012 + (a[3] || 0); };
@@ -625,7 +625,7 @@ export function makeCharacter(THREE, opts = {}) {
   const sleeve = jacket ? suitM : shirtM, arms = [];
   for (const sx of [-1, 1]) {
     const sh = new T.Group(); sh.position.set(sx * shX, shoulderY, -0.005); torso.add(sh);
-    add(sh, gb('shoulderBall', () => weld(new T.SphereGeometry(0.058, 16, 12))), sleeve, -sx * 0.01, -0.012, 0).scale.set(0.92, 0.82, 1.0);   // a rounded deltoid that caps the sleeve and runs into the shoulder
+    add(sh, gb('shoulderBall', () => weld(new T.SphereGeometry(0.058, 16, 12))), sleeve, -sx * 0.01, -0.02, 0).scale.set(0.9, 0.7, 1.0);   /* 20261030ag: sloped shoulder */   // a rounded deltoid that caps the sleeve and runs into the shoulder
     add(sh, gb('upArm', () => limb(0.30, [0.057, 0.052, 0.046, 0.042], seg)), sleeve);
     const el = new T.Group(); el.position.y = -0.30; sh.add(el);
     add(el, gb('elbowBall', () => weld(new T.SphereGeometry(0.042, 12, 10))), sleeve);
@@ -639,11 +639,11 @@ export function makeCharacter(THREE, opts = {}) {
     if (QQ.fingers) {
       const fg = cached(geoCache, 'finger', () => limb(0.075, [0.0085, 0.008, 0.007, 0.006], 8));
       for (let k = 0; k < 4; k++) { const f = new T.Group(); f.position.set(0, -0.09, (k - 1.5) * 0.019); f.rotation.y = 0; wr.add(f);
-        const m = add(f, fg, skinM, 0, 0, 0, bodyFine); m.scale.set(1, [0.9, 1, 0.97, 0.78][k], 1); f.rotation.z = -sx * 0.12; fingers.push(f); }
+        const m = add(f, fg, skinM, 0, 0, 0, faceFine); m.scale.set(1, [0.9, 1, 0.97, 0.78][k], 1); f.rotation.z = -sx * 0.12; fingers.push(f); }
       const th = new T.Group(); th.position.set(sx * -0.0, -0.03, 0.03); th.rotation.set(-0.6, 0, -sx * 0.3); wr.add(th);
-      add(th, fg, skinM, 0, 0, 0, bodyFine).scale.set(1.15, 0.75, 1.15); fingers.push(th);
+      add(th, fg, skinM, 0, 0, 0, faceFine).scale.set(1.15, 0.75, 1.15); fingers.push(th);
     }
-    sh.rotation.z = sx * 0.06; el.rotation.x = -0.12;
+    sh.rotation.z = sx * 0.1; el.rotation.x = -0.12;
     arms.push({ sh, el, wr, fingers, sx });
   }
   // --- legs ---
