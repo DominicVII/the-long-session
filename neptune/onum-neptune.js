@@ -1825,7 +1825,7 @@ function hairShellMat(S, q) {
       r -= 0.045 * G2(ax - 0.34, ny - 0.11 - eyY, 0.15) * fr;
       r += 0.05 * Math.exp(-(((ny - 0.27) / 0.075) ** 2)) * sstep2(0.62, 0.1, ax) * fr * f.brow;
       const nw = 0.104 * f.bridge + 0.085 * sstep2(0.12, -0.24, ny) * f.wing;
-      const na = ny > -0.24 ? mix2(0.012, 0.112 * f.nose, sstep2(0.2, -0.2, ny)) : 0.112 * f.nose * sstep2(-0.33, -0.24, ny);
+      const na = ny > -0.24 ? mix2(0.012, 0.14 * f.nose, sstep2(0.2, -0.2, ny)) : 0.14 * f.nose * sstep2(-0.33, -0.24, ny);
       r += (na + 0.035 * f.hook * G2(0, ny + 0.02, 0.11)) * Math.exp(-((nxs / nw) ** 2)) * fr;
       r += 0.052 * f.tip * G2(nxs / 1.2, ny + 0.19 - f.up, 0.085) * fr;
       r += 0.035 * f.wing * G2(Math.abs(nxs) - 0.12 * f.wing, ny + 0.22, 0.07) * fr;
@@ -2066,12 +2066,12 @@ function hairShellMat(S, q) {
       glasses: (_a = o.glasses) != null ? _a : r() < 0.25 * (0.5 + a01),
       beard: normBeard(o.beard, fem, r, a01),
       height: o.height || (fem ? 1.56 + r() * 0.18 : 1.68 + r() * 0.2),
-      hair: hexMix(baseHair, 13157564, grey * 0.9),
+      hair: vC(hexMix(baseHair, 13157564, grey * 0.9), 0.3),
       eye: o.eye || pick(EYES),
-      suit: ((s) => {
+      suit: vC(((s) => {
         var _a2;
         return (_a2 = o.suitColor) != null ? _a2 : s;
-      })(pickC(SUITS)),
+      })(pickC(SUITS)), 0.06 + r() * 0.24),
       shirt: ((s) => {
         var _a2;
         return (_a2 = o.shirtColor) != null ? _a2 : s;
@@ -2098,7 +2098,7 @@ function hairShellMat(S, q) {
         mouthW: 0.92 + r() * 0.16,
         lidDrop: r() * 0.12 + a01 * 0.1,
         ear: 0.9 + r() * 0.2,
-        tilt: (r() - 0.5) * 0.12,
+        tilt: (r() - 0.5) * 0.12, headS: 0.88 + r() * 0.24, headX: 0.9 + r() * 0.16, headY: 0.93 + r() * 0.16, shW: 0.86 + r() * 0.3,
         browShape: { arch: r() * (fem ? 1.3 : 0.9), thick: fem ? 0.8 + r() * 0.4 : 0.9 + r() * 0.6, len: r(), tail: r(), gap: (r() - 0.5) * 0.04 },
         asym: { eyeL: (r() - 0.5) * 0.04, eyeR: (r() - 0.5) * 0.04, browL: (r() - 0.5) * 0.05, browR: (r() - 0.5) * 0.05, nose: (r() - 0.5) * 0.05, cheek: (r() - 0.5) * 0.2, mouth: (r() - 0.5) * 0.1 }
       }),
@@ -2107,6 +2107,7 @@ function hairShellMat(S, q) {
       blinkSeed: r() * 1e9 | 0
     };
   }
+function vC(h, k) { const l = (((h >> 16) & 255) * 0.3 + ((h >> 8) & 255) * 0.59 + (h & 255) * 0.11) / 255; return hexMix(h, l < 0.42 ? 0x000000 : 0xf4f0e8, k); }   /* 20261030as: push hair/cloth value away from mid so it reads at rug distance */
   function makeCharacter(THREE, opts = {}) {
     T = THREE;
     MODE = opts.colorMode === "linear" ? "linear" : "game";
@@ -2171,7 +2172,7 @@ function hairShellMat(S, q) {
     const gb = (k, fn) => cached(geoCache, bkey + k, fn);
     const tieGeo = () => cached(geoCache, "tie", () => loft([{ y: 0.46, w: 0.012, d: 5e-3 }, { y: 0.43, w: 0.018, d: 5e-3 }, { y: 0.17, w: 0.032, d: 4e-3 }, { y: 0.15, w: 1e-3, d: 3e-3 }], 8));
     const sc = S.height / 1.75;
-    body.scale.set(sc * bw, sc, sc * (0.92 + 0.08 * B));
+    body.scale.set(sc * bw, sc, sc * (0.92 + 0.08 * B)); body.scale.x *= S.face.shW || 1;
     const hipY = 0.95, legX = fem ? 0.085 : 0.09;
     const hips = new T.Group();
     hips.position.y = hipY;
@@ -2198,6 +2199,7 @@ function hairShellMat(S, q) {
     const headPivot = new T.Group();
     headPivot.position.set(0, 0.1, 0);
     head.add(headPivot);
+    headPivot.scale.set((S.face.headS || 1) * (S.face.headX || 1), (S.face.headS || 1) * (S.face.headY || 1), S.face.headS || 1);
     const shape = headShape(Object.assign({ fem }, S.face));
     const headMat = headSkinMat(S, q);
     add(headPivot, sphereGeo(QQ.head[0], QQ.head[1], shape), headMat);
@@ -2304,12 +2306,12 @@ function hairShellMat(S, q) {
       const p = surf(shape, sx, -0.02, -0.08);
       const eg = new T.Group();
       eg.position.set(p.x + sx * 2e-3, p.y, p.z);
-      eg.rotation.y = sx * 1.35;
+      eg.rotation.y = sx * 1.1;
       headPivot.add(eg);
       const e1 = add(eg, earG, earM);
-      e1.scale.set(0.9, 1.25 * S.face.ear, 1);
+      e1.scale.set(1.15, 1.6 * S.face.ear, 1.15);
       const e2 = add(eg, earB, earM, -2e-3 * sx, -1e-3, -4e-3);
-      e2.scale.set(0.015, 0.026 * S.face.ear, 6e-3);
+      e2.scale.set(0.015, 0.034 * S.face.ear, 6e-3);
     }
     let hairShell = null;
     if (S.style !== "bald") {
@@ -2760,7 +2762,7 @@ function hairShellMat(S, q) {
       hips.rotation.z = (1 - w) * Math.sin(t * 0.35) * 0.02;
       torso.rotation.y = -Math.sin(ph) * 0.13 * w;
       torso.rotation.x = 0.04 * w + breath * 8e-3;
-      torso.scale.set(1 + breath * 6e-3, 1, 1 + breath * 0.01); hips.position.x += iw * 0.048 * PV1; hips.rotation.z += iw * 0.09 * PV1; torso.rotation.z = -iw * 0.07 * PV1; torso.rotation.x += iw * 0.1 * PV2; torso.scale.x *= 1 + 0.05 * PV3; torso.rotation.x += iw * 0.12 * PV4; hips.rotation.y += iw * 0.22 * PV3; torso.rotation.y += iw * 0.18 * PV2; hips.position.x += iw * 0.02 * PV4;   /* 20261030ar: stronger stance variety */   /* 20261030aq: per-person posture variety */ hips.position.x += iw * 0.018 * Math.sin(t * 0.23 + pz); torso.rotation.y += iw * 0.06 * Math.sin(t * 0.17 + pz * 2); torso.rotation.x += breath * 0.007;   /* 20261030ai: idle sway + breath */   /* 20261030ah: weight shift, slouch, chest width */
+      torso.scale.set(1 + breath * 6e-3, 1, 1 + breath * 0.01); hips.position.x += iw * 0.048 * PV1; hips.rotation.z += iw * 0.09 * PV1; torso.rotation.z = -iw * 0.07 * PV1; torso.rotation.x += iw * 0.1 * PV2; torso.scale.x *= 1 + 0.05 * PV3; torso.rotation.x += iw * 0.12 * PV4; hips.rotation.y += iw * 0.22 * PV3; torso.rotation.y += iw * 0.18 * PV2; hips.position.x += iw * 0.02 * PV4; rig.rotation.y = iw * 0.55 * PV1;   /* 20261030as: facing variety while standing */   /* 20261030ar: stronger stance variety */   /* 20261030aq: per-person posture variety */ hips.position.x += iw * 0.018 * Math.sin(t * 0.23 + pz); torso.rotation.y += iw * 0.06 * Math.sin(t * 0.17 + pz * 2); torso.rotation.x += breath * 0.007;   /* 20261030ai: idle sway + breath */   /* 20261030ah: weight shift, slouch, chest width */
       if (planted) {
         const duty = 0.62, SLf = duty * (st.SL || 1), A2 = 0.45, Bn = 0.43, yA = 0.04 + (fem ? 0.012 : 0), hipJ = hips.position.y - 0.03, ramp = clamp2(Math.max(0, vel, 0.32 * (st.pivot || 0)) / 0.12);
         for (const L of legs) {
