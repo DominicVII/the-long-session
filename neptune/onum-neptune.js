@@ -1492,7 +1492,7 @@
       { const E = (v, w) => Math.exp(-(v / w) * (v / w));   /* 20261030ae: painted feature marks in the head albedo itself, so they survive every LOD tier and 6-10 m */
         const ybw = E(ny - 0.255 - 0.03 * (0.3 - Math.abs(ax - 0.3)), 0.032) * sstep2(0.07, 0.13, ax) * sstep2(0.5, 0.42, ax) * fr, yln = E(ny - 0.135, 0.022) * sstep2(0.2, 0.25, ax) * sstep2(0.45, 0.4, ax) * fr;
         const yns = E(ax - 0.1, 0.03) * sstep2(0.06, -0.04, ny) * sstep2(-0.32, -0.22, ny) * fr, yun = G2(nx, ny + 0.32, 0.06) * fr, ylp = E(ny + 0.47, 0.02) * sstep2(0.2, 0.12, ax) * fr, yul = G2(nx * 0.5, ny + 0.58, 0.05) * fr;
-        const yk = 1 - 0.5 * ybw - 0.45 * yln - 0.22 * yns - 0.22 * yun - 0.38 * ylp - 0.18 * yul; r *= yk; g *= yk * 0.97; b *= yk * 0.96; }
+        const yk = 1 - 0.66 * ybw - 0.6 * yln - 0.22 * yns - 0.22 * yun - 0.38 * ylp - 0.18 * yul; r *= yk; g *= yk * 0.97; b *= yk * 0.96; }
         const m2 = 1 + mott * 0.06 - sstep2(0.7, 0.9, freck) * 0.05 * (dark ? 0.3 : 1);
         r *= m2;
         g *= m2;
@@ -1594,7 +1594,7 @@ function hairCardMat(S) {
 }
 function hairShellMat(S, q) {
     return cached(matCache, "hairshell3" + S.style + S.hair + (S.fem ? 1 : 0) + q + MODE, () => {
-      const W = q === "high" ? 512 : 256, H = W / 2, base = deepen(new T.Color(S.hair));
+      const W = q === "high" ? 512 : 256, H = W / 2, base = deepen(new T.Color(S.hair)); if ((base.r + base.g + base.b) / 3 > 0.4) base.multiplyScalar(0.78);
       const hgt = new Float32Array(W * H);
       const col = eqPaint(W, H, (nx, ny, nz, o, i) => {
         const { m } = hairMask(S.style, nx, ny, nz, S.fem);
@@ -1632,7 +1632,7 @@ function hairShellMat(S, q) {
   }
   function hairFuzzMat(S, q) {
     return cached(matCache, "hairfuzz" + S.style + S.hair + (S.fem ? 1 : 0) + q + MODE, () => {
-      const W = q === "high" ? 512 : 256, H = W / 2, base = deepen(new T.Color(S.hair));
+      const W = q === "high" ? 512 : 256, H = W / 2, base = deepen(new T.Color(S.hair)); if ((base.r + base.g + base.b) / 3 > 0.4) base.multiplyScalar(0.78);
       const col = eqPaint(W, H, (nx, ny, nz, o, i) => {
         const { m: m2 } = hairMask(S.style, nx, ny, nz, S.fem);
         const sc = mix2(nx, ny, sstep2(0.55, 0.9, Math.abs(nx))), al = (nz + ny) * 0.5;
@@ -2468,7 +2468,7 @@ function hairShellMat(S, q) {
         b.rotation.x = 1.4;
       }
     }
-    const col = add(torso, cached(geoCache, "collar", () => new T.TorusGeometry(0.056, 0.011, 10, 32)), shirtM, 0, 0.505, 0);
+    const col = add(torso, cached(geoCache, "collar", () => new T.TorusGeometry(0.06, 0.012, 10, 32)), shirtM, 0, 0.514, 0);
     col.rotation.x = Math.PI / 2 - 0.25;
     if (bottom !== "trousers") {
       const rings = [{ y: 0.02, w: tp[0][1] * 1.02, d: tp[0][2] * 1.02 }];
