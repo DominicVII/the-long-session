@@ -195,3 +195,10 @@ Verdict: lids, lash line, lips and ears now read at Senate mid-shot. Faces still
 - Irises 45% darker. Neck uses its own skin material at 0.8x (jaw shadow). Crown strand cards (ny>0.72) are 0.45x length.
 - Runtime skin: saturation x0.54, hue -0.025, lightness x0.9 (cooler, darker).
 - QA: front-on Senate shots at 7 m and 4 m (qa-30ad/after-senate-front7/4). Eyes, brows and nose now read on the near face; the low-poly stylised silhouette still reads toy -> ae.
+
+## 20261030ae
+- Head albedo (headskin4): painted brow band, lash line, nose-side, under-nose, lip line and under-lip shadow, so features survive every LOD tier at 6-10 m.
+- Asymmetry roughly doubled (eye, brow, nose, cheek, mouth offsets).
+- Hair cards: source-atop gradient (dark roots, anisotropic sheen band at ~30%, darker tips).
+- Skin shader: key/fill contrast (x0.78 shade to x1.1 lit) plus a soft cool rim on lit edges. Skin only, so sconces and the Capitol are untouched.
+- QA: qa-30ae (+ backup /workspace/neptune-qa-30ae): front7, front4, floor9, person-mid/close, cmp vs ad. Eyes and brows now read on faces across the floor; bodies, heads and hands are still low-poly figurines -> af.
