@@ -126,3 +126,13 @@ Presentation only; no collision, room mesh/load paths, NPC placement or JUPITER 
 - Skin: warmer under-skin emissive (subsurface stand-in) and roughness ≥ 0.6 (less wax) on nmSkin and onumc:skin/headskin.
 - Sconces: emissive 1.0/0.72 → 0.62/0.48, amber 0xf2b872; sconce point light 0.48→0.42 warmer.
 - Gaps: faces only subtly changed (no real SSS shader); corridor marble pillars kept (textured marble, untouched); outdoor sky/fog colour varies run to run so wide outdoor before/after are not like-for-like; perf of the 2.5 s traverse is unmeasured on a real modest machine.
+
+## 20261030w — realism pass 3 + Exec door (look only)
+- Exec Wing "jagged" door: root cause found. Skirting, dado and chair-rail bands (`band()` in the shell builder) ran straight through every door opening; the rail stood proud across the leaf and met the jambs in a sawtooth. Bands below the door head now stop at the jambs of every door on their wall (positions from `doorAt`). Door leaf widened dw-0.08 → dw-0.012 (no blue-black slot each side), leaf roughness .55 → .74 (no hot mirror spot). Trim/leaf meshes only; no collide data.
+- Plants (`propPlant`): matte faceted leaf material (roughness 1, no env, canvas leaf texture, 4 colour variants) + 7 leaf sprigs for a leafy silhouette. No footprint change.
+- Cloth: room-distance twill/fold map (`w30Cloth`, repeat 7) on character-module suits, weave normal x2, game wool/twill textures doubled contrast, matCloth normal 0.85.
+- Skin: mottle/blush/pore map (`w30Skin`) on onumc:skin, roughness ≥ 0.68, pore normal x2, warmer under-skin emissive, env ≤ 0.12.
+- District gate / bare whites: coursed, mottled sandstone canvas map (`w30Sand`) + stone normal 1.0.
+- Sconces: amber frosted glass (color 0xd99a52, emissive 0xff9a3c).
+- Shots: /workspace/tls/qa-30w (before = v, after = w; cmp.jpg, cmp-people.jpg).
+- Gaps for x: faces still read smooth at mid distance (map is mottle, not geometry); the bright globe in front of the Exec inner door is a lamp, untouched; plants in onum-office-amenities not converted; textured marble corridor pillars untouched.
