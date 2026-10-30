@@ -245,3 +245,14 @@ Verdict: lids, lash line, lips and ears now read at Senate mid-shot. Faces still
 - QA: qa-30aj (+ backup /workspace/neptune-qa-30aj).
 - QA: the Senate floor is populated (floor9 shows about 30 NPCs) and all four face-front cams locked on by the eyes (face-front2..5).
 - Verdict: FAIL. Faces read better and fingers and folds now show, but the bodies are still stiff, clay-like figurines with helmet hair at 6–10 m. Next is ak: hair mass (cards to volume), skin AO under the brow, nose, hairline and chin, attached cuffs and torso taper, and a stronger rim.
+
+## 20261030ak
+- Hair reads as a mass. The fine shard noise is cut (0.011 -> 0.004), a soft low-frequency lobe adds 0.016, and back/nape fullness adds 0.03 to blend into the neck. Strand cards drop 84/56/36 -> 50/34/22 and are wider clumps.
+- Skin AO (headskin6): stronger socket, under-brow and crease weights, plus a hairline shadow, a nose-side/under-nose shadow and a deeper under-chin shadow.
+- Torso: waist taper (-6% at y .14) and chest fill (+3.5% at y .38) in ring(). Shoulder balls are rounder (1.04/0.8/1.05).
+- Cuffs (cuff2) are wider and tapered (r .036 -> .033) and hug the sleeve end, so there is no floating ring.
+- Body rim in x30ClothShader: a warm key-side rim (0.4) plus a cool back rim. People only (cache key ak30cloth).
+- QA: qa-30ak (+ backup /workspace/neptune-qa-30ak). The Senate floor is populated and face-front2..5 locked on by the eyes. Contact shadows are still faint on the red rug in floor9. Idle sway can't be judged from stills.
+- Verdict: FAIL. Heads are fuller and shoulders rounder, but faces still read as carved and bodies as stiff figurines at 6–10 m. Next is al.
+- MARS aj -> al (on top of ak). Faces still look like clay at rug distance; eyes and brows only read at about 2 m. Hair still reads as helmet shells. Bodies look stiff, and the cuff rings and splayed fingers read as diorama parts. Foot blobs are only partial on floor9. Idle can't be shown in stills, so al needs a short frame-sequence or GIF capture. Senate population and face-front eye lock PASS; keep both.
+- al plan: an additive dark contact decal (multiply blend, 1.4 m footprint, near-black core) that reads on the red rug; much larger painted eye-socket and brow marks scaled for 8 m (or an LOD impostor feature boost); hair silhouette from an inflated soft hull, not cards; drop the fold torus rings for sleeve-taper geometry; curl the fingers into a relaxed hand, not splayed; multi-frame QA for idle.
