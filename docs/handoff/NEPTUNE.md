@@ -81,3 +81,15 @@ Boot fix (20261030d): 30a–30c shipped an entity-decoded main script (entity te
 - Verified: headless 1280×720 boot, stamp 20261030n, `ONUM_FF.installed` true, zero page errors.
 - **For JUPITER (o, collision):** colliders still follow PROPS data, so the moved House benches / visitor-office props / Senate chair may not match their new look; East Steps stickiness and NPC doorway slide-through not touched.
 - **Punch list for o (look):** East Steps near-white facade, per-room screenshot sweep (MARS qa-walls), z-fight check on wall decals, pale top-left panel.
+
+## 20261030p (NEPTUNE look, on JUPITER 20261030o cc39260)
+Presentation only; no collision, room mesh/load paths, NPC placement or JUPITER systems touched. Patch script: /workspace/tls/qa-30p/patch_p.py; shots /workspace/tls/qa-30p/.
+- **n verified (headless 1280x720, ONUM_FF.log):** office sofa added; Senate desk+chair out of the Court door; visitor office back-wall props pulled in 0.19 m. MARS verified Press TV, House radiator/benches, corridor radiator/bookcase.
+- **East Steps near-white facade:** the stepsRich doorway, pilasters, reveals and plinths (0xd6cdb6/0xbfb69e/0xb9b09c/0xc9bfa8/0xe6dfcf), plaza paving 0xb7b3a8 and fountain 0xc3bfb4 now use sandstone tones to match the 20261012a facade.
+- **Press grey desk slabs:** the 9 gallery desks are walnut (0x5a3b24/0x3b2716). Chairs are still grey.
+- **Corridor glare / washed wall:** propSconce PointLight was 0.25 m off the plaster at 0.55, which left a white hot spot. It now stands 0.5 m off at 0.48. This is global to all sconces.
+- **Union map (M):** header padded clear of the What's this / Notices chips. Bottom spacer so the last row clears the wire and Say aloud bar. Hover/focus outline, selected drop shadow, tooltip, role=button + tabindex. ★ on your state. A thin Federalist | Commonwealth bar shows the delegation you know, with a legend line.
+- **War map (World):** each power is now a coastline shape with a shallow-water shelf and a faint graticule, not an ellipse. The shape is deterministic per key and the footprint and click targets are unchanged. Relation numbers rounded (were raw floats like -25.8448...), here and in the realm detail lines. viewBox padded (-40 -24 720 504) so edge nodes and labels are not clipped. Legend moved below Horn League. Sea blob runs to the frame.
+- **Punch list (not done):** pink panel proud of the Senate Chamber door (corridor), source not located. Exec Wing door jagged/skewed (looks like shadow/aliasing). Pale top-left panel not seen this pass. Wall-decal z-fight not reproduced.
+- **Not found:** the raw will.care float (86.80000000000001). No display site was located in the main script; it is likely a generic dump (Engine Room audit?). Whoever owns that panel should round it.
+- **For JUPITER:** Exec Wing NPCs overlapping the right bookcase is NPC placement/collision.
