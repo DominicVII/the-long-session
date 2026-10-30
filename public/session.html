@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261030t">
+<meta name="onum-build" content="20261030u">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261030t";
+  var STAMP = "20261030u";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -3728,6 +3728,8 @@ renderer.debug.onShaderError = function(gl, prog, vs, fs){
 let PEOPLE_CAST_SHADOW = false;
 let _lastPR = -1;
 function setPR(v){
+  /* 20261030u: look. Below 1x every door frame and sill stair-stepped (the jagged Exec door, antialias is off on modest machines); Best anywhere and Balanced on a full GPU never drop under native 1x. */
+  try{ if(G && (G.gfx === "best" || (!MODEST && G.gfx !== "simple"))) v = Math.max(v, 1); }catch(e){}
   const n = Math.min(devicePixelRatio || 1, v);
   if(Math.abs(n - _lastPR) < 0.02) return;
   _lastPR = n;
@@ -5197,6 +5199,11 @@ function nmApply(m, col, rough, metal, key){
     if(nmTier() === 0) return;
     const F = nmFamily(kind);
     m.map = F.map;
+    /* 20261030u: realism. Surfaces used to carry only a tint map, so oak, stone and plaster read as flat plastic. Give them their grain in the light too. */
+    if(kind !== "glass" && kind !== "gloss" && kind !== "metal"){
+      if(F.rough) m.roughnessMap = F.rough;
+      if(F.normal && nmTier() >= 2){ m.normalMap = F.normal; const ns = kind === "stone" ? 0.55 : kind === "wood" ? 0.45 : kind === "leather" ? 0.4 : 0.28; m.normalScale = new THREE.Vector2(ns, ns); }
+    }
     if(kind === "glass"){ m.color.multiplyScalar(0.7); m.metalness = Math.max(m.metalness, 0.1); }
   }catch(e){}
 }
@@ -5218,7 +5225,7 @@ function nmSkin(col){
   const c = new THREE.Color(col); m.emissive = new THREE.Color(c.r * 0.09, c.g * 0.03, c.b * 0.02);
   if(nmTier() > 0){
     const F = nmFamily("skin"); m.map = F.map; m.roughnessMap = F.rough;
-    if(F.normal){ m.normalMap = F.normal; m.normalScale = new THREE.Vector2(0.25, 0.25); }
+    if(F.normal){ m.normalMap = F.normal; m.normalScale = new THREE.Vector2(0.34, 0.34); }
   }
   m._shared = true; NM.skin.set(key, m);
   return m;
@@ -5258,6 +5265,8 @@ function nmRoomPass(){
       if(m.isMeshStandardMaterial && m.userData.nmKind === undefined) m.envMapIntensity = m.metalness > 0.4 ? 0.9 : 0.3;
       const k = m.userData.nmKind || "";
       if(NM.env && m.isMeshStandardMaterial && !m.envMap && (m.metalness > 0.35 || /metal|glass|gloss|asphalt|tex:marble|tex:oak|tex:panel/.test(k) || m.isMeshPhysicalMaterial)){ m.envMap = NM.env; m.needsUpdate = true; }
+      /* 20261030u: realism. Matte surfaces get the room's light at a low strength: natural falloff and a soft edge sheen, not toy-flat walls. */
+      else if(NM.env && m.isMeshStandardMaterial && !m.envMap && nmTier() >= 1){ m.envMap = NM.env; m.envMapIntensity = Math.min(m.envMapIntensity || 0.3, 0.3) * 0.6; m.needsUpdate = true; }
     });
   }catch(e){}
 }
@@ -34592,7 +34601,7 @@ function corridorRich(w, d, h, hw){
     [[-hw + 1.0, 1.9], [hw - 1.0, 1.9], [-hw + 1.0, d - 1.9], [hw - 1.0, d - 1.9]].forEach(p => { try{ propPlant(p[0], p[1], 1.55); }catch(e){} });
     /* radiators under the left wall and a fire cabinet by the back door */
     [7.2, 17.4].forEach(z => { addBox(matCol(0x2a2d33, .5), -hw + 0.12, 0.38, z, 0.14, 0.58, 1.2); for(let i = 0; i < 7; i++) addBox(matCol(0x1a1c20, .6), -hw + 0.2, 0.38, z - 0.5 + i * 0.17, 0.02, 0.46, 0.05, 0, true); });
-    { const fz = d - 6.4;   /* 20261030t: was d - 4.4, which is the Senate door (0.85 d): the cabinet stood on its frame as a pink panel */
+    { const fz = d - 6.4;   /* 20261030u: was d - 4.4, which is the Senate door (0.85 d): the cabinet stood on its frame as a pink panel */
       addBox(matCol(0x5e1518, .55), hw - 0.12, 1.3, fz, 0.14, 0.7, 0.44); addBox(glass, hw - 0.2, 1.3, fz, 0.02, 0.55, 0.34, 0, true); addBox(brass, hw - 0.2, 1.0, fz, 0.02, 0.05, 0.2); }
   }catch(e){ try{ console.warn("corridor rich", e); }catch(x){} }
 }
@@ -35145,7 +35154,7 @@ function engEco(){
   Object.keys(O.towns).forEach(sn => (O.towns[sn] || []).forEach(T => { const r = rng(seedOf("eh:" + T.id)); for(let i = 0; i < 3; i++){ let nm = ""; try{ nm = wallSafeMint(() => newName(sn)); }catch(e){ nm = "A. Resident"; } const j = ENG_JOBS[Math.floor(r() * ENG_JOBS.length)]; eco.hh.push({id:eco.hh.length, name:nm, town:T.id, tname:T.name, state:sn, job:j[0], expo:j[1], will:ENG_WILLS[Math.floor(r() * ENG_WILLS.length)], home:Math.round(48 + r() * 30), stance:0}); } }));
   return eco;
 }
-/* 20261030t: the Engine's wants climb in +0.04 / +0.5 steps and read back as 86.80000000000001 in the audit dumps. Keep them at two decimals. Values unchanged in effect. */
+/* 20261030u: the Engine's wants climb in +0.04 / +0.5 steps and read back as 86.80000000000001 in the audit dumps. Keep them at two decimals. Values unchanged in effect. */
 setInterval(() => { try{ const E = typeof G !== "undefined" && G.eng, w = E && E.eco && E.eco.will; if(w) Object.keys(w).forEach(k => { if(typeof w[k] === "number") w[k] = Math.round(w[k] * 100) / 100; }); }catch(e){} }, 2000);
 function engTown(id){ const O = orgEnsure(); const sn = String(id).split("/")[0]; return (O.towns[sn] || []).find(t => t.id === id); }
 function engPickScope(){
@@ -48705,7 +48714,7 @@ const WM_LENS = {
   commit:"Commitment problem: a promise that cannot be enforced is cheap to give and dear to rely on; ask what happens if either side defects.",
   pub:"Public goods and free-riding: a neighbour will happily enjoy the security you pay for, and ask you for more."
 };
-function wmHome(){ const c = G.country || {}, name = c.name || "the Republic"; let cap = c.capital || ""; return {name, short:c.stem || String(name).replace(/^(The\s+)?(Free\s+|Consular\s+|People's\s+)?(Republic|Commonwealth|Union|Kingdom|Empire|State)\s+of\s+/i, "").replace(/\s+(VII|[IVX]+|\d+)$/, "") || name, cap}; }
+function wmHome(){ const c = G.country || {}, name = c.name || "the Republic"; let cap = c.capital || ""; return {name, short:String(c.stem || "").trim() || String(name).replace(/^(The\s+)?(Free\s+|Consular\s+|People's\s+)?(Republic|Commonwealth|Union|Kingdom|Empire|State)\s+of\s+/i, "").replace(/\s+(VII|[IVX]+|\d+)$/, "").trim() || String(name).trim() || "the Republic", cap}; }
 function wmStore(){ if(!G.wm) G.wm = {base:null, dead:{}, rec:{}, asks:[], log:[], seen:0, n:0, sel:null}; const W = G.wm; if(W.base == null){ try{ W.base = worldEnsure().dead || 0; }catch(e){ W.base = 0; } } return W; }
 function wmRec(k){ const W = wmStore(); return W.rec[k] || (W.rec[k] = {w:0, d:0, l:0}); }
 function wmRel(k){ return (G.realmRel || {})[k] || 0; }
@@ -48760,7 +48769,7 @@ function wmSVG(sel){
   let s = '<svg viewBox="-40 -24 720 504" role="img" aria-label="War map of the world" style="width:100%;max-height:64vh;background:#0e1a24;border-radius:8px;border:1px solid #2b3946">';
   s += '<rect x="-40" y="-24" width="720" height="504" fill="#0e1a24"/>' + defs + shelf + '<g>';
   s += '<g stroke="#16293a" stroke-width=".6" opacity=".7">' + [0,1,2,3,4,5,6,7].map(i => '<line x1="' + (-40 + i * 100) + '" y1="-24" x2="' + (-40 + i * 100) + '" y2="480"/>').join("") + [0,1,2,3,4].map(i => '<line x1="-40" y1="' + (-24 + i * 110) + '" x2="680" y2="' + (-24 + i * 110) + '"/>').join("") + '</g>' + '<g fill="#3d5a6e" font-size="8" font-family="Georgia,serif" opacity=".8">' + [[440,120,"42"],[230,300,"18"],[640,60,"66"],[30,380,"51"],[430,460,"88"],[200,20,"37"],[650,270,"74"]].map(t => '<text x="' + t[0] + '" y="' + t[1] + '">' + t[2] + '</text>').join("") + '</g></g>';
-  /* rivalries: dashed lines between neighbours who are each other's enemies (20261030t: over the land, mid-segment, clear of labels) */
+  /* rivalries: dashed lines between neighbours who are each other's enemies (20261030u: over the land, mid-segment, clear of labels) */
   let riv = "";
   const done = {}; Object.keys(REALM_RIVAL).forEach(a => { const b = REALM_RIVAL[a], key = [a, b].sort().join("-"); if(done[key]) return; done[key] = 1; const A = WM_GEO[a], B = WM_GEO[b], ax = A.x + (B.x - A.x) * 0.3, ay = A.y + (B.y - A.y) * 0.3, bx = A.x + (B.x - A.x) * 0.7, by = A.y + (B.y - A.y) * 0.7;
     riv += '<line pointer-events="none" x1="' + ax.toFixed(1) + '" y1="' + ay.toFixed(1) + '" x2="' + bx.toFixed(1) + '" y2="' + by.toFixed(1) + '" stroke="#c9a2e0" stroke-width="1.7" stroke-dasharray="4 5" opacity=".9"/>'; });
