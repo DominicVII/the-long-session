@@ -1528,7 +1528,7 @@
         normalMap: mk(toCanvas(W, H, nrm)),
         normalScale: new T.Vector2(0.12, 0.12),
         roughnessMap: mk(toCanvas(W, H, orm)),
-        roughness: 1,
+        roughness: 0.8,
         metalness: 0
       });
       gameSkin(m, S.skin);
@@ -1784,10 +1784,10 @@ function hairShellMat(S, q) {
     return cached(matCache, "skin" + hex + q, () => {
       const m = new T.MeshStandardMaterial({
         color: linSkin(hex),
-        roughness: 0.52,
+        roughness: 0.4,
         metalness: 0,
         normalMap: skinNormal(q === "high" ? 512 : 256),
-        normalScale: new T.Vector2(0.06, 0.06)
+        normalScale: new T.Vector2(0.14, 0.14)
       });
       gameSkin(m, hex);
       m.name = "onumc:skin";
@@ -1807,7 +1807,7 @@ function hairShellMat(S, q) {
     return cached(matCache, "cloth" + name + hex + q + rep, () => {
       if (MODE === "linear" && name === "suit_wool" && hex === 1713988) return makeMaterial("suit_wool", T, { repeat: rep, quality: Q[q].tex, physical: false });
       const tx = getTextures(name, T, { repeat: rep, quality: Q[q].tex });
-      return new T.MeshStandardMaterial({ color: lin(hex), normalMap: tx.normalMap, roughnessMap: tx.ormMap, aoMap: tx.ormMap, aoMapIntensity: 0.5, roughness: 1, metalness: 0 });
+      return new T.MeshStandardMaterial({ color: lin(hex), normalMap: tx.normalMap, roughnessMap: tx.ormMap, aoMap: tx.ormMap, normalScale: new T.Vector2(2.2, 2.2), aoMapIntensity: 1, roughness: 1, metalness: 0 });
     });
   }
   function leatherMat(hex, q) {
@@ -2059,7 +2059,7 @@ function hairShellMat(S, q) {
       fem,
       age,
       a01,
-      skin,
+      skin: hexMix(skin, [13660256, 11571296, 8413280][r() * 3 | 0], 0.12),
       build,
       outfit,
       style,
@@ -2251,7 +2251,7 @@ function vC(h, k) { const l = (((h >> 16) & 255) * 0.3 + ((h >> 8) & 255) * 0.59
         lids.push(lr);
       }
     }
-    const browM = hairMat(hexMix(S.hair, 0, 0.55), q);
+    const browM = hairMat(hexMix(S.hair, 0, 0.78), q);
     const BR = S.face.browShape;
     for (const sx of [-1, 1]) {
       const by = sx < 0 ? A.browL : A.browR;
@@ -2524,7 +2524,7 @@ function vC(h, k) { const l = (((h >> 16) & 255) * 0.3 + ((h >> 8) & 255) * 0.59
       }
       sh.rotation.z = sx * 0.1;
       el.rotation.x = -0.12;
-      arms.push({ sh, el, wr, fingers, sx });
+      arms.push({ sh, el, wr, fingers, sx }); if (sx < 0 && S.phase % 5 < 1.8) { const fk = (S.phase * 7 | 0) % 3; add(wr, cached(geoCache, 'atfolder', () => new T.BoxGeometry(0.016, 0.3, 0.23)), stdMat('atfolder' + fk, { color: lin([0xc9a86a, 0x24262e, 0xece6d6][fk]), roughness: 0.8 }), 0, -0.12, 0.05); }   /* 20261030at: folder/papers silhouette */
     }
     const legs = [], legM = bottom === "trousers" ? suitM : hoseM;
     for (const sx of [-1, 1]) {
@@ -2755,7 +2755,7 @@ function vC(h, k) { const l = (((h >> 16) & 255) * 0.3 + ((h >> 8) & 255) * 0.59
       const breath = Math.sin(t * 1.5); const pz = S.phase || 0, PV1 = Math.sin(pz * 1.7), PV2 = Math.sin(pz * 2.3 + 1), PV3 = Math.sin(pz * 3.1 + 2), PV4 = Math.sin(pz * 0.7 + 3), iw = 1 - w;   /* 20261030ah: per-person stance */
       const gT = state.gesture === true ? 1 : typeof state.gesture === "number" ? state.gesture : state.gesture ? 1 : state.talking ? 0.35 + 0.35 * Math.max(0, Math.sin(t * 0.7)) : 0;
       st.gest += (gT * (1 - w * 0.7) - st.gest) * Math.min(1, dt * 3);
-      const gs = st.gest;
+      const gs = Math.max(st.gest, iw * (S.phase % 3 < 1.2 ? sstep2(0.5, 0.9, Math.sin(t * 0.37 + S.phase)) * 0.85 : 0));   /* 20261030at: idle talk gestures */
       hips.position.y = hipY + (fem ? 0.012 : 0) - w * 0.012 + Math.abs(Math.cos(ph)) * 0.022 * w;
       hips.position.x = (1 - w) * Math.sin(t * 0.35) * 0.012;
       hips.rotation.y = Math.sin(ph) * 0.09 * w;
@@ -2800,7 +2800,7 @@ function vC(h, k) { const l = (((h >> 16) & 255) * 0.3 + ((h >> 8) & 255) * 0.59
         const s = A2.sx < 0 ? -1 : 1, swing = Math.sin(ph) * s * 0.38 * w;
         let shx = swing + Math.sin(t * 0.6 + A2.sx) * 0.015, shz = A2.sx * (0.07 + 0.01 * B), elx = -0.12 - 0.25 * w * Math.max(0, -swing * 2) - 0.05;
         shz += iw * A2.sx * 0.035 * (1 + PV4); elx -= iw * 0.18 * (1 + (A2.sx > 0 ? PV3 : PV2));   /* 20261030ah: arm rest variety */
-      const C2 = state.carry && state.carry.side === A2.sx && sit < 0.5 ? state.carry : null;
+      const C2 = state.carry && state.carry.side === A2.sx && sit < 0.5 ? state.carry : (A2.sx < 0 && S.phase % 5 < 1.8 && sit < 0.5 && !state.carry ? { pose: 'folder', side: -1 } : null);   /* 20261030at: held folder */
         if (C2) {
           const sip = clamp2(C2.sip || 0);
           if (C2.pose === "briefcase") {
@@ -2876,7 +2876,7 @@ function vC(h, k) { const l = (((h >> 16) & 255) * 0.3 + ((h >> 8) & 255) * 0.59
       neckG.rotation.y = st.lookYaw * 0.4;
       head.rotation.y = st.lookYaw * 0.6 + Math.sin(t * 0.43) * 0.04;
       head.rotation.x = st.lookPitch + Math.sin(t * 0.31) * 0.02 - torso.rotation.x + (state.talking ? Math.sin(t * 2.3) * 0.035 : 0);
-      head.rotation.z = Math.sin(t * 0.27) * 0.025 + 0.05 * PV2; head.rotation.y += 0.2 * PV4 * (state.lookAt ? 0.3 : 1);   /* 20261030ah: head tilt/turn variety */ head.rotation.y += 0.05 * Math.sin(t * 0.13 + pz * 3); head.rotation.x += 0.015 * Math.sin(t * 0.21 + pz);   /* 20261030ai: fidget */
+      head.rotation.z = Math.sin(t * 0.27) * 0.025 + 0.05 * PV2; head.rotation.y += 0.2 * PV4 * (state.lookAt ? 0.3 : 1);   /* 20261030ah: head tilt/turn variety */ head.rotation.y += 0.05 * Math.sin(t * 0.13 + pz * 3); head.rotation.y += (1 - w) * 0.45 * Math.sin(t * 0.19 + pz * 5) * sstep2(0.1, 0.7, Math.sin(t * 0.07 + pz));   /* 20261030at: idle head turns */ head.rotation.x += 0.015 * Math.sin(t * 0.21 + pz);   /* 20261030ai: fidget */
       if (st.lod > 1) return;
       st.nextBlink -= dt;
       if (st.nextBlink <= 0) {
