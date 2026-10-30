@@ -259,7 +259,7 @@ function headShape(f) {
     r -= 0.045 * G2(ax - 0.34, ny - 0.11 - eyY, 0.15) * fr;                                 // eye sockets
     r += 0.05 * Math.exp(-(((ny - 0.27) / 0.075) ** 2)) * sstep(0.62, 0.1, ax) * fr * f.brow; // brow ridge
     const nw = 0.104 * f.bridge + 0.085 * sstep(0.12, -0.24, ny) * f.wing;   // a bridge with some breadth, not a blade
-    const na = ny > -0.24 ? mix(0.012, 0.112 * f.nose, sstep(0.2, -0.2, ny)) : 0.112 * f.nose * sstep(-0.33, -0.24, ny);
+    const na = ny > -0.24 ? mix(0.012, 0.14 * f.nose, sstep(0.2, -0.2, ny)) : 0.14 * f.nose * sstep(-0.33, -0.24, ny);
     r += (na + 0.035 * f.hook * G2(0, ny + 0.02, 0.11)) * Math.exp(-((nxs / nw) ** 2)) * fr;   // nose (bridge, hook)
     r += 0.052 * f.tip * G2(nxs / 1.2, ny + 0.19 - f.up, 0.085) * fr;                       // tip bulb / upturn
     r += 0.035 * f.wing * G2(Math.abs(nxs) - 0.12 * f.wing, ny + 0.22, 0.07) * fr;                                    // nostril wings
@@ -396,18 +396,19 @@ function rollSpec(o) {
   return {
     fem, age, a01, skin, build, outfit, style, glasses: o.glasses ?? r() < 0.25 * (0.5 + a01), beard: normBeard(o.beard, fem, r, a01),
     height: o.height || (fem ? 1.56 + r() * 0.18 : 1.68 + r() * 0.2),
-    hair: hexMix(baseHair, 0xc8c4bc, grey * 0.9), eye: o.eye || pick(EYES),
-    suit: (s => o.suitColor ?? s)(pickC(SUITS)), shirt: (s => o.shirtColor ?? s)(pickC(SHIRTS)), tie: (s => o.tieColor ?? s)(pickC(TIES)), dress: o.dressColor,
+    hair: vC(hexMix(baseHair, 0xc8c4bc, grey * 0.9), 0.3), eye: o.eye || pick(EYES),
+    suit: vC((s => o.suitColor ?? s)(pickC(SUITS)), 0.06 + r() * 0.24), shirt: (s => o.shirtColor ?? s)(pickC(SHIRTS)), tie: (s => o.tieColor ?? s)(pickC(TIES)), dress: o.dressColor,
     face: ((F) => o.face ? Object.assign(F, o.face) : F)({ faceW: fem ? 0.92 + r() * 0.08 : 0.98 + r() * 0.08, jaw: fem ? 0.80 + r() * 0.1 : 0.92 + r() * 0.14, brow: fem ? 0.6 + r() * 0.3 : 0.9 + r() * 0.4,
       nose: fem ? 0.82 + r() * 0.25 : 0.95 + r() * 0.35, cheek: 0.8 + r() * 0.5, chin: 0.7 + r() * 0.6, lip: fem ? 1.1 + r() * 0.2 : 0.85 + r() * 0.2, age: a01,
       bridge: 0.8 + r() * 0.5, wing: 0.85 + r() * 0.35, hook: (r() - 0.45) * (fem ? 0.8 : 1.4), tip: 0.6 + r() * 0.9, up: (r() - 0.4) * 0.06,
-      mouthW: 0.92 + r() * 0.16, lidDrop: r() * 0.12 + a01 * 0.1, ear: 0.9 + r() * 0.2, tilt: (r() - 0.5) * 0.12,
+      mouthW: 0.92 + r() * 0.16, lidDrop: r() * 0.12 + a01 * 0.1, ear: 0.9 + r() * 0.2, tilt: (r() - 0.5) * 0.12, headS: 0.88 + r() * 0.24, headX: 0.9 + r() * 0.16, headY: 0.93 + r() * 0.16, shW: 0.86 + r() * 0.3,
       browShape: { arch: r() * (fem ? 1.3 : 0.9), thick: fem ? 0.8 + r() * 0.4 : 0.9 + r() * 0.6, len: r(), tail: r(), gap: (r() - 0.5) * 0.04 },
       asym: { eyeL: (r() - 0.5) * 0.04, eyeR: (r() - 0.5) * 0.04, browL: (r() - 0.5) * 0.05, browR: (r() - 0.5) * 0.05, nose: (r() - 0.5) * 0.05, cheek: (r() - 0.5) * 0.2, mouth: (r() - 0.5) * 0.1 } }),
     seed: o.seed >>> 0, phase: r() * 100, blinkSeed: (r() * 1e9) | 0
   };
 }
 
+function vC(h, k) { const l = (((h >> 16) & 255) * 0.3 + ((h >> 8) & 255) * 0.59 + (h & 255) * 0.11) / 255; return hexMix(h, l < 0.42 ? 0x000000 : 0xf4f0e8, k); }   /* 20261030as: push hair/cloth value away from mid so it reads at rug distance */
 export function makeCharacter(THREE, opts = {}) {
   T = THREE; MODE = opts.colorMode === 'linear' ? 'linear' : 'game'; matCache = matCaches[MODE];
   const opts0 = opts; { const s0 = rollSpec({ seed: 1, ...opts }), U0 = resolveUniform(opts.uniform, s0.fem);
@@ -440,7 +441,7 @@ export function makeCharacter(THREE, opts = {}) {
   const tieGeo = () => cached(geoCache, 'tie', () => loft([{ y: 0.46, w: 0.012, d: 0.005 }, { y: 0.43, w: 0.018, d: 0.005 }, { y: 0.17, w: 0.032, d: 0.004 }, { y: 0.15, w: 0.001, d: 0.003 }], 8));
 
   // --- dimensions (canonical 1.75 m person; root scaled to height) ---
-  const sc = S.height / 1.75; body.scale.set(sc * bw, sc, sc * (0.92 + 0.08 * B));   // on body, not root: hosts may set root.scale
+  const sc = S.height / 1.75; body.scale.set(sc * bw, sc, sc * (0.92 + 0.08 * B)); body.scale.x *= S.face.shW || 1;   // on body, not root: hosts may set root.scale
   const hipY = 0.95, legX = fem ? 0.085 : 0.09;
   const hips = new T.Group(); hips.position.y = hipY; rig.add(hips);
   const torso = new T.Group(); hips.add(torso);
@@ -454,7 +455,7 @@ export function makeCharacter(THREE, opts = {}) {
   const neckG = new T.Group(); neckG.position.set(0, 0.5, -0.005); torso.add(neckG);
   add(neckG, gb('neck', () => limb(-0.1, [0.058, 0.055, 0.052], seg)), cached(matCache, 'neckskin' + S.skin + q + MODE, () => { const m = skinM.clone(); m.color.multiplyScalar(0.8); return m; }));   /* 20261030ad: the neck sits in the jaw's shadow */
   const head = new T.Group(); head.position.set(0, 0.07, 0.012); neckG.add(head);
-  const headPivot = new T.Group(); headPivot.position.set(0, 0.10, 0); head.add(headPivot);
+  const headPivot = new T.Group(); headPivot.position.set(0, 0.10, 0); head.add(headPivot); headPivot.scale.set((S.face.headS || 1) * (S.face.headX || 1), (S.face.headS || 1) * (S.face.headY || 1), S.face.headS || 1);   /* 20261030as: per-person head size + shape (not identical ovals) */
   const shape = headShape(Object.assign({ fem }, S.face));
   const headMat = headSkinMat(S, q);
   add(headPivot, sphereGeo(QQ.head[0], QQ.head[1], shape), headMat);
@@ -514,8 +515,8 @@ export function makeCharacter(THREE, opts = {}) {
   const earB = cached(geoCache, 'earb', () => weld(new T.SphereGeometry(1, 14, 10)));
   const earM = earMat(S);
   for (const sx of [-1, 1]) { const p = surf(shape, sx, -0.02, -0.08);
-    const eg = new T.Group(); eg.position.set(p.x + sx * 0.002, p.y, p.z); eg.rotation.y = sx * 1.35; headPivot.add(eg);
-    const e1 = add(eg, earG, earM); e1.scale.set(0.9, 1.25 * S.face.ear, 1); const e2 = add(eg, earB, earM, -0.002 * sx, -0.001, -0.004); e2.scale.set(0.015, 0.026 * S.face.ear, 0.006); }
+    const eg = new T.Group(); eg.position.set(p.x + sx * 0.002, p.y, p.z); eg.rotation.y = sx * 1.1; headPivot.add(eg);
+    const e1 = add(eg, earG, earM); e1.scale.set(1.15, 1.6 * S.face.ear, 1.15); const e2 = add(eg, earB, earM, -0.002 * sx, -0.001, -0.004); e2.scale.set(0.015, 0.034 * S.face.ear, 0.006); }
   // hair shell: geometry gives volume, a painted alpha mask gives a clean, strand-broken hairline
   let hairShell = null;
   if (S.style !== 'bald') {
@@ -787,7 +788,7 @@ export function makeCharacter(THREE, opts = {}) {
     hips.position.x = (1 - w) * Math.sin(t * 0.35) * 0.012;
     hips.rotation.y = Math.sin(ph) * 0.09 * w; hips.rotation.z = (1 - w) * Math.sin(t * 0.35) * 0.02;
     torso.rotation.y = -Math.sin(ph) * 0.13 * w; torso.rotation.x = 0.04 * w + breath * 0.008;
-    torso.scale.set(1 + breath * 0.006, 1, 1 + breath * 0.01); hips.position.x += iw * 0.048 * PV1; hips.rotation.z += iw * 0.09 * PV1; torso.rotation.z = -iw * 0.07 * PV1; torso.rotation.x += iw * 0.1 * PV2; torso.scale.x *= 1 + 0.05 * PV3; torso.rotation.x += iw * 0.12 * PV4; hips.rotation.y += iw * 0.22 * PV3; torso.rotation.y += iw * 0.18 * PV2; hips.position.x += iw * 0.02 * PV4;   /* 20261030ar: stronger stance variety */   /* 20261030aq: per-person posture variety */ hips.position.x += iw * 0.018 * Math.sin(t * 0.23 + pz); torso.rotation.y += iw * 0.06 * Math.sin(t * 0.17 + pz * 2); torso.rotation.x += breath * 0.007;   /* 20261030ai: idle sway + breath */   /* 20261030ah: weight shift, slouch, chest width */
+    torso.scale.set(1 + breath * 0.006, 1, 1 + breath * 0.01); hips.position.x += iw * 0.048 * PV1; hips.rotation.z += iw * 0.09 * PV1; torso.rotation.z = -iw * 0.07 * PV1; torso.rotation.x += iw * 0.1 * PV2; torso.scale.x *= 1 + 0.05 * PV3; torso.rotation.x += iw * 0.12 * PV4; hips.rotation.y += iw * 0.22 * PV3; torso.rotation.y += iw * 0.18 * PV2; hips.position.x += iw * 0.02 * PV4; rig.rotation.y = iw * 0.55 * PV1;   /* 20261030as: facing variety while standing */   /* 20261030ar: stronger stance variety */   /* 20261030aq: per-person posture variety */ hips.position.x += iw * 0.018 * Math.sin(t * 0.23 + pz); torso.rotation.y += iw * 0.06 * Math.sin(t * 0.17 + pz * 2); torso.rotation.x += breath * 0.007;   /* 20261030ai: idle sway + breath */   /* 20261030ah: weight shift, slouch, chest width */
     // legs
     if (planted) {
       const duty = 0.62, SLf = duty * (st.SL || 1), A = 0.45, Bn = 0.43, yA = 0.04 + (fem ? 0.012 : 0), hipJ = hips.position.y - 0.03, ramp = clamp(Math.max(0, vel, 0.32 * (st.pivot || 0)) / 0.12);   // the stride fades with the real speed, so a slow walk still plants its feet
