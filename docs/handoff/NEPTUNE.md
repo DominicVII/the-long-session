@@ -105,3 +105,10 @@ Presentation only; no collision, room mesh/load paths, NPC placement or JUPITER 
 - QA: /workspace/tls/qa-30s/s-meeting-{open,parked,restored,closed,reopened}.png on a live House floor sitting; zero page errors.
 - War map (MARS FAIL on r: islands, not a continent): `wmSVG` now draws ONE mainland (`MAIN`, roughened); each power is its Voronoi share of it (`cellOf`, centres = `WM_GEO`, unchanged), borders are narrow straits with shared seeded rough edges, relation-coloured rims inside each coast. Salt Isles = 5-island chain off the SE coast (transparent r64 hit circle). Relation lines now drawn over the land as mid-segments (0.3–0.72) clear of labels. Shots: qa-30s/s-war-map(-closeup).png. Known: rivalry dashed lines are under the land now (only visible across water, e.g. Horn–Isles).
 - Still open: pink Senate door panel, jagged Exec Wing door, will.care float display.
+
+## 20261030t — look gaps
+- Pink Senate door panel: it was the corridor fire cabinet (`corridor rich`, crimson box + glass + brass) placed at `d - 4.4`, exactly the Senate door (0.85 d) on the same wall. Moved to `d - 6.4`, deeper red 0x5e1518. Shots qa-30t/{before,after}-corridor-senate-door.png.
+- will.care float: the Engine's wants (`G.eng.eco.will`) climb by +0.04/+0.5 and dumped as 86.80000000000001. A 2 s interval keeps them at two decimals (no behaviour change). No in-game HUD prints the raw number (cards use words / Math.round).
+- War map: rival dashed lines now drawn over the land as 0.3–0.7 mid-segments (brighter #c9a2e0), with the capital relation lines.
+- Jagged Exec Wing door: not reproduced in headless shots (qa-30t/{before,after}-corridor-exec-door.png, exec-inside-door.png); left unchanged. Needs a MARS shot/angle if still seen.
+- Seen in QA, not fixed: war-map capital name label sometimes blank (wmHome().short) on some generated countries.
