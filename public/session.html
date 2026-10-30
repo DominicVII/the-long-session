@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261030h">
+<meta name="onum-build" content="20261030i">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261030h";
+  var STAMP = "20261030i";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -11928,7 +11928,7 @@ function ssnTick(){
     /* a body sits when you are in its room */
     const want = SSN_ROOM[G.room];
     if(!SSN && want) ssnOpen({gov:want[0], kind:want[1], room:G.room});
-    else if(SSN && SSN.room && SSN.room !== G.room && SSN.auto !== false) { ssnClose(); return; }
+    else if(SSN && SSN.room && SSN.room !== G.room){ ssnClose(); return; }  /* 20261030i: leave room ends session (incl. press auto:false) */
     if(!SSN) return;
     const st = ssnStage(); if(st.id === "adjourn") return;
     if(st.timed && !SSN.fili){ SSN.remaining -= 1; if(SSN.remaining <= 0){ ssnNext(); return; } }
@@ -11994,7 +11994,9 @@ window.onumSessionEvent = function(e){
     else if(act === "walkout"){ const id = isYou ? "you" : e.actorId; if(SSN && SSN.out.indexOf(id) < 0) SSN.out.push(id);
       const followers = ls.filter(m => a && m.party === a.party && (m.rel.warmth > 20 || !isYou) && chance(0.35)); followers.forEach(m => { if(SSN && SSN.out.indexOf(m.id) < 0) SSN.out.push(m.id); });
       if(isYou){ G.you.standing = clamp(G.you.standing - 2, 0, 100); ls.forEach(m => { try{ m.rel.warmth = clamp(m.rel.warmth + (m.party === G.you.party ? 1 : -2), -100, 100); }catch(_){} }); }
-      log(nm + " walked out of " + body + (followers.length ? ", and " + followers.length + " followed" : "") + ".", true); if(SSN) ssnPublish(); }
+      log(nm + " walked out of " + body + (followers.length ? ", and " + followers.length + " followed" : "") + ".", true);
+      if(isYou){ try{ if(typeof walkOutNow === "function") walkOutNow(); else leaveSittingQuiet(); }catch(_){} }
+      else if(SSN) ssnPublish(); }
     else return {ok:false, why:"unknown action"};
     if(SSN && act !== "vote") ssnPublish();
     return {ok:true};
@@ -29611,18 +29613,24 @@ function goOutside(){
   });
 }
 function leaveSittingQuiet(){
-  if(!PROC.on) return;
-  PROC.on = false;
-  PROC.phase = "idle";
-  PROC.e = null;
-  PROC.speaker = null;
-  PROC.i = -1;
-  try{ const bar = el("procBar"); if(bar) bar.hidden = true; }catch(e){}
-  try{ document.body.classList.remove("in-session"); }catch(e){}
+  /* 20261030i: tear down PROC and ONUM_SESSION so the floor desk cannot linger after Walk out */
+  const hadProc = !!PROC.on;
+  const hadSsn = !!(typeof SSN !== "undefined" && SSN) || !!(window.ONUM_SESSION && window.ONUM_SESSION.stage && window.ONUM_SESSION.stage !== "idle");
+  if(PROC.on){
+    PROC.on = false;
+    PROC.phase = "idle";
+    PROC.e = null;
+    PROC.speaker = null;
+    PROC.i = -1;
+    try{ const bar = el("procBar"); if(bar) bar.hidden = true; }catch(e){}
+    try{ document.body.classList.remove("in-session"); }catch(e){}
+  }
+  try{ if(typeof ssnClose === "function") ssnClose(); else if(window.onumSession && typeof window.onumSession.close === "function") window.onumSession.close(); }catch(e){}
+  try{ const d = document.getElementById("ndFd"); if(d) d.hidden = true; }catch(e){}
   if(G.you) G.you.sitting = false;
   G.speechApproach = null;
   try{ catchClear("leave-sitting"); }catch(e){}
-  feed("You leave the sitting. It goes on without you.");
+  if(hadProc || hadSsn) feed("You leave the sitting. It goes on without you.");
 }
 function walkOutNow(){
   /* Always get off this floor. Career, mail, day — untouched. */
@@ -48473,7 +48481,7 @@ ssnTick = function(){
     const cardUp = typeof veil !== "undefined" && veil && !veil.hidden; if(cardUp || document.hidden) return;
     const want = SSN_ROOM[G.room];
     if(!SSN && want && (want[0] !== "executive" || (ss2YouChair(want[1]) && hereNow().filter(p => p && p !== G.you && !p.gone).length >= 2))) ssnOpen({gov:want[0], kind:want[1], room:G.room});
-    else if(SSN && SSN.room && SSN.room !== G.room && SSN.auto !== false){ ssnClose(); return; }
+    else if(SSN && SSN.room && SSN.room !== G.room){ ssnClose(); return; }  /* 20261030i: leave room ends session (incl. press auto:false) */
     if(!SSN) return; const st = ssnStage(); if(st.id === "adjourn") return;
     if(SS2.hold){ if(Date.now() - SS2.holdAt > 1000 * 60 * 30) SS2.hold = false; else return; }   /* typing freezes the floor and the stage */
     const now = Date.now();
