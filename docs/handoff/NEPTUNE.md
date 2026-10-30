@@ -202,3 +202,10 @@ Verdict: lids, lash line, lips and ears now read at Senate mid-shot. Faces still
 - Hair cards: source-atop gradient (dark roots, anisotropic sheen band at ~30%, darker tips).
 - Skin shader: key/fill contrast (x0.78 shade to x1.1 lit) plus a soft cool rim on lit edges. Skin only, so sconces and the Capitol are untouched.
 - QA: qa-30ae (+ backup /workspace/neptune-qa-30ae): front7, front4, floor9, person-mid/close, cmp vs ad. Eyes and brows now read on faces across the floor; bodies, heads and hands are still low-poly figurines -> af.
+
+## 20261030af
+- Head geometry: low tier 48x36 -> 62x48, med 60x46 -> 72x56. headShape adds jaw-angle volume, side-cheek volume and a nasolabial crease (a face silhouette, not an egg).
+- Crease occlusion in head albedo (headskin5): inner eye corners, nasolabial, under chin.
+- Skin shader: fixed view-space key direction (upper camera-left) with a 0.7 shadow side to 1.12 lit side. Skin only, so sconces and sandstone are untouched.
+- Not done: shoulder slope and hands (torso/hand geometry untouched). AO is painted plus shaded, not true screen-space AO.
+- QA: qa-30af (+ backup /workspace/neptune-qa-30af).
