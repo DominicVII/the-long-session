@@ -93,3 +93,8 @@ Presentation only; no collision, room mesh/load paths, NPC placement or JUPITER 
 - **Punch list (not done):** pink panel proud of the Senate Chamber door (corridor), source not located. Exec Wing door jagged/skewed (looks like shadow/aliasing). Pale top-left panel not seen this pass. Wall-decal z-fight not reproduced.
 - **Not found:** the raw will.care float (86.80000000000001). No display site was located in the main script; it is likely a generic dump (Engine Room audit?). Whoever owns that panel should round it.
 - **For JUPITER:** Exec Wing NPCs overlapping the right bookcase is NPC placement/collision.
+
+## 20261030r — war map geography (MARS FAIL on p)
+- `wmSVG`: blob ellipses replaced by authored per-power coastlines (`WM_SHAPE`, capes/bays/fjords) roughened by a seeded midpoint walk (fixed per key), scaled up so lands read as one continent split by straits. Salt Isles = archipelago (main isle + 3 islets); small offshore islets per power. Shallow-water shelf = wide soft stroke under each coast. Old faint gold/blue arcs and SE deep-water blob removed; depth soundings added. Land fill earthy (#4a4b3b, selected #6b5a2e); relation-colour coast stroke, labels, badges, centres (`WM_GEO`) and click targets unchanged.
+- QA: /workspace/tls/qa-30r/{before,r}-war-map(-closeup).png; headless boot at 20261030r, zero page errors, `[data-wm=isles]` click selects.
+- Not done in r: pink Senate door panel, jagged Exec Wing door aliasing, will.care float formatting.
