@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261030a">
+<meta name="onum-build" content="20261030b">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261030a";
+  var STAMP = "20261030b";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -10831,7 +10831,7 @@ setTimeout(() => { try{
   document.addEventListener("click", ev => { try{ const b = ev.target.closest(".talk__btn, .talk__acts button"); if(b && TALK.open && TALK.m){ const t = b.textContent.trim(); if(t && t.length > 3 && !/^(leave|close|goodbye|bye|done)$/i.test(t)) cvAdd("You", "you", TALK.m.id, t, false); } }catch(e){} }, true);
   document.addEventListener("click", ev => { const b = ev.target.closest("[data-cvreadid]"); if(!b) return; ev.stopPropagation(); cvRead(CV.th.find(x => x.id === +b.dataset.cvreadid)); }, true);
 }catch(e){} }, 2000);
-setInterval(() => { try{ cvScan(); }catch(e){} }, 600);
+setInterval(() => { try{ cvScan(); }catch(e){} }, 2500);   /* 20261030b: fallback only; talk lines kick it (NEPTUNE-TALKREWORK) */
 
 /* ══ voice hooks: calls, read-back texts, Conversations and approaches go to Neptune's onumVoice ══ */
 const VH = {said:new Map(), call:{id:null, n:0}, rb:(function(){ try{ return localStorage.getItem("onum.readback") === "1"; }catch(e){ return false; } })()};
@@ -26773,7 +26773,7 @@ function convClear(m){
 
 function openTalk(m){
   if(!G.running || G.over) return;
-  TALK.open = true; TALK.m = m;
+  TALK.open = true; TALK.m = m; TALK.seq = (TALK.seq || 0) + 1;   /* 20261030b: one token per open; every delayed line checks it */
   try{ const Gs = goalsEnsure(); if(Gs && m && m.kind === "member" && Gs.talked.indexOf(m.id) < 0) Gs.talked.push(m.id); }catch(e){}
   try{
     if(G.whip && m && G.whip.id === m.id){ G.whip = null; feed("You found " + surname(m.name) + ". Make the ask."); }
@@ -26909,6 +26909,9 @@ function wireHome(){
   w.classList.remove("wire--in");
   if(home && home.parentNode) home.parentNode.insertBefore(w, home.nextSibling);
 }
+/* 20261030b: narration in the transcript reads as narration, the second voice of a huddle reads as a second voice */
+function tkNarr(text){ try{ const log = el("chatLog"); if(!log) return null; const d = document.createElement("div"); d.className = "msg msg--narr"; d.textContent = text; log.appendChild(d); log.scrollTop = log.scrollHeight; countLog(); return d; }catch(e){ return null; } }
+function tkHud(span){ try{ if(span && span.parentNode) span.parentNode.classList.add("msg--huddle"); }catch(e){} return span; }
 /* walking up to two people mid-sentence puts you in their conversation: you hear what they were saying, and the other one stays and answers too */
 function huddleSay(o, first){
   try{
@@ -26927,25 +26930,25 @@ function huddleSay(o, first){
     try{ const h = m && m._huddle; if(h && G.running && G.t - h.t < 30){ const oid = h.a === m.id ? h.b : h.a, o = byId(oid);
       if(o && !o.gone && o.room === m.room && Math.hypot(o.x - m.x, o.z - m.z) < 4.5) TALK.huddle = {o, h, said:0}; } }catch(e){}
     const r = _openTalk.apply(this, arguments);
-    try{ if(m && TALK.open && m.traits && m !== G.you && m.kind !== "envoy" && chance(0.35)){ const kl = kinLine(m); setTimeout(() => { if(TALK.open && TALK.m === m) _appendMsg("them", kl, surname(m.name)); }, 1400); } }catch(e){}
+    try{ if(m && TALK.open && m.traits && m !== G.you && m.kind !== "envoy" && chance(0.35)){ const kl = kinLine(m), sq0 = TALK.seq; setTimeout(() => { if(TALK.open && TALK.m === m && TALK.seq === sq0) _appendMsg("them", kl, surname(m.name)); }, 1400); } }catch(e){}
     try{ const H = TALK.huddle; if(H && TALK.open){
       const L = H.h.lines.slice(0, 2).map(x => x[0] + ": \u201c" + x[1] + "\u201d").join("  ");
-      _appendMsg("them", "You step into the conversation between " + m.name + " and " + H.o.name + ". They had been saying: " + L, "In the room");
-      setTimeout(() => { if(TALK.open && TALK.huddle === H){ _appendMsg("them", huddleSay(H.o, true), surname(H.o.name)); H.said++; } }, 1800);
-      try{ const meta = el("tkMeta"); if(meta) meta.textContent += " \u00b7 with " + surname(H.o.name); }catch(e){}
+      tkNarr("You step into the conversation between " + m.name + " and " + H.o.name + ". They had been saying: " + L);
+      setTimeout(() => { if(TALK.open && TALK.huddle === H){ tkHud(_appendMsg("them", huddleSay(H.o, true), surname(H.o.name))); H.said++; } }, 1800);
+      /* 20261030b: the "with" pin is drawn by renderTalk (NEPTUNE-TALKREWORK), so the meta chips survive */
     } }catch(e){}
     return r;
   };
   appendMsg = function(kind){
     const r = _appendMsg.apply(this, arguments);
-    try{ const H = TALK.huddle; if(kind === "you" && H && TALK.open && H.said < 3){ H.said++; setTimeout(() => { if(TALK.open && TALK.huddle === H) _appendMsg("them", huddleSay(H.o, false), surname(H.o.name)); }, 1700); } }catch(e){}
+    try{ const H = TALK.huddle; if(kind === "you" && H && TALK.open && H.said < 3){ H.said++; setTimeout(() => { if(TALK.open && TALK.huddle === H) tkHud(_appendMsg("them", huddleSay(H.o, false), surname(H.o.name))); }, 1700); } }catch(e){}
     return r;
   };
   closeTalk = function(){ TALK.huddle = null; return _closeTalk.apply(this, arguments); };
 }
 function closeTalk(){
   const who = TALK.m;
-  TALK.open = false; TALK.m = null; TALK.prop = null;
+  TALK.open = false; TALK.m = null; TALK.prop = null; TALK.seq = (TALK.seq || 0) + 1;
   TALK.thread = null; TALK.beat = 2; TALK.followUp = null; TALK.seed = undefined; TALK.tell = "";
   el("talk").classList.remove("is-open");
   try{ if(who) feelHit(who, "relief", "they left"); }catch(e){}
@@ -33694,14 +33697,14 @@ function fwLive(m, why, onText){
       m.met = true; m.lastHail = G.t; m._fwT = G.t;
       const opening = (el("tkSay") && el("tkSay").textContent) || "";
       if(opening){ try{ speakAt(m, opening); }catch(e){} }
-      fwLive(m, "The player has just walked up to you, touched or clicked you to start talking.", t => { if(!TALK.open || TALK.m !== m) return; appendMsg("them", t, surname(m.name)); setSay(t, ""); try{ speakAt(m, t); }catch(e){} renderTalk(); });
+      const sq1 = TALK.seq; fwLive(m, "The player has just walked up to you, touched or clicked you to start talking.", t => { if(!TALK.open || TALK.m !== m || TALK.seq !== sq1) return; try{ if(el("chatLog") && el("chatLog").querySelector(".msg--you")) return; }catch(e){} appendMsg("them", t, surname(m.name)); setSay(t, ""); renderTalk(); });   /* 20261030b: the opening is spoken once; the live line is written, not spoken a second time */
     }catch(e){}
     return r;
   };
 }
 /* closing in on someone is the same as speaking to them: they turn and open the conversation themselves */
 function nearGreet(){
-  if(!G || !G.running || TALK.open || SIT.on || AP.toast || G.t - FW.last < 60 || Math.abs(cam.speed || 0) > 0.45) return;
+  if(!G || !G.running || TALK.open || SIT.on || (typeof window.onumTalkOwner === "function" && window.onumTalkOwner(true)) || AP.toast || G.t - FW.last < 60 || Math.abs(cam.speed || 0) > 0.45) return;
   let pc = false; try{ pc = !!PC.open; }catch(e){} if(pc) return;
   const here = hereNow().filter(o => o && !o.gone && o !== G.you && o.traits && o.x != null && !o.ohSeat && o.kind !== "player" && o.kind !== "envoy" && !o.wantsWord && apBudget(o) && (!o._ngT || G.t - o._ngT > 150));
   const m = here.find(o => Math.hypot(o.x - cam.x, o.z - cam.z) < 1.9);
@@ -37246,8 +37249,8 @@ function fwMore(m, onText){
     try{
       if(!m || !m.traits || m === G.you || !TALK.open || TALK.m !== m || m.kind === "envoy"){ try{ const b0 = el("tkOwn"); if(b0) b0.hidden = true; }catch(e){} return r; }
       try{ tkOwnMount(m); }catch(e){ console.warn('tkOwn', e); }
-      const k0 = m.id; NPCV.more = 0; const youCount = () => { try{ return (el("chatLog") || {querySelectorAll:() => []}).querySelectorAll(".msg--you").length; }catch(e){ return 0; } }, c0 = youCount();
-      [9000, 22000].forEach(ms => setTimeout(() => { if(!TALK.open || TALK.m !== m || youCount() !== c0 || NPCV.more >= 2) return; NPCV.more++;
+      const k0 = m.id, sq2 = TALK.seq; NPCV.more = 0; const youCount = () => { try{ return (el("chatLog") || {querySelectorAll:() => []}).querySelectorAll(".msg--you").length; }catch(e){ return 0; } }, c0 = youCount();
+      [9000, 22000].forEach(ms => setTimeout(() => { if(!TALK.open || TALK.m !== m || TALK.seq !== sq2 || youCount() !== c0 || NPCV.more >= 2) return; NPCV.more++;
         const add = t => { if(!TALK.open || TALK.m !== m || youCount() !== c0) return; appendMsg("them", t, surname(m.name)); setSay(t, ""); try{ speakAt(m, t); }catch(e){} };
         if(!fwMore(m, add) && NPCV.more === 1 && chance(0.4)){ let t = ""; try{ t = String(convHook(m) || ""); }catch(e){} if(t && t.length < 170 && t !== (el("tkSay") && el("tkSay").textContent)) add(t.replace(/\s+/g, " ")); } }, ms));
     }catch(e){}
@@ -41100,7 +41103,7 @@ function refreshPicks(){
   /* Number badges 1–9 for quick answers (keyboard + visible on pad). */
   const _pb = el("procBar");
   const _numOK = !veil.hidden || TALK.open || live || (_pb && !_pb.hidden);
-  NUMS = _numOK ? PICKS.filter(b => !b.closest(".tabs") && !b.closest("#travel") && !b.closest(".mk") && !b.matches("[data-edit], .swatch, .mk__sw, .mk__opt[data-set]") && !/^(close|back|×|✕)$/i.test((b.textContent || "").trim())) : [];
+  NUMS = _numOK ? PICKS.filter(b => !b.closest(".tabs") && !b.closest("#travel") && !b.closest(".mk") && !b.matches("[data-edit], .swatch, .tk-nonum, #tkOwn button, #wire button, .mk__sw, .mk__opt[data-set]") && !/^(close|back|×|✕)$/i.test((b.textContent || "").trim())) : [];
   document.querySelectorAll("[data-btn]").forEach(b => { delete b.dataset.btn; });
   NUMS.forEach((b, i) => { if(i < 9) b.dataset.btn = String(i + 1); });
   /* Preserve selection: never wipe PICK on an identical button set; re-apply is-pick by data-gp */
@@ -48748,7 +48751,7 @@ function wmCard(sel){
   govCardOpen("The world", "The war map", "", wmRender());
   const root = card;
   root.querySelectorAll("[data-wm]").forEach(g => { const f = () => { wmCard(g.getAttribute("data-wm") === W.sel ? null : g.getAttribute("data-wm")); }; g.addEventListener("click", f); g.addEventListener("keydown", e => { if(e.key === "Enter" || e.key === " "){ e.preventDefault(); f(); } }); });
-  root.querySelectorAll("[data-wmcall]").forEach(b => b.addEventListener("click", () => { try{ const F = wmEnvoy(b.getAttribute("data-wmcall")); const p = F.id != null ? byId(F.id) : null; if(p && typeof openTalk === "function"){ veil.hidden = true; G.running = true; openTalk(p); } else el("gcSay").textContent = "No line to their envoy is open."; }catch(e){} }));
+  root.querySelectorAll("[data-wmcall]").forEach(b => b.addEventListener("click", () => { try{ const F = wmEnvoy(b.getAttribute("data-wmcall")); const p = F.id != null ? byId(F.id) : null; if(p && typeof openTalk === "function" && !(typeof window.onumTalkOwner === "function" && window.onumTalkOwner())){ veil.hidden = true; G.running = true; openTalk(p); } else el("gcSay").textContent = "No line to their envoy is open."; }catch(e){} }));
   root.querySelectorAll("[data-wmfoe]").forEach(b => b.addEventListener("click", () => { try{ warCard(b.getAttribute("data-wmfoe")); }catch(e){} }));
   const say = t => { const g = el("gcSay"); if(g) g.textContent = t; };
   root.querySelectorAll("[data-wma]").forEach(b => b.addEventListener("click", () => { const [id, opt] = b.getAttribute("data-wma").split(":"), a = W.asks.find(x => x.id === id); if(!a || a.status !== "open") return; const r = wmApply(a, opt); wmCard(); say(r.line + " " + WM_LENS[r.lens]); }));
@@ -49846,6 +49849,151 @@ setInterval(sxDockTick, 300);
 try{ new MutationObserver(() => sxDockTick()).observe(veil, {attributes:true, attributeFilter:["class", "hidden"]}); }catch(e){}
 /* while you chair a cabinet or council, a seated member you click is called on in the meeting, not taken aside */
 { const _ot = openTalk; openTalk = function(m){ try{ const S = sxdSession(); if(m && S && S.chairId === "you" && (S.kind === "cabinet_meeting" || S.kind === "governor_council") && (S.seats || []).some(x => String(x.personId) === String(m.id)) && window.onumSession && typeof window.onumSession.callon === "function"){ window.onumSession.callon(m.id); return; } }catch(e){} return _ot.apply(this, arguments); }; }
+/* NEPTUNE-TALKREWORK BEGIN — 20261030b: one conversation surface per mode (UI/presentation + safe gates only; JUPITER's engine untouched).
+   Open talk: one pipeline (owner gate → existing chain → one opening), TALK.seq on every delayed line, a clean close that never leaves
+   TALK.open stuck, one reply box (tkOwn → LiveTalk when up, offline otherwise), a Done (Esc) button, Live/Offline chip, portrait,
+   secondary actions behind "More", duplicate lines dropped. Sessions: the floor desk is the one place to speak; the session view's own
+   speak box steps aside while the desk is up; Pass / Interject / Raise hand; press-conference hands as a pick row; Space finishes lines. */
+try{
+  const TR = window.NEPTUNE_TALKREWORK = {live:null, liveAt:0, moreOpen:false};
+  const sv = f => { try{ return f(); }catch(e){ return null; } };
+  /* who owns the conversation right now. strict=true also counts any open sitting/procedure (for unsolicited greetings). */
+  window.onumTalkOwner = function(strict){
+    try{ if(typeof SIT !== "undefined" && SIT.on) return "sit"; }catch(e){}
+    try{ if(typeof PROC !== "undefined" && PROC.on && (strict || PROC.phase === "you")) return "proc"; }catch(e){}
+    try{ const S = typeof sxdSession === "function" ? sxdSession() : null; if(S){
+      const me = x => x === "you" || (G.you && String(x) === String(G.you.id));
+      const seated = (S.seats || []).some(x => me(x && (x.personId != null ? x.personId : x)));
+      if(strict && seated) return "session";
+      if(seated && (me(S.floorId) || me(S.waitingOn) || S.held || S.typing)) return "session"; } }catch(e){}
+    return null;
+  };
+  /* ---- pipeline: route → gate → (existing chain: callon / time-ask / huddle / base / opening / hooks) → decorate ---- */
+  { const _inner = openTalk; openTalk = function(m){
+      try{
+        if(m && TALK.open && TALK.m === m){ const i = el("tkOwnIn"); if(i) i.focus(); return; }   /* already talking: no second opening */
+        const S = sv(() => sxdSession());
+        const chairRoute = !!(m && S && S.chairId === "you" && (S.seats || []).some(x => String(x.personId) === String(m.id)));
+        const own = window.onumTalkOwner();
+        if(m && !chairRoute && own && m !== G.you){
+          const msg = own === "session" ? "You are in the sitting. Raise your hand, or wait for the recess to take " + surname(m.name) + " aside." : own === "proc" ? "You have the floor. Finish, then take " + surname(m.name) + " aside." : "Not while the sitting is on.";
+          try{ const FD = window.NEPTUNE_FLOORDESK; if(FD && typeof FD.line === "function" && document.getElementById("ndFd") && !document.getElementById("ndFd").hidden) FD.line("you", "(" + msg + ")", true); else feed(msg); }catch(e){}
+          return;
+        }
+        if(m && TALK.open && TALK.m && TALK.m !== m){ try{ closeTalk(); }catch(e){} }
+      }catch(e){}
+      const r = _inner.apply(this, arguments);
+      try{ if(TALK.open && TALK.m === m) decorate(); }catch(e){}
+      return r;
+    }; }
+  /* ---- close: whatever a wrapper throws, the state is reset ---- */
+  { const _c = closeTalk; closeTalk = function(){
+      let r; try{ r = _c.apply(this, arguments); }catch(e){ try{ console.warn("closeTalk", e); }catch(x){} }
+      finally{ try{ TALK.open = false; TALK.m = null; TALK.huddle = null; TALK.seq = (TALK.seq || 0) + 1; TR.moreOpen = false;
+        const t = el("talk"); if(t) t.classList.remove("is-open", "tk-more"); const b0 = el("tkOwn"); if(b0) b0.hidden = true;
+        try{ wireHome(); }catch(e){} try{ picksDirty = true; }catch(e){} }catch(e){} }
+      return r; }; }
+  /* ---- duplicate lines: the same words from the same voice within 2s are shown once ---- */
+  { const _am = appendMsg; appendMsg = function(kind, text, who){
+      try{ const log = el("chatLog"), last = log && log.lastElementChild, now = Date.now();
+        if(last && text && last._k === kind + "|" + (who || "") + "|" + text && now - (last._at || 0) < 2000) return last.lastChild; }catch(e){}
+      const sp = _am.apply(this, arguments);
+      try{ const d = sp && sp.parentNode; if(d){ d._k = kind + "|" + (who || "") + "|" + text; d._at = Date.now(); } }catch(e){}
+      cvKick(); return sp; }; }
+  { const _tl = tlog; const seen = []; tlog = function(who, line, kind){
+      try{ if(kind === "talk" && line){ const now = Date.now(), t = String(line).trim(); for(let i = seen.length - 1; i >= 0; i--){ if(now - seen[i].at > 2000){ seen.splice(0, i + 1); break; } if(seen[i].t === t) return; } seen.push({t, at:now}); if(seen.length > 20) seen.shift(); } }catch(e){}
+      return _tl.apply(this, arguments); }; }
+  { const _ss = setSay; setSay = function(){ const r = _ss.apply(this, arguments); cvKick(); return r; }; }
+  /* the room log listens for talk instead of polling it (the 2.5s poll stays as a fallback) */
+  let cvT = 0; function cvKick(){ if(cvT) return; cvT = setTimeout(() => { cvT = 0; try{ if(typeof cvScan === "function") cvScan(); }catch(e){} }, 150); }
+  /* ---- presentation ---- */
+  const st = document.createElement("style"); st.id = "tkReworkCss";
+  st.textContent = ".talk{background:var(--paper,#f4f1e8)!important;color:var(--ink,#111)}.talk.is-open{max-height:min(52%,520px)}" +
+    ".tk-top{display:flex;gap:6px;align-items:center;margin-left:auto}.tk-chip{font:700 10px system-ui;letter-spacing:.1em;text-transform:uppercase;padding:3px 7px;border-radius:3px;border:1px solid}" +
+    ".tk-chip.live{background:#1f6b3a;color:#fff;border-color:#1f6b3a}.tk-chip.off{background:#2b2f37;color:#fff;border-color:#2b2f37}" +
+    ".tk-done{background:#111;color:#fff;border:1px solid #111;border-radius:4px;padding:5px 10px;font:700 12px system-ui;cursor:pointer}" +
+    ".tk-port{flex:none;width:48px;height:48px;border-radius:50%;overflow:hidden;border:2px solid #c9a24a;background:#2a2f3a;color:#fff;font:700 16px system-ui;display:flex;align-items:center;justify-content:center}.tk-port canvas{width:48px;height:48px}" +
+    ".talk .tk-x{display:none!important}.talk.tk-more .tk-x{display:flex!important}.tk-morebtn{border-style:dotted!important}" +
+    ".pin--with{background:#3a2f0c;color:#ffe08a;border:1px solid #c9a24a;padding:1px 6px;border-radius:3px}" +
+    ".msg--narr{font-style:italic;font-size:12px;color:var(--ink-3,#666);border-left:2px dashed var(--line,#999);padding-left:8px}" +
+    ".msg--huddle{border-left:3px solid #c9a24a;padding-left:8px;background:color-mix(in srgb,#c9a24a 10%,transparent)}.msg--huddle b{color:#8a6a1a}" +
+    ".talk.tk-one #wire.wire--in .wire__to,.talk.tk-one #wire.wire--in .wire__in,.talk.tk-one #wire.wire--in #wireSend,.talk.tk-one #wire.wire--in #wireMic,.talk.tk-one #wire.wire--in .wire__how{display:none!important}" +
+    "#sxDock.fd-on #nsxSay,#sxDock.fd-on #nsxSpeak,#sxDock.fd-on .nsx-say{display:none!important}" +
+    "#ndFd .fd-acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:5px}#ndFd .fd-acts button{background:#2a2d35;color:#fff;border:1px solid #c9a24a;border-radius:6px;padding:5px 10px;font:700 12px system-ui;cursor:pointer}" +
+    "#ndFd .fd-acts button.fd-ij{border-color:#e08a8a}#ndFd .fd-chair{background:#3a2f0c;color:#ffe08a;border:1px solid #ffe08a;border-radius:4px;padding:2px 7px;font:700 11px system-ui}" +
+    "#ndFd .fd-hands{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px;align-items:center}#ndFd .fd-hands b{color:#ffe08a;font:700 11px system-ui;text-transform:uppercase;letter-spacing:.08em}#ndFd .fd-hands button{background:#ffe08a;color:#111;border:0;border-radius:14px;padding:4px 10px;font:700 12px system-ui;cursor:pointer}";
+  document.head.appendChild(st);
+  function liveProbe(){ const LT = window.onumLiveTalk; if(!LT || typeof LT.reply !== "function"){ TR.live = false; return; }
+    if(Date.now() - TR.liveAt < 20000) return; TR.liveAt = Date.now();
+    try{ if(typeof LT.available !== "function"){ TR.live = true; return; } Promise.resolve(LT.available()).then(v => { TR.live = !!v; paintChip(); }).catch(() => { TR.live = false; paintChip(); }); }catch(e){ TR.live = false; } }
+  function paintChip(){ const c = document.getElementById("tkLive"); if(!c) return; c.className = "tk-chip tk-nonum " + (TR.live ? "live" : "off"); c.textContent = TR.live ? "Live" : "Offline"; c.title = TR.live ? "They answer through LiveTalk" : "They answer from the game itself; nothing is blocked"; }
+  function decorate(){
+    const T = el("talk"), m = TALK.m; if(!T || !m) return;
+    const head = T.querySelector(".talk__head");
+    if(head && !document.getElementById("tkTop")){ const d = document.createElement("div"); d.id = "tkTop"; d.className = "tk-top";
+      d.innerHTML = '<span id="tkLive" class="tk-chip tk-nonum off">Offline</span><button type="button" id="tkDone" class="tk-done tk-nonum" title="Close the conversation (Esc)">Done (Esc)</button>';
+      head.appendChild(d); d.querySelector("#tkDone").onclick = () => { try{ closeTalk(); }catch(e){} }; }
+    if(head){ let p = document.getElementById("tkPort"); if(!p){ p = document.createElement("div"); p.id = "tkPort"; p.className = "tk-port"; head.insertBefore(p, head.firstChild); }
+      if(p.dataset.id !== String(m.id)){ p.dataset.id = String(m.id); p.innerHTML = "";
+        try{ if(window.onumFamilyTree && typeof onumFamilyTree.portrait === "function"){ const c = onumFamilyTree.portrait(m.id, null, 96); if(c) p.appendChild(c); } }catch(e){}
+        if(!p.firstChild) p.textContent = String(m.name || "?").split(/\s+/).map(w => w[0] || "").join("").slice(0, 2).toUpperCase(); } }
+    liveProbe(); paintChip();
+    const own = el("tkOwn"); T.classList.toggle("tk-one", !!(own && !own.hidden));
+    try{ const H = TALK.huddle, meta = el("tkMeta"); if(H && meta && !meta.querySelector(".pin--with")){ const s = document.createElement("span"); s.className = "pin pin--with"; s.textContent = "with " + surname(H.o.name); meta.appendChild(s); } }catch(e){}
+    /* secondary actions behind More: the first four and every exit stay out; answering a question shows all */
+    try{ const box = el("tkActs"); if(box){ const old = box.querySelector(".tk-morebtn"); if(old) old.remove();
+      const bs = [...box.querySelectorAll(".talk__btn")]; bs.forEach(b => b.classList.remove("tk-x"));
+      const answering = TALK.thread && TALK.beat === 0;
+      if(!answering){ const extra = bs.filter(b => !b.classList.contains("talk__btn--exit")).slice(4);
+        if(extra.length >= 2){ extra.forEach(b => b.classList.add("tk-x")); const mb = document.createElement("button"); mb.type = "button"; mb.className = "talk__btn tk-morebtn tk-nonum";
+          mb.textContent = TR.moreOpen ? "Less \u25B4" : "More \u25BE (" + extra.length + ")"; mb.onclick = () => { TR.moreOpen = !TR.moreOpen; decorate(); try{ picksDirty = true; }catch(e){} };
+          const ex = box.querySelector(".talk__btn--exit"); box.insertBefore(mb, ex || null); } }
+      T.classList.toggle("tk-more", !!TR.moreOpen); } }catch(e){}
+    try{ picksDirty = true; }catch(e){}
+  }
+  TR.decorate = decorate;
+  { const _rt = renderTalk; renderTalk = function(){ const r = _rt.apply(this, arguments); try{ if(TALK.open) decorate(); }catch(e){} return r; }; }
+  /* Esc in the in-talk wire closes like Esc anywhere else; Enter (not typing) puts you in the reply box */
+  try{ el("wireIn").addEventListener("keydown", e => { if(e.key === "Escape" && TALK.open){ e.preventDefault(); const i = e.target; const v = (i.value || "").trim(); i.blur(); if(!v) closeTalk(); } }); }catch(e){}
+  addEventListener("keydown", e => { try{ if(e.key !== "Enter" || e.ctrlKey || e.metaKey || e.altKey || !TALK.open || typingInField(e)) return; if(typeof veil !== "undefined" && !veil.hidden) return; const i = el("tkOwnIn"); if(i && !el("tkOwn").hidden){ e.preventDefault(); i.focus(); } }catch(x){} });
+  /* ghost-state watchdog: the flag and the panel always agree */
+  setInterval(() => { try{ const t = el("talk"); if(!t) return; const on = t.classList.contains("is-open");
+      if(TALK.open && (!on || !TALK.m || TALK.m.gone)) closeTalk(); else if(!TALK.open && on) closeTalk(); }catch(e){} }, 1000);
+  /* ---- the floor desk: Pass / Interject / Raise hand, the chair's call-on row, press hands, Space finishes lines ---- */
+  const OSc = (k, ...a) => { try{ const O = window.onumSession; return O && typeof O[k] === "function" ? O[k].apply(O, a) : undefined; }catch(e){ return undefined; } };
+  const isMe = x => x === "you" || sv(() => G.you && String(x) === String(G.you.id));
+  function deskTick(){ try{
+      const D = document.getElementById("ndFd"), dock = document.getElementById("sxDock"); const on = !!(D && !D.hidden && getComputedStyle(D).display !== "none");
+      if(dock) dock.classList.toggle("fd-on", on); if(!on) return;
+      const S = window.ONUM_SESSION || {}, body = D.querySelector(".fd-body"); if(!body) return;
+      let A = D.querySelector(".fd-acts"); if(!A){ A = document.createElement("div"); A.className = "fd-acts"; const row = D.querySelector(".fd-row"); if(row) row.parentNode.insertBefore(A, row.nextSibling); else body.appendChild(A); }
+      const turn = isMe(S.floorId) || isMe(S.offer), chair = S.chairId === "you", fl = S.floorId != null && !isMe(S.floorId), press = /press/.test(String(S.kind || ""));
+      const q = (Array.isArray(S.queue) ? S.queue : []).filter(x => !isMe(x));
+      const sig = [turn, chair, fl, press, q.join(","), !!S.held].join("|"); if(A.dataset.sig === sig) return; A.dataset.sig = sig;
+      const ta = D.querySelector("textarea"), nm = id => { const p = sv(() => byId(isNaN(+id) ? id : +id)); return p && p.name ? String(p.name).split(/\s+/).slice(-1)[0] : String(id); };
+      let h = "";
+      if(chair) h += '<span class="fd-chair">You chair</span>';
+      if(turn && typeof (window.onumSession || {}).pass === "function") h += '<button type="button" class="fd-pass" title="Give up your turn">Pass</button>';
+      if(fl && typeof (window.onumSession || {}).interject === "function") h += '<button type="button" class="fd-ij" title="A word from your seat; it never takes the floor">Interject</button>';
+      if(chair && q.length && typeof (window.onumSession || {}).callon === "function" && !press) h += '<button type="button" class="fd-next1">Call on ' + String(nm(q[0])).replace(/[<>&"]/g, "") + '</button>';
+      A.innerHTML = h;
+      const b1 = A.querySelector(".fd-pass"); if(b1) b1.onclick = () => { if(ta) ta.value = ""; OSc("hold", false); OSc("pass"); };
+      const b2 = A.querySelector(".fd-ij"); if(b2) b2.onclick = () => { const t = ta ? ta.value.trim() : ""; const r = OSc("interject", t || "Point of order!", t ? "heckle" : "point_of_order"); if(ta && r && r.ok){ ta.value = ""; OSc("hold", false); }
+        try{ window.NEPTUNE_FLOORDESK.line("you", r && r.ok ? (t || "Point of order!") : "(not yet: " + ((r && r.reason) || "the chair did not hear it") + ")", !(r && r.ok)); }catch(e){} };
+      const b3 = A.querySelector(".fd-next1"); if(b3) b3.onclick = () => OSc("callon", q[0]);
+      /* press conference: raised hands as a pick row; the question waits for you */
+      let H = D.querySelector(".fd-hands"); if(press && chair && q.length){ if(!H){ H = document.createElement("div"); H.className = "fd-hands"; A.parentNode.insertBefore(H, A); }
+        H.innerHTML = "<b>Hands up</b>" + q.slice(0, 8).map(id => '<button type="button" data-hand="' + String(id).replace(/"/g, "") + '">' + String(nm(id)).replace(/[<>&"]/g, "") + '</button>').join("");
+        H.querySelectorAll("[data-hand]").forEach(b => b.onclick = () => { if(OSc("callon", b.getAttribute("data-hand")) === undefined){ try{ console.warn("press: onumSession.callon missing (JUPITER)"); }catch(e){} } }); }
+      else if(H) H.remove();
+    }catch(e){} }
+  setInterval(deskTick, 400); addEventListener("onum-session", () => setTimeout(deskTick, 0));
+  addEventListener("keydown", e => { try{ if(e.key !== " " || typingInField(e)) return; const D = document.getElementById("ndFd"); if(!D || D.hidden) return;
+      const un = [...D.querySelectorAll(".fd-l")].filter(l => l._full && !l._done && l.querySelector(".t") && l.querySelector(".t").textContent !== l._full); if(!un.length) return;
+      e.preventDefault(); e.stopImmediatePropagation(); un.forEach(l => { l._done = true; l.querySelector(".t").textContent = l._full; }); }catch(x){} }, true);
+  console.log("NEPTUNE talk rework ready");
+}catch(e){ try{ console.warn("NEPTUNE-TALKREWORK", e); }catch(x){} }
+/* NEPTUNE-TALKREWORK END */
 
 /* ══ 20261025i · THE ROAD A BILL TRAVELS. A bill is referred to the committee whose field it mostly touches; the committee's
    members offer amendments in markup (to strike the section they mind most, to cut the money) and vote on them and on the
@@ -51300,7 +51448,7 @@ armFrame();
   }
   /* Ctrl/Meta combos (copy, paste, select all, undo...) in any text field: let the browser have them, no game handler sees them. */
   const editable = t => t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
-  window.addEventListener("keydown", e => { if((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && editable(e.target)) e.stopImmediatePropagation(); }, true);
+  window.addEventListener("keydown", e => { if((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key !== "Enter" && editable(e.target)) e.stopImmediatePropagation(); }, true);
   /* ----- collapse/reopen ----- */
   function addX(e, r){
     if(r.noX || e.querySelector(":scope>.hmX")) return;
