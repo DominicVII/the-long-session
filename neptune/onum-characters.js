@@ -122,11 +122,11 @@ function hairCardMat(S) {
   return cached(matCache, 'haircard' + S.hair + MODE, () => {
     const c = document.createElement('canvas'); c.width = 64; c.height = 128; const x = c.getContext('2d');
     const base = deepen(new T.Color(S.hair)); let sd = 13; const r = () => { sd = (sd * 16807) % 2147483647; return sd / 2147483647; };
-    for (let i = 0; i < 60; i++) { const px = 4 + r() * 56, w = 0.8 + r() * 1.6, len = 70 + r() * 58, v = 0.7 + r() * 0.6;
+    for (let i = 0; i < 60; i++) { const px = 4 + r() * 56, w = 0.8 + r() * 1.6, len = 70 + r() * 58, v = 0.55 + r() * 0.4;
       x.strokeStyle = 'rgb(' + Math.min(255, base.r * 255 * v | 0) + ',' + Math.min(255, base.g * 255 * v | 0) + ',' + Math.min(255, base.b * 255 * v | 0) + ')';
       x.lineWidth = w; x.beginPath(); x.moveTo(px, 0); x.quadraticCurveTo(px + (r() - 0.5) * 10, len * 0.5, px + (r() - 0.5) * 14, len); x.stroke(); }
     const t = texEnc(new T.CanvasTexture(c));
-    return new T.MeshStandardMaterial({ color: 0xffffff, map: t, alphaTest: 0.45, side: T.DoubleSide, roughness: 0.55, metalness: 0 });
+    return new T.MeshStandardMaterial({ color: 0xffffff, map: t, alphaTest: 0.45, side: T.DoubleSide, roughness: 0.88, metalness: 0 });
   });
 }
 function hairShellMat(S, q) {
@@ -146,7 +146,7 @@ function hairShellMat(S, q) {
     const nrm = heightToNormal(W, H, hgt, W / 256 * 1.5);
     const mk = cv => new T.CanvasTexture(cv);
     return new T.MeshStandardMaterial({ map: texEnc(mk(toCanvas(W, H, col))), alphaMap: mk(toCanvas(W, H, alpha)), alphaTest: 0.5, normalMap: mk(toCanvas(W, H, nrm)),
-      normalScale: new T.Vector2(0.5, 0.5), roughness: 0.6, metalness: 0, side: T.FrontSide });
+      normalScale: new T.Vector2(0.5, 0.5), roughness: 0.9, metalness: 0, side: T.FrontSide });
   });
 }
 // the loose outer strands: fine vertical breaks in an alpha cut-out, a shade lighter and darker than the body of the hair
@@ -458,13 +458,13 @@ export function makeCharacter(THREE, opts = {}) {
     const sp = surf(shape, sx * 0.33, ey, 0.94); const c = new T.Vector3(sp.x, sp.y, sp.z - 0.0089);
     const eg = new T.Group(); eg.position.copy(c); headPivot.add(eg); eyes.push(eg);
     add(eg, cached(geoCache, 'eyeball' + q, () => weld(new T.SphereGeometry(0.0127, 20, 14))), eyeW, 0, 0, 0, faceFine);
-    add(eg, cached(geoCache, 'iris', () => new T.CircleGeometry(0.0063, 24)), irisM, 0, 0, 0.0122, faceFine);
-    add(eg, cached(geoCache, 'pupil', () => new T.CircleGeometry(0.0022, 14)), pupM, 0, 0, 0.0125, faceFine);
+    add(eg, cached(geoCache, 'iris', () => new T.CircleGeometry(0.0076, 24)), irisM, 0, 0, 0.0122, faceFine);
+    add(eg, cached(geoCache, 'pupil', () => new T.CircleGeometry(0.0029, 14)), pupM, 0, 0, 0.0125, faceFine);
     for (const up of [1, -1]) {   // eyelids: skin shells that hug the eyeball, with a lash line on the edge
       const lg = new T.Group(); lg.position.copy(c); lg.rotation.z = -sx * (S.face.tilt + (up > 0 ? 0 : 0.05)); headPivot.add(lg);
       const lr = new T.Group(); lg.add(lr);
       add(lr, cached(geoCache, 'lid' + up, () => weld(new T.SphereGeometry(0.0136, 24, 10, 0, Math.PI * 2, up > 0 ? 0 : Math.PI * 0.5, Math.PI * 0.5))), lidMat(S), 0, 0, 0, faceFine);
-      const lash = add(lr, cached(geoCache, 'lash' + up, () => { const g = new T.TorusGeometry(0.0137, up > 0 ? 0.0013 : 0.0006, 4, 20, Math.PI * 0.9);
+      const lash = add(lr, cached(geoCache, 'lash' + up, () => { const g = new T.TorusGeometry(0.0137, up > 0 ? 0.0025 : 0.0011, 4, 20, Math.PI * 0.9);
         g.rotateZ(Math.PI * 0.05); g.rotateX(Math.PI / 2 * (up > 0 ? -1 : -1)); return g; }), lashM, 0, 0, 0, faceFine);
       // crease above upper lid
       if (up > 0) { const cr = add(lg, cached(geoCache, 'crease', () => { const g = new T.TorusGeometry(0.0144, 0.0008, 4, 16, Math.PI * 0.7); g.rotateZ(Math.PI * 0.15); return g; }),
@@ -473,14 +473,14 @@ export function makeCharacter(THREE, opts = {}) {
     }
   }
   // brows: tapered, seeded shape
-  const browM = hairMat(hexMix(S.hair, 0x000000, 0.25), q);
+  const browM = hairMat(hexMix(S.hair, 0x000000, 0.55), q);
   const BR = S.face.browShape;
   for (const sx of [-1, 1]) {
     const by = (sx < 0 ? A.browL : A.browR);
     const xs = [0.10 + BR.gap, 0.24, 0.38, 0.47 + 0.08 * BR.len];
     const ys = [0.235, 0.27 + 0.03 * BR.arch, 0.275 + 0.035 * BR.arch, 0.235 - 0.03 * BR.tail];
     const pts = xs.map((x, i) => { const y = ys[i] + by; const p = surf(shape, sx * x, y, Math.sqrt(Math.max(0.05, 1 - x * x - y * y))); return p.add(p.clone().normalize().multiplyScalar(0.0012)); });
-    const curve = new T.CatmullRomCurve3(pts), tub = 14, rad = 6, base = (fem ? 0.0029 : 0.0041) * BR.thick;
+    const curve = new T.CatmullRomCurve3(pts), tub = 14, rad = 6, base = (fem ? 0.0047 : 0.0064) * BR.thick;
     const tg = new T.TubeGeometry(curve, tub, base, rad); const P = tg.attributes.position;
     for (let i = 0; i <= tub; i++) { const cp = curve.getPointAt(i / tub), tt = i / tub, k = mix(1, 0.3, Math.pow(tt, 1.6)) * (tt < 0.08 ? 0.8 : 1);
       for (let j = 0; j <= rad; j++) { const vi = i * (rad + 1) + j; const ox = P.getX(vi) - cp.x, oy = P.getY(vi) - cp.y, oz = P.getZ(vi) - cp.z;
@@ -534,8 +534,8 @@ export function makeCharacter(THREE, opts = {}) {
         const c = add(headPivot, cardG, cm, o[0] * k, o[1] * k, o[2] * k); c.castShadow = false;
         n.set(o[0], o[1], o[2]).normalize(); c.quaternion.setFromUnitVectors(Z, n);
         const L = (S.style === 'caesar' ? 0.022 : 0.034) + rr() * 0.028;
-        c.rotateZ(Math.atan2(nx, ny) * 0.0 + (rr() - 0.5) * 0.7 + (nz < 0 ? Math.PI : 0) * 0); c.rotateX(-0.35 - rr() * 0.4);
-        c.scale.set(0.022 + rr() * 0.02, L, 1);
+        c.rotateZ(Math.atan2(nx, ny) * 0.0 + (rr() - 0.5) * 0.7 + (nz < 0 ? Math.PI : 0) * 0); c.rotateX(-0.06 - rr() * 0.12);   /* 20261030ac: lie flat with the comb, no frizz */
+        c.scale.set(0.032 + rr() * 0.024, L, 1);
       }
     }
     if (S.style === 'bun') { const b = add(headPivot, earB, hairM, 0, 0.06, -0.1); b.scale.set(0.038, 0.034, 0.034); }
@@ -602,7 +602,7 @@ export function makeCharacter(THREE, opts = {}) {
     if (neck === 'scarf') { const b = add(torso, cached(geoCache, 'scarf', () => new T.TorusGeometry(0.06, 0.016, 8, 20)), tieM, 0, 0.47, 0.01); b.rotation.x = 1.4; }
   }
   // collar
-  const col = add(torso, cached(geoCache, 'collar', () => new T.TorusGeometry(0.054, 0.0065, 10, 32)), shirtM, 0, 0.505, 0.0); col.rotation.x = Math.PI / 2 - 0.25;
+  const col = add(torso, cached(geoCache, 'collar', () => new T.TorusGeometry(0.056, 0.011, 10, 32)), shirtM, 0, 0.505, 0.0); col.rotation.x = Math.PI / 2 - 0.25;
   // skirt / dress lower
   if (bottom !== 'trousers') {
     // per-person copy: its vertices are skinned to the two thigh bones every frame (see skinSkirt)
