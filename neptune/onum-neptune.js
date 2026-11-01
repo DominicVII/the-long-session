@@ -1401,8 +1401,8 @@
     if (MODE === "game") {
       const l = (c.r + c.g + c.b) / 3, k = 1.55 + 0.55 * Math.max(0, l - 0.45) / 0.45;
       c.r = Math.pow(c.r, k);
-      c.g = Math.pow(c.g, k + 0.12);
-      c.b = Math.pow(c.b, k + 0.16);
+      c.g = Math.pow(c.g, k + 0.09);
+      c.b = Math.pow(c.b, k + 0.12);   /* 20261030aw: lighter tones less orange */
     }
     return c;
   }
@@ -2165,7 +2165,7 @@ function vC(h, k) { const l = (((h >> 16) & 255) * 0.3 + ((h >> 8) & 255) * 0.59
     const longB = bottom === "dress" || bottom === "robe" || bottom === "robe_knee";
     const dressM = clothMat(S.dress != null ? S.dress : bottom === "dress" ? hexMix(S.suit, 6953514, 0.4) : S.suit, q);
     const shoeM = leatherMat(fem ? 1709076 : S.seed % 3 ? 1315346 : 3809300, q);
-    const hoseM = stdMat("hose" + S.skin, { color: lin(hexMix(S.skin, 2759960, 0.25)), roughness: 0.45 });
+    const hoseM = stdMat("hose2" + S.skin, { color: linSkin(hexMix(S.skin, 0x3a2a24, 0.15)), roughness: 0.5 });   /* 20261030aw: legs share the face's skin tone (linSkin), sheer hose, not orange-tan */
     const tieM = clothMat(S.tie, q, "suit_wool", 3);
     const bkey = (fem ? "f" : "m") + Math.round(B * 10) + q;
     const bw = 0.88 + 0.12 * B;
@@ -2512,7 +2512,7 @@ function vC(h, k) { const l = (((h >> 16) & 255) * 0.3 + ((h >> 8) & 255) * 0.59
           f.rotation.y = 0;
           wr.add(f);
           const m = add(f, fg, skinM, 0, 0, 0, faceFine);
-          m.scale.set(1.32, [0.9, 1, 0.97, 0.78][k] * 1.05, 1.25); f.rotation.x = -0.62 - 0.16 * k; /* 20261030au: resting finger curl, not mitts */ f.position.z *= 0.96;   /* 20261030al: relaxed curled digits, not splayed */   /* 20261030aj: distinct splayed digits */   /* 20261030ah: thicker fingers read as fingers, not nubs */
+          m.scale.set(1.1, [0.9, 1, 0.97, 0.78][k] * 1.0, 1.06) /* 20261030aw: slimmer fingers, no oversized hands */; f.rotation.x = -0.62 - 0.16 * k; /* 20261030au: resting finger curl, not mitts */ f.position.z *= 0.96;   /* 20261030al: relaxed curled digits, not splayed */   /* 20261030aj: distinct splayed digits */   /* 20261030ah: thicker fingers read as fingers, not nubs */
           f.rotation.z = -sx * 0.12;
           fingers.push(f);
         }

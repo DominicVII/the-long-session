@@ -346,3 +346,13 @@ Headless close-ups (Senate floor, 0.6 m faces and 3.2 m bodies) showed what actu
 - Contact shadow: soft footprint 0.95 x 0.8 m, core 0.6 alpha, no halo, grows at most 1.3x with distance, single material (contactmat5).
 - QA: QA ran in headless swiftshader. It boots past onboarding, enters the Senate, and the camera tracks a figure (scene.onBeforeRender). No page errors; all 5 inline scripts pass node --check. Smooth skin, distinct tones and varied hair colours are confirmed in the close-ups.
 - Left: light shirts still show faint fold stripes from x30ClothShader; side hair cards can still fan on long styles; brow tubes on grey-haired men are still broad at 0.6 m.
+
+## 20261030aw (on av): stripes, splotchy skin, hands and legs
+Dominic's screenshot of the East Steps (build au) showed a woman in a white blouse and an olive skirt with wavy zebra lines, a reddish-brown splotchy face, dark oversized hands and orange-tan legs.
+- The zebra lines were not a texture. They were x30ClothShader's procedural "drape folds" (sine bands that darkened cloth by up to 30%, plus 22% and 24% bands). Those are cut to 5% / 0 / 7%, the hem shadow goes 0.78 -> 0.9, the cloth key 0.4-1.26 -> 0.62-1.15 and the cloth AO 0.55 -> 0.7. Program key aw30cloth.
+- Skin shader: the capillary mottle (ym) and the warm/cool patchwork (yz) were large red and grey blotches. Both are now near-flat. Red shadow bleed is halved, skin roughness goes 0.56 -> 0.68 (matte, not plastic), and the program key is y30skin3.
+- Body skin map (w30Skin) blotches are cut to about a third, so hands and necks match the face.
+- Legs: hose used lin() (the cloth colour path) and came out orange-tan. It now uses linSkin with a 15% sheer tint (hose2).
+- deepenSkin: green/blue exponents +0.12/+0.16 -> +0.09/+0.12, so light tones are less orange.
+- Fingers 1.32x1.25 -> 1.1x1.06 thick.
+- QA: headless Senate close-ups are clean (shirts white, no stripes, even matte skin across tones). No page errors.

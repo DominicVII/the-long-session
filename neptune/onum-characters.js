@@ -38,7 +38,7 @@ const DEEPEN = 1.55;
 function deepen(c) { if (MODE === 'game') { c.r = Math.pow(c.r, DEEPEN); c.g = Math.pow(c.g, DEEPEN); c.b = Math.pow(c.b, DEEPEN); } return c; }
 function lin(hex) { const c = new T.Color(hex); return MODE === 'linear' ? c.convertSRGBToLinear() : deepen(c); }
 // skin needs more of the way: raw, the light tones carried so much green and blue that they lit up white
-function deepenSkin(c) { if (MODE === 'game') { const l = (c.r + c.g + c.b) / 3, k = 1.55 + 0.55 * Math.max(0, l - 0.45) / 0.45; c.r = Math.pow(c.r, k); c.g = Math.pow(c.g, k + 0.12); c.b = Math.pow(c.b, k + 0.16); } return c; }   // light tones get the most correction, deep tones the least
+function deepenSkin(c) { if (MODE === 'game') { const l = (c.r + c.g + c.b) / 3, k = 1.55 + 0.55 * Math.max(0, l - 0.45) / 0.45; c.r = Math.pow(c.r, k); c.g = Math.pow(c.g, k + 0.09); c.b = Math.pow(c.b, k + 0.12);   /* 20261030aw: lighter tones less orange */ } return c; }   // light tones get the most correction, deep tones the least
 function linSkin(hex) { const c = new T.Color(hex); return MODE === 'linear' ? c.convertSRGBToLinear() : deepenSkin(c); }
 function texEnc(t) { if (MODE === 'linear') { if ('colorSpace' in t && T.SRGBColorSpace) t.colorSpace = T.SRGBColorSpace; else t.encoding = T.sRGBEncoding; } return t; }
 
@@ -433,7 +433,7 @@ export function makeCharacter(THREE, opts = {}) {
   const longB = bottom === 'dress' || bottom === 'robe' || bottom === 'robe_knee';
   const dressM = clothMat(S.dress != null ? S.dress : bottom === 'dress' ? hexMix(S.suit, 0x6a1a2a, 0.4) : S.suit, q);
   const shoeM = leatherMat(fem ? 0x1a1414 : (S.seed % 3 ? 0x141212 : 0x3a2014), q);
-  const hoseM = stdMat('hose' + S.skin, { color: lin(hexMix(S.skin, 0x2a1d18, 0.25)), roughness: 0.45 });
+  const hoseM = stdMat('hose2' + S.skin, { color: linSkin(hexMix(S.skin, 0x3a2a24, 0.15)), roughness: 0.5 });   /* 20261030aw: legs share the face's skin tone (linSkin), sheer hose, not orange-tan */
   const tieM = clothMat(S.tie, q, 'suit_wool', 3);
   const bkey = (fem ? 'f' : 'm') + Math.round(B * 10) + q;            // body geometry bucket (shared)
   const bw = 0.88 + 0.12 * B;                                            // width factor
@@ -641,7 +641,7 @@ export function makeCharacter(THREE, opts = {}) {
     if (QQ.fingers) {
       const fg = cached(geoCache, 'finger', () => limb(0.075, [0.0085, 0.008, 0.007, 0.006], 8));
       for (let k = 0; k < 4; k++) { const f = new T.Group(); f.position.set(0, -0.09, (k - 1.5) * 0.019); f.rotation.y = 0; wr.add(f);
-        const m = add(f, fg, skinM, 0, 0, 0, faceFine); m.scale.set(1.32, [0.9, 1, 0.97, 0.78][k] * 1.05, 1.25); f.rotation.x = -0.62 - 0.16 * k; /* 20261030au: resting finger curl, not mitts */ f.position.z *= 0.96;   /* 20261030al: relaxed curled digits, not splayed */   /* 20261030aj: distinct splayed digits */   /* 20261030ah: thicker fingers read as fingers, not nubs */ f.rotation.z = -sx * 0.12; fingers.push(f); }
+        const m = add(f, fg, skinM, 0, 0, 0, faceFine); m.scale.set(1.1, [0.9, 1, 0.97, 0.78][k] * 1.0, 1.06) /* 20261030aw: slimmer fingers, no oversized hands */; f.rotation.x = -0.62 - 0.16 * k; /* 20261030au: resting finger curl, not mitts */ f.position.z *= 0.96;   /* 20261030al: relaxed curled digits, not splayed */   /* 20261030aj: distinct splayed digits */   /* 20261030ah: thicker fingers read as fingers, not nubs */ f.rotation.z = -sx * 0.12; fingers.push(f); }
       const th = new T.Group(); th.position.set(sx * -0.0, -0.03, 0.03); th.rotation.set(-0.6, 0, -sx * 0.3); wr.add(th);
       add(th, fg, skinM, 0, 0, 0, faceFine).scale.set(1.15, 0.75, 1.15); fingers.push(th);
     }
