@@ -335,3 +335,14 @@ Verdict: lids, lash line, lips and ears now read at Senate mid-shot. Faces still
 - Neptune visuals only; no main render loop / SSAO edits (JUPITER ap).
 - QA /workspace/neptune-qa-30au (copy qa-30au/): stamp 20261030au, no errors, idle pin 6.7% f0-f1. cmp-*-at-vs-au.png.
 - Verdict: **FAIL** - floor still reads figurine/diorama at 6-10 m. Not done: hair part line/crown contrast, seated mix (scene-driven), weight shift, face AO/SSS. Next: **av**.
+
+## 20261030av (on au 287616c): skin and looks
+Headless close-ups (Senate floor, 0.6 m faces and 3.2 m bodies) showed what actually read as figurine. It was not the geometry. The surfaces stacked up: pore normals ran about 4x (0.12 module x 4.0 game pass, plus the shader micro-bump), skin was desaturated to 54% and every tone went the same muddy red-brown, nearly everyone had white hair (age grey ramp mixed to 0xc8c4bc, then vC pushed light values toward 0xf4f0e8), brows were black caterpillars, shirts and light suits were zebra-striped wool, and every figure stood on a black disc with a halo that grew to 4 m wide.
+- Skin (module): head pore normal 0.8 -> 0.42, mottle 0.06 -> 0.04, painted plane/AO shading kept at 72% strength (ysv), painted brow/lash bands 1.15/1.05 -> 0.78/0.9; body skin normal 0.14 -> 0.07. Cache key headskin8.
+- Skin (game pass, all 5 HTML): normal multiplier 4.0/2.2 -> 1.6/1.4; HSL s x0.54 l x0.9 -> s x0.82 l x0.96 (tones stay apart); albedo pore step 0.92 -> 0.97; micro-bump 0.08/0.05 -> 0.025/0.02; desaturation 0.86 -> 0.94; grazing darkening, key multiply and directional AO softened (0.58 -> 0.8, 0.58 -> 0.72, 0.55 -> 0.68). Body speckle alpha halved. Program key y30skin2.
+- Hair: an explicit look.hair colour now stands (auto-grey x0.3), greying starts later (a01 0.5) and goes to pewter 0x9c978e, not white. vC pushes light values only 40% as far, toward 0xd6d0c4. Strand cards are combed (back over the crown, down the sides), longer than wide (w 0.028-0.044), lie flatter, shorter at the temples. Card sheen 0.22 -> 0.12.
+- Brows: tube x2.3 -> x1.3, colour 78% -> 55% toward black.
+- Cloth: wool normal 2.2 -> 1.2 (game pass x2.0 -> x1.3), AO map 1.0 -> 0.55. Shirts get their own smooth cotton (normal 0.35, AO 0.2).
+- Contact shadow: soft footprint 0.95 x 0.8 m, core 0.6 alpha, no halo, grows at most 1.3x with distance, single material (contactmat5).
+- QA: QA ran in headless swiftshader. It boots past onboarding, enters the Senate, and the camera tracks a figure (scene.onBeforeRender). No page errors; all 5 inline scripts pass node --check. Smooth skin, distinct tones and varied hair colours are confirmed in the close-ups.
+- Left: light shirts still show faint fold stripes from x30ClothShader; side hair cards can still fan on long styles; brow tubes on grey-haired men are still broad at 0.6 m.

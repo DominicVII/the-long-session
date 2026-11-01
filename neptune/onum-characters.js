@@ -67,7 +67,7 @@ function heightToNormal(W, H, h, str) { const n = new Float32Array(W * H * 4);
 // Cached per skin tone x sex x beard-shadow x quality (not per person) to keep memory flat.
 function headSkinMat(S, q) {
   const shadow = S.fem ? 0 : (S.beard === 'full' || S.beard === 'short') ? 0.6 : S.beard === 'stubble' ? 1 : 0.45;
-  const key = 'headskin7' + S.skin + (S.fem ? 'f' : 'm') + shadow + q + MODE;
+  const key = 'headskin8' + S.skin + (S.fem ? 'f' : 'm') + shadow + q + MODE;
   return cached(matCache, key, () => {
     const W = q === 'high' ? 512 : q === 'med' ? 256 : 128, H = W / 2, base = deepenSkin(new T.Color(S.skin));
     const dark = (base.r + base.g + base.b) / 3 < 0.45;
@@ -87,12 +87,12 @@ function headSkinMat(S, q) {
       r *= 1 + 0.05 * red * rk; g *= 1 - 0.12 * red * rk; b *= 1 - 0.10 * red * rk;
       r *= 1 - 0.10 * under; g *= 1 - 0.12 * under; b *= 1 - 0.06 * under; { const ysk = G2(ax - 0.33, ny - 0.12, 0.10) * fr, ybr = G2(ax - 0.30, ny - 0.215, 0.05) * fr, ych = G2(ax - 0.55, ny + 0.3, 0.13) * fr, yjw = sstep(-0.5, -0.85, ny) * sstep(-0.2, 0.3, nz), ytm = G2(ax - 0.75, ny - 0.15, 0.12) * fr;   /* 20261030ad: painted sockets, under-brow, cheek hollow, temple and under-jaw shade: the face holds its planes at 6-10 m */
       const yao = G2(ax - 0.17, ny - 0.1, 0.045) * fr + 0.8 * G2(ax - 0.15, ny + 0.34, 0.04) * fr + sstep(-0.62, -0.9, ny) * sstep(0.0, 0.4, nz) * 0.9;   /* 20261030af: crease occlusion (inner eye corners, nasolabial, under chin) */
-      /* 20261030ao: side/cheek face planes */ const ysh = 1 - 0.4 * sstep(0.42, 0.8, ax) * sstep(-0.45, 0.25, ny) - 0.18 * sstep(0.0, -0.3, ny) * sstep(0.22, 0.6, ax) - 0.5 * yao - 0.52 * ysk - 0.42 * ybr - 0.16 * ych - 0.16 * ytm - 0.5 * yjw - 0.22 * sstep(0.48, 0.66, ny) * sstep(-0.2, 0.4, nz) - 0.28 * G2(ax - 0.11, ny + 0.2, 0.05) * fr - 0.3 * G2(nx, ny + 0.33, 0.05) * fr;   /* 20261030ak: skin AO under brow, beside/under nose, hairline, under chin */ r *= ysh; g *= ysh * 0.985; b *= ysh * 0.99; }
+      /* 20261030ao: side/cheek face planes */ const ysh = 1 - 0.4 * sstep(0.42, 0.8, ax) * sstep(-0.45, 0.25, ny) - 0.18 * sstep(0.0, -0.3, ny) * sstep(0.22, 0.6, ax) - 0.5 * yao - 0.52 * ysk - 0.42 * ybr - 0.16 * ych - 0.16 * ytm - 0.5 * yjw - 0.22 * sstep(0.48, 0.66, ny) * sstep(-0.2, 0.4, nz) - 0.28 * G2(ax - 0.11, ny + 0.2, 0.05) * fr - 0.3 * G2(nx, ny + 0.33, 0.05) * fr;   /* 20261030ak: skin AO under brow, beside/under nose, hairline, under chin */ const ysv = 1 - 0.72 * (1 - ysh); /* 20261030av: planes kept, mud lifted */ r *= ysv; g *= ysv * 0.985; b *= ysv * 0.99; }
       { const E = (v, w) => Math.exp(-(v / w) * (v / w));   /* 20261030ae: painted feature marks in the head albedo itself, so they survive every LOD tier and 6-10 m */
         const ybw = E(ny - 0.255 - 0.03 * (0.3 - Math.abs(ax - 0.3)), 0.05) * sstep(0.07, 0.13, ax) * sstep(0.5, 0.42, ax) * fr, yln = E(ny - 0.13, 0.038) * sstep(0.2, 0.25, ax) * sstep(0.45, 0.4, ax) * fr;
         const yns = E(ax - 0.1, 0.03) * sstep(0.06, -0.04, ny) * sstep(-0.32, -0.22, ny) * fr, yun = G2(nx, ny + 0.32, 0.06) * fr, ylp = E(ny + 0.47, 0.02) * sstep(0.2, 0.12, ax) * fr, yul = G2(nx * 0.5, ny + 0.58, 0.05) * fr;
-        const yk = 1 - 1.15 * ybw - 1.05 * yln - 0.35 * G2(ax - 0.33, ny - 0.13, 0.09) * fr - 0.22 * yns - 0.22 * yun - 0.38 * ylp - 0.18 * yul; r *= yk; g *= yk * 0.97; b *= yk * 0.96; }
-      const m = 1 + mott * 0.06 - sstep(0.7, 0.9, freck) * 0.05 * (dark ? 0.3 : 1);
+        const yk = 1 - 0.78 * ybw - 0.9 * yln - 0.35 * G2(ax - 0.33, ny - 0.13, 0.09) * fr - 0.22 * yns - 0.22 * yun - 0.38 * ylp - 0.18 * yul; r *= yk; g *= yk * 0.97; b *= yk * 0.96; }
+      const m = 1 + mott * 0.04 - sstep(0.7, 0.9, freck) * 0.05 * (dark ? 0.3 : 1);
       r *= m; g *= m; b *= m;
       const bs = beard * (0.55 + 0.45 * sstep(0.35, 0.75, stub));
       r = mix(r, r * 0.62, bs * 0.55); g = mix(g, g * 0.64, bs * 0.55); b = mix(b, b * 0.72, bs * 0.55);
@@ -101,7 +101,7 @@ function headSkinMat(S, q) {
       const tz = Math.max(G2(nx, ny - 0.45, 0.3), G2(nx / 0.6, ny + 0.1, 0.18)) * fr;
       rgh[i / 4] = clamp(0.62 - tz * 0.18 + (pore - 0.5) * 0.1 + bs * 0.12);
     });
-    const nrm = heightToNormal(W, H, hgt, W / 256 * 0.8);
+    const nrm = heightToNormal(W, H, hgt, W / 256 * 0.42) /* 20261030av: pores read as skin, not orange peel */;
     const orm = new Float32Array(W * H * 4); for (let i = 0; i < W * H; i++) { orm[i * 4] = 1; orm[i * 4 + 1] = rgh[i]; orm[i * 4 + 2] = 0; orm[i * 4 + 3] = 1; }
     const mk = (cv) => { const t = new T.CanvasTexture(cv); t.anisotropy = 4; return t; };
     const m = new T.MeshStandardMaterial({ map: texEnc(mk(toCanvas(W, H, col))), normalMap: mk(toCanvas(W, H, nrm)), normalScale: new T.Vector2(0.12, 0.12),
@@ -125,14 +125,14 @@ function irisMat(hex) { return cached(matCache, 'iris' + hex + MODE, () => {
 // 20261030ab: hair strand cards. Alpha-cut clumps of strands, each its own tone, laid on the hair surface and lifted at the tips:
 // a broken, layered outline at room distance instead of a solid painted shell.
 function hairCardMat(S) {
-  return cached(matCache, 'haircard' + S.hair + MODE, () => {
+  return cached(matCache, 'haircard2' + S.hair + MODE, () => {
     const c = document.createElement('canvas'); c.width = 64; c.height = 128; const x = c.getContext('2d');
     const base = deepen(new T.Color(S.hair)); let sd = 13; const r = () => { sd = (sd * 16807) % 2147483647; return sd / 2147483647; };
     for (let i = 0; i < 60; i++) { const px = 4 + r() * 56, w = 0.8 + r() * 1.6, len = 70 + r() * 58, v = 0.55 + r() * 0.4;
       x.strokeStyle = 'rgb(' + Math.min(255, base.r * 255 * v | 0) + ',' + Math.min(255, base.g * 255 * v | 0) + ',' + Math.min(255, base.b * 255 * v | 0) + ')';
       x.lineWidth = w; x.beginPath(); x.moveTo(px, 0); x.quadraticCurveTo(px + (r() - 0.5) * 10, len * 0.5, px + (r() - 0.5) * 14, len); x.stroke(); }
     { x.globalCompositeOperation = 'source-atop'; const gr = x.createLinearGradient(0, 0, 0, 128);   /* 20261030ae: fake anisotropic sheen band + dark roots: clumps read as hair, not slabs */
-      gr.addColorStop(0, 'rgba(0,0,0,0.45)'); gr.addColorStop(0.28, 'rgba(255,240,215,0.22)'); gr.addColorStop(0.42, 'rgba(255,240,215,0)'); gr.addColorStop(1, 'rgba(0,0,0,0.25)');
+      gr.addColorStop(0, 'rgba(0,0,0,0.45)'); gr.addColorStop(0.28, 'rgba(255,240,215,0.12)'); gr.addColorStop(0.42, 'rgba(255,240,215,0)'); gr.addColorStop(1, 'rgba(0,0,0,0.25)');
       x.fillStyle = gr; x.fillRect(0, 0, 64, 128); x.globalCompositeOperation = 'source-over'; }
     const t = texEnc(new T.CanvasTexture(c));
     return new T.MeshStandardMaterial({ color: 0xffffff, map: t, alphaTest: 0.45, side: T.DoubleSide, roughness: 0.88, metalness: 0 });
@@ -236,15 +236,15 @@ function hairNormal(S) { return cached(texCache, 'hair' + S, () => (() => { cons
 // ---------- materials ----------
 function stdMat(key, o) { return cached(matCache, key, () => { const m = new T.MeshStandardMaterial(o); m.name = 'onumc:' + key; return m; }); }
 function skinMat(hex, q) { return cached(matCache, 'skin' + hex + q, () => { const m = new T.MeshStandardMaterial({ color: linSkin(hex), roughness: 0.4, metalness: 0,
-  normalMap: skinNormal(q === 'high' ? 512 : 256), normalScale: new T.Vector2(0.14, 0.14) });
+  normalMap: skinNormal(q === 'high' ? 512 : 256), normalScale: new T.Vector2(0.07, 0.07) }); /* 20261030av: smooth body skin */
   gameSkin(m, hex); m.name = 'onumc:skin'; return m; }); }
 function hairMat(hex, q) { return cached(matCache, 'hair' + hex + q, () => new T.MeshStandardMaterial({ color: lin(hex), roughness: 0.62, metalness: 0,
   normalMap: hairNormal(q === 'high' ? 512 : 256), normalScale: new T.Vector2(0.3, 0.3) })); }
 // cloth in any colour: wool normal + roughness/AO from onum-materials, colour ours
-function clothMat(hex, q, name = 'suit_wool', rep = 1) { return cached(matCache, 'cloth' + name + hex + q + rep, () => {
+function clothMat(hex, q, name = 'suit_wool', rep = 1, ns = 1.2) { return cached(matCache, 'cloth' + name + hex + q + rep + ns, () => {
   if (MODE === 'linear' && name === 'suit_wool' && hex === 0x1a2744) return makeMaterial('suit_wool', T, { repeat: rep, quality: Q[q].tex, physical: false });
   const tx = getTextures(name, T, { repeat: rep, quality: Q[q].tex });
-  return new T.MeshStandardMaterial({ color: lin(hex), normalMap: tx.normalMap, roughnessMap: tx.ormMap, aoMap: tx.ormMap, normalScale: new T.Vector2(2.2, 2.2), aoMapIntensity: 1, roughness: 1, metalness: 0 }); }); }
+  return new T.MeshStandardMaterial({ color: lin(hex), normalMap: tx.normalMap, roughnessMap: tx.ormMap, aoMap: tx.ormMap, normalScale: new T.Vector2(ns, ns) /* 20261030av: weave, not stripes */, aoMapIntensity: ns < 1 ? 0.2 : 0.55, roughness: 1, metalness: 0 }); }); }
 function leatherMat(hex, q) { return cached(matCache, 'leather' + hex + q, () => { const tx = getTextures('leather', T, { repeat: 1, quality: Q[q].tex });
   return new T.MeshStandardMaterial({ color: lin(hex), normalMap: tx.normalMap, normalScale: new T.Vector2(0.5, 0.5), roughness: 0.32, metalness: 0 }); }); }
 
@@ -392,11 +392,11 @@ function rollSpec(o) {
   const outfitR = pickC(fem ? OUTFITS.slice(4) : OUTFITS.slice(0, 4)), outfit = o.outfit || outfitR;
   const style = o.hair || pick(fem ? ['bob', 'long', 'bun', 'bob', 'short', 'curls'] : (a01 > 0.55 ? ['receding', 'bald_fringe', 'side_part', 'short', 'caesar'] : ['short', 'side_part', 'caesar', 'buzz', 'curls']));
   const baseHair = o.hairColor != null ? o.hairColor : (skin <= 0xd9ab84 && skin >= 0x9c6b45 ? pick(HAIRS) : skin < 0x9c6b45 ? pick([0x14100d, 0x1f1712, 0x2f2318]) : pick(HAIRS));
-  const grey = clamp((a01 - 0.35) * 1.6 + (r() - 0.5) * 0.3);
+  const grey = clamp((a01 - 0.5) * 1.5 + (r() - 0.5) * 0.3) * (o.hairColor != null ? 0.3 : 1);   /* 20261030av: the chosen hair colour stands; greying is later and pewter, not white */
   return {
     fem, age, a01, skin: hexMix(skin, [0xd07060, 0xb09060, 0x806050][r() * 3 | 0], 0.12), build,   /* 20261030at: per-person skin tint */ outfit, style, glasses: o.glasses ?? r() < 0.25 * (0.5 + a01), beard: normBeard(o.beard, fem, r, a01),
     height: o.height || (fem ? 1.56 + r() * 0.18 : 1.68 + r() * 0.2),
-    hair: vC(hexMix(baseHair, 0xc8c4bc, grey * 0.9), 0.3), eye: o.eye || pick(EYES),
+    hair: vC(hexMix(baseHair, 0x9c978e, grey * 0.8), 0.22), eye: o.eye || pick(EYES),
     suit: vC((s => o.suitColor ?? s)(pickC(SUITS)), 0.06 + r() * 0.24), shirt: (s => o.shirtColor ?? s)(pickC(SHIRTS)), tie: (s => o.tieColor ?? s)(pickC(TIES)), dress: o.dressColor,
     face: ((F) => o.face ? Object.assign(F, o.face) : F)({ faceW: fem ? 0.92 + r() * 0.08 : 0.98 + r() * 0.08, jaw: fem ? 0.80 + r() * 0.1 : 0.92 + r() * 0.14, brow: fem ? 0.6 + r() * 0.3 : 0.9 + r() * 0.4,
       nose: fem ? 0.82 + r() * 0.25 : 0.95 + r() * 0.35, cheek: 0.8 + r() * 0.5, chin: 0.7 + r() * 0.6, lip: fem ? 1.1 + r() * 0.2 : 0.85 + r() * 0.2, age: a01,
@@ -408,7 +408,7 @@ function rollSpec(o) {
   };
 }
 
-function vC(h, k) { const l = (((h >> 16) & 255) * 0.3 + ((h >> 8) & 255) * 0.59 + (h & 255) * 0.11) / 255; return hexMix(h, l < 0.42 ? 0x000000 : 0xf4f0e8, k); }   /* 20261030as: push hair/cloth value away from mid so it reads at rug distance */
+function vC(h, k) { const l = (((h >> 16) & 255) * 0.3 + ((h >> 8) & 255) * 0.59 + (h & 255) * 0.11) / 255; return hexMix(h, l < 0.42 ? 0x000000 : 0xd6d0c4, l < 0.42 ? k : k * 0.4); }   /* 20261030av: light hair and cloth no longer pushed to white */   /* 20261030as: push hair/cloth value away from mid so it reads at rug distance */
 export function makeCharacter(THREE, opts = {}) {
   T = THREE; MODE = opts.colorMode === 'linear' ? 'linear' : 'game'; matCache = matCaches[MODE];
   const opts0 = opts; { const s0 = rollSpec({ seed: 1, ...opts }), U0 = resolveUniform(opts.uniform, s0.fem);
@@ -419,7 +419,7 @@ export function makeCharacter(THREE, opts = {}) {
   // getting update() calls at every LOD (hooking a rig mesh froze LOD 3: rig hidden -> hook never ran again)
   const hook = new T.Mesh(cached(geoCache, 'hook', () => new T.BufferGeometry().setAttribute('position', new T.Float32BufferAttribute([0, 1, 0, 0.001, 1, 0, 0, 1.001, 0], 3))),
     cached(matCache, 'hookmat', () => new T.MeshBasicMaterial({ colorWrite: false, depthWrite: false, depthTest: false }))); hook.frustumCulled = false; hook.name = 'onumc-hook';
-  root.add(hook); root.add(body); { /* 20261030ah: soft contact shadow so people sit on the rug, not float on it */ const cg = cached(geoCache, "contact", () => new T.PlaneGeometry(1, 1).rotateX(-Math.PI / 2)), cm = cached(matCache, "contactmat4", () => { const c = document.createElement("canvas"); c.width = c.height = 64; const g = c.getContext("2d"), gr = g.createRadialGradient(32, 32, 2, 32, 32, 31); gr.addColorStop(0, "rgba(0,0,0,0.97)"); gr.addColorStop(0.3, "rgba(0,0,0,0.88)"); gr.addColorStop(0.55, "rgba(0,0,0,0.5)"); gr.addColorStop(0.72, "rgba(255,226,196,0.28)"); gr.addColorStop(0.88, "rgba(255,226,196,0.12)");   /* 20261030am: warm halo ring so the dark core reads against the red rug */   /* 20261030al: near-black contact core */   /* 20261030aj: darker contact core */ gr.addColorStop(1, "rgba(0,0,0,0)"); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); return new T.MeshBasicMaterial({ name: "onumc:contact", map: new T.CanvasTexture(c), color: 0xffffff, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }); }); const cmF = cached(matCache, 'contactmatF2', () => { const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'), gr = g.createRadialGradient(32, 32, 2, 32, 32, 31); gr.addColorStop(0, 'rgba(0,0,0,1)'); gr.addColorStop(0.5, 'rgba(0,0,0,0.95)'); gr.addColorStop(0.75, 'rgba(0,0,0,0.88)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); return new T.MeshBasicMaterial({ name: 'onumc:contactF', map: new T.CanvasTexture(c), color: 0xffffff, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }); });   /* 20261030aq: darker solid contact for mid/far */ const cs = new T.Mesh(cg, cm); cs.position.y = 0.006; cs.scale.set(1.45, 1, 1.2);   /* 20261030aj: larger, reads under feet at 7-9 m */ cs.renderOrder = 1; /* 20261030ao: contact grows with camera distance so it reads mid/far on the rug */ cs.onBeforeRender = (r0, s0, cam) => { const e = cs.matrixWorld.elements, dx = cam.position.x - e[12], dz = cam.position.z - e[14], k = 1 + 1.8 * Math.min(1, Math.max(0, (Math.sqrt(dx * dx + dz * dz) - 3.5) / 7)); cs.scale.set(1.45 * k, 1, 1.2 * k); cs.material = k > 1.15 ? cmF : cm; }; cs.castShadow = false; cs.name = "onumc-contact"; root.add(cs); } body.add(rig);
+  root.add(hook); root.add(body); { /* 20261030ah: soft contact shadow so people sit on the rug, not float on it */ const cg = cached(geoCache, "contact", () => new T.PlaneGeometry(1, 1).rotateX(-Math.PI / 2)), cm = cached(matCache, "contactmat5", () => { const c = document.createElement("canvas"); c.width = c.height = 64; const g = c.getContext("2d"), gr = g.createRadialGradient(32, 32, 2, 32, 32, 31); gr.addColorStop(0, "rgba(0,0,0,0.6)"); gr.addColorStop(0.35, "rgba(0,0,0,0.4)"); gr.addColorStop(0.7, "rgba(0,0,0,0.12)");   /* 20261030av: soft footprint, not a black disc with a halo */   /* 20261030am: warm halo ring so the dark core reads against the red rug */   /* 20261030al: near-black contact core */   /* 20261030aj: darker contact core */ gr.addColorStop(1, "rgba(0,0,0,0)"); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); return new T.MeshBasicMaterial({ name: "onumc:contact", map: new T.CanvasTexture(c), color: 0xffffff, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }); }); const cmF = cached(matCache, 'contactmatF2', () => { const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'), gr = g.createRadialGradient(32, 32, 2, 32, 32, 31); gr.addColorStop(0, 'rgba(0,0,0,1)'); gr.addColorStop(0.5, 'rgba(0,0,0,0.95)'); gr.addColorStop(0.75, 'rgba(0,0,0,0.88)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); return new T.MeshBasicMaterial({ name: 'onumc:contactF', map: new T.CanvasTexture(c), color: 0xffffff, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }); });   /* 20261030aq: darker solid contact for mid/far */ const cs = new T.Mesh(cg, cm); cs.position.y = 0.006; cs.scale.set(0.95, 1, 0.8);   /* 20261030aj: larger, reads under feet at 7-9 m */ cs.renderOrder = 1; /* 20261030ao: contact grows with camera distance so it reads mid/far on the rug */ cs.onBeforeRender = (r0, s0, cam) => { const e = cs.matrixWorld.elements, dx = cam.position.x - e[12], dz = cam.position.z - e[14], k = 1 + 0.3 * Math.min(1, Math.max(0, (Math.sqrt(dx * dx + dz * dz) - 3.5) / 7)); cs.scale.set(0.95 * k, 1, 0.8 * k); cs.material = cm; }; cs.castShadow = false; cs.name = "onumc-contact"; root.add(cs); } body.add(rig);
   root.name = 'onum-character'; const meshes = [], faceFine = [], bodyFine = [];
   const add = (parent, geo, mat, x = 0, y = 0, z = 0, list) => { const m = new T.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true;
     parent.add(m); meshes.push(m); if (list) list.push(m); return m; };
@@ -429,7 +429,7 @@ export function makeCharacter(THREE, opts = {}) {
     sleek: [1, 0, 'open', 'trousers'], sleek_f: [1, 0, 'open', 'trousers'] }[S.outfit] || [1, 0, 'tie', 'trousers'];
   const [jacket, vest, neck, bottom] = W;
   const skinM = skinMat(S.skin, q), hairM = hairMat(S.hair, q);
-  const suitM = clothMat(S.suit, q), shirtM = clothMat(S.shirt, q, 'suit_wool', 4);
+  const suitM = clothMat(S.suit, q), shirtM = clothMat(S.shirt, q, 'suit_wool', 4, 0.35);   /* 20261030av: shirting is smooth cotton, not ribbed wool */
   const longB = bottom === 'dress' || bottom === 'robe' || bottom === 'robe_knee';
   const dressM = clothMat(S.dress != null ? S.dress : bottom === 'dress' ? hexMix(S.suit, 0x6a1a2a, 0.4) : S.suit, q);
   const shoeM = leatherMat(fem ? 0x1a1414 : (S.seed % 3 ? 0x141212 : 0x3a2014), q);
@@ -483,14 +483,14 @@ export function makeCharacter(THREE, opts = {}) {
     }
   }
   // brows: tapered, seeded shape
-  const browM = hairMat(hexMix(S.hair, 0x000000, 0.78), q)   /* 20261030at: darker brows read at 8 m */;
+  const browM = hairMat(hexMix(S.hair, 0x000000, 0.55), q)   /* 20261030at: darker brows read at 8 m */;
   const BR = S.face.browShape;
   for (const sx of [-1, 1]) {
     const by = (sx < 0 ? A.browL : A.browR);
     const xs = [0.10 + BR.gap, 0.24, 0.38, 0.47 + 0.08 * BR.len];
     const ys = [0.235, 0.27 + 0.03 * BR.arch, 0.275 + 0.035 * BR.arch, 0.235 - 0.03 * BR.tail];
     const pts = xs.map((x, i) => { const y = ys[i] + by; const p = surf(shape, sx * x, y, Math.sqrt(Math.max(0.05, 1 - x * x - y * y))); return p.add(p.clone().normalize().multiplyScalar(0.0012)); });
-    const curve = new T.CatmullRomCurve3(pts), tub = 14, rad = 6, base = (fem ? 0.0047 : 0.0064) * BR.thick * 2.3; /* 20261030au: heavier brow mass for rug distance */   /* 20261030aj: brows read across the rug */
+    const curve = new T.CatmullRomCurve3(pts), tub = 14, rad = 6, base = (fem ? 0.0047 : 0.0064) * BR.thick * 1.3; /* 20261030av: brows back from caterpillar */ /* 20261030au: heavier brow mass for rug distance */   /* 20261030aj: brows read across the rug */
     const tg = new T.TubeGeometry(curve, tub, base, rad); const P = tg.attributes.position;
     for (let i = 0; i <= tub; i++) { const cp = curve.getPointAt(i / tub), tt = i / tub, k = mix(1, 0.3, Math.pow(tt, 1.6)) * (tt < 0.08 ? 0.8 : 1);
       for (let j = 0; j <= rad; j++) { const vi = i * (rad + 1) + j; const ox = P.getX(vi) - cp.x, oy = P.getY(vi) - cp.y, oz = P.getZ(vi) - cp.z;
@@ -543,9 +543,10 @@ export function makeCharacter(THREE, opts = {}) {
         shape(nx, ny, nz, o); const k = hk(nx, ny, nz, m, t) + 0.002;
         const c = add(headPivot, cardG, cm, o[0] * k, o[1] * k, o[2] * k, faceFine);   /* 20261030al: strand cards near only; far silhouette is the soft mass */ c.castShadow = false;
         n.set(o[0], o[1], o[2]).normalize(); c.quaternion.setFromUnitVectors(Z, n);
-        const L = ((S.style === 'caesar' ? 0.022 : 0.034) + rr() * 0.028) * (ny > 0.72 ? 0.45 : 1);   /* 20261030ad: short at the crown, no spikes */
-        c.rotateZ(Math.atan2(nx, ny) * 0.0 + (rr() - 0.5) * 0.7 + (nz < 0 ? Math.PI : 0) * 0); c.rotateX(-0.06 - rr() * 0.12);   /* 20261030ac: lie flat with the comb, no frizz */
-        c.scale.set(0.05 + rr() * 0.03, L * 0.85, 1);
+        const L = ((S.style === 'caesar' ? 0.022 : 0.034) + rr() * 0.028) * (ny > 0.72 ? 0.45 : ny < 0.35 ? 0.7 : 1);   /* 20261030av: shorter at the temples and sides, lying flat: no spikes off the head */   /* 20261030ad: short at the crown, no spikes */
+        { const tp = Math.min(1, Math.max(0, (ny - 0.3) / 0.5)), fl = new T.Vector3(0, -(1 - tp), -tp).normalize(), tg = fl.sub(n.clone().multiplyScalar(fl.dot(n))), dv = new T.Vector3(0, -1, 0).applyQuaternion(c.quaternion);   /* 20261030av: strands comb back over the crown and fall down the sides, not scattered scraps */
+          c.rotateZ((tg.lengthSq() > 1e-6 ? Math.atan2(n.dot(dv.clone().cross(tg)), dv.dot(tg.normalize())) : 0) + (rr() - 0.5) * 0.25); } c.rotateX(-0.02 - rr() * 0.05);   /* 20261030ac: lie flat with the comb, no frizz */
+        c.scale.set(0.028 + rr() * 0.016, L * 1.25, 1);   /* 20261030av: longer than wide: strands, not paper scraps */
       }
     }
     if (S.style === 'bun') { const b = add(headPivot, earB, hairM, 0, 0.06, -0.1); b.scale.set(0.038, 0.034, 0.034); }
