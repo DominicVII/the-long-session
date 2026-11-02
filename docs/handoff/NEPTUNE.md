@@ -356,3 +356,17 @@ Dominic's screenshot of the East Steps (build au) showed a woman in a white blou
 - deepenSkin: green/blue exponents +0.12/+0.16 -> +0.09/+0.12, so light tones are less orange.
 - Fingers 1.32x1.25 -> 1.1x1.06 thick.
 - QA: headless Senate close-ups are clean (shirts white, no stripes, even matte skin across tones). No page errors.
+
+## 20261030ax (on aw): tailoring, hair that lies on the head, bundle regenerated
+Dominic: "Max code and graphical design."
+- **Shirt V, lapels, tie (the big one):** the old shirt front was a solid loft pushed through the jacket, so its edge was torn and sawtoothed and the lapels were two flat boxes. A new `surfPatch()` (with `loftAt` and `frontPoint`) lays a patch on the jacket loft's own superellipse surface, lifted along the normal. It never cuts the cloth. From it come the shirt V (`axV*`), a lapel on each side a shade darker than the jacket (they widen to the notch and roll into the collar), and a tie that lies on the shirt with a tapered four-in-hand knot. Buttons ride the surface (`fz`).
+- **Bow tie:** two wings pinched at a knot at the collar, not a lozenge on the chest. The cravat (`scarf`) falls down the V.
+- **Women's jackets:** a blouse fills the V, and skin shows only at an open neckline (from y 0.425), not down to the waist.
+- **Shirts:** a plain cotton material (`axshirt`), with no wool normal or roughness grain (that grain was the wavy lines on white shirts). Its `onumc:` name keeps the game's stone and cloth passes off it.
+- **Hair cards:** each card curves with the skull (geometry z = -y², with scale.z = L²/0.2), so tips lie on the hair instead of spiking off it. Cards stay inside the hairline (mask >= 0.86) and light hair cards get the same 0.78 tone as the shell.
+- **Skin:** the fair-skin blush multiplier goes 1.9 -> 1.35 and the red zones are weaker (no pink patches). Cache key headskin9.
+- **Shoulders:** the cap is bigger (1.16 x 0.96 x 1.12) and bridges sleeve and jacket, so there's no step.
+- **Bundle:** `neptune/onum-neptune.js` is now regenerated from the three modules with esbuild 0.24.2 (`--bundle --format=iife --target=es2019`, entry `__entry.js` sets `window.ONUM_NEPTUNE`) instead of being hand-mirrored. Mirror drift is gone. To rebuild:
+  `printf "import * as chars from './onum-characters.js'; import * as flags from './onum-flags.js'; import * as mats from './onum-materials.js'; window.ONUM_NEPTUNE = { chars, flags, mats };" | npx esbuild@0.24.2 --bundle --format=iife --target=es2019 --sourcefile=__entry.js` (run in `neptune/`, header comment first).
+- **QA:** headless Senate and East Steps runs, with faces, bodies and a wide shot. Suits read at 3-7 m: white V, lapels, tie or bow. No page errors. Under file:// the bundle loads (NEPTUNE.mods set, not failed) and `makeCharacter` builds m/f at low/med/high (104-134 meshes), with no errors.
+- **Left:** the shirt V is flat-lit (no cloth shader on purpose); brows are still broad at 0.6 m; white hair shells are still blocky up close.
