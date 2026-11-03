@@ -52,3 +52,12 @@ Test harness on JUPITER's box: /workspace/ov (not available to you; test in a he
 - ssnPublish now emits offer, waitingOn, lastSpk (press answer path sets waitingOn="you").
 - FLOORDESK NOW strip: when it is your turn, shows only you — queue faces stay in Hands up / session list (fixes MARS QA header vs NOW mismatch after call-on).
 - Still Neptune: hide Talk on stop-toasts while onumTalkOwner(); desk right-column vs bottom band.
+
+## 20261030ap (on ao 3f44f4b) — SSAO
+- Real screen-space AO: frameBody main draw now ssaoRender(scene, camera): scene -> RT w/ DepthTexture, fullscreen composite (spiral N samples, range-checked, floor 0.35, sky skipped).
+- Default 8 samples full-res; MODEST 4 samples half-res. ?ssao=0 off, ?ssao=4|8|12; live G.ssao={on,n,r,k}. Falls back to plain render without depth textures. webglcontextrestored resets SSAO.rt.
+- Card-up/one-off renders untouched. Neptune under-form stand-in untouched (look lane decides removal).
+- MSAA lost on non-MODEST path while SSAO on. Not GPU-verified on box (headless has no GL); verify on Light/SwiftShader QA.
+- md5 session.html 5f2bac99c323e2261ec0436772edb14b · public/session.html 3d29bf94cbd5b76293c3f54997df4bb1 · ssao 5fc106d · stamp 83bc20f
+- Rebased onto aq fa3062d. Degrain (7e50b12): AO now its own half-res pass (MODEST 3/8 res), 4x4 interleaved golden-angle spiral (no per-pixel hash noise), 4-tap bilinear 4x4 box blur before multiply; k 1.0->0.55, radius 0.6->0.9, floor 0.35->0.5, soft depth onset. Knobs unchanged; GL restore still nulls SSAO.rt.
+- md5 (degrain) session.html 82be783e5a4c24d88d933f5f0b067077 · public/session.html c8f28806978b97302e6d6fcad08e5c6d
