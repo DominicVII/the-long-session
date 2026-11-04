@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261104bd">
+<meta name="onum-build" content="20261104be">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -25,7 +25,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261104bd";
+  var STAMP = "20261104be";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -10780,6 +10780,7 @@ function apAgenda(m){
 }
 function apBudget(m){ const d = G.day; if(m._apD !== d){ m._apD = d; m._apN = 0; } return m._apN < 3; }
 function apToast(m, a){
+  try{ if(G.speechApproach || (typeof CATCH !== "undefined" && (CATCH.on || CATCH.armedByInteract)) || speechStationNear(1.15)) return; }catch(e){}
   try{ if(AP.toast) AP.toast.remove(); }catch(e){}
   const w = document.createElement("div"); w.id = "apToast";
   try{ w.dataset.npc = m.id; w.dataset.name = m.name; }catch(e){}
@@ -10804,6 +10805,8 @@ function apSpeak(m, a, to){
 function apTick(){
   if(!G || !G.running || (typeof TALK !== "undefined" && TALK.open)) return;
   if(G.t - AP.last < 25) return;
+  /* 20261104be A1: no "stops you" while the stand/catch zone owns the player */
+  try{ if(G.speechApproach || (typeof CATCH !== "undefined" && (CATCH.on || CATCH.armedByInteract)) || speechStationNear(1.15)) return; }catch(e){}
   const here = everyone().filter(m => m && !m.gone && !m.ohSeat && m.room === G.room && m.x != null && apBudget(m) && !m.wantsWord && m.kind !== "player");
   if(!here.length) return;
   const m = pick(here), A = apAgenda(m); if(!A.length) return;
@@ -27502,7 +27505,7 @@ function speechBeats(kind){
 function speechStationNear(maxDist){
   /* Literal stand only. Old 3.5–5.2 m treated the aisle as the lectern
      and auto-armed CATCH while you walked past. */
-  maxDist = Math.min(maxDist === undefined ? 0.72 : maxDist, 0.85);
+  maxDist = maxDist === undefined ? 0.72 : maxDist; maxDist = maxDist <= 1.15 ? maxDist : 0.85; /* 20261104be: catch zone reaches the 1.15 m hard.dist ring (lectern collider kept you >0.85) */
   const ids = SPEECH_STATION_IDS[G.room];
   if(!ids || !G.running) return null;
   const list = PROPS[G.room] || [];
@@ -28222,8 +28225,11 @@ function catchFrame(dt){
   if(CATCH.suspended) catchResume();
   /* Don't snag while walking to the stand — approach owns the camera */
   if(G.speechApproach) return;
-  const hard = speechStationNear(0.72);
+  const hard = speechStationNear(1.15);
   const atStand = !!(hard && !playerIsMoving());
+  /* 20261104be A1: standing still in the stand zone arms the solo catch itself; Press-E is no longer required (it was stolen by adjacent members) */
+  if(atStand && !PROC.on && !CATCH.on && !CATCH.suppressed && !CATCH.armedByInteract) CATCH.armedByInteract = true;
+  if(hard || CATCH.on || CATCH.armedByInteract){ try{ if(AP.toast){ AP.toast.remove(); AP.toast = null; } }catch(e){} }
   /* Armed by E at the stand; walking off before you arrive drops it */
   if(CATCH.armedByInteract && !CATCH.on && !hard && !G.speechApproach){
     CATCH.armedByInteract = false;
@@ -28529,7 +28535,7 @@ function updatePrompt(thing, dr, seat){
   }
     /* 20261104ay+: at a speech stand, do not let an adjacent member steal the prompt for Press-E talk */
   try{
-    const hardStand = speechStationNear(0.85);
+    const hardStand = speechStationNear(1.15);
     if(hardStand && !TALK.open && !(PROC.on && PROC.phase !== "you" && !CATCH.armedByInteract)){
       if(CATCH.on || CATCH.armedByInteract || G.speechApproach || (hardStand.dist != null && hardStand.dist <= 1.15)){
         /* catchFrame / earlier branches own the glass — skip person Press-E */
