@@ -400,3 +400,7 @@ Dominic: "Max code and graphical design."
 - **Dialogue paint:** `#ndBdPaint` wraps `ss2NpcSpeak`: it captures the speech text from the `onumSessionEvent` speak call and sends it to `cabPaint` → `#ndFd` (and `vhSay`), skipping it if the desk's last line already shows that text. ba vote/argue/holdFloor, cabAsk callOn, cabShow→cabPaint, cabCallOn aside+callOn not touched.
 - **Look:** no change. Faces and bodies from the ultra stamps are already on the tip; I made no look edits without a live check.
 - **For be:** `ss2MaybeHeckle` interjections and `#ltcLog` mirroring still skip cabPaint. Next: route heckles through cabPaint(aside=true). Also a room-distance look pass, after a live screenshot.
+
+
+## 20261104be
+MARS soft FAIL fix: uxBdCss one-surface fold now also hides Ledger wire `#hmWire` (no `.wire` class) during prompt/apToast, same `display:none!important` as `.wire`.
