@@ -52,3 +52,10 @@ Test harness on JUPITER's box: /workspace/ov (not available to you; test in a he
 - ssnPublish now emits offer, waitingOn, lastSpk (press answer path sets waitingOn="you").
 - FLOORDESK NOW strip: when it is your turn, shows only you — queue faces stay in Hands up / session list (fixes MARS QA header vs NOW mismatch after call-on).
 - Still Neptune: hide Talk on stop-toasts while onumTalkOwner(); desk right-column vs bottom band.
+
+## 20261104ba — cause→effect + session flow (Dominic soft FAIL B; SESSION-FLOW A–D)
+- One module at the end of the main script (`/* ══ 20261104ba · JUPITER`). Wraps, does not replace: `reactEmit`, `kMark`, `roleDuties`, `roleDutiesHTML`, `roleDutyRun` (gappt → `appointCard`), `choiceCard` / `rolePowers` (Sign/Veto context), `rivalAdvance`, `lMorning`, `ssnNpcLine`, `cabAsk`, `cabCallOn`, `ssnNext`, `ssnTick`, `playerTyping`, `onumSession.pass/callon`; new `onumSession.callVote`.
+- `G.followUps` [{day, from, kind, title, whoId, text, wire, desk}] (saved) fired by `baFire()` from `lMorning`: wire feed + `G.reactNews` (Ledger) + `pushMail` + `remember(m)` / `m.baHook` (talk hook) + `G.baDesk` desk card (2 days).
+- Mood: `baZeit()` on desk ("The country today"); `baShiftMood` after appoint/sign/veto/state bill pushes a `zeitgeist` fad + named NPC beat.
+- Sessions: Call-on fallback report after 9s/empty LiveTalk, floor held for read time; 2–4 named exchanges before Decisions; Decisions = call → each seat casts → tally → adjourn; typing holds only when focus is in the session say-box.
+- Neptune (bb): paint `onumSession.callVote` as a "Call the vote" button in Decisions; read `m.baHook` for LiveTalk openers; desk-paint of Call-on text is yours.
