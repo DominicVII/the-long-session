@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261104bj">
+<meta name="onum-build" content="20261104bk">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -25,7 +25,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261104bj";
+  var STAMP = "20261104bk";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -47960,11 +47960,12 @@ try{
         (Q.length ? '<div><b style="color:#ffe08a">Waiting to speak</b><ol class="nsx-q">' + Q.slice(0, 8).map(q => '<li>' + esc4(nm(idOf(q), q && q.name)) + '</li>').join("") + '</ol>' + (Q.length > 8 ? '<small>and ' + (Q.length - 8) + ' more</small>' : "") + '</div>' : "") +
         (R ? '<div class="nsx-board"><div>' + (ay != null ? ay : cnt("aye") || 0) + '<small>AYE</small></div><div>' + (no != null ? no : cnt("no") || 0) + '<small>NO</small></div><div>' + (pr != null ? pr : cnt("present") || 0) + '<small>PRESENT</small></div></div>' + (R.needed ? '<div class="nsx-row"><span>Needed to carry</span><span>' + esc4(R.needed) + '</span></div>' : "") : "") +
         (S.speak ? '<div class="nsx-row"><input id="nsxSay" placeholder="Say to the chamber\u2026" style="flex:1;background:#000;color:#fff;border:1px solid #6b6f7a;border-radius:4px;padding:4px"><button type="button" id="nsxSpeak" style="background:#ffe08a;color:#111;border:0;border-radius:4px;font-weight:700;cursor:pointer">Speak</button></div>' : "") + '<div class="nsx-acts">' + (canVote ? '<button type="button" data-v="aye">Vote aye</button><button type="button" data-v="no">Vote no</button><button type="button" class="g" data-v="present">Present</button>' : "") +
-          acts.map(a => '<button type="button" class="g" data-a="' + esc4(a.id) + '">' + esc4(a.label) + '</button>').join("") + '</div></div>';
+          acts.map((a, i) => '<button type="button" class="g" data-ai="' + i + '" data-a="' + esc4(a.id) + '"' + (a.arg != null ? ' data-arg="' + esc4(a.arg) + '"' : '') + '>' + esc4(a.label) + '</button>').join("") + '</div></div>';
       const sb = P.querySelector("#nsxSpeak"); if(sb) sb.onclick = () => { const i = P.querySelector("#nsxSay"), t = i && i.value.trim(); if(!t) return; try{ (window.onumSession || {}).speak(t); }catch(e){} };
       P.querySelector("#nsxMin").onclick = () => { SN.min = !SN.min; render(); };
       P.querySelectorAll("[data-v]").forEach(b => b.onclick = () => { try{ OS.vote(b.getAttribute("data-v")); }catch(e){ try{ console.warn("onumSession.vote", e); }catch(e2){} } });
-      P.querySelectorAll("[data-a]").forEach(b => b.onclick = () => { const id = b.getAttribute("data-a"), a = acts.find(x => x.id === id); try{ const O = window.onumSession || {}; if(typeof O[id] === "function") O[id](a && a.arg); else if(typeof O.act === "function") O.act(id, a && a.arg); }catch(e){ try{ console.warn("onumSession." + id, e); }catch(e2){} } });
+      /* 20261104bk C4: several Call-on buttons share id "callon" — use data-ai / data-arg so Tennyson/Walsh are not Bray */
+      P.querySelectorAll("[data-ai]").forEach(b => b.onclick = () => { const i = +b.getAttribute("data-ai"), a = acts[i] || {id:b.getAttribute("data-a")}; const id = a.id || b.getAttribute("data-a"); let arg = a.arg; if(b.hasAttribute("data-arg")){ const raw = b.getAttribute("data-arg"); arg = raw === "" ? raw : (isNaN(+raw) ? raw : +raw); } try{ const O = window.onumSession || {}; if(typeof O[id] === "function") O[id](arg); else if(typeof O.act === "function") O.act(id, arg); }catch(e){ try{ console.warn("onumSession." + id, e); }catch(e2){} } });
     }catch(e){ try{ console.warn("NEPTUNE-SESSION render", e); }catch(e2){} }
   }
   SN.render = render;
@@ -52321,8 +52322,9 @@ function baRebut(a, b){ const t = baTopic(); return pick([baSn(b) + " talks as i
 /* A. Call on always gets words, and the floor is held until they finish */
 function baHoldFloor(p, out){ if(!SSN) return; SSN.floorId = p.id; SS2.spkUntil = Date.now() + ss2Read(out); SSN._busy = SS2.spkUntil + 800; ss2Pub();
   const tok = SSN._tok; setTimeout(() => { try{ if(SSN && SSN.floorId === p.id && SSN._tok === tok){ SSN.floorId = null; SSN._busy = 0; ss2Pub(); } }catch(e){} }, ss2Read(out) + 900); }
-{ const _ca = cabAsk; cabAsk = async function(p, you, text, kind){ if(!p || !SSN) return; const n0 = (SSN._th || []).length, gen = SSN._baGen = (SSN._baGen || 0) + 1; SSN.floorId = p.id; try{ ss2Pub(); }catch(e){}
-  /* 20261104bi: a later ask (second Call-on) supersedes this one; its 9s fallback / hold must not reclaim the floor */
+{ const _ca = cabAsk; cabAsk = async function(p, you, text, kind){ if(!p || !SSN) return; const n0 = (SSN._th || []).length; /* 20261104bk: do not bump _baGen here — cabCallOn owns supersede; capture current gen */
+  const gen = SSN._baGen || 0; SSN.floorId = p.id; try{ ss2Pub(); }catch(e){}
+  /* 20261104bi/bk: a later Call-on bumps _baGen; this ask's 9s fallback / hold must not reclaim the floor */
   const live = () => !!SSN && SSN._baGen === gen;
   let done = false; const fall = () => { if(done || !live()) return; done = true; if((SSN._th || []).length > n0) return; const out = baReport(p); try{ cabShow(p, out); }catch(e){ try{ speakAt(p, out); }catch(_){} } baHoldFloor(p, out); };
   const timer = setTimeout(fall, 9000);
