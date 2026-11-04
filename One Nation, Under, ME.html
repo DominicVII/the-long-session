@@ -27857,7 +27857,7 @@ const CATCH = {
   on:false, mode:null, sid:null, prop:null, kind:null,
   queue:[], used:null, current:null, pieces:[],
   /* age/dwell are FRAME counts — ticker drains one frame per paint, not wall-clock */
-  age:0, dwell:330, dist:99, passed:0, caught:0,
+  age:0, dwell:5500, dist:99, passed:0, caught:0,
   renderKey:"",
   /* East Steps: set true only via stump interact / approachSpeechStation; cleared in catchClear */
   armedByInteract:false,
@@ -27868,13 +27868,13 @@ const CATCH = {
 };
 const CATCH_FPS = 60; /* nominal frames for dwell mapping (display only) */
 function catchDwellForDist(dist){
-  /* 20261030ay: wall of ≥5.5s so a tap is not a race. Closer = more read time. */
+  /* 20261030ay+: wall-clock ms (≥5.5s). Independent of display refresh. */
   let sec;
   if(dist <= 2.0) sec = 7.0;
   else if(dist <= 3.5) sec = 7.0 - (dist - 2.0) * (1.0 / 1.5); /* → ~6.0 at 3.5 */
   else if(dist <= 5.2) sec = 6.0 - Math.min(0.5, (dist - 3.5) * 0.25); /* ~6.0 → 5.5 */
   else sec = 5.5;
-  return Math.max(Math.round(5.5 * CATCH_FPS), Math.round(sec * CATCH_FPS));
+  return Math.max(5500, Math.round(sec * 1000));
 }
 function catchSessionId(st, mode){
   return (mode || "speech") + "|" + G.room + "|" + (st && st.prop ? st.prop.id : "none") +
@@ -28207,7 +28207,7 @@ function catchTick(dt){
   const focused = !!(PICK >= 0 && PICKS[PICK] && pr && pr.contains(PICKS[PICK]));
   if(!(CATCH.hover || focused)){
     CATCH.dwell = catchDwellForDist(CATCH.dist == null ? 2.5 : CATCH.dist);
-    CATCH.age = (CATCH.age || 0) + 1;
+    CATCH.age = (CATCH.age || 0) + Math.max(0, (dt || 0) * 1000);
     if(CATCH.current && CATCH.age >= CATCH.dwell){
       CATCH.age = 0;
       try{ catchMiss(); }catch(e){}
@@ -28268,7 +28268,8 @@ function catchFrame(dt){
     if(!CATCH.armedByInteract && !CATCH.on){
       return;
     }
-    if(!CATCH.armedByInteract && CATCH.on && playerIsMoving()){
+    /* 20261030ay+: tiny steps at the stand must not kill an armed stream — only leave clears */
+    if(!CATCH.armedByInteract && CATCH.on && playerIsMoving() && !(hard && hard.dist <= 1.15)){
       catchClear("left");
       return;
     }
