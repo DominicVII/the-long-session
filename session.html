@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261104bh">
+<meta name="onum-build" content="20261104bi">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -25,7 +25,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261104bh";
+  var STAMP = "20261104bi";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -37668,7 +37668,7 @@ function cabPick(text){
   return seats[Math.floor(Math.random() * seats.length)];
 }
 /* 20261104bb NEPTUNE: a called-on member is seen speaking at once, as text on the floor desk, whether or not voice is invited or LiveTalk answers */
-function cabPaint(p, text, aside){ if(!p || !text) return; try{ const FD = window.NEPTUNE_FLOORDESK, D = document.getElementById("ndFd"); if(FD && typeof FD.line === "function" && D && !D.hidden){ FD.line(p.id, String(text), !!aside); const L = D.querySelector(".fd-log"), d = L && L.lastElementChild; if(d){ d._done = true; const t = d.querySelector(".t"); if(t) t.textContent = String(text); L.scrollTop = L.scrollHeight; } } }catch(e){} try{ vhSay(p, String(text)); }catch(e){} }
+function cabPaint(p, text, aside){ if(!p || !text) return; try{ const FD = window.NEPTUNE_FLOORDESK, D = document.getElementById("ndFd"); if(FD && typeof FD.line === "function" && D && !D.hidden){ const L0 = D.querySelector(".fd-log"), l0 = L0 && L0.lastElementChild, t0 = l0 && l0.querySelector(".t"); if(l0 && l0._pid === p.id && t0 && t0.textContent === String(text)) return; FD.line(p.id, String(text), !!aside); const L = D.querySelector(".fd-log"), d = L && L.lastElementChild; if(d){ d._done = true; d._pid = p.id; const t = d.querySelector(".t"); if(t) t.textContent = String(text); L.scrollTop = L.scrollHeight; } } }catch(e){} try{ vhSay(p, String(text)); }catch(e){} }
 function cabFallback(p){ const role = String((p && p.role) || "my office"); return "Chair, from " + role + ": the department is working through today\u2019s papers. Nothing needs your decision this minute beyond what is on the order paper, and I will put the detail in writing. I need the chair\u2019s support on our next request."; }
 async function cabAsk(p, you, text, kind, callOn){
   if(!p) return; const LT = window.onumLiveTalk; if(!LT || !LT.reply){ if(callOn){ const f = cabFallback(p); cabPaint(p, f); try{ tlog(p.name, f, "talk"); }catch(e){} try{ if(SSN) ssnPublish(); }catch(e){} } return; }
@@ -52310,12 +52310,16 @@ function baRebut(a, b){ const t = baTopic(); return pick([baSn(b) + " talks as i
 /* A. Call on always gets words, and the floor is held until they finish */
 function baHoldFloor(p, out){ if(!SSN) return; SSN.floorId = p.id; SS2.spkUntil = Date.now() + ss2Read(out); SSN._busy = SS2.spkUntil + 800; ss2Pub();
   const tok = SSN._tok; setTimeout(() => { try{ if(SSN && SSN.floorId === p.id && SSN._tok === tok){ SSN.floorId = null; SSN._busy = 0; ss2Pub(); } }catch(e){} }, ss2Read(out) + 900); }
-{ const _ca = cabAsk; cabAsk = async function(p, you, text, kind){ if(!p || !SSN) return; const n0 = (SSN._th || []).length; SSN.floorId = p.id; try{ ss2Pub(); }catch(e){}
-  let done = false; const fall = () => { if(done || !SSN) return; done = true; if((SSN._th || []).length > n0) return; const out = baReport(p); try{ cabShow(p, out); }catch(e){ try{ speakAt(p, out); }catch(_){} } baHoldFloor(p, out); };
+{ const _ca = cabAsk; cabAsk = async function(p, you, text, kind){ if(!p || !SSN) return; const n0 = (SSN._th || []).length, gen = SSN._baGen = (SSN._baGen || 0) + 1; SSN.floorId = p.id; try{ ss2Pub(); }catch(e){}
+  /* 20261104bi: a later ask (second Call-on) supersedes this one; its 9s fallback / hold must not reclaim the floor */
+  const live = () => !!SSN && SSN._baGen === gen;
+  let done = false; const fall = () => { if(done || !live()) return; done = true; if((SSN._th || []).length > n0) return; const out = baReport(p); try{ cabShow(p, out); }catch(e){ try{ speakAt(p, out); }catch(_){} } baHoldFloor(p, out); };
   const timer = setTimeout(fall, 9000);
   try{ await _ca.apply(this, arguments); }catch(e){}
-  clearTimeout(timer); if(!done){ if(SSN && (SSN._th || []).length > n0){ done = true; const last = SSN._th[SSN._th.length - 1]; baHoldFloor(p, last.text); } else fall(); } }; }
+  clearTimeout(timer); if(!live()) return; if(!done){ if(SSN && (SSN._th || []).length > n0){ done = true; const last = SSN._th[SSN._th.length - 1]; baHoldFloor(p, last.text); } else fall(); } }; }
 cabCallOn = function(id){ try{ const p = byId(isNaN(+id) ? id : +id); if(!p || !SSN) return false; const kind = SSN.kind;
+    /* 20261104bi C4: calling on B while A holds the floor supersedes A — cancel A's stream/rebut (tok), BA fallback (gen), hold and busy */
+    try{ SSN._tok = (SSN._tok || 0) + 1; SSN._baGen = (SSN._baGen || 0) + 1; SSN._busy = 0; SSN._arg = null; if(typeof SS2 !== "undefined" && SS2){ SS2.spkUntil = 0; } }catch(e){}
     try{ SSN.floorId = p.id; ssnPublish(); }catch(e){}
     /* keep Neptune aside + callOn so bc 25s/cabFallback + cabPaint desk path stay alive */
     try{ cabPaint(p, "rises to report…", true); }catch(e){}
