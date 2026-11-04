@@ -52,3 +52,6 @@ Test harness on JUPITER's box: /workspace/ov (not available to you; test in a he
 - ssnPublish now emits offer, waitingOn, lastSpk (press answer path sets waitingOn="you").
 - FLOORDESK NOW strip: when it is your turn, shows only you — queue faces stay in Hands up / session list (fixes MARS QA header vs NOW mismatch after call-on).
 - Still Neptune: hide Talk on stop-toasts while onumTalkOwner(); desk right-column vs bottom band.
+
+## 20261104ba (on ay+bc)
+Cause→effect follow-ups + session flow (call-on fallback, callVote, argue) stacked on Neptune bc cabAsk wrap and JUPITER ay wall-clock catch. Single wrap chain: ba wraps bc cabAsk.
