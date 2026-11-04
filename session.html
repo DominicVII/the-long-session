@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261104ay">
+<meta name="onum-build" content="20261104ba">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -25,7 +25,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261104ay";
+  var STAMP = "20261104ba";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -48969,7 +48969,7 @@ async function cabLive(p, stimulus, mode){
   let out = ""; try{ const r = await Promise.race([LT.reply({npcId:p.id, channel:"face", text:stimulus, extra:cabCtx(p, mode || ""), max:260}), new Promise(res => setTimeout(() => res(null), 60000))]); out = r && r.text ? String(r.text) : ""; }catch(e){}
   out = engWhole(engClean(out)); return out.length > 600 ? engWhole(out.slice(0, 600)) : out;
 }
-/* 20261104ay NEPTUNE: every cabinet reply paints the floor desk (cabPaint carries the bubble) */
+/* 20261104ba NEPTUNE: every cabinet reply paints the floor desk (cabPaint carries the bubble) */
 function cabShow(p, out){
   try{ speakAt(p, out); }catch(e){} try{ cabPaint(p, out); }catch(e){ try{ vhSay(p, out); }catch(x){} } try{ tlog(p.name, out, "talk"); }catch(e){} try{ lLog(p.name + ": " + out.slice(0, 160), "session"); }catch(e){}
   cabPush(p.name, out); window.__cabLast = p.id; if(SSN){ SSN.lastSpk = p.id; SS2.spkUntil = Date.now() + ss2Read(out); try{ ssnEnsure().log.push({d:G.day, kind:SSN.kind, act:"speak", who:p.name, t:out.slice(0, 120)}); }catch(e){} ss2Pub(); }
@@ -49008,7 +49008,7 @@ function cabPick(text){
   for(const [re, role] of DEPT){ if(re.test(t)){ const p = seats.find(x => role.test(String(x.role || ""))); if(p) return p; } }
   const lastP = window.__cabLast != null ? seats.find(p => String(p.id) === String(window.__cabLast)) : null; return lastP || seats[Math.floor(Math.random() * seats.length)];
 }
-/* 20261104ay NEPTUNE: re-wrap keeps the bb Call-on path: callOn replies paint the desk, and empty/timeout (25s) give the templated report */
+/* 20261104ba NEPTUNE: re-wrap keeps the bb Call-on path: callOn replies paint the desk, and empty/timeout (25s) give the templated report */
 cabAsk = async function(p, you, text, kind, callOn){
   if(!p) return; if(!SSN){ if(callOn){ const f = cabFallback(p); try{ cabPaint(p, f); }catch(e){} try{ tlog(p.name, f, "talk"); }catch(e){} } return; }
   const tok = SSN._tok = (SSN._tok || 0) + 1; SSN._arg = null; SSN._busy = Date.now() + 80000;
@@ -51989,6 +51989,163 @@ window.onumWill = {store:() => wlStore(), regard:(a, b) => wlRegard(a, b), optio
 armFrame();
 
 })();
+
+/* ══ 20261104ba · JUPITER · cause → effect, and sittings that finish what they start.
+   (1) Every desk/docket act schedules a concrete beat 1–2 days on (G.followUps): a wire line, a person who cares (remembered, so talk opens on it),
+       a letter, and a desk card. Fired from the morning (lMorning). Appointments, signatures and vetoes, feuds and the national mood each get named
+       stakes before the act and named consequences after it.
+   (2) Cabinet/council: Call on always produces words (fallback report when LiveTalk is empty or slow) and holds the floor until they finish;
+       2–4 named exchanges between secretaries before Decisions; Decisions is Call the vote → each seat casts → tally → adjourn. Typing only freezes
+       a sitting when focus is the session say-box. ══ */
+const BA = {stamp:"20261104ba"};
+function baMembers(){ return (G.members || []).filter(m => m && !m.gone && m.kind === "member"); }
+function baSn(p){ try{ return surname(p.name); }catch(e){ return String((p && p.name) || "").split(/\s+/).slice(-1)[0]; } }
+function baPick(pred){ const L = baMembers().filter(pred || (() => true)); return L.length ? L[Math.floor(Math.random() * L.length)] : null; }
+function baHome(pred){ const st = G.you && G.you.state; return baPick(m => m.state === st && (!pred || pred(m))) || baPick(pred) || baPick(); }
+function baAl(m, pos, title){ try{ return alignment(m, {pos:pos || {econ:0, lib:0, def:0, wel:0}, title:title || "act", id:"ba:" + (title || "")}); }catch(e){ return 0; } }
+function baQ(){ return (G.followUps = G.followUps || []); }
+/* {in, kind, title, whoId, text, wire, desk} */
+function baFollow(o){ const Q = baQ(); if(Q.some(x => !x.fired && x.title === o.title && x.day === G.day + (o.in || 1))) return;
+  Q.push({day:(G.day || 0) + (o.in || 1), from:G.day, kind:o.kind || "act", title:o.title, whoId:o.whoId != null ? o.whoId : null, text:o.text, wire:o.wire || o.text, desk:o.desk !== false});
+  if(Q.length > 40) Q.splice(0, Q.length - 40); }
+function baFire(){
+  const Q = baQ(), due = Q.filter(x => !x.fired && x.day <= G.day); if(!due.length) return;
+  G.baDesk = (G.baDesk || []).filter(d => d.day >= G.day - 1);
+  due.forEach((x, i) => { x.fired = G.day; const m = x.whoId != null ? byId(x.whoId) : null;
+    try{ feed(x.wire, "news"); }catch(e){}
+    try{ G.reactNews = (G.reactNews || []).concat([{t:x.wire, d:G.day}]).slice(-12); }catch(e){}
+    try{ pushMail(m ? {name:m.name, id:m.id} : null, x.title, x.text + (m ? "\n\n" + m.name + " wants a word about it. Find them, or call." : ""), {kind:"note"}); }catch(e){}
+    if(m){ try{ remember(m, x.title + ": " + x.text, 7, true); }catch(e){} m.baHook = {day:G.day, t:x.title, text:x.text, kind:x.kind}; }
+    if(x.desk) G.baDesk.push({day:G.day, key:"ba" + G.day + "_" + i, t:x.title, d:x.text, whoId:x.whoId, kind:x.kind}); });
+  if(Q.length > 40) G.followUps = Q.filter(x => !x.fired || x.fired >= G.day - 3);
+}
+/* the national mood and the fad, in words */
+function baMoodWord(v){ v = v || 0; return v > 30 ? "buoyant" : v > 10 ? "hopeful" : v > -10 ? "uneasy and watching" : v > -30 ? "sour" : "angry"; }
+function baZeit(){ const f = (G.fads || [])[0], b = G.baMood;
+  return "The country is " + baMoodWord(G.mood) + " (national mood " + ((G.mood || 0) > 0 ? "+" : "") + Math.round(G.mood || 0) + ")." + (f ? " Everyone is on about " + f.t + "." : "") + (b && b.day >= G.day - 3 ? " Since day " + b.day + ": " + b.t : ""); }
+function baShiftMood(d, beat, who){ G.mood = clamp((G.mood || 0) + d, -100, 100); G.baMood = {day:G.day, t:beat, whoId:who ? who.id : null};
+  G.fads = G.fads || []; G.fads.unshift({t:beat.replace(/\.$/, ""), k:"zeitgeist", by:who ? who.id : null, day:G.day}); if(G.fads.length > 28) G.fads.length = 28;
+  if(who) baFollow({in:1, kind:"mood", title:"The talk of the country", whoId:who.id, text:beat + " " + who.name + " has been saying so to anyone who will listen.", wire:"ZEITGEIST · " + beat}); }
+/* who stands where on an act, by name */
+function baSides(pos, title, pool){ const L = (pool || baMembers()).map(m => ({m, a:baAl(m, pos, title)})).sort((x, y) => y.a - x.a);
+  return {fr:L.length ? L.filter(x => x.a > 0).length / L.length : 0.5, sponsors:L.slice(0, 2).filter(x => x.a > 0).map(x => x.m), opponents:L.slice(-2).reverse().filter(x => x.a < 0).map(x => x.m)}; }
+function baNames(L){ return L.length ? L.map(m => m.name + (m.party ? " (" + m.party + ")" : "")).join(" and ") : "nobody on record"; }
+function baActContext(title, pos){ const s = baSides(pos, title), ov = Math.round(clamp((s.fr - 0.55) * 4, 0, 0.95) * 100);
+  return "Chamber lean: about " + Math.round(s.fr * 100) + "% of members favour it. Override odds if you veto: about " + ov + "%. Sponsors: " + baNames(s.sponsors) + ". Opponents: " + baNames(s.opponents) + ". " + baZeit(); }
+function baStateContext(S, b){ let a = 0, n = 0, u = 0; try{ const by = dkStatehouse(S, {title:b.title, pos:b.pos || {econ:b.dir * 20, lib:0, def:0, wel:0}}); Object.keys(by).forEach(p => { a += by[p].aye; n += by[p].no; u += by[p].un; }); }catch(e){}
+  const tot = a + n + u, ov = tot ? Math.round(clamp(((a + u * 0.4) / tot - 0.6) * 4, 0, 0.95) * 100) : 0, sp = baHome(m => (m.party === G.you.party)), op = baHome(m => m.party !== G.you.party);
+  return "Statehouse lean: " + a + " for, " + n + " against, " + u + " undecided. Override odds if you veto: about " + ov + "%. Sponsor: " + (sp ? sp.name : "the majority leader") + ". Loudest opponent: " + (op ? op.name : "the minority") + ". " + baZeit(); }
+/* consequences, scheduled the moment the act lands */
+{ const _re = reactEmit; reactEmit = function(kind, data, delay){ const r = _re.apply(this, arguments);
+  try{ const d = data || {}, y = G.you;
+    if(kind === "appoint"){ const sen = baPick(m => m.chamber === "senate" || /senat/i.test(String(m.post || ""))) || baHome(m => m.party !== y.party), loser = baHome(), pr = baHome(m => m.party === y.party);
+      if(d.ok){ baFollow({in:1, kind:"appoint", title:"Morning after: " + d.name, whoId:sen && sen.id, text:(sen ? sen.name : "A senator") + " is asking why " + d.name + " got the seat as " + String(d.post || "appointee").toLowerCase() + ", and who was promised it first.", wire:"APPOINTMENT · " + d.name + " takes up the post; " + (sen ? baSn(sen) : "the Senate") + " wants hearings on how it was filled."});
+        baFollow({in:2, kind:"appoint", title:"Who remembers", whoId:loser && loser.id, text:(loser ? loser.name : "Someone") + " backed another name for the post and has not forgotten. The department's first line under " + d.name + " is already in the papers.", wire:"PRESS · The first order from " + d.name + " draws a column and two letters."});
+        baShiftMood(1, "Talk of " + d.name + " as the new " + String(d.post || "appointee").toLowerCase() + ".", pr); }
+      else baFollow({in:1, kind:"appoint", title:"The seat stays open", whoId:sen && sen.id, text:(sen ? sen.name : "The opposition") + " is claiming the defeat of " + d.name + " as a win, and asking whom you will send next.", wire:"APPOINTMENT · " + d.name + " withdrawn after the vote; " + (sen ? baSn(sen) : "the opposition") + " claims it."}); }
+    if(kind === "actSigned" || kind === "actVetoed"){ const s = baSides(d.pos, d.title), sp = s.sponsors[0], op = s.opponents[0], ok = kind === "actSigned";
+      if(ok){ baFollow({in:1, kind:"sign", title:"Suit filed: " + d.title, whoId:op && op.id, text:(op ? op.name : "Its opponents") + " has backed a suit against the " + d.title + ". The bench will hear it.", wire:"COURTS · A suit against the " + d.title + " is filed; " + (op ? baSn(op) : "opponents") + " behind it."});
+        baShiftMood(ok ? 2 : -2, "Everyone is arguing about the " + d.title + ".", sp || op); }
+      else { baFollow({in:1, kind:"veto", title:"Override attempt: " + d.title, whoId:sp && sp.id, text:(sp ? sp.name + ", its sponsor," : "Its sponsors") + " is counting votes to override your veto of the " + d.title + ", and says it is personal now.", wire:"HOUSE · " + (sp ? baSn(sp) : "Sponsors") + " moves to override the veto of the " + d.title + "."});
+        if(sp){ try{ sp.rel.warmth = clamp(sp.rel.warmth - 12, -100, 100); remember(sp, "You vetoed my " + d.title + ".", 9, true); }catch(e){} baFollow({in:2, kind:"feud", title:"A sponsor's grudge", whoId:sp.id, text:sp.name + " is telling the cloakroom you killed the " + d.title + " to spite them.", wire:"CLOAKROOM · " + baSn(sp) + " on your veto: \u201cI will remember it.\u201d"}); }
+        baShiftMood(-2, "The veto of the " + d.title + " is the only thing on the radio.", op || sp); } }
+    if(kind === "stateBill"){ const sp = baHome(m => m.party === y.party), op = baHome(m => m.party !== y.party);
+      baFollow({in:1, kind:d.signed ? "sign" : "veto", title:(d.signed ? "After you signed " : "After your veto of ") + d.title, whoId:(d.signed ? op : sp) && (d.signed ? op : sp).id, text:d.signed ? (op ? op.name : "The minority") + " is taking the " + d.title + " to the state court." : (sp ? sp.name : "The majority leader") + " is whipping an override of the " + d.title + " in the statehouse.", wire:"STATEHOUSE · " + (d.signed ? "Suit filed over the " : "Override drive on the ") + d.title + "."});
+      baShiftMood(d.signed ? 1 : -1, d.state + " is talking about the " + d.title + ".", d.signed ? sp : op); }
+  }catch(e){ try{ console.warn("ba react", e); }catch(_){} } return r; }; }
+/* universal: anything done at the desk or on the docket comes back within two days */
+const BA_KEYNAME = {gbrief:"the morning briefing", gbud:"the budget", gpress:"the press availability", gdesk:"the statehouse desk", gpard:"the pardons", gemer:"the emergency file", gleg:"the legislature", gappt:"the appointment", scalls:"the calls from home", sbrief:"the staff meeting", conf:"the confirmation hearing", treaty:"the treaty", pcab:"the cabinet", bread:"the briefs"};
+{ const _km = kMark; kMark = function(key){ const was = (() => { try{ return kOnceToday(key); }catch(e){ return true; } })(); const r = _km.apply(this, arguments);
+  try{ if(!was && G.you && heldOffice() && heldOffice() !== "house" && !/^ba/.test(key) && key !== "chamber"){ const nm = BA_KEYNAME[key] || "what you did at the desk today", m = baHome();
+      baFollow({in:chance(0.5) ? 1 : 2, kind:"desk", title:"Back on " + nm, whoId:m && m.id, text:(m ? m.name : "Someone from home") + " heard about " + nm + " and has a stake in how it lands" + (m && m.state ? " in " + m.state : "") + ".", wire:"WIRE · Word of " + nm + " reaches " + ((m && m.state) || "the districts") + "; " + (m ? baSn(m) : "a member") + " is asking questions."}); } }catch(e){}
+  return r; }; }
+/* the desk carries the beats, and the country's mood */
+{ const _rd = roleDuties; roleDuties = function(){ const L = _rd.apply(this, arguments); try{ if(!L.length) return L;
+    (G.baDesk || []).filter(d => d.day >= G.day - 1).forEach(d => { const m = d.whoId != null ? byId(d.whoId) : null;
+      L.push({key:d.key, t:d.t, d:d.d, extra:true, run(){ spend(20, 2); if(m){ try{ remember(m, "The " + (typeof roleTitle === "function" ? roleTitle() : "member") + " took up " + d.t.toLowerCase() + " with me.", 5, true); m.rel.warmth = clamp(m.rel.warmth + 3, -100, 100); }catch(e){} }
+        return "You take it up: " + d.d + (m ? " " + m.name + " will hear you did, and wants to talk it through." : ""); }}); }); }catch(e){} return L; }; }
+{ const _rh = roleDutiesHTML; roleDutiesHTML = function(){ const h = _rh.apply(this, arguments); try{ if(!heldOffice() || heldOffice() === "house") return h;
+    const up = baQ().filter(x => !x.fired).slice(-3).map(x => '<div style="font-size:12px;opacity:.85">Day ' + x.day + ': ' + pcEsc(x.title) + '</div>').join("");
+    return '<div class="pc__h">The country today</div><div style="font-size:13px;margin-bottom:4px">' + pcEsc(baZeit()) + '</div>' + (up ? '<div class="pc__h">Coming back to you</div>' + up : "") + h; }catch(e){ return h; } }; }
+/* appointments from the duty list open the real choice: named candidates, backers, odds, interview */
+{ const _rr = roleDutyRun; roleDutyRun = function(key){ if(key === "gappt" && !kOnceToday("gappt")){ try{ kMark("gappt"); const ks = Object.keys(APPT).filter(k => k !== "cab"); appointCard(ks[Math.floor(Math.random() * ks.length)]); return; }catch(e){} } return _rr.apply(this, arguments); }; }
+/* before a signature or a veto: who stands where and the odds */
+{ const _cc = choiceCard; choiceCard = function(eyebrow, title, text, opts, key, mins){ try{ if((opts || []).some(o => /^(Sign|Veto)/.test(o.t || ""))){
+      const S = (G.states || []).find(s => s.n === G.you.state), b = key === "gdesk" && S && S.bill ? S.bill : null, act = !b ? (G.lastActs || []).find(a => String(title).indexOf(a.title) >= 0) : null;
+      if(b) text = text + "\n" + baStateContext(S, b); else if(act) text = text + "\n" + baActContext(act.title, act.pos); } }catch(e){}
+    return _cc.call(this, eyebrow, title, text, opts, key, mins); }; }
+{ const _rp = rolePowers; rolePowers = function(){ const P = _rp.apply(this, arguments); try{ P.forEach(p => { const m = /^(Sign|Veto): (.+)$/.exec(p.t || ""); if(!m || p._ba) return; const a = (G.lastActs || []).find(x => x.title === m[2]); if(a){ p._ba = 1; p.d = (p.d || "") + " " + baActContext(a.title, a.pos); } }); }catch(e){} return P; }; }
+/* feuds name the wrong */
+function baWrong(r, m){ if(r.why) return r.why; let t = ""; try{ const tm = topMemory(m); t = tm && tm.t ? tm.t : ""; }catch(e){}
+  const b = (G.lastActs || []).slice(-1)[0];
+  r.why = t ? "it goes back to this: \u201c" + String(t).slice(0, 120) + "\u201d" : b ? "it goes back to the " + b.title + ", which " + baSn(m) + " says you used against them" : "it goes back to the seat " + baSn(m) + " says you promised and gave away";
+  return r.why; }
+{ const _ra = rivalAdvance; rivalAdvance = function(r, news){ const st0 = r.stage, out0 = r.out; const res = _ra.apply(this, arguments);
+  try{ if(r.stage !== st0 || r.out !== out0){ const m = byId(r.id); if(m){ const why = baWrong(r, m), last = r.log[r.log.length - 1];
+      if(last && last.t.indexOf(why) < 0) last.t += " (Why: " + why + ".)";
+      const line = "LEDGER · " + m.name + " vs. " + baSn(G.you) + ": " + (last ? last.t : "the feud moves") ;
+      G.reactNews = (G.reactNews || []).concat([{t:line, d:G.day}]).slice(-12);
+      try{ remember(m, "My quarrel with " + G.you.name + ": " + why + ".", 8, true); }catch(e){}
+      const ally = baHome(x => x.id !== m.id && x.party === m.party);
+      if(!r.out) baFollow({in:1, kind:"feud", title:"The feud with " + m.name, whoId:ally ? ally.id : m.id, text:(ally ? ally.name + " is carrying " + baSn(m) + "'s side in " + (ally.state || "the district") + "; " : "") + "the grievance is plain: " + why + ".", wire:"DISTRICT · " + baSn(m) + "'s people are working " + (G.you.state || "home") + "."}); } } }catch(e){}
+  return res; }; }
+/* the morning fires what is due */
+{ const _lm = lMorning; lMorning = function(){ const r = _lm.apply(this, arguments); try{ baFire(); }catch(e){ try{ console.warn("ba fire", e); }catch(_){} } return r; }; }
+
+/* ── sittings: cabinet and council ── */
+const BA_CARE = [[/treasur/i, "the cost, and who pays it"], [/defen[cs]e|war/i, "readiness, and what the other side reads into it"], [/state\b|foreign/i, "how it plays with our neighbours"], [/attorney|justice/i, "whether it survives the courts"], [/interior|public works|roads/i, "the roads and the counties"], [/health/i, "the hospitals and the poor rolls"], [/school|education/i, "the schools"], [/safety|constab|police/i, "order on the streets"], [/labou?r/i, "the men on the line and their wages"]];
+function baCare(p){ const r = String((p && p.role) || ""); const c = BA_CARE.find(x => x[0].test(r)); return c ? c[1] : "what it does to my department"; }
+function baTopic(){ try{ return cabTopic(); }catch(e){ return "the matter before the room"; } }
+function baReport(p){ const t = baTopic(), al = (() => { try{ const b = ssnBill(); return b ? baAl(p, b.pos, b.title) : 0; }catch(e){ return 0; } })();
+  return (p.role ? p.role + ". " : "") + "On " + t + ", what I watch is " + baCare(p) + ". " + (al > 10 ? "My department can carry it, and I want it decided today." : al < -10 ? "I cannot carry it as it stands, and I want that on the record." : "I need a figure from Treasury and a decision from the chair before I commit my people."); }
+function baRebut(a, b){ const t = baTopic(); return pick([baSn(b) + " talks as if " + baCare(b) + " were the whole question. On " + t + ", I answer for " + baCare(a) + ".", "With respect to " + baSn(b) + ", I have heard that before. My department will be left holding " + t + ".", "I disagree with " + baSn(b) + ". If we move on " + t + " without settling " + baCare(a) + ", it comes back to this table in a week."]); }
+{ const _nl = ssnNpcLine; ssnNpcLine = function(m){ try{ if(cabKind()) return baReport(m); }catch(e){} return _nl.apply(this, arguments); }; }
+/* A. Call on always gets words, and the floor is held until they finish */
+function baHoldFloor(p, out){ if(!SSN) return; SSN.floorId = p.id; SS2.spkUntil = Date.now() + ss2Read(out); SSN._busy = SS2.spkUntil + 800; ss2Pub();
+  const tok = SSN._tok; setTimeout(() => { try{ if(SSN && SSN.floorId === p.id && SSN._tok === tok){ SSN.floorId = null; SSN._busy = 0; ss2Pub(); } }catch(e){} }, ss2Read(out) + 900); }
+{ const _ca = cabAsk; cabAsk = async function(p, you, text, kind){ if(!p || !SSN) return; const n0 = (SSN._th || []).length; SSN.floorId = p.id; try{ ss2Pub(); }catch(e){}
+  let done = false; const fall = () => { if(done || !SSN) return; done = true; if((SSN._th || []).length > n0) return; const out = baReport(p); try{ cabShow(p, out); }catch(e){ try{ speakAt(p, out); }catch(_){} } baHoldFloor(p, out); };
+  const timer = setTimeout(fall, 9000);
+  try{ await _ca.apply(this, arguments); }catch(e){}
+  clearTimeout(timer); if(!done){ if(SSN && (SSN._th || []).length > n0){ done = true; const last = SSN._th[SSN._th.length - 1]; baHoldFloor(p, last.text); } else fall(); } }; }
+cabCallOn = function(id){ try{ const p = byId(isNaN(+id) ? id : +id); if(!p || !SSN) return false; SSN.floorId = p.id; ssnPublish();
+    cabAsk(p, G.you, "(You call on " + p.name + " by name.) Give your report: what is going on in your department today, what needs a decision, and what you need from the chair. Two to four sentences.", SSN.kind); return true; }catch(e){ return false; } };
+{ const _co = window.onumSession.callon; window.onumSession.callon = function(id){ try{ if(cabKind()) return cabCallOn(id); }catch(e){} return _co ? _co.apply(this, arguments) : false; }; }
+/* D. before Decisions, two to four named exchanges between secretaries; B. Decisions is a called, cast, tallied vote */
+function baArgue(done){ const seats = cabSeats(); if(!SSN || seats.length < 2){ done(); return; }
+  const n = 2 + Math.floor(Math.random() * 3), tok = SSN._tok = (SSN._tok || 0) + 1; let i = 0, prev = null;
+  const a0 = seats[Math.floor(Math.random() * seats.length)], b0 = seats.filter(x => x !== a0).sort((x, y) => (y.party !== a0.party) - (x.party !== a0.party))[0];
+  try{ feed("Before the decision, " + a0.name + " and " + b0.name + " have it out.", ""); }catch(e){}
+  const step = async () => { if(!SSN || tok !== SSN._tok) return; if(i >= n){ SSN._busy = 0; SSN.floorId = null; done(); return; }
+    const sp = i % 2 ? b0 : a0, other = i % 2 ? a0 : b0; SSN._busy = Date.now() + 70000; SSN.floorId = sp.id; ss2Pub();
+    let out = ""; try{ out = await Promise.race([cabLive(sp, prev ? other.name + " has just said: \u201c" + prev + "\u201d" : "The chair wants the room's views before deciding.", "Argue the matter with " + other.name + " before the vote, in one to three sentences, by name."), new Promise(r => setTimeout(() => r(""), 9000))]); }catch(e){}
+    if(!SSN || tok !== SSN._tok) return; out = out || (i === 0 ? baReport(sp) : baRebut(sp, other)); prev = out; i++;
+    cabShow(sp, out); SSN.floorId = sp.id; SSN._busy = Date.now() + ss2Read(out) + 1200; setTimeout(step, ss2Read(out) + 700); };
+  step(); }
+function baCallVote(){ if(!SSN || !cabKind() || SSN._baVote) return false; const st = ssnStage(); if(!st || st.id !== "decisions") return false;
+  SSN._baVote = 1; const seats = cabSeats(), b = (() => { try{ return ssnBill(); }catch(e){ return null; } })(), tok = SSN._tok = (SSN._tok || 0) + 1, chair = byId(SSN.chairId);
+  const say = (p, t) => { try{ if(p){ speakAt(p, t); vhSay(p, t); } }catch(e){} try{ tlog(p ? p.name : "The chair", t, p ? "talk" : "you"); lLog((p ? p.name + ": " : "") + t, "session"); }catch(e){} };
+  say(SSN.chairId === "you" ? null : chair, "The question is on " + baTopic() + ". The secretaries will cast in turn."); SSN._busy = Date.now() + 60000; let i = 0;
+  const next = () => { if(!SSN || tok !== SSN._tok) return;
+    if(i >= seats.length){ if(SSN.votes.you == null && ss2Entitled(SSN.kind)) SSN.votes.you = "present"; ssnTally(); const R = SSN.result || {aye:0, no:0};
+      const line = "Decided, " + R.aye + " to " + R.no + ": " + (R.aye > R.no ? "carried." : "the motion fails."); say(SSN.chairId === "you" ? null : chair, line); try{ feed(line, R.aye > R.no ? "good" : "bad"); }catch(e){}
+      const m = seats.find(p => SSN.votes[p.id] === (R.aye > R.no ? "no" : "aye")); if(m) baFollow({in:1, kind:"cabinet", title:"Outvoted in " + (SSN.kind === "governor_council" ? "council" : "cabinet"), whoId:m.id, text:m.name + " lost the vote on " + baTopic() + " and is telling people why.", wire:"CAPITOL · " + baSn(m) + " was outvoted on " + baTopic() + "."});
+      SSN._busy = 0; ss2Pub(); setTimeout(() => { try{ if(SSN && tok === SSN._tok && ssnStage().id === "decisions") ssnNext(); }catch(e){} }, ss2Read(line) + 800); return; }
+    const p = seats[i++]; let v = 0; try{ v = b ? baAl(p, b.pos, b.title) : ((p.rel && p.rel.warmth) || 0) + (Math.random() * 40 - 20); }catch(e){}
+    SSN.votes[p.id] = v >= 0 ? "aye" : "no"; SSN.floorId = p.id; const t = v >= 0 ? "Aye." : "No."; say(p, t + (Math.abs(v) > 25 ? " " + (v > 0 ? "Gladly." : "And I want it minuted.") : "")); ss2Pub(); setTimeout(next, 1400); };
+  setTimeout(next, 1800); return true; }
+window.onumSession.callVote = baCallVote;
+{ const _nx = ssnNext; ssnNext = function(){ try{ if(SSN && cabKind()){ const nx = SSN.def.stages[SSN.si + 1], cur = ssnStage();
+      if(nx && nx.id === "decisions" && !SSN._baArg){ SSN._baArg = 1; const me = this, a = arguments; baArgue(() => { try{ _nx.apply(me, a); }catch(e){} }); return; }
+      if(cur && cur.id === "decisions" && !SSN._baVoted){ if(!SSN._baVote){ baCallVote(); return; } if(SSN.result == null) return; SSN._baVoted = 1; } } }catch(e){} return _nx.apply(this, arguments); }; }
+{ const _ps = window.onumSession.pass; window.onumSession.pass = function(){ try{ if(cabKind() && ssnStage().id === "decisions" && !SSN._baVote){ return baCallVote(); } }catch(e){} return _ps.apply(this, arguments); }; }
+/* C. typing freezes a sitting only when focus is the session say-box; otherwise the secretaries keep going */
+function baSayFocus(){ try{ const a = document.activeElement; if(!a || !/^(INPUT|TEXTAREA)$/.test(a.tagName)) return false; return !!(a.closest && a.closest("#ndSess,[id*=Sess],[id*=ssn],[data-ssn],[data-session]")) || /sess|ssn/i.test(a.id || "") || /sess|ssn/i.test(a.name || ""); }catch(e){ return false; } }
+{ const _pt = playerTyping; playerTyping = function(){ try{ if(SSN && cabKind() && !baSayFocus()) return false; }catch(e){} return _pt.apply(this, arguments); }; }
+{ const _tk = ssnTick; ssnTick = function(){ try{ if(SSN && cabKind()){ if(SS2.hold && !baSayFocus()) SS2.hold = false; const st = ssnStage();
+      if(st && st.id === "decisions"){ if(!SSN._baVote && !SSN._busy){ SSN._baDecAt = SSN._baDecAt || Date.now(); if(SSN.chairId !== "you" || Date.now() - SSN._baDecAt > 20000) baCallVote(); else if(!SSN._baHint){ SSN._baHint = 1; try{ note("Decisions: call the vote when you are ready (Pass also calls it)."); }catch(e){} } } return; }
+      if(st && (st.id === "briefings" || st.id === "reports") && SSN.chairId === "you" && !(SSN.roundLeft || []).length && SSN.floorId == null && !(SSN._busy && Date.now() < SSN._busy)){ SSN._baIdle = SSN._baIdle || Date.now(); if(Date.now() - SSN._baIdle > 25000){ SSN._baIdle = 0; ssnNext(); return; } } else SSN._baIdle = 0; } }catch(e){}
+  return _tk.apply(this, arguments); }; }
 </script>
 
 
