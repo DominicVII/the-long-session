@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261030ax">
+<meta name="onum-build" content="20261030ay">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -24,7 +24,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261030ax";
+  var STAMP = "20261030ay";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -202,9 +202,9 @@ body.help-held .keys{display:flex !important; opacity:1; visibility:visible}
 .prompt.is-live .prompt__btn{pointer-events:auto; cursor:pointer}
 .prompt__h{display:block; font-size:10px; letter-spacing:.12em; text-transform:uppercase;
   color:rgba(220,228,236,.72); margin:0 0 6px; font-weight:600}
-.prompt__opts{display:flex; flex-wrap:wrap; gap:5px; justify-content:center}
-.prompt__btn{font-size:11.5px; font-weight:600; background:rgba(255,255,255,.08); color:#eef1f4;
-  border:1px solid rgba(200,210,220,.28); border-radius:2px; padding:6px 9px; cursor:pointer; text-align:left; pointer-events:auto}
+.prompt__opts{display:flex; flex-wrap:wrap; gap:8px; justify-content:center}
+.prompt__btn{font-size:13px; font-weight:600; background:rgba(255,255,255,.10); color:#eef1f4;
+  border:1px solid rgba(200,210,220,.34); border-radius:4px; padding:12px 14px; min-height:44px; min-width:7.5em; cursor:pointer; text-align:left; pointer-events:auto; touch-action:manipulation}
 .prompt__btn:hover{border-color:#c9a24a; color:#fff}
 .prompt__btn u{text-decoration:none; font-family:"JetBrains Mono",monospace; font-size:9.5px;
   color:rgba(200,210,220,.55); margin-left:6px}
@@ -21444,12 +21444,20 @@ function closeTip(){ const b = el("tipCard"); if(b) b.hidden = true; }
 addEventListener("click", e => {
   const t = e.target && e.target.closest ? e.target.closest("[data-tipk]") : null;
   if(t){
+    /* During live glass / session / talk, tips do not open — they steal the first tap */
+    if(promptLive() || TALK.open || (PROC && PROC.on) || (CATCH && CATCH.on)) return;
     e.preventDefault(); e.stopPropagation();
     openTip(t.getAttribute("data-tipk"), t.getAttribute("data-tipv"));
     return;
   }
   const box = el("tipCard");
-  if(box && !box.hidden && !(e.target.closest && e.target.closest("#tipCard"))) closeTip();
+  if(box && !box.hidden && !(e.target.closest && e.target.closest("#tipCard"))){
+    if(e.target.closest && (e.target.closest("#prompt") || e.target.closest("#talk") || e.target.closest("#procBar") || e.target.closest(".prompt__btn"))){
+      closeTip();
+      return;
+    }
+    closeTip();
+  }
 });
 
 /* ══════════════════════════════════════════════════════════
@@ -23722,6 +23730,10 @@ function procStart(e){
   try{ seatPlayerInSession(); }catch(e){}
   if(chair) chair.sitting = false;        /* the chair is on their feet */
   G.running = true;                       /* the clock does not stop for this */
+  /* 20261030ay: one layer — peel tip/phone so session prompts are tappable */
+  try{ closeTip(); }catch(e){}
+  try{ if(!veil.hidden && phoneWasRunning !== null) phoneClose(); }catch(e){}
+  try{ if(PC.open) pcClose(); }catch(e){}
   el("procBar").hidden = false;
   procSetBar(procTitle(e), (chair ? surname(chair.name) : "The chair") + " is opening.");
   const open = fresh(() => (e.k === "caucus" ? "Right. Doors closed. "
@@ -27777,11 +27789,29 @@ let promptKey = "", promptActs = [];
 function promptEsc(s){
   return String(s == null ? "" : s).replace(/&/g,"\x26amp;").replace(/</g,"\x26lt;").replace(/>/g,"\x26gt;").replace(/"/g,"\x26quot;");
 }
+/* 20261030ay: live choice prompts hold so focus flicker / tip clicks do not steal the tap */
+let glassHoldUntil = 0;
+let glassHoldKey = "";
+function glassHolding(){
+  return !!(promptActs && promptActs.length && glassHoldUntil && (typeof performance !== "undefined" ? performance.now() : Date.now()) < glassHoldUntil);
+}
+function glassArmHold(ms){
+  glassHoldUntil = (typeof performance !== "undefined" ? performance.now() : Date.now()) + (ms == null ? 16000 : ms);
+}
+function glassClearHold(){ glassHoldUntil = 0; glassHoldKey = ""; }
+
 function setGlassPrompt(header, choices){
   const pr = el("prompt");
   if(!pr) return;
   const key = (header || "") + "|" + (choices || []).map(c => c.t).join(";");
-  if(key === promptKey && !pr.hidden) return;
+  if(key === promptKey && !pr.hidden){
+    if(choices && choices.length){ glassHoldKey = key; glassArmHold(16000); }
+    return;
+  }
+  /* Sticky: do not replace a live choice prompt with a bare Press-E line or a clear while hold is armed */
+  if(glassHolding() && (!choices || !choices.length) && glassHoldKey && key !== glassHoldKey){
+    return;
+  }
   promptKey = key;
   promptActs = choices || [];
   pr.classList.remove("is-catch");
@@ -27793,6 +27823,9 @@ function setGlassPrompt(header, choices){
     markPicks();
     return;
   }
+  try{ closeTip(); }catch(e){}
+  glassHoldKey = key;
+  glassArmHold(16000);
   pr.classList.add("is-live");
   pr.hidden = false;
   pr._said = key;
@@ -27805,10 +27838,13 @@ function setGlassPrompt(header, choices){
   html += "</div>";
   setHTML(pr, html);
   pr.querySelectorAll("[data-gp]").forEach(b => {
-    b.addEventListener("click", () => {
+    b.addEventListener("pointerdown", e => { try{ e.stopPropagation(); }catch(x){} });
+    b.addEventListener("click", e => {
+      try{ e.preventDefault(); e.stopPropagation(); }catch(x){}
       const act = promptActs[+b.getAttribute("data-gp")];
       if(!act) return;
       promptKey = "";
+      glassClearHold();
       act.run();
       markPicks();
     });
@@ -27821,22 +27857,24 @@ const CATCH = {
   on:false, mode:null, sid:null, prop:null, kind:null,
   queue:[], used:null, current:null, pieces:[],
   /* age/dwell are FRAME counts — ticker drains one frame per paint, not wall-clock */
-  age:0, dwell:168, dist:99, passed:0, caught:0,
+  age:0, dwell:330, dist:99, passed:0, caught:0,
   renderKey:"",
   /* East Steps: set true only via stump interact / approachSpeechStation; cleared in catchClear */
   armedByInteract:false,
   /* B / Esc backed out of speech glass — stay clear until interact / re-seat */
-  suppressed:false
+  suppressed:false,
+  /* 20261030ay: TALK/veil suspend keeps state; hover pauses age so taps are not torn */
+  suspended:false, hover:false
 };
 const CATCH_FPS = 60; /* nominal frames for dwell mapping (display only) */
 function catchDwellForDist(dist){
-  /* Frame-based window. Close = more frames to read/catch; farther = snappier. */
+  /* 20261030ay: wall of ≥5.5s so a tap is not a race. Closer = more read time. */
   let sec;
-  if(dist <= 2.0) sec = 3.2;
-  else if(dist <= 3.5) sec = 3.2 - (dist - 2.0) * (0.8 / 1.5); /* → 2.4 at edge */
-  else if(dist <= 5.2) sec = 2.0 - Math.min(0.35, (dist - 3.5) * 0.2); /* ~2.0 → 1.65 */
-  else sec = 1.6;
-  return Math.max(24, Math.round(sec * CATCH_FPS));
+  if(dist <= 2.0) sec = 7.0;
+  else if(dist <= 3.5) sec = 7.0 - (dist - 2.0) * (1.0 / 1.5); /* → ~6.0 at 3.5 */
+  else if(dist <= 5.2) sec = 6.0 - Math.min(0.5, (dist - 3.5) * 0.25); /* ~6.0 → 5.5 */
+  else sec = 5.5;
+  return Math.max(Math.round(5.5 * CATCH_FPS), Math.round(sec * CATCH_FPS));
 }
 function catchSessionId(st, mode){
   return (mode || "speech") + "|" + G.room + "|" + (st && st.prop ? st.prop.id : "none") +
@@ -27850,11 +27888,37 @@ function catchClear(reason){
   CATCH.pieces = []; CATCH.caught = 0; CATCH.passed = 0;
   CATCH.renderKey = ""; CATCH.prop = null;
   CATCH.armedByInteract = false;
+  CATCH.suspended = false; CATCH.hover = false;
   if(back) CATCH.suppressed = true;
   else if(reason !== "wait" && reason !== "ui" && reason !== "busy-clear") CATCH.suppressed = false;
   const pr = el("prompt");
   if(pr) pr.classList.remove("is-catch");
 }
+function catchSuspend(reason){
+  /* Keep stream + arm; hide glass while TALK/veil steals the frame. */
+  if(!CATCH.on && !CATCH.armedByInteract) return;
+  CATCH.suspended = true;
+  const pr = el("prompt");
+  if(pr){ pr.classList.remove("is-catch", "is-live"); }
+  try{ promptKey = ""; }catch(e){}
+}
+function catchResume(){
+  if(!CATCH.suspended) return;
+  CATCH.suspended = false;
+  /* Stay armed — do not force re-approach */
+  if(CATCH.on){
+    CATCH.renderKey = "";
+    CATCH.age = 0;
+    catchPaint();
+  }
+}
+function catchHoverBind(pr){
+  if(!pr || pr._catchHover) return;
+  pr._catchHover = true;
+  pr.addEventListener("pointerenter", () => { CATCH.hover = true; });
+  pr.addEventListener("pointerleave", () => { CATCH.hover = false; });
+}
+
 function catchShuffle(arr){
   const a = arr.slice();
   for(let i=a.length-1;i>0;i--){ const j = (Math.random()*(i+1))|0; const t=a[i]; a[i]=a[j]; a[j]=t; }
@@ -27954,6 +28018,8 @@ function catchArmCurrent(){
   CATCH.i = ((CATCH.i|0) + CATCH.deck.length) % CATCH.deck.length;
   CATCH.current = CATCH.deck[CATCH.i];
   CATCH.renderKey = "";
+  CATCH.age = 0;
+  CATCH.dwell = catchDwellForDist(CATCH.dist == null ? 2.5 : CATCH.dist);
 }
 function catchStep(d){
   if(!CATCH.on || !CATCH.deck || !CATCH.deck.length) return false;
@@ -28076,10 +28142,15 @@ function catchPaint(){
       html += "</div>";
     }
     setHTML(pr, html);
-    pr.querySelectorAll("[data-gp]").forEach(b => b.addEventListener("click", () => {
-      const act = promptActs[+b.getAttribute("data-gp")];
-      if(act) act.run();
-    }));
+    catchHoverBind(pr);
+    pr.querySelectorAll("[data-gp]").forEach(b => {
+      b.addEventListener("pointerdown", e => { try{ e.stopPropagation(); CATCH.hover = true; }catch(x){} });
+      b.addEventListener("click", e => {
+        try{ e.preventDefault(); e.stopPropagation(); }catch(x){}
+        const act = promptActs[+b.getAttribute("data-gp")];
+        if(act) act.run();
+      });
+    });
     markPicks();
     return;
   }
@@ -28117,21 +28188,45 @@ function catchPaint(){
     ' · held ' + nPieced + '</span>' +
     '</div>';
   setHTML(pr, html);
-  pr.querySelectorAll("[data-gp]").forEach(b => b.addEventListener("click", () => {
-    const act = promptActs[+b.getAttribute("data-gp")];
-    if(act) act.run();
-  }));
+  catchHoverBind(pr);
+  pr.querySelectorAll("[data-gp]").forEach(b => {
+    b.addEventListener("pointerdown", e => { try{ e.stopPropagation(); CATCH.hover = true; }catch(x){} });
+    b.addEventListener("click", e => {
+      try{ e.preventDefault(); e.stopPropagation(); }catch(x){}
+      const act = promptActs[+b.getAttribute("data-gp")];
+      if(act) act.run();
+    });
+  });
   markPicks();
 }
 function catchTick(dt){
-  if(!CATCH.on) return;
+  if(!CATCH.on || CATCH.suspended) return;
+  /* Pause the dwell clock while the pointer or pad pick is on the glass */
+  const pr = el("prompt");
+  catchHoverBind(pr);
+  const focused = !!(PICK >= 0 && PICKS[PICK] && pr && pr.contains(PICKS[PICK]));
+  if(!(CATCH.hover || focused)){
+    CATCH.dwell = catchDwellForDist(CATCH.dist == null ? 2.5 : CATCH.dist);
+    CATCH.age = (CATCH.age || 0) + 1;
+    if(CATCH.current && CATCH.age >= CATCH.dwell){
+      CATCH.age = 0;
+      try{ catchMiss(); }catch(e){}
+      try{ catchArmCurrent(); }catch(e){}
+    }
+  }
   catchPaint();
 }
 function catchFrame(dt){
-  if(!G.running || TALK.open || !veil.hidden){
+  if(!G.running){
     if(CATCH.on) catchClear("ui");
     return;
   }
+  /* 20261030ay: transient TALK/veil must not kill CATCH mid-tap — suspend + resume */
+  if(TALK.open || !veil.hidden){
+    if(CATCH.on || CATCH.armedByInteract) catchSuspend("ui");
+    return;
+  }
+  if(CATCH.suspended) catchResume();
   /* Don't snag while walking to the stand — approach owns the camera */
   if(G.speechApproach) return;
   const hard = speechStationNear(0.72);
@@ -28347,7 +28442,12 @@ function seatOutOfHand(){
 
 function updatePrompt(thing, dr, seat){
   if(!G.running || TALK.open || !veil.hidden){
+    glassClearHold();
     setGlassPrompt(null, null);
+    return;
+  }
+  /* Sticky live choices: focus flicker must not wipe buttons mid-tap */
+  if(glassHolding() && !(CATCH.on && CATCH.mode) && !(PROC.on && PROC.phase === "you" && !CATCH.suppressed)){
     return;
   }
   /* Catch stream owns the glass while active */
@@ -41531,6 +41631,7 @@ function clearSpeechBusy(reason){
   try{ catchClear(why === "back" ? "back" : "busy-clear"); }catch(e){}
   try{
     promptKey = "";
+    glassClearHold();
     const pr = el("prompt");
     if(pr){ pr.classList.remove("is-catch"); }
     /* If still in a live sitting and seated, let updatePrompt redraw seat voice */
