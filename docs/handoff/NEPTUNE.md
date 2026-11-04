@@ -394,3 +394,9 @@ Dominic: "Max code and graphical design."
 - `cabAsk(..., callOn=true)`: LiveTalk missing → templated report painted right away; LiveTalk empty/timeout (25s for Call on, 120s otherwise unchanged) → templated report. Real reply → painted on the desk + bubble (voice via `speakAt`/`speak` still only when invited).
 - Not touched: vote/tally/argue (JUPITER ba), catchDwell / setGlassPrompt / TALK.clear (JUPITER ay), az hit-target + `.prompt.is-live` CSS.
 - Gaps: desk paint only when #ndFd is visible (bubble always); no separate LiveTalk chat (#ltcLog) entry; fallback report is generic per office; headless browser boot not run this pass (all inline scripts pass `node --check`).
+
+## 20261104bd (NEPTUNE, on JUPITER ba tip 8b20ec8)
+- **One surface, tighter:** new `#uxBdCss` (appended; az `#uxAyCss` untouched). While `#prompt.is-live` or `#apToast` is up, `.notices`, `#tipCard`, `.wire` fold; `#procBar` and `.compass` dim and stop taking clicks; a live prompt dims a coexisting `#apToast` so only one surface asks. Desk/toast buttons keep min 120px wide, `#ndFd .fd-log` scroll is contained (no page jump under the finger).
+- **Dialogue paint:** `#ndBdPaint` wraps `ss2NpcSpeak`: it captures the speech text from the `onumSessionEvent` speak call and sends it to `cabPaint` → `#ndFd` (and `vhSay`), skipping it if the desk's last line already shows that text. ba vote/argue/holdFloor, cabAsk callOn, cabShow→cabPaint, cabCallOn aside+callOn not touched.
+- **Look:** no change. Faces and bodies from the ultra stamps are already on the tip; I made no look edits without a live check.
+- **For be:** `ss2MaybeHeckle` interjections and `#ltcLog` mirroring still skip cabPaint. Next: route heckles through cabPaint(aside=true). Also a room-distance look pass, after a live screenshot.
