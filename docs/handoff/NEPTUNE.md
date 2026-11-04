@@ -422,3 +422,12 @@ No abilities, no PROPS actions, no rolePowers / OFFICE_DUTIES / K_HOME_OF / dock
   - `.is-many` (>4 opts: 2-col, 40px) / `.is-lots` (>8: 36px); wheel/touchmove on `#prompt`/`#apToast` stopPropagation.
   - `#apToast` capped 100dvh-140px scroll; `#ndFd .fd-hands` 30dvh scroll; `#sxDock` dvh cap + pan-y/overscroll on `#sxDock`, fd-on panes, `#tkActs` (bl added no HUD fit, only follow-up strip styling).
 - Untouched: Consequences strip, G.baDesk, followUps, catch arm/dwell, abilities, rolePowers, cabAsk/cabCallOn, uxAyCss/uxBdCss/#hmWire.
+
+## 20261104bn — HUD QoL + polish (on bm)
+- Hit targets: `#sxDock`, `#tkActs`, `.fd-hands` buttons ≥44px; Consequences strip `.nsx-fu` buttons ≥40px; `#prompt.is-lots` floor raised 36→40px (bm scroll/compress kept).
+- Desk: `#ndFd .fd-log` capped at 38dvh with its own scroll, 14px/1.45 for reading.
+- One-surface: `#tipCard` and `#wire` hidden while `#prompt.is-live` or `#apToast` (adds to az clDock/clTx/plate fold).
+- Focus: `.prompt__opts`/`.prompt__catch-row` get tabindex=-1 so scroll containers never take gamepad/Tab focus; focused options `scrollIntoView({block:"nearest"})`; 3px gold `:focus-visible` ring.
+- Sitting heckles/points of order (ss2MaybeHeckle → onumSession.interject) now land on the desk via `cabPaint(m, text, true)` from an `onum-session` interjection listener (no wrapping; murmurs with no text skipped).
+- `#ltcLog` left alone: it is the private Chat thread (chatPaint wipes/rebuilds it from MEM), so mirroring cabPaint there would pollute DMs.
+- Next (bo): look/window-glow.
