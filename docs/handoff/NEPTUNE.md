@@ -431,3 +431,7 @@ No abilities, no PROPS actions, no rolePowers / OFFICE_DUTIES / K_HOME_OF / dock
 - Sitting heckles/points of order (ss2MaybeHeckle → onumSession.interject) now land on the desk via `cabPaint(m, text, true)` from an `onum-session` interjection listener (no wrapping; murmurs with no text skipped).
 - `#ltcLog` left alone: it is the private Chat thread (chatPaint wipes/rebuilds it from MEM), so mirroring cabPaint there would pollute DMs.
 - Next (bo): look/window-glow.
+
+### 20261104bn soft-FAIL fold
+- Gold 3px `#ffe08a` focus ring + `scroll-margin:8px` extended to `#ndFd .fd-hands button`, `.fd-hands button`, `#apToast button`, `#apToast [role=button]` (nnQolCss only; bm `nlPromptFit*` untouched).
+- Point of order: the engine has no separate PO event — `onumSession.interject()` dispatches `onum-session` with `stage:"interjection"` and `interjection.kind:"point_of_order"`. nnQolJs now branches on that existing `kind` (distinct PO paint, "Point of order:" prefix) rather than inventing a new event. PO still rides the interjection stage by design.
