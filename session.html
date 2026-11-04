@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261104bb">
+<meta name="onum-build" content="20261104bc">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -25,7 +25,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261104bb";
+  var STAMP = "20261104bc";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -48879,8 +48879,9 @@ async function cabLive(p, stimulus, mode){
   let out = ""; try{ const r = await Promise.race([LT.reply({npcId:p.id, channel:"face", text:stimulus, extra:cabCtx(p, mode || ""), max:260}), new Promise(res => setTimeout(() => res(null), 60000))]); out = r && r.text ? String(r.text) : ""; }catch(e){}
   out = engWhole(engClean(out)); return out.length > 600 ? engWhole(out.slice(0, 600)) : out;
 }
+/* 20261104bc NEPTUNE: every cabinet reply paints the floor desk (cabPaint carries the bubble) */
 function cabShow(p, out){
-  try{ speakAt(p, out); }catch(e){} try{ vhSay(p, out); }catch(e){} try{ tlog(p.name, out, "talk"); }catch(e){} try{ lLog(p.name + ": " + out.slice(0, 160), "session"); }catch(e){}
+  try{ speakAt(p, out); }catch(e){} try{ cabPaint(p, out); }catch(e){ try{ vhSay(p, out); }catch(x){} } try{ tlog(p.name, out, "talk"); }catch(e){} try{ lLog(p.name + ": " + out.slice(0, 160), "session"); }catch(e){}
   cabPush(p.name, out); window.__cabLast = p.id; if(SSN){ SSN.lastSpk = p.id; SS2.spkUntil = Date.now() + ss2Read(out); try{ ssnEnsure().log.push({d:G.day, kind:SSN.kind, act:"speak", who:p.name, t:out.slice(0, 120)}); }catch(e){} ss2Pub(); }
 }
 /* the others answer: the person it concerns first, then maybe a colleague who disagrees, and the first speaker may reply once */
@@ -48917,10 +48918,13 @@ function cabPick(text){
   for(const [re, role] of DEPT){ if(re.test(t)){ const p = seats.find(x => role.test(String(x.role || ""))); if(p) return p; } }
   const lastP = window.__cabLast != null ? seats.find(p => String(p.id) === String(window.__cabLast)) : null; return lastP || seats[Math.floor(Math.random() * seats.length)];
 }
-cabAsk = async function(p, you, text, kind){
-  if(!p || !SSN) return; const tok = SSN._tok = (SSN._tok || 0) + 1; SSN._arg = null; SSN._busy = Date.now() + 80000;
-  const out = await cabLive(p, text, "The chair has just spoken to the room or to you. Answer the chair directly, and if you disagree, say so plainly. If it belongs to a colleague's office, say whose it is and give your view of it in a line."); if(!SSN || tok !== SSN._tok) return;
-  if(!out){ SSN._busy = 0; return; } cabShow(p, out); SSN._busy = Date.now() + ss2Read(out) + 1500;
+/* 20261104bc NEPTUNE: re-wrap keeps the bb Call-on path: callOn replies paint the desk, and empty/timeout (25s) give the templated report */
+cabAsk = async function(p, you, text, kind, callOn){
+  if(!p) return; if(!SSN){ if(callOn){ const f = cabFallback(p); try{ cabPaint(p, f); }catch(e){} try{ tlog(p.name, f, "talk"); }catch(e){} } return; }
+  const tok = SSN._tok = (SSN._tok || 0) + 1; SSN._arg = null; SSN._busy = Date.now() + 80000;
+  const ask = cabLive(p, text, "The chair has just spoken to the room or to you. Answer the chair directly, and if you disagree, say so plainly. If it belongs to a colleague's office, say whose it is and give your view of it in a line.");
+  let out = ""; try{ out = callOn ? await Promise.race([ask, new Promise(res => setTimeout(() => res(""), 25000))]) : await ask; }catch(e){ out = ""; } if(!SSN || tok !== SSN._tok) return;
+  if(!out){ if(!callOn){ SSN._busy = 0; return; } out = cabFallback(p); } cabShow(p, out); SSN._busy = Date.now() + ss2Read(out) + 1500;
   setTimeout(() => { if(SSN && tok === SSN._tok) cabRebut(p, out, 1, tok); }, ss2Read(out) + 600);
 };
 { const _ev2 = window.onumSessionEvent; window.onumSessionEvent = function(e){ const r = _ev2.apply(this, arguments);
