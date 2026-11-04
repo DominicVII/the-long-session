@@ -4,6 +4,14 @@ Neptune owned: visuals, the visible world, offices' look, LiveTalk/voices, the L
 JUPITER owns systems (procedure/clock, offices + ONUM_OFFICE_HISTORY, family sim, regions, Engine charter/audit, saves, powers, war). MARS owns QA + onumCandid. Don't edit another owner's systems; guard every cross-owner call.
 
 
+## 20261104bo — look punch + fold bn MARS LIVE soft notes (on JUPITER bp `056f287`)
+- New `<style id="boLookCss">` after `nnQolJs` (bn/bm blocks `nlPromptFit`, `nnQolCss`/`nnQolJs` untouched).
+- Window-glow: soft gold edge + inset ambient light on `#office`, `#pzOffice`, `#hmCab`, `#ndFd`, `#ndSess`, `#sxDock` (docked children get inset only). No layout changes.
+- Soft placards: office/desk notes, `.fd-cue`, `.fd-top`, asides get letter-spacing .02em, line-height 1.45, cream `#e9dfc4`, muted gold bold.
+- Focus ring (MARS soft FAIL "ring unclear"): 3px `#ffe08a` outline offset 2px + dark gap + 5px `#c9a24a` ring + gold halo on `#sxDock`/`#tkActs`/`.fd-hands`/prompt opts/`#apToast`; focused live option gets light gold fill.
+- CSS only: bp powers (amenDesk/rolePowers/systems), cause→effect, G.baDesk, followUps, catch-dwell, cabAsk callOn untouched; bm fit + bn scroll unchanged.
+- OPEN: LIVE heckle/PO → cabPaint (bn) still needs a sitting recheck by MARS; re-shoot focus ring at screenshot res.
+
 ## 20261104bc — fix MARS soft FAIL on bb: Call-on reply reaches the desk
 - The later `cabAsk = async function(p,you,text,kind)` (20261022f block) replaced the bb `cabAsk(..., callOn)`. Re-wrapped it: it now takes `callOn`; on Call-on the LiveTalk reply is raced against 25s, and empty/timeout gives `cabFallback` (templated report) instead of returning silently. Also no-SSN + callOn paints the fallback.
 - `cabShow` now calls `cabPaint` (desk `.fd-log` line + bubble via vhSay) instead of bare `vhSay`, so every cabinet reply/rebuttal paints the desk.
