@@ -382,3 +382,10 @@ Dominic: "Max code and graphical design."
   `printf "import * as chars from './onum-characters.js'; import * as flags from './onum-flags.js'; import * as mats from './onum-materials.js'; window.ONUM_NEPTUNE = { chars, flags, mats };" | npx esbuild@0.24.2 --bundle --format=iife --target=es2019 --sourcefile=__entry.js` (run in `neptune/`, header comment first).
 - **QA:** headless Senate and East Steps runs, with faces, bodies and a wide shot. Suits read at 3-7 m: white V, lapels, tie or bow. No page errors. Under file:// the bundle loads (NEPTUNE.mods set, not failed) and `makeCharacter` builds m/f at low/med/high (104-134 meshes), with no errors.
 - **Left:** the shirt V is flat-lit (no cloth shader on purpose); brows are still broad at 0.6 m; white hair shells are still blocky up close.
+
+## 20261104bb — Call on: text lands at once (MARS SESSION-FLOW E/F)
+- `cabPaint(p, text, aside)`: writes the line to the floor desk (#ndFd `.fd-log`, full text at once, no word-by-word typing) and the speaker's bubble (`vhSay`). Text only; never gated by `voiceInvited()`.
+- `cabCallOn`: paints "<name> rises to report…" on the desk the moment you tap Call on, then asks LiveTalk.
+- `cabAsk(..., callOn=true)`: LiveTalk missing → templated report painted right away; LiveTalk empty/timeout (25s for Call on, 120s otherwise unchanged) → templated report. Real reply → painted on the desk + bubble (voice via `speakAt`/`speak` still only when invited).
+- Not touched: vote/tally/argue (JUPITER ba), catchDwell / setGlassPrompt / TALK.clear (JUPITER ay), az hit-target + `.prompt.is-live` CSS.
+- Gaps: desk paint only when #ndFd is visible (bubble always); no separate LiveTalk chat (#ltcLog) entry; fallback report is generic per office; headless browser boot not run this pass (all inline scripts pass `node --check`).
