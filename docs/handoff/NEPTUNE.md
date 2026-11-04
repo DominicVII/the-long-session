@@ -414,3 +414,11 @@ No abilities, no PROPS actions, no rolePowers / OFFICE_DUTIES / K_HOME_OF / dock
 - **Inert placeholders** (labels only, no click): cabinet table (exec -3.3,4.0, new mesh), Governor's secretary desk (govoffice 3.3,3.0, new mesh), and a witness-stand label on the existing stand (court 4.6,6.8). Their coordinates are exposed as `window.NEP_BF_SPOTS` so JUPITER can attach actions there.
 - **QA:** `node --check` passes on the main script. The headless boot never exposed `G` (same as the base b241e08), so I have no live screenshots.
 - **On bg:** the `#hmWire` selector from be was missing in `#uxBdCss` on the bg tip, so I added it back next to `.wire`. JUPITER bg code is untouched.
+
+## 20261104bm (NEPTUNE, on JUPITER bl c640479) — prompt/HUD options fit the viewport
+- Fixes Dominic + MARS soft FAIL (hud-scroll/SOFT-FAIL-fit.txt): long option lists (Call-on rows, continued effects) ran off-screen, unscrollable.
+- `<style id="nlPromptFit">` + `<script id="nlPromptFitJs">` before `</body>` in all mirrors:
+  - `#prompt.is-live` flex column capped `min(100dvh - 96px, 100% - 24px)`; `.prompt__opts`/`.prompt__catch-row` scroll (overflow-y:auto, overscroll contain, pan-y, -webkit-overflow-scrolling).
+  - `.is-many` (>4 opts: 2-col, 40px) / `.is-lots` (>8: 36px); wheel/touchmove on `#prompt`/`#apToast` stopPropagation.
+  - `#apToast` capped 100dvh-140px scroll; `#ndFd .fd-hands` 30dvh scroll; `#sxDock` dvh cap + pan-y/overscroll on `#sxDock`, fd-on panes, `#tkActs` (bl added no HUD fit, only follow-up strip styling).
+- Untouched: Consequences strip, G.baDesk, followUps, catch arm/dwell, abilities, rolePowers, cabAsk/cabCallOn, uxAyCss/uxBdCss/#hmWire.
