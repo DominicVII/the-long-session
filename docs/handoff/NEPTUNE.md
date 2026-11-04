@@ -3,6 +3,18 @@
 Neptune owned: visuals, the visible world, offices' look, LiveTalk/voices, the Live status, session rendering (floor desk), family tree/portraits, update banner + build label, walking/render lag, Engine Room displays, style editor (barber/tailor).
 JUPITER owns systems (procedure/clock, offices + ONUM_OFFICE_HISTORY, family sim, regions, Engine charter/audit, saves, powers, war). MARS owns QA + onumCandid. Don't edit another owner's systems; guard every cross-owner call.
 
+
+## 20261104az (was briefly labelled ay; JUPITER owns ay catch-dwell) — session UX, HUD presentation only (Dominic: "simpler sessions; prompts last seconds, I have to reclick")
+- One CSS block `<style id="uxAyCss">` in the head of all 5 copies; no JS, no JUPITER systems touched.
+- While `#prompt.is-live`: Notices dock (`#clDock`) and side transcript (`#clTx`) fold away; nameplates (`.plate`) dim to .25 and take no clicks, so the prompt is the one surface.
+- Stable hit targets: `#prompt .prompt__btn` min 44px tall / 120px wide, 14px text, no transition; catch ticker line reserves a fixed 2.7em so text changes never move the buttons; catch prompt fixed width; live prompt opaque #0c0f13 with gold border.
+- 44px minimum on session buttons too: `#ndSess`, `#ndFd`, `#sxDock`, `.fd-hands`, `#apToast`, `#sxParkBar`, `.talk__btn`, `#tkMore`, `#tkDone`.
+- Findings left for JUPITER (owner): catch dwell 1.6–3.2s frame-counted (`catchDwellForDist`, dwell 168), `catchClear("ui")` on TALK.open/veil, setGlassPrompt/catchPaint rebuild, single-modal gate. Also seen: `#ndSess` render rebuilds its whole innerHTML on every clock tick (1s sig poll incl. S.clock) so vote/action buttons are swapped mid-press; "stops you" toast `apToast` auto-removes at 14000ms and `apTick` (4s) can replace it. A candidate JS patch for those (sticky toast + 60s idle, Esc, no swap; ndSess skip-if-same / defer while pressed) is parked at /workspace/neptune-qa-30ay/full-js-css-candidate.diff on the box, NOT shipped.
+- QA: headless boot clean, stamp 20261104az, zero page errors.
+- NEXT (later stamp, after JUPITER ships decision cause→effect): LiveTalk openers hook act stakes.
+- NEXT (Neptune, MARS SESSION-FLOW sheet): paint the Call-on reply on the floor desk / LiveTalk strip immediately as text (no voice/Ollama dependency); Call on / Pass / Interject already get 44px via az CSS. JUPITER owns ba session-flow systems (vote/argue/fallback speech).
+- Stamp history: ay = JUPITER catch-dwell (branch jupiter-ay-catch-dwell); this HUD work shipped as az. Two early commits on main (f97894b, 9e249bb) briefly said ay; superseded by az.
+
 ## Dominic's standing rules (never break)
 - Keep ALL depth, make presentation WAY simpler. Never delete detail or systems.
 - Panels opaque, high-contrast. Names keep normal formatting (may be clickable).
