@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261104bi">
+<meta name="onum-build" content="20261104bj">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -25,7 +25,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261104bi";
+  var STAMP = "20261104bj";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -17583,7 +17583,11 @@ function backStandsFor(id){
 function seatPlayerInSession(){
   /* Place you in a chamber seat when a scheduled sitting / committee opens,
      so seated speech prompts are live without hunting a chair. */
+  /* 20261104bj A1 LIVE: House Floor Call-to-order must not teleport-seat you —
+     audience-side lectern catch needs a quiet standing Floor (W walk / E rise).
+     Take seat / E on a bench still seats. Committee / caucus / press unchanged. */
   if(!G.you || !SEATED_ROOMS[G.room] || G.noSit || G.plainSit) return false;
+  if(G.room === "floor") return false;
   const seats = seatsFor(G.room);
   if(!seats.length) return false;
   /* Prefer a gallery / mid seat, not the chair's dais slot (committee index 3). */
@@ -25402,7 +25406,12 @@ function takeSeat(){
   promptKey = "";
   refreshPanels();
 }
-function riseFromSeat(){ G.you.sitting = false; feed("You rise."); refreshPanels(); }
+function riseFromSeat(){
+  G.you.sitting = false;
+  try{ if(document.activeElement && document.activeElement.blur) document.activeElement.blur(); }catch(e){}
+  feed("You rise.");
+  refreshPanels();
+}
 function floorActions(){
   const b = G.bill, you = G.you, A = [];
   A.push({t: you.sitting ? "Rise" : "Take your seat", c:"5m", run(){
@@ -27634,9 +27643,10 @@ function tickSpeechApproach(dt){
 }
 function interactPropOrSpeech(o){
   if(!o) return;
-  /* Seated or already at the stand: open the prop. Do not walk you to the
-     lectern — that was eating File amendment / Career actions. */
-  if(o.id === "table" || (G.you && G.you.sitting && (o.id === "lectern" || o.id === "rostrum" || o.id === "table"))){
+  /* Table: open the prop (amend / career). Lectern / rostrum while seated:
+     20261104bj rise and approach the stand so A1 catch / Press-E can arm —
+     openProp here was blocking the walk-to-lectern path. */
+  if(o.id === "table"){
     openProp(o);
     return;
   }
@@ -42170,6 +42180,7 @@ function tick(dt){
   /* walking while seated stands you up, rather than dragging the chair */
   if(G.you && G.you.sitting && (vx || vz)){
     G.you.sitting = false;
+    try{ if(document.activeElement && document.activeElement.blur) document.activeElement.blur(); }catch(e){}
     feed("You get up.");
     if(G._deskWasBare){
       G._deskWasBare = false;
