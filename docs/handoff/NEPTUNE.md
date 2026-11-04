@@ -414,3 +414,11 @@ No abilities, no PROPS actions, no rolePowers / OFFICE_DUTIES / K_HOME_OF / dock
 - **Inert placeholders** (labels only, no click): cabinet table (exec -3.3,4.0, new mesh), Governor's secretary desk (govoffice 3.3,3.0, new mesh), and a witness-stand label on the existing stand (court 4.6,6.8). Their coordinates are exposed as `window.NEP_BF_SPOTS` so JUPITER can attach actions there.
 - **QA:** `node --check` passes on the main script. The headless boot never exposed `G` (same as the base b241e08), so I have no live screenshots.
 - **On bg:** the `#hmWire` selector from be was missing in `#uxBdCss` on the bg tip, so I added it back next to `.wire`. JUPITER bg code is untouched.
+
+## 20261104bl (NEPTUNE, on JUPITER bk tip 5e52544) — prompt options fit the viewport
+- Problem: prompts with many options ran off-screen with no way to scroll.
+- `<style id="nlPromptFit">` + `<script id="nlPromptFitJs">` appended before `</body>` (all mirrors):
+  - `#prompt.is-live` becomes a flex column capped at `min(100dvh - 96px, 100% - 24px)`; `.prompt__opts` / `.prompt__catch-row` scroll (`overflow-y:auto`, `overscroll-behavior:contain`, `touch-action:pan-y`, `-webkit-overflow-scrolling:touch`).
+  - JS tags `#prompt.is-many` (>4 options: 2-column, 40px min) and `.is-lots` (>8: 36px min); wheel/touchmove on `#prompt`/`#apToast` stop propagation so the list scrolls, not the world.
+  - `#apToast` capped at `100dvh - 140px` with scroll; `#ndFd .fd-hands` capped at 30dvh with scroll; `#sxDock` / `#tkActs` get overscroll containment.
+- uxAyCss/uxBdCss (`#hmWire`) folds, JUPITER catch-dwell, abilities, rolePowers, cabAsk/cabCallOn untouched.
