@@ -400,3 +400,17 @@ Dominic: "Max code and graphical design."
 - **Dialogue paint:** `#ndBdPaint` wraps `ss2NpcSpeak`: it captures the speech text from the `onumSessionEvent` speak call and sends it to `cabPaint` → `#ndFd` (and `vhSay`), skipping it if the desk's last line already shows that text. ba vote/argue/holdFloor, cabAsk callOn, cabShow→cabPaint, cabCallOn aside+callOn not touched.
 - **Look:** no change. Faces and bodies from the ultra stamps are already on the tip; I made no look edits without a live check.
 - **For be:** `ss2MaybeHeckle` interjections and `#ltcLog` mirroring still skip cabPaint. Next: route heckles through cabPaint(aside=true). Also a room-distance look pass, after a live screenshot.
+
+
+## 20261104be
+MARS soft FAIL fix: uxBdCss one-surface fold now also hides Ledger wire `#hmWire` (no `.wire` class) during prompt/apToast, same `display:none!important` as `.wire`.
+
+## 20261104bf (NEPTUNE, rebased onto JUPITER bg tip 9142568) — office LOOK/DETAIL only
+No abilities, no PROPS actions, no rolePowers / OFFICE_DUTIES / K_HOME_OF / docketFor / kDeskActs edits (JUPITER owns those).
+- **`execRich()` / `govRich()`**, wired in `kOfficeRich` beside `senateRich`/`courtRich`: emissive windows with floor light-pools, gilt portraits, a floor seal ("THE EXECUTIVE" / "STATE OF <state>"), a cluttered Executive desk (blotter, pen set, out-tray, photo, nameplate) and a grain map under the Governor's desk glass. Door plaques: "THE OFFICE OF THE EXECUTIVE", "OFFICE OF THE GOVERNOR".
+- **Own-office layouts:** `officeRoleSpots()` now gives the Senator and the Justice their own table/mail positions. `nepOfficeRoleLook()`: Senator gets a flag pair by the state-map wall, a portrait and an "OFFICE OF THE SENATOR" plaque. Justice gets darker walnut furniture, a law-book wall, a robe on a stand and "CHAMBERS OF THE JUSTICE". Leader and Representative get door plaques.
+- **Senate (`nepChamberLook`):** a raised presiding dais step with a "PRESIDING OFFICER" plaque, a wooden cap on the existing visitors' rail with a "VISITORS" plaque, and a press rail with a reporters' ledge.
+- **Court:** placards on the existing counsel tables (PETITIONER/RESPONDENT), the lectern and the bar, plus a brass lectern edge. I added no duplicate geometry because the tables, lectern and bar already exist in the base build.
+- **Inert placeholders** (labels only, no click): cabinet table (exec -3.3,4.0, new mesh), Governor's secretary desk (govoffice 3.3,3.0, new mesh), and a witness-stand label on the existing stand (court 4.6,6.8). Their coordinates are exposed as `window.NEP_BF_SPOTS` so JUPITER can attach actions there.
+- **QA:** `node --check` passes on the main script. The headless boot never exposed `G` (same as the base b241e08), so I have no live screenshots.
+- **On bg:** the `#hmWire` selector from be was missing in `#uxBdCss` on the bg tip, so I added it back next to `.wire`. JUPITER bg code is untouched.
