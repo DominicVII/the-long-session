@@ -4,6 +4,11 @@ Neptune owned: visuals, the visible world, offices' look, LiveTalk/voices, the L
 JUPITER owns systems (procedure/clock, offices + ONUM_OFFICE_HISTORY, family sim, regions, Engine charter/audit, saves, powers, war). MARS owns QA + onumCandid. Don't edit another owner's systems; guard every cross-owner call.
 
 
+## 20261104bc — fix MARS soft FAIL on bb: Call-on reply reaches the desk
+- The later `cabAsk = async function(p,you,text,kind)` (20261022f block) replaced the bb `cabAsk(..., callOn)`. Re-wrapped it: it now takes `callOn`; on Call-on the LiveTalk reply is raced against 25s, and empty/timeout gives `cabFallback` (templated report) instead of returning silently. Also no-SSN + callOn paints the fallback.
+- `cabShow` now calls `cabPaint` (desk `.fd-log` line + bubble via vhSay) instead of bare `vhSay`, so every cabinet reply/rebuttal paints the desk.
+- Aside "rises to report…" on Call-on tap unchanged. az HUD CSS, JUPITER ay dwell / ba untouched. callVote/baHook not on main — not done. `#ltcLog` still not written (optional, later).
+
 ## 20261104az (was briefly labelled ay; JUPITER owns ay catch-dwell) — session UX, HUD presentation only (Dominic: "simpler sessions; prompts last seconds, I have to reclick")
 - One CSS block `<style id="uxAyCss">` in the head of all 5 copies; no JS, no JUPITER systems touched.
 - While `#prompt.is-live`: Notices dock (`#clDock`) and side transcript (`#clTx`) fold away; nameplates (`.plate`) dim to .25 and take no clicks, so the prompt is the one surface.
