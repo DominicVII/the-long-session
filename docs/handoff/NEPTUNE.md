@@ -4,6 +4,13 @@ Neptune owned: visuals, the visible world, offices' look, LiveTalk/voices, the L
 JUPITER owns systems (procedure/clock, offices + ONUM_OFFICE_HISTORY, family sim, regions, Engine charter/audit, saves, powers, war). MARS owns QA + onumCandid. Don't edit another owner's systems; guard every cross-owner call.
 
 
+## 20261104bq — fold MARS soft FAILs from bo (on bo `736b34b`)
+- S1: boLookCss window-glow retargeted to real panels: `#pcScreen` (desk computer), `aside.dossier` (desk panes), plus `#ndFd`, `#ndSess`, `#sxDock`. Dropped dead `#office` (3D room key, no DOM id) and `#pzOffice` (settings button).
+- S2: removed HUD button `#hmCab` from glow (no separate cabinet panel id exists).
+- S3: stamp `20261104bq` (bo < bp lexical confusion).
+- S5: unscoped `.fd-hands` focus rule dropped (kept `#ndFd .fd-hands`). S4: `#apToast` dual rules kept intentionally (outline + live background are different props).
+- Untouched: dual focus ring, placards, bm/bn blocks, amenDesk/systems.
+
 ## 20261104bo — look punch + fold bn MARS LIVE soft notes (on JUPITER bp `056f287`)
 - New `<style id="boLookCss">` after `nnQolJs` (bn/bm blocks `nlPromptFit`, `nnQolCss`/`nnQolJs` untouched).
 - Window-glow: soft gold edge + inset ambient light on `#office`, `#pzOffice`, `#hmCab`, `#ndFd`, `#ndSess`, `#sxDock` (docked children get inset only). No layout changes.
