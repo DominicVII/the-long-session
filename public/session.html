@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261104bc">
+<meta name="onum-build" content="20261104ay">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -25,7 +25,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261104bc";
+  var STAMP = "20261104ay";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -9159,7 +9159,7 @@ function physScan(){
   }catch(e){}
   PHYS.boxes = out.slice(0, 400); PHYS.room = G.room; PHYS.at = performance.now(); PHYS.ff = physFFSig();
 }
-/* 20261030o: look = collide. neptune/onum-furniture-fixes.js moves/hides props on the first frames after a build
+/* 20261030o: look = collide. ../neptune/onum-furniture-fixes.js moves/hides props on the first frames after a build
    (sometimes after the 250 ms / 1.8 s scans, e.g. late furnish). Its log is the signal: any new fix -> rescan, so
    bodies collide with the props where you SEE them, not where the room builder first put them. */
 function physShown(o){ for(let p = o.parent; p && p !== roomGroup; p = p.parent) if(p.visible === false) return false; return true; }
@@ -21445,12 +21445,20 @@ function closeTip(){ const b = el("tipCard"); if(b) b.hidden = true; }
 addEventListener("click", e => {
   const t = e.target && e.target.closest ? e.target.closest("[data-tipk]") : null;
   if(t){
+    /* During live glass / session / talk, tips do not open — they steal the first tap */
+    if(promptLive() || TALK.open || (PROC && PROC.on) || (CATCH && CATCH.on)) return;
     e.preventDefault(); e.stopPropagation();
     openTip(t.getAttribute("data-tipk"), t.getAttribute("data-tipv"));
     return;
   }
   const box = el("tipCard");
-  if(box && !box.hidden && !(e.target.closest && e.target.closest("#tipCard"))) closeTip();
+  if(box && !box.hidden && !(e.target.closest && e.target.closest("#tipCard"))){
+    if(e.target.closest && (e.target.closest("#prompt") || e.target.closest("#talk") || e.target.closest("#procBar") || e.target.closest(".prompt__btn"))){
+      closeTip();
+      return;
+    }
+    closeTip();
+  }
 });
 
 /* ══════════════════════════════════════════════════════════
@@ -23723,6 +23731,10 @@ function procStart(e){
   try{ seatPlayerInSession(); }catch(e){}
   if(chair) chair.sitting = false;        /* the chair is on their feet */
   G.running = true;                       /* the clock does not stop for this */
+  /* 20261030ay: one layer — peel tip/phone so session prompts are tappable */
+  try{ closeTip(); }catch(e){}
+  try{ if(!veil.hidden && phoneWasRunning !== null) phoneClose(); }catch(e){}
+  try{ if(PC.open) pcClose(); }catch(e){}
   el("procBar").hidden = false;
   procSetBar(procTitle(e), (chair ? surname(chair.name) : "The chair") + " is opening.");
   const open = fresh(() => (e.k === "caucus" ? "Right. Doors closed. "
@@ -27778,11 +27790,29 @@ let promptKey = "", promptActs = [];
 function promptEsc(s){
   return String(s == null ? "" : s).replace(/&/g,"\x26amp;").replace(/</g,"\x26lt;").replace(/>/g,"\x26gt;").replace(/"/g,"\x26quot;");
 }
+/* 20261030ay: live choice prompts hold so focus flicker / tip clicks do not steal the tap */
+let glassHoldUntil = 0;
+let glassHoldKey = "";
+function glassHolding(){
+  return !!(promptActs && promptActs.length && glassHoldUntil && (typeof performance !== "undefined" ? performance.now() : Date.now()) < glassHoldUntil);
+}
+function glassArmHold(ms){
+  glassHoldUntil = (typeof performance !== "undefined" ? performance.now() : Date.now()) + (ms == null ? 16000 : ms);
+}
+function glassClearHold(){ glassHoldUntil = 0; glassHoldKey = ""; }
+
 function setGlassPrompt(header, choices){
   const pr = el("prompt");
   if(!pr) return;
   const key = (header || "") + "|" + (choices || []).map(c => c.t).join(";");
-  if(key === promptKey && !pr.hidden) return;
+  if(key === promptKey && !pr.hidden){
+    if(choices && choices.length){ glassHoldKey = key; glassArmHold(16000); }
+    return;
+  }
+  /* Sticky: do not replace a live choice prompt with a bare Press-E line or a clear while hold is armed */
+  if(glassHolding() && (!choices || !choices.length) && glassHoldKey && key !== glassHoldKey){
+    return;
+  }
   promptKey = key;
   promptActs = choices || [];
   pr.classList.remove("is-catch");
@@ -27794,6 +27824,9 @@ function setGlassPrompt(header, choices){
     markPicks();
     return;
   }
+  try{ closeTip(); }catch(e){}
+  glassHoldKey = key;
+  glassArmHold(16000);
   pr.classList.add("is-live");
   pr.hidden = false;
   pr._said = key;
@@ -27806,10 +27839,13 @@ function setGlassPrompt(header, choices){
   html += "</div>";
   setHTML(pr, html);
   pr.querySelectorAll("[data-gp]").forEach(b => {
-    b.addEventListener("click", () => {
+    b.addEventListener("pointerdown", e => { try{ e.stopPropagation(); }catch(x){} });
+    b.addEventListener("click", e => {
+      try{ e.preventDefault(); e.stopPropagation(); }catch(x){}
       const act = promptActs[+b.getAttribute("data-gp")];
       if(!act) return;
       promptKey = "";
+      glassClearHold();
       act.run();
       markPicks();
     });
@@ -27821,23 +27857,25 @@ function setGlassPrompt(header, choices){
 const CATCH = {
   on:false, mode:null, sid:null, prop:null, kind:null,
   queue:[], used:null, current:null, pieces:[],
-  /* age/dwell are FRAME counts — ticker drains one frame per paint, not wall-clock */
-  age:0, dwell:168, dist:99, passed:0, caught:0,
+  /* age/dwell are wall-clock ms — ticker drains one frame per paint, not wall-clock */
+  age:0, dwell:330, dist:99, passed:0, caught:0,
   renderKey:"",
   /* East Steps: set true only via stump interact / approachSpeechStation; cleared in catchClear */
   armedByInteract:false,
   /* B / Esc backed out of speech glass — stay clear until interact / re-seat */
-  suppressed:false
+  suppressed:false,
+  /* 20261030ay: TALK/veil suspend keeps state; hover pauses age so taps are not torn */
+  suspended:false, hover:false
 };
 const CATCH_FPS = 60; /* nominal frames for dwell mapping (display only) */
 function catchDwellForDist(dist){
-  /* Frame-based window. Close = more frames to read/catch; farther = snappier. */
+  /* 20261030ay+: wall-clock ms (≥5.5s). Independent of display refresh. */
   let sec;
-  if(dist <= 2.0) sec = 3.2;
-  else if(dist <= 3.5) sec = 3.2 - (dist - 2.0) * (0.8 / 1.5); /* → 2.4 at edge */
-  else if(dist <= 5.2) sec = 2.0 - Math.min(0.35, (dist - 3.5) * 0.2); /* ~2.0 → 1.65 */
-  else sec = 1.6;
-  return Math.max(24, Math.round(sec * CATCH_FPS));
+  if(dist <= 2.0) sec = 7.0;
+  else if(dist <= 3.5) sec = 7.0 - (dist - 2.0) * (1.0 / 1.5); /* → ~6.0 at 3.5 */
+  else if(dist <= 5.2) sec = 6.0 - Math.min(0.5, (dist - 3.5) * 0.25); /* ~6.0 → 5.5 */
+  else sec = 5.5;
+  return Math.max(5500, Math.round(sec * 1000));
 }
 function catchSessionId(st, mode){
   return (mode || "speech") + "|" + G.room + "|" + (st && st.prop ? st.prop.id : "none") +
@@ -27851,10 +27889,35 @@ function catchClear(reason){
   CATCH.pieces = []; CATCH.caught = 0; CATCH.passed = 0;
   CATCH.renderKey = ""; CATCH.prop = null;
   CATCH.armedByInteract = false;
+  CATCH.suspended = false; CATCH.hover = false;
   if(back) CATCH.suppressed = true;
   else if(reason !== "wait" && reason !== "ui" && reason !== "busy-clear") CATCH.suppressed = false;
   const pr = el("prompt");
   if(pr) pr.classList.remove("is-catch");
+}
+function catchSuspend(reason){
+  /* Keep stream + arm; hide glass while TALK/veil steals the frame. */
+  if(!CATCH.on && !CATCH.armedByInteract) return;
+  CATCH.suspended = true;
+  const pr = el("prompt");
+  if(pr){ pr.classList.remove("is-catch", "is-live"); }
+  try{ promptKey = ""; }catch(e){}
+}
+function catchResume(){
+  if(!CATCH.suspended) return;
+  CATCH.suspended = false;
+  /* Stay armed — do not force re-approach */
+  if(CATCH.on){
+    CATCH.renderKey = "";
+    CATCH.age = 0;
+    catchPaint();
+  }
+}
+function catchHoverBind(pr){
+  if(!pr || pr._catchHover) return;
+  pr._catchHover = true;
+  pr.addEventListener("pointerenter", () => { CATCH.hover = true; });
+  pr.addEventListener("pointerleave", () => { CATCH.hover = false; });
 }
 function catchShuffle(arr){
   const a = arr.slice();
@@ -27955,6 +28018,8 @@ function catchArmCurrent(){
   CATCH.i = ((CATCH.i|0) + CATCH.deck.length) % CATCH.deck.length;
   CATCH.current = CATCH.deck[CATCH.i];
   CATCH.renderKey = "";
+  CATCH.age = 0;
+  CATCH.dwell = catchDwellForDist(CATCH.dist == null ? 2.5 : CATCH.dist);
 }
 function catchStep(d){
   if(!CATCH.on || !CATCH.deck || !CATCH.deck.length) return false;
@@ -28125,14 +28190,33 @@ function catchPaint(){
   markPicks();
 }
 function catchTick(dt){
-  if(!CATCH.on) return;
+  if(!CATCH.on || CATCH.suspended) return;
+  /* Pause the dwell clock while the pointer or pad pick is on the glass */
+  const pr = el("prompt");
+  catchHoverBind(pr);
+  const focused = !!(PICK >= 0 && PICKS[PICK] && pr && pr.contains(PICKS[PICK]));
+  if(!(CATCH.hover || focused)){
+    CATCH.dwell = catchDwellForDist(CATCH.dist == null ? 2.5 : CATCH.dist);
+    CATCH.age = (CATCH.age || 0) + Math.max(0, (dt || 0) * 1000);
+    if(CATCH.current && CATCH.age >= CATCH.dwell){
+      CATCH.age = 0;
+      try{ catchMiss(); }catch(e){}
+      try{ catchArmCurrent(); }catch(e){}
+    }
+  }
   catchPaint();
 }
 function catchFrame(dt){
-  if(!G.running || TALK.open || !veil.hidden){
+  if(!G.running){
     if(CATCH.on) catchClear("ui");
     return;
   }
+  /* 20261030ay: transient TALK/veil must not kill CATCH mid-tap — suspend + resume */
+  if(TALK.open || !veil.hidden){
+    if(CATCH.on || CATCH.armedByInteract) catchSuspend("ui");
+    return;
+  }
+  if(CATCH.suspended) catchResume();
   /* Don't snag while walking to the stand — approach owns the camera */
   if(G.speechApproach) return;
   const hard = speechStationNear(0.72);
@@ -28174,7 +28258,8 @@ function catchFrame(dt){
     if(!CATCH.armedByInteract && !CATCH.on){
       return;
     }
-    if(!CATCH.armedByInteract && CATCH.on && playerIsMoving()){
+    /* 20261030ay+: tiny steps at the stand must not kill an armed stream — only leave clears */
+    if(!CATCH.armedByInteract && CATCH.on && playerIsMoving() && !(hard && hard.dist <= 1.15)){
       catchClear("left");
       return;
     }
@@ -28348,7 +28433,12 @@ function seatOutOfHand(){
 
 function updatePrompt(thing, dr, seat){
   if(!G.running || TALK.open || !veil.hidden){
+    glassClearHold();
     setGlassPrompt(null, null);
+    return;
+  }
+  /* Sticky live choices: focus flicker must not wipe buttons mid-tap */
+  if(glassHolding() && !(CATCH.on && CATCH.mode) && !(PROC.on && PROC.phase === "you" && !CATCH.suppressed)){
     return;
   }
   /* Catch stream owns the glass while active */
@@ -43865,7 +43955,7 @@ try{
     gather(h){ try{ ensureConsularCaucus(); consularBody(h == null ? 12 : h); }catch(e){} return G.consularAtBronze || 0; }
   };
 }catch(e){}
-/* NEPTUNE-UNIFORMS BEGIN — loads neptune/onum-*.js (characters, flags, materials, office amenities).
+/* NEPTUNE-UNIFORMS BEGIN — loads ../neptune/onum-*.js (characters, flags, materials, office amenities).
    Everything is guarded: if a module fails to load, the game runs exactly as before. */
 try{
   const NEP = {mods:null, decree:null, failed:false};
@@ -44015,7 +44105,7 @@ try{
   /* loader */
   const base = (() => { try{ return new URL("../neptune/", location.href).href; }catch(e){ return "../neptune/"; } })();
   const sc = document.createElement("script"); sc.src = base + "onum-office-amenities.js"; sc.onerror = () => console.warn("NEPTUNE: amenities not loaded"); document.head.appendChild(sc);
-  /* 20261030n: walls/blocked props everywhere: the furniture runtime fixes (neptune/FURNITURE-QA.md: props through walls, radiator in doorways, in-wall ledges, off-wall TV) were written but never loaded. Look-only; collision untouched. */
+  /* 20261030n: walls/blocked props everywhere: the furniture runtime fixes (../neptune/FURNITURE-QA.md: props through walls, radiator in doorways, in-wall ledges, off-wall TV) were written but never loaded. Look-only; collision untouched. */
   { const ff = document.createElement("script"); ff.src = base + "onum-furniture-fixes.js"; ff.onerror = () => console.warn("NEPTUNE: furniture fixes not loaded"); document.head.appendChild(ff); }
   /* 20261012u: ES modules cannot load from file:// (Play.bat / double-click), so Neptune never ran there and every
      person was the game's boxy fallback figure. The same modules ship pre-bundled as a classic script for that case. */
@@ -48879,7 +48969,7 @@ async function cabLive(p, stimulus, mode){
   let out = ""; try{ const r = await Promise.race([LT.reply({npcId:p.id, channel:"face", text:stimulus, extra:cabCtx(p, mode || ""), max:260}), new Promise(res => setTimeout(() => res(null), 60000))]); out = r && r.text ? String(r.text) : ""; }catch(e){}
   out = engWhole(engClean(out)); return out.length > 600 ? engWhole(out.slice(0, 600)) : out;
 }
-/* 20261104bc NEPTUNE: every cabinet reply paints the floor desk (cabPaint carries the bubble) */
+/* 20261104ay NEPTUNE: every cabinet reply paints the floor desk (cabPaint carries the bubble) */
 function cabShow(p, out){
   try{ speakAt(p, out); }catch(e){} try{ cabPaint(p, out); }catch(e){ try{ vhSay(p, out); }catch(x){} } try{ tlog(p.name, out, "talk"); }catch(e){} try{ lLog(p.name + ": " + out.slice(0, 160), "session"); }catch(e){}
   cabPush(p.name, out); window.__cabLast = p.id; if(SSN){ SSN.lastSpk = p.id; SS2.spkUntil = Date.now() + ss2Read(out); try{ ssnEnsure().log.push({d:G.day, kind:SSN.kind, act:"speak", who:p.name, t:out.slice(0, 120)}); }catch(e){} ss2Pub(); }
@@ -48918,7 +49008,7 @@ function cabPick(text){
   for(const [re, role] of DEPT){ if(re.test(t)){ const p = seats.find(x => role.test(String(x.role || ""))); if(p) return p; } }
   const lastP = window.__cabLast != null ? seats.find(p => String(p.id) === String(window.__cabLast)) : null; return lastP || seats[Math.floor(Math.random() * seats.length)];
 }
-/* 20261104bc NEPTUNE: re-wrap keeps the bb Call-on path: callOn replies paint the desk, and empty/timeout (25s) give the templated report */
+/* 20261104ay NEPTUNE: re-wrap keeps the bb Call-on path: callOn replies paint the desk, and empty/timeout (25s) give the templated report */
 cabAsk = async function(p, you, text, kind, callOn){
   if(!p) return; if(!SSN){ if(callOn){ const f = cabFallback(p); try{ cabPaint(p, f); }catch(e){} try{ tlog(p.name, f, "talk"); }catch(e){} } return; }
   const tok = SSN._tok = (SSN._tok || 0) + 1; SSN._arg = null; SSN._busy = Date.now() + 80000;
