@@ -1,3 +1,20 @@
+## 20261107i: the meeting is the desk
+
+- Point of order, press, challenge, call on, chair, pass, interject, next, your vote, and a secretary's office sit on the floor desk, not on a second bar.
+- Only the person who has the floor, or the chair, is written into the meeting. Side talk stays out of it.
+- What they say there is the vote, or the office, and why. Not a memory and not a request for the clock.
+
+## 20261107h: a foreign call says why
+
+- Each capital says what it wants and the reason inside its own government: who can overrule the minister, and why they are asking this week.
+- The Secretary of State answers that reason. Grain, a trade schedule, a warning, or silence each say whether they met the ask or dodged it.
+- Asking them why, on the phone, gets the reason and not the same sentence as the ask.
+
+## 20261107g: they say the reason that is already on the card
+
+- A person marked with you, against you, or undecided now speaks as that. The speech no longer calls someone undecided while the card says against.
+- Every line names the thing they want. The gloss says the same reason, and what would move the vote.
+
 ## 20261107f: the menu after a click stays
 
 - Looking around is as it was. The look-prompt no longer pins you to the last thing.
