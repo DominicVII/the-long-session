@@ -1,3 +1,9 @@
+## 20261107f: the menu after a click stays
+
+- Looking around is as it was. The look-prompt no longer pins you to the last thing.
+- Opening a thing (the suggestion box, the counter, a meeting, a desk) keeps that menu up until you choose or leave it. It was being closed because it had no person attached.
+- Those choices sit in the frame, two across, not behind a scroll.
+
 # One Nation, Under, ME. — the log
 
 Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.com/DominicVII/the-long-session)
