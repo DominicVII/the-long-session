@@ -4,6 +4,11 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261107a: Ollama on your PC
+
+- The game retries after a miss, and if port 11434 refuses the page it tries the local bridge on 11435.
+- Fix Ollama.bat starts Ollama, pulls llama3.2:3b if it is missing, and keeps a bridge open that only this game may use. Leave that window open while you play.
+
 ## 20261106e: they look at the room
 
 - A member with a weak private lean, a close seat, or too much vanity moves with the people around them, and says so.

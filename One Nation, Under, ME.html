@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261106e">
+<meta name="onum-build" content="20261107a">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -25,7 +25,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261106e";
+  var STAMP = "20261107a";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -47095,21 +47095,35 @@ try{
   }
   async function probeNet(force, ms){
     if(!CFG.on){ LT.up = false; LT.why = "Live talk is switched off in Settings"; return false; }
-    if(LT.up === false && force !== "ui" && force !== "re") return false;   /* 20261020u: one quiet check per session; Settings can try again */
+    if(LT.up === false && force !== "ui" && force !== "re" && (LT.downUntil || 0) > Date.now()) return false;   /* 20261107a: a miss is retried after the backoff, so the bridge can be started after the page */
     if(!force && LT.up !== null && Date.now() - LT.at < 30000) return LT.up;
     /* 20261030q: circuit breaker. A refused 127.0.0.1:11434 was being re-fetched in a tight loop (up stayed null while a reply was busy),
        eating the main thread and delaying clicks by seconds. After a refusal, nothing but Settings' Test tries again until the backoff ends
        (15 s, 30 s, 60 s ... capped at 10 min). */
     if(force !== "ui" && (LT.downUntil || 0) > Date.now()) return LT.up === true ? true : false;
     LT.at = Date.now();
-    try{ const c = new AbortController(); const t = setTimeout(() => c.abort(), ms || 1800);
-      const r = await fetch(CFG.url + "/api/tags", {signal:c.signal}); clearTimeout(t);
+    try{
+      const primary = (CFG.url || "http://127.0.0.1:11434").replace(/\/$/, "");
+      const bases = [primary];
+      if(primary.indexOf(":11435") < 0) bases.push("http://127.0.0.1:11435");
+      let r = null, used = primary, err = null;
+      for(let bi = 0; bi < bases.length; bi++){
+        const base = bases[bi];
+        try{
+          const c = new AbortController(); const t = setTimeout(() => c.abort(), ms || 4000);
+          const rr = await fetch(base + "/api/tags", {signal:c.signal}); clearTimeout(t);
+          if(rr && rr.ok){ r = rr; used = base; break; }
+          r = rr; used = base;
+        }catch(e1){ err = e1; }
+      }
+      if(!r) throw err || new Error("ollama");
+      if(used !== primary){ CFG.url = used; try{ save(); }catch(e2){} }
       const j = await r.json(); LT.models = (j.models || []).map(x => x.name); ltSet(r.ok); try{ if(r.ok && !CFG.userModel && LT.models.length){ const L = LT.models, sz = n => { const m = /:(\d+(?:\.\d+)?)b/i.exec(n); return m ? +m[1] : 99; };
         const pref = ["llama3.2:3b", "llama3.2:latest", "llama3.2", "qwen2.5:3b", "phi3:mini", "gemma3:4b", "llama3.2:1b", "qwen2.5:1.5b"]; let pick = pref.find(x => L.includes(x));
         if(!pick){ const small = L.filter(n => !/embed/i.test(n) && sz(n) <= 4).sort((x, y) => sz(y) - sz(x)); pick = small[0] || (L.includes("gemma3:12b") ? "gemma3:12b" : L.filter(n => !/embed/i.test(n)).sort((x, y) => sz(x) - sz(y))[0]); }
         if(pick && pick !== CFG.model){ CFG.model = pick; try{ save(); }catch(e){} } } }catch(e){} LT.why = r.ok ? "" : "Ollama answered with an error";
     }catch(e){ LT.refused = (LT.refused || 0) + 1; LT.downUntil = Date.now() + Math.min(600000, 15000 * Math.pow(2, LT.refused - 1)); ltSet(false, force === "ui"); if(LT.up === true){ paintPill(); return true; }   /* 20261021b: one counter (ltSet) for checks, replies and report() */
-      LT.why = "Ollama did not answer at " + CFG.url + " within " + ((ms || 1800) / 1000) + " seconds (it may be busy loading a large model, or not running)"; }
+      LT.why = "Ollama did not answer at " + CFG.url + ". Double-click Fix Ollama.bat in the game folder and leave that window open."; }
     paintPill(); return LT.up;
   }
   /* 20261020w: Ollama started after the page loaded: one quiet re-check when a chat opens or a reply is asked for, at most once a minute, and only after a failed check */
@@ -47586,7 +47600,7 @@ try{
       '<label><input type="checkbox" id="ltVo"' + (CFG.voices ? " checked" : "") + '> Live voices — rephrase scripted lines so they never repeat</label>' +
       '<label>Model <input id="ltModel" value="' + esc2(CFG.model) + '" list="ltModels"><datalist id="ltModels">' + (LT.models || []).map(x => '<option value="' + esc2(x) + '">').join("") + '</datalist></label>' +
       '<label>The Engine\u2019s model (optional, a larger one thinks better) <input id="ltEng" value="' + esc2(CFG.engineModel || "") + '" list="ltModels" placeholder="same as above"></label>' +
-      '<label>Server <input id="ltUrl" value="' + esc2(CFG.url) + '"></label><div class="lt-st">' + (LT.up ? "Connected. Models: " + esc2((LT.models || []).join(", ")) : "Not reachable. Install Ollama, set OLLAMA_ORIGINS=*, run `ollama pull llama3.2:3b`.") + '</div>' +
+      '<label>Server <input id="ltUrl" value="' + esc2(CFG.url) + '"></label><div class="lt-st">' + (LT.up ? "Connected. Models: " + esc2((LT.models || []).join(", ")) : "Not reachable. Double-click Fix Ollama.bat in the game folder, leave that window open, then Test.") + '</div>' +
       '<div class="lt-row"><button type="button" class="btn btn--ghost" id="ltTest">Test</button><button type="button" class="btn btn--ghost" id="ltForget">Forget conversations</button><button type="button" class="btn" id="ltClose">Done</button></div>';
     const upd = () => { CFG.on = P.querySelector("#ltOn").checked; CFG.voices = P.querySelector("#ltVo").checked; { const nv = P.querySelector("#ltModel").value.trim() || "llama3.2:3b"; if(nv !== CFG.model) CFG.userModel = true; CFG.model = nv; } CFG.engineModel = (P.querySelector("#ltEng") || {value:""}).value.trim(); CFG.url = P.querySelector("#ltUrl").value.trim().replace(/\/$/, "") || "http://127.0.0.1:11434"; LT.up = null; save(); };
     P.querySelectorAll("input").forEach(i => i.addEventListener("change", upd));
