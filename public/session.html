@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261106a">
+<meta name="onum-build" content="20261106b">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -25,7 +25,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261106a";
+  var STAMP = "20261106b";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -23520,37 +23520,65 @@ function procChair(pool){
   if(posted.length) return posted.sort((a,b) => b.influence - a.influence)[0];
   return pool.slice().sort((a,b) => b.influence - a.influence)[0] || null;
 }
-function procLineFor(m, e){
+function ownWhy(why){
+  return firstPerson(String(why || "")).replace(/\.+$/, "");
+}
+function meanOf(m){
   const b = G.bill && !G.bill.done ? G.bill : null;
+  try{ autoInit(m); }catch(e){}
+  let bio = null; try{ bio = bioOf(m); }catch(e){}
   const dir = b ? memberVote(m, b) : 0;
-  const st = m.state || "my district";
-  const pool = [];
-  if(e.k === "caucus"){
-    pool.push(dir >= 0
-      ? "I will be voting with the party and I would rather we went in together than went in counting."
-      : "I am not going to be able to give the party this one, and I would rather say it here than have you find out on the floor.");
-    pool.push("Whatever we decide in this room, we decide it here and we do not relitigate it in the corridor.");
-    pool.push("There are four people in " + st + " who will lose their jobs over this. I need somebody to tell me what I say to them.");
-  } else if(e.k === "hearing"){
-    pool.push("The witness has given us two different figures in twenty minutes and I would like to know which one is in the record.");
-    pool.push("I want to be clear what we are asking. Not what we would like the answer to be — what we are asking.");
-    pool.push("I have read the submission. My question is who wrote it, and who paid for the people who wrote it.");
-  } else if(e.k === "presser"){
-    pool.push("I will take questions, but I am not going to pretend the number is smaller than it is.");
-    pool.push("What I said in committee is what I will say here, which is more than some can manage.");
-    pool.push("If the gallery wants a fight this morning they can have one, but it will be on the substance.");
-  } else if(e.k === "crisis"){
-    pool.push("People in " + st + " are waiting to hear whether this House is capable of moving in a single day.");
-    pool.push("We can argue about the cause afterwards. Today we vote the money and we go home.");
-    pool.push("I will not be rushed into something I have not read, and I will not apologise for that.");
-  } else {
-    pool.push("I have said my piece to my own people and I will say it here.");
-    pool.push("There is a version of this everyone can live with, and we are not looking for it.");
+  let st = {level:0, why:""};
+  try{ if(b) st = stakeIn(m, b); }catch(e){}
+  const town = (bio && bio.town) || m.state || "home";
+  return {b:b, dir:dir, why:(st && st.why) || "", town:town, st:st};
+}
+function sideWord(dir){ return dir > 0 ? "aye" : dir < 0 ? "no" : "undecided"; }
+function procLineFor(m, e){
+  const M = meanOf(m);
+  const b = M.b, dir = M.dir, town = M.town;
+  const side = sideWord(dir);
+  const bag = m._mean || (m._mean = {});
+  const key = ((b && (b.id || b.title)) || "none") + ":" + ((e && e.k) || "floor");
+  const angles = [];
+  function add(id, line){
+    if(!line || bag[key + ":" + id] || heardBefore(line)) return;
+    angles.push({id:id, line:line});
   }
-  const mood = moodOf(m).val;
-  if(mood < -30) pool.push("I am going to say the unpopular thing, since nobody else in this room will.");
-  if(mood > 34)  pool.push("For once I think we are close to something workable, and I would hate to watch us lose it.");
-  return fresh(() => pick(pool));
+  if(b && dir){
+    add("vote", "I am voting " + side + " on " + b.title + ". That is the vote. I am not dressing it up as something else.");
+    if(M.why) add("why", "The reason is not the briefing. " + ownWhy(M.why) + ".");
+    if(b.cost) add("cost", b.title + " is " + money(b.cost) + ". I am a " + side + " because " + town + " is who pays it, and I have decided.");
+    if(m.need && b.domain && m.need !== b.domain) add("gap", town + " asked me for " + m.need + ". This text is " + b.domain + ". My " + side + " is about that difference.");
+    else if(m.need && b.domain) add("fit", "This is " + b.domain + ", which is what " + town + " asked for. So I am a " + side + ". I am not here to repeat the caucus line.");
+    const opps = (G.members || []).filter(o => o && o !== m && !o.gone && memberVote(o, b) && memberVote(o, b) !== dir);
+    opps.slice(0, 3).forEach(o => {
+      let ow = "";
+      try{ ow = stakeIn(o, b).why || ""; }catch(e2){}
+      const od = sideWord(memberVote(o, b));
+      add("opp:" + o.id, surname(o.name) + " is a " + od + ". I am a " + side + ". " + (ow ? "Their case is " + ownWhy(ow) + ". Mine is " + town + "." : "They do not answer to " + town + "."));
+    });
+    if(m.fear && m.fear.t) add("fear", "The part I usually leave out: " + ownWhy(m.fear.t) + " That is the " + side + ".");
+  } else {
+    add("plain", "I did not come to give the speech this room already knows. " + town + " sent me to say what they asked, and I am saying it once.");
+  }
+  if(e && e.k === "caucus" && dir < 0) add("split", "Do not tell this room we are together. I am a no" + (b ? " on " + b.title : "") + ". If you need a yes, you do not have mine.");
+  if(e && e.k === "caucus" && dir > 0) add("with", "I am a yes" + (b ? " on " + b.title : "") + " because of " + town + ", not because someone said unity. If you are a no, say the reason.");
+  if(e && e.k === "hearing" && PROC && PROC.wit) add("wit", "I want one figure from " + surname(PROC.wit.name) + " that " + town + " can be billed for. Not two figures and a mood.");
+  if(e && e.k === "presser" && b) add("press", "Print the vote: I am a " + side + " on " + b.title + ". Do not print a fight I did not pick.");
+  if(e && e.k === "crisis" && b) add("now", "Today the question is " + b.title + ", and my vote is " + side + ". The argument about who to blame can wait until " + town + " has the answer.");
+  for(let i = 0; i < angles.length; i++){
+    const a = angles[i];
+    bag[key + ":" + a.id] = 1;
+    rememberLine(a.line);
+    try{ noteSaid(m, a.line); }catch(e2){}
+    return a.line;
+  }
+  const n = (m._meanN = (m._meanN || 0) + 1);
+  const line = (b ? "On " + b.title + " I remain a " + side + ". " : "") + "I will not say the same argument again. What is new is " + n + " households in " + town + " wrote this week, and they did not ask for a slogan.";
+  rememberLine(line);
+  try{ noteSaid(m, line); }catch(e2){}
+  return line;
 }
 /* "Point of order" on its own is a noise. In a real chamber the member
    has to say what the point IS, and the clerk writes it down. So every
@@ -23640,7 +23668,7 @@ function procOptions(e){
   const b = G.bill && !G.bill.done ? G.bill : null;
   const out = [];
   if(e.k === "caucus"){
-    out.push({t:"Hold the line", say:"We go in together. Whatever any of us thinks, we go in together.", w:1, sway:4, stand:8, loyal:true});
+    out.push({t:"Say your vote", say: (b ? ("I am a " + sideWord(memberVote(G.you, b)) + " on " + b.title + ". If this room is not, say so. Do not call a split a line.") : "Say where you actually are. I am not interested in the word unity."), w:1, sway:4, stand:8, loyal:true});
     out.push({t:"Speak for the doubters", say:"There are people in this room who cannot vote for this, and pretending otherwise is how we lose them for good.", w:1, sway:-2, stand:-2, doubt:true});
     out.push({t:"Say nothing useful", say:"I will listen and make my mind up on the floor.", w:0, sway:0, stand:-3});
   } else if(e.k === "hearing"){
@@ -23656,7 +23684,7 @@ function procOptions(e){
     out.push({t:"Insist on reading it", say:"I will not vote for a number I have not seen written down.", w:0, sway:-3, stand:4, risk:true});
     out.push({t:"Stand aside", say:"I defer to the members whose states are under water.", w:1, sway:0, stand:-1});
   } else {
-    out.push({t:"Say what you think", say:"I will tell you what I actually think, which is rarer in here than it should be.", w:1, sway:2, stand:4});
+    out.push({t:"Say the vote", say: (b ? ("My vote on " + b.title + " is " + sideWord(memberVote(G.you, b)) + ". That is what I think. I will not add a speech I have already given.") : "I will say the thing once and I will not repeat it."), w:1, sway:2, stand:4});
     out.push({t:"Keep it short", say:"Noted. I have nothing to add.", w:0, sway:0, stand:-1});
   }
   if(b) out.push({t:"Make the case for your vote",
@@ -24023,9 +24051,11 @@ function procTick(dt){
       PROC.speaker.sitting = true; PROC.speaker.backStand = false;
     }
     PROC.speaker = m; m.sitting = false; m.backStand = false;
-    m.say = fresh(() => q.say, 3); m.sayT = 6.5; m.sayTo = "you"; m.faceUntil = G.t + 7;
-    speakAt(m, q.say);
-    appendFloor(surname(m.name), q.say);
+    const asked = procLineFor(m, e);
+    const say = asked + " So my question is this: " + q.say;
+    m.say = say; m.sayT = 6.5; m.sayTo = "you"; m.faceUntil = G.t + 7;
+    speakAt(m, say);
+    appendFloor(surname(m.name), say);
     procSetBar(procTitle(e), surname(m.name) + " is questioning " + surname(W.name) + ".");
     setTimeout(() => { if(PROC.on && PROC.wit) witnessAnswer(W, q); }, 3200);
     PROC.t = 9.5;
@@ -26758,14 +26788,33 @@ function renderProp(){
    and built again. Only when a pool is genuinely exhausted does
    anything repeat, which is the one case where it should. */
 const SAID = new Set();
+function rememberLine(line){
+  const s = String(line || "").trim();
+  if(!s) return;
+  SAID.add(s);
+  try{
+    const h = saidHashOf(s);
+    if(!Array.isArray(G.saidHash)) G.saidHash = [];
+    const S = saidSet();
+    if(!S.has(h)){
+      S.add(h); G.saidHash.push(h);
+      if(G.saidHash.length > 900) G.saidHash.splice(0, G.saidHash.length - 900);
+    }
+  }catch(e){}
+}
+function heardBefore(line){
+  const s = String(line || "").trim();
+  if(!s) return false;
+  if(SAID.has(s)) return true;
+  try{ return saidSet().has(saidHashOf(s)); }catch(e){ return false; }
+}
 function fresh(build, tries){
   let out = "";
   for(let i = 0; i < (tries || 24); i++){
     out = build();
-    if(!SAID.has(out)){ SAID.add(out); return out; }
+    if(out && !heardBefore(out)){ rememberLine(out); return out; }
   }
-  SAID.add(out);
-  return out;
+  return out || "";
 }
 
 /* what is on their mind, drawn from where they actually are */
@@ -27515,13 +27564,40 @@ function speechBeats(kind){
       {order:15, t:"Back to work", line:"Thank you. I am going back to work. Keep the receipt on what I promised.", stance:1, mins:8}
     ]
   };
-  const base = (pool[kind] || pool.floor).slice();
+  const honest = honestBeats(kind).filter(b => b && b.line && !heardBefore(b.line));
+  if(honest.length) return honest.slice(0, 8);
+  let base = (pool[kind] || pool.floor).slice().filter(b => b && b.line && !heardBefore(b.line));
   if(bill){
-    base.push({order:8.5, t:"Name the bill", line:"On " + bill + ": I have read it, I know how I am voting, and I will say why where it counts.", stance:1, mins:13});
+    const named = "On " + bill + " my vote is " + sideWord(G.you ? memberVote(G.you, G.bill) : 0) + ". I will not give the slogan again.";
+    if(!heardBefore(named)) base.unshift({order:1, t:"The vote", line:named, stance:1, mins:11});
   }
-  /* shuffle for catch variety; Deliver re-sorts by order */
-  for(let i=base.length-1;i>0;i--){ const j = (Math.random()*(i+1))|0; const t=base[i]; base[i]=base[j]; base[j]=t; }
-  return base.slice(0, Math.min(10, base.length));
+  if(!base.length){
+    const town = (G.you && (bioOf(G.you).town || G.you.state)) || "home";
+    base.push({order:1, t:"Once", line:"I am not repeating the last sitting. " + town + " gets the vote, and the vote is the point. Day " + (G.day || 1) + ".", stance:1, mins:9});
+  }
+  return base.slice(0, 8);
+}
+function honestBeats(kind){
+  const you = G.you; if(!you) return [];
+  const M = meanOf(you);
+  const b = M.b, side = sideWord(M.dir), town = M.town;
+  const out = [];
+  if(!b || !M.dir) {
+    out.push({order:1, t:"What I mean", line:"I am not here to give the speech this room has already heard. " + town + " is who I answer to, and I will say the thing once.", stance:1, mins:10});
+    return out;
+  }
+  out.push({order:1, t:"The vote", line:"I am a " + side + " on " + b.title + ". That is the position. I am not wrapping it in a phrase the last sitting already used.", stance:M.dir, mins:10});
+  if(M.why) out.push({order:2, t:"The reason", line:"The reason, once: " + ownWhy(M.why) + ".", stance:M.dir, mins:11});
+  if(b.cost) out.push({order:3, t:"The cost", line:"The number is " + money(b.cost) + ". " + town + " is who I answer to for it.", stance:M.dir, mins:10});
+  const opps = (G.members || []).filter(o => o && !o.gone && memberVote(o, b) && memberVote(o, b) !== M.dir).slice(0, 4);
+  opps.forEach((o, i) => {
+    let ow = "";
+    try{ ow = stakeIn(o, b).why || ""; }catch(e){}
+    out.push({order:4 + i, t:"Not " + surname(o.name), line:surname(o.name) + " is a " + sideWord(memberVote(o, b)) + ". I am a " + side + ". " + (ow ? "Their case is " + ownWhy(ow) + ". Mine is " + town + "." : "They do not sit for " + town + "."), stance:M.dir, mins:11});
+  });
+  if(kind === "caucus") out.push({order:9, t:"The split", line: (M.dir < 0 ? "I am a no. Do not leave this room saying we agreed." : "I am a yes because of " + town + ". If you are a no, say why. Do not say unity."), stance:M.dir, mins:9});
+  if(kind === "hearing") out.push({order:9, t:"The figure", line:"I want the figure " + town + " will be charged, not the sentence that sounds like the last hearing.", stance:1, mins:10});
+  return out;
 }
 function speechStationNear(maxDist){
   /* Literal stand only. Old 3.5–5.2 m treated the aisle as the lectern
@@ -28096,6 +28172,7 @@ function catchNow(){
   CATCH.renderKey = "";
   promptKey = "";
   try{
+    try{ if(item && item.line) rememberLine(item.line); }catch(e2){}
     feed("Caught · " + item.t + " (" + CATCH.pieces.length + ")");
     setSay("Caught: " + item.t + " — pieced " + CATCH.pieces.length + ". Deliver when ready.", fx("held for full speech",""));
   }catch(e){}

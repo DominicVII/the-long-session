@@ -4,6 +4,11 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261106b: they say the vote, and they do not say it twice
+
+- A sitting was the same three arguments every time, while the real split (aye or no, the town, the cost, the person across the room) stayed off the line. Speakers now say their vote and the reason. A second turn has to be a different reason.
+- A line that has been said is remembered in the save. The next session does not get it again. The lectern offers the position, not the old slogans.
+
 ## 20261106a: sessions and meetings resume where you left them
 
 - Stepping off a lectern, backing out, or leaving a hearing, caucus, press stand, or stump keeps the line you were on and the lines already held. Press E at the same stand and it continues. Delivering the speech clears it. The place is in the save.
