@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261106b">
+<meta name="onum-build" content="20261106c">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -25,7 +25,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261106b";
+  var STAMP = "20261106c";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -52249,6 +52249,136 @@ armFrame();
   setInterval(() => { try{ layout(); }catch(e){} }, 400);
   kick();
 })();
+
+/* 20261106c: a meeting is run from one bar that fits the screen. Point of order, call on a name,
+   press, challenge, call on others, chair, pass, interject, call on next. Nothing in that bar scrolls. */
+(function(){
+  const st = document.createElement("style"); st.id = "mtRunCss";
+  st.textContent = "#mtBar{position:fixed;left:6px;right:6px;z-index:10060;display:none;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;padding:6px;background:#121419;color:#f4f1e8;border:2px solid #c9a24a;border-radius:8px;box-shadow:0 4px 16px #000}" +
+    "#mtBar.on{display:grid}#mtBar .mt-s{grid-column:1/-1;font:600 11px/1.2 system-ui;color:#ffe08a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}" +
+    "#mtBar button{min-height:34px;max-height:44px;padding:4px 6px;background:#2a2d35;color:#fff;border:1px solid #c9a24a;border-radius:6px;font:700 11px/1.15 system-ui;cursor:pointer;overflow:hidden}" +
+    "#mtBar button:disabled{opacity:.4;cursor:default}#mtBar button.mt-go{background:#ffe08a;color:#111;border-color:#ffe08a}" +
+    "body.mt-on #ndSess .nsx-acts,body.mt-on #ndFd .fd-acts,body.mt-on #ndFd .fd-hands{display:none!important}" +
+    ".proc{max-height:38vh;overflow:hidden}.proc__opts{display:grid;grid-template-columns:1fr 1fr;gap:4px}.proc__h i{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}";
+  document.head.appendChild(st);
+  const bar = document.createElement("div"); bar.id = "mtBar"; bar.setAttribute("role","toolbar"); bar.setAttribute("aria-label","Run the meeting");
+  document.body.appendChild(bar);
+  let others = false;
+  const sv = f => { try{ return f(); }catch(e){ return null; } };
+  const OS = () => window.onumSession || {};
+  const youId = x => x === "you" || (G.you && String(x) === String(G.you.id));
+  const chairYou = S => !!(S && youId(S.chairId));
+  const person = id => { if(id == null || id === "" || youId(id)) return null; return sv(() => byId(isNaN(+id) ? id : +id)); };
+  const sn = p => { const n = p && p.name ? String(p.name) : ""; const b = n.split(/\s+/).filter(Boolean); return b.length ? b[b.length - 1] : "them"; };
+  function live(){
+    const S = window.ONUM_SESSION; if(!S || S.stage === "idle") return null;
+    if(S.open === false) return null;
+    if(!(S.kind || S.floorId != null || (S.seats && S.seats.length) || S.chairId != null)) return null;
+    return S;
+  }
+  function seats(S){ return (S.seats || []).map(x => x && (x.personId != null ? x.personId : x.id)).filter(id => id != null && !youId(id)); }
+  function target(S){
+    if(S.floorId != null && !youId(S.floorId)) return S.floorId;
+    const q = (S.queue || []).find(id => !youId(id)); if(q != null) return q;
+    if(window.__cabLast != null && !youId(window.__cabLast)) return window.__cabLast;
+    return seats(S)[0];
+  }
+  function nextId(S){
+    const q = (S.queue || []).find(id => !youId(id)); if(q != null) return q;
+    const L = seats(S); if(!L.length) return null;
+    const i = L.findIndex(id => String(id) === String(S.floorId));
+    return L[(i + 1) % L.length];
+  }
+  function sayMean(p){
+    if(!p || !SSN) return false;
+    let line = "";
+    try{
+      const k = /hear|committee/.test(SSN.kind) ? "hearing" : /press/.test(SSN.kind) ? "presser" : /caucus/.test(SSN.kind) ? "caucus" : "floor";
+      line = procLineFor(p, {k:k});
+    }catch(e){}
+    if(!line) line = sn(p) + " is on the record.";
+    try{ SSN.floorId = p.id; SSN.queue = (SSN.queue || []).filter(x => String(x) !== String(p.id)); ssnPublish(); }catch(e){}
+    try{ speakAt(p, line); }catch(e){}
+    try{ const FD = window.NEPTUNE_FLOORDESK, D = document.getElementById("ndFd"); if(FD && D && !D.hidden) FD.line(p.id, line); }catch(e){}
+    try{ tlog(p.name, line, "talk"); }catch(e){}
+    try{ appendFloor(sn(p), line); }catch(e){}
+    return true;
+  }
+  function call(id){
+    const O = OS();
+    if(typeof O.callon === "function"){ const r = O.callon(id); if(r) return true; }
+    const p = person(id); if(!p || !chairYou(live())) return false;
+    return sayMean(p);
+  }
+  const _press = window.onumSession && window.onumSession.press;
+  const _chal = window.onumSession && window.onumSession.challenge;
+  if(window.onumSession){
+    window.onumSession.press = function(id){
+      if(typeof cabKind === "function" && cabKind() && _press) return _press.apply(this, arguments);
+      if(!chairYou(live())) return false;
+      const p = person(id != null ? id : target(live() || {})); if(!p) return false;
+      return sayMean(p);
+    };
+    window.onumSession.challenge = function(id){
+      if(typeof cabKind === "function" && cabKind() && _chal) return _chal.apply(this, arguments);
+      if(!chairYou(live())) return false;
+      const p = person(id != null ? id : target(live() || {})); if(!p) return false;
+      return sayMean(p);
+    };
+    const _call = window.onumSession.callon;
+    window.onumSession.callon = function(id){
+      if(typeof prKind === "function" && prKind() && _call) return _call.apply(this, arguments);
+      if(typeof cabKind === "function" && cabKind() && _call) return _call.apply(this, arguments);
+      if(!chairYou(live())) return _call ? _call.apply(this, arguments) : false;
+      const p = person(id); if(!p) return false;
+      return sayMean(p);
+    };
+  }
+  const _rec = typeof ssnRecognize === "function" ? ssnRecognize : null;
+  if(_rec){ ssnRecognize = function(){ if(SSN && chairYou(window.ONUM_SESSION) && !SSN._allowRec) return; return _rec.apply(this, arguments); }; }
+  function btn(label, go, on, title){
+    const b = document.createElement("button"); b.type = "button"; b.textContent = label; if(title) b.title = title;
+    if(on) b.className = "mt-go";
+    if(!go) b.disabled = true; else b.onclick = () => { try{ go(); }catch(e){} paint(); };
+    return b;
+  }
+  function place(){
+    const hb = document.getElementById("hmBar"); let btm = 8;
+    try{ if(hb && !hb.hidden && getComputedStyle(hb).display !== "none") btm = Math.ceil(innerHeight - hb.getBoundingClientRect().top + 6); }catch(e){}
+    bar.style.bottom = btm + "px";
+  }
+  function paint(){
+    const S = live(); document.body.classList.toggle("mt-on", !!S);
+    if(!S){ bar.className = ""; bar.innerHTML = ""; return; }
+    bar.className = "on"; place();
+    const ch = chairYou(S), who = person(target(S)), nx = person(nextId(S)), fl = S.floorId != null ? (youId(S.floorId) ? "You" : sn(person(S.floorId) || {name:String(S.floorId)})) : "open";
+    bar.innerHTML = "";
+    const s = document.createElement("div"); s.className = "mt-s";
+    s.textContent = (ch ? "You chair" : ("Chair: " + (person(S.chairId) ? sn(person(S.chairId)) : "the chair"))) + " · floor: " + fl;
+    bar.appendChild(s);
+    if(others){
+      bar.appendChild(btn("Back", () => { others = false; }, false, "Back to the meeting"));
+      seats(S).slice(0, 8).forEach(id => { const p = person(id); if(!p) return; bar.appendChild(btn("Call on " + sn(p), ch ? () => { others = false; call(id); } : null, false, p.name)); });
+      return;
+    }
+    bar.appendChild(btn("Point of order", () => { const O = OS(); if(typeof O.pointOfOrder === "function") O.pointOfOrder(); }, true, "Raise a point of order"));
+    bar.appendChild(btn(who ? "Call on " + sn(who) : "Call on", (ch && who) ? () => call(who.id != null ? who.id : target(S)) : null, true, who ? who.name : "Nobody to call"));
+    bar.appendChild(btn("Press", (ch && who) ? () => OS().press && OS().press(who.id) : null, false, "Press them for the specific point"));
+    bar.appendChild(btn("Challenge", (ch && who) ? () => OS().challenge && OS().challenge(who.id) : null, false, "Challenge what they just said"));
+    bar.appendChild(btn("Call on others", ch && seats(S).length ? () => { others = true; } : null, false, "Pick someone else"));
+    bar.appendChild(btn("Chair", () => {
+      if(ch){ try{ SSN.floorId = "you"; ssnPublish(); }catch(e){} }
+      else if(S.chairId != null) call(S.chairId);
+    }, ch, ch ? "The chair takes the floor" : "Call on the chair"));
+    bar.appendChild(btn("Pass", () => { const O = OS(); if(typeof O.pass === "function") O.pass(); }, false, "Give up the turn"));
+    bar.appendChild(btn("Interject", () => { const O = OS(); const t = (document.querySelector("#ndFd textarea") || {}).value; const line = (t || "").trim(); if(typeof O.interject === "function") O.interject(line || "Point of order!", line ? "heckle" : "point_of_order"); else if(typeof O.pointOfOrder === "function") O.pointOfOrder(); try{ const ta = document.querySelector("#ndFd textarea"); if(ta) ta.value = ""; }catch(e){} }, false, "A word from your seat"));
+    bar.appendChild(btn(nx ? "Call on next" : "Call on next", ch ? () => { const id = nextId(S); if(id == null){ try{ if(SSN){ SSN._allowRec = true; ssnRecognize(); SSN._allowRec = false; } }catch(e){} return; } call(id); } : null, true, nx ? nx.name : "No one waiting"));
+  }
+  setInterval(paint, 500);
+  addEventListener("onum-session", () => setTimeout(paint, 0));
+  addEventListener("resize", place);
+})();
+
 </script>
 
 </body>
