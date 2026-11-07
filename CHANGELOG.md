@@ -4,6 +4,11 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261107e: prompts stay until you use them
+
+- Talk, Use, Sit, and the desk no longer vanish between one frame and the next. Looking away for a flicker, or someone walking through your view, does not pull the button out from under the click.
+- A new thing has to hold your eye before it replaces the one you were on. Stepping away is what clears it.
+
 ## 20261107d: the cabinet sits, and the offices work
 
 - Six named officers sit the cabinet table. The governor's council sits its own named staff. They are not unnamed departments.

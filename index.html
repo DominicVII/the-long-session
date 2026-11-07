@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261107d">
+<meta name="onum-build" content="20261107e">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -25,7 +25,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261107d";
+  var STAMP = "20261107e";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -18035,6 +18035,37 @@ function focusProp(){
   return best;
 }
 /* Whichever is nearer and in front of you. */
+/* A prompt stays with what you were looking at. One missed frame, or
+   someone walking through the cone, must not pull the buttons out from
+   under the click. A new target has to hold your eye; leaving has to be real. */
+const FOCUS_HOLD = {thing:null, miss:0, pending:null, pendingAt:0};
+function heldFocus(raw){
+  const now = (typeof performance !== "undefined" ? performance.now() : 0);
+  if(raw && raw.ref){
+    const cur = FOCUS_HOLD.thing;
+    const same = cur && raw.type === cur.type && raw.ref === cur.ref;
+    if(same){ FOCUS_HOLD.miss = 0; FOCUS_HOLD.pending = null; return cur; }
+    if(!FOCUS_HOLD.pending || FOCUS_HOLD.pending.ref !== raw.ref || FOCUS_HOLD.pending.type !== raw.type){
+      FOCUS_HOLD.pending = raw; FOCUS_HOLD.pendingAt = now;
+    }
+    if(cur && now - FOCUS_HOLD.pendingAt < 480) return cur;
+    FOCUS_HOLD.thing = raw; FOCUS_HOLD.miss = 0; FOCUS_HOLD.pending = null;
+    return raw;
+  }
+  const cur = FOCUS_HOLD.thing;
+  if(!cur || !cur.ref){ FOCUS_HOLD.thing = null; return null; }
+  FOCUS_HOLD.miss++;
+  let near = false;
+  try{
+    const d = Math.hypot((cur.ref.x||0) - cam.x, (cur.ref.z||0) - cam.z);
+    const limit = cur.type === "person" ? 3.1 : ((cur.ref.r || 2.4) + 1.1);
+    near = d < limit;
+  }catch(e){}
+  /* half a second of looking away, or a step and a half if you are still beside it */
+  if(FOCUS_HOLD.miss < 28 || (near && FOCUS_HOLD.miss < 80)) return cur;
+  FOCUS_HOLD.thing = null; FOCUS_HOLD.miss = 0; FOCUS_HOLD.pending = null;
+  return null;
+}
 function focusThing(){
   const p = focusTarget(), o = focusProp();
   if(p && o){
@@ -28773,15 +28804,30 @@ function updatePrompt(thing, dr, seat){
     }
     return;
   }
-  /* Default: door / person / prop / seat */
-  const want = (dr && !thing) ? "→ " + ROOMS[dr.dr.to].t
-             : (thing && !TALK.open)
-               ? (thing.type === "person"
-                   ? "Press E to speak with " + surname(thing.ref.name)
-                   : "Press E — " + thing.ref.label)
-               : seat ? (G.you.sitting ? "Press E to stand" : "Press E to sit")
-               : null;
-  setGlassPrompt(mPadPrompt(want), null);
+  /* Default: door / person / prop / seat. These are buttons, and they stay
+     with the thing you were on. A label that vanishes is not a choice. */
+  if(thing && !TALK.open && thing.type === "person" && thing.ref){
+    const who = thing.ref;
+    setGlassPrompt("Speak with " + surname(who.name), [
+      {t:"Talk", c:"E", run(){ try{ openTalk(who); }catch(e){} }}
+    ]);
+    return;
+  }
+  if(thing && !TALK.open && thing.type === "prop" && thing.ref && thing.ref.id !== "desk"){
+    const o = thing.ref;
+    setGlassPrompt(o.label || "Here", [
+      {t:"Use", c:"E", run(){ try{ interactPropOrSpeech(o); }catch(e){} }}
+    ]);
+    return;
+  }
+  if(dr && !thing){ setGlassPrompt("→ " + ROOMS[dr.dr.to].t, null); return; }
+  if(seat){
+    setGlassPrompt(G.you && G.you.sitting ? "Seated" : "A seat", [
+      {t: G.you && G.you.sitting ? "Stand" : "Sit", c:"E", run(){ try{ toggleSit(); }catch(e){} }}
+    ]);
+    return;
+  }
+  setGlassPrompt(null, null);
 }
 
 const PROPS = {
@@ -40652,8 +40698,8 @@ renderer.domElement.addEventListener("pointerup", () => {
   /* Click interact works with pad live (hybrid); glass buttons use their own handlers */
   const seat = seatUnderYou();
   const talk = personInTalkRange();
-  const f = focusThing();
-  if(seat && !talk) toggleSit();
+  const f = FOCUS_HOLD.thing || focusThing();
+  if(seat && !talk && !(f && f.type === "prop")) toggleSit();
   else if(f) (f.type === "person" ? openTalk : interactPropOrSpeech)(f.ref);
   else if(seat) toggleSit();
 });
@@ -43245,7 +43291,7 @@ function frameBody(now, draw){
     }
   }
   if(_prof) _prof.mark("render");
-  const thing = G.running ? focusThing() : null;
+  const thing = G.running ? heldFocus(focusThing()) : (FOCUS_HOLD.thing = null, FOCUS_HOLD.miss = 0, null);
   const foc = thing && thing.type === "person" ? thing.ref : null;
   /* Moving: skip HUD plate/track/tele work — feet first. */
   if(playerMoving){ if((FRAME_ID & 7) === 0) try{ updatePlates(foc); }catch(e){} }   /* 20261030q: turning to a wall hides plates too */
