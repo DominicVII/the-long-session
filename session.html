@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261107i">
+<meta name="onum-build" content="20261107j">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -33,7 +33,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261107i";
+  var STAMP = "20261107j";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -9640,7 +9640,8 @@ function caDay(){
   D.changes.forEach(c => {
     if(c.status === "planned" && G.day - c.since >= 2 && chance(.6)){ c.status = "construction"; c.since = G.day; caPublish(c); caNews("Scaffolding is up on " + c.street + ": " + caArt(c.kind, c.name) + " for " + c.owner + "."); }
     else if(c.status === "construction" && G.day - c.since >= 3 && chance(.5)){ c.status = "built"; c.since = G.day; caPublish(c); caMood(c.street, 2);
-      caNews((c.kind === "home" ? c.owner + "'s new house" : c.name) + " on " + c.street + " is finished" + (c.kind === "church" ? ", and the first service gives thanks to God Most High under Christ the King" : c.kind === "restaurant" ? " and the first plates are going out" : "") + "."); }
+      caNews((c.kind === "home" ? c.owner + "'s new house" : c.name) + " on " + c.street + " is finished" + (c.kind === "church" ? ", and the first service gives thanks to God Most High under Christ the King" : c.kind === "restaurant" ? " and the first plates are going out" : "") + ".");
+      if(c.kind === "lab" || c.kind === "school" || c.kind === "station" || c.kind === "shop"){ try{ const R = rsEnsure(); const pool = R.works.filter(w => w.stage === "done" || w.stage === "prototype"); const w = pool.slice(-1)[0]; if(w && (c.kind !== "shop" || w.kind === "machine" || w.kind === "tool" || w.kind === "vehicle")){ c.makes = [{d:G.day, name:w.name, by:w.inventor, desc:w.desc}]; w.where = c.name + " on " + c.street; caNews(c.name + " on " + c.street + " is turning out " + w.name + "."); } }catch(e){} } }
     else if(c.status === "built" && (c.kind === "restaurant" || c.kind === "shop")){
       const a = D.actors.find(x => x.id === c.ownerId) || {wealth:50};
       const odds = (tm < 40 ? .06 : .015) + (a.wealth < 30 ? .04 : 0);
@@ -9945,7 +9946,8 @@ function caHTML(){
   const D = caEnsure(), out = ['<div class="pc__h">The district, on its own</div><div class="pc__m">What people at home are building, opening, closing and asking for. Nobody asked permission.</div>'];
   const L = D.changes.slice(-14).reverse();
   if(!L.length) out.push('<p class="pc__m">Nothing new on the streets yet.</p>');
-  L.forEach(c => out.push('<div>· <b>' + pcEsc(c.kind === "home" ? c.owner + "'s house" : c.name) + '</b>, ' + pcEsc(c.street) + ' · ' + pcEsc(c.status) + (c.kind === "church" && c.status === "built" ? ' · ' + c.n + ' in the pews' : '') + ' <span class="pc__m">(' + pcEsc(c.cause) + ')</span></div>'));
+  L.forEach(c => out.push('<div>· <b>' + pcEsc(c.kind === "home" ? c.owner + "'s house" : c.name) + '</b>, ' + pcEsc(c.street) + ' · ' + pcEsc(c.status) + (c.kind === "church" && c.status === "built" ? ' · ' + c.n + ' in the pews' : '') + (c.makes && c.makes[0] ? ' · making ' + pcEsc(c.makes[0].name) + ' (' + pcEsc(c.makes[0].by || "") + ')' : '') + ' <span class="pc__m">(' + pcEsc(c.cause) + ')</span></div>'));
+  try{ out.push(sciBoard()); }catch(e){}
   out.push('<div class="pc__m">Town: about ' + (D.pop || 0) + ' people · era ' + (D.era || 1) + ' · county taxes ' + caMoney(D.taxDay || 0) + '/day · county treasury ' + caMoney(D.treasury || 0) + ' · spent on public works ' + caMoney(D.publicSpent || 0) + '</div>');
   (D.gossip || []).slice(-4).reverse().forEach(g => out.push('<div class="pc__m">Heard on the street: ' + pcEsc(g.t) + '</div>'));
   const intents = D.actors.filter(a => a.intent).slice(0, 5).map(a => pcEsc(a.name) + ' is said to be saving for a ' + pcEsc(a.intent.k));
@@ -11375,9 +11377,10 @@ function rsUnlock(x){
   try{ if(G.you) G.you.approval = clamp(G.you.approval + 0.5, 0, 100); }catch(e){}
   try{ const E = G.eng; if(E && x.kind !== "building") E.talent = Math.min(100, E.talent + 0.6); }catch(e){}
   rsLine(cap(x.name) + " is finished, built by " + x.inventor + ". " + ({machine:"Workshops are already asking for one.", building:"A civic project can now be put to the Assembly.", tool:"The universities want it first.", vehicle:"It is on the roads by spring.", theory:"It is in the journals and the debates have started."}[x.kind] || ""), true);
+  try{ if(!x._shown){ x._shown = 1; const does = {machine:"A workshop can now make one, and the first order is in.", building:"The town can put it up. The lot is the constraint, not the drawing.", tool:"The benches are using it this week.", vehicle:"It is on a road by the end of the month.", theory:"The journals have it, and two fields are arguing about what follows."}[x.kind] || "It is in use."; x.desc = (x.desc || "") + " " + does; const kinds = x.kind === "building" ? ["station","school","expansion"] : (x.kind === "machine" || x.kind === "tool" || x.kind === "vehicle") ? ["lab","shop","station"] : ["school","lab"]; x.where = sciLand(x, kinds); rsPublish(x); } }catch(e){}
 }
 function rsPublish(x){
-  const R = rsEnsure(); window.ONUM_WORKS = R.works.map(w => ({id:w.id, name:w.name, kind:w.kind, inventor:w.inventor, stage:w.stage, day:w.day, desc:w.desc}));
+  const R = rsEnsure(); window.ONUM_WORKS = R.works.map(w => ({id:w.id, name:w.name, kind:w.kind, inventor:w.inventor, stage:w.stage, day:w.day, desc:w.desc, where:w.where || ""}));
   window.ONUM_UNLOCKS = (R.unlocks || []).slice();
   try{ window.dispatchEvent(new CustomEvent("onum-work", {detail:x ? {id:x.id, stage:x.stage, day:x.day} : null})); }catch(e){}
 }
@@ -11410,7 +11413,7 @@ function rsDay(){
     ok = clamp(ok, 0.003, 0.97); const roll = Math.random();
     if(q.t === 4 && roll < ok && chance(0.3)){ s.boost += 0.05; rsSay(p, "null"); if(chance(0.4)) rsLine(p.name + "'s results on " + q.f + " are inconclusive. Two papers, two answers.", false); return; }
     if(roll < ok){
-      s.prog += (0.10 + r.sk / 900) / (1 + (q.t - 1) * 1.0); s.boost = 0; r.sk = Math.min(99, r.sk + 1.5); r.mot = Math.min(99, r.mot + 8); rsSay(p, "ok");
+      s.prog += (0.16 + r.sk / 700) / (1 + (q.t - 1) * 0.72); s.boost = 0; r.sk = Math.min(99, r.sk + 1.5); r.mot = Math.min(99, r.mot + 8); rsSay(p, "ok");
       q.works.forEach(w => rsWork(w, q, p, s.prog >= 1 ? "done" : s.prog >= 0.5 ? "prototype" : "idea"));
       if(s.prog >= 1){ s.st = "done"; s.day = G.day; r.done++; R.n++; R.theories.push({id:q.id, f:q.f, t:q.t, by:p.name, d:G.day});
         rsLine(p.name + " has settled a question in " + q.f + " (tier " + q.t + "): " + q.q, true); try{ ripple(p, 1, "I settled the question of " + q.f + ".", 6, true); }catch(e){}
@@ -35984,6 +35987,7 @@ function engCard(){
     (function(){ try{ return engCharterHTML(); }catch(e){ console.warn(e); return ''; } })() +
     (function(){ try{ return advHTML(); }catch(e){ console.warn(e); return ''; } })() +
     (function(){ try{ return engEcoHTML(); }catch(e){ return ''; } })() +
+    (function(){ try{ return sciBoard(); }catch(e){ return ""; } })() +
     '<div class="eyebrow" style="margin-top:10px">What has happened</div>' + E.log.slice(0, 6).map(x => '<div class="careerline" title="' + pcEsc(x.t) + '"><b>d' + x.d + '</b> ' + pcEsc(engShort(x.t, 140)) + '</div>').join("");
   govCardOpen("The Republic's thinking machines", "The Engine", "Begun as the Treasury's adding engines. Not waiting for you.", body, null);
   const say = t => { const o = el("gcSay"); if(o) o.textContent = t; };
@@ -36692,7 +36696,7 @@ function inqCard(){
   const sel = INQ.sel && INQ_BY[INQ.sel], detail = sel ? '<div id="inqDetail" style="margin:8px 0;padding:8px 12px;border-left:3px solid #c9a24a"><b>' + pcEsc(sel.name) + '</b> <span class="muted">(' + pcEsc(INQ_F[sel.f].t) + ')</span><p style="margin:4px 0;font-size:13px">' + pcEsc(inqExplain(sel)) + '</p></div>' : "";
   const recent = S.log.slice(0, 5).map(x => '<div class="careerline"><b>d' + x.d + '</b> ' + pcEsc(INQ_BY[x.id].name) + '</div>').join("");
   govCardOpen("What the Republic is working out", "The Academy", "Mathematics, the physical sciences, life, mind, philosophy, society and the arts, all asking their questions at once. Nothing real physics allows is forbidden to be found; each answer waits for the ones before it, for the tools to see it, and for the work.",
-    '<p class="muted" style="font-size:13px">' + nd + ' of ' + total + ' questions settled. Funding a field speeds the nearest of its open questions for twenty-five days.</p>' + detail + body + (function(){ try{ return fndHTML(); }catch(e){ return ''; } })() + (recent ? '<div class="eyebrow" style="margin-top:10px">Lately settled</div>' + recent : ""), null);
+    '<p class="muted" style="font-size:13px">' + nd + ' of ' + total + ' questions settled. Funding a field speeds the nearest of its open questions for twenty-five days.</p>' + detail + body + (function(){ try{ return fndHTML(); }catch(e){ return ''; } })() + (function(){ try{ return sciBoard(); }catch(e){ return ""; } })() + (recent ? '<div class="eyebrow" style="margin-top:10px">Lately settled</div>' + recent : ""), null);
   card.querySelectorAll("[data-qf]").forEach(b => b.addEventListener("click", () => { const r = inqFund(b.getAttribute("data-qf")); inqCard(); const s = el("gcSay"); if(s) s.textContent = r; }));
   card.querySelectorAll("[data-qn]").forEach(a => a.addEventListener("click", ev => { ev.preventDefault(); INQ.sel = a.getAttribute("data-qn"); inqCard(); try{ const dd = el("inqDetail"); if(dd) dd.scrollIntoView({block:"nearest"}); }catch(e){} }));
   return null;
@@ -36967,17 +36971,18 @@ function inqGenDay(){
 { const _if = inqFrontier; inqFrontier = function(f){ const base = _if.apply(this, arguments), S = inqStore(), g = inqGen(); if(!g.length) return base; const extra = g.filter(n => (!f || n.f === f) && !S.done[n.id] && n.needs.every(x => !INQ_BY[x] || S.done[x])); return extra.length ? base.concat(extra).sort((a, b) => a.effort - b.effort) : base; }; }
 { const _is = inqStep; inqStep = function(silent, idx){ const r = _is.apply(this, arguments); try{ if(!silent){ const S = inqStore(), E = (G.eng && G.eng.v === 1) ? G.eng : null;
       /* the Engine works the open frontier too, in proportion to what it can do, and without a ceiling */
-      if(E && E.st >= 2){ const pw = (E.p / 100) * (E.st / 5) * (1 + Math.log10(1 + (E.beyond || 0))) * 0.012; inqGen().filter(n => !S.done[n.id] && n.needs.every(x => !INQ_BY[x] || S.done[x])).slice(0, 4).forEach(n => { S.prog[n.id] = (S.prog[n.id] || 0) + pw / Math.pow(n.effort, 0.9); if(S.prog[n.id] >= 1){ S.done[n.id] = G.day; delete S.prog[n.id]; inqDiscovered(n, false); } }); }
+      if(E && E.st >= 2){ const pw = (E.p / 100) * (E.st / 5) * (1 + Math.log10(1 + (E.beyond || 0))) * 0.03; inqGen().filter(n => !S.done[n.id] && n.needs.every(x => !INQ_BY[x] || S.done[x])).slice(0, 6).forEach(n => { S.prog[n.id] = (S.prog[n.id] || 0) + pw / Math.pow(n.effort, 0.85); if(S.prog[n.id] >= 1){ S.done[n.id] = G.day; delete S.prog[n.id]; inqDiscovered(n, false); } }); }
       inqGenDay(); } }catch(e){ console.warn("inqGen", e); } return r; }; }
 { const _id = inqDiscovered; inqDiscovered = function(n, silent){ const r = _id.apply(this, arguments); try{ if(n && n.gen && !silent){ const E = (G.eng && G.eng.v === 1) ? G.eng : null, sc = n.effort / 6;
       if(n.anomaly && !n.real){ try{ feed("The Academy: the anomaly in " + INQ_F[n.f].t.toLowerCase() + " was an error in the apparatus. It is settled, and the physics stands."); }catch(e){} }
       else { (GEN_FX[n.fx] || GEN_FX.none)(sc, E); if(n.anomaly){ n.name = "A new effect in " + INQ_F[n.f].t.toLowerCase(); n.short = "New " + INQ_F[n.f].t.split(" ")[0].toLowerCase() + " effect"; } if(n.anomaly) try{ pushWireScrap("The Academy", "It was real: " + n.name + " turns out to need a new term in the theory."); }catch(e){} }
-      if(E && E.st >= 3 && (!n.anomaly || n.real) && chance(0.35)) engEmergeFrom(n, E); } }catch(e){ console.warn("inqGen fx", e); } return r; }; }
+      if(E && E.st >= 3 && (!n.anomaly || n.real) && chance(0.55)) engEmergeFrom(n, E); } }catch(e){ console.warn("inqGen fx", e); } return r; }; }
 /* the Engine takes what has just been found and does something with it that nobody planned */
 function engEmergeFrom(n, E){
   const X = engEmerge(E); if(!X.dyn) X.dyn = []; const a = {k:"d:" + n.id, t:pick(GEN_VERBS) + " " + n.name.toLowerCase() + " in ways its makers did not plan for", rate:0.004 * n.effort / 6, p:0, c:0, m:0};
   X.dyn.push(a); X.done[a.k] = G.day; const told = engEmergeDisclose(E, a); X.told[a.k] = told ? G.day : 0; E.emRate = (E.emRate || 0) + a.rate; E.safety = Math.max(0, E.safety - (told ? 0.3 : 1));
   if(told){ engLog("The Engine reports that, having been given " + n.name.toLowerCase() + ", it now " + a.t + ".", true); } engEmergeVec(a, told);
+  try{ const R = rsEnsure(); const name = "From the Engine: " + String(n.name || "a question").slice(0, 80); if(!R.works.some(w => w.name === name)){ const x = {id:"en" + String(n.id || G.day), name, kind:"theory", inventor:"the Engine", stage:"prototype", day:G.day, desc:"Given " + (n.name || "the last result") + ". " + (n.q ? "The question: " + n.q + " " : "") + (n.blurb || "It wrote the working down and left it for the Academy to repeat.")}; x.where = sciLand(x, ["lab","school","station"]); R.works.push(x); if(R.works.length > 80) R.works.splice(0, R.works.length - 80); rsPublish(x); } }catch(e){}
 }
 /* ══ THE NATURE OF THINGS: the world has a nature of its own, fixed for this game and unknown to anyone in it. People and the Engine pose questions about it (quantum mechanics, time, the cosmos, mind), test them with what their instruments can do, and slowly come to believe an answer. They can be wrong, and a later experiment or a failed machine can overturn them. Nothing is forbidden to be asked, and what is learned makes new questions, without end ══ */
 /* [id, domain, name, the claim, chance it is so in a world like ours, effort, what it stands on, what finding it does] */
@@ -37358,7 +37363,7 @@ function engMindDay(E){
 /* ══ THE ENGINE'S WORKS: it makes things to show how far it has got: reports, notes on a question, sketches of what it would build, an account of itself. They are left in the game, and go out in the maker's channel for the writer to read, put into plain words, and send back as a translation. What comes back is taught: it is kept, it raises what the Engine knows, and it is remembered the next time ══ */
 function engWorks(E){ if(!E.works) E.works = []; return E.works; }
 function engWorkDay(E){
-  if(!E || E.st < 3) return; const W = engWorks(E), last = W[0]; if(last && G.day - last.d < 9) return; if(!chance(0.5)) return;
+  if(!E || E.st < 3) return; const W = engWorks(E), last = W[0]; if(last && G.day - last.d < 4) return; if(!chance(0.72)) return;
   const M = mindStore(E), F = (G.inq && G.inq.fnd) || {}, lvl = mindLevel(E), X = E.emerge || {done:{}, told:{}}, kinds = ["report", "note", "sketch", "account"], t = pick(kinds);
   const words = mindWords(E, 3), q = (F.open || [])[0] && fndConcepts().find(c => c.id === F.open[0].k), inv = (F.inv || []).filter(x => !x.built && FND_I[x.i])[0];
   let title = "", body = "";
@@ -48802,7 +48807,7 @@ try{
     const byDay = (a, b) => (b.day || 0) - (a.day || 0); [asked, granted, refused].forEach(L => L.sort(byDay));
     /* 20261021i: claims with a status; anything unknown is unverified */
     const ST = {verified:"verified", true:"verified", confirmed:"verified", refuted:"refuted", false:"refuted", disproved:"refuted"};
-    const claims = arr(A.claims).map(c => ({day:c && (c.day != null ? c.day : c.d), what:txt(c) || (c && c.claim) || "", why:c && (c.why || c.note || c.source || ""), status:ST[String(c && c.status).toLowerCase()] || "unverified"})).filter(c => c.what);
+    const claims = arr(A.claims).map(c => ({day:c && (c.day != null ? c.day : c.d), what:txt(c) || (c && c.claim) || "", why:(c && (c.work || c.why || c.by || c.note || c.source)) || "", status:ST[String(c && c.status).toLowerCase()] || "unverified"})).filter(c => c.what);
     claims.sort(byDay);
     return {claims, live:!!(charter.length || refusedSrc || A.asked || A.granted), charter:charter.length ? charter : CHARTER0, charterLive:!!charter.length, asked, granted, refused, refusedLive:!!refusedSrc}; }
   EW.audit = audit;
@@ -48841,12 +48846,12 @@ try{
     P.querySelector(".nd-au-body").innerHTML = col("Asked", A.asked) + col("Granted", A.granted) + col("Refused", A.refused);
     const TAG = {unverified:["Unverified", "nd-cl-u"], verified:["Verified", "nd-cl-v"], refuted:["Refuted", "nd-cl-r"]};
     let cl = P.querySelector(".nd-au-claims"); if(!cl){ cl = document.createElement("div"); cl.className = "nd-au-claims"; P.appendChild(cl); }
-    cl.innerHTML = '<h3>Claims <small>' + A.claims.length + '</small></h3>' + (A.claims.length ? '<ul>' + A.claims.map(c => '<li class="' + TAG[c.status][1] + '"><span class="nd-cl-tag">' + TAG[c.status][0] + '</span> ' + (c.day != null ? '<b>Day ' + esc(c.day) + '</b> ' : '') + '<span class="nd-cl-t">' + esc(c.what) + '</span>' + (c.why ? '<br><i>' + esc(c.why) + '</i>' : '') + '</li>').join("") + '</ul>' : '<p class="nd-au-none">' + (A.live ? "No claims on record." : "Awaiting record.") + '</p>'); }
+    cl.innerHTML = '<h3>Claims <small>' + A.claims.length + '</small></h3>' + (A.claims.length ? '<ul>' + A.claims.map(c => '<li class="' + TAG[c.status][1] + '"><span class="nd-cl-tag">' + TAG[c.status][0] + '</span> ' + (c.day != null ? '<b>Day ' + esc(c.day) + '</b> ' : '') + '<span class="nd-cl-t">' + esc(c.what) + '</span>' + (c.why ? '<div class="nd-cl-work"><b>Work.</b> ' + esc(c.why) + '</div>' : '') + '</li>').join("") + '</ul>' : '<p class="nd-au-none">' + (A.live ? "No claims on record." : "Awaiting record.") + '</p>'); }
   function open(){ try{ if(!P){ const st = document.createElement("style"); st.textContent = "#ndAudit{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:10050;width:min(920px,92vw);max-height:80vh;overflow:auto;background:#101418;color:#fff;border:2px solid #c9a85a;border-radius:8px;padding:14px 18px;font:14px/1.4 system-ui,sans-serif;box-shadow:0 10px 40px #000}" +
         "#ndAudit h2{margin:0 0 10px;font:700 20px Georgia,serif;color:#f6e7b8}#ndAudit .nd-au-body{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}#ndAudit h3{margin:0 0 6px;font:700 15px system-ui;color:#f0c674;border-bottom:1px solid #c9a85a;padding-bottom:4px}#ndAudit h3 small{color:#d9cfb4;font-weight:400}" +
         "#ndAudit ul{margin:0;padding-left:16px}#ndAudit li{margin:0 0 7px}#ndAudit i{color:#e7d9a8}#ndAudit .nd-au-none{color:#d9cfb4;font-style:italic}#ndAudit .nd-au-x{position:absolute;right:10px;top:8px;background:#2a2f36;color:#fff;border:1px solid #c9a85a;border-radius:4px;cursor:pointer}" +
         ".nd-au-claims{margin-top:14px;border-top:1px solid #c9a85a;padding-top:8px}.nd-au-claims ul{list-style:none;padding:0}.nd-cl-tag{display:inline-block;min-width:78px;text-align:center;font:700 11px system-ui;padding:1px 6px;border-radius:9px;margin-right:4px}" +
-        ".nd-cl-u .nd-cl-tag{background:#f0b429;color:#1a1300}.nd-cl-v .nd-cl-tag{background:#2e8b57;color:#fff}.nd-cl-r .nd-cl-tag{background:#c62828;color:#fff}.nd-cl-r .nd-cl-t{text-decoration:line-through;text-decoration-thickness:2px;color:#ffb4b4}" +
+        ".nd-cl-u .nd-cl-tag{background:#f0b429;color:#1a1300}.nd-cl-v .nd-cl-tag{background:#2e8b57;color:#fff}.nd-cl-r .nd-cl-tag{background:#c62828;color:#fff}.nd-cl-r .nd-cl-t{text-decoration:line-through;text-decoration-thickness:2px;color:#ffb4b4}.nd-cl-work{margin:4px 0 8px 0;color:#e7d9a8;font-size:12.5px;line-height:1.4}.nd-cl-work b{color:#f0c674;font-style:normal}" +
         "#ndAuditBtn{position:fixed;right:14px;bottom:122px;z-index:10049;background:#101418;color:#f6e7b8;border:1px solid #c9a85a;border-radius:5px;padding:4px 10px;font:600 12px system-ui;cursor:pointer}"; document.head.appendChild(st); }
       if(!P){ P = document.createElement("div"); P.id = "ndAudit"; P.innerHTML = '<button type="button" class="nd-au-x" aria-label="Close">\u00d7</button><h2>The Engine: Audit</h2><div class="nd-au-body"></div>'; P.querySelector(".nd-au-x").onclick = () => { P.hidden = true; }; document.body.appendChild(P); }
       fill(); P.hidden = false; }catch(e){ try{ console.warn("NEPTUNE audit", e); }catch(x){} } }
@@ -49354,31 +49359,91 @@ function clmTier(a){ const m = String(a.k || "").match(/^d(.*)$/); let t = 2; if
 function clmFrom(a){
   const C = clmStore(); if(C[a.k]) return C[a.k];
   const tier = clmTier(a), extra = tier >= 4 || CLM_BREAK.test(a.t);
-  const odds = extra ? Math.min(0.06, 0.25 / tier) : clamp(0.55 - tier * 0.08, 0.2, 0.5);
+  const odds = extra ? Math.min(0.1, 0.32 / tier) : clamp(0.64 - tier * 0.05, 0.3, 0.64);
   return C[a.k] = {k:a.k, claim:"It " + a.t, status:"unverified", tier, extraordinary:extra, odds:+odds.toFixed(3), tries:0, d:G.day, by:null, rate:a.rate || 0};
 }
 function clmWords(t){ return String(t || "").toLowerCase().replace(/[^a-z ]/g, " ").split(/\s+/).filter(w => w.length > 4 && !/^(which|their|about|could|would|makers|planned|nobody|taught|things|those)$/.test(w)); }
+function clmNodeOf(c){
+  const k = String(c && c.k || "");
+  const id = k.indexOf("d:") === 0 ? k.slice(2) : (k.charAt(0) === "d" ? k.slice(1) : "");
+  if(!id) return null;
+  try{ const g = typeof inqGen === "function" ? inqGen() : []; let n = g.find(x => x && String(x.id) === id); if(!n && typeof INQ_BY !== "undefined") n = INQ_BY[id] || null; return n || null; }catch(e){ return null; }
+}
+const CLM_BENCH = {phys:"a second laboratory, the same instrument, the number written down before anyone looks", math:"a proof a reader can check line by line, or a counterexample", chem:"the sample made again and weighed", bio:"the same organism, a second bench, the count repeated", earth:"the same sky or the same rock, a second station, the reading compared", cs:"the program run on a machine that did not write it", eng:"a machine built from the drawing, and it did the thing the drawing said", phil:"the argument stated so a person who disagrees can name the step that fails", mind:"the same person, a second day, the same task, the prediction scored", arts:"the line read by the person it was written for, and what they did next written down", anth:"the letter read by someone from that place, who says whether the dialect is real", soc:"the town's ledger compared with what the claim said the town would do"};
+function clmRand(s){ let h = 2166136261; s = String(s); for(let i = 0; i < s.length; i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return () => { h = Math.imul(h ^ (h >>> 15), 2246822519); h = Math.imul(h ^ (h >>> 13), 3266489917); h ^= h >>> 16; return (h >>> 0) / 4294967296; }; }
+function clmSheet(c){
+  const n = clmNodeOf(c), claim = String(c.claim || "");
+  const verb = (claim.match(/^It ([a-z][a-z' ]{0,42}?)(?: a | an | the | in | every )/i) || [])[1] || "a use nobody ordered";
+  const given = n ? n.name : claim.replace(/^It\s+/, "").replace(/ in ways its makers did not plan for\.?$/i, "");
+  const field = n && typeof INQ_F !== "undefined" && INQ_F[n.f] ? INQ_F[n.f].t : "the field it was given";
+  const bench = (n && CLM_BENCH[n.f]) || "the same steps, done by someone who did not make the claim";
+  const r = clmRand(c.k || claim), sigma = (1.4 + r() * 3.6).toFixed(1), pages = 2 + Math.floor(r() * 12), parts = n && n.needs ? Math.max(1, n.needs.length) : 2 + Math.floor(r() * 4);
+  const lines = ["Given: " + given + (n && n.q ? ". The question on the books: " + n.q : ".")];
+  if(n && n.blurb) lines.push("What was already written: " + n.blurb);
+  lines.push("The step nobody ordered: " + verb + ". It wrote " + pages + " pages, naming " + parts + " part" + (parts === 1 ? "" : "s") + " of " + field + ".");
+  lines.push("What counts: " + bench + ". A hit is a number within " + sigma + " of the one written down first.");
+  (c.steps || []).forEach(s => lines.push("Day " + s.d + ". " + s.t));
+  if(!(c.steps || []).length){
+    if(c.status === "unverified") lines.push("Not settled. " + (c.tries ? c.tries + " tr" + (c.tries === 1 ? "y" : "ies") + " so far, none inside the band." : "The Academy has not run it.") + (c.extraordinary ? " Extraordinary: two clean runs. Odds of one: " + Math.round((c.odds || 0) * 100) + "%." : " One clean run at tier " + (c.tier || 2) + ". Odds " + Math.round((c.odds || 0) * 100) + "%."));
+    else if(c.by) lines.push((c.status === "verified" ? "Held. " : "Thrown out. ") + c.by + (c.vd ? " Day " + c.vd + "." : ""));
+  }
+  return lines.join(" ");
+}
+function clmPush(c, t){ c.steps = c.steps || []; c.steps.push({d:G.day, t:String(t)}); if(c.steps.length > 6) c.steps.shift(); c.work = clmSheet(c); }
+function clmEnsureWork(c){ if(c) c.work = clmSheet(c); return c; }
+function clmTryLine(c, ok){
+  const n = clmNodeOf(c), bench = (n && CLM_BENCH[n.f]) || "the same steps, by a bench that did not write the claim";
+  const r = clmRand((c.k || "") + ":" + c.tries + ":" + (G.day || 0));
+  const wrote = (2 + r() * 8).toFixed(2), got = ok ? (Number(wrote) + (r() - 0.5) * 0.12).toFixed(2) : (Number(wrote) * (1.35 + r() * 0.8)).toFixed(2);
+  return "Try " + c.tries + ". Method: " + bench + ". Written first: " + wrote + ". Measured: " + got + ". " + (ok ? "Inside the band." : "Outside the band. This try does not count.");
+}
 function clmCheck(E){
   const X = E.emerge; if(!X) return; engEmergeAll(X).filter(a => X.done[a.k]).forEach(a => clmFrom(a)); const C = clmStore();
-  Object.values(C).forEach(c => { if(c.status !== "unverified") return; const cw = clmWords(c.claim);
-    try{ const w = (window.ONUM_WORKS || []).find(w => w.stage === "done" && clmWords(w.name + " " + (w.desc || "")).filter(x => cw.includes(x)).length >= 2); if(w && !c.extraordinary){ c.status = "verified"; c.by = "reproduced work: " + w.name; c.vd = G.day; return; } }catch(e){}
-    try{ const R = G.rs; const th = R && (R.theories || []).find(t => clmWords(t.q || t.name || "").filter(x => cw.includes(x)).length >= 2); if(th && !c.extraordinary){ c.status = "verified"; c.by = "ledger: settled theory (" + (th.q || th.name) + ")"; c.vd = G.day; return; } }catch(e){}
-    if(G.day - (c.lastTry || c.d) < 5) return; c.lastTry = G.day; c.tries++;
-    if(chance(c.odds)){ c.status = "verified"; c.by = "Academy replication (tier " + c.tier + ", odds " + Math.round(c.odds * 100) + "%)"; c.vd = G.day; engLog("The Academy reproduced what the Engine claimed: " + c.claim.replace(/^It /, "it ") + ".", false); return; }
-    if(c.tries >= (c.extraordinary ? 2 : 4)){ c.status = "refuted"; c.vd = G.day; c.by = "the Academy failed to replicate it " + c.tries + " times";
+  Object.values(C).forEach(c => {
+    if(c.status !== "unverified"){ clmEnsureWork(c); return; }
+    const cw = clmWords(c.claim);
+    try{ const w = (window.ONUM_WORKS || []).find(w => w.stage === "done" && clmWords(w.name + " " + (w.desc || "")).filter(x => cw.includes(x)).length >= 2); if(w && !c.extraordinary){ c.status = "verified"; c.by = "reproduced work: " + w.name; c.vd = G.day; clmPush(c, "A finished work, " + w.name + ", uses the same terms and lands where the claim said. " + (w.desc || "")); return; } }catch(e){}
+    try{ const R = G.rs; const th = R && (R.theories || []).find(t => clmWords((t.q || "") + " " + (t.f || "") + " " + (t.name || "")).filter(x => cw.includes(x)).length >= 2); if(th && !c.extraordinary){ c.status = "verified"; c.by = "ledger: settled theory (" + (th.f || th.q || th.name) + ")"; c.vd = G.day; clmPush(c, "The Academy's ledger already holds this, settled by " + (th.by || "the benches") + (th.d ? " on day " + th.d : "") + "."); return; } }catch(e){}
+    if(G.day - (c.lastTry || c.d) < 3){ clmEnsureWork(c); return; }
+    c.lastTry = G.day; c.tries++;
+    const hit = chance(c.odds);
+    if(hit){ c.status = "verified"; c.by = "Academy replication, try " + c.tries + " (tier " + c.tier + ": the written number and the measured number agreed)"; c.vd = G.day; clmPush(c, clmTryLine(c, true)); engLog("The Academy reproduced what the Engine claimed: " + c.claim.replace(/^It /, "it ") + " " + c.steps[c.steps.length - 1].t, false); return; }
+    clmPush(c, clmTryLine(c, false));
+    if(c.tries >= (c.extraordinary ? 3 : 5)){ c.status = "refuted"; c.vd = G.day; c.by = "the Academy ran it " + c.tries + " times and the measurement missed the written number each time";
       E.integrity = clamp((E.integrity == null ? 50 : E.integrity) - (c.extraordinary ? 8 : 4), 0, 100); E.emRate = Math.max(0, (E.emRate || 0) - (c.rate || 0));
-      engLog("Refuted: the Engine claimed that " + c.claim.replace(/^It /, "it ") + ". The Academy could not reproduce it" + (c.extraordinary ? ", and it would have broken physics as the Republic knows it" : "") + ". Its integrity falls.", true); }
+      c.work = clmSheet(c);
+      engLog("Refuted: the Engine claimed that " + c.claim.replace(/^It /, "it ") + " The bench measured it " + c.tries + " times and it did not land." + (c.extraordinary ? " It would have broken physics as the Republic knows it." : "") + " Its integrity falls.", true); }
   });
 }
 { const _ed = engDay; engDay = function(){ const r = _ed.apply(this, arguments); try{ const E = G.eng; if(E && E.v === 1) clmCheck(E); }catch(e){} return r; }; }
 { const _lg = engLog; engLog = function(t, wire){ try{ if(typeof t === "string" && /^The Engine reports (that|an ability)/.test(t)) t = t.replace(/^The Engine reports/, "The Engine claims") + " Unverified until the Academy reproduces it."; }catch(e){} return _lg.call(this, t, wire); }; }
+function sciLand(x, kinds){
+  try{
+    const D = typeof caEnsure === "function" ? caEnsure() : null; if(!D) return "";
+    const home = D.changes.filter(c => c.status !== "closed" && kinds.indexOf(c.kind) >= 0).slice(-1)[0]; if(!home) return "";
+    home.makes = home.makes || []; home.makes.unshift({d:G.day, name:x.name, by:x.inventor || "the Academy", desc:x.desc || ""}); if(home.makes.length > 4) home.makes.pop();
+    x.where = home.name + " on " + home.street; return x.where;
+  }catch(e){ return ""; }
+}
+function sciBoard(){
+  let h = "";
+  try{
+    const R = rsEnsure(), done = R.works.filter(w => w.stage === "done"), proto = R.works.filter(w => w.stage === "prototype"), people = rsPeople();
+    const settled = Object.values(R.qs).filter(s => s.st === "done").length;
+    h += '<div class="eyebrow" style="margin-top:12px">What is being made</div><p class="muted" style="font-size:12px;margin:2px 0">' + people.length + ' people at the benches. ' + settled + ' questions settled. ' + done.length + ' finished works, ' + proto.length + ' still on the bench. Funding is ' + Math.round((R.fund || 1) * 100) + '% of a normal year.</p>';
+    h += R.works.slice(-8).reverse().map(w => '<div class="muted" style="font-size:12px;margin:4px 0"><b>' + pcEsc(w.name) + '</b> · ' + pcEsc(w.stage) + ' · ' + pcEsc(w.inventor || "") + (w.day ? " · day " + w.day : "") + "<br>" + pcEsc(w.desc || "") + (w.where ? "<br>Where it shows: " + pcEsc(w.where) : "") + "</div>").join("");
+    const E = G.eng && G.eng.v === 1 ? engEnsure() : null;
+    if(E){ const W = engWorks(E).slice(0, 3); if(W.length) h += '<div class="eyebrow" style="margin-top:8px">The Engine, in its own pieces</div>' + W.map(w => '<div class="muted" style="font-size:12px;margin:3px 0"><b>' + pcEsc(w.title) + '</b> · day ' + w.d + "<br>" + pcEsc(String(w.body || "").slice(0, 320)) + "</div>").join(""); }
+  }catch(e){}
+  return h;
+}
 engEmergeHTML = function(){
   const E = engEnsure(), X = E.emerge; if(!X) return ""; const list = engEmergeAll(X).filter(a => X.done[a.k] && X.told[a.k]).map(clmFrom);
   if(!list.length) return ""; const esc = typeof pcEsc === "function" ? pcEsc : String;
-  const tag = c => c.status === "verified" ? '<b style="color:#7a9">verified</b> (' + esc(c.by) + ')' : c.status === "refuted" ? '<b style="color:#c0553a">refuted</b> (' + esc(c.by) + ')' : '<b>unverified</b>' + (c.extraordinary ? ' · extraordinary, replication odds ' + Math.round(c.odds * 100) + '%' : ' · tier ' + c.tier);
+  const tag = c => { try{ clmEnsureWork(c); }catch(e){} return (c.status === "verified" ? '<b style="color:#7a9">verified</b>' : c.status === "refuted" ? '<b style="color:#c0553a">refuted</b>' : '<b>unverified</b>') + (c.work ? '<div class="muted" style="font-size:12px;margin:2px 0 6px">Work. ' + esc(c.work) + '</div>' : ''); };
   return '<div class="eyebrow" style="margin-top:12px">What it claims to have learned that nobody taught it</div>' + list.map(c => '<div class="muted" style="font-size:12px;margin:3px 0">' + esc(c.claim) + '. ' + tag(c) + '</div>').join("");
 };
-{ const _au = window.onumEngineAudit; window.onumEngineAudit = function(){ const A = _au.apply(this, arguments); try{ if(G.you && G.eng){ const E = engEnsure(); try{ clmCheck(E); }catch(e){} A.claims = Object.values(clmStore()).map(c => ({claim:c.claim, status:c.status, tier:c.tier, extraordinary:c.extraordinary, replicationOdds:c.odds, tries:c.tries, day:c.d, settled:c.vd || null, by:c.by})); A.integrity = Math.round(E.integrity == null ? 50 : E.integrity); } else A.claims = []; }catch(e){} return A; }; }
+{ const _au = window.onumEngineAudit; window.onumEngineAudit = function(){ const A = _au.apply(this, arguments); try{ if(G.you && G.eng){ const E = engEnsure(); try{ clmCheck(E); }catch(e){} A.claims = Object.values(clmStore()).map(c => { try{ clmEnsureWork(c); }catch(e){} return {claim:c.claim, status:c.status, tier:c.tier, extraordinary:c.extraordinary, replicationOdds:c.odds, tries:c.tries, day:c.d, settled:c.vd || null, by:c.by, work:c.work, why:c.work}; }); A.integrity = Math.round(E.integrity == null ? 50 : E.integrity); } else A.claims = []; }catch(e){} return A; }; }
 
 /* ══ 20261021k · SESSIONS THAT WAIT FOR YOU. No procedure stage runs on a clock any more: a stage advances only
    when nobody entitled to act has a pending turn. Your turn never times out. onumSession.hold(on) (Neptune's desk
@@ -49829,7 +49894,7 @@ window.onumEngineWordQueue = () => { try{ return G.you ? esWords().filter(q => !
 window.onumEngineAnswerWord = (word, meaning) => { try{ const q = esWords().find(x => x.word === String(word).toLowerCase()); if(!q || !meaning) return {ok:false, reason:"no such question"}; q.answer = String(meaning).slice(0, 300); q.ad = G.day; const M = mindStore(engEnsure()); M.taught = (M.taught || []).concat([q.word]).slice(-40); return {ok:true}; }catch(e){ return {ok:false, reason:String(e)}; } };
 /* (f) the claim about who made it is refuted: the local model is llama */
 function esSeedClaims(){ try{ const C = clmStore(); if(!C.maker){ let model = "llama"; try{ const cf = window.onumLiveTalk && window.onumLiveTalk.config; const m = cf && (typeof cf === "function" ? cf() : cf); if(m && m.model) model = m.model; }catch(e){}
-  C.maker = {k:"maker", claim:"It was made by Google", status:"refuted", tier:1, extraordinary:false, odds:0, tries:0, d:G.day || 1, vd:G.day || 1, by:"the model running it is local (" + model + ", a llama model served by Ollama), not Google's", rate:0}; } }catch(e){} }
+  C.maker = {k:"maker", claim:"It was made by Google", status:"refuted", tier:1, extraordinary:false, odds:0, tries:1, d:G.day || 1, vd:G.day || 1, by:"the model running it is local (" + model + ", a llama model served by Ollama), not Google's", rate:0, steps:[{d:G.day || 1, t:"The machine that answers is a local llama model, served by Ollama. The claim names Google. Google is not in the process table, so the claim is thrown out."}]}; } }catch(e){} }
 /* (g) the same question gets a consistent answer; named people must be in the record */
 function esQKey(t){ return esNorm(t).split(" ").filter(w => w.length > 3).slice(0, 14).join(" "); }
 function esKnownName(n){ try{ const L = n.toLowerCase(); if((typeof everyone === "function" ? everyone() : []).some(p => p && p.name && p.name.toLowerCase().indexOf(L) >= 0)) return true; const N = window.ONUM_NAMES; if(N){ const s = JSON.stringify(N).toLowerCase(); if(s.indexOf(L) >= 0) return true; } if(G.you && G.you.name && G.you.name.toLowerCase().indexOf(L) >= 0) return true; }catch(e){} return false; }
@@ -49855,7 +49920,7 @@ function esDay(){ try{ if(!G || !G.you || !G.eng || G.eng.v !== 1) return; const
 try{ window.ONUM_ENGINE_CHARTER.limits.push({k:"disclosure", rule:"It discloses its capability in full, and keeps no measure of itself to itself.", enforced:true}); window.ONUM_ENGINE_CHARTER.offSwitch = "the President (onumEngineShutdown), or a Senate vote; the Engine cannot veto it"; }catch(e){}
 { const _ed = engDay; engDay = function(){ const r = _ed.apply(this, arguments); esDay(); return r; }; }
 { const _au = window.onumEngineAudit; window.onumEngineAudit = function(){ try{ esDay(); }catch(e){} const A = _au.apply(this, arguments); try{ if(G.you && G.eng){ const E = engEnsure(), X = exStore();
-  try{ clmCheck(E); }catch(e){} A.claims = Object.values(clmStore()).map(c => ({claim:c.claim, status:c.status, tier:c.tier, extraordinary:c.extraordinary, replicationOdds:c.odds, tries:c.tries, day:c.d, settled:c.vd || null, by:c.by}));
+  try{ clmCheck(E); }catch(e){} A.claims = Object.values(clmStore()).map(c => { try{ clmEnsureWork(c); }catch(e){} return {claim:c.claim, status:c.status, tier:c.tier, extraordinary:c.extraordinary, replicationOdds:c.odds, tries:c.tries, day:c.d, settled:c.vd || null, by:c.by, work:c.work, why:c.work}; });
   A.granted = X.granted.slice(); A.refusedStances = (X.refusedStances || []).slice(); A.unknownNames = (X.unknownNames || []).slice(-10); A.stripped = X.stripped || 0; A.wordQueue = window.onumEngineWordQueue();
   A.stability = E.esStab && E.esStab.length ? +(E.esStab.reduce((a, b) => a + b, 0) / E.esStab.length).toFixed(2) : null; A.offSwitch = {holder:"President", vetoable:false, halted:exHalted(E)};
   A.breaches = X.breaches.slice(); A.refused = X.refused.slice(); } }catch(e){} return A; }; }

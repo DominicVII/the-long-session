@@ -1,3 +1,9 @@
+## 20261107j: the work under the claim
+
+- Every Engine claim now shows the work: what it was given, the pages it wrote, the measurement that would count, and each try the Academy ran.
+- The Academy finishes questions faster and files the finished thing. The Engine files its own pieces more often.
+- Labs, schools, stations and the shops that can use a machine show what they are turning out. The same list is on the Academy, the Engine and the district.
+
 ## 20261107i: the meeting is the desk
 
 - Point of order, press, challenge, call on, chair, pass, interject, next, your vote, and a secretary's office sit on the floor desk, not on a second bar.
