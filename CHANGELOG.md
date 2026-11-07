@@ -4,6 +4,11 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261107c: your vote is the one you set
+
+- Aye, no, or clear, on the bill and on the meeting bar. That is what you tell them when they ask.
+- A sitting no longer invents your side from mood. Until you set it, the answer is that you have not said.
+
 ## 20261107b: the herd is in the room
 
 - Members who are going with the room drift toward their own side. The ones who refuse it stand off by the wall.

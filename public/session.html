@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261107b">
+<meta name="onum-build" content="20261107c">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -25,7 +25,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261107b";
+  var STAMP = "20261107c";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -2657,6 +2657,12 @@ function natureOf(m, bill){
 
 function memberVote(m, bill){
   if(m && m.kind === "envoy") return 0;
+  /* the player's vote is the one they set, never the mood */
+  if(m && G.you && (m === G.you || m.kind === "you")){
+    const p = preferredVote(bill);
+    if(p === 1 || p === -1) return p;
+    return 0;
+  }
   /* Taylor Day: the House votes the First Order line — locked for every member */
   if(bill && typeof isTaylorDay === "function" && isTaylorDay()) return firstOrderTraditionVote(bill);
   /* COLLAB HOOK: absent partner uses ProxyAI from their action log */
@@ -19025,8 +19031,9 @@ function phoneBillHtml(){
     '<p class="muted">Intention: <strong>' + (you.vote===1?"aye":you.vote===-1?"no":"undeclared") + '</strong>' +
       (b.voteDay ? ' · roll call day ' + b.voteDay : '') + '</p>' +
     '<div class="risk__actions">' +
-      '<button class="conc__btn" type="button" data-gp="phone-vote:1" data-phone-vote="1">Vote aye</button>' +
-      '<button class="conc__btn" type="button" data-gp="phone-vote:-1" data-phone-vote="-1">Vote no</button>' +
+      '<button class="conc__btn" type="button" data-gp="phone-vote:1" data-phone-vote="1">My vote: aye</button>' +
+      '<button class="conc__btn" type="button" data-gp="phone-vote:-1" data-phone-vote="-1">My vote: no</button>' +
+      '<button class="conc__btn" type="button" data-gp="phone-vote:0" data-phone-vote="0">Clear my vote</button>' +
     '</div></div>';
 }
 function phoneMailHtml(){
@@ -19119,9 +19126,10 @@ function phoneCard(){
   card.querySelectorAll("[data-phone-vote]").forEach(btn => btn.addEventListener("click", () => {
     if(!G.bill || G.bill.done) return;
     const vote = +btn.getAttribute("data-phone-vote");
-    if(vote !== 1 && vote !== -1) return;
+    if(vote !== 1 && vote !== -1 && vote !== 0) return;
+    if(vote === 0){ setMyVote(null); feed("Your vote is cleared. You have not told them."); try{ queueSave(); }catch(e){} phoneCard(); return; }
     if(!inHouse()){ feed("You have no vote in the House."); return; }
-    G.you.vote = vote;
+    setMyVote(vote);
     try{ taylorDayVoteDefiance(vote); }catch(e){}
     feed(vote > 0 ? "Phone vote recorded: yes." : "Phone vote recorded: no.");
     try{ queueSave(); }catch(e){}
@@ -25808,6 +25816,11 @@ function dossierFor(m){
   L.push("THE PERSON YOU ARE TALKING TO: " + you.name + ", " + partyName(you.party) +
     (youPost ? ", " + youPost : "") + ", " + youTitle + " (" + youPlace + ").");
   try{ const Y = ndYou(); if(Y.formerLine) L.push("They are " + Y.formerLine + " (history only)."); if(Y.homeLine) L.push(Y.homeLine); }catch(e){}
+  try{
+    const pv = (b && !b.done && typeof preferredVote === "function") ? preferredVote(b) : null;
+    if(b && !b.done && (pv === 1 || pv === -1)) L.push("THEIR VOTE, WHICH THEY SET AND WHICH THEIR MOOD DOES NOT CHANGE: they are a " + (pv > 0 ? "yes" : "no") + " on " + b.title + ". If you ask how they will vote, that is the answer. Do not guess a different one from their manner.");
+    else if(b && !b.done) L.push("They have not set a vote on " + b.title + ". If you ask, they have not said. Do not invent one from their mood.");
+  }catch(e){}
   L.push("Address them as " + youTitle + ". " + (youHouse
     ? "They sit in the House with you, as a fellow member."
     : "They do not sit in the House with you any more; they hold the office above, and you speak to them as the " + youTitle + " they are."));
@@ -27732,7 +27745,7 @@ function honestBeats(kind){
   const b = M.b, side = sideWord(M.dir), town = M.town;
   const out = [];
   if(!b || !M.dir) {
-    out.push({order:1, t:"What I mean", line:"I am not here to give the speech this room has already heard. " + town + " is who I answer to, and I will say the thing once.", stance:1, mins:10});
+    out.push({order:1, t:"What I mean", line: b ? ("I have not set my vote on " + b.title + ". I will not let the mood of the day answer for me.") : ("I am not here to give the speech this room has already heard. " + town + " is who I answer to, and I will say the thing once."), stance:1, mins:10});
     return out;
   }
   out.push({order:1, t:"The vote", line:"I am a " + side + " on " + b.title + ". That is the position. I am not wrapping it in a phrase the last sitting already used.", stance:M.dir, mins:10});
@@ -30570,12 +30583,29 @@ function floorSitsNow(){
     return (m >= 11*60 && m < 12*60 + 36) || (m >= 14*60 && m < 17*60);
   }catch(e){ return false; }
 }
+function setMyVote(v){
+  if(!G.you || !G.bill || G.bill.done) return false;
+  if(v !== 1 && v !== -1 && v !== null) return false;
+  G.you.vote = v;
+  G.you.voteBill = v == null ? null : G.bill.id;
+  G.bill.myVote = v;
+  try{ queueSave(); }catch(e){}
+  return true;
+}
+function preferredVote(bill){
+  bill = bill || (G.bill && !G.bill.done ? G.bill : null);
+  if(!bill || !G.you) return null;
+  if(bill.myVote === 1 || bill.myVote === -1) return bill.myVote;
+  if((G.you.vote === 1 || G.you.vote === -1) && (G.you.voteBill == null || G.you.voteBill === bill.id)){
+    bill.myVote = G.you.vote; G.you.voteBill = bill.id;
+    return G.you.vote;
+  }
+  return null;
+}
 function yourSide(b){
-  b = b || G.bill; if(!b || !G.you) return 1;
-  if(G.you.vote === 1 || G.you.vote === -1) return G.you.vote;
-  if(b.mine) return 1;
-  try{ const l = partyLine(b)[G.you.party]; if(l) return l > 0 ? 1 : -1; }catch(e){}
-  try{ return alignment(G.you, b) > 0 ? 1 : -1; }catch(e){ return 1; }
+  b = b || G.bill; if(!b || !G.you) return 0;
+  const p = preferredVote(b);
+  return (p === 1 || p === -1) ? p : 0;
 }
 function whipRoomName(m){
   if(!m) return "";
@@ -30606,7 +30636,7 @@ function whipCard(){
   try{ closeTalk(); }catch(e){}
   const b = W.b, side = W.side;
   G.running = false;
-  const sideWord = side > 0 ? "aye" : "no";
+  const sideWord = side > 0 ? "aye" : side < 0 ? "no" : "not set";
   const here = (m) => m.room === G.room;
   const row = (r) => '<div class="whip__row">' +
     '<span class="whip__n">' + r.m.name + ' <i>' + (r.m.party || "") + '</i></span>' +
@@ -39772,12 +39802,13 @@ function refreshFloor(){
             (you.influence < 10 || you.out ? ' disabled' : '') + '>Toward ' + a.lo +
             '<u>a bill pushing ' + a.n.toLowerCase() + ' hard to the ' + a.lo + '</u></button></div>').join("") +
       '</div></div>' +
-    '<div class="card__actions"><button class="btn btn--ghost" type="button" id="voteAye">Vote aye</button>' +
-      '<button class="btn btn--ghost" type="button" id="voteNo">Vote no</button>' +
+    '<div class="card__actions"><button class="btn btn--ghost" type="button" id="voteAye">My vote: aye</button>' +
+      '<button class="btn btn--ghost" type="button" id="voteNo">My vote: no</button>' +
+      '<button class="btn btn--ghost" type="button" id="voteClear">Clear it</button>' +
       (canMark ? '<button class="btn btn--ghost" type="button" id="markUp">Mark it up in ' + com.t + '</button>' : '') +
     '</div>' +
     '<p class="muted" style="margin-top:8px">Intention: <strong>' +
-      (you.vote===1?"aye":you.vote===-1?"no":"undeclared") + '</strong>' +
+      (you.vote===1?"aye":you.vote===-1?"no":"not set") + '</strong>. This is what you tell them when they ask. Mood does not change it.' +
       (canMark ? ' · Marking up costs 60 minutes and 10 influence, moves the bill toward your district, and the leadership will notice.' : '') + '</p>';
   /* the chamber: only offered when you are actually on the floor */
   if(G.room === "floor"){
@@ -39810,16 +39841,17 @@ function refreshFloor(){
     const [ax, d] = btn.getAttribute("data-bill").split(":");
     proposeBill(ax, +d);
   }));
-  const a = el("voteAye"), n = el("voteNo"), mk = el("markUp");
+  const a = el("voteAye"), n = el("voteNo"), vc = el("voteClear"), mk = el("markUp");
+  if(vc) vc.addEventListener("click", () => { setMyVote(null); refreshPanels(); });
   if(a) a.addEventListener("click", () => {
-    G.you.vote = 1;
+    setMyVote(1);
     try{ taylorDayVoteDefiance(1); }catch(e){}
     refreshPanels();
     /* COLLAB HOOK: intention logged as soft signal until roll call */
     try{ if(typeof TLSCollab !== "undefined" && G.bill) TLSCollab.recordAction({kind:"intention", vote:1, billId:G.bill.id, title:G.bill.title, pos:G.bill.pos&&{econ:G.bill.pos.econ,lib:G.bill.pos.lib,def:G.bill.pos.def,wel:G.bill.pos.wel}}); }catch(e){}
   });
   if(n) n.addEventListener("click", () => {
-    G.you.vote = -1;
+    setMyVote(-1);
     try{ taylorDayVoteDefiance(-1); }catch(e){}
     refreshPanels();
     try{ if(typeof TLSCollab !== "undefined" && G.bill) TLSCollab.recordAction({kind:"intention", vote:-1, billId:G.bill.id, title:G.bill.title, pos:G.bill.pos&&{econ:G.bill.pos.econ,lib:G.bill.pos.lib,def:G.bill.pos.def,wel:G.bill.pos.wel}}); }catch(e){}
@@ -45207,12 +45239,12 @@ try{
     if(SX.matter[room]) return SX.matter[room]();
     const y = G.you, bill = G.bill && !G.bill.done ? G.bill : null, cs = (G.cases || []).find(x => x && !x.done);
     const st = (G.states || []).find(s => s.n === y.state), hot = (G.states || []).slice().sort((a, b) => (b.unrest || 0) - (a.unrest || 0))[0];
-    let side = 1; try{ if(bill) side = alignment(y, bill) >= 0 ? 1 : -1; }catch(e){}
+    let side = 0; try{ if(bill) side = (typeof preferredVote === "function" ? preferredVote(bill) : (y.vote === 1 || y.vote === -1 ? y.vote : 0)) || 0; }catch(e){}
     const bt = bill ? bill.title : "the appropriations calendar";
     const M = {
-      senate:{q:(side > 0 ? "passing " : "defeating ") + bt, short:bt, yes:"aye", no:"no", comp:"a sunset clause and a cap on the first-year cost"},
-      committee:{q:(side > 0 ? "reporting " : "holding ") + bt + (side > 0 ? " to the floor" : " in committee"), short:bt, yes:"report it", no:"hold it", comp:"a markup that strikes section four and adds a review in two years"},
-      caucus:{q:"the party line on " + bt + " being " + (side > 0 ? "yes" : "no"), short:bt, yes:"hold the line", no:"a free vote", comp:"a free vote for members from close districts, the line for everyone else"},
+      senate:{q:(side > 0 ? "passing " : side < 0 ? "defeating " : "whether to pass ") + bt, short:bt, yes:"aye", no:"no", comp:"a sunset clause and a cap on the first-year cost"},
+      committee:{q:(side > 0 ? "reporting " : side < 0 ? "holding " : "what to do with ") + bt + (side > 0 ? " to the floor" : side < 0 ? " in committee" : ""), short:bt, yes:"report it", no:"hold it", comp:"a markup that strikes section four and adds a review in two years"},
+      caucus:{q:"your vote on " + bt + " being " + (side > 0 ? "yes" : side < 0 ? "no" : "not yet set"), short:bt, yes:"hold the line", no:"a free vote", comp:"a free vote for members from close districts, the line for everyone else"},
       court:{q:cs ? "a ruling that " + (cs.t || "the act") + " stands" : "denying the motion on filing deadlines", short:cs ? (cs.t || "the case") : "the motion", yes:"for the Union", no:"for the petitioner", comp:"a narrow holding on this record only"},
       exec:{q:"sending emergency money to " + (hot ? hot.n : "the worst-hit state") + " today", short:"aid to " + (hot ? hot.n : "the states"), yes:"sign it", no:"hold it", comp:"half now, half after the auditors report"},
       govoffice:{q:"fixing what the petitioners brought in today out of this year's budget", short:"the petitions", yes:"grant", no:"defer", comp:"the road and the school now, the water main in the spring budget"},
@@ -45254,7 +45286,7 @@ try{
     out.forEach((p, i) => {
       p.id = i; p.sn = sn(p.name); p.spoke = 0; p.cut = 0; p.dealt = false; p.moved = 0; p.hist = [];
       let lean = 0;
-      try{ if(p.m && M.bill){ const v = memberVote(p.m, M.bill); lean = v * (alignment(y, M.bill) >= 0 ? 1 : -1) * 22; } }catch(e){}
+      try{ if(p.m && M.bill){ const v = memberVote(p.m, M.bill); const mine = (typeof preferredVote === "function" ? preferredVote(M.bill) : 0) || 0; lean = mine ? v * mine * 22 : 0; } }catch(e){}
       if(p.m && p.party === y.party) lean += 10; else if(p.m && p.party) lean -= 6;
       if(/counsel for the Union|budget director|witness/.test(p.role)) lean -= 14;
       if(/petitioner|deputy for the states|home-state/.test(p.role)) lean += 8;
@@ -45543,12 +45575,12 @@ try{
     for(let i = 0; i < (n || 1); i++){
       const t = tg[i] || C[0]; if(!t) break;
       let reason = "";
-      try{ const b = M.bill; if(b && b.pos){ const ax = AXES.slice().sort((x, z) => Math.abs(b.pos[z.k] || 0) - Math.abs(b.pos[x.k] || 0))[0], dir = (b.pos[ax.k] || 0) > 0 ? 1 : -1, yAye = alignment(y, b) >= 0, bank = DK_READ[ax.k] && DK_READ[ax.k][dir] && DK_READ[ax.k][dir][yAye ? "for" : "against"]; if(bank) reason = bank[Math.floor(Math.random() * bank.length)]; } }catch(e){}
+      try{ const b = M.bill; const mine = b ? ((typeof preferredVote === "function" ? preferredVote(b) : 0) || 0) : 0; if(b && !mine) reason = "My principal has not set a vote, and I will not invent one from the mood of the day"; else if(b && b.pos){ const ax = AXES.slice().sort((x, z) => Math.abs(b.pos[z.k] || 0) - Math.abs(b.pos[x.k] || 0))[0], dir = (b.pos[ax.k] || 0) > 0 ? 1 : -1, yAye = mine > 0, bank = DK_READ[ax.k] && DK_READ[ax.k][dir] && DK_READ[ax.k][dir][yAye ? "for" : "against"]; if(bank) reason = bank[Math.floor(Math.random() * bank.length)]; } }catch(e){}
       if(t.case && t.case.settleShort){ const text2 = (i === 0 ? one(["The chair will forgive me; I speak for the Governor. ", "Let me put the Governor's case, since it is not being put. "]) : "And to " + t.sn + " directly: ") + "The Governor does not doubt " + t.case.short + ". The question is how: " + t.case.settleShort + " gets " + t.sn + " most of what they came for, and the rest has a date. " + capS(t.case.stakeShort || "") + ", which is why it should not be left.";
         shift(S, t, Math.round(delta * 1.2), "argued by " + A.sn); C.filter(o => o !== t && side(o) === 0).forEach(o => shift(S, o, 2, A.sn + " argued your line"));
         out.push({p:null, who:A.name + " (for you)", text:text2, to:t.id, tag:"support", gloss:A.name + " argues your line in their own words. They are your highest-influence " + (A.official ? "administration aide" : "party member") + "."}); continue; }
       if(!reason) reason = one(["the cost is known and the delay costs more", "the people who asked for this have waited long enough", "the alternative is to do nothing, and nothing has a price too", "it is a fair settlement, and fair is rarer than perfect"]);
-      const own = A.pos && M.bill && M.bill.pos ? (alignment({pos:A.pos}, M.bill) >= 0) === (alignment(y, M.bill) >= 0) : true;
+      const mine2 = M.bill ? ((typeof preferredVote === "function" ? preferredVote(M.bill) : 0) || 0) : 0; const own = !mine2 || !(A.pos && M.bill && M.bill.pos) ? true : (alignment({pos:A.pos}, M.bill) >= 0) === (mine2 > 0);
       const text = (i === 0 ? one(["The chair will forgive me; I speak for " + (function(){ try{ return ndYou().address; }catch(e){ return "the member"; } })() + ". ", "Allow me to say what my principal has said to me. ", "Let me put the case, since it is not being put. "]) : "And to " + t.sn + " directly: ") + (own ? "I believe it myself: " : "I would not always have chosen it, but the line is clear and here is the best of it: ") + reason + ".";
       const f = A.party && t.party === A.party ? 1.3 : 1, d = Math.round(delta * f * (Math.random() < Math.max(0, (A.temper - 70) / 120) ? -0.3 : 1));
       shift(S, t, d, "argued by " + A.sn); C.filter(o => o !== t && side(o) === 0).forEach(o => shift(S, o, 2, A.sn + " argued your line"));
@@ -52536,7 +52568,8 @@ armFrame();
     const S = live(); document.body.classList.toggle("mt-on", !!S);
     if(!S){ if(sig){ sig = ""; bar.className = ""; bar.innerHTML = ""; } return; }
     const who = up(), nx = nextFresh();
-    const now = [others, note, who && who.id, nx, (SSN && SSN._mtSaid && SSN._mtSaid.length), S.floorId, (S.queue || []).length].join("|");
+    const pv = (G.bill && typeof preferredVote === "function") ? (preferredVote(G.bill) || 0) : 0;
+    const now = [others, note, who && who.id, nx, (SSN && SSN._mtSaid && SSN._mtSaid.length), S.floorId, (S.queue || []).length, pv].join("|");
     if(!force && now === sig && bar.childElementCount) { place(); return; }
     sig = now; bar.className = "on"; place(); bar.innerHTML = "";
     const s = document.createElement("div"); s.className = "mt-s";
@@ -52549,6 +52582,9 @@ armFrame();
         bar.appendChild(btn((heard(id) ? "Again: " : "Call on ") + sn(p), () => { others = false; callOn(id); }, !heard(id), p.name)); });
       return;
     }
+    const pv2 = (G.bill && typeof preferredVote === "function") ? (preferredVote(G.bill) || 0) : 0;
+    bar.appendChild(btn(pv2 === 1 ? "My vote: aye" : "Set aye", () => { if(typeof setMyVote === "function") setMyVote(1); note = "Your vote is aye. That is what you tell them."; }, pv2 === 1, "What you say when they ask"));
+    bar.appendChild(btn(pv2 === -1 ? "My vote: no" : "Set no", () => { if(typeof setMyVote === "function") setMyVote(-1); note = "Your vote is no. That is what you tell them."; }, pv2 === -1, "What you say when they ask"));
     bar.appendChild(btn("Point of order", order, true, "You take a point of order"));
     bar.appendChild(btn(who ? "Press " + sn(who) : "Press", press, false, "The person already up gives the figure"));
     bar.appendChild(btn("Challenge", challenge, false, "Somebody on the other side answers"));
