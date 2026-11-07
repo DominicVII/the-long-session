@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261106d">
+<meta name="onum-build" content="20261106e">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -25,7 +25,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261106d";
+  var STAMP = "20261106e";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -2552,6 +2552,109 @@ function taylorDayVoteDefiance(vote, bill){
   commitBlasphemy("you", "Defied Taylor Day — voted against First Order tradition / the line of continuity");
   return true;
 }
+/* 20261106e: herd, and the rest of human nature.
+   The count is taken from the private lean, before anyone looks around,
+   so the herd cannot count itself twice. A strong private lean still wins.
+   What moves the close ones is being left standing alone, wanting the winning
+   side, spite, fear of the seat, liking you, being too tired to fight,
+   and the few who break from the room on purpose so they will be remembered. */
+let _floorKey = "", _floor = null;
+function rawVoteScore(m, bill){
+  if(m.pledge && G.day - m.pledgeDay < 8){
+    const line = partyLine(bill)[m.party];
+    const strain = (line !== 0 && line !== m.pledge) ? (m.traits.loyalty - 45) : -100;
+    if(strain < 22) return m.pledge * 80;
+  }
+  const line = partyLine(bill)[m.party];
+  let net = 0;
+  try{ net = netVoteLean(m, bill) * 48; }catch(e){}
+  let sq = 0; try{ sq = alignmentRaw(m, {pos:{econ:0, lib:0, def:0, wel:0}}); }catch(e){}
+  return (alignment(m,bill) - sq)*0.9 + line*((m.traits.loyalty||50)-30)*0.6 + (m.rel && m.rel.warmth || 0)*0.12
+        + lobbyPush(bill)*(1 - (m.traits.conviction||50)/140)
+        + (m.sway || 0)
+        + net
+        + (m.margin < 8 ? -G.mood*0.2*(m.party==="FED"?-1:1) : 0);
+}
+function floorLean(bill){
+  const key = ((bill && (bill.id || bill.title)) || "none") + "@" + (G.day || 0) + "@" + Math.floor((G.t || 0) / 2) + "#" + ((G.members && G.members.length) || 0);
+  if(_floorKey === key && _floor) return _floor;
+  const raw = {}, byParty = {};
+  let aye = 0, no = 0;
+  for(const m of (G.members || [])){
+    if(!m || m.gone || (m.kind && m.kind !== "member")) continue;
+    let s = 0;
+    try{ s = rawVoteScore(m, bill); }catch(e){}
+    raw[m.id] = s;
+    const p = byParty[m.party] || (byParty[m.party] = {aye:0, no:0});
+    if(s > 0){ aye++; p.aye++; } else { no++; p.no++; }
+  }
+  _floorKey = key; _floor = {raw:raw, byParty:byParty, aye:aye, no:no};
+  return _floor;
+}
+function natureOf(m, bill){
+  const none = {kind:"plain", pull:0, line:""};
+  if(!m || !bill || m.kind === "envoy" || m.kind === "you") return none;
+  let own = 0;
+  try{ own = rawVoteScore(m, bill); }catch(e){ return none; }
+  const F = floorLean(bill);
+  const mine = own > 0 ? 1 : -1;
+  const selfAye = own > 0 ? 1 : 0;
+  const pp0 = F.byParty[m.party] || {aye:0, no:0};
+  const pAye = pp0.aye - selfAye, pNo = pp0.no - (1 - selfAye);
+  const rAye = F.aye - selfAye, rNo = F.no - (1 - selfAye);
+  const partySide = pAye === pNo ? 0 : (pAye > pNo ? 1 : -1);
+  const roomSide = rAye === rNo ? 0 : (rAye > rNo ? 1 : -1);
+  const t = m.traits || {};
+  const conv = t.conviction || 50, loy = t.loyalty || 50, van = t.vanity || 50, amb = t.ambition || 50, temp = t.temper || 40;
+  let pull = 0, kind = "hold";
+  const herdWant = (loy - conv) * 0.22 + (m.margin < 10 ? 8 : 0) + (van > 68 && Math.abs(pAye - pNo) > 3 ? 6 : 0);
+  if(partySide && herdWant > 4){
+    pull += partySide * herdWant * 0.85;
+    kind = partySide === mine ? "with" : "herd";
+  }
+  if(roomSide && Math.abs(rAye - rNo) > 4){
+    const crowd = (van - conv) * 0.12;
+    if(crowd > 2){ pull += roomSide * crowd; if(roomSide !== mine && kind !== "herd") kind = "herd"; }
+  }
+  if(amb > 72 && loy < 42 && temp > 55 && (m.margin || 0) > 12 && partySide && partySide === mine){
+    pull -= partySide * 14;
+    kind = "apart";
+  }
+  try{ if(moodOf(m).val < -30 && partySide){ pull += partySide * 6; if(partySide !== mine) kind = "tired"; } }catch(e){}
+  if(G.you && G.you.vote && m.rel){
+    if(m.rel.warmth > 25){ pull += G.you.vote * Math.min(10, m.rel.warmth * 0.15); if(G.you.vote !== mine) kind = "for-you"; }
+    else if(m.rel.warmth < -30){ pull -= G.you.vote * 6; kind = "spite"; }
+  }
+  const fearT = (m.fear && (m.fear.t || m.fear)) || "";
+  if(/seat|lose|losing|forgotten|nobody/.test(String(fearT).toLowerCase()) && (m.margin || 20) < 8 && partySide){
+    pull += partySide * 7;
+    if(partySide !== mine) kind = "fear";
+  }
+  pull = clamp(pull, -26, 26);
+  const flipped = (own > 0) !== ((own + pull) > 0);
+  if(flipped && m._herdFlipDay !== G.day){
+    m._herdFlipDay = G.day;
+    try{ mindRemember(m, "thought", kind === "apart"
+      ? "I was with them. I stepped off so I would not disappear into the count."
+      : "I was going the other way. Then I looked at the room, and I did not want to be the one left standing."); }catch(e){}
+  }
+  const side = (own + pull) > 0 ? "aye" : "no";
+  let town = m.state || "home";
+  try{ const bio = bioOf(m); if(bio && bio.town) town = bio.town; }catch(e){}
+  const title = bill.title || "this";
+  let line = "";
+  if(kind === "herd") line = "I am a " + side + " on " + title + " because the room is, and I will not be the one left standing. " + town + " did not send me here to be a martyr for a count I cannot win.";
+  else if(kind === "apart") line = "The room is going one way. I am a " + side + " on " + title + " the other way, on purpose. If I only repeat them, nobody remembers I was here.";
+  else if(kind === "spite") line = "I am a " + side + " on " + title + ", and it is not the brief. I do not like the person asking, and I am not pretending that is a principle.";
+  else if(kind === "for-you") line = "I am a " + side + " on " + title + ". Part of that is you. I am not going to call it principle when it is also that I would rather be with you than against you.";
+  else if(kind === "tired") line = "I am a " + side + " on " + title + ". I have fought this kind of day before, and I am not fighting the room tonight. " + town + " still gets a vote. It does not get a performance.";
+  else if(kind === "fear") line = "I am a " + side + " on " + title + " because my seat is close and " + town + " is watching who stands alone. I know what I think. I also know what it costs to be the only one.";
+  else if(kind === "with") line = "I am a " + side + " on " + title + ", and so is my side of the room. I would have been here anyway. I am not going to insult you by pretending I cannot see them.";
+  else line = "I am a " + side + " on " + title + " because of " + town + ". The room can go where it likes. I am not following it, and I am not standing against it just to be seen.";
+  m._nature = {day:G.day, kind:kind, bill:title};
+  return {kind:kind, pull:pull, line:line, side:side, town:town};
+}
+
 function memberVote(m, bill){
   if(m && m.kind === "envoy") return 0;
   /* Taylor Day: the House votes the First Order line — locked for every member */
@@ -2566,17 +2669,11 @@ function memberVote(m, bill){
     const strain = (line !== 0 && line !== m.pledge) ? m.traits.loyalty - 45 : -100;
     if(strain < 22) return m.pledge;
   }
-  const line = partyLine(bill)[m.party];
-  let net = 0;
-  try{ net = netVoteLean(m, bill) * 48; }catch(e){}
-  /* 20261027b: measured against leaving the law as it is, not against nothing */
-  let sq = 0; try{ sq = alignmentRaw(m, {pos:{econ:0, lib:0, def:0, wel:0}}); }catch(e){}
-  const score = (alignment(m,bill) - sq)*0.9 + line*(m.traits.loyalty-30)*0.6 + m.rel.warmth*0.12
-              + lobbyPush(bill)*(1 - m.traits.conviction/140)
-              + (m.sway || 0)
-              + net
-              + (m.margin < 8 ? -G.mood*0.2*(m.party==="FED"?-1:1) : 0);
-  return score > 0 ? 1 : -1;
+  let score = 0;
+  try{ score = rawVoteScore(m, bill); }catch(e){}
+  let pull = 0;
+  try{ const N = natureOf(m, bill); pull = N.pull || 0; }catch(e){}
+  return (score + pull) > 0 ? 1 : -1;
 }
 function backgroundSeats(){
   /* 20261027a: only members of the House hold seats (an envoy seated among them does not); the player holds one only while in the House */
@@ -23547,6 +23644,7 @@ function procLineFor(m, e){
   }
   if(b && dir){
     add("vote", "I am voting " + side + " on " + b.title + ". That is the vote. I am not dressing it up as something else.");
+    try{ const N = natureOf(m, b); if(N && N.line) add("nature", N.line); }catch(e2){}
     if(M.why) add("why", "The reason is not the briefing. " + ownWhy(M.why) + ".");
     if(b.cost) add("cost", b.title + " is " + money(b.cost) + ". I am a " + side + " because " + town + " is who pays it, and I have decided.");
     if(m.need && b.domain && m.need !== b.domain) add("gap", town + " asked me for " + m.need + ". This text is " + b.domain + ". My " + side + " is about that difference.");
@@ -52302,14 +52400,27 @@ armFrame();
   function callOn(id){
     const p = person(id); if(!p || p === G.you){ note = "Pick a member, not yourself."; sig = ""; return; }
     const b = bill(), sd = side(p);
-    const line = (b && sd) ? ("I am a " + sd + " on " + b.title + ". I speak for " + town(p) + ", and I am not repeating the member who spoke before me.") : (sn(p) + " takes the floor for " + town(p) + ".");
+    let line = "";
+    try{ const N = (b && typeof natureOf === "function") ? natureOf(p, b) : null; if(N && N.line && !(typeof heardBefore === "function" && heardBefore(N.line))) line = N.line; }catch(e){}
+    if(!line){ try{ line = procLineFor(p, {k:"floor"}); }catch(e){} }
+    if(!line) line = (b && sd) ? ("I am a " + sd + " on " + b.title + ". I speak for " + town(p) + ".") : (sn(p) + " takes the floor for " + town(p) + ".");
+    try{ if(typeof rememberLine === "function") rememberLine(line); }catch(e){}
     show(p, line);
   }
   function press(){
     const p = up(); if(!p){ note = "Call on someone first. Press is for the person already up."; sig = ""; return; }
     const b = bill(), sd = side(p);
     const fig = (b && b.cost) ? (" The figure is " + money(b.cost) + ".") : "";
-    show(p, "You pressed for the specific point. My vote is " + (sd || "unchanged") + (b ? " on " + b.title : "") + "." + fig + " " + town(p) + " is who I answer to for that, and I have said it.");
+    let human = "";
+    try{ const N = (b && typeof natureOf === "function") ? natureOf(p, b) : null;
+      if(N && N.kind === "herd") human = " I went with the room. That is the specific truth.";
+      else if(N && N.kind === "apart") human = " I broke from the room on purpose.";
+      else if(N && N.kind === "fear") human = " My seat is close. That is why I am not standing alone.";
+      else if(N && N.kind === "spite") human = " I do not like who asked. That is in the vote.";
+      else if(N && N.kind === "for-you") human = " Part of this vote is you.";
+      else if(N && N.kind === "tired") human = " I am not fighting the room tonight.";
+    }catch(e){}
+    show(p, "You pressed for the specific point. My vote is " + (sd || "unchanged") + (b ? " on " + b.title : "") + "." + fig + " " + town(p) + " is who I answer to." + human);
   }
   function challenge(){
     const p = up(); if(!p){ note = "Call on someone first. A challenge needs someone to answer."; sig = ""; return; }
@@ -52317,7 +52428,9 @@ armFrame();
     const opp = seats(live()).map(person).filter(o => o && o !== p && (!b || memberVote(o, b) !== sd))[0];
     if(!opp){ note = "Nobody on the other side is in the room."; sig = ""; return; }
     const od = side(opp);
-    show(opp, "I challenge " + sn(p) + ". I am a " + (od || "no") + (b ? " on " + b.title : "") + " and " + sn(p) + " is a " + (side(p) || "the other way") + ". That is the disagreement. It is not the same speech.");
+    let mine = "";
+    try{ const N = (b && typeof natureOf === "function") ? natureOf(opp, b) : null; if(N && N.line) mine = " " + N.line; }catch(e){}
+    show(opp, "I challenge " + sn(p) + ". I am a " + (od || "no") + (b ? " on " + b.title : "") + " and " + sn(p) + " is a " + (side(p) || "the other way") + "." + (mine || " That is the disagreement."));
   }
   function order(){
     show(G.you, "Point of order. The member is not on the question before this room.");

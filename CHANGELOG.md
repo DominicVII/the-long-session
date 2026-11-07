@@ -4,6 +4,12 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261106e: they look at the room
+
+- A member with a weak private lean, a close seat, or too much vanity moves with the people around them, and says so.
+- A convinced member does not. A few break from the room on purpose. Spite, fear of the seat, being tired, and liking you are in the vote and in the speech.
+- The count is taken before anyone looks around, so the herd cannot count itself twice. A pledge still holds.
+
 ## 20261106d: each meeting button does a different thing
 
 - Call on a name, or a seat, and that person speaks. Next goes to someone who has not spoken yet, and stops when everyone has.
