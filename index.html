@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261104bc">
+<meta name="onum-build" content="20261106a">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -25,7 +25,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261104bc";
+  var STAMP = "20261106a";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -25578,7 +25578,7 @@ function maybeApproach(m){
    you actually say is written back into the same memory the
    procedural systems read.
    ══════════════════════════════════════════════════════════ */
-const TALK = {open:false, m:null, prop:null, beat:2, thread:null, followUp:null, seed:undefined};
+const TALK = {open:false, m:null, prop:null, beat:2, thread:null, followUp:null, seed:undefined, shelf:{}};
 /* Nothing in this game reaches outside itself. Every word anybody says
    is written here, out of who they are and what has happened to them,
    and it works the same with no signal as it does anywhere else. No
@@ -26411,8 +26411,8 @@ function chatErr(code){
   if(code === "cancelled") return "(they stop mid-sentence)";
   return "(the conversation does not come off)";
 }
-function appendMsg(kind, text, who){
-  try{ if(text && kind === "you") tlog("You", text, "you"); else if(text && kind === "them") tlog(who || "", text, "talk"); }catch(e){}
+function appendMsg(kind, text, who, silent){
+  try{ if(!silent && text && kind === "you") tlog("You", text, "you"); else if(!silent && text && kind === "them") tlog(who || "", text, "talk"); }catch(e){}
   const log = el("chatLog");
   const d = document.createElement("div");
   d.className = "msg msg--" + kind;
@@ -26435,8 +26435,8 @@ function showChat(m){
   box.hidden = false;
   el("chatLog").innerHTML = "";
   (m.chat || []).forEach(t => {
-    if(t.role === "user") appendMsg("you", t.content);
-    else appendMsg("them", stripEffect(t.content), surname(m.name));
+    if(t.role === "user") appendMsg("you", t.content, "", true);
+    else appendMsg("them", stripEffect(t.content), surname(m.name), true);
   });
   el("chatRaw").hidden = true;
   el("chatRaw").textContent = "";
@@ -27181,6 +27181,32 @@ function openTalk(m){
     });
     return;
   }
+  /* Already in it: do not open a new meeting over the one you left. */
+  const shelf = (TALK.shelf && m && TALK.shelf[m.id]) || null;
+  const mark = (m && m.talkMark) || null;
+  if((m.chat && m.chat.length) || shelf){
+    if(shelf){
+      TALK.thread = shelf.thread || null;
+      TALK.beat = shelf.beat != null ? shelf.beat : 2;
+      TALK.followUp = shelf.followUp || null;
+      TALK.tell = shelf.tell || "";
+      if(shelf.seed !== undefined) TALK.seed = shelf.seed;
+    } else if(mark){
+      TALK.thread = null;
+      TALK.beat = mark.beat != null ? mark.beat : 2;
+      if(TALK.beat === 0) TALK.beat = 2;
+      TALK.followUp = mark.followUp || null;
+      TALK.tell = mark.tell || "";
+      if(mark.seed !== undefined) TALK.seed = mark.seed;
+    }
+    m.met = true;
+    showChat(m);
+    const last = m.chat && m.chat.length ? m.chat[m.chat.length - 1] : null;
+    const back = last ? stripEffect(String(last.content || "")) : (TALK.tell || "You were in the middle of this.");
+    setSay(back, fx("where you left it", ""));
+    renderTalk();
+    return;
+  }
   m.met = true;
   const th = convStart(m);
   if(th){
@@ -27247,6 +27273,19 @@ function huddleSay(o, first){
 }
 function closeTalk(){
   const who = TALK.m;
+  if(who && who.id != null){
+    if(!TALK.shelf) TALK.shelf = {};
+    TALK.shelf[who.id] = {
+      thread: TALK.thread, beat: TALK.beat, followUp: TALK.followUp,
+      tell: TALK.tell || "", seed: TALK.seed
+    };
+    who.talkMark = {
+      beat: TALK.beat,
+      followUp: TALK.followUp || null,
+      tell: TALK.tell || "",
+      seed: TALK.seed
+    };
+  }
   TALK.open = false; TALK.m = null; TALK.prop = null; TALK.seq = (TALK.seq || 0) + 1;
   TALK.thread = null; TALK.beat = 2; TALK.followUp = null; TALK.seed = undefined; TALK.tell = "";
   el("talk").classList.remove("is-open");
@@ -27845,6 +27884,11 @@ function catchSessionId(st, mode){
 }
 function catchClear(reason){
   const back = reason === "back" || reason === "esc";
+  const sid = CATCH.sid;
+  const hold = reason === "left" || reason === "ui" || reason === "wait" || back || reason === "busy-clear";
+  const drop = reason === "delivered" || reason === "blasphemy";
+  if(hold && (CATCH.on || (CATCH.pieces && CATCH.pieces.length) || (CATCH.deck && CATCH.deck.length))) speechSnap();
+  if(drop) speechDrop(sid);
   if(!back && reason !== "busy-clear" && !CATCH.on && !CATCH.current && !(CATCH.pieces && CATCH.pieces.length) && !CATCH.armedByInteract && !CATCH.suppressed) return;
   CATCH.on = false; CATCH.mode = null; CATCH.sid = null;
   CATCH.queue = []; CATCH.deck = []; CATCH.i = 0; CATCH.current = null; CATCH.age = 0;
@@ -27962,6 +28006,45 @@ function catchStep(d){
   CATCH.current = CATCH.deck[CATCH.i];
   CATCH.renderKey = "";
   catchPaint();
+  try{ speechSnap(); }catch(e){}
+  return true;
+}
+function speechSnap(){
+  if(!CATCH.sid) return;
+  const deck = CATCH.deck || [];
+  const pieces = CATCH.pieces || [];
+  if(!deck.length && !pieces.length) return;
+  if(!G.speechHold) G.speechHold = {};
+  const slim = b => !b ? null : {
+    key:b.key, t:b.t, line:b.line, stance:b.stance||0, mins:b.mins||12,
+    order:b.order, kind:b.kind,
+    opt: b.opt ? {t:b.opt.t, say:b.opt.say || b.opt.t, stand:b.opt.stand} : null
+  };
+  G.speechHold[CATCH.sid] = {
+    mode:CATCH.mode, kind:CATCH.kind,
+    propId: CATCH.prop && CATCH.prop.id,
+    i: CATCH.i|0, caught: CATCH.caught|0, passed: CATCH.passed|0,
+    deck: deck.map(slim).filter(Boolean),
+    pieces: pieces.map(slim).filter(Boolean),
+    used: CATCH.used ? Array.from(CATCH.used) : []
+  };
+  const keys = Object.keys(G.speechHold);
+  while(keys.length > 12) delete G.speechHold[keys.shift()];
+}
+function speechDrop(sid){
+  if(G.speechHold && sid) delete G.speechHold[sid];
+}
+function speechRevive(sid){
+  const h = G.speechHold && G.speechHold[sid];
+  if(!h) return false;
+  if((!h.deck || !h.deck.length) && (!h.pieces || !h.pieces.length)) return false;
+  CATCH.deck = (h.deck || []).map(b => Object.assign({}, b));
+  CATCH.queue = [];
+  CATCH.pieces = (h.pieces || []).map(p => Object.assign({}, p));
+  CATCH.i = h.i|0;
+  CATCH.caught = h.caught|0;
+  CATCH.passed = h.passed|0;
+  CATCH.used = new Set(h.used || []);
   return true;
 }
 function catchStart(mode, st){
@@ -27973,6 +28056,17 @@ function catchStart(mode, st){
   CATCH.prop = st && st.prop ? st.prop : null;
   CATCH.kind = st && st.kind ? st.kind : "floor";
   CATCH.dist = st && st.dist != null ? st.dist : 2.5;
+  if(speechRevive(sid)){
+    if(st && st.prop) CATCH.prop = st.prop;
+    CATCH.current = null;
+    catchArmCurrent();
+    try{
+      const n = (CATCH.pieces && CATCH.pieces.length) || 0;
+      const at = (CATCH.deck && CATCH.deck.length) ? (((CATCH.i|0) % CATCH.deck.length) + 1) + "/" + CATCH.deck.length : "end";
+      setSay("Where you left it. Line " + at + (n ? ", " + n + " held." : "."), fx("session resumed",""));
+    }catch(e){}
+    return;
+  }
   CATCH.used = new Set();
   CATCH.passed = 0; CATCH.caught = 0;
   CATCH.pieces = [];
@@ -28008,6 +28102,7 @@ function catchNow(){
   /* next line after a catch — do NOT deploySpeechBeat / procYouSay yet */
   catchArmCurrent();
   catchPaint();
+  try{ speechSnap(); }catch(e){}
   return true;
 }
 function catchMiss(){
@@ -40450,6 +40545,7 @@ function saveCaptureBase(){
     voiceVar:G.voiceVar, voiceRate:G.voiceRate, voiceCarry:G.voiceCarry, hours:G.hours,
     withWhom:G.withWhom, ties:G.ties, rite:G.rite, gov:G.gov, placed:G.placed, panel:null, court:G.court, own:G.own, parties:G.parties,
     termLength:G.termLength, country:G.country,
+    speechHold:G.speechHold || {},
     greatest:G.greatest, blasphemy:G.blasphemy, loreNote:G.loreNote, greatnessOpen:G.greatnessOpen,
     relics:G.relics, relicSpots:G.relicSpots, consularLore:G.consularLore, bind:G.bind, sens:G.sens, invertY:!!G.invertY, voiceVol:G.voiceVol, goals:G.goals, whip:G.whip || null, billQueue:G.billQueue || [], faith:G.faith || null, life:G.life || null, ach:G.ach || {}, law:G.law || null, ladder:G.ladder || [], cases:G.cases || [], lastActs:G.lastActs || [], wx:G.wx || null, town:G.town || null, rivals:G.rivals || [], rivalNext:G.rivalNext || 0, daylog:(G.daylog || []).slice(-120), paperRead:G.paperRead || 0, seedL:G.seedL || 0, mHints:G.mHints || {}, tlog:(G.tlog || []).slice(-500), ag:G.ag || null, sitPrep:G.sitPrep || {}, echoes:G.echoes || [], billKinds:G.billKinds || {}, realmRel:G.realmRel || {}, org:G.org || null, conflict:G.conflict || null, conflictLog:G.conflictLog || [], warAuth:G.warAuth || null, react:G.react || [], reactNews:G.reactNews || [], senStaff:G.senStaff || null, presStaff:G.presStaff || null, listened:G.listened || 0,
     world:G.world, ofh:G.ofh || null, rgn:G.rgn || null, dyn:G.dyn || null, ssn:G.ssn || null, app:G.app || null, shp:G.shp || null, dn:G.dn || null, rs:G.rs || null, mm:G.mm || null, sc:G.sc || null, ph:G.ph || null,  sbox:G.sbox || null, dist:G.dist || null, fam:G.fam || null, loreBookSeeded:!!G.loreBookSeeded, saidHash:G.saidHash || [], dm:G.dm || null, lore:G.lore || null, trip:G.trip || null,

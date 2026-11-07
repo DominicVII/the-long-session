@@ -4,6 +4,11 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261106a: sessions and meetings resume where you left them
+
+- Stepping off a lectern, backing out, or leaving a hearing, caucus, press stand, or stump keeps the line you were on and the lines already held. Press E at the same stand and it continues. Delivering the speech clears it. The place is in the save.
+- A meeting you already started reopens on the last thing said, marked where you left it, instead of a new opener. Someone who came looking for you still speaks first.
+
 ## 20261030q: clicks and talk stay yours (Ollama circuit breaker), people out of bookcases, tags off blank walls, Engine dump fixes
 
 - **Click lag / talk stolen in seconds (PRIORITY).** With Ollama not running, `127.0.0.1:11434/api/tags` was re-fetched in a tight loop (MARS: ~97 ERR_CONNECTION_REFUSED), starving the main thread so clicks landed ~10 s late and talk/chrome seemed to vanish. Cause: a failed check was ignored while a reply was "busy", leaving the state `null`, and every `available()` re-fetched. Now a failure always counts when the state is unknown, and a refusal opens a circuit breaker (15 s, 30 s, 60 s … capped at 10 min); only Settings → Test bypasses it. A good answer closes it. Talk falls back to the offline voice, so a started conversation still gets a reply and stays open until you leave (headless probe: open 20 s+, reply returned, no closeTalk fired).
