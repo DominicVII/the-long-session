@@ -4,6 +4,11 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261106d: each meeting button does a different thing
+
+- Call on a name, or a seat, and that person speaks. Next goes to someone who has not spoken yet, and stops when everyone has.
+- Press makes the person already up give the figure. Challenge is answered by somebody on the other side. The chair speaks as the chair. Pass stays quiet. A point of order and an interjection are you.
+
 ## 20261106c: a meeting is run from one bar, and it fits
 
 - Point of order, call on a name, press, challenge, call on others, chair, pass, interject, and call on next sit on one bar. It fits the screen. Nothing in it scrolls.
