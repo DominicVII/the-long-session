@@ -4,6 +4,11 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261107b: the herd is in the room
+
+- Members who are going with the room drift toward their own side. The ones who refuse it stand off by the wall.
+- In passing they say which it is, instead of another empty "excuse me."
+
 ## 20261107a: Ollama on your PC
 
 - The game retries after a miss, and if port 11434 refuses the page it tries the local bridge on 11435.

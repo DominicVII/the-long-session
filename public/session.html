@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261107a">
+<meta name="onum-build" content="20261107b">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -25,7 +25,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261107a";
+  var STAMP = "20261107b";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -18103,6 +18103,54 @@ function breakSeat(m){
     return bd < 7 ? best : null;
   }catch(e){ return null; }
 }
+
+function herdStep(m, b){
+  if(!m || m.kind !== "member" || !b || !G.bill || G.bill.done) return false;
+  if(Math.random() > 0.55) return false;
+  let N = m._nature;
+  if(!N || N.day !== G.day || N.bill !== (G.bill.title || "")){
+    try{ N = natureOf(m, G.bill); }catch(e){ return false; }
+  }
+  if(!N || !N.kind) return false;
+  if(N.kind === "apart" || N.kind === "spite"){
+    const side = m.party === "COM" ? 1 : -1;
+    m.tx = side * b.hw * 0.78;
+    m.tz = b.d0 + 1.4;
+    return true;
+  }
+  if(N.kind === "hold"){
+    m.tx = (m.party === "COM" ? 1 : -1) * b.hw * 0.55;
+    m.tz = (b.d0 + b.d1) / 2;
+    return true;
+  }
+  if(N.kind === "herd" || N.kind === "with" || N.kind === "fear" || N.kind === "tired" || N.kind === "for-you"){
+    const mates = [];
+    for(const o of (G.members || [])){
+      if(!o || o === m || o.gone || o.room !== m.room || o.party !== m.party || o.x == null) continue;
+      mates.push(o);
+      if(mates.length > 6) break;
+    }
+    if(!mates.length) return false;
+    let x = 0, z = 0;
+    mates.forEach(o => { x += o.x; z += o.z; });
+    m.tx = x / mates.length + (Math.random() * 1.4 - 0.7);
+    m.tz = z / mates.length + (Math.random() * 1.4 - 0.7);
+    return true;
+  }
+  return false;
+}
+function herdMutter(m){
+  const N = m && m._nature;
+  if(!N || N.day !== G.day || !G.bill || G.bill.done) return null;
+  if(N.kind === "herd" || N.kind === "fear") return "I am not standing out there alone.";
+  if(N.kind === "apart") return "Let them bunch up. I am not in it.";
+  if(N.kind === "with") return "We are of one mind in this room. I can see it.";
+  if(N.kind === "spite") return "I will not give them the satisfaction.";
+  if(N.kind === "tired") return "Not tonight. The room can have this one.";
+  if(N.kind === "for-you") return "I am nearer your side than I meant to be.";
+  if(N.kind === "hold") return "The room can move. I am staying where I am.";
+  return null;
+}
 function wander(m, dt){
   if(m.sayT > 0 && m.say && m._tlSaid !== m.say && m.room === G.room){ try{ tlHeard(m); }catch(e){} }
   if(m.sayT > 0) m.sayT -= dt;
@@ -18175,6 +18223,7 @@ function wander(m, dt){
       }
       else if(mood.val < -35 && chance(.5)){ m.tx = -Math.sign(cam.x||1)*b.hw*0.8; m.tz = cam.z > b.d1/2 ? b.d0+1 : b.d1-1; }
       else if(allies.length && chance(.34)){ momentToAlly(m, pick(allies), b); }
+      else if(m.kind === "member" && herdStep(m, b)){ /* with their side, or off on their own */ }
       else if(m.room === "district" && m.kind === "civ"){
         /* a stroll: along one sidewalk for a block, or across to the other side; stop and look at a window */
         const side = chance(.65) ? (m.x < 0 ? -1 : 1) : (m.x < 0 ? 1 : -1);
@@ -18195,8 +18244,10 @@ function wander(m, dt){
         try{ const near = Math.hypot(m.x - cam.x, m.z - cam.z) < 3 && m.room === G.room;
           if(near && chance(.25)) fl = loreFamLine() || famLine(m, null);
           else if(chance(.35)){ const o = hereNow().find(q => q !== m && q.kind !== "civ" && Math.hypot(q.x - m.x, q.z - m.z) < 3); if(o){ fl = famLine(m, o); if(fl){ m.sayTo = o.id; } } } }catch(e){}
-        if(fl){ m.say = fl; m.sayT = 2.6; } else
-        m.say = pick([
+        const hm = herdMutter(m);
+        if(fl){ m.say = fl; m.sayT = 2.6; }
+        else if(hm){ m.say = hm; m.sayT = 2.8; m.sayTo = null; }
+        else m.say = pick([
           "Excuse me.",
           "They will not like that.",
           "Is the clerk in?",
