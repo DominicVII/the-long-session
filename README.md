@@ -46,7 +46,7 @@ See [CHANGELOG.md](CHANGELOG.md) for every build.
 - **Lives kept:** sentience, pulse (no feeling bar), youSent, local AGI, foreign **realms / envoys**.
 - **East Steps** are treads you climb; **District** has a church of what you follow.
 
-Wrapper iframe: `/session.html?v=20261023a` (`src/lib/onum-build.ts`).
+Wrapper iframe: `/session.html?v=20261106b` (`src/lib/onum-build.ts`).
 
 ---
 
