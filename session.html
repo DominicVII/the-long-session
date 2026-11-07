@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261107c">
+<meta name="onum-build" content="20261107d">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -25,7 +25,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261107c";
+  var STAMP = "20261107d";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -2160,8 +2160,8 @@ function makeCivilian(){
   return c;
 }
 function byId(id){
-  const all = G.members.concat(G.press, G.civ);
-  for(const m of all) if(m.id === id) return m;
+  const lists = [G.members, G.press, G.civ, G.officials];
+  for(const list of lists){ if(!list) continue; for(const m of list) if(m && m.id === id) return m; }
   return null;
 }
 /* everyone() is called several times a frame. Concatenating three arrays
@@ -2169,11 +2169,12 @@ function byId(id){
    array until one of the three actually changes. */
 let _allCache = null, _allSrc = null;
 function everyone(){
-  const M = G.members, P = G.press, C = G.civ;
+  const M = G.members, P = G.press, C = G.civ, O = G.officials;
+  const ol = O ? O.length : 0;
   if(_allCache && _allSrc && _allSrc[0]===M && _allSrc[1]===P && _allSrc[2]===C &&
-     _allSrc[3]===M.length && _allSrc[4]===P.length && _allSrc[5]===C.length) return _allCache;
-  _allCache = M.concat(P, C);
-  _allSrc = [M, P, C, M.length, P.length, C.length];
+     _allSrc[3]===M.length && _allSrc[4]===P.length && _allSrc[5]===C.length && _allSrc[6]===O && _allSrc[7]===ol) return _allCache;
+  _allCache = O ? M.concat(P, C, O) : M.concat(P, C);
+  _allSrc = [M, P, C, M.length, P.length, C.length, O, ol];
   return _allCache;
 }
 
@@ -3385,7 +3386,7 @@ function restaff(force){
   sweepAbroad();
   everyone().forEach(m => {
     if(TALK.m === m || visiting() === m) return;
-    if(m.kind === "envoy") return;
+    if(m.kind === "envoy" || m.kind === "official") return;
     if(livesElsewhere(m)) return;
     if(m.ohK) return;
     if(m.away) return;
@@ -12212,6 +12213,10 @@ function ssnRecognize(){
   const p = pick_ === "you" ? G.you : byId(pick_); SSN.lastParty = p && p.party; ssnPublish();
 }
 function ssnNpcLine(m){
+  if(m && m.kind === "official"){
+    const line = {treaty:"The capitals are quiet, which will not last. I can open one if you say the word.", purse:"The chest can spare a reserve. Say so and I will move it.", readiness:"The guard is stood to. I can ease the heat.", ground:"One state is hotter than the rest. I can send people.", works:"A shift is about to be cut. I can keep it.", brief:"A brief is drafted. I can file it today.", chief:"The day is crowded. I can clear it.", treasurer:"There is money the budget forgot. I can find it.", safety:"The corners are thin. I can put a second shift on.", press:"The wire is about to invent your line. I can give them one.", agency:"The department has one thing it can do today, and it is ready."}[m._ability] || "The office is in order.";
+    return "From " + (m.role || "my office") + ". " + line;
+  }
   const b = ssnBill(), st = ssnStage(); let al = 0; try{ al = b ? alignment(m, b) : 0; }catch(e){}
   const mind = (() => { try{ return onumMindOf(m.id) || {}; }catch(e){ return {}; } })();
   const home = m.state || "home", t = b ? b.title : "the question";
@@ -33133,9 +33138,10 @@ function appointCard(kind){
     el("aq_" + b.getAttribute("data-q")).textContent = "“" + (Math.abs(v) < 14 ? "On " + a.n.toLowerCase() + " I follow the evidence and the room. I would rather tell you that than a doctrine." : v > 0 ? "I would push toward " + a.hi + ": a state that " + DK_AXIS[P.ax].hi.does + "." : "I would push toward " + a.lo + ": a state that " + DK_AXIS[P.ax].lo.does + ".") + " I will do what you ask, and I will say so in public if I disagree.”"; }));
   card.querySelectorAll("[data-ap]").forEach(b => b.addEventListener("click", () => { const c = cands[+b.getAttribute("data-ap")]; if(card.querySelector("[data-done]")) return;
     const av = apptVote(kind, c.o, S), ok = av.ok; spend(40, 4);
-    if(kind === "cab" && ok){ const m = pick(G.members.filter(x => x.party === y.party && !x.machine && !x.gone && !x.cabinet)); if(m){ m.cabinet = pick(["Treasury", "State", "War", "Interior", "Labour"]); c.o.name = m.name; ripple(m, 12, "Named to the cabinet. I owe this one.", 10, true); } }
+    if(kind === "cab" && ok){ try{ const post = cabOpenPost(); const p = cabInstall(post, c.o); if(p){ c.o.name = p.name; c._postTitle = post.t; } }catch(e){} }
     if(ok){ if(S && (GOV_AGENCIES[kind])){ govStaff(S); S.agency[kind] = c.o; } if(kind === "judge"){ y.approval = clamp(y.approval + ((c.o.pos.lib || 0) > 0 ? 1 : 0), 0, 100); } y.standing = clamp(y.standing + 1, 0, 100); try{ y.used = y.used || {}; y.used[kind === "judge" ? "appt" : kind === "cab" ? "cab" : "appt2"] = G.day; }catch(e){} }
-    const msg = ok ? c.o.name + " is confirmed as " + P.post.toLowerCase() + " by " + av.body + ", " + av.aye + " to " + av.no + ". " + cap(viewWords(c.o.pos)) + "; you will hear it in how they advise you." : cap(av.body) + " rejects " + c.o.name + ", " + av.aye + " to " + av.no + ". The name is withdrawn and the seat stays open.";
+    const postName = (kind === "cab" && c._postTitle) ? c._postTitle : P.post;
+    const msg = ok ? c.o.name + " is confirmed as " + postName.toLowerCase() + " by " + av.body + ", " + av.aye + " to " + av.no + ". " + cap(viewWords(c.o.pos)) + "; you will hear it in how they advise you." : cap(av.body) + " rejects " + c.o.name + ", " + av.aye + " to " + av.no + ". The name is withdrawn and the seat stays open.";
     reactEmit("appoint", {kind, name:c.o.name, ok, post:P.post}); el("gcSay").textContent = msg; feed(msg, ok ? "good" : "bad"); card.querySelectorAll("[data-ap]").forEach(x => { x.disabled = true; x.setAttribute("data-done", "1"); }); }));
   return null;
 }
@@ -37807,7 +37813,150 @@ function playerTyping(){ return Date.now() < window.__typing.until; }
 { const _ea = enlAuto; enlAuto = function(){ if(playerTyping()) return; return _ea.apply(this, arguments); }; }
 { const _ut = unseenTick; unseenTick = async function(){ if(playerTyping()) return; return _ut.apply(this, arguments); }; }
 /* cabinet and council: speak to a member and they answer; call on a member and they report */
-function cabSeats(){ try{ if(!SSN || (SSN.kind !== "cabinet_meeting" && SSN.kind !== "governor_council")) return []; const seated = (SSN.seats || []).map(s => byId(isNaN(+s.personId) ? s.personId : +s.personId)).filter(p => p && p !== G.you && !p.gone), want = SSN.kind === "cabinet_meeting" ? /^(Secretary of (State|the Treasury|Defen[cs]e|War|the Interior|Commerce|Labor|Energy|Health|Education|Agriculture|Transportation|Justice|Homeland)|Attorney General|Vice President)/i : /Secretary|Commissioner|Treasurer|Attorney General|Adjutant|Chief of Staff/i; const members = seated.filter(p => want.test(String(p.role || ""))); if(members.length) return members; const all = everyone().filter(p => p && !p.gone && p !== G.you && want.test(String(p.role || ""))); return all.length ? all : seated; }catch(e){ return []; } }   /* the cabinet is the secretaries, whoever else is standing in the room */
+const CABINET_POSTS = [
+  {k:"state", t:"Secretary of State", ab:"treaty"},
+  {k:"treasury", t:"Secretary of the Treasury", ab:"purse"},
+  {k:"war", t:"Secretary of War", ab:"readiness"},
+  {k:"interior", t:"Secretary of the Interior", ab:"ground"},
+  {k:"labour", t:"Secretary of Labor", ab:"works"},
+  {k:"ag", t:"Attorney General", ab:"brief"}
+];
+function cabMake(post, src){
+  const base = makeMember((G.you && G.you.party) || "IND", {name: src && src.name, state: (G.you && G.you.state) || null, keepParty:true});
+  base.kind = "official";
+  base.role = post.t;
+  base._post = post.k;
+  base._ability = post.ab;
+  base.post = null;
+  base.room = "exec";
+  base.sitting = false;
+  base.intent = {k:"office", t:"hold " + post.t + " and use it when the chair asks"};
+  if(src && src.pos){ try{ Object.assign(base.pos, src.pos); }catch(e){} }
+  try{ autoInit(base); ensureSelfhood(base); }catch(e){}
+  return base;
+}
+function cabRoster(){
+  if(!G.officials) G.officials = [];
+  if(!G.cabPosts) G.cabPosts = {};
+  CABINET_POSTS.forEach(post => {
+    let p = G.cabPosts[post.k] != null ? byId(G.cabPosts[post.k]) : null;
+    if(!p || p.gone){
+      p = cabMake(post, null);
+      G.officials.push(p);
+      G.cabPosts[post.k] = p.id;
+      _allCache = null;
+    }
+    p.role = post.t; p._post = post.k; p._ability = post.ab; p.kind = "official";
+  });
+  return CABINET_POSTS.map(post => byId(G.cabPosts[post.k])).filter(Boolean);
+}
+function cabOpenPost(){
+  cabRoster();
+  return CABINET_POSTS.find(post => { const p = byId(G.cabPosts[post.k]); return p && !p._named; }) || CABINET_POSTS[(G.day || 0) % CABINET_POSTS.length];
+}
+function cabInstall(post, official){
+  if(!post) return null;
+  if(!G.officials) G.officials = [];
+  const old = G.cabPosts && byId(G.cabPosts[post.k]);
+  if(old){ old.gone = true; old.room = "away"; old.sitting = false; }
+  const p = cabMake(post, official || null);
+  p._named = true;
+  G.officials.push(p);
+  G.cabPosts[post.k] = p.id;
+  _allCache = null;
+  try{ p.room = (typeof heldOffice === "function" && heldOffice() === "pres") ? "exec" : "away"; }catch(e){ p.room = "away"; }
+  try{ placeInRoom(p); }catch(e){}
+  return p;
+}
+function govRoster(){
+  const y = G.you; if(!y) return [];
+  const S = (G.states || []).find(s => s.n === y.state); if(!S || typeof govStaff !== "function") return [];
+  govStaff(S);
+  if(!G.officials) G.officials = [];
+  const posts = [].concat(
+    Object.keys(GOV_ROLES).map(k => ({k, t:GOV_ROLES[k].t, o:S.cab[k], ab:k === "press" ? "press" : k})),
+    Object.keys(GOV_AGENCIES).map(k => ({k:"ag_"+k, t:GOV_AGENCIES[k].head, o:S.agency[k], ab:"agency"}))
+  );
+  return posts.map(post => {
+    if(!post.o) return null;
+    let p = post.o.pid != null ? byId(post.o.pid) : null;
+    if(!p || p.gone){
+      p = cabMake({k:post.k, t:post.t, ab:post.ab}, post.o);
+      p.room = "govoffice";
+      G.officials.push(p);
+      post.o.pid = p.id;
+      _allCache = null;
+    }
+    p.role = post.t; p._ability = post.ab; p.kind = "official";
+    return p;
+  }).filter(Boolean);
+}
+function cabSeatMeeting(S){
+  if(!S) return;
+  const people = S.kind === "cabinet_meeting" ? cabRoster() : S.kind === "governor_council" ? govRoster() : null;
+  if(!people || !people.length) return;
+  const room = S.kind === "cabinet_meeting" ? "exec" : "govoffice";
+  const spots = [[-1.7,3.5],[1.7,3.5],[-1.7,5.1],[1.7,5.1],[-0.55,5.7],[0.55,5.7],[ -2.4,4.3],[2.4,4.3]];
+  people.forEach((p, i) => {
+    const s = spots[i % spots.length];
+    p.room = room; p.away = false; p.gone = false;
+    p.sitting = true; p.x = p.tx = s[0]; p.z = p.tz = s[1];
+  });
+  try{ moved(); }catch(e){}
+  S.seats = people.map((p, i) => ({seatId:"appt"+i, personId:p.id}));
+  if(!S.seats.some(s => s.personId === "you")) S.seats.push({seatId:"you", personId:"you"});
+}
+function cabUse(p){
+  if(!p) return "Call on someone first. An empty chair has no office.";
+  if(p._usedDay === G.day) return (typeof surname === "function" ? surname(p.name) : p.name) + " has already used the office today.";
+  const y = G.you || {};
+  let t = "", spent = true;
+  const ab = p._ability || "";
+  const stOf = (n) => (G.states || []).find(s => s.n === n);
+  if(ab === "treaty"){
+    const R = (G.realms || [])[0];
+    if(R){ R.rel = Math.max(-100, Math.min(100, (R.rel || 0) + 6)); t = p.name + " opens a channel to " + (R.t || "a neighbour") + ". They are warmer than this morning."; }
+    else { t = p.name + " sends the note. No capital is on the other end today."; spent = false; }
+  } else if(ab === "purse"){
+    y.funds = Math.round((y.funds || 0) + 25000);
+    if(G.money) G.money.index = Math.max(42, Math.min(190, (G.money.index || 100) + 0.8));
+    t = p.name + " releases a reserve from the Treasury. The chest takes twenty-five thousand.";
+  } else if(ab === "readiness"){
+    try{ const w = worldEnsure(); w.heat = Math.max(0, (w.heat || 0) - 4); }catch(e){}
+    t = p.name + " stands the guard down a step. The heat drops.";
+  } else if(ab === "ground"){
+    const st = (G.states || []).slice().sort((a,b) => (b.unrest||0)-(a.unrest||0))[0];
+    if(st){ st.unrest = Math.max(0, (st.unrest||0) - 8); t = p.name + " sends people into " + st.n + ". The unrest there comes down."; }
+    else { t = p.name + " has the wagons ready and nowhere that needs them."; spent = false; }
+  } else if(ab === "works"){
+    const st = stOf(y.state) || (G.states || [])[0];
+    if(st){ st.ind = Math.min(100, (st.ind||0) + 4); t = p.name + " keeps a shift open in " + st.n + "."; }
+    else { t = p.name + " has the order and no state to send it to."; spent = false; }
+  } else if(ab === "brief"){
+    y.standing = Math.max(0, Math.min(100, (y.standing||0) + 2));
+    t = p.name + " files the brief. It is in writing, and your standing moves with it.";
+  } else if(ab === "chief"){
+    y.influence = Math.max(0, Math.min(100, (y.influence||0) + 3));
+    t = p.name + " clears the afternoon. Your reach in the building moves.";
+  } else if(ab === "treasurer"){
+    y.funds = Math.round((y.funds||0) + 12000);
+    t = p.name + " finds twelve thousand the budget had buried.";
+  } else if(ab === "safety"){
+    const st = stOf(y.state); if(st) st.unrest = Math.max(0, (st.unrest||0) - 6);
+    t = p.name + " puts a second shift on the corners.";
+  } else if(ab === "press"){
+    y.approval = Math.max(0, Math.min(100, (y.approval||0) + 2));
+    t = p.name + " gives the wire your line before the wire invents one.";
+  } else if(ab === "agency"){
+    const st = stOf(y.state); if(st){ st.ind = Math.min(100, (st.ind||0)+2); st.unrest = Math.max(0, (st.unrest||0)-2); }
+    t = p.name + " spends the office on the thing the department was built for.";
+  } else { t = p.name + " holds " + (p.role || "an office") + ", and there is nothing in it to spend today."; spent = false; }
+  if(spent) p._usedDay = G.day;
+  try{ feed(t); }catch(e){}
+  try{ remember(p, "You had me use the office.", 3); }catch(e){}
+  return t;
+}
+function cabSeats(){ try{ if(!SSN || (SSN.kind !== "cabinet_meeting" && SSN.kind !== "governor_council")) return []; const seated = (SSN.seats || []).map(s => byId(isNaN(+s.personId) ? s.personId : +s.personId)).filter(p => p && p !== G.you && !p.gone), want = SSN.kind === "cabinet_meeting" ? /^(Secretary of (State|the Treasury|Defen[cs]e|War|the Interior|Commerce|Labor|Labour|Energy|Health|Education|Agriculture|Transportation|Justice|Homeland)|Attorney General|Vice President)/i : /Secretary|Commissioner|Treasurer|Attorney General|Adjutant|Chief of Staff|Director|Superintendent/i; const members = seated.filter(p => want.test(String(p.role || ""))); if(members.length) return members; const all = everyone().filter(p => p && !p.gone && p !== G.you && want.test(String(p.role || ""))); return all.length ? all : seated; }catch(e){ return []; } }   /* the cabinet is the secretaries, whoever else is standing in the room */
 function cabPick(text){
   const seats = cabSeats(); if(!seats.length) return null; const t = String(text || "").toLowerCase();
   const sn = p => String(p.name || "").split(/\s+/).slice(-1)[0].toLowerCase();
@@ -37830,7 +37979,7 @@ async function cabAsk(p, you, text, kind, callOn){
 { const _se = window.onumSessionEvent; window.onumSessionEvent = function(e){ const r = _se.apply(this, arguments);
   try{ if(e && e.action === "speak" && (e.actorId === "you" || (G.you && e.actorId === G.you.id)) && r && r.ok !== false && SSN && (SSN.kind === "cabinet_meeting" || SSN.kind === "governor_council")){ const p = cabPick(e.text); if(p) setTimeout(() => cabAsk(p, G.you, String(e.text || ""), SSN && SSN.kind), 900); } }catch(x){} return r; }; }
 function cabCallOn(id){
-  try{ const p = byId(isNaN(+id) ? id : +id); if(!p || !SSN) return false; const kind = SSN.kind;
+  try{ const p = byId(isNaN(+id) ? id : +id); if(!p || !SSN) return false; window.__cabLast = p.id; const kind = SSN.kind;
     try{ SSN.floorId = p.id; ssnPublish(); }catch(e){}
     cabPaint(p, "rises to report\u2026", true);
     cabAsk(p, G.you, "(You call on " + p.name + " by name.) Give your report: what is going on in your department today, what needs a decision, and what you need from the chair. Two to four sentences.", kind, true).then(() => { try{ if(SSN && SSN.floorId === p.id){ SSN.floorId = null; ssnPublish(); } }catch(e){} });
@@ -49163,6 +49312,7 @@ function ss2Pub(extra){ if(!SSN){ ssnPublish(); return; } ssnPublish(); const S 
   if(SSN.def.agenda) S.agenda = SSN.def.agenda.slice(); if(extra) Object.assign(S, extra); }
 /* open: you chair your own cabinet or council; the stage shape is the House's */
 { const _op = ssnOpen; ssnOpen = function(o){ const r = _op.apply(this, arguments); try{ if(r){ if(ss2YouChair(r.kind)) r.chairId = "you"; if(r.kind === "conference" || r.kind === "cabinet_meeting" || r.kind === "governor_council"){ r.seats = r.seats.filter(s => s.personId !== "you" || ss2Entitled(r.kind)); if(!r.seats.some(s => s.personId === "you")) r.seats.push({seatId:"you", personId:"you"}); }
+  if(r.kind === "cabinet_meeting" || r.kind === "governor_council"){ try{ cabSeatMeeting(r); }catch(e){} }
   SS2.stageSaid = 0; SS2.chairSaid = false; SS2.budget = ss2Budget(r); SS2.hold = false; ss2Pub(); } }catch(e){} return r; }; }
 function ss2Budget(S){ const n = S.seats.filter(s => s.personId !== "you").length; const st = S.def.stages[S.si]; if(!st) return 0; return st.speaker === "round" ? Math.min(n, 8) : st.speaker === "queue" ? Math.min(n, 3 + Math.floor(Math.random() * 3)) : 0; }
 { const _nx = ssnNext; ssnNext = function(){ const r = _nx.apply(this, arguments); try{ if(SSN){ SS2.stageSaid = 0; SS2.chairSaid = false; SS2.budget = ss2Budget(SSN); SS2.gapUntil = Date.now() + 1500; const st = ssnStage();
@@ -52585,6 +52735,11 @@ armFrame();
     const pv2 = (G.bill && typeof preferredVote === "function") ? (preferredVote(G.bill) || 0) : 0;
     bar.appendChild(btn(pv2 === 1 ? "My vote: aye" : "Set aye", () => { if(typeof setMyVote === "function") setMyVote(1); note = "Your vote is aye. That is what you tell them."; }, pv2 === 1, "What you say when they ask"));
     bar.appendChild(btn(pv2 === -1 ? "My vote: no" : "Set no", () => { if(typeof setMyVote === "function") setMyVote(-1); note = "Your vote is no. That is what you tell them."; }, pv2 === -1, "What you say when they ask"));
+    if(typeof cabKind === "function" && cabKind()) bar.appendChild(btn("Their office", () => {
+      const id = (SSN && SSN.floorId && SSN.floorId !== "you") ? SSN.floorId : window.__cabLast;
+      const p = id != null ? byId(id) : (typeof cabSeats === "function" ? cabSeats()[0] : null);
+      note = (typeof cabUse === "function") ? cabUse(p) : "No office to use.";
+    }, true, "The person with the floor uses the power of their appointment"));
     bar.appendChild(btn("Point of order", order, true, "You take a point of order"));
     bar.appendChild(btn(who ? "Press " + sn(who) : "Press", press, false, "The person already up gives the figure"));
     bar.appendChild(btn("Challenge", challenge, false, "Somebody on the other side answers"));

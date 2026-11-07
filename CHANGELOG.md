@@ -4,6 +4,12 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261107d: the cabinet sits, and the offices work
+
+- Six named officers sit the cabinet table. The governor's council sits its own named staff. They are not unnamed departments.
+- Call on one, then Their office. Each appointment can spend its power once a day: a channel, a reserve, the guard, a state, a shift, a brief.
+- Naming a secretary replaces the person in that chair. The chair keeps the power of the office.
+
 ## 20261107c: your vote is the one you set
 
 - Aye, no, or clear, on the bill and on the meeting bar. That is what you tell them when they ask.
