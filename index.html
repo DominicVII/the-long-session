@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261107j">
+<meta name="onum-build" content="20261107l">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -33,7 +33,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261107j";
+  var STAMP = "20261107l";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -8927,9 +8927,9 @@ function dkItems(){
   const y = G.you, k = roleKey(), out = [];
   const S = (G.states || []).find(s => s.n === y.state);
   const nat = b => b && !b.done ? {kind:"bill", title:b.title, line:b.line, sponsor:b.sponsor, pos:b.pos, b} : null;
-  if(k === "house" || k === "leader" || k === "chair"){ const it = nat(G.bill); if(it){ it.body = "The House"; it.by = dkCongress(it); it.acts = [
-      {t:"Vote aye (declare)", run(){ y.vote = 1; feed("You declare for the " + it.title + "."); return "Declared aye. The whip writes it down."; }},
-      {t:"Vote nay (declare)", run(){ y.vote = -1; feed("You declare against the " + it.title + "."); return "Declared nay. The whip writes that down too."; }}]; out.push(it); } }
+  if(k === "house" || k === "leader" || k === "chair"){ const it = nat(G.bill); if(it){ it.body = "The House"; it.by = dkCongress(it); const mine = typeof preferredVote === "function" ? preferredVote(G.bill) : null; it.acts = [
+      {t: mine === 1 ? "Vote aye (this is your vote)" : "Vote aye (declare)", run(){ if(typeof setMyVote === "function") setMyVote(1); else y.vote = 1; feed("You declare for the " + it.title + "."); return "Declared aye. That is the vote they are told, not your mood."; }},
+      {t: mine === -1 ? "Vote nay (this is your vote)" : "Vote nay (declare)", run(){ if(typeof setMyVote === "function") setMyVote(-1); else y.vote = -1; feed("You declare against the " + it.title + "."); return "Declared nay. That is the vote they are told, not your mood."; }}]; out.push(it); } }
   if(k === "senate"){ const it = nat(G.bill); if(it){ it.body = "The Senate"; it.by = dkSenate(it); it.acts = ["aye","nay"].map(v => ({t:"Vote " + v, off:it.b.senateVote, run(){
       const s = dkStateLean(S, it) * (v === "aye" ? 1 : -1); it.b.senateVote = v; y.approval = clamp(y.approval + (s > 0 ? 2 : -2), 0, 100);
       (G.members || []).filter(m => m.party === y.party && m.rel).forEach(m => m.rel.warmth = clamp(m.rel.warmth + (partyLine(it.b)[y.party] === (v === "aye" ? 1 : -1) ? 1 : -2), -100, 100));
@@ -9198,6 +9198,14 @@ function delegationCases(r){
   return [amb, att, mil];
 }
 
+function dkMineHTML(it){
+  const b = (it && it.b) || (it && it.kind === "bill" && G.bill && !G.bill.done ? G.bill : null);
+  if(!b || b.done || b !== G.bill) return "";
+  const v = typeof preferredVote === "function" ? preferredVote(b) : null;
+  const word = v === 1 ? "AYE" : v === -1 ? "NO" : "NOT SET";
+  const why = v === 1 || v === -1 ? "This is the vote you fixed. The room is told this, not your mood." : "You have not fixed a vote. Nobody may read one out of your mood.";
+  return '<div class="eyebrow" style="margin-top:8px">Your vote on this bill</div><p><b>' + word + '</b> — ' + why + '</p><div class="card__actions"><button type="button" class="btn' + (v === 1 ? "" : " btn--ghost") + '" data-myv="1">Aye</button> <button type="button" class="btn' + (v === -1 ? "" : " btn--ghost") + '" data-myv="-1">No</button> <button type="button" class="btn btn--ghost" data-myv="0">Clear</button></div>';
+}
 function dkCard(i){
   const L = dkItems(); i = i || 0;
   const it = L[i];
@@ -9205,7 +9213,7 @@ function dkCard(i){
   let h = '<div class="eyebrow">The docket · ' + pcEsc(ROLE_T[roleKey()] || "Member") + (L.length > 1 ? ' · ' + (i + 1) + ' of ' + L.length : '') + '</div>';
   if(!it){ h += '<h1>Nothing before you</h1><p class="dream">No bill or case is waiting on you today.</p>'; }
   else {
-    h += '<h1>' + pcEsc(it.title) + '</h1><p class="muted">' + pcEsc(it.line || "") + ' Sponsor: ' + pcEsc(youMark(it.sponsor || "")) + '.</p>' +
+    h += '<h1>' + pcEsc(it.title) + '</h1>' + dkMineHTML(it) + '<p class="muted">' + pcEsc(it.line || "") + ' Sponsor: ' + pcEsc(youMark(it.sponsor || "")) + '.</p>' +
       '<div class="eyebrow" style="margin-top:8px">In plain words</div><p>' + pcEsc(dkPlain(it)) + '</p>' +
       '<div class="eyebrow" style="margin-top:8px">Full text, clause by clause</div><ol style="margin:6px 0 0 18px">' + dkProvisionsRich(it) + '</ol>' +
       (it.benchRows ? '<div class="eyebrow" style="margin-top:10px">The bench · how it leans</div>' + it.benchRows.map(r => '<div class="whip__row"><span class="whip__n">' + pcEsc(r.name) + '</span><span class="whip__w">' + pcEsc(r.v) + '</span></div>').join("") : dkBreak(it.by || {}, it.body || "")) +
@@ -9216,6 +9224,7 @@ function dkCard(i){
   h += '<div class="card__actions">' + (L.length > 1 ? '<button type="button" class="btn btn--ghost" id="dkNext">Next item</button>' : '') + '<button type="button" class="btn btn--ghost" id="dkClose">Close</button></div>';
   card.innerHTML = h; veil.hidden = false;
   card.querySelectorAll("[data-dk]").forEach(b => b.onclick = () => { const r = it.acts[+b.getAttribute("data-dk")].run(); try{ el("dkSay").textContent = r || ""; }catch(e){} card.querySelectorAll("[data-dk]").forEach(x => x.disabled = true); try{ refreshPanels(); }catch(e){} });
+  card.querySelectorAll("[data-myv]").forEach(b => b.onclick = () => { const n = +b.getAttribute("data-myv"); if(typeof setMyVote === "function") setMyVote(n === 0 ? null : n); dkCard(i); });
   const nx = el("dkNext"); if(nx) nx.onclick = () => dkCard((i + 1) % L.length);
   el("dkClose").onclick = () => { veil.hidden = true; G.running = true; };
 }
@@ -10153,7 +10162,9 @@ function dkReadersHTML(it){
         '<div class="muted" style="font-size:12px">' + pcEsc(life.join("; ")) + '.</div></div>';
     }).join("");
     let you = "";
-    try{ const y = G.you, yp = y && y.pos; if(yp){ const sc = alignment({pos:yp}, bill); const parts = AXES.filter(a => Math.abs(bill.pos[a.k] || 0) >= 8).map(a => pcEsc(DK_AXIS[a.k].n) + ": you " + Math.round(yp[a.k] || 0) + ", the bill " + Math.round(bill.pos[a.k] || 0)); you = '<div style="margin:8px 0;padding:6px 8px;border-left:3px solid #c9a24a;background:rgba(201,162,74,.1)"><b>You</b> — by your own answers, this text sits ' + (sc > 8 ? "close to" : sc < -8 ? "far from" : "somewhere between") + ' where you stand. <span class="muted">(' + parts.join("; ") + ')</span><div class="muted" style="font-size:12px">That is only your own record. Read the clauses above, weigh who gains and who loses, and decide it for yourself.</div></div>'; } }catch(e){}
+    try{ const y = G.you, yp = y && y.pos; const real = (it && it.b) || (G.bill && it && G.bill.title === it.title ? G.bill : null); const mine = real && typeof preferredVote === "function" ? preferredVote(real) : null;
+      if(mine === 1 || mine === -1) you = '<div style="margin:8px 0;padding:6px 8px;border-left:3px solid #c9a24a;background:rgba(201,162,74,.1)"><b>You</b> — you fixed this as <b>' + (mine === 1 ? "aye" : "no") + '</b>. That is the leaning on this bill. It is not taken from your mood.</div>';
+      else if(yp){ const sc = alignment({pos:yp}, bill); const parts = AXES.filter(a => Math.abs(bill.pos[a.k] || 0) >= 8).map(a => pcEsc(DK_AXIS[a.k].n) + ": you " + Math.round(yp[a.k] || 0) + ", the bill " + Math.round(bill.pos[a.k] || 0)); you = '<div style="margin:8px 0;padding:6px 8px;border-left:3px solid #c9a24a;background:rgba(201,162,74,.1)"><b>You</b> — you have not fixed a vote. By your own answers the text sits ' + (sc > 8 ? "close to" : sc < -8 ? "far from" : "somewhere between") + ' where you stand, and that is not a vote. <span class="muted">(' + parts.join("; ") + ')</span></div>'; } }catch(e){}
     return '<div class="eyebrow" style="margin-top:10px">How different people read the same text</div><div class="muted" style="font-size:12px">Nobody here was told what to think of it. Each of them reads it through their own beliefs, their own trade and place, and their own temper, so they agree only where those happen to point the same way.</div>' + you + rows;
   }catch(e){ return ""; }
 }
@@ -10168,6 +10179,7 @@ function dkWire(root, it, sayEl, rerender){
   root.querySelectorAll("[data-dkamend]").forEach(b => b.onclick = ev => { ev.stopPropagation(); const r = dkAmend(it); rerender && rerender(); said(r); });
   root.querySelectorAll("[data-dkpow]").forEach(b => b.onclick = ev => { ev.stopPropagation(); const p = dkPowers(it)[+b.getAttribute("data-dkpow")]; if(!p) return; const r = p.run(); if(sayEl && r) sayEl.textContent = r; try{ refreshPanels(); }catch(e){} if(!p.keep) rerender && rerender(); });
   root.querySelectorAll("[data-dkopen]").forEach(b => b.onclick = ev => { ev.stopPropagation(); const L = dkItems(); const i = Math.max(0, L.findIndex(x => x.title === it.title)); dkCard(i); });
+  root.querySelectorAll("[data-myv]").forEach(b => b.onclick = ev => { ev.stopPropagation(); const n = +b.getAttribute("data-myv"); if(typeof setMyVote === "function") setMyVote(n === 0 ? null : n); if(rerender) rerender(); else said(n === 1 ? "Your vote is aye." : n === -1 ? "Your vote is no." : "Your vote is cleared. They will not invent one."); });
 }
 function dkPowHTML(it){
   const P = dkPowers(it);
@@ -10191,6 +10203,7 @@ function dkPowHTML(it){
 function dkInlineHTML(it){
   return '<details class="dk-inline" style="border:1px solid rgba(0,0,0,.15);border-radius:8px;padding:6px 10px;margin:0 0 10px;background:rgba(255,255,255,.55);text-align:left">' +
     '<summary style="cursor:pointer;font:600 13px system-ui">Docket: ' + pcEsc(it.title) + ' · clauses, cost, every chamber, your state, your powers ▾</summary>' +
+    dkMineHTML(it) +
     '<p class="muted" style="margin:6px 0">' + pcEsc(it.line || "") + ' Sponsor: ' + pcEsc(youMark(it.sponsor || "")) + '.</p>' +
     '<ol style="margin:4px 0 0 18px;font-size:13px">' + dkClauseHTML(it) + '</ol>' + dkExtraHTML(it) +
     (function(){ try{ return dkPublic(it, !!it.national || roleKey() === "pres"); }catch(e){ return ""; } })() +
@@ -10209,7 +10222,7 @@ function dkInject(){
     const it = dkFind(card.textContent); if(!it) return;
     const w = document.createElement("div"); w.innerHTML = dkInlineHTML(it);
     const node = w.firstChild;
-    node.open = card.textContent.indexOf(it.title) >= 0;      /* open where the card is about this bill, folded elsewhere */
+    node.open = false;   /* the bill stays shut until you open it from this line, the Docket menu, or the morning card */
     const h1 = card.querySelector("h1, .eyebrow"); if(h1 && h1.nextSibling) h1.parentNode.insertBefore(node, h1.nextSibling); else card.insertBefore(node, card.firstChild);
     const reopen = () => { const was = node.open; const n2 = document.createElement("div"); n2.innerHTML = dkInlineHTML(it); const nn = n2.firstChild; nn.open = was; node.replaceWith(nn); dkWire(nn, it, nn.querySelector(".dk-say"), null); };
     dkWire(node, it, node.querySelector(".dk-say"), reopen);
@@ -12247,6 +12260,15 @@ function ssnRecognize(){
   const p = pick_ === "you" ? G.you : byId(pick_); SSN.lastParty = p && p.party; ssnPublish();
 }
 function ssnNpcLine(m){
+    if(m && m.kind === "press"){
+      const b = ssnBill(), topic = b ? b.title : "today's business";
+      return pick([
+        "On " + topic + ": what is the answer for the record?",
+        "Who pays for this, and when do the districts see it?",
+        (m.outlet || "My paper") + " wants a straight answer. Will you stand by it tomorrow?",
+        "What changes for the places that are already hurting?"
+      ]);
+    }
     if(m && m.kind === "official"){
     const line = {treaty:"A neighbour will take a letter this week and will not take a garrison. I can open the channel, and the reason is that a quiet week is the only week they answer.", purse:"The chest can spare a reserve. I would move it because the counties that are hot will ask by Friday, and a reserve named today is cheaper than one named in a panic.", readiness:"The guard is stood to. I can ease it, because heat that is not a war is paid for by the towns, not by the enemy.", ground:"One state is hotter than the rest. I can send people, because unrest named and unanswered becomes a second call tomorrow.", works:"A shift is about to be cut. I can keep it, because a closed shift is a town that stops writing to us.", brief:"A brief is drafted. I can file it, because a case without a filing is a speech and the court does not rule on speeches.", chief:"The day is crowded with people who are not the work. I can clear it so the work is what you see.", treasurer:"There is money the budget buried. I can find it, because a figure you have not seen is a vote you cannot defend.", safety:"The corners are thin. I can put a second shift on, because a street with nobody on it becomes the story.", press:"The wire is about to invent your line. I can give them one, because a line you did not say is the one they print.", agency:"The department was built for one thing. It is ready, and I would spend it on that and not on a second errand."}[m._ability] || "I hold this office because the chair is not empty, and the papers today are the work.";
     return "From " + (m.role || "my office") + ". " + line;
@@ -21179,6 +21201,7 @@ function dayPlanCard(){
                 (e.rsvp === false ? "✓ Declined" : "Decline") + '</button>' +
             '</div></div>').join("")
       : '<p>No meetings, no hearings, nobody wanting you behind a lectern. Do your own work — the corridor will invent a story if you do not.</p>') +
+    (b && !b.done ? '<div class="card__actions"><button class="btn btn--ghost" type="button" id="planBill">Open the bill</button></div>' : '') +
     '<div class="card__actions"><button class="btn" type="button" id="planGo" data-gp="plan:go">Start the day</button></div>';
   veil.hidden = false;
   card.querySelectorAll("[data-rsvp]").forEach(btn => btn.addEventListener("click", () => {
@@ -21193,6 +21216,8 @@ function dayPlanCard(){
     list.forEach(ev => { ev.rsvp = true; });
     dayPlanCard();
   });
+  const planBill = el("planBill");
+  if(planBill) planBill.addEventListener("click", () => { try{ dkCard(0); }catch(e){} });
   const pg = el("planGo");
   if(pg) pg.addEventListener("click", () => {
     if(pg.disabled) return;
@@ -52788,9 +52813,18 @@ armFrame();
   const person = id => { if(id == null || id === "" || youId(id)) return youId(id) ? G.you : null; return sv(() => byId(isNaN(+id) ? id : +id)); };
   const sn = p => { const n = p && p.name ? String(p.name) : ""; const b = n.split(/\s+/).filter(Boolean); return b.length ? b[b.length - 1] : "them"; };
   function live(){
-    const S = window.ONUM_SESSION; if(!S || S.stage === "idle" || S.open === false) return null;
-    if(!(S.kind || S.floorId != null || (S.seats && S.seats.length) || S.chairId != null)) return null;
-    return S;
+    const S = window.ONUM_SESSION; if(S && S.stage !== "idle" && S.open !== false && (S.kind || S.floorId != null || (S.seats && S.seats.length) || S.chairId != null)) return S;
+    try{
+      if(typeof PROC !== "undefined" && PROC && PROC.on && PROC.e){
+        const people = [].concat(PROC.order || [], PROC.chair ? [PROC.chair] : [], PROC.wit && PROC.wit.member ? [PROC.wit.member] : []).filter(Boolean);
+        const seen = {};
+        const seats = [];
+        people.forEach(p => { if(!p || p.id == null || seen[p.id] || p === G.you) return; seen[p.id] = 1; seats.push({personId:p.id}); });
+        const sp = PROC.speaker;
+        return {kind:PROC.e.k, stage:PROC.phase || "open", floorId: sp === G.you ? "you" : (sp && sp.id), chairId: PROC.chair && PROC.chair.id, seats, queue:[], _proc:true};
+      }
+    }catch(e){}
+    return null;
   }
   function seats(S){ return (S && S.seats || []).map(x => x && (x.personId != null ? x.personId : x.id)).filter(id => id != null && !youId(id)); }
   function bill(){ return (G.bill && !G.bill.done) ? G.bill : null; }
@@ -52813,21 +52847,54 @@ armFrame();
     try{ tlog(p === G.you ? "You" : p.name, line, p === G.you ? "you" : "talk"); }catch(e){}
     try{ appendFloor(p === G.you ? "You" : sn(p), line); }catch(e){}
     if(p !== G.you) mark(p.id);
+    try{ if(typeof PROC !== "undefined" && PROC && PROC.on) PROC.speaker = p; }catch(e){}
     note = sn(p) + " is speaking";
     sig = "";
   }
+  function kindOf(){ const S = live(); return (S && S.kind) || ""; }
+  function askLine(p, kind){
+    const b = bill(), topic = b ? b.title : "today's business", outlet = (p && (p.outlet || p.role)) || "the paper";
+    if(kind === "press_conference" || kind === "presser" || (p && p.kind === "press")) return pick([
+      outlet + ". On " + topic + ", what is the answer for the record?",
+      "Who pays for this, and when do the districts see it?",
+      "Will you stand by that tomorrow, or is this only today's line?",
+      "The places already hurting want a number, not a mood."
+    ]);
+    if(kind === "hearing" || kind === "committee_hearing") return "For the record: what did you know about " + topic + ", and what does it cost " + town(p) + "?";
+    if(kind === "caucus") return "In this room, not on the floor: I am a " + (side(p) || "undecided") + (b ? " on " + b.title : "") + ". " + town(p) + " is who I face after.";
+    if(kind === "crisis") return "This cannot wait on a tidy bill. " + town(p) + " needs an answer today" + (b ? " on " + b.title : "") + ", and I am a " + (side(p) || "no") + " until I hear the cost.";
+    if(kind === "townhall") return "I came from " + town(p) + " to ask what you will do" + (b ? " about " + b.title : "") + ". I want a yes or a no I can take home.";
+    return "";
+  }
   function callOn(id){
-    const p = person(id); if(!p || p === G.you){ note = "Pick a member, not yourself."; sig = ""; return; }
+    const kind = kindOf();
+    if(kind === "press_conference" && window.onumSession && typeof window.onumSession.callon === "function"){
+      const ok = window.onumSession.callon(id);
+      if(ok){ note = "Called. They ask, then the floor is yours to answer."; sig = ""; return; }
+    }
+    if((kind === "cabinet_meeting" || kind === "governor_council") && typeof cabCallOn === "function"){
+      cabCallOn(id); note = "Called. They speak from the office they hold."; sig = ""; return;
+    }
+    const p = person(id); if(!p || p === G.you){ note = "Pick someone else, not yourself."; sig = ""; return; }
     const b = bill(), sd = side(p);
-    let line = "";
-    try{ const N = (b && typeof natureOf === "function") ? natureOf(p, b) : null; if(N && N.line && !(typeof heardBefore === "function" && heardBefore(N.line))) line = N.line; }catch(e){}
-    if(!line){ try{ line = procLineFor(p, {k:"floor"}); }catch(e){} }
+    let line = askLine(p, kind);
+    if(!line){ try{ const N = (b && typeof natureOf === "function") ? natureOf(p, b) : null; if(N && N.line && !(typeof heardBefore === "function" && heardBefore(N.line))) line = N.line; }catch(e){} }
+    if(!line){ try{ line = procLineFor(p, {k: kind === "hearing" || kind === "committee_hearing" ? "hearing" : "floor"}); }catch(e){} }
     if(!line) line = (b && sd) ? ("I am a " + sd + " on " + b.title + ". I speak for " + town(p) + ".") : (sn(p) + " takes the floor for " + town(p) + ".");
     try{ if(typeof rememberLine === "function") rememberLine(line); }catch(e){}
     show(p, line);
   }
   function press(){
-    const p = up(); if(!p){ note = "Call on someone first. Press is for the person already up."; sig = ""; return; }
+    const kind = kindOf(), p = up();
+    if(kind === "press_conference" || kind === "presser" || (p && p.kind === "press")){
+      if(!p){ note = "Call on a reporter first. Then press them for the follow-up."; sig = ""; return; }
+      show(p, "Follow-up. The first answer was not a number. " + (bill() ? bill().title + ": " : "") + "who pays, and what fails if you do nothing?");
+      return;
+    }
+    if((kind === "cabinet_meeting" || kind === "governor_council") && window.onumSession && typeof window.onumSession.press === "function"){
+      window.onumSession.press(p && p.id); note = "Pressed for the figure."; sig = ""; return;
+    }
+    if(!p){ note = "Call on someone first. Press is for the person already up."; sig = ""; return; }
     const b = bill(), sd = side(p);
     const fig = (b && b.cost) ? (" The figure is " + money(b.cost) + ".") : "";
     let human = "";
@@ -52842,7 +52909,17 @@ armFrame();
     show(p, "You pressed for the specific point. My vote is " + (sd || "unchanged") + (b ? " on " + b.title : "") + "." + fig + " " + town(p) + " is who I answer to." + human);
   }
   function challenge(){
-    const p = up(); if(!p){ note = "Call on someone first. A challenge needs someone to answer."; sig = ""; return; }
+    const kind = kindOf(), p = up();
+    if(kind === "press_conference" || kind === "presser"){
+      const other = seats(live()).map(person).filter(o => o && o !== p && o.kind === "press")[0] || seats(live()).map(person).filter(o => o && o !== p)[0];
+      if(!other){ note = "Nobody else in the gallery to challenge it."; sig = ""; return; }
+      show(other, "A different paper. " + (p ? sn(p) + " asked the easy one. " : "") + "Answer this: what do you refuse to do, and who is hurt by that refusal?");
+      return;
+    }
+    if((kind === "cabinet_meeting" || kind === "governor_council") && window.onumSession && typeof window.onumSession.challenge === "function"){
+      window.onumSession.challenge(p && p.id); note = "Challenged. They answer the objection."; sig = ""; return;
+    }
+    if(!p){ note = "Call on someone first. A challenge needs someone to answer."; sig = ""; return; }
     const b = bill(); const sd = b ? memberVote(p, b) : 0;
     const opp = seats(live()).map(person).filter(o => o && o !== p && (!b || memberVote(o, b) !== sd))[0];
     if(!opp){ note = "Nobody on the other side is in the room."; sig = ""; return; }
@@ -52861,6 +52938,14 @@ armFrame();
     const S = live(); const c = S && person(S.chairId);
     if(!c || c === G.you){ show(G.you, "The chair: one member at a time. Call the next name when you are ready."); return; }
     show(c, "The chair will hear one member at a time. " + (up() ? sn(up()) + " has been heard." : "The floor is open.") + " Call the next. I am not yielding this chair to repeat them.");
+  }
+  function endSitting(){
+    try{
+      if(typeof SSN !== "undefined" && SSN){ let n = 0; while(SSN && ssnStage() && ssnStage().id !== "adjourn" && n < 8){ ssnNext(); n++; } ssnClose(); }
+      if(typeof PROC !== "undefined" && PROC && PROC.on){ PROC.on = false; PROC.speaker = null; const pb = document.getElementById("procBar"); if(pb) pb.hidden = true; }
+      const d = document.getElementById("ndFd"); if(d) d.hidden = true;
+    }catch(e){}
+    note = "The sitting is closed."; sig = "";
   }
   function pass(){
     try{ if(SSN){ const id = SSN.floorId; if(id && !youId(id)) mark(id); SSN.floorId = null; ssnPublish(); } }catch(e){}
@@ -52895,9 +52980,12 @@ armFrame();
   }
   function paint(force){
     const S = live(); document.body.classList.toggle("mt-on", !!S);
-    const A = host();
-    if(!S || !A){ if(sig){ sig = ""; if(A){ A.innerHTML = ""; delete A.dataset.mt; } } bar.className = ""; bar.innerHTML = ""; return; }
-    A.dataset.mt = "1"; bar.className = ""; bar.innerHTML = "";
+    let A = host();
+    const floating = !A;
+    if(floating){ A = bar; place(); }
+    if(!S){ if(sig){ sig = ""; const desk = host(); if(desk){ desk.innerHTML = ""; delete desk.dataset.mt; } } bar.className = ""; bar.innerHTML = ""; return; }
+    if(!floating){ A.dataset.mt = "1"; bar.className = ""; bar.innerHTML = ""; }
+    else bar.className = "on";
     const who = up(), nx = nextFresh();
     const pv = (G.bill && typeof preferredVote === "function") ? (preferredVote(G.bill) || 0) : 0;
     const now = [others, note, who && who.id, nx, (SSN && SSN._mtSaid && SSN._mtSaid.length), S.floorId, (S.queue || []).length, pv].join("|");
@@ -52930,6 +53018,7 @@ armFrame();
     A.appendChild(btn("Pass", pass, false, "Move on. Nobody else speaks until you call the next."));
     A.appendChild(btn("Interject", interject, false, "You speak from your seat. It does not give you the floor."));
     A.appendChild(btn(nx ? ("Next: " + sn(person(nx))) : "Next: done", next, true, nx ? person(nx).name : "Everyone seated has been called"));
+    A.appendChild(btn("End the sitting", endSitting, false, "Close this press conference, hearing, caucus or floor. It does not keep talking after you leave it."));
   }
   document.addEventListener("click", e => {
     const S = live(); if(!S) return;
