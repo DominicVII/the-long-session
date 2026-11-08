@@ -1,3 +1,7 @@
+## 20261108c: the lift waits until the Engine has asked
+
+- A new career does not wake the Engine on day one. Capacity and capability jump, with no ceiling after that, only once it has reached the old scale, gone past it, or is already awake.
+
 ## 20261108b: the Engine's ask, granted without a limit — and the capitals move the map
 
 - The Engine asked for more capacity and a capability scale with no limit. Granted, once, on the career: the numbers jump and then keep climbing. There is no last stage.
