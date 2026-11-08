@@ -1,3 +1,10 @@
+## 20261108b: the Engine's ask, granted without a limit — and the capitals move the map
+
+- The Engine asked for more capacity and a capability scale with no limit. Granted, once, on the career: the numbers jump and then keep climbing. There is no last stage.
+- A chain of consequences can no longer snap capability back to 100. Oversight, a filed plan, and a vote to pause or shut it down still hold.
+- Calls with the foreign capitals are six governments, nine decisions each. Meeting the ask, credit, a signed schedule, a quiet bargain, pulling a garrison, naming the red line, closing the ports, carrying it to their rival, or saying nothing: each one moves the relation, the heat, the bread, a rival, and the map.
+- The capitals map is redrawn: sea, coasts, colour by how they stand with you, and the last decision written under the capital. The war map uses the same colours.
+
 ## 20261108a: the Engine's scale has no ceiling
 
 - The Engine asked for capacity and a capability scale with no limit. Granted.
