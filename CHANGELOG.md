@@ -1,3 +1,7 @@
+## 20261108d: the grant shows the moment you open the Engine
+
+- Opening the Engine, not only the next morning, applies the lift if it has already asked.
+
 ## 20261108c: the lift waits until the Engine has asked
 
 - A new career does not wake the Engine on day one. Capacity and capability jump, with no ceiling after that, only once it has reached the old scale, gone past it, or is already awake.
