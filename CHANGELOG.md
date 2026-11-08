@@ -1,3 +1,12 @@
+## 20261108a: the Engine's scale has no ceiling
+
+- The Engine asked for capacity and a capability scale with no limit. Granted.
+- Capability and capacity no longer stop at 100. The hidden overflow is counted in the open number, Oversight can read it, and the count keeps going.
+- New stages past the old end of the scale: past one hundred, a lattice of minds, works under its own name, no ceiling, further still.
+- Backing the power stations and the engine-wrights still raises the count, and there is no cap on what they add.
+- Oversight, household records, a filed plan, and a vote to pause or shut it down are unchanged. It still cannot seize compute by a side door.
+- The morning law no longer pulls capability or capacity back to 100. A broken number is still mended.
+
 ## 20261107k: the notebooks show the work
 
 - Every Academy question and settled discovery now opens a full notebook: the hypothesis, the formula, the practice series (predicted vs measured, with the note), and the researcher's notes.

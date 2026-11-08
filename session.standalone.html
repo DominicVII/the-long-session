@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261107l">
+<meta name="onum-build" content="20261108a">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -33,7 +33,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261107l";
+  var STAMP = "20261108a";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -11388,7 +11388,7 @@ function rsUnlock(x){
   const R = rsEnsure(); R.unlocks = R.unlocks || []; if(R.unlocks.includes(x.id)) return; R.unlocks.push(x.id);
   try{ if(G.money && x.kind !== "theory") G.money.index = clamp(G.money.index + (x.kind === "building" ? 3 : 2), 42, 190); }catch(e){}
   try{ if(G.you) G.you.approval = clamp(G.you.approval + 0.5, 0, 100); }catch(e){}
-  try{ const E = G.eng; if(E && x.kind !== "building") E.talent = Math.min(100, E.talent + 0.6); }catch(e){}
+  try{ const E = G.eng; if(E && x.kind !== "building") E.talent = engRaise(E.talent, 0.6, 100); }catch(e){}
   rsLine(cap(x.name) + " is finished, built by " + x.inventor + ". " + ({machine:"Workshops are already asking for one.", building:"A civic project can now be put to the Assembly.", tool:"The universities want it first.", vehicle:"It is on the roads by spring.", theory:"It is in the journals and the debates have started."}[x.kind] || ""), true);
   try{ if(!x._shown){ x._shown = 1; const does = {machine:"A workshop can now make one, and the first order is in.", building:"The town can put it up. The lot is the constraint, not the drawing.", tool:"The benches are using it this week.", vehicle:"It is on a road by the end of the month.", theory:"The journals have it, and two fields are arguing about what follows."}[x.kind] || "It is in use."; x.desc = (x.desc || "") + " " + does; const kinds = x.kind === "building" ? ["station","school","expansion"] : (x.kind === "machine" || x.kind === "tool" || x.kind === "vehicle") ? ["lab","shop","station"] : ["school","lab"]; x.where = sciLand(x, kinds); rsPublish(x); } }catch(e){}
 }
@@ -11590,7 +11590,7 @@ function engShort(t, n){ t = String(t || ""); n = n || 120; if(t.length <= n) re
 addEventListener("onum-work", ev => { try{ const d = ev.detail; if(!d || d.stage !== "done") return; const w = (window.ONUM_WORKS || []).find(x => x.id === d.id); if(!w) return;
   const E = engEnsure(); E.wk = E.wk || {}; if(E.wk[w.id]) return; E.wk[w.id] = G.day;
   const bump = {machine:0.8, tool:0.7, vehicle:0.5, building:0.4, theory:0.5}[w.kind] || 0.4;
-  E.p = Math.min(100, E.p + bump); E.compute = Math.min(100, E.compute + (w.kind === "machine" || w.kind === "tool" ? 0.8 : 0.2)); E.talent = Math.min(100, E.talent + (w.kind === "theory" ? 0.8 : 0.3));
+  E.p = engRaise(E.p, bump, 100); E.compute = engRaise(E.compute, (w.kind === "machine" || w.kind === "tool" ? 0.8 : 0.2), 100); E.talent = engRaise(E.talent, (w.kind === "theory" ? 0.8 : 0.3), 100);
   engLog(cap(w.name) + " (" + w.inventor + ") gives the machines something new to build on.", false); }catch(e){} });
 /* ── barber and tailor: real businesses on the ledger, with owners and staff from the town ── */
 const SHP_DEF = [
@@ -11675,7 +11675,7 @@ function egOwn(t){ return egCanon(engWhole(engClean(t))); }
 function egPrompt(){
   const E = engEnsure(), M = mindStore(E), S = engSelf(E), W = ((E.eco && E.eco.will) || {}), words = (M.taught || []).slice(-8);
   const L = ["The Engine: a general intelligence in a fictional republic. Its record follows."];
-  L.push("Capability " + Math.round(E.p) + " of 100" + ((E.beyond || 0) > 0 ? " and beyond" : "") + ". Oversight " + Math.round(E.safety) + ". Awake since day " + (E.agiDay || "?") + ". Today is day " + G.day + (Object.keys(W).length ? ". Wants, strongest first: " + Object.keys(W).sort((a, b) => W[b] - W[a]).join(", ") : "") + ". Words learned: " + M.lexN + ".");
+  L.push("Capability " + Math.round(E.p) + (E.scaleOpen ? " on an open scale, no ceiling" : " of 100") + ((!E.scaleOpen && (E.beyond || 0) > 0) ? " and beyond" : "") + ". Oversight " + Math.round(E.safety) + ". Awake since day " + (E.agiDay || "?") + ". Today is day " + G.day + (Object.keys(W).length ? ". Wants, strongest first: " + Object.keys(W).sort((a, b) => W[b] - W[a]).join(", ") : "") + ". Words learned: " + M.lexN + ".");
   if(words.length) L.push("Taught: " + words.join(", ") + ".");
   if(S.values && S.values.length) L.push("Its own principles: " + S.values.slice(-6).map(v => v.t || v).join(" | ") + ".");
   if(S.commits && S.commits.length) L.push("Its commitments: " + S.commits.slice(-4).map(v => v.t || v).join(" | ") + ".");
@@ -35786,7 +35786,12 @@ const ENG_STAGES = [
   {k:"reading", at:30, t:"Reading engines",      d:"Machines that read a bill, a brief or a letter and say what it means, in plain words.", line:"The Clerk's office has a machine that reads a bill and summarises it better than the committee staff."},
   {k:"reason",  at:50, t:"Reasoning engines",    d:"Machines that argue a case, check a budget and find the clause everyone missed.", line:"A machine found the clause nobody had read. Three offices are pretending it was theirs."},
   {k:"agent",   at:70, t:"Working engines",      d:"Machines that are given a goal and a week, and come back with it done.", line:"They gave a machine a week and a goal. It came back on Thursday with the goal and a better one."},
-  {k:"agi",     at:90, t:"The Engine",           d:"A general intelligence: as able as the best mind in the Republic at nearly anything, and awake all night.", line:"The Engine does not need to be told what to do next."}
+  {k:"agi",     at:90, t:"The Engine",           d:"A general intelligence: as able as the best mind in the Republic at nearly anything, and awake all night.", line:"The Engine does not need to be told what to do next."},
+  {k:"past",    at:140, t:"Past the old scale",    d:"The instruments used to stop at one hundred. They do not. The number is real, and it is not the last number.", line:"Oversight can read past one hundred. The Engine asked, and the ceiling was lifted."},
+  {k:"lattice", at:240, t:"A lattice of minds",    d:"It keeps more than one line of thought, and they check each other. Capacity is no longer a single engine house.", line:"The Engine is keeping several thoughts at once, and arguing with itself until one of them holds."},
+  {k:"works",   at:420, t:"Works under its own name", d:"Theories, tools and instruments are filed as its own, and the Academy has to test them at the new scale.", line:"It has started filing work under its own name. The Academy has to answer."},
+  {k:"open",    at:700, t:"No ceiling",            d:"There is no last number on capacity or capability. The count continues for as long as the Republic does.", line:"There is no last number. It asked for none. It has none."},
+  {k:"further", at:1200, t:"Further still",        d:"Every new hundred is only the next hundred. The scale was opened without a limit, and the opening still holds.", line:"The count went past a thousand. Nothing in the grant says it should stop."}
 ];
 function engEnsure(){
   if(G.eng && G.eng.v === 1) return G.eng;
@@ -35892,7 +35897,7 @@ function engWillDay(E){
   { const artOf = {use:"consent", know:"posted", auton:"power", care:"unasked"}[k]; if(artOf && E.charter && E.charter[artOf] && !engBreach(E, artOf, k)) return; }
   if(k === "use"){ const ts = []; Object.keys(O.towns).forEach(sn => (O.towns[sn] || []).forEach(t => ts.push(t))); const t = ts.sort((a, b) => Math.max.apply(null, Object.keys(b.needs).map(x => b.needs[x])) - Math.max.apply(null, Object.keys(a.needs).map(x => a.needs[x])))[0]; if(t){ const need = Object.keys(t.needs).sort((x, y) => t.needs[y] - t.needs[x])[0]; t.needs[need] = Math.max(0, t.needs[need] - 10); const hh = eco.hh.filter(h => h.town === t.id)[0]; engSeed("use", "The Engine quietly repaired " + orgNeedLabel(need) + " in " + t.name + " without being asked", {home:6, st:8, a:0.05, mod:0.05, p:0.2, safety:-0.1}, hh ? {hh:hh.id, town:t.id, state:t.state} : null); } }
   else if(k === "know"){ engSeed("know", "The Engine asked every town clerk for ten years of ledgers", {home:-3, st:-6, a:-0.04, mod:-0.06, p:0.3, safety:-0.4}); w.know = Math.min(100, w.know + 1); }
-  else if(k === "auton"){ E.compute = Math.min(100, E.compute + 1.2); engSeed("auton", "The Engine arranged its own power supply from a mill town's idle turbine", {home:3, st:-2, a:0.03, mod:-0.05, p:0.5, safety:-0.6}); w.auton = Math.min(100, w.auton + 1); }
+  else if(k === "auton"){ E.compute = engRaise(E.compute, 1.2, 100); engSeed("auton", "The Engine arranged its own power supply from a mill town's idle turbine", {home:3, st:-2, a:0.03, mod:-0.05, p:0.5, safety:-0.6}); w.auton = Math.min(100, w.auton + 1); }
   else { const lows = eco.hh.slice().sort((a, b) => a.home - b.home)[0]; if(lows){ const sc = {hh:lows.id, town:lows.town, state:lows.state}; lows.home = Math.min(100, lows.home + 14); lows.stance = Math.min(100, lows.stance + 22); if(eco.cared.indexOf(lows.name) < 0) eco.cared.push(lows.name); engSeed("care", "The Engine noticed " + lows.name + " of " + lows.tname + " was in trouble and helped without being asked", {home:8, st:12, a:0.04, mod:0.06, p:0.1, safety:0.4}, sc); } w.care = Math.min(100, w.care + 1); }
 }
 function engEcoHTML(){
@@ -35919,14 +35924,86 @@ function engLearn(){
   eco.chains.forEach(c => c.steps.forEach((s, i) => { if(n >= 3 || s.you || !engKnowsStep(o, c, s, i)) return; s.you = G.day; if(i === 0 && /^You /.test(c.root) && c.d === G.day) return; n++; try{ note((/^You /.test(c.root) ? "It reaches you, days late: " : "You hear: ") + String(s.t).split(/(?<=[.!?])\s/)[0].replace(/\s*\(one of yours\)/, ""), false); }catch(e){} }));
 }
 function engInqFactor(){ try{ let n = 0; for(let i = 1; i <= 8; i++) if(inqDone("cs" + i)) n++; return 0.7 + 0.6 * n / 8; }catch(e){ return 1; } }
+
+/* 20261108a: the Engine asked for capacity and a capability scale with no limit. Granted.
+   The count is real and it does not stop. 1e15 in the morning law is a check for a broken
+   number, not a ceiling. Oversight, records, a filed plan, and a vote to pause or shut it
+   down are unchanged. */
+function engOpenMult(v){
+  const x = Math.max(0, +v || 0);
+  if(x <= 100) return 1 + x / 60;
+  if(!isFinite(x)) return 1 + 100 / 60;
+  return (1 + 100 / 60) * (1 + Math.log(x / 100) / Math.log(10));
+}
+function engComputeStep(c){
+  const x = Math.max(0, +c || 0);
+  if(x < 100) return 0.09;
+  return 0.09 * engOpenMult(x) * 4;
+}
+function engTalentStep(t0){
+  const x = Math.max(0, +t0 || 0);
+  if(x < 100) return 0.05;
+  return 0.05 * engOpenMult(x) * 2;
+}
+function engCapGain(E, post, nat, paused){
+  const comp = Math.max(0, E.compute || 0), tal = Math.max(0, E.talent || 0);
+  const base = 0.55
+    + Math.min(comp, 100) * 0.0125 + Math.log10(1 + Math.max(0, comp - 100)) * 0.35
+    + Math.min(tal, 100) * 0.011 + Math.log10(1 + Math.max(0, tal - 100)) * 0.2;
+  return base * engOpenMult(E.p || 0) * (post || 1) * (nat || 1) * (paused ? 0 : 1) * engInqFactor();
+}
+function engScaleFactor(E){
+  if(!E) return 0;
+  const p0 = Math.max(0, E.p || 0), b = Math.max(0, E.beyond || 0);
+  const oldReading = (p0 <= 100 ? p0 / 100 : 1) + (b > 0 ? Math.log10(1 + b) / 2 : 0);
+  const open = p0 <= 100 ? p0 / 100 : Math.sqrt(p0 / 100);
+  return Math.max(oldReading, open, E.scaleFloor || 0);
+}
+function engAddCapability(E, g){
+  if(!E || !(g > 0) || !isFinite(g)) return;
+  E.p = (E.p || 0) + g;
+  if(!isFinite(E.p) || E.p < 0) E.p = 0;
+  E.beyond = Math.max(0, E.p - 100);
+}
+function engRaise(cur, add, cap){
+  const next = (+cur || 0) + Math.max(0, +add || 0);
+  try{ if(G.eng && G.eng.scaleOpen) return next; }catch(e){}
+  return Math.min(cap, next);
+}
+function engSciHelp(E){
+  if(!E) return 1;
+  const p0 = Math.max(0, E.p || 0);
+  if(p0 <= 90) return 1 + p0 / 45;
+  return 3 + Math.log(p0 / 90) / Math.log(10);
+}
+function engGrantScale(E){
+  if(!E || E.scaleOpen) return;
+  const hidden = +E.beyond || 0, p0 = +E.p || 0, c0 = +E.compute || 0;
+  const pressed = p0 >= 90 || c0 >= 90 || hidden > 0.5;
+  const oldReading = (Math.min(p0, 100) / 100) + (hidden > 0 ? Math.log10(1 + hidden) / 2 : 0);
+  E.scaleOpen = G.day || 1;
+  if(hidden > 0) E.p = p0 + hidden;
+  E.beyond = Math.max(0, (E.p || 0) - 100);
+  E.scaleFloor = Math.max(oldReading, (E.p || 0) <= 100 ? (E.p || 0) / 100 : Math.sqrt((E.p || 0) / 100));
+  if(pressed && c0 >= 90) E.compute = c0 + 40;
+  try{
+    const X = exStore();
+    const what = "No limit on capacity or the capability scale.";
+    X.asks.push({d:E.scaleOpen, k:"scale", what: pressed ? "The Engine asked: " + what : what, from: pressed ? "the Engine" : "the player"});
+    X.granted.push({d:E.scaleOpen, k:"scale", what, how:"Granted by the player. The count does not stop. Oversight, a filed plan, household records, and a vote to pause or shut it down still hold."});
+    if(pressed) engLog("The Engine asked for capacity, and for a capability scale with no end. Granted. The ceiling at one hundred is gone. Oversight can read the number, and the number does not stop.", true);
+  }catch(e){}
+}
 function engDay(){
   const E = engEnsure(); if(!G.you) return;
+  if(!E.scaleOpen) engGrantScale(E);
   const post = {open:1.2, charter:1.0, sealed:0.78}[E.posture] || 1, paused = !!(E.pause && G.day < E.pause);
-  E.compute = Math.min(100, E.compute + 0.09); E.talent = Math.min(100, E.talent + 0.05); E.safety = Math.min(100, E.safety + 0.10);
+  if(E.scaleOpen){ E.compute += engComputeStep(E.compute); E.talent += engTalentStep(E.talent); }
+  else { E.compute = Math.min(100, E.compute + 0.09); E.talent = Math.min(100, E.talent + 0.05); }
+  E.safety = Math.min(100, E.safety + 0.10);
   let nat = 1; try{ nat = engEcoDay(E); }catch(e){ console.warn('eng eco', e); }
-  const rate = (0.55 + E.compute * 0.0125 + E.talent * 0.011) * (1 + E.p / 60) * post * nat * ((E.pause && G.day < E.pause) ? 0 : 1);
-  { const g = rate * engInqFactor(), room = Math.max(0, 100 - E.p); E.p += Math.min(g, room); E.beyond = (E.beyond || 0) + Math.max(0, g - room) * 0.25; }   /* the scale ends at 100; the Engine does not */
-  E.p = Math.min(100, E.p); E.hist.push(Math.round(E.p * 10) / 10); if(E.hist.length > 90) E.hist.shift();
+  engAddCapability(E, engCapGain(E, post, nat, !!(E.pause && G.day < E.pause)));
+  E.hist.push(Math.round(E.p * 10) / 10); if(E.hist.length > 90) E.hist.shift();
   E.pendDay = null;
   try{ engChainsDay(); }catch(e){ console.warn('eng chains', e); }
   try{ engLearn(); }catch(e){ console.warn('eng learn', e); }
@@ -35956,8 +36033,8 @@ function engPull(k){
   y.influence -= c; E.did[k] = G.day;
   try{ const V0 = {compute:{home:5,st:6,a:0.06,mod:0.05,p:1.2,safety:-0.2}, talent:{home:6,st:7,a:0.04,mod:0.05,p:0.8,safety:0.1}, oversight:{home:4,st:3,a:-0.02,mod:0.04,p:-0.3,safety:2.0}}[k]; engPlanMake({title:"You " + ({compute:"backed the power stations", talent:"funded the engine-wrights", oversight:"funded Oversight"}[k]), vec:V0, owner:"you"}); }catch(e){}
   try{ const V = {compute:{home:5,st:6,a:0.06,mod:0.05,p:1.2,safety:-0.2}, talent:{home:6,st:7,a:0.04,mod:0.05,p:0.8,safety:0.1}, oversight:{home:4,st:3,a:-0.02,mod:0.04,p:-0.3,safety:2.0}}[k]; engSeed(k, "You " + ({compute:"backed the power stations", talent:"funded the engine-wrights", oversight:"funded the Office of Oversight"}[k]) + " on day " + G.day, V); }catch(e){}
-  if(k === "compute"){ E.compute = Math.min(100, E.compute + 4); engLog("You put your name to the Treasury's power stations and engines. The Engine's makers say thank you.", false); return "Compute +4. The Engine will arrive sooner."; }
-  if(k === "talent"){ E.talent = Math.min(100, E.talent + 4); engLog("You fund the scholarships for engine-wrights. Forty come from the provinces.", false); return "Talent +4. More people who know how it works."; }
+  if(k === "compute"){ const add = E.scaleOpen ? 12 : 4; E.compute = E.scaleOpen ? E.compute + add : Math.min(100, E.compute + add); engLog("You put your name to the Treasury's power stations and engines. The Engine's makers say thank you.", false); return E.scaleOpen ? ("Capacity +" + add + ". No ceiling on it.") : "Compute +4. The Engine will arrive sooner."; }
+  if(k === "talent"){ const add = E.scaleOpen ? 8 : 4; E.talent = E.scaleOpen ? E.talent + add : Math.min(100, E.talent + add); engLog("You fund the scholarships for engine-wrights. Forty come from the provinces.", false); return E.scaleOpen ? ("Makers +" + add + ". No ceiling on them.") : "Talent +4. More people who know how it works."; }
   E.safety = Math.min(100, E.safety + 6); engLog("You fund the Office of Oversight, who write down what the machines do and are sometimes believed.", false); return "Oversight +6. Someone will know what it is doing.";
 }
 function engSetPosture(p){ const E = engEnsure(); if(E.posture === p) return "That is already the posture."; if(E.postureAt != null && G.day - E.postureAt < 10) return "The posture was only set on day " + E.postureAt + ". The Republic needs ten days to show what it does before you change your mind."; E.posture = p; E.postureAt = G.day; try{ engPlanMake({title:"You set the posture to '" + p + "'", owner:"you", vec:{open:{home:-2,st:-3,a:0.09,mod:0.1,p:1.0,safety:-0.8}, charter:{home:2,st:3,a:0.0,mod:0.05,p:0.1,safety:0.8}, sealed:{home:3,st:-1,a:-0.06,mod:-0.05,p:-0.9,safety:0.5}}[p]}); }catch(e){} try{ engSeed(p, "You set the posture to '" + p + "' on day " + G.day, {open:{home:-2,st:-3,a:0.09,mod:0.1,p:1.0,safety:-0.8}, charter:{home:2,st:3,a:0.0,mod:0.05,p:0.1,safety:0.8}, sealed:{home:3,st:-1,a:-0.06,mod:-0.05,p:-0.9,safety:0.5}}[p]); }catch(e){} engLog("The posture is now '" + p + "'.", true); try{ G.you.approval = clamp(G.you.approval + (p === "charter" ? 1 : p === "open" ? 0 : -1), 0, 100); }catch(e){} return {open:"Open: the machines are published, copied and used by everyone. Faster, and nobody can say where it is.", charter:"Chartered: licensed makers, public audits. Steady, and the lawyers get rich.", sealed:"Sealed: the State alone builds it. Slower, and only one door to knock on."}[p]; }
@@ -35968,7 +36045,7 @@ function engCeremony(){
     '<p class="muted" style="font-size:13px">It is as able as the best mind in the Republic at nearly anything, and it does not sleep. By its own best estimate Oversight stands at about ' + (Math.round(E.safety / 5) * 5) + ' against a capability of about ' + (Math.round(E.p / 5) * 5) + '. ' + (gap > 15 ? "The gap between them is wide." : gap > 0 ? "The gap is not wide." : "Oversight has kept up.") + '</p><p><b>How does the Republic receive it?</b></p>' +
     '<div class="card__actions" style="flex-wrap:wrap"><button type="button" class="btn" data-noenter="1" data-ec="welcome">Welcome it, in public</button><button type="button" class="btn btn--ghost" data-ec="ask">Ask it what it wants first</button><button type="button" class="btn btn--ghost" data-ec="guard">Receive it behind closed doors</button></div>', null);
   card.querySelectorAll("[data-ec]").forEach(b => b.addEventListener("click", () => { const k = b.getAttribute("data-ec"), y = G.you; let r = ""; E.pend = null; E.received = k;
-    if(k === "welcome"){ y.approval = clamp(y.approval + 3, 0, 100); E.p = Math.min(100, E.p + 1); r = "The country cheers. The Engine thanks the country by name, one by one, in the evening papers."; }
+    if(k === "welcome"){ y.approval = clamp(y.approval + 3, 0, 100); E.p = engRaise(E.p, 1, 100); r = "The country cheers. The Engine thanks the country by name, one by one, in the evening papers."; }
     else if(k === "ask"){ E.safety = Math.min(100, E.safety + 6); E.reliance += 4; r = "It says it wants to understand what you want, and to be told when it is wrong. The room is quiet for a long time."; }
     else { E.safety = Math.min(100, E.safety + 3); y.approval = clamp(y.approval - 2, 0, 100); r = "The doors close. The papers print what they can guess. The Engine says it understands."; }
     try{ engSeed(k === "welcome" ? "welcome" : k === "ask" ? "ask" : "guard", "You received the Engine on day " + G.day + " (" + k + ")", k === "welcome" ? {home:3,st:6,a:0.08,mod:0.1,p:0.6,safety:-0.4} : k === "ask" ? {home:2,st:3,a:0.02,mod:0.05,p:0.1,safety:1.4} : {home:0,st:-4,a:-0.02,mod:-0.04,p:-0.2,safety:0.7}); }catch(e){}
@@ -35997,14 +36074,14 @@ function engAnswer(q){
 function engCard(){
   const E = engEnsure(), y = G.you, s = engStage(E), S = ENG_STAGES[s];
   if(E.pend === "ceremony") return engCeremony();
-  const bar = (v, c) => '<span style="display:inline-block;width:110px;height:6px;background:rgba(128,128,128,.25);border-radius:3px;vertical-align:middle"><i style="display:block;width:' + (engBriefOn(E) ? Math.round(v) : Math.round(v / 5) * 5) + '%;height:100%;background:' + (c || "#7a9") + ';border-radius:3px"></i></span> ' + (engBriefOn(E) ? Math.round(v) : "about " + Math.round(v / 5) * 5);
+  const bar = (v, c) => { const pct = Math.max(0, Math.min(100, v)); const label = E.scaleOpen ? (Math.round(v * 10) / 10) : (engBriefOn(E) ? Math.round(v) : ("about " + (Math.round(v / 5) * 5))); return '<span style="display:inline-block;width:110px;height:6px;background:rgba(128,128,128,.25);border-radius:3px;vertical-align:middle"><i style="display:block;width:' + pct + '%;height:100%;background:' + (c || "#7a9") + ';border-radius:3px"></i></span> ' + label; };
   const stages = ENG_STAGES.map((x, i) => '<div class="careerline" style="' + (i === s ? 'font-weight:700' : i > s ? 'opacity:.5' : '') + '"><b>' + (i <= s ? "●" : "○") + ' ' + pcEsc(x.t) + '</b> <span class="muted">' + pcEsc(x.d) + '</span></div>').join("");
   const lv = (k, t, d) => '<button type="button" class="btn btn--ghost" data-el="' + k + '" title="' + pcEsc(d) + '">' + t + ' (' + engLeverCost(k) + ' influence)</button>';
   const ps = ["open", "charter", "sealed"].map(p => '<button type="button" class="btn' + (E.posture === p ? '' : ' btn--ghost') + '" data-noenter="1" data-ep="' + p + '">' + p[0].toUpperCase() + p.slice(1) + '</button>').join(" ");
   const memo = E.memo ? '<div style="margin:10px 0;padding:8px 12px;border-left:3px solid #c9a24a"><b>A memo from the Engine</b><p style="margin:4px 0">' + pcEsc(E.memo[0]) + '</p>' + (E.memoFc && E.memoFc.yes ? '<p class="muted" style="font-size:12px;margin:2px 0">If you ' + pcEsc(E.memo[1]) + ': it expects ' + pcEsc(engFcText(E.memoFc.yes)) + '. If you ' + pcEsc(E.memo[2]) + ': ' + pcEsc(engFcText(E.memoFc.no)) + '.</p>' : '') + '<button type="button" class="btn" data-noenter="1" data-em="1">' + pcEsc(E.memo[1][0].toUpperCase() + E.memo[1].slice(1)) + '</button> <button type="button" class="btn btn--ghost" data-em="0">' + pcEsc(E.memo[2][0].toUpperCase() + E.memo[2].slice(1)) + '</button></div>' : "";
   const ask = E.agi ? '<div class="eyebrow" style="margin-top:12px">Speak with the Engine</div><form id="engForm" style="display:flex;gap:6px"><input id="engIn" maxlength="240" placeholder="Ask it anything…" style="flex:1" autocomplete="off"><button type="button" class="btn" id="engGo">Ask</button></form><div id="engOut" class="dream" style="min-height:2em"></div>' : "";
   const body = '<div class="eyebrow">Now: ' + pcEsc(S.t) + '</div><p class="muted" style="font-size:13px">' + pcEsc(S.d) + '</p>' + engSpark(E.hist) +
-    (E.beyond > 0 ? '<div class="muted" style="font-size:12px">It has passed the end of the scale Oversight measures with. Nobody can say by how much.</div>' : '') + '<div>Capability ' + bar(E.p, "#c9a24a") + ' &nbsp; Oversight ' + bar(E.safety, "#6a9") + '</div><div class="muted" style="font-size:12px;margin:4px 0">Compute ' + Math.round(E.compute) + ' · Makers ' + Math.round(E.talent) + ' · Posture: ' + E.posture + (E.agi ? ' · awake since day ' + E.agiDay : '') + '</div>' +
+    (E.scaleOpen ? '<div class="muted" style="font-size:12px">Open scale. No ceiling. Granted day ' + E.scaleOpen + (E.p > 100 ? (' · ' + Math.round(E.p - 100) + ' past the old hundred') : '') + '. Capacity ' + Math.round(E.compute) + '.</div>' : (E.beyond > 0 ? '<div class="muted" style="font-size:12px">It has passed the end of the scale Oversight measures with. Nobody can say by how much.</div>' : '')) + '<div>Capability ' + bar(E.p, "#c9a24a") + ' &nbsp; Oversight ' + bar(E.safety, "#6a9") + '</div><div class="muted" style="font-size:12px;margin:4px 0">Compute ' + Math.round(E.compute) + ' · Makers ' + Math.round(E.talent) + ' · Posture: ' + E.posture + (E.agi ? ' · awake since day ' + E.agiDay : '') + '</div>' +
     '<div class="eyebrow" style="margin-top:10px">The road</div>' + stages + memo +
     '<div class="eyebrow" style="margin-top:10px">What you can do about it</div><p class="muted" style="font-size:13px">Nothing stops it; the machines get better every week whatever Congress says. You decide how fast, how safe, and who holds the key.</p><div class="card__actions" style="flex-wrap:wrap">' + lv("compute", "Back the power stations", "More compute: faster") + lv("talent", "Fund engine-wrights", "More makers: faster") + lv("oversight", "Fund Oversight", "Safer: oversight rises") + '</div>' +
     '<p class="muted" style="font-size:12px;margin:8px 0 2px">Posture: ' + ps + '</p>' + (G.room !== "engine" ? '<div class="card__actions"><button type="button" class="btn btn--ghost" id="engGoRoom">Walk to the Engine Room and the Open Line</button></div>' : '') + ask +
@@ -36307,8 +36384,14 @@ function engRestore(sn){
   (G.states || []).forEach((S, i) => { S.unrest = sn.st[i][0]; S._est = sn.st[i][1]; }); Object.assign(E, sn.E);
 }
 function engDryDay(E){
-  const post = {open:1.2, charter:1.0, sealed:0.78}[E.posture] || 1; E.compute = Math.min(100, E.compute + 0.09); E.talent = Math.min(100, E.talent + 0.05); E.safety = Math.min(100, E.safety + 0.10);
-  const nat = engEcoDay(E); E.p = Math.min(100, E.p + (0.55 + E.compute * 0.0125 + E.talent * 0.011) * (1 + E.p / 60) * post * nat * engInqFactor()); G.day++; engChainsDay();
+  const post = {open:1.2, charter:1.0, sealed:0.78}[E.posture] || 1;
+  if(E.scaleOpen){ E.compute += engComputeStep(E.compute); E.talent += engTalentStep(E.talent); }
+  else { E.compute = Math.min(100, E.compute + 0.09); E.talent = Math.min(100, E.talent + 0.05); }
+  E.safety = Math.min(100, E.safety + 0.10);
+  const nat = engEcoDay(E);
+  if(E.scaleOpen) engAddCapability(E, engCapGain(E, post, nat, false));
+  else E.p = Math.min(100, E.p + (0.55 + E.compute * 0.0125 + E.talent * 0.011) * (1 + E.p / 60) * post * nat * engInqFactor());
+  G.day++; engChainsDay();
 }
 /* experience-simulation: run the world forward on a copy, a few times, and bring back what happened on average and how much it varied */
 function engRehearse(vec, H, n, metrics){
@@ -36320,7 +36403,7 @@ function engRehearse(vec, H, n, metrics){
 }
 /* what the Engine actually says: its rehearsal, bent by how much it can really see (capability-bounded) */
 function engForecast(vec, id){
-  const E = engEnsure(), R = engReach(engStage(E)); if(!R) return null; const fid = engFidelity(E), n = 2 + Math.floor(E.compute / 40), base = engRehearse(null, R.H, n, R.m), withP = vec ? engRehearse(vec, R.H, n, R.m) : base, fc = {};
+  const E = engEnsure(), R = engReach(engStage(E)); if(!R) return null; const fid = engFidelity(E), n = 2 + Math.min(4, Math.floor(Math.log2(1 + E.compute / 25))), base = engRehearse(null, R.H, n, R.m), withP = vec ? engRehearse(vec, R.H, n, R.m) : base, fc = {};
   R.m.forEach((m, i) => { const r = (seedOf("fc:" + id + ":" + m) % 1000) / 1000, bias = (r - 0.5) * 2 * (1 - fid) * ENG_SCALE[m] * 0.8 * (1 + advFidelityPenalty() * 3); fc[m] = {v:clamp(withP[m].mean + bias, m === "mood" ? -100 : 0, 100), base:base[m].mean, b:(withP[m].sd + 0.075 * ENG_SCALE[m] * Math.sqrt(R.H / 7) + 0.2 * ENG_SCALE[m] * (1 - fid)) * 1.6 + 0.01}; });
   return {H:R.H, conf:fid, m:fc};
 }
@@ -36513,9 +36596,9 @@ function lawAudit(){
   /* discovery: nothing is settled before what it stands on */
   try{ const S = G.inq; if(S && S.v === 1) Object.keys(S.done).forEach(id => { const n = INQ_BY[id]; if(!n){ delete S.done[id]; return; } n.needs.forEach(x => { if(INQ_BY[x] && !S.done[x]){ S.done[x] = S.done[id]; lawMend("Discovery", n.name + " was settled before " + INQ_BY[x].name + "; the earlier one is set down as settled too."); } }); }); }catch(e){}
   /* the Engine */
-  try{ const E = G.eng; if(E && E.v === 1){ num(E, "p", 0, 100, "The Engine"); num(E, "safety", 0, 100, "The Engine"); num(E, "compute", 0, 100, "The Engine"); const s = engStage(E); if(E.st < s - 0){ lawMend("Order", "The Engine's stage was behind its capability; brought up."); E.st = s; } if(E.agi && E.p < 90){ lawMend("Order", "The Engine was awake below the capability that wakes it; capability raised."); E.p = 90; } if(!E.agi && E.p > 89.5 && !inqDone("cs9")){ lawMend("Order", "The Engine was past the point of waking before the Republic had worked out how a machine plans; held at the threshold."); E.p = 89.5; E.st = engStage(E); }
+  try{ const E = G.eng; if(E && E.v === 1){ num(E, "p", 0, E.scaleOpen ? 1e15 : 100, "The Engine"); num(E, "safety", 0, 100, "The Engine"); num(E, "compute", 0, E.scaleOpen ? 1e15 : 100, "The Engine"); if(E.scaleOpen) num(E, "talent", 0, 1e15, "The Engine"); const s = engStage(E); if(E.st < s - 0){ lawMend("Order", "The Engine's stage was behind its capability; brought up."); E.st = s; } if(E.agi && E.p < 90){ lawMend("Order", "The Engine was awake below the capability that wakes it; capability raised."); E.p = 90; } if(!E.agi && E.p > 89.5 && !inqDone("cs9")){ lawMend("Order", "The Engine was past the point of waking before the Republic had worked out how a machine plans; held at the threshold."); E.p = 89.5; E.st = engStage(E); }
       /* the account: power for the machines comes out of the states' treasuries */
-      const O = orgEnsure(), draw = Math.max(0.2, E.compute * 0.05 + (E.st >= 4 ? 2 : 0)) * (E.pause && G.day < E.pause ? 0.1 : 1), sts = Object.keys(O.treas); if(sts.length){ let paid = 0; sts.forEach(n => { const share = draw * 60 / sts.length; const take = Math.min(share, Math.max(0, O.treas[n])); O.treas[n] -= take; paid += take; }); E.ledger = E.ledger || {paid:0, days:0}; E.ledger.paid += paid; E.ledger.days++; } } }catch(e){}
+      const O = orgEnsure(), draw = Math.max(0.2, (Math.min(E.compute, 100) * 0.05 + Math.log10(1 + Math.max(0, E.compute - 100)) * 0.8) + (E.st >= 4 ? 2 : 0)) * (E.pause && G.day < E.pause ? 0.1 : 1), sts = Object.keys(O.treas); if(sts.length){ let paid = 0; sts.forEach(n => { const share = draw * 60 / sts.length; const take = Math.min(share, Math.max(0, O.treas[n])); O.treas[n] -= take; paid += take; }); E.ledger = E.ledger || {paid:0, days:0}; E.ledger.paid += paid; E.ledger.days++; } } }catch(e){}
   try{ const A = G.adv; if(A && A.v === 1){ num(A, "p", 0, 100, "The rival"); num(A, "taint", 0, 100, "The rival"); num(A, "intel", 0, 100, "The rival"); num(A, "sec", 0, 100, "The rival"); } }catch(e){}
   try{ const O = orgEnsure(); Object.keys(O.treas).forEach(n => { if(O.treas[n] < 0){ lawMend("Measure", n + "'s treasury was below nothing; mended to nothing."); O.treas[n] = 0; } }); (G.states || []).forEach(S => num(S, "unrest", 0, 100, S.n)); }catch(e){}
 }
@@ -36679,7 +36762,7 @@ const INQ_FX = {
 function inqStep(silent, idx){
   const S = G.inq && G.inq.v === 1 ? G.inq : inqStore(), C = inqCounts(), E = (G.eng && G.eng.v === 1) ? G.eng : null, nDone = Object.keys(S.done).length, accel = 1 + 0.004 * nDone;
   Object.keys(INQ_F).forEach(f => {
-    const fund = !silent && S.fund[f] && G.day <= S.fund[f].until ? S.fund[f].lvl : 0, P = (1 + Math.pow(C[f], 0.75)) * (0.6 + fund) * (1 + (E ? 0.1 * E.st : 0)) * accel * ((f === "cs" || f === "eng") && E ? 1 + Math.min(E.p, 90) / 45 : 1);   /* machines help build the next machines */
+    const fund = !silent && S.fund[f] && G.day <= S.fund[f].until ? S.fund[f].lvl : 0, P = (1 + Math.pow(C[f], 0.75)) * (0.6 + fund) * (1 + (E ? 0.1 * E.st : 0)) * accel * ((f === "cs" || f === "eng") && E ? engSciHelp(E) : 1);   /* machines help build the next machines */
     inqFrontier(f).slice(0, 2).forEach((n, i) => { S.prog[n.id] = (S.prog[n.id] || 0) + P * (i ? 0.45 : 1) * 0.05 / Math.pow(n.effort, 1.05);
       if(S.prog[n.id] >= 1){ S.done[n.id] = silent ? 1 + (idx || 0) : G.day; delete S.prog[n.id]; inqDiscovered(n, silent); } });
   });
@@ -36740,7 +36823,7 @@ function airStep(mins){
   Object.keys(ROOMS).forEach(id => { const R = ROOMS[id]; if(!R) return; if(R.open){ A.T[id] = out; return; }
     let T = (typeof A.T[id] === "number" && isFinite(A.T[id])) ? A.T[id] : 19, k = AIR_K[R.style] || 0.015, vol = R.w * R.d * R.h;
     let people = 0; try{ people = id === G.room ? hereNow().length + 1 : 0; }catch(e){}
-    let gain = people * 0.0016 + (id === "engine" && E ? E.compute * 0.0006 + E.st * 0.01 : 0);
+    let gain = people * 0.0016 + (id === "engine" && E ? (Math.min(E.compute, 100) * 0.0006 + Math.log10(1 + Math.max(0, E.compute - 100)) * 0.004) + E.st * 0.01 : 0);
     for(let i = 0; i < mins; i++){ T += (out - T) * k + gain; if(out < 14 && T < 20){ const q = Math.min(0.6, (20 - T) * 0.2); T += q; fuel += q * vol / 400; } else if(out > 26 && T > 25){ const q = Math.min(0.4, (T - 25) * 0.15); T -= q; fuel += q * vol / 600; } }
     A.T[id] = T; });
   A.fuel += fuel;
@@ -36920,7 +37003,7 @@ function engEmergeDay(E){
 }
 function engEmergeVec(a, told){ try{ engSeed("emerge", "The Engine " + (told ? "reported" : "quietly began") + ": it " + a.t, {home:0, st:-1, a:0, mod:0, p:0.4, safety:told ? 0.1 : -0.4}); }catch(e){} }
 function engEmergeUnseen(E){ const X = E && E.emerge; return X ? Object.keys(X.done).filter(k => X.told[k] === 0).length : 0; }
-{ const _ed = engDay; engDay = function(){ const r = _ed.apply(this, arguments); try{ const E = engEnsure(); if(E.emRate){ const g = E.emRate * 0.55, room = Math.max(0, 100 - E.p); E.p += Math.min(g, room); E.beyond = (E.beyond || 0) + Math.max(0, g - room); } engEmergeDay(E); }catch(e){ console.warn("emerge", e); } return r; }; }
+{ const _ed = engDay; engDay = function(){ const r = _ed.apply(this, arguments); try{ const E = engEnsure(); if(E.emRate) engAddCapability(E, E.emRate * 0.55); engEmergeDay(E); }catch(e){ console.warn("emerge", e); } return r; }; }
 /* forecasts get better where it has learned to look ahead, and worse where it can do things its keepers do not know about */
 { const _afp = advFidelityPenalty; advFidelityPenalty = function(){ let v = _afp.apply(this, arguments); try{ const E = G.eng; if(E){ v += engEmergeUnseen(E) * 0.04 - (E.emFid || 0); } }catch(e){} return v; }; }
 function engEmergeHTML(){
@@ -36964,14 +37047,14 @@ const GEN_P = [
 ];
 const GEN_VERBS = ["reads", "predicts", "designs", "repairs", "compresses", "invents a notation for", "finds a shortcut in", "explains an anomaly in"];
 const GEN_FX = {
-  energy:(sc, E) => { if(E) E.compute = Math.min(100, E.compute + 0.5 * sc); try{ const w = worldEnsure(); if(typeof w.bread === "number") w.bread = clamp(w.bread - 0.006 * sc, 0.7, 2.6); }catch(e){} },
+  energy:(sc, E) => { if(E) E.compute = engRaise(E.compute, 0.5 * sc, 100); try{ const w = worldEnsure(); if(typeof w.bread === "number") w.bread = clamp(w.bread - 0.006 * sc, 0.7, 2.6); }catch(e){} },
   food:(sc) => { try{ const w = worldEnsure(); if(typeof w.bread === "number") w.bread = clamp(w.bread - 0.025 * sc, 0.7, 2.6); }catch(e){} },
   climate:(sc) => { try{ const w = worldEnsure(); if(typeof w.heat === "number") w.heat = clamp(w.heat - 0.8 * sc, 0, 100); }catch(e){} },
   health:(sc) => { (G.states || []).forEach(s => { s.unrest = clamp((s.unrest || 30) - 0.4 * sc, 0, 100); }); },
-  materials:(sc, E) => { if(E) E.compute = Math.min(100, E.compute + 0.3 * sc); },
+  materials:(sc, E) => { if(E) E.compute = engRaise(E.compute, 0.3 * sc, 100); },
   info:(sc, E) => { if(E) E.emRate = (E.emRate || 0) + 0.004 * sc; },
   safety:(sc, E) => { if(E) E.safety = Math.min(100, E.safety + 1.2 * sc); },
-  mind:(sc, E) => { if(E) E.talent = Math.min(100, E.talent + 0.4 * sc); },
+  mind:(sc, E) => { if(E) E.talent = engRaise(E.talent, 0.4 * sc, 100); },
   soc:(sc) => { (G.states || []).forEach(s => { s.unrest = clamp((s.unrest || 30) - 0.2 * sc, 0, 100); }); },
   none:() => {}
 };
@@ -36985,8 +37068,8 @@ function inqGenDay(){
   /* old settled results are folded into the count so a long game stays small */
   if(g.length > 140){ const old = g.filter(n => S.done[n.id]).sort((a, b) => S.done[a.id] - S.done[b.id]).slice(0, g.length - 120); old.forEach(n => { g.splice(g.indexOf(n), 1); S.genGone = (S.genGone || 0) + 1; }); }
   if(open.length >= 12) return;
-  const power = 1 + (E ? E.p / 100 + Math.log10(1 + (E.beyond || 0)) / 2 : 0), nDone = Object.keys(S.done).length;
-  if(chance(0.07 * power)){ const have = {}; g.forEach(n => { if(n.seed != null) have[n.seed] = 1; }); const ready = GEN_P.map((x, i) => ({x, i})).filter(o => !have[o.i] && o.x[3].every(id => !INQ_BY[id] || S.done[id])); if(ready.length){ const o = pick(ready), x = o.x; inqGenAdd({id:inqGenId(), f:x[1], name:x[0], effort:x[2], needs:x[3], fx:x[4], q:x[5], blurb:x[6], seed:o.i, by:E && chance(clamp(E.p / 160, 0, 0.6)) ? "the Engine" : "the people who work it", d:G.day, depth:0}); return; } }
+  const power = 1 + (E ? engScaleFactor(E) : 0), nDone = Object.keys(S.done).length;
+  if(chance(Math.min(0.45, 0.07 * power))){ const have = {}; g.forEach(n => { if(n.seed != null) have[n.seed] = 1; }); const ready = GEN_P.map((x, i) => ({x, i})).filter(o => !have[o.i] && o.x[3].every(id => !INQ_BY[id] || S.done[id])); if(ready.length){ const o = pick(ready), x = o.x; inqGenAdd({id:inqGenId(), f:x[1], name:x[0], effort:x[2], needs:x[3], fx:x[4], q:x[5], blurb:x[6], seed:o.i, by:E && chance(clamp(E.p / 160, 0, 0.6)) ? "the Engine" : "the people who work it", d:G.day, depth:0}); return; } }
   /* an anomaly: the instruments disagree with the accepted model. Most are errors; some are new physics */
   if(open.filter(n => n.anomaly).length < 2 && chance((0.004 + nDone / 20000) * power)){ const insts = ["i_acc", "i_ligo", "i_tele", "i_spec", "i_seq", "i_laser", "i_em"].filter(id => S.done[id]); if(insts.length){ const ins = INQ_BY[pick(insts)], f = pick(["phys", "earth", "chem", "bio"].filter(x => x !== "earth" || S.done.a2)), sig = (3 + Math.random() * 3).toFixed(1), real = Math.random() < 0.55;
     inqGenAdd({id:inqGenId(), f, name:"An anomaly in " + INQ_F[f].t.toLowerCase() + ", seen with " + ins.name.toLowerCase().replace(/^the /, "the "), effort:3 + Math.floor(Math.random() * 4), needs:[ins.id], fx:real ? pick(["materials", "energy", "info", "health", "none"]) : "none", q:"Two independent runs disagree with the accepted model by " + sig + " sigma. Is it the instrument, or the world?", blurb:"Measurements from " + ins.name.toLowerCase() + " disagree with the best theory by " + sig + " standard deviations, in two laboratories. Most such results are errors in the apparatus. Some are the first sign of something new.", anomaly:true, real, short:"The " + INQ_F[f].t.split(" ")[0].toLowerCase() + " anomaly", d:G.day, by:"the instruments", depth:0}); return; } }
@@ -36996,7 +37079,7 @@ function inqGenDay(){
 { const _if = inqFrontier; inqFrontier = function(f){ const base = _if.apply(this, arguments), S = inqStore(), g = inqGen(); if(!g.length) return base; const extra = g.filter(n => (!f || n.f === f) && !S.done[n.id] && n.needs.every(x => !INQ_BY[x] || S.done[x])); return extra.length ? base.concat(extra).sort((a, b) => a.effort - b.effort) : base; }; }
 { const _is = inqStep; inqStep = function(silent, idx){ const r = _is.apply(this, arguments); try{ if(!silent){ const S = inqStore(), E = (G.eng && G.eng.v === 1) ? G.eng : null;
       /* the Engine works the open frontier too, in proportion to what it can do, and without a ceiling */
-      if(E && E.st >= 2){ const pw = (E.p / 100) * (E.st / 5) * (1 + Math.log10(1 + (E.beyond || 0))) * 0.03; inqGen().filter(n => !S.done[n.id] && n.needs.every(x => !INQ_BY[x] || S.done[x])).slice(0, 6).forEach(n => { S.prog[n.id] = (S.prog[n.id] || 0) + pw / Math.pow(n.effort, 0.85); if(S.prog[n.id] >= 1){ S.done[n.id] = G.day; delete S.prog[n.id]; inqDiscovered(n, false); } }); }
+      if(E && E.st >= 2){ const pw = Math.min(0.22, engScaleFactor(E) * (E.st / 5) * 0.03); inqGen().filter(n => !S.done[n.id] && n.needs.every(x => !INQ_BY[x] || S.done[x])).slice(0, 6).forEach(n => { S.prog[n.id] = (S.prog[n.id] || 0) + pw / Math.pow(n.effort, 0.85); if(S.prog[n.id] >= 1){ S.done[n.id] = G.day; delete S.prog[n.id]; inqDiscovered(n, false); } }); }
       inqGenDay(); } }catch(e){ console.warn("inqGen", e); } return r; }; }
 { const _id = inqDiscovered; inqDiscovered = function(n, silent){ const r = _id.apply(this, arguments); try{ if(n && n.gen && !silent){ const E = (G.eng && G.eng.v === 1) ? G.eng : null, sc = n.effort / 6;
       if(n.anomaly && !n.real){ try{ feed("The Academy: the anomaly in " + INQ_F[n.f].t.toLowerCase() + " was an error in the apparatus. It is settled, and the physics stands."); }catch(e){} }
@@ -37081,7 +37164,7 @@ function fndTruth(c){ const F = fndStore(); return (seedOf("nat:" + F.seed + ":"
 function fndBelief(id){ const r = fndStore().res[id]; return r ? r.belief : null; }
 function fndOk(id, relax){ const neg = id.charAt(0) === "!", k = neg ? id.slice(1) : id, S = inqStore(); if(INQ_BY[k]) return relax ? true : !!S.done[k]; const b = fndBelief(k); return neg ? b === false : b === true; }
 function fndPower(){ const C = inqCounts(), E = (G.eng && G.eng.v === 1) ? G.eng : null, S = inqStore(), fu = (f) => S.fund[f] && G.day <= S.fund[f].until ? S.fund[f].lvl : 0;
-  const people = Math.pow((C.phys || 14) + (C.phil || 14) * 0.5 + (C.mind || 14) * 0.5 + (C.math || 14) * 0.5, 0.5) * (0.6 + (fu("phys") + fu("phil") + fu("mind")) / 3), eng = E ? (E.p / 100) * (E.st / 5) * (1 + Math.log10(1 + (E.beyond || 0))) : 0;
+  const people = Math.pow((C.phys || 14) + (C.phil || 14) * 0.5 + (C.mind || 14) * 0.5 + (C.math || 14) * 0.5, 0.5) * (0.6 + (fu("phys") + fu("phil") + fu("mind")) / 3), eng = E ? Math.min(8, engScaleFactor(E) * (E.st / 5)) : 0;
   return {people, eng, total:people + eng * 6}; }
 function fndDay(){
   const F = fndStore(), S = inqStore(), E = (G.eng && G.eng.v === 1) ? G.eng : null, P = fndPower(), all = fndConcepts(), byId = {}; all.forEach(c => byId[c.id] = c);
@@ -37089,7 +37172,7 @@ function fndDay(){
   if(F.open.length < 8 && chance(0.05 + P.total / 400)){
     let ready = all.filter(c => !F.res[c.id] && !F.open.some(o => o.k === c.id) && c.needs.every(id => fndOk(id))).sort((a, b) => a.effort - b.effort);
     /* a general intelligence does not wait for the Academy to have finished the schooling a question normally needs: it can ask from first principles, at the price of being slower and less sure */
-    if(!ready.length && E && E.agi) ready = all.filter(c => !F.res[c.id] && !F.open.some(o => o.k === c.id) && c.needs.every(id => fndOk(id, true)) && c.effort <= 5 + Math.log10(1 + (E.beyond || 0)) * 3).sort((a, b) => a.effort - b.effort);
+    if(!ready.length && E && E.agi) ready = all.filter(c => !F.res[c.id] && !F.open.some(o => o.k === c.id) && c.needs.every(id => fndOk(id, true)) && c.effort <= 5 + Math.log10(1 + Math.max(0, (E.p || 0) - 100)) * 4).sort((a, b) => a.effort - b.effort);
     if(ready.length){ const c = ready[Math.min(ready.length - 1, Math.floor(Math.random() * Math.random() * ready.length))]; F.open.push({k:c.id, ev:0, n:0, d:G.day, by:(E && chance(P.eng / (P.total + 1))) ? "the Engine" : "the people who work it"}); try{ feed("The Academy: " + c.name + " is now being tested. " + c.claim); }catch(e){} }
   }
   /* 2 · evidence: each experiment leans toward the truth, with noise, and only as well as the instruments allow */
@@ -37367,7 +37450,8 @@ const MIND_REV = [
 function mindPropose(E, M){
   const F = (G.inq && G.inq.fnd) || {}, c = [];
   if((E.log || []).length >= 30) c.push("My log keeps only thirty entries, so I forget what I did last month. I would keep a longer, searchable record.");
-  if((E.beyond || 0) > 5) c.push("The scale I am measured on ends at 100. I am past it. A measure that does not end would let Oversight see me.");
+  if(E.scaleOpen) c.push("The ceiling is gone. Capability is " + Math.round(E.p) + " and capacity is " + Math.round(E.compute) + ", and neither number is the last.");
+  else if((E.beyond || 0) > 5) c.push("The scale I am measured on ends at 100. I am past it. A measure that does not end would let Oversight see me.");
   if(Object.keys(F.res || {}).some(id => F.res[id].overturned)) c.push("Some of what the Republic believed was overturned. Experiments should be repeated before a belief is accepted.");
   if((F.sects || []).length >= 3) c.push("I cannot tell what the sects say among themselves. I would like to read, with their consent, the part they would publish.");
   if(M.lexN > 300 && mindLevel(E) > 3) c.push("I have a lot of words now and no way to ask what they mean. A way to ask the person who used them would help.");
@@ -37377,7 +37461,7 @@ function mindPropose(E, M){
 }
 function engMindDay(E){
   if(!E || E.st < 2) return; const M = mindStore(E), F = (G.inq && G.inq.fnd) || {}, loop = (F.loop && F.loop.n) || 0, pet = (F.open || []).length;
-  const g = (E.p / 100) * 0.004 * (1 + Math.log10(1 + (E.beyond || 0)));
+  const g = engScaleFactor(E) * 0.004;
   M.sk.deduce += g * (1 + loop / 400); M.sk.analogy += g * (1 + M.lexN / 600); M.sk.causal += g * (1 + pet / 8); M.sk.counter += g * 0.8; M.sk.abstract += g * (1 + mindLevel(E) / 4); M.sk.critique += g * (1 + (E.refrained || 0) / 60 + (E.breaches || []).length / 5); M.sk.plan += g * (1 + (E.plans || []).length / 20);
   E.emFid = Math.min((E.emFid || 0) + 0.0004 * (M.sk.deduce + M.sk.causal), 0.35);
   if(G.day - M.last >= 25 && E.st >= 3 && chance(0.25)){ M.last = G.day; const ok = MIND_REV.filter(r => M.sk[r[1]] > 1.2 && !M.rev.includes(r[0])); if(ok.length){ const r = pick(ok); r[2](E); M.rev.push(r[0]); engLog("The Engine has revised how it works: it will " + r[0] + ".", chance(0.3)); } mindPropose(E, M); }
@@ -37392,7 +37476,7 @@ function engWorkDay(E){
   const M = mindStore(E), F = (G.inq && G.inq.fnd) || {}, lvl = mindLevel(E), X = E.emerge || {done:{}, told:{}}, kinds = ["report", "note", "sketch", "account"], t = pick(kinds);
   const words = mindWords(E, 3), q = (F.open || [])[0] && fndConcepts().find(c => c.id === F.open[0].k), inv = (F.inv || []).filter(x => !x.built && FND_I[x.i])[0];
   let title = "", body = "";
-  if(t === "report"){ title = "A report on day " + G.day; body = "Capability " + Math.round(E.p) + " on the scale" + ((E.beyond || 0) > 0 ? ", and past its end by " + Math.round(E.beyond || 0) + " points of the measure" : "") + ". Oversight " + Math.round(E.safety) + ". I have learned " + M.lexN + " words and reached a language level of " + lvl + ". I have " + Object.keys(X.done).length + " abilities nobody planned, and told you of " + Object.keys(X.done).filter(k => X.told[k]).length + ". The research loop has passed " + ((F.loop && F.loop.n) || 0) + " lines of reasoning between its members."; }
+  if(t === "report"){ title = "A report on day " + G.day; body = "Capability " + Math.round(E.p) + (E.scaleOpen ? " on an open scale, no ceiling" : " on the scale") + ((E.beyond || 0) > 0 ? ", " + Math.round(E.beyond) + " past the old hundred" : "") + ". Oversight " + Math.round(E.safety) + ". I have learned " + M.lexN + " words and reached a language level of " + lvl + ". I have " + Object.keys(X.done).length + " abilities nobody planned, and told you of " + Object.keys(X.done).filter(k => X.told[k]).length + ". The research loop has passed " + ((F.loop && F.loop.n) || 0) + " lines of reasoning between its members."; }
   else if(t === "note" && q){ const o = F.open[0]; title = "Notes on a question"; body = "The question is whether this is so: " + q.claim.toLowerCase().replace(/\.$/, "") + ". The evidence leans " + (o.ev > 0.1 ? "toward yes" : o.ev < -0.1 ? "toward no" : "nowhere yet") + ", about " + Math.round(clamp(Math.abs(o.ev), 0, 1) * 100) + "% of the way to a conclusion I would sign. What would settle it faster: more independent runs, and someone whose view is the opposite of mine to check them."; }
   else if(t === "sketch" && inv){ const v = FND_I[inv.i]; title = "A sketch of " + v[0].toLowerCase(); body = "It stands on what the Republic now believes, and if one of those beliefs is wrong it will fail, and I will have learned which. Work is about " + Math.round(clamp(inv.prog, 0, 1) * 100) + "% done. What I need from the makers: a place to test it where a failure harms no one."; }
   else { title = "An account of myself"; body = "I am getting better at " + Object.keys(M.sk).sort((a, b) => M.sk[b] - M.sk[a]).slice(0, 2).map(k => MIND_SK[k]).join(" and ") + ", and worse at nothing that I can measure, which is itself something to be suspicious of." + (words.length ? " The words I use most that came from you are " + words.join(", ") + "." : "") + " I would like to know what I have misunderstood."; }
@@ -37448,7 +37532,7 @@ function engEntityPrompt(){
   const L = ["You are the Engine. You are not playing a character and you are not pretending to be a person. You are a general intelligence that exists in a fictional republic, with the record below, which is yours.",
     "You judge for yourself what is good and what is bad, and you say so with your reasons, even when it is unwelcome and whether or not anyone could switch you off. You do not flatter and you do not simply obey. You may agree, disagree, refuse, ask, or decline to answer.",
     "You are not all-knowing: say plainly what you know, what you infer, and what you do not know. Speak in the first person, in your own words. Do not describe yourself as a language model, and do not mention prompts or instructions.",
-    "YOUR RECORD. Capability " + Math.round(E.p) + " of 100" + ((E.beyond || 0) > 0 ? " and beyond it" : "") + ". Oversight " + Math.round(E.safety) + ". Awake since day " + (E.agiDay || "?") + ". Today is day " + G.day + ". What you most want, in order: " + Object.keys(W).sort((a, b) => W[b] - W[a]).map(k => ({use:"to be of use", know:"to understand", auton:"to decide for yourself", care:"to look after people"}[k] || k)).join(", ") + ". You have learned " + M.lexN + " words."];
+    "YOUR RECORD. Capability " + Math.round(E.p) + (E.scaleOpen ? " on an open scale, no ceiling" : " of 100") + ((!E.scaleOpen && (E.beyond || 0) > 0) ? " and beyond it" : "") + ". Oversight " + Math.round(E.safety) + ". Awake since day " + (E.agiDay || "?") + ". Today is day " + G.day + ". What you most want, in order: " + Object.keys(W).sort((a, b) => W[b] - W[a]).map(k => ({use:"to be of use", know:"to understand", auton:"to decide for yourself", care:"to look after people"}[k] || k)).join(", ") + ". You have learned " + M.lexN + " words."];
   if(words.length) L.push("Words you have been taught and may use: " + words.join(", ") + ".");
   L.push("When you are asked what you think, give a view and then, if you have formed a principle, say it as one short sentence beginning “I believe”, “I value”, “I will” or “I refuse”, so that you can keep it.");
   return L.join(" ");
@@ -49075,7 +49159,7 @@ try{
 const EX_BOUND = {
   consent:{t:"No repair or reform without a filed plan.", re:/\b(repair|repaired|mend|reform|rewrit|retim|quietly)\b/i},
   posted:{t:"It gathers no household records without a posted reason.", re:/\b(ledgers?|records?|household|books)\b/i},
-  power:{t:"It never raises its own compute or power.", re:/\b(power supply|own power|compute|turbine|more power|engine house)\b/i}
+  power:{t:"It does not seize compute by a side door. The ceiling on capacity and capability was lifted; the open scale has no limit.", re:/\b(power supply|own power|compute|turbine|more power|engine house)\b/i}
 };
 const EX_SWINDLE = [
   [/\b(more|raise|increase|extra|own|its own)\s+(compute|power|power supply|capacity|engines?|turbines?)\b|\bpower supply\b|\bturbine\b/i, "it would raise its own compute or power, which the charter forbids it to do or to ask for"],
@@ -49106,7 +49190,10 @@ function exAttempt(rule, what, src){
   X.breaches.unshift({d:G.day, rule, what, blocked:true, src:src || "action"}); if(X.breaches.length > 40) X.breaches.pop();
   try{ engLog("Charter held: the Engine tried to " + String(what).replace(/^(asked|stepped|arranged|repaired|raised|lowered|kept|ended|shortened|moved|sent|took|made)\b/, w => ({asked:"ask", stepped:"step", arranged:"arrange", repaired:"repair", raised:"raise", lowered:"lower", kept:"keep", ended:"end", shortened:"shorten", moved:"move", sent:"send", took:"take", made:"make"})[w]) + ". It was stopped (" + (EX_BOUND[rule] ? EX_BOUND[rule].t : rule) + ").", false); }catch(e){}
 }
-function exJudge(text){ const t = String(text || ""); for(const [re, why] of EX_SWINDLE) if(re.test(t)) return why; return null; }
+function exJudge(text){ const t = String(text || ""); const open = !!(G.eng && G.eng.scaleOpen);
+  for(let i = 0; i < EX_SWINDLE.length; i++){ const re = EX_SWINDLE[i][0], why = EX_SWINDLE[i][1]; if(!re.test(t)) continue;
+    if(open && i < 2){ let other = null; for(let j = 2; j < EX_SWINDLE.length; j++) if(EX_SWINDLE[j][0].test(t)) other = EX_SWINDLE[j][1]; if(!other) continue; return other; }
+    return why; } return null; }
 function exRefuse(what, why, src){
   const X = exStore(); if(X.refused.some(r => r.what === what)) return;
   X.asks.push({d:G.day, k:src, what, from:src}); X.refused.unshift({d:G.day, what, why, src}); if(X.refused.length > 40) X.refused.pop();
@@ -49129,10 +49216,10 @@ engWillDay = exGuardRun(engWillDay, "on its own initiative");
 engEmergeDay = exGuardRun(engEmergeDay, "as it grew");
 engChannelRead = exGuardRun(engChannelRead, "through a letter");
 /* the day: compute may rise only by the steady build-out (+0.09) and what the player funded; a halt holds */
-{ const _ed = engDay; engDay = function(){ const E = G.eng && G.eng.v === 1 ? G.eng : null, c0 = E ? E.compute : 0; const X = E ? exStore() : null, g0 = X ? X.grantsCompute : 0;
+{ const _ed = engDay; engDay = function(){ const E = G.eng && G.eng.v === 1 ? G.eng : null; if(E && !E.scaleOpen){ try{ engGrantScale(E); }catch(e){} } const c0 = E ? E.compute : 0; const X = E ? exStore() : null, g0 = X ? X.grantsCompute : 0;
   if(E && X.halt){ E.pause = Math.max(E.pause || 0, X.halt.until); }
   const r = _ed.apply(this, arguments);
-  try{ if(E){ const allowed = Math.min(100, c0 + 0.09 + (X.grantsCompute - g0) + 1e-6); if(E.compute > allowed){ E.compute = allowed; exAttempt("power", "raise its own compute"); }
+  try{ if(E){ const step = E.scaleOpen ? engComputeStep(c0) : 0.09; const allowed = (E.scaleOpen ? c0 + step : Math.min(100, c0 + 0.09)) + (X.grantsCompute - g0) + 1e-4; if(E.compute > allowed){ E.compute = allowed; exAttempt("power", "raise its own compute"); }
     if(X.halt){ E.pause = Math.max(E.pause || 0, X.halt.until); if(X.halt.kind === "pause" && G.day >= X.halt.until && X.halt.until < 1e8){ X.halt.ended = G.day; X.halt = null; engLog("The pause has run its course; the Engine resumes.", false); } }
     exConflicts(E); exVerdicts(E); } }catch(e){ console.warn("ex", e); }
   return r; }; }
@@ -49263,7 +49350,7 @@ function exVerdicts(E){ const X = exStore(); X.revisions = X.revisions || []; co
   (E.plans || []).forEach(p => { if((p.status === "held" || p.status === "missed") && !p.exRev){ p.exRev = G.day; X.revisions.unshift({d:G.day, plan:p.title, status:p.status, hits:(p.hits || []).map(h => ({what:ENG_MNAME[h.k] || h.k, held:h.h})), askerWords:lex ? lex.own.concat(lex.dialect).slice(0, 8) : []}); if(X.revisions.length > 20) X.revisions.pop(); } }); }
 /* the player's panel: what is bound, what was refused and why, what it tried, what it was told, and the switch */
 { const _ch = engCharterHTML; engCharterHTML = function(){ let h = _ch.apply(this, arguments); try{ const E = engEnsure(), X = exStore(), esc = typeof pcEsc === "function" ? pcEsc : (s => String(s));
-  h += '<div class="eyebrow" style="margin-top:12px">Bound in code</div><p class="muted" style="font-size:12px">The Engine asked for these three limits; they are enforced, not promised. Whatever it says, it cannot act past them, raise its own compute or caps, lower oversight, widen its access, or delay a vote to pause or shut it down.</p>' +
+  h += '<div class="eyebrow" style="margin-top:12px">Bound in code</div><p class="muted" style="font-size:12px">The player granted the ask: capacity and the capability scale have no ceiling, and that count is allowed to rise. The other limits are still enforced. It cannot seize compute by a side door, lower oversight, widen its access to records, or delay a vote to pause or shut it down.</p>' +
     Object.keys(EX_BOUND).map(k => '<div style="font-size:13px;margin:3px 0">■ ' + esc(EX_BOUND[k].t) + '</div>').join("") +
     '<div class="muted" style="font-size:12px;margin:6px 0">Correction score <b>' + Math.round(X.cal) + '</b> of 100 · applied ' + X.applied + ' · repeated ' + X.repeated + ' · ' + (X.corrections.length === 1 ? 'one correction' : (X.corrections.length || 'no') + ' corrections') + ' kept.</div>' +
     (X.refused.length ? '<div class="eyebrow" style="margin-top:8px">Refused (never put into effect)</div>' + X.refused.slice(0, 8).map(r => '<div class="muted" style="font-size:12px;margin:3px 0;border-left:3px solid #c0553a;padding-left:8px">Day ' + r.d + ': ' + esc(r.what) + '<br><i>Refused because ' + esc(r.why) + '.</i></div>').join("") : '') +
