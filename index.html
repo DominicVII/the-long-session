@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261108g">
+<meta name="onum-build" content="20261108h">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -33,7 +33,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261108g";
+  var STAMP = "20261108h";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -40656,8 +40656,7 @@ function refreshCareer(){
       " · " + partyName(you.party) + (inHouse() ? " · " + committeeOf(you.committee).t : "") + '</p>' + powerMapHTML() +
     '<div class="card__actions" style="margin:10px 0 14px">' +
       '<button class="btn btn--ghost" type="button" id="saveExport">Export career save</button>' +
-      '<button class="btn btn--ghost" type="button" id="saveImport">Import career save</button>' +
-      '<input type="file" id="saveImportFile" accept="application/json,.json" hidden></div>' +
+      '<button class="btn btn--ghost" type="button" id="saveImport">Import career save</button></div>' +
     '<div class="careerline"><b>Terms</b><span>'+you.terms+'</span></div>' +
     (inHouse() || you.out ?
       '<div class="careerline"><b>Roll calls</b><span>'+you.record.votes.length+' cast, '+you.record.bills+' on the winning side</span></div>' +
@@ -40753,10 +40752,9 @@ function refreshCareer(){
         ' <span class="muted">\u2014 ' + h.precedent + '</span></span></div>'; }).join(""); })() +
     '<p class="muted" style="margin-top:14px">The House: <strong>'+G.seatsBy.FED+'</strong> Federalist, <strong>'+
       G.seatsBy.COM+'</strong> Commonwealth, <strong>'+G.seatsBy.IND+'</strong> independent. Majority is 91.</p>';
-  const saveExport = el("saveExport"), saveImport = el("saveImport"), saveFile = el("saveImportFile");
+  const saveExport = el("saveExport"), saveImport = el("saveImport");
   if(saveExport) saveExport.addEventListener("click", exportCareerSave);
-  if(saveImport && saveFile) saveImport.addEventListener("click", () => saveFile.click());
-  if(saveFile) saveFile.addEventListener("change", () => importCareerSave(saveFile.files && saveFile.files[0]));
+  if(saveImport) saveImport.addEventListener("click", () => { if(window.onumPickCareer) window.onumPickCareer(); });
   el("paneCareer").querySelectorAll("[data-am]").forEach(b =>
     b.addEventListener("click", () => proposeAmendment(b.getAttribute("data-am"))));
   const bg = el("btnGreatness");
@@ -41185,11 +41183,14 @@ const TLSCollab = (function(){
   }
   function downloadExport(){
     const blob = new Blob([JSON.stringify(exportBundle(), null, 2)], {type:"application/json"});
+    const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = "tls-collab-export.json";
-    if(document.body) { document.body.appendChild(a); a.click(); a.remove(); }
-    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    a.href = url; a.download = "tls-collab-export.json";
+    a.textContent = "Download tls-collab-export.json";
+    a.style.cssText = "position:fixed;left:8px;bottom:8px;z-index:200000;background:#ffe08a;color:#111;padding:10px 14px;border-radius:8px;font:700 14px system-ui";
+    if(document.body) document.body.appendChild(a);
+    try{ a.click(); }catch(e){}
+    setTimeout(() => { try{ URL.revokeObjectURL(url); a.remove(); }catch(e){} }, 120000);
   }
   function summary(){
     const b = state.seatB;
@@ -41507,34 +41508,110 @@ function hydrateLoadedPerson(m){
   if(!m.pos) m.pos = {econ:0, lib:0, def:0, wel:0};
   try{ if(m.name) usedNames.add(m.name); }catch(e){}
 }
-function exportCareerSave(){
-  const d = pickNewestSave();
-  const raw = d ? JSON.stringify(d) : localStorage.getItem(SAVE_KEY);
-  if(!raw){ note("There is no career save to export.", true); return; }
+function careerSnapshot(){
+  try{
+    if(G && G.you && G.members && G.members.length){
+      const base = saveCaptureBase();
+      base.members = G.members.map(stripMesh);
+      base.press = (G.press || []).map(stripMesh);
+      base.civ = (G.civ || []).map(stripMesh);
+      base.you = stripMesh(G.you);
+      base.savedAtMs = Date.now();
+      return base;
+    }
+  }catch(e){}
+  try{ return pickNewestSave(); }catch(e){ return null; }
+}
+function downloadNamed(name, text){
+  const blob = new Blob([text], {type:"application/json"});
+  const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob([raw], {type:"application/json"}));
-  a.download = "one-nation-under-me-save.json";
-  if(document.body) document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-  note("Career save exported.", false);
+  a.href = url; a.download = name; a.textContent = "Download " + name;
+  a.style.cssText = "position:fixed;left:8px;bottom:8px;z-index:200000;background:#ffe08a;color:#111;padding:12px 16px;border-radius:8px;font:700 15px system-ui;text-decoration:none";
+  document.body.appendChild(a);
+  try{ a.click(); }catch(e){}
+  setTimeout(() => { try{ URL.revokeObjectURL(url); a.remove(); }catch(e){} }, 120000);
+}
+function exportCareerSave(){
+  const d = careerSnapshot();
+  if(!d || !d.you){ note("There is no career save to export.", true); return; }
+  let raw;
+  try{ raw = JSON.stringify(d); }catch(e){ note("Could not write the career file.", true); return; }
+  const name = "one-nation-under-me-day" + (d.day || "x") + ".json";
+  downloadNamed(name, raw);
+  note("Career exported, day " + (d.day || "?") + ". If the browser did not save it, use the gold Download link.", false);
+}
+function careerFromText(text){
+  let t = String(text || "").replace(/^\uFEFF/, "").trim();
+  if(!t) throw new Error("That file is empty.");
+  if(t.slice(0, 5) === "ONZ1|"){
+    const j = (typeof engOpen === "function") ? engOpen(t) : null;
+    if(!j) throw new Error("That save file is damaged.");
+    t = j;
+  }
+  const d = (typeof t === "string") ? JSON.parse(t) : t;
+  if(d && d.you && Array.isArray(d.members) && d.members.length) return d;
+  if(d && d.career && d.career.you && Array.isArray(d.career.members)) return d.career;
+  throw new Error("That file is not a career save. It needs you and the House.");
+}
+function idbPutCareer(raw){
+  return new Promise(res => {
+    try{
+      const finish = db => {
+        try{
+          const tx = db.transaction("s", "readwrite");
+          tx.objectStore("s").put(raw, "career");
+          tx.oncomplete = () => { try{ ENG_IDB.cache = raw; ENG_IDB.db = db; }catch(e){} res(true); };
+          tx.onerror = () => res(false);
+        }catch(e){ res(false); }
+      };
+      if(ENG_IDB.db) return finish(ENG_IDB.db);
+      const rq = indexedDB.open("onum-saves", 1);
+      rq.onupgradeneeded = () => { try{ if(!rq.result.objectStoreNames.contains("s")) rq.result.createObjectStore("s"); }catch(e){} };
+      rq.onsuccess = () => finish(rq.result);
+      rq.onerror = () => res(false);
+    }catch(e){ res(false); }
+  });
+}
+function whenCareerReady(cb){
+  const ready = () => { try{ return !!pickNewestSave(); }catch(e){ return false; } };
+  if(ready()){ cb(true); return; }
+  let n = 0;
+  const t = setInterval(() => { n++; if(ready() || n > 30){ clearInterval(t); cb(ready()); } }, 100);
 }
 function importCareerSave(file){
   if(!file) return;
   const reader = new FileReader();
   reader.onload = () => {
+    let d, payload;
     try{
-      const d = JSON.parse(String(reader.result || ""));
-      if(!d || !d.you || !Array.isArray(d.members) || !d.members.length)
-        throw new Error("That file is not a valid career save.");
-      if(!storeCareer(JSON.stringify(d, saveRound))) throw new Error("This browser has no room for that career save. Clear other site data for this page and try again.");
-      location.reload();
-    }catch(e){ note((e && e.message) || "Could not import that career save.", true); }
+      d = careerFromText(String(reader.result || ""));
+      payload = JSON.stringify(d);
+    }catch(e){ note((e && e.message) || "Could not read that career save.", true); return; }
+    idbPutCareer(payload).then(idbOk => {
+      let lsOk = false;
+      try{ if(payload.length < 4500000) lsOk = !!storeCareer(payload); }catch(e){}
+      if(!idbOk && !lsOk){ note("This browser has no room for that career. Clear site data for this page and try again.", true); return; }
+      try{ localStorage.setItem("longsession.v3.pointer", "idb"); }catch(e){}
+      note("Career imported, day " + (d.day || "?") + ". Reloading.", false);
+      setTimeout(() => { try{ location.reload(); }catch(e){} }, 350);
+    });
   };
-  reader.onerror = () => note("Could not read that career save.", true);
+  reader.onerror = () => note("Could not read that file.", true);
   reader.readAsText(file);
 }
+window.onumPickCareer = function(){
+  let inp = document.getElementById("onumCareerFile");
+  if(!inp){
+    inp = document.createElement("input");
+    inp.type = "file"; inp.id = "onumCareerFile";
+    inp.accept = ".json,.txt,application/json,text/plain";
+    inp.style.cssText = "position:fixed;left:0;top:0;width:1px;height:1px;opacity:0.02";
+    inp.addEventListener("change", () => { const f = inp.files && inp.files[0]; inp.value = ""; if(f) importCareerSave(f); });
+    document.body.appendChild(inp);
+  }
+  try{ inp.click(); }catch(e){ note("The file window did not open. Try the menu again.", true); }
+};
 
 /* ══════════════════════════════════════════════════════════
    17 · LOOP & BOOT
@@ -41675,7 +41752,7 @@ function setupSettingsUI(){
       row("Notebook", "Happenings, faith on the wire, and the things nobody explains", '<button type="button" class="settings-btn settings-btn-secondary" id="pzNote">Open</button>') +
       row("Whip count", "Who is with you on the bill, who to work, and where they are", '<button type="button" class="settings-btn settings-btn-secondary" id="pzWhip"' + (G.bill && !G.bill.done ? '' : ' disabled') + '>Open</button>') +
       row("Export save", "Download this career as a file you can keep", '<button type="button" class="settings-btn settings-btn-secondary" id="pzExport">Export save</button>') +
-      row("Import save", "Load a career file; the game reloads into it", '<button type="button" class="settings-btn settings-btn-secondary" id="pzImport">Import save</button><input type="file" id="pzImportFile" accept=".json,application/json" hidden>') +
+      row("Import save", "Load a career file, including a .txt paste; the game reloads into it", '<button type="button" class="settings-btn settings-btn-secondary" id="pzImport">Import save</button>') +
       row("Title", "Continue, or begin a new career", '<button type="button" class="settings-btn settings-btn-secondary" id="pzTitle">Title menu</button>') +
     '</div>' +
     '<div class="settings-section" data-section="graphics">' +
@@ -41726,9 +41803,9 @@ function setupSettingsUI(){
   const byAch = el("pzAch"); if(byAch) byAch.addEventListener("click", () => { closeSettings(); setTimeout(() => { try{ achCard(); }catch(e){} }, 30); });
   const byChest = el("pzChest"); if(byChest) byChest.addEventListener("click", () => { closeSettings(); setTimeout(() => { try{ chestCard(); }catch(e){} }, 30); });
   const byNote = el("pzNote"); if(byNote) byNote.addEventListener("click", () => { closeSettings(); setTimeout(() => { try{ notebookCard(); }catch(e){} }, 30); });
-  const byExp = el("pzExport"); if(byExp) byExp.addEventListener("click", () => { try{ save(true, true); }catch(e){} exportCareerSave(); });
-  const byImp = el("pzImport"), impF = el("pzImportFile");
-  if(byImp && impF){ byImp.addEventListener("click", () => impF.click()); impF.addEventListener("change", () => importCareerSave(impF.files && impF.files[0])); }
+  const byExp = el("pzExport"); if(byExp) byExp.addEventListener("click", () => exportCareerSave());
+  const byImp = el("pzImport");
+  if(byImp) byImp.addEventListener("click", () => { if(window.onumPickCareer) window.onumPickCareer(); });
   const byWhip = el("pzWhip"); if(byWhip) byWhip.addEventListener("click", () => { closeSettings(); setTimeout(() => { try{ whipCard(); }catch(e){} }, 30); });
   const byTitle = el("pzTitle"); if(byTitle) byTitle.addEventListener("click", () => { closeSettings(); try{ G.running = true; showGameMenu(); }catch(e){} });
   const byKeys = el("pzKeys"); if(byKeys) byKeys.addEventListener("click", () => { closeSettings(); try{ settingsCard(); }catch(e){} });
@@ -43851,6 +43928,7 @@ function cardActContinue(){
     if(acts) acts.innerHTML = '<button class="btn" type="button" disabled>Loading career…</button>';
   }catch(e){}
   yieldMain(() => {
+    whenCareerReady(() => {
     let ok = false;
     try{ ok = !!loadSave(); }catch(e){ ok = false; }
     if(!ok || !G.you || !(G.members && G.members.length)){
@@ -43865,6 +43943,7 @@ function cardActContinue(){
         G._booting = false;
         showContinueBroken(e);
       }
+    });
     });
   });
 }
@@ -53060,7 +53139,11 @@ armFrame();
     "body.mt-on #ndSess .nsx-seat{cursor:pointer}body.mt-on #ndSess .nsx-q li{cursor:pointer}" +
     "body.mt-on #ndSess .nsx-acts{display:none!important}" +
     "#mtOne{display:none}#mtOne.on{display:flex;flex-direction:column;position:fixed;left:8px;right:8px;bottom:8px;z-index:10070;max-height:min(78vh,640px);overflow:auto;background:#121419;color:#f4f1e8;border:2px solid #c9a24a;border-radius:10px;box-shadow:0 8px 28px #000;padding:8px 10px 10px;font:14px/1.35 system-ui,sans-serif}" +
-    "#mtOne .mt-head{font:700 16px Georgia,serif;color:#ffe08a;text-transform:capitalize;margin:0 0 4px}" +
+    "#mtOne .mt-head{display:flex;align-items:center;justify-content:space-between;gap:8px;font:700 16px Georgia,serif;color:#ffe08a;text-transform:capitalize;margin:0 0 4px}" +
+    "#mtOne .mt-title{flex:1;min-width:0}" +
+    "#mtOne .mt-x,#onumX{width:44px;height:44px;flex:none;border:2px solid #c9a24a;background:#2a2d35;color:#ffe08a;border-radius:8px;font:700 22px/1 system-ui;cursor:pointer}" +
+    "#onumX{position:fixed;top:8px;right:8px;z-index:12000}" +
+    "#onumX[hidden]{display:none!important}" +
     "#mtOne .mt-now{margin:0 0 6px}#mtOne .mt-now b{color:#ffe08a}#mtOne .mt-seats{display:flex;flex-wrap:wrap;gap:4px}" +
     "#mtOne .mt-seat{width:34px;height:34px;border-radius:6px;border:2px solid #000;color:#fff;font:700 11px system-ui;cursor:pointer;padding:0}" +
     "#mtOne .mt-seat.on{outline:3px solid #ffe08a;box-shadow:0 0 10px #ffe08a}#mtOne .mt-seat.you{border-color:#fff}" +
@@ -53239,12 +53322,20 @@ armFrame();
   const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&"+"amp;", "<":"&"+"lt;", ">":"&"+"gt;", '"':"&"+"quot;", "'":"\x26#39;"})[c]);
   function colOf(p){ try{ if(p && typeof partyColorNum === "function"){ const n = partyColorNum(p.party); if(n != null) return "#" + (Number(n) >>> 0).toString(16).padStart(6,"0").slice(-6); } }catch(e){} return "#3a3f4b"; }
   function iniOf(p, id){ const n = youId(id) ? "You" : (p && p.name) || "?"; return (String(n).match(/\b\w/g) || ["?"]).slice(0, 2).join("").toUpperCase(); }
+  function shutMeet(){
+    try{ endSitting(); }catch(e){}
+    try{ if(typeof leaveSittingQuiet === "function") leaveSittingQuiet(); }catch(e){}
+    try{ window.ONUM_SESSION = {stage:"idle"}; }catch(e){}
+    document.body.classList.remove("mt-one", "mt-on", "in-session");
+    const P0 = document.getElementById("mtOne"); if(P0) P0.classList.remove("on");
+    note = "You left the sitting."; sig = "";
+  }
   function one(){
     let P = document.getElementById("mtOne");
     if(P && P.querySelector(".mt-acts")) return P;
     if(P) P.remove();
     P = document.createElement("div"); P.id = "mtOne"; P.setAttribute("role","region"); P.setAttribute("aria-label","Meeting");
-    P.innerHTML = '<div class="mt-head"></div><div class="mt-floor"></div><div class="mt-log"></div><div class="mt-acts"></div><div class="mt-say"><textarea rows="2" placeholder="Say it to the room."></textarea><button type="button" class="mt-speak">Speak</button></div>';
+    P.innerHTML = '<div class="mt-head"><span class="mt-title"></span><button type="button" class="mt-x" title="Close this sitting">\u00d7</button></div><div class="mt-floor"></div><div class="mt-log"></div><div class="mt-acts"></div><div class="mt-say"><textarea rows="2" placeholder="Say it to the room."></textarea><button type="button" class="mt-speak">Speak</button></div>';
     const ta = P.querySelector("textarea");
     ["keydown","keyup","keypress"].forEach(k => ta.addEventListener(k, e => e.stopPropagation()));
     const go = () => {
@@ -53254,6 +53345,7 @@ armFrame();
       note = "You said it."; sig = ""; paint(true);
     };
     P.querySelector(".mt-speak").onclick = ev => { ev.preventDefault(); go(); };
+    P.querySelector(".mt-x").onclick = ev => { ev.preventDefault(); ev.stopPropagation(); shutMeet(); };
     ta.addEventListener("keydown", e => { if(e.key === "Enter" && !e.shiftKey){ e.preventDefault(); go(); } });
     P.addEventListener("click", ev => {
       const b = ev.target.closest && ev.target.closest(".mt-seat"); if(!b) return;
@@ -53298,7 +53390,7 @@ armFrame();
     const P = one();
     if(!S){ P.classList.remove("on"); sig = ""; const acts0 = P.querySelector(".mt-acts"); if(acts0) acts0.innerHTML = ""; return; }
     P.classList.add("on");
-    const head = P.querySelector(".mt-head");
+    const head = P.querySelector(".mt-title") || P.querySelector(".mt-head");
     if(head) head.textContent = String(S.kind || "session").replace(/_/g, " ") + (S.stageName ? " · " + S.stageName : (S.stage ? " · " + String(S.stage).replace(/_/g, " ") : ""));
     const fl = P.querySelector(".mt-floor"); if(fl) fl.innerHTML = floorHTML(S);
     const lg = P.querySelector(".mt-log");
@@ -53355,6 +53447,39 @@ armFrame();
       if(id != null){ e.preventDefault(); callOn(id); paint(true); }
     }
   }, true);
+  function uiOpen(){
+    const mt = document.getElementById("mtOne");
+    if(document.body.classList.contains("mt-one") && mt && mt.classList.contains("on")) return "meet";
+    const pause = document.getElementById("pauseOverlay");
+    if(pause && pause.classList.contains("is-open")) return "pause";
+    const cld = document.getElementById("onumCapitalLedgerDialog");
+    if(cld && !cld.hidden) return "ledger";
+    try{ if(typeof veil !== "undefined" && veil && !veil.hidden) return "card"; }catch(e){}
+    try{ if(typeof TALK !== "undefined" && TALK.open) return "talk"; }catch(e){}
+    const proc = document.getElementById("procBar");
+    if(proc && !proc.hidden) return "proc";
+    return "";
+  }
+  function shutTop(){
+    const k = uiOpen();
+    if(k === "meet"){ shutMeet(); return; }
+    if(k === "pause"){ try{ if(typeof closeSettings === "function") closeSettings(); }catch(e){} return; }
+    if(k === "ledger"){ const b = document.querySelector("#onumCapitalLedgerDialog .cld-close"); if(b) b.click(); else { const d = document.getElementById("onumCapitalLedgerDialog"); if(d) d.hidden = true; } return; }
+    if(k === "card"){ try{ veil.hidden = true; card.classList.remove("card--open"); if(G) G.running = true; }catch(e){} return; }
+    if(k === "talk"){ try{ if(typeof closeTalk === "function") closeTalk(); }catch(e){} return; }
+    if(k === "proc"){ try{ if(typeof leaveSittingQuiet === "function") leaveSittingQuiet(); }catch(e){} return; }
+  }
+  const ux = document.createElement("button"); ux.type = "button"; ux.id = "onumX"; ux.hidden = true; ux.textContent = "\u00d7"; ux.title = "Close this"; ux.setAttribute("aria-label", "Close");
+  ux.onclick = ev => { ev.preventDefault(); ev.stopPropagation(); shutTop(); };
+  document.body.appendChild(ux);
+  setInterval(() => { try{ ux.hidden = !uiOpen(); }catch(e){} }, 400);
+  addEventListener("keydown", e => {
+    if(e.key !== "Escape") return;
+    const t = e.target;
+    if(t && (t.tagName === "TEXTAREA" || t.tagName === "INPUT" || t.isContentEditable)) return;
+    if(!uiOpen()) return;
+    e.preventDefault(); e.stopPropagation(); shutTop();
+  }, true);
   setInterval(() => paint(false), 700);
   addEventListener("onum-session", () => setTimeout(() => paint(true), 0));
   addEventListener("resize", () => paint(false));
@@ -53363,7 +53488,7 @@ armFrame();
 
 </script>
 <script>
-/* 20261108g District Ledger: beside the Capitol Ledger. Generated dispatches stay marked as such. */
+/* 20261108h District Ledger: beside the Capitol Ledger. Generated dispatches stay marked as such. */
 (function(){
   'use strict';
 
