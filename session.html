@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261108i">
+<meta name="onum-build" content="20261109a">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -33,7 +33,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261108i";
+  var STAMP = "20261109a";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -867,6 +867,16 @@ body.boot-menu .shell{grid-template-rows:minmax(0,1fr)}
 .np__col h3{font:700 12px Archivo,system-ui,sans-serif;letter-spacing:.12em;text-transform:uppercase;margin:0 0 6px;border-bottom:1px solid rgba(160,160,160,.4);padding-bottom:3px}.np__col h3 small{display:block;font:italic 11px Georgia,serif;letter-spacing:0;text-transform:none;opacity:.7}
 .np__lede{font-weight:700}.np__q{font-style:italic}.np__q small{font-style:normal;opacity:.7}.np__small{list-style:none;margin:0;padding:0}.np__small li{margin:0 0 6px;font-size:13px}
 .np__band{margin:14px 0 0;text-align:center;font:700 11px Archivo,system-ui,sans-serif;letter-spacing:.3em;text-transform:uppercase;border-top:3px double currentColor;padding-top:6px;opacity:.8}.np__foot{font-size:12px;opacity:.75;border-top:1px solid rgba(160,160,160,.4);padding-top:6px;margin-top:8px}
+.rx{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin:8px 0}
+.rx__c{border:1px solid rgba(160,160,160,.45);border-radius:4px;padding:6px 8px;background:rgba(255,255,255,.04)}
+.rx__c b{display:block;font:700 13px Georgia,serif;margin-bottom:2px}
+.rx__c small{display:block;opacity:.72;font:11px Archivo,system-ui,sans-serif;letter-spacing:.04em;margin-bottom:4px}
+.rx__bars{display:flex;height:16px;border-radius:2px;overflow:hidden;font:700 10px/16px Archivo,system-ui,sans-serif;color:#fff;margin:4px 0}
+.rx__bars span{text-align:center;min-width:18px;white-space:nowrap}
+.rx__svg{display:block;width:100%;height:46px;margin-top:2px}
+.rx__tabs{display:flex;flex-wrap:wrap;gap:4px;margin:8px 0}
+.rx__tabs button,.rx__sel{font:600 12px Archivo,system-ui,sans-serif;min-height:36px;padding:4px 8px;border:1px solid var(--line,#8a7f66);background:transparent;color:inherit;border-radius:3px;cursor:pointer}
+.rx__tabs button.on{background:#ffe08a;color:#111;border-color:#ffe08a}
 
 @keyframes fadeInOverlay{from{opacity:0} to{opacity:1}}
 .settings-panel{background:var(--paper); border-radius:8px; box-shadow:0 20px 60px rgba(0,0,0,.9); max-width:min(600px,92vw); max-height:85vh; overflow-y:auto; animation:slideUpPanel .35s cubic-bezier(.16,.1,.3,1); display:flex; flex-direction:column}
@@ -30225,6 +30235,7 @@ function election(){
   }
   G.donors = G.donors.filter(d => !d.angry);
   judicialElection(swing, null);
+  try{ raceOnElection({youWon:!!youWon, seeking, midTerm:!!midTerm, margin: youWon ? you.margin : Math.round(yourResult)}); }catch(e){}
   G.congress++; G.term++; G.sittingDay = 1;
   if(youWon) assignPosts(false);
 
@@ -30245,6 +30256,7 @@ function election(){
     '<p>National mood moved <strong>' + (swing>0?"+":"") + Math.round(swing) + '</strong> toward the ' +
       (swing>0?"Federalists":"Commonwealth") + '.' + (swungSeats && swungSeats.n ? ' Beyond the seats on the board, <strong>' + swungSeats.n + '</strong> changed hands from the ' + partyName(swungSeats.from) + ' to the ' + partyName(swungSeats.to) + '.' : '') + ' The House stands <strong>' + Object.keys(G.seatsBy).filter(p => (G.seatsBy[p] || 0) > 0).sort((a, c) => G.seatsBy[c] - G.seatsBy[a]).map(p => G.seatsBy[p] + ' ' + partyName(p)).join(', ') + '</strong>.</p>' +
     '<h2>The board</h2><div class="results">' + rows + '</div>' +
+    '<p class="muted">Those returns go into the book of races, under the Ledger: polls, every state, and the offices the papers have started to count.</p>' +
     (newcomers.length ? '<p><strong>Sworn in:</strong> ' + listify(newcomers.map(m=>m.name+" ("+m.party+")")) +
       '. They do not know you yet.</p>' : '') +
     (heirs.length ? '<p><strong>The houses hold:</strong> ' + listify(heirs.map(h =>
@@ -39672,6 +39684,222 @@ function lHeadline(t){
   if(t.length > 110) t = t.slice(0, 107).replace(/\s+\S*$/, "") + "...";
   return t;
 }
+/* 20261109a · the book of races. A short board at the start; more offices and a longer poll as the career goes on. */
+const RACE_SAY = [
+  "Three races are being counted: the executive, your seat, and the governor at home.",
+  "The papers have added your senator and the attorney general at home.",
+  "Every governor is on the board, and the treasurer at home.",
+  "Every state now has a senator and an attorney general in the count.",
+  "The book is fat: secretary of state, comptroller, and the state House, in every state, with a longer poll."
+];
+let RACE_UI = {view:"watch", st:""};
+function raceDepth(){
+  const d = G.day || 1, c = G.congress || 1, n = (G.races && G.races.n) || 0;
+  let k = 0;
+  if(d >= 12 || n >= 1) k = 1;
+  if(d >= 40 || n >= 2 || c >= 3) k = 2;
+  if(d >= 90 || n >= 3) k = 3;
+  if(d >= 160 || n >= 5) k = 4;
+  return k;
+}
+function raceId(k, st){ return st ? k + "@" + st : k; }
+function raceTitle(k, st){
+  const home = (G.you && (G.you.state || "") + (G.you.dist ? " " + G.you.dist : "")) || "";
+  if(k === "pres"){ try{ return execTitle(); }catch(e){ return "President"; } }
+  if(k === "house") return "Your seat" + (home ? ", " + home : "");
+  const T = {gov:"Governor", sen:"Senator", ag:"Attorney General", treas:"Treasurer", sos:"Secretary of State", comp:"Comptroller", housegen:"State House"};
+  return (T[k] || k) + (st ? (k === "sen" ? " from " : k === "gov" ? " of " : ", ") + st : "");
+}
+function raceWant(){
+  const depth = raceDepth(), y = G.you || {}, home = y.state || "", states = (G.states || []).map(s => s.n);
+  const list = [["pres", ""], ["house", ""]];
+  if(home) list.push(["gov", home]);
+  if(depth >= 1 && home){ list.push(["sen", home]); list.push(["ag", home]); }
+  if(depth >= 2){ states.forEach(n => { if(n !== home) list.push(["gov", n]); }); if(home) list.push(["treas", home]); }
+  if(depth >= 3){ states.forEach(n => { if(!list.some(x => x[0] === "sen" && x[1] === n)) list.push(["sen", n]); if(n !== home) list.push(["ag", n]); }); }
+  if(depth >= 4){ states.forEach(n => { list.push(["sos", n]); list.push(["comp", n]); list.push(["housegen", n]); }); }
+  return list;
+}
+function raceLean(st){
+  if(!st) return G.mood || 0;
+  const s = (G.states || []).find(x => x.n === st);
+  return s ? (s.lean || 0) : 0;
+}
+function raceMake(k, st){
+  const lean = raceLean(st), y = G.you || {};
+  const incP = lean > 8 ? "FED" : lean < -8 ? "COM" : (Math.random() < 0.5 ? "FED" : "COM");
+  const chP = incP === "FED" ? "COM" : "FED";
+  let inc = newName(st || (y.state || null)), you = false, pInc = incP;
+  if(k === "pres" && G.exec && G.exec.name){ inc = G.exec.name; pInc = G.exec.party || incP; you = !!(G.exec.you || y.office === "pres"); }
+  else if(k === "house" && y.name && !y.out && (y.office || "house") === "house"){ inc = y.name; pInc = y.party || incP; you = true; }
+  else if(k === "gov" && y.office === "gov" && st && st === y.state){ inc = y.name; pInc = y.party || incP; you = true; }
+  else if(k === "sen" && y.office === "senate" && st && st === y.state){ inc = y.name; pInc = y.party || incP; you = true; }
+  const pull = you ? 50 + ((y.approval || 50) - 50) * 0.35 + (y.margin || 0) * 0.25 : 50 + lean * 0.2;
+  const base = clamp(Math.round(pull + rint(-4, 4)), 34, 66);
+  const day = G.day || 1;
+  return {k, st:st || "", you, field:[{n:inc, p:pInc, you:you}, {n:newName(st || (y.state || null)), p:chP, you:false}], series:[[Math.max(1, day - 3), clamp(base + rint(-3, 3), 32, 68)], [day, base]]};
+}
+function raceSync(rc){
+  const y = G.you; if(!y || !rc) return;
+  if(rc.k === "house" && !y.out && (y.office || "house") === "house"){ rc.you = true; rc.field[0].n = y.name; rc.field[0].p = y.party || rc.field[0].p; rc.field[0].you = true; }
+  else if(rc.k === "pres" && ((G.exec && G.exec.you) || y.office === "pres")){ rc.you = true; rc.field[0].n = y.name; rc.field[0].p = y.party || rc.field[0].p; rc.field[0].you = true; }
+  else if(rc.k === "gov" && y.office === "gov" && rc.st === y.state){ rc.you = true; rc.field[0].n = y.name; rc.field[0].p = y.party || rc.field[0].p; rc.field[0].you = true; }
+  else if(rc.k === "sen" && y.office === "senate" && rc.st === y.state){ rc.you = true; rc.field[0].n = y.name; rc.field[0].p = y.party || rc.field[0].p; rc.field[0].you = true; }
+  else if(rc.k === "pres" && G.exec && G.exec.name && !rc.you){ rc.field[0].n = G.exec.name; if(G.exec.party) rc.field[0].p = G.exec.party; }
+}
+function raceEnsure(){
+  if(typeof ENG_DRY !== "undefined" && ENG_DRY.on) return G.races || {live:{}, hist:[], n:0};
+  if(!G.races || !G.races.live) G.races = {v:1, n:0, hist:[], live:{}, polled:0, seeded:0};
+  const B = G.races;
+  raceWant().forEach(pair => { const id = raceId(pair[0], pair[1]); if(!B.live[id]) B.live[id] = raceMake(pair[0], pair[1]); });
+  Object.keys(B.live).forEach(id => { try{ raceSync(B.live[id]); }catch(e){} });
+  if(!B.seeded){ raceBackfill(B); B.seeded = 1; }
+  return B;
+}
+function raceBackfill(B){
+  if(B.hist && B.hist.length) return;
+  B.hist = B.hist || [];
+  const y = G.you || {}, cong = G.congress || 1;
+  const back = Math.min(4, 1 + Math.floor((G.day || 1) / 55));
+  const home = y.state || ((G.states || [])[0] || {}).n || "";
+  for(let i = back; i >= 1; i--){
+    const c = Math.max(1, cong - i);
+    const presP = (G.mood || 0) >= 0 ? "FED" : "COM";
+    B.hist.push({c, d:Math.max(1, (G.day || 1) - i * 70), k:"pres", st:"", w:(G.exec && i === 1 && G.exec.name) ? G.exec.name : newName(null), p:(G.exec && i === 1 && G.exec.party) ? G.exec.party : presP, m:4 + (i * 3) % 9, y:false});
+    if(y.name && (y.terms || 1) > i && (y.office || "house") === "house") B.hist.push({c, d:Math.max(1, (G.day || 1) - i * 70), k:"house", st:home, w:y.name, p:y.party || "IND", m:Math.max(1, Math.round(y.margin || 6)), y:true});
+    else B.hist.push({c, d:Math.max(1, (G.day || 1) - i * 70), k:"house", st:home, w:newName(home), p:presP, m:3 + i, y:false});
+    if(home) B.hist.push({c, d:Math.max(1, (G.day || 1) - i * 70), k:"gov", st:home, w:(y.office === "gov" && i === 1) ? y.name : newName(home), p:(y.office === "gov" && i === 1) ? (y.party || presP) : presP, m:5 + i, y:!!(y.office === "gov" && i === 1)});
+  }
+}
+function raceStep(rc){
+  const y = G.you || {}, lean = raceLean(rc.st);
+  let pull = rc.you ? 50 + ((y.approval || 50) - 50) * 0.4 + (y.margin || 0) * 0.3 : 50 + lean * 0.18;
+  if(rc.k === "pres") pull += (G.mood || 0) * 0.08;
+  if(rc.st){ const s = (G.states || []).find(x => x.n === rc.st); if(s) pull -= Math.max(0, (s.unrest || 0) - 45) * 0.05; }
+  const last = rc.series.length ? rc.series[rc.series.length - 1][1] : pull;
+  const nxt = clamp(Math.round(last * 0.7 + pull * 0.3 + rint(-3, 3)), 31, 69);
+  rc.series.push([G.day || 1, nxt]);
+  const cap = [8, 12, 18, 28, 42][raceDepth()];
+  if(rc.series.length > cap) rc.series.splice(0, rc.series.length - cap);
+}
+function raceDay(){
+  if(typeof ENG_DRY !== "undefined" && ENG_DRY.on) return;
+  if(!G.you) return;
+  const B = raceEnsure();
+  if(B.polled === G.day) return;
+  B.polled = G.day;
+  const depth = raceDepth(), home = (G.you && G.you.state) || "";
+  const ids = Object.keys(B.live);
+  ids.forEach(id => {
+    const rc = B.live[id];
+    const hot = rc.k === "pres" || rc.k === "house" || (home && rc.st === home);
+    const turn = (seedOf("rx:" + id + ":" + G.day) % Math.max(1, 5 - depth)) === 0;
+    if(hot || turn) raceStep(rc);
+  });
+  if((G.day || 0) % 6 === 0 && B.live.pres && B.live.pres.series.length){
+    const rc = B.live.pres, pct = rc.series[rc.series.length - 1][1];
+    try{ lLog("A poll puts " + rc.field[0].n + " at " + pct + " for " + raceTitle("pres") + ", " + rc.field[1].n + " at " + (100 - pct) + ".", "press"); }catch(e){}
+  }
+}
+function raceTrim(B){
+  const cap = [40, 90, 160, 280, 520][raceDepth()];
+  if(!B.hist || B.hist.length <= cap) return;
+  const keep = [], rest = [];
+  const home = (G.you && G.you.state) || "";
+  B.hist.forEach(h => { if(h.y || h.k === "pres" || h.k === "house" || (home && h.st === home)) keep.push(h); else rest.push(h); });
+  B.hist = keep.concat(rest.slice(Math.max(0, keep.length + rest.length - cap)));
+  if(B.hist.length > cap + keep.length) B.hist = B.hist.slice(-cap);
+}
+function raceSettleOne(rc, pct, cong){
+  const a = clamp(Math.round(pct), 30, 70), win = a >= 50 ? 0 : 1, winner = rc.field[win];
+  G.races.hist.push({c:cong, d:G.day || 1, k:rc.k, st:rc.st || "", w:winner.n, p:winner.p, m:Math.max(1, Math.round(Math.abs(a - 50) * 2)), y:!!(rc.you && win === 0)});
+  if(win === 1){ const loser = rc.field[0]; rc.field[0] = {n:rc.field[1].n, p:rc.field[1].p, you:false}; rc.field[1] = {n:newName(rc.st || null), p:loser.p, you:false}; rc.you = false; }
+  else rc.field[1] = {n:newName(rc.st || null), p:rc.field[1].p, you:false};
+  const lead = win === 0 ? a : 100 - a;
+  rc.series = [[G.day || 1, clamp(lead, 32, 68)]];
+}
+function raceOnElection(meta){
+  if(typeof ENG_DRY !== "undefined" && ENG_DRY.on) return;
+  meta = meta || {};
+  const B = raceEnsure(); B.n = (B.n || 0) + 1;
+  const cong = (G.congress || 1) + 1;
+  Object.keys(B.live).forEach(id => {
+    const rc = B.live[id];
+    if(meta.midTerm && rc.you && (rc.k === "pres" || rc.k === "gov" || rc.k === "sen")) return;
+    let pct = (rc.series.length ? rc.series[rc.series.length - 1][1] : 50) + rint(-4, 4);
+    const mine = !meta.midTerm && ((rc.k === "house" && (meta.seeking === "house" || !meta.seeking)) || (rc.k === "pres" && meta.seeking === "pres") || (rc.k === "gov" && meta.seeking === "gov" && rc.you) || (rc.k === "sen" && meta.seeking === "senate" && rc.you));
+    if(mine) pct = meta.youWon ? clamp(50 + Math.abs(meta.margin || 2) / 2, 51, 68) : clamp(49 - Math.abs(meta.margin || 2) / 2, 32, 49);
+    if(rc.k === "house" && !meta.midTerm && meta.seeking && meta.seeking !== "house" && meta.seeking !== "none" && meta.youWon){ rc.you = false; pct = 50 + rint(-6, 8); }
+    raceSettleOne(rc, pct, cong);
+  });
+  raceTrim(B);
+}
+function raceMoe(rc){
+  const n = (rc && rc.series && rc.series.length) || 1;
+  return Math.max(1.1, 5.6 - raceDepth() * 0.75 - Math.min(2.2, n / 14));
+}
+function raceSample(rc){
+  const n = (rc && rc.series && rc.series.length) || 1;
+  return 380 + raceDepth() * 420 + n * 55;
+}
+function raceCol(p){ try{ return partyColorHex(p) || "#5B6670"; }catch(e){ return p === "FED" ? "#2f5f8a" : p === "COM" ? "#8e2f3b" : "#6b6456"; } }
+function raceSpark(series){
+  if(!series || series.length < 2) return "";
+  const ys = series.map(p => p[1]), min = Math.min(42, Math.min.apply(null, ys)), max = Math.max(58, Math.max.apply(null, ys));
+  const w = 240, h = 46;
+  const pts = ys.map((y, i) => { const x = 1 + (i / (ys.length - 1)) * (w - 2); const yy = (h - 3) - ((y - min) / (max - min || 1)) * (h - 6); return x.toFixed(1) + "," + yy.toFixed(1); }).join(" ");
+  const y50 = (h - 3) - ((50 - min) / (max - min || 1)) * (h - 6);
+  return '<svg class="rx__svg" viewBox="0 0 ' + w + ' ' + h + '" aria-hidden="true"><line x1="0" y1="' + y50.toFixed(1) + '" x2="' + w + '" y2="' + y50.toFixed(1) + '" stroke="#c9a24a" stroke-dasharray="3 3" stroke-width="1"/><polyline fill="none" stroke="#1d3f66" stroke-width="1.7" points="' + pts + '"/></svg>';
+}
+function raceBars(rc){
+  const a = rc.series.length ? rc.series[rc.series.length - 1][1] : 50, b = 100 - a;
+  const f0 = rc.field[0], f1 = rc.field[1];
+  return '<div class="rx__bars"><span style="width:' + a + '%;background:' + raceCol(f0.p) + '">' + a + '</span><span style="width:' + b + '%;background:' + raceCol(f1.p) + '">' + b + '</span></div>' +
+    '<small>' + pcEsc(f0.n) + ' ' + pcEsc(partyLabel(f0.p)) + ' ' + a + ' · ' + pcEsc(f1.n) + ' ' + pcEsc(partyLabel(f1.p)) + ' ' + b + ' · ±' + raceMoe(rc).toFixed(1) + ' · sample ' + raceSample(rc).toLocaleString("en-US") + '</small>';
+}
+function raceCardHTML(rc){
+  return '<div class="rx__c"><b>' + pcEsc(raceTitle(rc.k, rc.st)) + '</b>' + raceBars(rc) + raceSpark(rc.series) + '</div>';
+}
+function raceHouseBar(){
+  const s = G.seatsBy || {}, keys = Object.keys(s).filter(p => (s[p] || 0) > 0);
+  const tot = keys.reduce((a, p) => a + (s[p] || 0), 0) || 1;
+  return '<div class="rx__c"><b>The House, as it stands</b><div class="rx__bars">' + keys.sort((a, b) => s[b] - s[a]).map(p => '<span style="width:' + ((s[p] / tot) * 100) + '%;background:' + raceCol(p) + '">' + s[p] + '</span>').join("") + '</div><small>' + keys.map(p => s[p] + ' ' + partyName(p)).join(" · ") + '</small></div>';
+}
+function racePaperHTML(){
+  const B = raceEnsure(), depth = raceDepth();
+  const home = (G.you && G.you.state) || "";
+  const ids = Object.keys(B.live).filter(id => { const rc = B.live[id]; return rc.k === "pres" || rc.k === "house" || (home && rc.st === home); }).slice(0, 4);
+  return '<p class="np__deck">' + pcEsc(RACE_SAY[depth] || "") + ' The count gets longer as the term does.</p><div class="rx">' + raceHouseBar() + ids.map(id => raceCardHTML(B.live[id])).join("") + '</div>';
+}
+function raceCard(){
+  G.running = false;
+  const B = raceEnsure(), depth = raceDepth(), y = G.you || {};
+  const sts = (G.states || []).map(s => s.n);
+  if(!RACE_UI.st) RACE_UI.st = y.state || sts[0] || "";
+  const view = RACE_UI.view || "watch";
+  let body = "";
+  if(view === "past"){
+    const rows = (B.hist || []).slice().reverse().slice(0, 48);
+    body = rows.length ? '<div class="results">' + rows.map(h => '<div><span>' + pcEsc(raceTitle(h.k, h.st)) + ' · ' + pcEsc(h.w) + ' <span class="chip chip--' + (h.p === "FED" ? "fed" : h.p === "COM" ? "com" : "ind") + '">' + pcEsc(h.p || "") + '</span></span><b class="win">+' + h.m + '</b><b>' + ordinal(h.c) + '</b></div>').join("") + '</div>' : '<p>No returns filed yet.</p>';
+  } else {
+    let ids = Object.keys(B.live);
+    if(view === "watch") ids = ids.filter(id => { const rc = B.live[id]; return rc.k === "pres" || rc.k === "house" || rc.st === (y.state || ""); });
+    else if(view === "home") ids = ids.filter(id => B.live[id].st === (y.state || "") || B.live[id].k === "house" || B.live[id].k === "pres");
+    else ids = ids.filter(id => B.live[id].st === RACE_UI.st || B.live[id].k === "pres");
+    body = (view === "all" ? '<label class="rx__sel">State <select id="rxSt" class="rx__sel">' + sts.map(n => '<option' + (n === RACE_UI.st ? ' selected' : '') + '>' + pcEsc(n) + '</option>').join("") + '</select></label>' : '') +
+      '<div class="rx">' + (view !== "all" ? raceHouseBar() : '') + ids.map(id => raceCardHTML(B.live[id])).join("") + '</div>';
+  }
+  const tab = (id, t) => '<button type="button" data-rvw="' + id + '"' + (view === id ? ' class="on"' : '') + '>' + t + '</button>';
+  card.innerHTML = '<div class="eyebrow">The book of races · ' + (depth + 1) + ' of 5</div><h1>Polls, charts, returns</h1>' +
+    '<p class="dream">' + pcEsc(RACE_SAY[depth] || "") + ' A new office joins the count as the career lengthens. Each morning adds a point. The error shrinks as the sample catches up. Election night files the return and starts the next chart.</p>' +
+    '<div class="rx__tabs">' + tab("watch", "Watching") + tab("home", "Your state") + tab("all", "Every state") + tab("past", "History") + '</div>' + body +
+    '<div class="card__actions"><button type="button" class="btn" id="rxBack">Back to the Ledger</button><button type="button" class="btn btn--ghost" id="rxClose">Close</button></div>';
+  veil.hidden = false;
+  card.querySelectorAll("[data-rvw]").forEach(b => b.addEventListener("click", () => { RACE_UI.view = b.getAttribute("data-rvw"); raceCard(); }));
+  const sel = el("rxSt"); if(sel) sel.addEventListener("change", () => { RACE_UI.st = sel.value; raceCard(); });
+  el("rxBack").addEventListener("click", () => paperCard());
+  el("rxClose").addEventListener("click", () => walkNow());
+}
 function paperBuild(){
   const D = G.day, y = G.you;
   const prev = (G.daylog || []).filter(x => x.d === D - 1 || (x.d === D && /overnight|this morning/i.test(x.t)));
@@ -39755,6 +39983,8 @@ function npHTML(){
     '</div>' +
     '<div class="np__band">The presses disagree</div><div class="np__cols">' + party.join("") + faith + '</div>' +
     '<div class="np__cols">' + ind + col("Small headlines, from other papers", small(other)) + col("From the desks", (function(){ let h = ""; [() => agLedgerHTML(), () => sbLedgerHTML(), () => riteLedgerHTML(), () => govLedgerHTML(), () => orgLedgerHTML()].forEach(f => { try{ h += f() || ""; }catch(e){} }); return h || '<p class="np__q">Nothing from the desks today.</p>'; })()) + '</div>' +
+    '<div class="np__band">The numbers</div>' +
+    (function(){ try{ return racePaperHTML(); }catch(e){ return ""; } })() +
     '<p class="np__foot">' + pcEsc(P.poll) + (P.letter ? ' Letters from home: ' + pcEsc(P.letter) : '') + '</p></div>';
 }
 function paperCard(){
@@ -39763,9 +39993,11 @@ function paperCard(){
   G.paperRead = G.day;
   card.innerHTML = npHTML() +
     '<div class="card__actions"><button type="button" class="btn" id="lpClose">Fold it</button>' +
+    '<button type="button" class="btn btn--ghost" id="lpRaces">Races</button>' +
     '<button type="button" class="btn btn--ghost" id="lpRival">Rivals</button><button type="button" class="btn btn--ghost" id="lpHome">Home</button></div>';
   veil.hidden = false;
   el("lpClose").addEventListener("click", () => walkNow());
+  const lpR = el("lpRaces"); if(lpR) lpR.addEventListener("click", () => { try{ raceCard(); }catch(e){ note("The book of races did not open.", true); } });
   el("lpRival").addEventListener("click", () => rivalCard());
   el("lpHome").addEventListener("click", () => homeCard());
 }
@@ -39796,6 +40028,7 @@ function lMorning(){
     else if(w.k === "clear" && w.s === "spring") y.energy = clamp(y.energy + 4, 0, 100);
     try{ feed(wxLine(w)); }catch(e){}
   }
+  try{ raceDay(); }catch(e){}
 }
 function lTick(){
   if(!G.you || !G.running) return;
@@ -39823,6 +40056,7 @@ function lJobLine(){
 PROPS.office = PROPS.office || [];
 PROPS.office.push({id:"ledger", label:"The morning Ledger", sub:"Folded on the side table, still warm from the van", x:1.55, z:4.85, r:1.25,
   acts:() => [{t:"Read today's Ledger", c:"10m", run(){ spend(10, -2); paperCard(); }},
+              {t:"The horse race", c:"10m", run(){ spend(10, -1); try{ raceCard(); }catch(e){} }},
               {t:"Look at the letters from home", c:"5m", run(){ spend(5, 0); homeCard(); }}]});
 
 /* ══════════════════════════════════════════════════════════
@@ -41325,6 +41559,7 @@ function saveCaptureBase(){
     journal:G.journal, career:G.career, room:G.room, savedAt:G.savedAt,
     feed:(G.feed||[]).slice(-24), mail:(G.mail||[]).slice(-20), mailId:G.mailId, pendingReplies:G.pendingReplies, visitId:G.visitId,
     states:G.states, prog:G.prog, lobbies:G.lobbies, money:G.money, history:G.history, events:G.events,
+    races:G.races || null,
     regime:G.regime, amended:G.amended, exec:G.exec, presidents:G.presidents, statute:G.statute,
     bare:G.bare, gfx:G.gfx, simple:G.simple, fullDetail:G.fullDetail, noSit:G.noSit,
     voiceVar:G.voiceVar, voiceRate:G.voiceRate, voiceCarry:G.voiceCarry, hours:G.hours,
