@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261108h">
+<meta name="onum-build" content="20261108i">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -33,7 +33,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261108h";
+  var STAMP = "20261108i";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -11299,21 +11299,35 @@ function engUnpack(s0){
 /* the wrapped form is "ONZ1|<hash>|<packed>"; anything else is the old plain JSON */
 function engWrap(json){ try{ const z = engPack(json); if(engUnpack(z) !== json) return json; return "ONZ1|" + engHash(json) + "|" + z; }catch(e){ return json; } }
 function engOpen(raw){ if(!raw || raw.slice(0, 5) !== "ONZ1|") return raw; const a = raw.indexOf("|", 5); const h = raw.slice(5, a); const j = engUnpack(raw.slice(a + 1)); if(engHash(j) !== h) return null; return j; }
-const ENG_IDB = {db:null, cache:null};
-try{ const rq = indexedDB.open("onum-saves", 1); rq.onupgradeneeded = () => { try{ rq.result.createObjectStore("s"); }catch(e){} };
-  rq.onsuccess = () => { ENG_IDB.db = rq.result; try{ const g = ENG_IDB.db.transaction("s").objectStore("s").get("career"); g.onsuccess = () => { ENG_IDB.cache = g.result || null; }; }catch(e){} }; }catch(e){}
-function engIdbPut(raw){ try{ if(!ENG_IDB.db) return; ENG_IDB.db.transaction("s", "readwrite").objectStore("s").put(raw, "career"); ENG_IDB.cache = raw; }catch(e){} }
+const ENG_IDB = {db:null, cache:null, ready:null};
+ENG_IDB.ready = new Promise(res => {
+  try{
+    const rq = indexedDB.open("onum-saves", 1);
+    rq.onupgradeneeded = () => { try{ if(!rq.result.objectStoreNames.contains("s")) rq.result.createObjectStore("s"); }catch(e){} };
+    rq.onsuccess = () => {
+      ENG_IDB.db = rq.result;
+      try{
+        const g = ENG_IDB.db.transaction("s").objectStore("s").get("career");
+        g.onsuccess = () => { ENG_IDB.cache = g.result || null; res(true); };
+        g.onerror = () => res(false);
+      }catch(e){ res(false); }
+    };
+    rq.onerror = () => res(false);
+    setTimeout(() => res(false), 8000);
+  }catch(e){ res(false); }
+});
+function engIdbPut(raw){ try{ if(window.ONUM_IMPORTING) return; if(!ENG_IDB.db) return; ENG_IDB.db.transaction("s", "readwrite").objectStore("s").put(raw, "career"); ENG_IDB.cache = raw; }catch(e){} }
 (function(){
   const baseParse = parseSaveRaw;
   parseSaveRaw = function(raw){ try{ return baseParse(engOpen(raw)); }catch(e){ return null; } };
   const baseWrite = writeSaveKey;
   writeSaveKey = function(key, raw){ const t = performance.now(); const w = (typeof raw === "string" && raw.length > 20000 && raw.charAt(0) === "{") ? engWrap(raw) : raw; const ok = baseWrite(key, w); if(key === SAVE_KEY && ok){ engCost("save-write", performance.now() - t); ENG.lastSave = {plain:raw.length, stored:w.length, at:Date.now()}; engIdbPut(w); } return ok; };
   const basePick = pickNewestSave;
-  pickNewestSave = function(){ let b = basePick(); try{ const d = ENG_IDB.cache ? parseSaveRaw(ENG_IDB.cache) : null; if(d && (!b || isBetterSave(d, b))) b = d; }catch(e){} return b; };
+  pickNewestSave = function(){ let b = basePick(); try{ const d = ENG_IDB.cache ? parseSaveRaw(ENG_IDB.cache) : null; let force = false; try{ force = localStorage.getItem("longsession.v3.force") === "idb"; }catch(e){} if(d && (force || !b || isBetterSave(d, b))) b = d; }catch(e){} return b; };
 })();
 /* autosave on a steady beat, never mid-walk (queueSave already refuses then) */
 engJob("autosave", 90000, () => { try{ if(G && G.running && !G.over) queueSave(false); }catch(e){} });
-addEventListener("pagehide", () => { try{ save(false, true); }catch(e){} });
+addEventListener("pagehide", () => { try{ if(window.ONUM_IMPORTING) return; save(false, true); }catch(e){} });
 /* ── 5. what each system costs, on screen (F9 or ?perf=1) ── */
 function engOverlay(on){
   let w = document.getElementById("engPerf");
@@ -12776,22 +12790,23 @@ save = function(explicit, sync){
     svPack(S.json, raw => { S.raw = raw; svIdle(w1, S.explicit); });
   };
   const w1 = () => {
+    if(window.ONUM_IMPORTING){ SV.busy = false; return; }
     let ok = svRawWrite(SAVE_KEY, S.raw);
     if(!ok){ for(const k of [SAVE_BEST_KEY, SAVE_BACKUP_KEY]){ try{ localStorage.removeItem(k); }catch(e){} ok = svRawWrite(SAVE_KEY, S.raw); if(ok) break; } }
-    if(!ok && ENG_IDB.db){ try{ engIdbPut(S.raw); ok = true; if(!G._idbOnly){ G._idbOnly = 1; note("Saved to the browser's larger store (the small one is full). Your career is kept.", false); } }catch(e){} }   /* a career too big for localStorage still saves */
+    if(!ok && ENG_IDB.db && !window.ONUM_IMPORTING){ try{ engIdbPut(S.raw); ok = true; if(!G._idbOnly){ G._idbOnly = 1; note("Saved to the browser's larger store (the small one is full). Your career is kept.", false); } }catch(e){} }   /* a career too big for localStorage still saves */
     if(!ok) return svDone(S.base, S.explicit, false);
     SV.lastBody = S.body; try{ ENG.lastSave = {plain:S.json.length, stored:S.raw.length, at:Date.now()}; }catch(e){}
     svIdle(w2, S.explicit);
   };
   const w2 = () => { svRawWrite(SAVE_BACKUP_KEY, S.raw); svIdle(w3, S.explicit); };          /* the backup, its own tick */
-  const w3 = () => { if(S.raw.length < 1600000) svRawWrite(SAVE_BEST_KEY, S.raw); try{ engIdbPut(S.raw); }catch(e){}  /* IDB put is async */
+  const w3 = () => { if(window.ONUM_IMPORTING){ SV.busy = false; return; } if(S.raw.length < 1600000) svRawWrite(SAVE_BEST_KEY, S.raw); try{ engIdbPut(S.raw); }catch(e){}  /* IDB put is async */
     SV.last = {ms:performance.now() - T0, plain:S.json.length, stored:S.raw.length}; svDone(S.base, S.explicit, true); };
   svIdle(snap, S.explicit);
   return true;
 };
 /* the page is going away: one synchronous pass, primary key only (backup holds the last good copy) */
 function svFlushSync(){
-  try{ if(!G || !G.you || !G.members || !G.members.length) return false;
+  try{ if(window.ONUM_IMPORTING) return false; if(!G || !G.you || !G.members || !G.members.length) return false;
     const base = saveCaptureBase(); base.members = G.members.map(stripMesh); base.press = (G.press || []).map(stripMesh); base.civ = (G.civ || []).map(stripMesh); base.you = stripMesh(G.you);
     if(SV.rank != null && careerRank(base) < SV.rank) return false;
     const json = JSON.stringify(base, saveRound);
@@ -41454,6 +41469,7 @@ function loadSave(){
     }
     if(!d) return false;
     Object.assign(G, d);
+    try{ if(localStorage.getItem("longsession.v3.force") === "idb") localStorage.removeItem("longsession.v3.force"); }catch(e){}
     if(G.fullDetail === undefined || G.fullDetail === null) G.fullDetail = true;
     if(!G.gfx || (G.gfx !== "best" && G.gfx !== "balanced" && G.gfx !== "simple")){
       G.gfx = (G.simple === true) ? "simple" : "best";
@@ -41535,11 +41551,39 @@ function downloadNamed(name, text){
 function exportCareerSave(){
   const d = careerSnapshot();
   if(!d || !d.you){ note("There is no career save to export.", true); return; }
+  const name = "one-nation-under-me-day" + (d.day || "x") + ".json";
   let raw;
   try{ raw = JSON.stringify(d); }catch(e){ note("Could not write the career file.", true); return; }
-  const name = "one-nation-under-me-day" + (d.day || "x") + ".json";
-  downloadNamed(name, raw);
-  note("Career exported, day " + (d.day || "?") + ". If the browser did not save it, use the gold Download link.", false);
+  const file = new File([raw], name, {type:"application/json"});
+  const link = () => {
+    downloadNamed(name, raw);
+    note("Career exported, day " + (d.day || "?") + ". If the browser did not save it, tap the gold Download link.", false);
+  };
+  const share = () => {
+    try{
+      if(navigator.share && navigator.canShare && navigator.canShare({files:[file]})){
+        navigator.share({files:[file], title:name}).then(() => {
+          note("Career exported, day " + (d.day || "?") + ". Save it into Files.", false);
+        }).catch(err => { if(err && err.name === "AbortError") return; link(); });
+        return;
+      }
+    }catch(e){}
+    link();
+  };
+  if(typeof window.showSaveFilePicker === "function"){
+    let pick;
+    try{
+      pick = window.showSaveFilePicker({suggestedName:name, types:[{description:"Career save", accept:{"application/json":[".json"]}}]});
+    }catch(e){ share(); return; }
+    pick.then(h => {
+      if(!h || typeof h.createWritable !== "function"){ share(); return; }
+      return h.createWritable().then(w => w.write(new Blob([raw], {type:"application/json"})).then(() => w.close())).then(() => {
+        note("Career saved to the file you chose, day " + (d.day || "?") + ".", false);
+      });
+    }).catch(err => { if(err && err.name === "AbortError"){ note("Export cancelled.", false); return; } share(); });
+    return;
+  }
+  share();
 }
 function careerFromText(text){
   let t = String(text || "").replace(/^\uFEFF/, "").trim();
@@ -41549,9 +41593,16 @@ function careerFromText(text){
     if(!j) throw new Error("That save file is damaged.");
     t = j;
   }
-  const d = (typeof t === "string") ? JSON.parse(t) : t;
+  let d;
+  try{ d = (typeof t === "string") ? JSON.parse(t) : t; }
+  catch(e){
+    const i = t.indexOf("{"), j = t.lastIndexOf("}");
+    if(i < 0 || j <= i) throw new Error("That file is not a career save. It needs you and the House.");
+    d = JSON.parse(t.slice(i, j + 1));
+  }
+  if(typeof d === "string"){ try{ d = JSON.parse(d); }catch(e){} }
   if(d && d.you && Array.isArray(d.members) && d.members.length) return d;
-  if(d && d.career && d.career.you && Array.isArray(d.career.members)) return d.career;
+  if(d && d.career && d.career.you && Array.isArray(d.career.members) && d.career.members.length) return d.career;
   throw new Error("That file is not a career save. It needs you and the House.");
 }
 function idbPutCareer(raw){
@@ -41563,6 +41614,7 @@ function idbPutCareer(raw){
           tx.objectStore("s").put(raw, "career");
           tx.oncomplete = () => { try{ ENG_IDB.cache = raw; ENG_IDB.db = db; }catch(e){} res(true); };
           tx.onerror = () => res(false);
+          tx.onabort = () => res(false);
         }catch(e){ res(false); }
       };
       if(ENG_IDB.db) return finish(ENG_IDB.db);
@@ -41574,10 +41626,25 @@ function idbPutCareer(raw){
   });
 }
 function whenCareerReady(cb){
-  const ready = () => { try{ return !!pickNewestSave(); }catch(e){ return false; } };
-  if(ready()){ cb(true); return; }
-  let n = 0;
-  const t = setInterval(() => { n++; if(ready() || n > 30){ clearInterval(t); cb(ready()); } }, 100);
+  const go = () => {
+    let n = 0;
+    const tick = () => {
+      let ok = false;
+      try{ ok = !!pickNewestSave(); }catch(e){}
+      if(ok || n++ > 15) cb(!!ok);
+      else setTimeout(tick, 100);
+    };
+    tick();
+  };
+  try{
+    if(ENG_IDB && ENG_IDB.ready && typeof ENG_IDB.ready.then === "function"){
+      let done = false;
+      const t = setTimeout(() => { if(!done){ done = true; go(); } }, 4500);
+      ENG_IDB.ready.then(() => { if(!done){ done = true; clearTimeout(t); go(); } }, () => { if(!done){ done = true; clearTimeout(t); go(); } });
+      return;
+    }
+  }catch(e){}
+  go();
 }
 function importCareerSave(file){
   if(!file) return;
@@ -41588,29 +41655,66 @@ function importCareerSave(file){
       d = careerFromText(String(reader.result || ""));
       payload = JSON.stringify(d);
     }catch(e){ note((e && e.message) || "Could not read that career save.", true); return; }
+    window.ONUM_IMPORTING = true;
     idbPutCareer(payload).then(idbOk => {
       let lsOk = false;
-      try{ if(payload.length < 4500000) lsOk = !!storeCareer(payload); }catch(e){}
-      if(!idbOk && !lsOk){ note("This browser has no room for that career. Clear site data for this page and try again.", true); return; }
-      try{ localStorage.setItem("longsession.v3.pointer", "idb"); }catch(e){}
+      if(payload.length < 4200000){
+        try{ lsOk = !!storeCareer(payload); }catch(e){}
+      }
+      if(idbOk){
+        try{
+          if(payload.length >= 4200000){
+            localStorage.removeItem("longsession.v3");
+            localStorage.removeItem("longsession.v3.backup");
+            localStorage.removeItem("longsession.v3.best");
+          }
+          localStorage.setItem("longsession.v3.force", "idb");
+          localStorage.setItem("longsession.v3.pointer", "idb");
+        }catch(e){}
+      }
+      if(!idbOk && !lsOk){
+        window.ONUM_IMPORTING = false;
+        note("This browser has no room for that career. Clear site data for this page and try again.", true);
+        return;
+      }
       note("Career imported, day " + (d.day || "?") + ". Reloading.", false);
-      setTimeout(() => { try{ location.reload(); }catch(e){} }, 350);
+      setTimeout(() => { try{ location.reload(); }catch(e){} }, 400);
     });
   };
   reader.onerror = () => note("Could not read that file.", true);
   reader.readAsText(file);
 }
 window.onumPickCareer = function(){
-  let inp = document.getElementById("onumCareerFile");
-  if(!inp){
-    inp = document.createElement("input");
-    inp.type = "file"; inp.id = "onumCareerFile";
-    inp.accept = ".json,.txt,application/json,text/plain";
-    inp.style.cssText = "position:fixed;left:0;top:0;width:1px;height:1px;opacity:0.02";
-    inp.addEventListener("change", () => { const f = inp.files && inp.files[0]; inp.value = ""; if(f) importCareerSave(f); });
-    document.body.appendChild(inp);
+  const take = f => { if(f) importCareerSave(f); };
+  if(typeof window.showOpenFilePicker === "function"){
+    let pick;
+    try{
+      pick = window.showOpenFilePicker({multiple:false, types:[{description:"Career save", accept:{"application/json":[".json"], "text/plain":[".txt"]}}]});
+    }catch(e){ pick = null; }
+    if(pick){
+      pick.then(hs => hs && hs[0] && hs[0].getFile()).then(take).catch(err => {
+        if(err && err.name === "AbortError") return;
+        onumCareerInput();
+      });
+      return;
+    }
   }
-  try{ inp.click(); }catch(e){ note("The file window did not open. Try the menu again.", true); }
+  onumCareerInput();
+  function onumCareerInput(){
+    let inp = document.getElementById("onumCareerFile");
+    if(!inp){
+      inp = document.createElement("input");
+      inp.type = "file"; inp.id = "onumCareerFile";
+      inp.accept = ".json,.txt,application/json,text/plain,*/*";
+      inp.style.cssText = "position:fixed;left:0;top:0;width:100%;height:100%;opacity:0.01;z-index:2147483000";
+      inp.addEventListener("change", () => { const f = inp.files && inp.files[0]; inp.value = ""; inp.style.display = "none"; take(f); });
+      inp.addEventListener("cancel", () => { inp.style.display = "none"; });
+      document.body.appendChild(inp);
+    }
+    inp.style.display = "block";
+    try{ inp.click(); }catch(e){ note("The file window did not open. Try the menu again.", true); }
+    setTimeout(() => { try{ if(inp) inp.style.display = "none"; }catch(e){} }, 120000);
+  }
 };
 
 /* ══════════════════════════════════════════════════════════
@@ -49850,9 +49954,10 @@ function ss2MaybeHeckle(sp){ if(!chance(0.18) || Date.now() - SS2.lastIj < 6000)
 ssnTick = function(){
   try{
     if(!G || !G.you){ if(SSN) ssnClose(); return; }
+    if(window.ONUM_SIT_HELD && window.ONUM_SIT_HELD !== G.room) window.ONUM_SIT_HELD = "";
     const cardUp = typeof veil !== "undefined" && veil && !veil.hidden; if(cardUp || document.hidden) return;
     const want = SSN_ROOM[G.room];
-    if(!SSN && want && (want[0] !== "executive" || (ss2YouChair(want[1]) && hereNow().filter(p => p && p !== G.you && !p.gone).length >= 2))) ssnOpen({gov:want[0], kind:want[1], room:G.room});
+    if(!SSN && want && window.ONUM_SIT_HELD !== G.room && (want[0] !== "executive" || (ss2YouChair(want[1]) && hereNow().filter(p => p && p !== G.you && !p.gone).length >= 2))) ssnOpen({gov:want[0], kind:want[1], room:G.room});
     else if(SSN && SSN.room && SSN.room !== G.room){ ssnClose(); return; }  /* 20261030i: leave room ends session (incl. press auto:false) */
     if(!SSN) return; const st = ssnStage(); if(st.id === "adjourn") return;
     if(SS2.hold){ if(Date.now() - SS2.holdAt > 1000 * 60 * 30) SS2.hold = false; else return; }   /* typing freezes the floor and the stage */
@@ -53139,10 +53244,10 @@ armFrame();
     "body.mt-on #ndSess .nsx-seat{cursor:pointer}body.mt-on #ndSess .nsx-q li{cursor:pointer}" +
     "body.mt-on #ndSess .nsx-acts{display:none!important}" +
     "#mtOne{display:none}#mtOne.on{display:flex;flex-direction:column;position:fixed;left:8px;right:8px;bottom:8px;z-index:10070;max-height:min(78vh,640px);overflow:auto;background:#121419;color:#f4f1e8;border:2px solid #c9a24a;border-radius:10px;box-shadow:0 8px 28px #000;padding:8px 10px 10px;font:14px/1.35 system-ui,sans-serif}" +
-    "#mtOne .mt-head{display:flex;align-items:center;justify-content:space-between;gap:8px;font:700 16px Georgia,serif;color:#ffe08a;text-transform:capitalize;margin:0 0 4px}" +
+    "#mtOne .mt-head{display:flex;align-items:center;justify-content:space-between;gap:8px;font:700 16px Georgia,serif;color:#ffe08a;text-transform:capitalize;margin:0 0 4px;position:sticky;top:0;z-index:3;background:#121419}" +
     "#mtOne .mt-title{flex:1;min-width:0}" +
     "#mtOne .mt-x,#onumX{width:44px;height:44px;flex:none;border:2px solid #c9a24a;background:#2a2d35;color:#ffe08a;border-radius:8px;font:700 22px/1 system-ui;cursor:pointer}" +
-    "#onumX{position:fixed;top:8px;right:8px;z-index:12000}" +
+    "#onumX{position:fixed;top:max(8px, env(safe-area-inset-top));right:max(8px, env(safe-area-inset-right));z-index:2147483000;width:48px;height:48px}" +
     "#onumX[hidden]{display:none!important}" +
     "#mtOne .mt-now{margin:0 0 6px}#mtOne .mt-now b{color:#ffe08a}#mtOne .mt-seats{display:flex;flex-wrap:wrap;gap:4px}" +
     "#mtOne .mt-seat{width:34px;height:34px;border-radius:6px;border:2px solid #000;color:#fff;font:700 11px system-ui;cursor:pointer;padding:0}" +
@@ -53293,6 +53398,7 @@ armFrame();
     show(c, "The chair will hear one member at a time. " + (up() ? sn(up()) + " has been heard." : "The floor is open.") + " Call the next. I am not yielding this chair to repeat them.");
   }
   function endSitting(){
+    try{ window.ONUM_SIT_HELD = (typeof G !== "undefined" && G && G.room) || "held"; }catch(e){ window.ONUM_SIT_HELD = "held"; }
     try{
       if(typeof SSN !== "undefined" && SSN){ let n = 0; while(SSN && ssnStage() && ssnStage().id !== "adjourn" && n < 8){ ssnNext(); n++; } ssnClose(); }
       if(typeof PROC !== "undefined" && PROC && PROC.on){ PROC.on = false; PROC.speaker = null; const pb = document.getElementById("procBar"); if(pb) pb.hidden = true; }
@@ -53323,6 +53429,7 @@ armFrame();
   function colOf(p){ try{ if(p && typeof partyColorNum === "function"){ const n = partyColorNum(p.party); if(n != null) return "#" + (Number(n) >>> 0).toString(16).padStart(6,"0").slice(-6); } }catch(e){} return "#3a3f4b"; }
   function iniOf(p, id){ const n = youId(id) ? "You" : (p && p.name) || "?"; return (String(n).match(/\b\w/g) || ["?"]).slice(0, 2).join("").toUpperCase(); }
   function shutMeet(){
+    try{ window.ONUM_SIT_HELD = (typeof G !== "undefined" && G && G.room) || "held"; }catch(e){ window.ONUM_SIT_HELD = "held"; }
     try{ endSitting(); }catch(e){}
     try{ if(typeof leaveSittingQuiet === "function") leaveSittingQuiet(); }catch(e){}
     try{ window.ONUM_SESSION = {stage:"idle"}; }catch(e){}
@@ -53447,27 +53554,53 @@ armFrame();
       if(id != null){ e.preventDefault(); callOn(id); paint(true); }
     }
   }, true);
+  function shown(id){
+    const e = document.getElementById(id);
+    if(!e || e.hidden) return false;
+    try{ const cs = getComputedStyle(e); if(cs.display === "none" || cs.visibility === "hidden") return false; }catch(err){ return true; }
+    return true;
+  }
   function uiOpen(){
-    const mt = document.getElementById("mtOne");
-    if(document.body.classList.contains("mt-one") && mt && mt.classList.contains("on")) return "meet";
+    if(shown("clPanel")) return "clarity";
+    if(shown("tipCard")) return "tip";
+    if(shown("ndStyle")) return "ndStyle";
+    if(shown("ndFam")) return "ndFam";
+    if(shown("ndPb")) return "ndPb";
+    if(shown("ndAudit")) return "ndAudit";
     const pause = document.getElementById("pauseOverlay");
     if(pause && pause.classList.contains("is-open")) return "pause";
-    const cld = document.getElementById("onumCapitalLedgerDialog");
-    if(cld && !cld.hidden) return "ledger";
+    if(shown("onumCapitalLedgerDialog")) return "ledger";
+    const mt = document.getElementById("mtOne");
+    if(document.body.classList.contains("mt-one") && mt && mt.classList.contains("on")) return "meet";
     try{ if(typeof veil !== "undefined" && veil && !veil.hidden) return "card"; }catch(e){}
     try{ if(typeof TALK !== "undefined" && TALK.open) return "talk"; }catch(e){}
+    if(document.body.classList.contains("ui-open")) return "panels";
+    if(shown("pbPhone")) return "phone";
     const proc = document.getElementById("procBar");
     if(proc && !proc.hidden) return "proc";
+    if(shown("ndFd")) return "desk";
+    if(shown("ndSess")) return "sess";
     return "";
   }
   function shutTop(){
     const k = uiOpen();
-    if(k === "meet"){ shutMeet(); return; }
+    if(k === "clarity"){ try{ if(typeof CL !== "undefined" && CL && typeof CL.close === "function") CL.close(); else { const p = document.getElementById("clPanel"); if(p) p.hidden = true; } }catch(e){} return; }
+    if(k === "tip"){ try{ if(typeof closeTip === "function") closeTip(); else { const t = document.getElementById("tipCard"); if(t) t.hidden = true; } }catch(e){} return; }
+    if(k === "ndStyle" || k === "ndFam" || k === "ndPb" || k === "ndAudit"){ const e = document.getElementById(k); if(e) e.remove(); return; }
     if(k === "pause"){ try{ if(typeof closeSettings === "function") closeSettings(); }catch(e){} return; }
     if(k === "ledger"){ const b = document.querySelector("#onumCapitalLedgerDialog .cld-close"); if(b) b.click(); else { const d = document.getElementById("onumCapitalLedgerDialog"); if(d) d.hidden = true; } return; }
+    if(k === "meet"){ shutMeet(); return; }
     if(k === "card"){ try{ veil.hidden = true; card.classList.remove("card--open"); if(G) G.running = true; }catch(e){} return; }
     if(k === "talk"){ try{ if(typeof closeTalk === "function") closeTalk(); }catch(e){} return; }
-    if(k === "proc"){ try{ if(typeof leaveSittingQuiet === "function") leaveSittingQuiet(); }catch(e){} return; }
+    if(k === "panels"){ try{ if(typeof closePanels === "function") closePanels(); }catch(e){} return; }
+    if(k === "phone"){ try{ if(typeof phoneClose === "function") phoneClose(); }catch(e){} return; }
+    if(k === "proc" || k === "desk" || k === "sess"){
+      try{ window.ONUM_SIT_HELD = (G && G.room) || "held"; }catch(e){}
+      try{ if(typeof leaveSittingQuiet === "function") leaveSittingQuiet(); }catch(e){}
+      try{ const d = document.getElementById("ndFd"); if(d) d.hidden = true; }catch(e){}
+      try{ const s = document.getElementById("ndSess"); if(s) s.hidden = true; }catch(e){}
+      return;
+    }
   }
   const ux = document.createElement("button"); ux.type = "button"; ux.id = "onumX"; ux.hidden = true; ux.textContent = "\u00d7"; ux.title = "Close this"; ux.setAttribute("aria-label", "Close");
   ux.onclick = ev => { ev.preventDefault(); ev.stopPropagation(); shutTop(); };
@@ -53488,7 +53621,7 @@ armFrame();
 
 </script>
 <script>
-/* 20261108h District Ledger: beside the Capitol Ledger. Generated dispatches stay marked as such. */
+/* 20261108i District Ledger: beside the Capitol Ledger. Generated dispatches stay marked as such. */
 (function(){
   'use strict';
 
