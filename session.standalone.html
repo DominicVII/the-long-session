@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261110bs">
+<meta name="onum-build" content="20261110bw">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -54,7 +54,7 @@
   window.onumLimSet = function(k, v){ if(!(k in D)) return false; L[k] = fix(v); try{ var o = JSON.parse(localStorage.getItem("onum.limits") || "{}") || {}; o[k] = (L[k] === INF) ? null : L[k]; localStorage.setItem("onum.limits", JSON.stringify(o)); }catch(e){} return true; };
   window.onumLimReset = function(){ try{ localStorage.removeItem("onum.limits"); }catch(e){} Object.keys(D).forEach(function(k){ L[k] = D[k]; }); L._eff = {}; L._gov = null; return true; };
   var show = function(v){ return v === INF ? "inf" : (typeof v === "number" ? Math.round(v * 100) / 100 : v); };
-  window.onumLimDump = function(){ var out = {build:"20261110bs", mode:L.mode || "scale"}; Object.keys(D).forEach(function(k){ out[k] = show(L[k]); });
+  window.onumLimDump = function(){ var out = {build:"20261110bw", mode:L.mode || "scale"}; Object.keys(D).forEach(function(k){ out[k] = show(L[k]); });
     out.effective = {}; Object.keys(L._eff).forEach(function(k){ out.effective[k] = show(L._eff[k]); }); out.governor = L._gov;
     try{ out.engineBudgetMs = window.onumEngine ? show(window.onumEngine.budget) : null; out.frameMs = window.onumEngine ? show(window.onumEngine.dtEma) : null; }catch(e){} return out; };
   window.onumLimLine = function(){ var d = window.onumLimDump(), e = d.effective, g = function(k){ return e[k] != null ? e[k] + "*" : d[k]; };
@@ -79,7 +79,7 @@
 </script>
 <script>
 (function(){
-  var STAMP = "20261110bs";
+  var STAMP = "20261110bw";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -11384,29 +11384,77 @@ function engUnpack(s0){
 /* the wrapped form is "ONZ1|<hash>|<packed>"; anything else is the old plain JSON */
 function engWrap(json){ try{ const z = engPack(json); if(engUnpack(z) !== json) return json; return "ONZ1|" + engHash(json) + "|" + z; }catch(e){ return json; } }
 function engOpen(raw){ if(!raw || raw.slice(0, 5) !== "ONZ1|") return raw; const a = raw.indexOf("|", 5); const h = raw.slice(5, a); const j = engUnpack(raw.slice(a + 1)); if(engHash(j) !== h) return null; return j; }
-const ENG_IDB = {db:null, cache:null, ready:null};
-ENG_IDB.ready = new Promise(res => {
+/* 20261110bv JUPITER: IndexedDB open+get is async. The title card used to run on
+   the same tick, before get("career") returned, so a late/large career kept only
+   in IDB looked like "no save" and the only button was New career. Wait for the
+   get, refresh the title when it arrives, and keep a small localStorage meta so
+   Continue can name the sitting even before the blob is in memory. */
+const ENG_IDB = {db:null, cache:null, ready:false, waiters:[]};
+function engIdbNotify(){
+  ENG_IDB.ready = true;
+  const ws = ENG_IDB.waiters.splice(0);
+  for(let i = 0; i < ws.length; i++){ try{ ws[i](); }catch(e){} }
+  try{ document.dispatchEvent(new CustomEvent("onum-careers-ready", {detail: (window.ONUM_CAREERS && window.ONUM_CAREERS.peek) ? window.ONUM_CAREERS.peek() : null})); }catch(e){}
+}
+function engIdbWhenReady(fn, ms){
+  if(ENG_IDB.ready){ try{ fn(); }catch(e){} return; }
+  let done = false;
+  const once = () => { if(done) return; done = true; try{ fn(); }catch(e){} };
+  ENG_IDB.waiters.push(once);
+  setTimeout(once, ms == null ? 2000 : ms);
+}
+function engIdbPutAt(key, raw, cb){
   try{
+    if(window.ONUM_IMPORTING && key === "career"){ if(cb) cb(false); return false; }
+    if(!ENG_IDB.db){ if(cb) cb(false); return false; }
+    if(key === "career") ENG_IDB.cache = raw;
+    const req = ENG_IDB.db.transaction("s", "readwrite").objectStore("s").put(raw, key);
+    req.onsuccess = () => { if(cb) cb(true); };
+    req.onerror = () => { if(cb) cb(false); };
+    return true;
+  }catch(e){ if(cb) cb(false); return false; }
+}
+function engIdbGetAt(key, cb){
+  try{
+    if(!ENG_IDB.db){ if(cb) cb(null); return; }
+    const g = ENG_IDB.db.transaction("s").objectStore("s").get(key);
+    g.onsuccess = () => { if(cb) cb(g.result == null ? null : g.result); };
+    g.onerror = () => { if(cb) cb(null); };
+  }catch(e){ if(cb) cb(null); }
+}
+function engIdbOnCareer(raw){
+  ENG_IDB.cache = raw || null;
+  try{ if(raw && typeof svWriteCareerMeta === "function") svWriteCareerMeta(raw); }catch(e){}
+  try{ if(typeof careerIndexMergeIdb === "function") careerIndexMergeIdb(); }catch(e){}
+  engIdbNotify();
+  try{
+    if(document.body.classList.contains("boot-menu") && !G._booting && !G.make && !(G.running && G.you)){
+      if(typeof opening === "function") opening();
+    }
+  }catch(e){}
+}
+try{
+  if(typeof indexedDB === "undefined"){ engIdbNotify(); }
+  else {
     const rq = indexedDB.open("onum-saves", 1);
     rq.onupgradeneeded = () => { try{ if(!rq.result.objectStoreNames.contains("s")) rq.result.createObjectStore("s"); }catch(e){} };
+    rq.onerror = () => { try{ engIdbNotify(); }catch(e){} };
     rq.onsuccess = () => {
       ENG_IDB.db = rq.result;
       try{
         const g = ENG_IDB.db.transaction("s").objectStore("s").get("career");
-        g.onsuccess = () => { ENG_IDB.cache = g.result || null; res(true); };
-        g.onerror = () => res(false);
-      }catch(e){ res(false); }
+        g.onsuccess = () => { engIdbOnCareer(g.result || null); };
+        g.onerror = () => { engIdbOnCareer(null); };
+      }catch(e){ engIdbOnCareer(null); }
     };
-    rq.onerror = () => res(false);
-    setTimeout(() => res(false), 8000);
-  }catch(e){ res(false); }
-});
-function engIdbPut(raw){ try{ if(window.ONUM_IMPORTING) return; if(!ENG_IDB.db) return; ENG_IDB.db.transaction("s", "readwrite").objectStore("s").put(raw, "career"); ENG_IDB.cache = raw; }catch(e){} }
+  }
+}catch(e){ try{ engIdbNotify(); }catch(e2){} }
+function engIdbPut(raw){ try{ if(window.ONUM_IMPORTING) return; if(!ENG_IDB.db) return; ENG_IDB.db.transaction("s", "readwrite").objectStore("s").put(raw, "career"); ENG_IDB.cache = raw; try{ if(typeof svWriteCareerMeta === "function") svWriteCareerMeta(raw); }catch(e2){} }catch(e){} }
 (function(){
   const baseParse = parseSaveRaw;
   parseSaveRaw = function(raw){ try{ return baseParse(engOpen(raw)); }catch(e){ return null; } };
   const baseWrite = writeSaveKey;
-  writeSaveKey = function(key, raw){ const t = performance.now(); const w = (typeof raw === "string" && raw.length > 20000 && raw.charAt(0) === "{") ? engWrap(raw) : raw; const ok = baseWrite(key, w); if(key === SAVE_KEY && ok){ engCost("save-write", performance.now() - t); ENG.lastSave = {plain:raw.length, stored:w.length, at:Date.now()}; engIdbPut(w); } return ok; };
+  writeSaveKey = function(key, raw){ const t = performance.now(); const w = (typeof raw === "string" && raw.length > 20000 && raw.charAt(0) === "{") ? engWrap(raw) : raw; const ok = baseWrite(key, w); if(key === SAVE_KEY && ok){ engCost("save-write", performance.now() - t); ENG.lastSave = {plain:raw.length, stored:w.length, at:Date.now()}; engIdbPut(w); try{ svWriteCareerMeta(raw); }catch(e2){} } return ok; };
   const basePick = pickNewestSave;
   pickNewestSave = function(){ let b = basePick(); try{ const d = ENG_IDB.cache ? parseSaveRaw(ENG_IDB.cache) : null; let force = false; try{ force = localStorage.getItem("longsession.v3.force") === "idb"; }catch(e){} if(d && (force || !b || isBetterSave(d, b))) b = d; }catch(e){} return b; };
 })();
@@ -12838,7 +12886,7 @@ function svRawWrite(key, raw){ try{ localStorage.setItem(key, raw); return true;
 function svDone(base, explicit, wrote){
   if(!wrote){ G._saveFails = (G._saveFails || 0) + 1; const t = Date.now();
     if(!G._saveWarnAt || t - G._saveWarnAt > 120000){ G._saveWarnAt = t; try{ note("The game could not save: this browser's storage is full. Career, then Export career save, keeps your day.", true); }catch(e){} }
-  } else { G._saveFails = 0; G.savedAt = hhmm(); saveCount++; SV.rank = careerRank(base); if(explicit) note("Saved.", false);
+  } else { G._saveFails = 0; G.savedAt = hhmm(); saveCount++; SV.rank = careerRank(base); try{ if(S && S.raw) svWriteCareerMeta(S.raw); else if(base) svWriteCareerMeta(base); }catch(e3){} if(explicit) note("Saved.", false);
     try{ const pip = el("savePip"); if(pip){ pip.classList.add("is-on"); clearTimeout(save._pip); save._pip = setTimeout(() => pip.classList.remove("is-on"), 1200); } }catch(e){} }
   SV.busy = false; svNext();
 }
@@ -12878,7 +12926,7 @@ save = function(explicit, sync){
   const w1 = () => {
     if(window.ONUM_IMPORTING){ SV.busy = false; return; }
     const big = !!(ENG_IDB.db && S.raw.length > onumLimN("lsMaxChars", 2400000)); let ok = big ? false : svRawWrite(SAVE_KEY, S.raw);
-    if(!ok && !big){ for(const k of [SAVE_BEST_KEY, SAVE_BACKUP_KEY]){ try{ localStorage.removeItem(k); }catch(e){} ok = svRawWrite(SAVE_KEY, S.raw); if(ok) break; } }
+    if(!ok && !big){ careerFreeQuota(); ok = svRawWrite(SAVE_KEY, S.raw); }
     if(!ok && ENG_IDB.db && !window.ONUM_IMPORTING){ try{ engIdbPut(S.raw); ok = true; if(!G._idbOnly){ G._idbOnly = 1; note("Saved to the browser's larger store (the small one is full). Your career is kept.", false); } }catch(e){} }   /* a career too big for localStorage still saves */
     if(!ok) return svDone(S.base, S.explicit, false);
     SV.lastBody = S.body; try{ ENG.lastSave = {plain:S.json.length, stored:S.raw.length, at:Date.now()}; }catch(e){}
@@ -12900,7 +12948,7 @@ function svFlushSync(){
     let raw = json;
     if(!ok){ raw = engWrap(json); ok = svRawWrite(SAVE_KEY, raw); }
     try{ engIdbPut(raw); }catch(e){}
-    if(ok) SV.rank = careerRank(base);
+    if(ok){ SV.rank = careerRank(base); try{ svWriteCareerMeta(raw); }catch(e2){} }
     return ok;
   }catch(e){ return false; }
 }
@@ -42071,6 +42119,9 @@ const TLSCollab = (function(){
 const SAVE_KEY = "longsession.v3";
 const SAVE_BACKUP_KEY = "longsession.v3.backup";
 const SAVE_BEST_KEY = "longsession.v3.best";
+const SAVE_META_KEY = "longsession.v3.meta";
+const SAVE_CAREERS_INDEX = "longsession.v3.careers";
+const SAVE_ARCHIVE_PREFIX = "onum_career_archive_";
 function careerRank(d){
   if(!d || !d.you) return -1;
   const cong = +(d.congress || 1);
@@ -42117,11 +42168,8 @@ function saveRound(k, v){ return (typeof v === "number" && isFinite(v) && v % 1 
 function storeCareer(payload){
   let ok = writeSaveKey(SAVE_KEY, payload);
   if(!ok){
-    for(const k of [SAVE_BEST_KEY, SAVE_BACKUP_KEY]){
-      try{ localStorage.removeItem(k); }catch(e){}
-      ok = writeSaveKey(SAVE_KEY, payload);
-      if(ok) break;
-    }
+    careerFreeQuota();
+    ok = writeSaveKey(SAVE_KEY, payload);
   }
   if(ok){
     writeSaveKey(SAVE_BACKUP_KEY, payload);                         /* a second copy, if it fits */
@@ -42130,10 +42178,292 @@ function storeCareer(payload){
   return ok;
 }
 function wipeCareerSaves(){
-  [SAVE_KEY, SAVE_BACKUP_KEY, SAVE_BEST_KEY].forEach(k => {
-    try{ localStorage.removeItem(k); }catch(e){}
+  /* 20261110bv JUPITER: a career is never deleted. Older callers used this
+     to clear the active slot before a new oath; that path now archives and
+     leaves the blob in place. This function is a no-op on purpose. */
+}
+
+function svWriteCareerMeta(rawOrData){
+  try{
+    let d = rawOrData;
+    if(typeof d === "string") d = parseSaveRaw(d);
+    if(!d || !d.you){
+      if(typeof G !== "undefined" && G && G.you) d = {you:G.you, day:G.day, congress:G.congress, country:G.country, room:G.room, minute:G.minute, savedAtMs:Date.now()};
+      else return false;
+    }
+    const slot = (arguments.length > 1 && arguments[1]) ? arguments[1] : "career";
+    const meta = {
+      name: d.you && d.you.name,
+      day: d.day || 1,
+      rank: careerRank(d),
+      slot: slot,
+      congress: d.congress || 1,
+      country: d.country || null,
+      room: d.room || "office",
+      minute: d.minute || 0,
+      savedAtMs: d.savedAtMs || Date.now(),
+      bytes: (typeof rawOrData === "string") ? rawOrData.length : 0
+    };
+    localStorage.setItem(SAVE_META_KEY, JSON.stringify(meta));
+    return true;
+  }catch(e){ return false; }
+}
+function peekCareerMeta(){
+  try{
+    const m = JSON.parse(localStorage.getItem(SAVE_META_KEY) || "null");
+    if(m && (m.name || m.day || m.slot || m.rank)) return m;
+  }catch(e){}
+  return null;
+}
+function pickNewestRaw(){
+  const cands = [];
+  const push = (raw, src) => {
+    if(!raw) return;
+    let d = null;
+    try{ d = parseSaveRaw(raw); }catch(e){ d = null; }
+    if(d) cands.push({raw:raw, d:d, src:src});
+  };
+  try{ push(localStorage.getItem(SAVE_KEY), SAVE_KEY); }catch(e){}
+  try{ push(localStorage.getItem(SAVE_BACKUP_KEY), SAVE_BACKUP_KEY); }catch(e){}
+  try{ push(localStorage.getItem(SAVE_BEST_KEY), SAVE_BEST_KEY); }catch(e){}
+  try{ if(ENG_IDB && ENG_IDB.cache) push(ENG_IDB.cache, "idb:career"); }catch(e){}
+  if(!cands.length) return null;
+  let best = cands[0];
+  for(let i = 1; i < cands.length; i++) if(isBetterSave(cands[i].d, best.d)) best = cands[i];
+  return best;
+}
+function careerSlug(name){
+  return String(name || "career").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "career";
+}
+function careerArchiveId(name){
+  const iso = new Date().toISOString().replace(/[:.]/g, "-");
+  return SAVE_ARCHIVE_PREFIX + iso + "_" + careerSlug(name);
+}
+let CAREER_INDEX_MEM = [];
+function careerIndexRead(){
+  let idx = [];
+  try{ idx = JSON.parse(localStorage.getItem(SAVE_CAREERS_INDEX) || "[]"); }catch(e){ idx = []; }
+  if(!Array.isArray(idx)) idx = [];
+  const seen = {};
+  const out = [];
+  const add = (x) => { if(x && x.id && !seen[x.id]){ seen[x.id] = 1; out.push(x); } };
+  idx.forEach(add);
+  CAREER_INDEX_MEM.forEach(add);
+  return out;
+}
+function careerIndexWrite(idx){
+  CAREER_INDEX_MEM = Array.isArray(idx) ? idx.slice() : [];
+  try{ localStorage.setItem(SAVE_CAREERS_INDEX, JSON.stringify(CAREER_INDEX_MEM)); }catch(e){}
+  try{ engIdbPutAt("careers", JSON.stringify(CAREER_INDEX_MEM)); }catch(e){}
+}
+function careerIndexMergeIdb(){
+  engIdbGetAt("careers", function(raw){
+    if(!raw) return;
+    let extra = raw;
+    try{ if(typeof extra === "string") extra = JSON.parse(extra); }catch(e){ return; }
+    if(!Array.isArray(extra) || !extra.length) return;
+    const idx = careerIndexRead();
+    const seen = {};
+    idx.forEach(x => { if(x && x.id) seen[x.id] = 1; });
+    extra.forEach(x => { if(x && x.id && !seen[x.id]) idx.push(x); });
+    careerIndexWrite(idx);
   });
 }
+function careerScanLocalArchives(idx){
+  const out = (idx || careerIndexRead()).slice();
+  const seen = {};
+  out.forEach(x => { if(x && x.id) seen[x.id] = 1; });
+  try{
+    for(let i = 0; i < localStorage.length; i++){
+      const k = localStorage.key(i);
+      if(!k || k.indexOf(SAVE_ARCHIVE_PREFIX) !== 0 || seen[k]) continue;
+      let d = null;
+      try{ d = parseSaveRaw(localStorage.getItem(k)); }catch(e){}
+      out.push({id:k, name:d && d.you && d.you.name, day:d && d.day, congress:d && d.congress, bytes:(localStorage.getItem(k) || "").length, source:"scan"});
+      seen[k] = 1;
+    }
+  }catch(e){}
+  return out;
+}
+function careerArchiveCurrent(reason, cb){
+  const done = (res) => { if(typeof cb === "function") try{ cb(res); }catch(e){} return res; };
+  const run = () => {
+    const picked = pickNewestRaw();
+    if(!picked || !picked.raw) return done({ok:true, empty:true});
+    const d = picked.d;
+    const id = careerArchiveId(d && d.you && d.you.name);
+    const raw = picked.raw;
+    let lsOk = false;
+    try{ localStorage.setItem(id, raw); lsOk = localStorage.getItem(id) === raw; }catch(e){}
+    const entry = {
+      id:id,
+      name:d.you && d.you.name,
+      day:d.day || 1,
+      rank:careerRank(d),
+      congress:d.congress || 1,
+      savedAtMs:d.savedAtMs || Date.now(),
+      bytes:raw.length,
+      reason:reason || "archive",
+      source:picked.src,
+      stamp:"20261110bv"
+    };
+    const commit = (idbOk, verified) => {
+      if(!verified) return done({ok:false, why:"no-store", id:id, lsOk:lsOk, idbOk:!!idbOk});
+      const idx = careerIndexRead().filter(x => x && x.id !== id);
+      idx.unshift(entry);
+      careerIndexWrite(idx);
+      try{ svWriteCareerMeta(d, id); }catch(e){}
+      return done({ok:true, id:id, entry:entry, lsOk:lsOk, idbOk:!!idbOk, verified:true, raw:raw});
+    };
+    const finish = (idbOk) => {
+      if(lsOk){
+        let same = false;
+        try{ same = localStorage.getItem(id) === raw; }catch(e){}
+        if(same) return commit(idbOk, true);
+      }
+      if(idbOk){
+        engIdbGetAt(id, function(got){ commit(true, got === raw); });
+        return;
+      }
+      return commit(false, false);
+    };
+    let issued = false;
+    try{ issued = !!engIdbPutAt(id, raw, function(ok){ finish(ok); }); }catch(e){ issued = false; }
+    if(!issued) finish(false);
+  };
+  if(typeof ENG_IDB === "undefined" || ENG_IDB.ready) return run();
+  engIdbWhenReady(run, 2000);
+}
+function careerReadArchiveRaw(id, cb){
+  let raw = null;
+  try{ raw = localStorage.getItem(id); }catch(e){}
+  if(raw){ if(cb) cb(raw); return; }
+  engIdbGetAt(id, function(v){ if(cb) cb(v || null); });
+}
+function careerWriteActiveRaw(raw, cb){
+  let lsOk = false;
+  try{ lsOk = !!writeSaveKey(SAVE_KEY, raw); }catch(e){}
+  if(lsOk){ try{ writeSaveKey(SAVE_BACKUP_KEY, raw); }catch(e){} }
+  try{ svWriteCareerMeta(raw); }catch(e){}
+  try{ if(typeof ENG_IDB !== "undefined") ENG_IDB.cache = raw; }catch(e){}
+  let issued = false;
+  try{ issued = !!engIdbPutAt("career", raw, function(idbOk){ if(cb) cb(!!(lsOk || idbOk)); }); }catch(e){ issued = false; }
+  if(!issued){ if(cb) cb(!!lsOk); }
+}
+function careerRestore(id, cb){
+  const done = (res) => { if(typeof cb === "function") try{ cb(res); }catch(e){} return res; };
+  if(!id) return done({ok:false, why:"no-id"});
+  careerArchiveCurrent("before-restore", function(a){
+    if(!a || !a.ok) return done({ok:false, why:"could-not-archive-current"});
+    careerReadArchiveRaw(id, function(raw){
+      if(!raw) return done({ok:false, why:"missing", id:id});
+      careerWriteActiveRaw(raw, function(ok){
+        done({ok:!!ok, id:id, bytes:raw.length, raw:raw});
+      });
+    });
+  });
+}
+
+function careerKeyProtected(k){
+  /* 20261110bv: never evict an archive, the careers index, or the sidecar to free quota. */
+  if(!k) return false;
+  if(k === SAVE_META_KEY || k === SAVE_CAREERS_INDEX) return true;
+  if(k.indexOf(SAVE_ARCHIVE_PREFIX) === 0) return true;
+  return false;
+}
+function careerFreeQuota(){
+  for(const k of [SAVE_BEST_KEY, SAVE_BACKUP_KEY]){
+    if(careerKeyProtected(k)) continue;
+    try{ localStorage.removeItem(k); }catch(e){}
+  }
+}
+function careerWipeActive(){
+  /* Active slot only, and only after a verified archive. Archives stay. */
+  [SAVE_KEY, SAVE_BACKUP_KEY, SAVE_BEST_KEY].forEach(k => {
+    if(careerKeyProtected(k)) return;
+    try{ localStorage.removeItem(k); }catch(e){}
+  });
+  try{
+    if(typeof ENG_IDB !== "undefined" && ENG_IDB.db){
+      ENG_IDB.db.transaction("s", "readwrite").objectStore("s").delete("career");
+      ENG_IDB.cache = null;
+    }
+  }catch(e){}
+  try{
+    const idx = careerIndexRead();
+    const m = peekCareerMeta() || {};
+    if(idx[0] && idx[0].id){
+      m.slot = idx[0].id;
+      if(idx[0].name) m.name = m.name || idx[0].name;
+      if(idx[0].day) m.day = m.day || idx[0].day;
+      if(idx[0].rank != null) m.rank = m.rank || idx[0].rank;
+      localStorage.setItem(SAVE_META_KEY, JSON.stringify(m));
+    }
+  }catch(e){}
+}
+function careerClearWipe(){
+  try{ if(typeof G !== "undefined" && G){ G._wipeOnOath = false; G._freshOk = false; } }catch(e){}
+  return true;
+}
+function careerLoad(slotId, cb){
+  const done = (res) => { if(typeof cb === "function") try{ cb(res); }catch(e){} return res; };
+  const apply = (raw, slot) => {
+    const d = parseSaveRaw(raw);
+    if(!d) return done({ok:false, why:"parse", slot:slot});
+    return done({ok:true, slot:slot, raw:raw, data:d, peek:{name:d.you && d.you.name, day:d.day || 1, rank:careerRank(d), slot:slot}});
+  };
+  const id = slotId || (peekCareerMeta() && peekCareerMeta().slot) || "career";
+  if(id === "career" || id === "active" || id === SAVE_KEY){
+    const p = pickNewestRaw();
+    if(p && p.raw) return apply(p.raw, p.src || "career");
+    const meta = peekCareerMeta();
+    if(meta && meta.slot && meta.slot !== "career" && meta.slot !== "active") return careerLoad(meta.slot, cb);
+    return done({ok:false, why:"empty"});
+  }
+  if(id === SAVE_BACKUP_KEY || id === SAVE_BEST_KEY){
+    let raw = null;
+    try{ raw = localStorage.getItem(id); }catch(e){}
+    if(raw) return apply(raw, id);
+    return done({ok:false, why:"empty", slot:id});
+  }
+  careerReadArchiveRaw(id, function(raw){
+    if(!raw) return done({ok:false, why:"missing", slot:id});
+    apply(raw, id);
+  });
+}
+function careerOnReady(cb){
+  const fire = () => { try{ if(typeof cb === "function") cb(window.ONUM_CAREERS); }catch(e){} };
+  engIdbWhenReady(fire, 2000);
+}
+
+window.ONUM_CAREERS = {
+  stamp:"20261110bv",
+  peek: function(){ return peekCareerMeta() || peekSave(); },
+  list: function(cb){
+    const archives = careerScanLocalArchives(careerIndexRead());
+    const out = {stamp:"20261110bv", active:peekSave(), archives:archives};
+    if(typeof cb === "function") cb(out);
+    return out;
+  },
+  load: function(slotId, cb){ return careerLoad(slotId, cb); },
+  archiveCurrent: function(cb){ return careerArchiveCurrent("api", cb); },
+  restore: function(slotId, cb){ return careerRestore(slotId, cb); },
+  onReady: function(cb){ return careerOnReady(cb); },
+  clearWipe: function(){
+    careerClearWipe();
+    return {ok:true, wipeOnOath:!!(typeof G!=="undefined" && G && G._wipeOnOath), freshOk:!!(typeof G!=="undefined" && G && G._freshOk)};
+  },
+  _qaSetWipe: function(v){ try{ if(!G) return false; G._wipeOnOath = !!v; G._freshOk = !!v; return true; }catch(e){ return false; } },
+  /* aliases */
+  current: function(){ return peekCareerMeta() || peekSave(); },
+  archive: function(reason, cb){ return careerArchiveCurrent(reason || "manual", cb); },
+  ready: function(cb){ return careerOnReady(cb); },
+  activeRaw: function(){ const p = pickNewestRaw(); return p ? p.raw : null; },
+  readRaw: function(id, cb){ return careerReadArchiveRaw(id, cb); },
+  writeActive: function(raw, cb){ return careerWriteActiveRaw(raw, cb); },
+  wipeActive: function(){ return careerWipeActive(); },
+  freeQuota: function(){ return careerFreeQuota(); }
+};
 let saveBusy = false, saveCount = 0, saveQueued = false;
 function queueSave(explicit){
   if(explicit){ try{ return save(true); }catch(e){ return false; } }
@@ -42495,6 +42825,12 @@ function whenCareerReady(cb){
       let done = false;
       const t = setTimeout(() => { if(!done){ done = true; go(); } }, 4500);
       ENG_IDB.ready.then(() => { if(!done){ done = true; clearTimeout(t); go(); } }, () => { if(!done){ done = true; clearTimeout(t); go(); } });
+      return;
+    }
+  }catch(e){}
+  try{
+    if(typeof engIdbWhenReady === "function" && typeof ENG_IDB !== "undefined" && !ENG_IDB.ready){
+      engIdbWhenReady(go, 2000);
       return;
     }
   }catch(e){}
@@ -44708,10 +45044,132 @@ function frameBody(now, draw){
   if(_prof){ _prof.mark("ui"); _prof.end(true); }
 }
 
+function titleEsc(s){ return String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&"+"amp;","<":"&"+"lt;",">":"&"+"gt;",'"':"&"+"quot;"}[c])); }
+function titlePeek(){
+  try{ if(window.ONUM_CAREERS && window.ONUM_CAREERS.peek){ const p = window.ONUM_CAREERS.peek(); if(p && (p.name || p.day || p.slot || p.rank)) return p; } }catch(e){}
+  try{ return peekSave(); }catch(e){ return null; }
+}
+function titleCareersReady(){
+  try{ if(window.__onumCareersReady) return true; }catch(e){}
+  try{ if(typeof ENG_IDB !== "undefined" && ENG_IDB && ENG_IDB.ready) return true; }catch(e){}
+  return false;
+}
+function titleArchiveCount(){
+  try{
+    if(window.ONUM_CAREERS && window.ONUM_CAREERS.list){
+      const L = window.ONUM_CAREERS.list();
+      return (L && L.archives && L.archives.length) || 0;
+    }
+  }catch(e){}
+  return 0;
+}
+function titleClearWipeAndOpen(){
+  try{ if(window.ONUM_CAREERS && window.ONUM_CAREERS.clearWipe) window.ONUM_CAREERS.clearWipe(); else careerClearWipe(); }catch(e){}
+  try{ if(typeof G !== "undefined" && G) G.make = null; }catch(e){}
+  try{ veil.classList.remove("veil--make"); }catch(e){}
+  opening();
+}
+function titleBindReady(){
+  if(window.__onumTitleReadyBound) return;
+  window.__onumTitleReadyBound = true;
+  const refresh = () => {
+    window.__onumCareersReady = true;
+    try{
+      if(typeof G !== "undefined" && G){
+        if(G._booting) return;
+        if(G.make) return;
+        if(G.running && G.you && G.members && G.members.length) return;
+      }
+      if(!document.body.classList.contains("boot-menu")) return;
+      if(typeof veil !== "undefined" && veil && veil.hidden) return;
+      if(el("freshBack") || el("freshYes") || el("bootArchBack") || el("bootArchYes") || el("mkGo") || el("mkNameBack") || el("sortedBack")) return;
+      const h = card && card.querySelector("h1");
+      const looking = !!(h && /Looking for your career/.test(h.textContent || ""));
+      const onTitle = !!(el("cont") || el("fresh") || looking);
+      if(onTitle) opening();
+    }catch(e){}
+  };
+  try{ document.addEventListener("onum-careers-ready", refresh); }catch(e){}
+  try{ if(window.ONUM_CAREERS && window.ONUM_CAREERS.onReady) window.ONUM_CAREERS.onReady(refresh); }catch(e){}
+}
+function titleShowArchives(){
+  let list = {active:null, archives:[]};
+  try{ if(window.ONUM_CAREERS && window.ONUM_CAREERS.list) list = window.ONUM_CAREERS.list(); }catch(e){}
+  const archives = (list && list.archives) || [];
+  document.body.classList.add("boot-menu");
+  card.classList.add("card--open");
+  try{ veil.classList.remove("veil--make"); }catch(e){}
+  veil.hidden = false;
+  const rows = archives.map(a => {
+    const id = titleEsc(a && a.id || "");
+    const label = titleEsc((a && a.name || "Career") + (a && a.day ? " · day " + a.day : "") + (a && a.congress ? " · Congress " + a.congress : ""));
+    return '<button class="btn btn--ghost" type="button" data-arch="' + id + '" style="display:block;width:100%;text-align:left;margin:4px 0">' + label + '</button>';
+  }).join("");
+  card.innerHTML =
+    '<div class="eyebrow">Earlier careers</div>' +
+    '<h1>Your saved sittings</h1>' +
+    '<p>These careers stay saved. Restoring one first archives the career you are on now, so nothing is lost.</p>' +
+    '<div class="boot-arch-list">' + (rows || '<p class="muted">No earlier careers in this browser.</p>') + '</div>' +
+    '<div class="card__actions"><button class="btn" type="button" id="bootArchBack">Back</button></div>';
+  const bb = el("bootArchBack");
+  if(bb) bb.onclick = (ev) => { try{ ev.preventDefault(); ev.stopPropagation(); }catch(e){} opening(); };
+  card.querySelectorAll("[data-arch]").forEach(b => b.addEventListener("click", (ev) => {
+    try{ ev.preventDefault(); ev.stopPropagation(); }catch(e){}
+    const id = b.getAttribute("data-arch");
+    const entry = archives.filter(x => x && x.id === id)[0] || {id:id};
+    titleConfirmRestore(entry);
+  }));
+  try{ markPicks(); }catch(e){}
+  try{ if(bb) bb.focus(); }catch(e){}
+}
+function titleConfirmRestore(entry){
+  const name = (entry && entry.name) || "this career";
+  const day = (entry && entry.day) || "";
+  card.innerHTML =
+    '<div class="eyebrow">Earlier careers</div>' +
+    '<h1>Restore this career?</h1>' +
+    '<p><strong>' + titleEsc(name) + '</strong>' + (day ? ' (day <strong>' + titleEsc(String(day)) + '</strong>)' : '') +
+      ' will become the sitting you continue. Your current career is archived first and kept, and you can return to it any time.</p>' +
+    '<div class="card__actions">' +
+      '<button class="btn" type="button" id="bootArchBack">Back</button>' +
+      '<button class="btn btn--ghost" type="button" id="bootArchYes" data-noenter>Yes, restore this career</button></div>';
+  const bb = el("bootArchBack"), by = el("bootArchYes");
+  if(bb) bb.onclick = (ev) => { try{ ev.preventDefault(); ev.stopPropagation(); }catch(e){} titleShowArchives(); };
+  if(by) by.onclick = (ev) => {
+    try{ ev.preventDefault(); ev.stopPropagation(); }catch(e){}
+    if(by._busy) return;
+    by._busy = true;
+    try{ by.disabled = true; }catch(e){}
+    try{
+      window.ONUM_CAREERS.restore(entry.id, function(res){
+        if(!res || !res.ok){
+          by._busy = false;
+          try{ by.disabled = false; }catch(e){}
+          try{
+            const p = card.querySelector("p");
+            if(p) p.textContent = (res && res.why === "could-not-archive-current")
+              ? "Could not archive the current career first, so nothing was moved. Export it from Settings, then try again. Back returns to the list; the career is still there."
+              : "Could not restore that career. It is still in the list. Nothing was moved. Back returns to Earlier careers.";
+          }catch(e){}
+          return;
+        }
+        try{ cardActContinue(); }catch(e){ showContinueBroken(e); }
+      });
+    }catch(e){
+      by._busy = false;
+      try{ by.disabled = false; }catch(e2){}
+      try{
+        const p = card.querySelector("p");
+        if(p) p.textContent = "Could not restore that career. It is still in the list. Nothing was moved. Back returns to Earlier careers.";
+      }catch(e3){}
+    }
+  };
+  try{ markPicks(); }catch(e){}
+  try{ if(bb) bb.focus(); }catch(e){}
+}
 function peekSave(){
   const d = pickNewestSave();
-  if(!d) return null;
-  return {
+  if(d) return {
     day: d.day || 1,
     congress: d.congress || 1,
     country: d.country || null,
@@ -44719,11 +45177,14 @@ function peekSave(){
     room: d.room || "office",
     minute: d.minute || 0
   };
+  return peekCareerMeta();
 }
 function bootFreshCareer(){
   if(G._booting) return;
-  /* 20261011a: a stray Enter on the title must not erase a long career. Ask first;
-     the old save is only wiped when the new oath is actually taken (startRun). */
+  /* 20261110bv JUPITER: a new career never deletes the old one. Archive first.
+     NEPTUNE-TITLE hook (copy only): eyebrow "New career", heading, the confirm
+     paragraph, Back / Yes buttons — presentation is Neptune's; the data path
+     is archive-and-keep, never wipe. Oath (nameCard) is only reached after Yes. */
   let pk = null; try{ pk = peekSave(); }catch(e){}
   if(pk && !G._freshOk){
     try{
@@ -44731,23 +45192,65 @@ function bootFreshCareer(){
       card.classList.add("card--open");
       document.body.classList.add("boot-menu");
       card.innerHTML =
-        '<div class="eyebrow">New career</div>' +
-        '<h1>Start over?</h1>' +
-        '<p>Your career' + (pk.name ? ' as <strong>' + pk.name + '</strong>' : '') + ' is on day <strong>' + (pk.day || 1) +
-          '</strong>. Taking a new oath replaces it. Until you take the oath, nothing is erased.</p>' +
+        '<div class="eyebrow">Start a new career</div>' +
+        '<h1>Start a new career?</h1>' +
+        '<p>Your day <strong>' + (pk.day || 1) + '</strong> career' + (pk.name ? ' as <strong>' + titleEsc(pk.name) + '</strong>' : '') +
+          ' stays saved as an archive, and you can return to it any time. The oath is only for a new career.</p>' +
         '<div class="card__actions">' +
           '<button class="btn" type="button" id="freshBack" data-gp="boot:back">Back</button>' +
-          '<button class="btn btn--ghost" type="button" id="freshYes">Yes, a new career</button></div>';
+          '<button class="btn btn--ghost" type="button" id="freshYes" data-noenter style="border-color:var(--bad);color:var(--bad)">Yes, start a new career</button></div>';
       const by = el("freshYes"), bb = el("freshBack");
-      if(by) by.onclick = (ev) => { try{ ev.preventDefault(); ev.stopPropagation(); }catch(e){} G._freshOk = true; bootFreshCareer(); };
-      if(bb) bb.onclick = (ev) => { try{ ev.preventDefault(); ev.stopPropagation(); }catch(e){} G._freshOk = false; opening(); };
+      if(by) by.onclick = (ev) => {
+        try{ ev.preventDefault(); ev.stopPropagation(); }catch(e){}
+        if(by._busy) return;
+        if(by._needType){
+          const typed = ((el("freshType") && el("freshType").value) || "").trim();
+          if(typed.toLowerCase() !== String(by._needType).toLowerCase()){
+            try{ const box = el("freshType"); if(box){ box.style.borderColor = "var(--bad)"; box.focus(); } }catch(e){}
+            return;
+          }
+        }
+        by._busy = true;
+        try{ by.disabled = true; }catch(e){}
+        careerArchiveCurrent("new-career", function(res){
+          if(!res || !res.ok){
+            by._busy = false;
+            try{ by.disabled = false; }catch(e){}
+            try{
+              const p = card.querySelector("p");
+              if(p) p.textContent = "Could not archive the current career, so a new one was not started. Nothing was erased. Export the career from Settings, then try again. To try archiving again, type the career name below and press Yes once more.";
+              let box = el("freshType");
+              if(!box){
+                box = document.createElement("input");
+                box.id = "freshType";
+                box.type = "text";
+                box.className = "mk__name";
+                box.setAttribute("autocomplete","off");
+                box.setAttribute("spellcheck","false");
+                box.placeholder = "Type " + (pk.name || "the career name") + " to try again";
+                const acts = card.querySelector(".card__actions");
+                if(acts && acts.parentNode) acts.parentNode.insertBefore(box, acts);
+              }
+              by._needType = String((pk && pk.name) || "START").trim();
+              try{ box.focus(); }catch(e2){}
+            }catch(e){}
+            return;
+          }
+          G._archiveVerified = res;
+          G._freshOk = true;
+          G._wipeOnOath = true; /* armed; startRun wipes the active slot only after this verified archive */
+          bootFreshCareer();
+        });
+      };
+      if(bb) bb.onclick = (ev) => { try{ ev.preventDefault(); ev.stopPropagation(); }catch(e){} careerClearWipe(); opening(); };
       try{ markPicks(); }catch(e){}
       return;
     }catch(e){}
   }
   G._freshOk = false;
   G._booting = true;
-  G._wipeOnOath = true;
+  /* 20261110bv: leave G._wipeOnOath / G._archiveVerified armed for startRun.
+     Back already called clearWipe. Do not wipe here. */
   try{ G.you = null; G.members = []; G.make = null; G.running = false; }catch(e){}
   try{ card.classList.remove("card--open"); }catch(e){}
   try{ veil.classList.remove("veil--make"); }catch(e){}
@@ -44770,9 +45273,16 @@ function bootFreshCareer(){
 }
 function opening(){
   /* Do NOT loadSave() here — hydrating a full career on the start card freezes the UI
-     so Continue/New career look dead. Peek only; load on Continue click. */
-  const peek = peekSave();
+     so Continue/Start a new career look dead. Peek only; load on Continue click. */
+  /* 20261110bu NEPTUNE-TITLE: Continue is the primary, first, default-focused button
+     whenever any save exists (sidecar peek, localStorage, or IDB). While the larger
+     store is still loading, show "Looking for your career…" — never a New-career-only
+     first frame. Enter/Space never reach Start a new career when a save exists or the
+     load is still pending. */
+  titleBindReady();
+  const peek = titlePeek();
   const hasSave = !!peek;
+  const pending = !hasSave && !titleCareersReady();
   try{
     if(!G.parties) G.parties = defaultPartyMap();
     ensureParties();
@@ -44781,9 +45291,17 @@ function opening(){
   document.body.classList.add("boot-menu");
   card.classList.add("card--open");
   try{ veil.classList.remove("veil--make"); }catch(e){}
+  if(pending){
+    card.innerHTML = '<div class="eyebrow">One Nation, Under, ME.</div><h1>Looking for your career…</h1><p>Checking this browser\'s larger store for a saved sitting.</p>';
+    veil.hidden = false;
+    try{ markPicks(); }catch(e){}
+    return;
+  }
   const cong = hasSave ? (peek.congress || 1) : 1;
   const dayN = hasSave ? (peek.day || 1) : 1;
   const cname = (peek && peek.country && peek.country.name) ? peek.country.name : (G.country && G.country.name);
+  const archN = titleArchiveCount();
+  const contLabel = "Continue" + (peek && peek.name ? " — " + peek.name : "") + " · day " + dayN;
   card.innerHTML =
     '<img class="card__logo" src="assets/logo.png" width="220" height="147" alt="One Nation, Under, ME." onerror="this.onerror=null;this.replaceWith(Object.assign(document.createElement(\'div\'),{className:\'card__logo card__logo--text\',textContent:\'One Nation, Under, ME.\'}))">' +    '<div class="eyebrow">One Nation, Under, ME. · The ' + ordinal(cong) + ' Congress' +
       (cname ? ' · ' + cname : '') + '</div>' +
@@ -44802,13 +45320,15 @@ function opening(){
       (FIRST_CONSUL.holiday || "Taylor Day") + ' (' + (FIRST_CONSUL.holidayFull || "Day of the First Consul") +
       '), a national holiday. Comparison to him is blasphemy; The Greatest may descend under him only.</p></details>' +
     '<div class="legend">' + (function(){ try{ return partyLegendHTML(); }catch(e){ return ""; } })() + '</div>' +
+    /* 20261110bu NEPTUNE-TITLE: primary is Continue (existing career, loads it
+       directly). Secondary is "Start a new career". No delete or replace warning
+       belongs on this card. */
     '<div class="card__actions">' +
-      (hasSave ? '<button class="btn" type="button" id="cont" data-gp="boot:cont">Continue' +
-        (peek.name ? ' — ' + peek.name : '') +
-        ' · day ' + dayN + '</button>' : '') +
-      '<button class="btn' + (hasSave?' btn--ghost':'') + '" type="button" id="fresh" data-gp="boot:fresh">New career</button>' +
+      (hasSave ? '<button class="btn" type="button" id="cont" data-gp="boot:cont" autofocus>' + titleEsc(contLabel) + '</button>' : '') +
+      '<button class="btn' + (hasSave?' btn--ghost':'') + '" type="button" id="fresh" data-gp="boot:fresh"' + (hasSave ? ' data-noenter' : '') + '>Start a new career</button>' +
       '<button class="btn btn--ghost" type="button" id="bootBook" data-gp="boot:book">Handbook</button></div>' +
-      '<p class="boot-hint">Enter continues · Esc opens settings once you are inside · H hides the panels</p>';
+      (archN ? '<p class="muted" style="margin:10px 0 0"><button type="button" class="btn btn--ghost" id="bootArchives" style="font-size:12px;min-height:0;padding:4px 10px;letter-spacing:.06em">Earlier careers (' + archN + ')</button></p>' : '') +
+      '<p class="boot-hint">' + (hasSave ? 'Enter continues · Esc does nothing here · H hides the panels once you are inside' : 'Enter starts a new career only when none is saved · Esc does nothing here') + '</p>';
   veil.hidden = false;
   const bindBoot = (node, fn) => {
     if(!node) return;
@@ -44820,7 +45340,9 @@ function opening(){
   bindBoot(el("cont"), cardActContinue);
   bindBoot(el("fresh"), bootFreshCareer);
   bindBoot(el("bootBook"), () => { try{ handbookCard(); }catch(e){} });
+  bindBoot(el("bootArchives"), titleShowArchives);
   markPicks();
+  try{ const c = el("cont"); if(c) c.focus(); }catch(e){}
 }
 function softUnstickVeil(){
   G._booting = false;
@@ -44836,12 +45358,32 @@ function softUnstickVeil(){
 if(!window.__onumBootEnterBound){
   window.__onumBootEnterBound = true;
   addEventListener("keydown", e => {
-    if(e.key !== "Enter") return;
+    if(e.key !== "Enter" && e.key !== " " && e.key !== "Escape") return;
     if(!document.body.classList.contains("boot-menu")) return;
     if(veil.hidden) return;
-    const cont = el("cont"), fresh = el("fresh");
-    const go = (cont && !cont.hidden) ? cont : fresh;
-    if(go) go.click();
+    /* 20261110bu: Esc does nothing destructive on the title; on confirm/oath it is Back. */
+    if(e.key === "Escape"){
+      const back = el("freshBack") || el("bootArchBack") || el("mkNameBack") || el("sortedBack");
+      if(back){ e.preventDefault(); e.stopPropagation(); try{ back.click(); }catch(err){} return; }
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    const t = e.target;
+    if(t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+    /* 20261110bu: Enter and Space on the title must never reach Start a new career
+       when a save exists, or while the load is still pending. Even if #fresh is focused. */
+    const freshEl = el("fresh");
+    const aimedFresh = !!(t && (t.id === "fresh" || (t.getAttribute && t.getAttribute("data-gp") === "boot:fresh") || (freshEl && (t === freshEl || (freshEl.contains && freshEl.contains(t))))));
+    const peekNow = titlePeek();
+    const pendingNow = !peekNow && !titleCareersReady();
+    if(aimedFresh && (peekNow || pendingNow)){ e.preventDefault(); e.stopPropagation(); return; }
+    if(t && (t.tagName === "BUTTON" || t.tagName === "A" || t.tagName === "SELECT") && card.contains(t)) return;
+    if(el("freshBack") || el("freshYes") || el("bootArchBack") || el("bootArchYes") || el("mkGo") || el("mkNameBack") || el("sortedBack")) return;
+    const cont = el("cont");
+    if(cont && !cont.hidden && !cont.disabled){ e.preventDefault(); e.stopPropagation(); cont.click(); return; }
+    if(peekNow || pendingNow){ e.preventDefault(); e.stopPropagation(); return; }
+    if(freshEl && !freshEl.hidden){ e.preventDefault(); e.stopPropagation(); freshEl.click(); }
   });
 }
 if(!window.__onumBootClickBound){
@@ -44863,10 +45405,22 @@ document.addEventListener("keydown", (e) => {
   if(e.key !== "Enter" && e.key !== " ") return;
   const t = e.target;
   if(t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+  /* 20261110bu: even a focused Start a new career button must not take Enter/Space
+     when a save exists or the load is still pending. */
+  const freshEl = el("fresh");
+  const aimedFresh = !!(t && (t.id === "fresh" || (t.getAttribute && t.getAttribute("data-gp") === "boot:fresh") || (freshEl && (t === freshEl || (freshEl.contains && freshEl.contains(t))))));
+  if(aimedFresh && document.body.classList.contains("boot-menu")){
+    const peekNow = titlePeek();
+    if(peekNow || !titleCareersReady()){ e.preventDefault(); e.stopPropagation(); return; }
+  }
   /* a button you have tabbed to does its own thing; Enter is only a shortcut for the card's primary when nothing is focused, and never for a choice that cannot be undone */
   if(t && (t.tagName === "BUTTON" || t.tagName === "A" || t.tagName === "SELECT") && card.contains(t)) return;
   const primary = card.querySelector(".card__actions .btn:not(.btn--ghost):not([data-noenter])") || card.querySelector(".card__actions .btn:not([data-noenter])");
   if(!primary) return;
+  if((primary.id === "fresh" || (primary.getAttribute && primary.getAttribute("data-gp") === "boot:fresh")) && document.body.classList.contains("boot-menu")){
+    const peekNow = titlePeek();
+    if(peekNow || !titleCareersReady()){ e.preventDefault(); e.stopPropagation(); return; }
+  }
   e.preventDefault();
   e.stopPropagation();
   primary.click();
@@ -44886,13 +45440,10 @@ function cardActContinue(){
     const acts = card.querySelector(".card__actions");
     if(acts) acts.innerHTML = '<button class="btn" type="button" disabled>Loading career…</button>';
   }catch(e){}
-  yieldMain(() => {
-    whenCareerReady(() => {
-    let ok = false;
-    try{ ok = !!loadSave(); }catch(e){ ok = false; }
+  const finish = (ok, err) => {
     if(!ok || !G.you || !(G.members && G.members.length)){
       G._booting = false;
-      showContinueBroken();
+      showContinueBroken(err);
       return;
     }
     yieldPaint(() => {
@@ -44903,8 +45454,47 @@ function cardActContinue(){
         showContinueBroken(e);
       }
     });
+  };
+  const archiveSlotOf = () => {
+    try{
+      const p = (window.ONUM_CAREERS && window.ONUM_CAREERS.peek)
+        ? window.ONUM_CAREERS.peek()
+        : (typeof peekCareerMeta === "function" ? peekCareerMeta() : null);
+      const slot = p && p.slot;
+      if(!slot) return null;
+      if(slot === "career" || slot === "active" || slot === SAVE_KEY || slot === SAVE_BACKUP_KEY || slot === SAVE_BEST_KEY) return null;
+      return slot;
+    }catch(e){ return null; }
+  };
+  const go = () => {
+    yieldMain(() => {
+      let ok = false, err = null;
+      try{ ok = !!loadSave(); }catch(e){ ok = false; err = e; }
+      if(ok && G.you && G.members && G.members.length){ finish(true); return; }
+      /* 20261110bw: after the oath wipes the active slot, the sidecar still
+         names the archived career. loadSave only reads the empty active
+         keys, so Continue would fail. Restore that slot through the
+         careers API (safe on an empty active: archiveCurrent no-ops),
+         then load the sitting as usual. */
+      const slot = archiveSlotOf();
+      const api = window.ONUM_CAREERS;
+      if(!slot || !api || typeof api.restore !== "function"){ finish(false, err); return; }
+      try{
+        api.restore(slot, function(res){
+          if(!res || !res.ok){
+            finish(false, (res && res.why) || err);
+            return;
+          }
+          let ok2 = false, err2 = err;
+          try{ ok2 = !!loadSave(); }catch(e){ ok2 = false; err2 = e; }
+          finish(ok2, err2);
+        });
+      }catch(e){ finish(false, e); }
     });
-  });
+  };
+  /* 20261110bv: the IDB career may not be in cache yet on a fast Continue click. */
+  if(typeof ENG_IDB !== "undefined" && !ENG_IDB.ready) engIdbWhenReady(go, 2000);
+  else go();
 }
 function resumeLiveCareer(){
   /* Pause menu Continue: HUD back. Chamber rooms still trap — walk out. */
@@ -44932,20 +45522,36 @@ function showContinueBroken(err){
     veil.hidden = false;
     card.classList.add("card--open");
     document.body.classList.add("boot-menu");
-    const peek = peekSave();
+    const peek = (typeof titlePeek === "function") ? titlePeek() : peekSave();
+    let nArch = 0;
+    try{ nArch = titleArchiveCount(); }catch(e){}
+    const why = (err && err.why) || (err && err.message) || err;
+    const whyKey = (typeof why === "string") ? why : "";
+    const body = (whyKey === "could-not-archive-current")
+      ? "Could not archive the current career first, so nothing was moved. Export it from Settings, then try again."
+      : (whyKey === "missing" || whyKey === "empty" || whyKey === "no-store" || whyKey === "parse")
+        ? "The named career is still listed under Earlier careers. It was not erased."
+        : "The career was not erased. Restore it from Earlier careers, or try Continue again.";
+    const raw = (whyKey && whyKey !== "could-not-archive-current" && whyKey !== "missing" && whyKey !== "empty" && whyKey !== "no-store" && whyKey !== "parse")
+      ? String(whyKey).slice(0, 180)
+      : "";
     card.innerHTML =
       '<div class="eyebrow">Career save is still here</div>' +
       '<h1>Could not open that sitting.</h1>' +
-      '<p>The career was not erased. Retry, or export it from Career once you are in.</p>' +
+      '<p>' + body + '</p>' +
       (peek ? '<p class="muted">On disk: day ' + peek.day + (peek.name ? ' · ' + peek.name : '') + '.</p>' : '') +
-      (err ? '<p class="muted">' + String((err && err.message) || err).slice(0, 180) + '</p>' : '') +
+      (raw ? '<p class="muted">' + raw + '</p>' : '') +
       '<div class="card__actions">' +
-        '<button class="btn" type="button" id="cont" data-gp="boot:cont">Try Continue again</button>' +
-        '<button class="btn btn--ghost" type="button" id="fresh" data-gp="boot:fresh">New career</button>' +
+        (nArch ? '<button class="btn" type="button" id="bootArchives">Restore from Earlier careers</button>' : '') +
+        '<button class="' + (nArch ? 'btn btn--ghost' : 'btn') + '" type="button" id="cont" data-gp="boot:cont">Try Continue again</button>' +
+        '<button class="btn btn--ghost" type="button" id="fresh" data-gp="boot:fresh">Start a new career</button>' +
       '</div>';
-    const c = el("cont"), f = el("fresh");
+    const c = el("cont"), f = el("fresh"), a = el("bootArchives");
     if(c) c.onclick = () => { try{ cardActContinue(); }catch(e){ softUnstickVeil(); } };
+    if(a) a.onclick = () => { try{ titleShowArchives(); }catch(e){ softUnstickVeil(); } };
     if(f) f.onclick = () => { try{ bootFreshCareer(); }catch(e){ softUnstickVeil(); } };
+    try{ markPicks(); }catch(e){}
+    try{ const focus = a || c; if(focus) focus.focus(); }catch(e){}
   }catch(e2){ softUnstickVeil(); }
 }
 /* ══════════════════════════════════════════════════════════
@@ -45150,6 +45756,7 @@ function nameCard(){
       (L.frame === "masc" ? opts("Beard", [{v:1,t:"Yes"},{v:0,t:"No"}], L.beard?1:0, "beard") : "") +
     '</div>' +
     '<div class="card__actions">' +
+      '<button class="btn btn--ghost" type="button" id="mkNameBack">Back</button>' +
       '<button class="btn btn--ghost" type="button" id="mkRand">Surprise me</button>' +
       '<button class="btn" type="button" id="mkGo">Take the oath</button></div>';
   veil.classList.add("veil--make");
@@ -45204,6 +45811,11 @@ function nameCard(){
     G.make.autoName = newName(G.make.state);
     G.make.name = G.make.autoName;
     nameCard();
+  });
+  const mkBack = el("mkNameBack");
+  if(mkBack) mkBack.addEventListener("click", (ev) => {
+    try{ ev.preventDefault(); ev.stopPropagation(); }catch(e){}
+    titleClearWipeAndOpen();
   });
   el("mkGo").addEventListener("click", () => {
     G.make.name = (el("nameIn").value || G.make.name).slice(0,40);
@@ -45351,6 +45963,7 @@ function sortedCard(){
       extraBtns +
       '<button class="btn' + (r.homeless ? '' : ' btn--ghost') +
         '" type="button" data-join="OWN" id="foundOwn">Found your own party</button>' +
+      '<button class="btn btn--ghost" type="button" id="sortedBack">Back</button>' +
     '</div>' +
     '<p style="margin:8px 0 0"><button class="btn btn--ghost" type="button" id="hatRead" style="font-size:12px;min-height:0;padding:4px 10px">Let the returning officer read it back</button></p>' +
     '<div id="ownStep" hidden><p class="muted" style="margin:10px 0 4px">Name your party, and choose its colour. Then found it.</p>' +
@@ -45424,12 +46037,23 @@ function sortedCard(){
     }
     startRun();
   }));
+  const sb = el("sortedBack");
+  if(sb) sb.addEventListener("click", (ev) => {
+    try{ ev.preventDefault(); ev.stopPropagation(); }catch(e){}
+    titleClearWipeAndOpen();
+  });
 }
 function startRun(){
   const r = G.make.sorted || {pos:{econ:0,lib:0,def:0,wel:0}, loyal:0};
+  /* 20261110bv: wipe the active slot only after a verified archive. Archives stay. */
   if(G._wipeOnOath){
     G._wipeOnOath = false;
-    try{ wipeCareerSaves(); }catch(e){} try{ localStorage.removeItem(SAVE_KEY); }catch(e){}
+    if(G._archiveVerified && G._archiveVerified.ok){
+      try{ careerWipeActive(); }catch(e){}
+    }else{
+      /* Should have been archived on Yes. If not, do not wipe. */
+      try{ careerArchiveCurrent("start-run"); }catch(e){}
+    }
   }
   if(mkMesh){ scene.remove(mkMesh); mkMesh = null; }
   mkLights(false);
@@ -45664,7 +46288,45 @@ try{ migrateGfx(); }catch(e){}
 /* Keep the opening card responsive. Quality setup and the first room build
    happen after Continue/New career, never on the menu's critical path. */
 try{ resize(); }catch(e){}
-try{ opening(); }catch(e){
+function bootTitle(){
+  /* 20261110bv JUPITER: do not decide "no save" until IndexedDB has answered
+     (or a short timeout). A large career is often IDB-only. */
+  const fallback = (e) => {
+    if(window.console) console.warn("opening", e);
+    try{
+      veil.hidden = false;
+      card.classList.add("card--open");
+      card.innerHTML = '<h1>One Nation, Under, ME.</h1><p>Could not finish the start card.</p>' +
+        '<div class="card__actions">' +
+        '<button class="btn" type="button" id="cont" data-gp="boot:cont">Continue</button>' +
+        '<button class="btn" type="button" id="fresh" data-gp="boot:fresh">Start a new career</button></div>';
+      const c = el("cont"), f = el("fresh");
+      if(c) c.onclick = () => { try{ cardActContinue(); }catch(err){ softUnstickVeil(); } };
+      if(f) f.onclick = () => { try{ bootFreshCareer(); }catch(err){ softUnstickVeil(); } };
+    }catch(e2){}
+  };
+  const safeOpen = () => {
+    try{
+      if(G._booting) return;
+      if(G.make) return;
+      if(G.running && G.you && G.members && G.members.length) return;
+      opening();
+    }catch(e){ fallback(e); }
+  };
+  let peeked = null;
+  try{ peeked = peekSave(); }catch(e){}
+  if(peeked) safeOpen();
+  else {
+    try{
+      document.body.classList.add("boot-menu");
+      card.classList.add("card--open");
+      veil.hidden = false;
+      card.innerHTML = '<div class="eyebrow">One Nation, Under, ME.</div><h1>Looking for your career…</h1><p>Checking this browser\'s larger store for a saved sitting.</p>';
+    }catch(e){}
+  }
+  engIdbWhenReady(safeOpen, 2000);
+}
+try{ bootTitle(); }catch(e){
   if(window.console) console.warn("opening", e);
   try{
     veil.hidden = false;
@@ -45672,7 +46334,7 @@ try{ opening(); }catch(e){
     card.innerHTML = '<h1>One Nation, Under, ME.</h1><p>Could not finish the start card.</p>' +
       '<div class="card__actions">' +
       '<button class="btn" type="button" id="cont" data-gp="boot:cont">Continue</button>' +
-      '<button class="btn" type="button" id="fresh" data-gp="boot:fresh">New career</button></div>';
+      '<button class="btn" type="button" id="fresh" data-gp="boot:fresh">Start a new career</button></div>';
     const c = el("cont"), f = el("fresh");
     if(c) c.onclick = () => { try{ cardActContinue(); }catch(err){ softUnstickVeil(); } };
     if(f) f.onclick = () => { try{ bootFreshCareer(); }catch(err){ softUnstickVeil(); } };
