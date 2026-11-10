@@ -1,0 +1,32 @@
+<!doctype html>
+<!-- 20261104be QA harness (Call-on): patches the existing Continuable save so Continue lands you as
+     President in the Executive Wing; ssnTick then auto-opens cabinet_meeting with chairId "you"
+     (needs >=2 others in the room). No eval, no session.html change. Keys: longsession.v3 / .backup / .best -->
+<html><head><meta charset="utf-8"><title>QA · Call-on harness</title>
+<style>body{font:15px system-ui;background:#111;color:#eee;padding:24px;max-width:720px}pre{background:#222;padding:10px;white-space:pre-wrap}a,button{font-size:16px}</style></head>
+<body><h2>QA · Cabinet-chair harness (Call-on)</h2><pre id="log"></pre>
+<p><button id="go">Open session.html</button> &nbsp; <button id="undo">Restore pre-harness save</button></p>
+<script>
+(function(){
+  var KEYS=["longsession.v3","longsession.v3.backup","longsession.v3.best"], BK="qa.callon.orig.";
+  var q=new URLSearchParams(location.search), office=q.get("office")||"pres", room=q.get("room")||(office==="gov"?"govoffice":"exec");
+  var target=q.get("to")||"session.html", L=document.getElementById("log"), n=0;
+  function log(s){ L.textContent+=s+"\n"; }
+  KEYS.forEach(function(k){
+    var raw=localStorage.getItem(k); if(!raw) return; var d;
+    try{ d=JSON.parse(raw); }catch(e){ log(k+": not JSON, skipped"); return; }
+    if(!d||!d.you||!Array.isArray(d.members)||!d.members.length){ log(k+": not a career, skipped"); return; }
+    if(!localStorage.getItem(BK+k)) try{ localStorage.setItem(BK+k, raw); }catch(e){ log("backup of "+k+" failed (storage full?)"); }
+    d.you.office=office; d.you.out=false; d.you.room=room; d.room=room; d.visitId=null;
+    if(typeof d.minute!=="number"||d.minute<9*60||d.minute>=20*60) d.minute=10*60;
+    d.pendingNight=false; d.over=false; d.savedAtMs=Date.now(); d.qaHarness="callon-20261104be";
+    try{ localStorage.setItem(k, JSON.stringify(d)); n++; log(k+": patched → office="+office+", room="+room+" (day "+d.day+", "+(d.you.name||"you")+")"); }
+    catch(e){ log(k+": write failed "+e); }
+  });
+  if(!n) log("NO CAREER SAVE FOUND. Open session.html, click New career, play until the first autosave (walk out of the office / sleep), then reload this page.");
+  else log("\nDone. Click Open, then Continue. You should spawn in The Executive Wing as President; the cabinet opens when 2+ secretaries are in the room.");
+  document.getElementById("go").onclick=function(){ location.href=target+(target.indexOf("?")<0?"?":"&")+"v=20261104be&qa=callon"; };
+  document.getElementById("undo").onclick=function(){ KEYS.forEach(function(k){ var o=localStorage.getItem(BK+k); if(o){ localStorage.setItem(k,o); localStorage.removeItem(BK+k); log("restored "+k); } }); };
+  if(n && q.get("auto")==="1") setTimeout(function(){ document.getElementById("go").click(); }, 600);
+})();
+</script></body></html>
