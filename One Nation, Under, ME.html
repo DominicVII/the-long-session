@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261110bs">
+<meta name="onum-build" content="20261110bv">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -46,7 +46,7 @@
   window.onumLimSet = function(k, v){ if(!(k in D)) return false; L[k] = fix(v); try{ var o = JSON.parse(localStorage.getItem("onum.limits") || "{}") || {}; o[k] = (L[k] === INF) ? null : L[k]; localStorage.setItem("onum.limits", JSON.stringify(o)); }catch(e){} return true; };
   window.onumLimReset = function(){ try{ localStorage.removeItem("onum.limits"); }catch(e){} Object.keys(D).forEach(function(k){ L[k] = D[k]; }); L._eff = {}; L._gov = null; return true; };
   var show = function(v){ return v === INF ? "inf" : (typeof v === "number" ? Math.round(v * 100) / 100 : v); };
-  window.onumLimDump = function(){ var out = {build:"20261110bs", mode:L.mode || "scale"}; Object.keys(D).forEach(function(k){ out[k] = show(L[k]); });
+  window.onumLimDump = function(){ var out = {build:"20261110bv", mode:L.mode || "scale"}; Object.keys(D).forEach(function(k){ out[k] = show(L[k]); });
     out.effective = {}; Object.keys(L._eff).forEach(function(k){ out.effective[k] = show(L._eff[k]); }); out.governor = L._gov;
     try{ out.engineBudgetMs = window.onumEngine ? show(window.onumEngine.budget) : null; out.frameMs = window.onumEngine ? show(window.onumEngine.dtEma) : null; }catch(e){} return out; };
   window.onumLimLine = function(){ var d = window.onumLimDump(), e = d.effective, g = function(k){ return e[k] != null ? e[k] + "*" : d[k]; };
@@ -71,7 +71,7 @@
 </script>
 <script>
 (function(){
-  var STAMP = "20261110bs";
+  var STAMP = "20261110bv";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -11201,15 +11201,76 @@ function engUnpack(s0){
 /* the wrapped form is "ONZ1|<hash>|<packed>"; anything else is the old plain JSON */
 function engWrap(json){ try{ const z = engPack(json); if(engUnpack(z) !== json) return json; return "ONZ1|" + engHash(json) + "|" + z; }catch(e){ return json; } }
 function engOpen(raw){ if(!raw || raw.slice(0, 5) !== "ONZ1|") return raw; const a = raw.indexOf("|", 5); const h = raw.slice(5, a); const j = engUnpack(raw.slice(a + 1)); if(engHash(j) !== h) return null; return j; }
-const ENG_IDB = {db:null, cache:null};
-try{ const rq = indexedDB.open("onum-saves", 1); rq.onupgradeneeded = () => { try{ rq.result.createObjectStore("s"); }catch(e){} };
-  rq.onsuccess = () => { ENG_IDB.db = rq.result; try{ const g = ENG_IDB.db.transaction("s").objectStore("s").get("career"); g.onsuccess = () => { ENG_IDB.cache = g.result || null; }; }catch(e){} }; }catch(e){}
-function engIdbPut(raw){ try{ if(!ENG_IDB.db) return; ENG_IDB.db.transaction("s", "readwrite").objectStore("s").put(raw, "career"); ENG_IDB.cache = raw; }catch(e){} }
+/* 20261110bv JUPITER: IndexedDB open+get is async. The title card used to run on
+   the same tick, before get("career") returned, so a late/large career kept only
+   in IDB looked like "no save" and the only button was New career. Wait for the
+   get, refresh the title when it arrives, and keep a small localStorage meta so
+   Continue can name the sitting even before the blob is in memory. */
+const ENG_IDB = {db:null, cache:null, ready:false, waiters:[]};
+function engIdbNotify(){
+  ENG_IDB.ready = true;
+  const ws = ENG_IDB.waiters.splice(0);
+  for(let i = 0; i < ws.length; i++){ try{ ws[i](); }catch(e){} }
+  try{ document.dispatchEvent(new CustomEvent("onum-careers-ready", {detail: (window.ONUM_CAREERS && window.ONUM_CAREERS.peek) ? window.ONUM_CAREERS.peek() : null})); }catch(e){}
+}
+function engIdbWhenReady(fn, ms){
+  if(ENG_IDB.ready){ try{ fn(); }catch(e){} return; }
+  let done = false;
+  const once = () => { if(done) return; done = true; try{ fn(); }catch(e){} };
+  ENG_IDB.waiters.push(once);
+  setTimeout(once, ms == null ? 2000 : ms);
+}
+function engIdbPutAt(key, raw, cb){
+  try{
+    if(!ENG_IDB.db){ if(cb) cb(false); return false; }
+    if(key === "career") ENG_IDB.cache = raw;
+    const req = ENG_IDB.db.transaction("s", "readwrite").objectStore("s").put(raw, key);
+    req.onsuccess = () => { if(cb) cb(true); };
+    req.onerror = () => { if(cb) cb(false); };
+    return true;
+  }catch(e){ if(cb) cb(false); return false; }
+}
+function engIdbGetAt(key, cb){
+  try{
+    if(!ENG_IDB.db){ if(cb) cb(null); return; }
+    const g = ENG_IDB.db.transaction("s").objectStore("s").get(key);
+    g.onsuccess = () => { if(cb) cb(g.result == null ? null : g.result); };
+    g.onerror = () => { if(cb) cb(null); };
+  }catch(e){ if(cb) cb(null); }
+}
+function engIdbOnCareer(raw){
+  ENG_IDB.cache = raw || null;
+  try{ if(raw && typeof svWriteCareerMeta === "function") svWriteCareerMeta(raw); }catch(e){}
+  try{ if(typeof careerIndexMergeIdb === "function") careerIndexMergeIdb(); }catch(e){}
+  engIdbNotify();
+  try{
+    if(document.body.classList.contains("boot-menu") && !G._booting && !G.make && !(G.running && G.you)){
+      if(typeof opening === "function") opening();
+    }
+  }catch(e){}
+}
+try{
+  if(typeof indexedDB === "undefined"){ engIdbNotify(); }
+  else {
+    const rq = indexedDB.open("onum-saves", 1);
+    rq.onupgradeneeded = () => { try{ rq.result.createObjectStore("s"); }catch(e){} };
+    rq.onerror = () => { try{ engIdbNotify(); }catch(e){} };
+    rq.onsuccess = () => {
+      ENG_IDB.db = rq.result;
+      try{
+        const g = ENG_IDB.db.transaction("s").objectStore("s").get("career");
+        g.onsuccess = () => { engIdbOnCareer(g.result || null); };
+        g.onerror = () => { engIdbOnCareer(null); };
+      }catch(e){ engIdbOnCareer(null); }
+    };
+  }
+}catch(e){ try{ engIdbNotify(); }catch(e2){} }
+function engIdbPut(raw){ try{ if(!ENG_IDB.db) return; ENG_IDB.db.transaction("s", "readwrite").objectStore("s").put(raw, "career"); ENG_IDB.cache = raw; try{ if(typeof svWriteCareerMeta === "function") svWriteCareerMeta(raw); }catch(e2){} }catch(e){} }
 (function(){
   const baseParse = parseSaveRaw;
   parseSaveRaw = function(raw){ try{ return baseParse(engOpen(raw)); }catch(e){ return null; } };
   const baseWrite = writeSaveKey;
-  writeSaveKey = function(key, raw){ const t = performance.now(); const w = (typeof raw === "string" && raw.length > 20000 && raw.charAt(0) === "{") ? engWrap(raw) : raw; const ok = baseWrite(key, w); if(key === SAVE_KEY && ok){ engCost("save-write", performance.now() - t); ENG.lastSave = {plain:raw.length, stored:w.length, at:Date.now()}; engIdbPut(w); } return ok; };
+  writeSaveKey = function(key, raw){ const t = performance.now(); const w = (typeof raw === "string" && raw.length > 20000 && raw.charAt(0) === "{") ? engWrap(raw) : raw; const ok = baseWrite(key, w); if(key === SAVE_KEY && ok){ engCost("save-write", performance.now() - t); ENG.lastSave = {plain:raw.length, stored:w.length, at:Date.now()}; engIdbPut(w); try{ svWriteCareerMeta(raw); }catch(e2){} } return ok; };
   const basePick = pickNewestSave;
   pickNewestSave = function(){ let b = basePick(); try{ const d = ENG_IDB.cache ? parseSaveRaw(ENG_IDB.cache) : null; if(d && (!b || isBetterSave(d, b))) b = d; }catch(e){} return b; };
 })();
@@ -12622,7 +12683,7 @@ function svRawWrite(key, raw){ try{ localStorage.setItem(key, raw); return true;
 function svDone(base, explicit, wrote){
   if(!wrote){ G._saveFails = (G._saveFails || 0) + 1; const t = Date.now();
     if(!G._saveWarnAt || t - G._saveWarnAt > 120000){ G._saveWarnAt = t; try{ note("The game could not save: this browser's storage is full. Career, then Export career save, keeps your day.", true); }catch(e){} }
-  } else { G._saveFails = 0; G.savedAt = hhmm(); saveCount++; SV.rank = careerRank(base); if(explicit) note("Saved.", false);
+  } else { G._saveFails = 0; G.savedAt = hhmm(); saveCount++; SV.rank = careerRank(base); try{ if(S && S.raw) svWriteCareerMeta(S.raw); else if(base) svWriteCareerMeta(base); }catch(e3){} if(explicit) note("Saved.", false);
     try{ const pip = el("savePip"); if(pip){ pip.classList.add("is-on"); clearTimeout(save._pip); save._pip = setTimeout(() => pip.classList.remove("is-on"), 1200); } }catch(e){} }
   SV.busy = false; svNext();
 }
@@ -12661,7 +12722,7 @@ save = function(explicit, sync){
   };
   const w1 = () => {
     const big = !!(ENG_IDB.db && S.raw.length > onumLimN("lsMaxChars", 2400000)); let ok = big ? false : svRawWrite(SAVE_KEY, S.raw);
-    if(!ok && !big){ for(const k of [SAVE_BEST_KEY, SAVE_BACKUP_KEY]){ try{ localStorage.removeItem(k); }catch(e){} ok = svRawWrite(SAVE_KEY, S.raw); if(ok) break; } }
+    if(!ok && !big){ careerFreeQuota(); ok = svRawWrite(SAVE_KEY, S.raw); }
     if(!ok && ENG_IDB.db){ try{ engIdbPut(S.raw); ok = true; if(!G._idbOnly){ G._idbOnly = 1; note("Saved to the browser's larger store (the small one is full). Your career is kept.", false); } }catch(e){} }   /* a career too big for localStorage still saves */
     if(!ok) return svDone(S.base, S.explicit, false);
     SV.lastBody = S.body; try{ ENG.lastSave = {plain:S.json.length, stored:S.raw.length, at:Date.now()}; }catch(e){}
@@ -12683,7 +12744,7 @@ function svFlushSync(){
     let raw = json;
     if(!ok){ raw = engWrap(json); ok = svRawWrite(SAVE_KEY, raw); }
     try{ engIdbPut(raw); }catch(e){}
-    if(ok) SV.rank = careerRank(base);
+    if(ok){ SV.rank = careerRank(base); try{ svWriteCareerMeta(raw); }catch(e2){} }
     return ok;
   }catch(e){ return false; }
 }
@@ -40716,6 +40777,9 @@ const TLSCollab = (function(){
 const SAVE_KEY = "longsession.v3";
 const SAVE_BACKUP_KEY = "longsession.v3.backup";
 const SAVE_BEST_KEY = "longsession.v3.best";
+const SAVE_META_KEY = "longsession.v3.meta";
+const SAVE_CAREERS_INDEX = "longsession.v3.careers";
+const SAVE_ARCHIVE_PREFIX = "onum_career_archive_";
 function careerRank(d){
   if(!d || !d.you) return -1;
   const cong = +(d.congress || 1);
@@ -40762,11 +40826,8 @@ function saveRound(k, v){ return (typeof v === "number" && isFinite(v) && v % 1 
 function storeCareer(payload){
   let ok = writeSaveKey(SAVE_KEY, payload);
   if(!ok){
-    for(const k of [SAVE_BEST_KEY, SAVE_BACKUP_KEY]){
-      try{ localStorage.removeItem(k); }catch(e){}
-      ok = writeSaveKey(SAVE_KEY, payload);
-      if(ok) break;
-    }
+    careerFreeQuota();
+    ok = writeSaveKey(SAVE_KEY, payload);
   }
   if(ok){
     writeSaveKey(SAVE_BACKUP_KEY, payload);                         /* a second copy, if it fits */
@@ -40775,10 +40836,292 @@ function storeCareer(payload){
   return ok;
 }
 function wipeCareerSaves(){
-  [SAVE_KEY, SAVE_BACKUP_KEY, SAVE_BEST_KEY].forEach(k => {
-    try{ localStorage.removeItem(k); }catch(e){}
+  /* 20261110bv JUPITER: a career is never deleted. Older callers used this
+     to clear the active slot before a new oath; that path now archives and
+     leaves the blob in place. This function is a no-op on purpose. */
+}
+
+function svWriteCareerMeta(rawOrData){
+  try{
+    let d = rawOrData;
+    if(typeof d === "string") d = parseSaveRaw(d);
+    if(!d || !d.you){
+      if(typeof G !== "undefined" && G && G.you) d = {you:G.you, day:G.day, congress:G.congress, country:G.country, room:G.room, minute:G.minute, savedAtMs:Date.now()};
+      else return false;
+    }
+    const slot = (arguments.length > 1 && arguments[1]) ? arguments[1] : "career";
+    const meta = {
+      name: d.you && d.you.name,
+      day: d.day || 1,
+      rank: careerRank(d),
+      slot: slot,
+      congress: d.congress || 1,
+      country: d.country || null,
+      room: d.room || "office",
+      minute: d.minute || 0,
+      savedAtMs: d.savedAtMs || Date.now(),
+      bytes: (typeof rawOrData === "string") ? rawOrData.length : 0
+    };
+    localStorage.setItem(SAVE_META_KEY, JSON.stringify(meta));
+    return true;
+  }catch(e){ return false; }
+}
+function peekCareerMeta(){
+  try{
+    const m = JSON.parse(localStorage.getItem(SAVE_META_KEY) || "null");
+    if(m && (m.name || m.day || m.slot || m.rank)) return m;
+  }catch(e){}
+  return null;
+}
+function pickNewestRaw(){
+  const cands = [];
+  const push = (raw, src) => {
+    if(!raw) return;
+    let d = null;
+    try{ d = parseSaveRaw(raw); }catch(e){ d = null; }
+    if(d) cands.push({raw:raw, d:d, src:src});
+  };
+  try{ push(localStorage.getItem(SAVE_KEY), SAVE_KEY); }catch(e){}
+  try{ push(localStorage.getItem(SAVE_BACKUP_KEY), SAVE_BACKUP_KEY); }catch(e){}
+  try{ push(localStorage.getItem(SAVE_BEST_KEY), SAVE_BEST_KEY); }catch(e){}
+  try{ if(ENG_IDB && ENG_IDB.cache) push(ENG_IDB.cache, "idb:career"); }catch(e){}
+  if(!cands.length) return null;
+  let best = cands[0];
+  for(let i = 1; i < cands.length; i++) if(isBetterSave(cands[i].d, best.d)) best = cands[i];
+  return best;
+}
+function careerSlug(name){
+  return String(name || "career").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "career";
+}
+function careerArchiveId(name){
+  const iso = new Date().toISOString().replace(/[:.]/g, "-");
+  return SAVE_ARCHIVE_PREFIX + iso + "_" + careerSlug(name);
+}
+let CAREER_INDEX_MEM = [];
+function careerIndexRead(){
+  let idx = [];
+  try{ idx = JSON.parse(localStorage.getItem(SAVE_CAREERS_INDEX) || "[]"); }catch(e){ idx = []; }
+  if(!Array.isArray(idx)) idx = [];
+  const seen = {};
+  const out = [];
+  const add = (x) => { if(x && x.id && !seen[x.id]){ seen[x.id] = 1; out.push(x); } };
+  idx.forEach(add);
+  CAREER_INDEX_MEM.forEach(add);
+  return out;
+}
+function careerIndexWrite(idx){
+  CAREER_INDEX_MEM = Array.isArray(idx) ? idx.slice() : [];
+  try{ localStorage.setItem(SAVE_CAREERS_INDEX, JSON.stringify(CAREER_INDEX_MEM)); }catch(e){}
+  try{ engIdbPutAt("careers", JSON.stringify(CAREER_INDEX_MEM)); }catch(e){}
+}
+function careerIndexMergeIdb(){
+  engIdbGetAt("careers", function(raw){
+    if(!raw) return;
+    let extra = raw;
+    try{ if(typeof extra === "string") extra = JSON.parse(extra); }catch(e){ return; }
+    if(!Array.isArray(extra) || !extra.length) return;
+    const idx = careerIndexRead();
+    const seen = {};
+    idx.forEach(x => { if(x && x.id) seen[x.id] = 1; });
+    extra.forEach(x => { if(x && x.id && !seen[x.id]) idx.push(x); });
+    careerIndexWrite(idx);
   });
 }
+function careerScanLocalArchives(idx){
+  const out = (idx || careerIndexRead()).slice();
+  const seen = {};
+  out.forEach(x => { if(x && x.id) seen[x.id] = 1; });
+  try{
+    for(let i = 0; i < localStorage.length; i++){
+      const k = localStorage.key(i);
+      if(!k || k.indexOf(SAVE_ARCHIVE_PREFIX) !== 0 || seen[k]) continue;
+      let d = null;
+      try{ d = parseSaveRaw(localStorage.getItem(k)); }catch(e){}
+      out.push({id:k, name:d && d.you && d.you.name, day:d && d.day, congress:d && d.congress, bytes:(localStorage.getItem(k) || "").length, source:"scan"});
+      seen[k] = 1;
+    }
+  }catch(e){}
+  return out;
+}
+function careerArchiveCurrent(reason, cb){
+  const done = (res) => { if(typeof cb === "function") try{ cb(res); }catch(e){} return res; };
+  const run = () => {
+    const picked = pickNewestRaw();
+    if(!picked || !picked.raw) return done({ok:true, empty:true});
+    const d = picked.d;
+    const id = careerArchiveId(d && d.you && d.you.name);
+    const raw = picked.raw;
+    let lsOk = false;
+    try{ localStorage.setItem(id, raw); lsOk = localStorage.getItem(id) === raw; }catch(e){}
+    const entry = {
+      id:id,
+      name:d.you && d.you.name,
+      day:d.day || 1,
+      rank:careerRank(d),
+      congress:d.congress || 1,
+      savedAtMs:d.savedAtMs || Date.now(),
+      bytes:raw.length,
+      reason:reason || "archive",
+      source:picked.src,
+      stamp:"20261110bv"
+    };
+    const commit = (idbOk, verified) => {
+      if(!verified) return done({ok:false, why:"no-store", id:id, lsOk:lsOk, idbOk:!!idbOk});
+      const idx = careerIndexRead().filter(x => x && x.id !== id);
+      idx.unshift(entry);
+      careerIndexWrite(idx);
+      try{ svWriteCareerMeta(d, id); }catch(e){}
+      return done({ok:true, id:id, entry:entry, lsOk:lsOk, idbOk:!!idbOk, verified:true, raw:raw});
+    };
+    const finish = (idbOk) => {
+      if(lsOk){
+        let same = false;
+        try{ same = localStorage.getItem(id) === raw; }catch(e){}
+        if(same) return commit(idbOk, true);
+      }
+      if(idbOk){
+        engIdbGetAt(id, function(got){ commit(true, got === raw); });
+        return;
+      }
+      return commit(false, false);
+    };
+    let issued = false;
+    try{ issued = !!engIdbPutAt(id, raw, function(ok){ finish(ok); }); }catch(e){ issued = false; }
+    if(!issued) finish(false);
+  };
+  if(typeof ENG_IDB === "undefined" || ENG_IDB.ready) return run();
+  engIdbWhenReady(run, 2000);
+}
+function careerReadArchiveRaw(id, cb){
+  let raw = null;
+  try{ raw = localStorage.getItem(id); }catch(e){}
+  if(raw){ if(cb) cb(raw); return; }
+  engIdbGetAt(id, function(v){ if(cb) cb(v || null); });
+}
+function careerWriteActiveRaw(raw, cb){
+  let lsOk = false;
+  try{ lsOk = !!writeSaveKey(SAVE_KEY, raw); }catch(e){}
+  if(lsOk){ try{ writeSaveKey(SAVE_BACKUP_KEY, raw); }catch(e){} }
+  try{ svWriteCareerMeta(raw); }catch(e){}
+  try{ if(typeof ENG_IDB !== "undefined") ENG_IDB.cache = raw; }catch(e){}
+  let issued = false;
+  try{ issued = !!engIdbPutAt("career", raw, function(idbOk){ if(cb) cb(!!(lsOk || idbOk)); }); }catch(e){ issued = false; }
+  if(!issued){ if(cb) cb(!!lsOk); }
+}
+function careerRestore(id, cb){
+  const done = (res) => { if(typeof cb === "function") try{ cb(res); }catch(e){} return res; };
+  if(!id) return done({ok:false, why:"no-id"});
+  careerArchiveCurrent("before-restore", function(a){
+    if(!a || !a.ok) return done({ok:false, why:"could-not-archive-current"});
+    careerReadArchiveRaw(id, function(raw){
+      if(!raw) return done({ok:false, why:"missing", id:id});
+      careerWriteActiveRaw(raw, function(ok){
+        done({ok:!!ok, id:id, bytes:raw.length, raw:raw});
+      });
+    });
+  });
+}
+
+function careerKeyProtected(k){
+  /* 20261110bv: never evict an archive, the careers index, or the sidecar to free quota. */
+  if(!k) return false;
+  if(k === SAVE_META_KEY || k === SAVE_CAREERS_INDEX) return true;
+  if(k.indexOf(SAVE_ARCHIVE_PREFIX) === 0) return true;
+  return false;
+}
+function careerFreeQuota(){
+  for(const k of [SAVE_BEST_KEY, SAVE_BACKUP_KEY]){
+    if(careerKeyProtected(k)) continue;
+    try{ localStorage.removeItem(k); }catch(e){}
+  }
+}
+function careerWipeActive(){
+  /* Active slot only, and only after a verified archive. Archives stay. */
+  [SAVE_KEY, SAVE_BACKUP_KEY, SAVE_BEST_KEY].forEach(k => {
+    if(careerKeyProtected(k)) return;
+    try{ localStorage.removeItem(k); }catch(e){}
+  });
+  try{
+    if(typeof ENG_IDB !== "undefined" && ENG_IDB.db){
+      ENG_IDB.db.transaction("s", "readwrite").objectStore("s").delete("career");
+      ENG_IDB.cache = null;
+    }
+  }catch(e){}
+  try{
+    const idx = careerIndexRead();
+    const m = peekCareerMeta() || {};
+    if(idx[0] && idx[0].id){
+      m.slot = idx[0].id;
+      if(idx[0].name) m.name = m.name || idx[0].name;
+      if(idx[0].day) m.day = m.day || idx[0].day;
+      if(idx[0].rank != null) m.rank = m.rank || idx[0].rank;
+      localStorage.setItem(SAVE_META_KEY, JSON.stringify(m));
+    }
+  }catch(e){}
+}
+function careerClearWipe(){
+  try{ if(typeof G !== "undefined" && G){ G._wipeOnOath = false; G._freshOk = false; } }catch(e){}
+  return true;
+}
+function careerLoad(slotId, cb){
+  const done = (res) => { if(typeof cb === "function") try{ cb(res); }catch(e){} return res; };
+  const apply = (raw, slot) => {
+    const d = parseSaveRaw(raw);
+    if(!d) return done({ok:false, why:"parse", slot:slot});
+    return done({ok:true, slot:slot, raw:raw, data:d, peek:{name:d.you && d.you.name, day:d.day || 1, rank:careerRank(d), slot:slot}});
+  };
+  const id = slotId || (peekCareerMeta() && peekCareerMeta().slot) || "career";
+  if(id === "career" || id === "active" || id === SAVE_KEY){
+    const p = pickNewestRaw();
+    if(p && p.raw) return apply(p.raw, p.src || "career");
+    const meta = peekCareerMeta();
+    if(meta && meta.slot && meta.slot !== "career" && meta.slot !== "active") return careerLoad(meta.slot, cb);
+    return done({ok:false, why:"empty"});
+  }
+  if(id === SAVE_BACKUP_KEY || id === SAVE_BEST_KEY){
+    let raw = null;
+    try{ raw = localStorage.getItem(id); }catch(e){}
+    if(raw) return apply(raw, id);
+    return done({ok:false, why:"empty", slot:id});
+  }
+  careerReadArchiveRaw(id, function(raw){
+    if(!raw) return done({ok:false, why:"missing", slot:id});
+    apply(raw, id);
+  });
+}
+function careerOnReady(cb){
+  const fire = () => { try{ if(typeof cb === "function") cb(window.ONUM_CAREERS); }catch(e){} };
+  engIdbWhenReady(fire, 2000);
+}
+
+window.ONUM_CAREERS = {
+  stamp:"20261110bv",
+  peek: function(){ return peekCareerMeta() || peekSave(); },
+  list: function(cb){
+    const archives = careerScanLocalArchives(careerIndexRead());
+    const out = {stamp:"20261110bv", active:peekSave(), archives:archives};
+    if(typeof cb === "function") cb(out);
+    return out;
+  },
+  load: function(slotId, cb){ return careerLoad(slotId, cb); },
+  archiveCurrent: function(cb){ return careerArchiveCurrent("api", cb); },
+  restore: function(slotId, cb){ return careerRestore(slotId, cb); },
+  onReady: function(cb){ return careerOnReady(cb); },
+  clearWipe: function(){
+    careerClearWipe();
+    return {ok:true, wipeOnOath:!!(typeof G!=="undefined" && G && G._wipeOnOath), freshOk:!!(typeof G!=="undefined" && G && G._freshOk)};
+  },
+  _qaSetWipe: function(v){ try{ if(!G) return false; G._wipeOnOath = !!v; G._freshOk = !!v; return true; }catch(e){ return false; } },
+  /* aliases */
+  current: function(){ return peekCareerMeta() || peekSave(); },
+  archive: function(reason, cb){ return careerArchiveCurrent(reason || "manual", cb); },
+  ready: function(cb){ return careerOnReady(cb); },
+  activeRaw: function(){ const p = pickNewestRaw(); return p ? p.raw : null; },
+  readRaw: function(id, cb){ return careerReadArchiveRaw(id, cb); },
+  writeActive: function(raw, cb){ return careerWriteActiveRaw(raw, cb); },
+  wipeActive: function(){ return careerWipeActive(); },
+  freeQuota: function(){ return careerFreeQuota(); }
+};
 let saveBusy = false, saveCount = 0, saveQueued = false;
 function queueSave(explicit){
   if(explicit){ try{ return save(true); }catch(e){ return false; } }
@@ -43188,8 +43531,7 @@ function frameBody(now, draw){
 
 function peekSave(){
   const d = pickNewestSave();
-  if(!d) return null;
-  return {
+  if(d) return {
     day: d.day || 1,
     congress: d.congress || 1,
     country: d.country || null,
@@ -43197,11 +43539,14 @@ function peekSave(){
     room: d.room || "office",
     minute: d.minute || 0
   };
+  return peekCareerMeta();
 }
 function bootFreshCareer(){
   if(G._booting) return;
-  /* 20261011a: a stray Enter on the title must not erase a long career. Ask first;
-     the old save is only wiped when the new oath is actually taken (startRun). */
+  /* 20261110bv JUPITER: a new career never deletes the old one. Archive first.
+     NEPTUNE-TITLE hook (copy only): eyebrow "New career", heading, the confirm
+     paragraph, Back / Yes buttons — presentation is Neptune's; the data path
+     is archive-and-keep, never wipe. Oath (nameCard) is only reached after Yes. */
   let pk = null; try{ pk = peekSave(); }catch(e){}
   if(pk && !G._freshOk){
     try{
@@ -43210,22 +43555,43 @@ function bootFreshCareer(){
       document.body.classList.add("boot-menu");
       card.innerHTML =
         '<div class="eyebrow">New career</div>' +
-        '<h1>Start over?</h1>' +
+        '<h1>Start a new career?</h1>' +
         '<p>Your career' + (pk.name ? ' as <strong>' + pk.name + '</strong>' : '') + ' is on day <strong>' + (pk.day || 1) +
-          '</strong>. Taking a new oath replaces it. Until you take the oath, nothing is erased.</p>' +
+          '</strong>. It will be archived and kept. A new career does not delete it, and you can restore it later. The oath is only for a new career.</p>' +
         '<div class="card__actions">' +
           '<button class="btn" type="button" id="freshBack" data-gp="boot:back">Back</button>' +
-          '<button class="btn btn--ghost" type="button" id="freshYes">Yes, a new career</button></div>';
+          '<button class="btn btn--ghost" type="button" id="freshYes">Yes, start a new career</button></div>';
       const by = el("freshYes"), bb = el("freshBack");
-      if(by) by.onclick = (ev) => { try{ ev.preventDefault(); ev.stopPropagation(); }catch(e){} G._freshOk = true; bootFreshCareer(); };
-      if(bb) bb.onclick = (ev) => { try{ ev.preventDefault(); ev.stopPropagation(); }catch(e){} G._freshOk = false; opening(); };
+      if(by) by.onclick = (ev) => {
+        try{ ev.preventDefault(); ev.stopPropagation(); }catch(e){}
+        if(by._busy) return;
+        by._busy = true;
+        try{ by.disabled = true; }catch(e){}
+        careerArchiveCurrent("new-career", function(res){
+          if(!res || !res.ok){
+            by._busy = false;
+            try{ by.disabled = false; }catch(e){}
+            try{
+              const p = card.querySelector("p");
+              if(p) p.textContent = "Could not archive the current career, so a new one was not started. Nothing was erased. Export the career from Settings, then try again.";
+            }catch(e){}
+            return;
+          }
+          G._archiveVerified = res;
+          G._freshOk = true;
+          G._wipeOnOath = true; /* armed; startRun wipes the active slot only after this verified archive */
+          bootFreshCareer();
+        });
+      };
+      if(bb) bb.onclick = (ev) => { try{ ev.preventDefault(); ev.stopPropagation(); }catch(e){} careerClearWipe(); opening(); };
       try{ markPicks(); }catch(e){}
       return;
     }catch(e){}
   }
   G._freshOk = false;
   G._booting = true;
-  G._wipeOnOath = true;
+  /* 20261110bv: leave G._wipeOnOath / G._archiveVerified armed for startRun.
+     Back already called clearWipe. Do not wipe here. */
   try{ G.you = null; G.members = []; G.make = null; G.running = false; }catch(e){}
   try{ card.classList.remove("card--open"); }catch(e){}
   try{ veil.classList.remove("veil--make"); }catch(e){}
@@ -43280,6 +43646,9 @@ function opening(){
       (FIRST_CONSUL.holiday || "Taylor Day") + ' (' + (FIRST_CONSUL.holidayFull || "Day of the First Consul") +
       '), a national holiday. Comparison to him is blasphemy; The Greatest may descend under him only.</p></details>' +
     '<div class="legend">' + (function(){ try{ return partyLegendHTML(); }catch(e){ return ""; } })() + '</div>' +
+    /* 20261110bv NEPTUNE-TITLE hook (copy only): primary is Continue (existing
+       career, loads it directly). Secondary is "New career" — Neptune may retitle
+       it "Start a new career". No delete warning belongs on this card. */
     '<div class="card__actions">' +
       (hasSave ? '<button class="btn" type="button" id="cont" data-gp="boot:cont">Continue' +
         (peek.name ? ' — ' + peek.name : '') +
@@ -43364,23 +43733,28 @@ function cardActContinue(){
     const acts = card.querySelector(".card__actions");
     if(acts) acts.innerHTML = '<button class="btn" type="button" disabled>Loading career…</button>';
   }catch(e){}
-  yieldMain(() => {
-    let ok = false;
-    try{ ok = !!loadSave(); }catch(e){ ok = false; }
-    if(!ok || !G.you || !(G.members && G.members.length)){
-      G._booting = false;
-      showContinueBroken();
-      return;
-    }
-    yieldPaint(() => {
-      try{ begin(); }
-      catch(e){
-        if(window.console) console.warn("begin", e);
+  const go = () => {
+    yieldMain(() => {
+      let ok = false;
+      try{ ok = !!loadSave(); }catch(e){ ok = false; }
+      if(!ok || !G.you || !(G.members && G.members.length)){
         G._booting = false;
-        showContinueBroken(e);
+        showContinueBroken();
+        return;
       }
+      yieldPaint(() => {
+        try{ begin(); }
+        catch(e){
+          if(window.console) console.warn("begin", e);
+          G._booting = false;
+          showContinueBroken(e);
+        }
+      });
     });
-  });
+  };
+  /* 20261110bv: the IDB career may not be in cache yet on a fast Continue click. */
+  if(typeof ENG_IDB !== "undefined" && !ENG_IDB.ready) engIdbWhenReady(go, 2000);
+  else go();
 }
 function resumeLiveCareer(){
   /* Pause menu Continue: HUD back. Chamber rooms still trap — walk out. */
@@ -43903,9 +44277,15 @@ function sortedCard(){
 }
 function startRun(){
   const r = G.make.sorted || {pos:{econ:0,lib:0,def:0,wel:0}, loyal:0};
+  /* 20261110bv: wipe the active slot only after a verified archive. Archives stay. */
   if(G._wipeOnOath){
     G._wipeOnOath = false;
-    try{ wipeCareerSaves(); }catch(e){} try{ localStorage.removeItem(SAVE_KEY); }catch(e){}
+    if(G._archiveVerified && G._archiveVerified.ok){
+      try{ careerWipeActive(); }catch(e){}
+    }else{
+      /* Should have been archived on Yes. If not, do not wipe. */
+      try{ careerArchiveCurrent("start-run"); }catch(e){}
+    }
   }
   if(mkMesh){ scene.remove(mkMesh); mkMesh = null; }
   mkLights(false);
@@ -44140,7 +44520,45 @@ try{ migrateGfx(); }catch(e){}
 /* Keep the opening card responsive. Quality setup and the first room build
    happen after Continue/New career, never on the menu's critical path. */
 try{ resize(); }catch(e){}
-try{ opening(); }catch(e){
+function bootTitle(){
+  /* 20261110bv JUPITER: do not decide "no save" until IndexedDB has answered
+     (or a short timeout). A large career is often IDB-only. */
+  const fallback = (e) => {
+    if(window.console) console.warn("opening", e);
+    try{
+      veil.hidden = false;
+      card.classList.add("card--open");
+      card.innerHTML = '<h1>One Nation, Under, ME.</h1><p>Could not finish the start card.</p>' +
+        '<div class="card__actions">' +
+        '<button class="btn" type="button" id="cont" data-gp="boot:cont">Continue</button>' +
+        '<button class="btn" type="button" id="fresh" data-gp="boot:fresh">New career</button></div>';
+      const c = el("cont"), f = el("fresh");
+      if(c) c.onclick = () => { try{ cardActContinue(); }catch(err){ softUnstickVeil(); } };
+      if(f) f.onclick = () => { try{ bootFreshCareer(); }catch(err){ softUnstickVeil(); } };
+    }catch(e2){}
+  };
+  const safeOpen = () => {
+    try{
+      if(G._booting) return;
+      if(G.make) return;
+      if(G.running && G.you && G.members && G.members.length) return;
+      opening();
+    }catch(e){ fallback(e); }
+  };
+  let peeked = null;
+  try{ peeked = peekSave(); }catch(e){}
+  if(peeked) safeOpen();
+  else {
+    try{
+      document.body.classList.add("boot-menu");
+      card.classList.add("card--open");
+      veil.hidden = false;
+      card.innerHTML = '<div class="eyebrow">One Nation, Under, ME.</div><h1>Looking for your career…</h1><p>Checking this browser\'s larger store for a saved sitting.</p>';
+    }catch(e){}
+  }
+  engIdbWhenReady(safeOpen, 2000);
+}
+try{ bootTitle(); }catch(e){
   if(window.console) console.warn("opening", e);
   try{
     veil.hidden = false;
