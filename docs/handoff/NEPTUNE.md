@@ -4,6 +4,25 @@ Neptune owned: visuals, the visible world, offices' look, LiveTalk/voices, the L
 JUPITER owns systems (procedure/clock, offices + ONUM_OFFICE_HISTORY, family sim, regions, Engine charter/audit, saves, powers, war). MARS owns QA + onumCandid. Don't edit another owner's systems; guard every cross-owner call.
 
 
+## 20261110br — easy UI + plain dialogue (Dominic: "pull common Ui from known games and simplify to easiest as well as dialogue") (on bq `0d76be2`)
+- One new `<style id="brEasyCss">` + `<script id="brEasyJs">` before `</body>` in all 6 mirrors. Presentation only: no game data, engine text, simulation, 3D layout or JUPITER systems touched. bm `nlPromptFit`, bn `nnQolCss/Js`, bo/bq `boLookCss` (dual focus ring kept), bp amenDesk powers, cause->effect/G.baDesk/followUps, cabAsk callOn, catch-dwell, rolePowers untouched.
+- Text sources are never rewritten: `#tkSay` and `#ndFd .fd-l .t` keep their exact text (cabPaint/dedupe/heckle code reads them). The simplified view is a sibling (`.br-v` on desk lines, CSS clamp + `#brSayRow` on the talk box).
+
+| Pattern (borrowed from) | What br does |
+|---|---|
+| Bottom choice bar, big plain verbs (Pokémon / Persona / Fire Emblem) | Live `#prompt` buttons 14px, wrap cleanly; header clamps to 3 lines (hover/focus shows all) |
+| Primary first, Back last (most JRPG menus) | In `#prompt .prompt__opts` and `#tkActs`, Back/Cancel/Leave it/Not now/Walk away move to the end (clicks still go by `data-gp`) |
+| Color roles (Civ / Stardew / XCOM) | gold `.br-pri` = first safe choice; red `.br-dng` = veto/reject/resign/impeach/fire…, `talk__btn--risk`; slate `.br-back` = Back/Walk out. `#apToast` Talk gold, Walk away slate |
+| Numbered shortcuts (Fallout / Mass Effect dialogue wheels) | Existing 1–9 `data-btn` badges are larger + gold. When the game shows no badges, docked choices (`#apToast`, then `#ndFd`, then `#sxDock`) get `data-brn` 1–9 and the number key clicks them (only if the game's own key handler did not take it; never while typing) |
+| Name tag + dialogue box + next cue (Pokémon / Persona / Ace Attorney) | `#tkName` is a gold name plate; long `#tkSay` (>140 chars) clamps to 4 lines with "…more/less"; blinking ▶ cue (static if reduced-motion) |
+| One idea per bubble, no stage clutter (visual novels) | Desk log lines: `*stage*`, `[stage]`, leading/trailing `(stage)` hidden from the visible line; one sentence up to ~140 chars + "…more"; click the line for the full text (full text stays in `.t` and the log) |
+| Always-on controls hint (every console game) | `#brHint` bottom-left, context aware (walking / live prompt / talk / stopped-in-hall / desk / card / typing); lifts above whatever is docked bottom-left |
+| Esc = Back (PC convention) | Esc clicks the visible Walk away on `#apToast`, or the Back/Walk out of the focused prompt/desk/dock. Talk, pause, PC desk and cards keep their own Esc; desk Cancel is never the Esc target |
+
+- Disable (reversible): `localStorage.setItem("onum.easyUi","0")` then reload (or `onumEasyUi.off()` for this tab; `onumEasyUi.on()` re-enables). Default ON. All CSS is gated on `html.br-easy`.
+- QA (box headless, :8817): boot clean apart from the pre-existing `reactEmit` ReferenceError (line ~52260, also on bq `0d76be2`, systems lane). Synthetic checks: prompt reorder + roles, toast numbering + Esc = Walk away, desk line clamp/…more/click-to-open, talk clamp + more toggle, off switch.
+- OPEN for MARS LIVE: real sitting (desk lines, `#sxDock` numbering), talk box with a real NPC, `#apToast` in a corridor, hint placement over the docked desk strip.
+
 ## 20261104bq — fold MARS soft FAILs from bo (on bo `736b34b`)
 - S1: boLookCss window-glow retargeted to real panels: `#pcScreen` (desk computer), `aside.dossier` (desk panes), plus `#ndFd`, `#ndSess`, `#sxDock`. Dropped dead `#office` (3D room key, no DOM id) and `#pzOffice` (settings button).
 - S2: removed HUD button `#hmCab` from glow (no separate cabinet panel id exists).
