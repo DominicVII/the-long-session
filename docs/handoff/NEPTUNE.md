@@ -4,6 +4,19 @@ Neptune owned: visuals, the visible world, offices' look, LiveTalk/voices, the L
 JUPITER owns systems (procedure/clock, offices + ONUM_OFFICE_HISTORY, family sim, regions, Engine charter/audit, saves, powers, war). MARS owns QA + onumCandid. Don't edit another owner's systems; guard every cross-owner call.
 
 
+## 20261110bu — title screen + prompt presentation (on bv `2eeec08`)
+
+Dominic: starting a game said he must start a new career, then warned it would delete his 380-day career. Continuity is the biggest part.
+
+- Stacked on JUPITER bv (`2eeec08`, `jupiter-ct-on-ff47aba`). Presentation only: bound to `window.ONUM_CAREERS` (`peek`, `list`, `restore`, `onReady` / `onum-careers-ready`, `clearWipe`). Did not change save/archive logic.
+- Title: Continue is primary / first / focused, labeled "Continue — {name} · day {N}". Secondary is "Start a new career". Pending load shows "Looking for your career…", then refreshes. No "delete" / "replace" wording on the title or on the way into a game.
+- Enter / Space never reach Start a new career when a save exists or the load is pending (including a focused #fresh). Esc is non-destructive on the title; Back on confirm / archive / name / party cards.
+- Confirm card: archive-and-keep copy; Back primary; Yes danger-styled; typed confirm only after a failed archive (retry), otherwise one click on Yes. Oath only after Yes.
+- nameCard + sortedCard Back → `ONUM_CAREERS.clearWipe()` and the title (bv already cleared wipe on the confirm Back; not duplicated there).
+- "Earlier careers (N)" on the title when archives exist; restore confirm, then `ONUM_CAREERS.restore` (which archives the current career first).
+- Stamp `20261110bu` in `src/lib/onum-build.ts` and the HTML stamp lines. All six mirrors updated (public/session.html still differs only by the `../neptune/` path). `brEasy*` / `nlPromptFit*` / `nnQol*` / `boLookCss` byte-identical.
+- Left for JUPITER: engine/save-slot work is already in bv. Left for MARS: CODE + LIVE of bu on top of bv, especially Continue from a day-380 save (localStorage / IDB-only / backup-key-only), Enter/Space never hitting New career, archive still loadable after a new career + oath + reload, and `?limits=classic` boot.
+
 ## 20261110bt — fold MARS CODE soft FAILs S1–S5 on br (on br `8684961`)
 - Only `brEasyCss` / `brEasyJs` changed (+ stamp). No engine/systems, no other Neptune blocks; `reactEmit` (JUPITER, bs) untouched.
 - S1 `onumEasyUi.off()` is a full teardown: clears the 450ms tick + pending debounce, disconnects all 3 MutationObservers, removes the key/click listeners, undoes every Back-last move (journaled `{b, par, next}`, restored in reverse), strips `data-brn`, `.br-pri/.br-dng/.br-back`, `.br-v`, `.br-has/.br-open`, `#tkSay .br-long/.br-open`, restores any `title` it set, removes `#brSayRow` + `#brHint`, then `markPicks()` if it reordered. `on()` restarts idempotently. Boot with `onum.easyUi="0"` installs nothing (API still present so `on()` works live).
