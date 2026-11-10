@@ -4,6 +4,14 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261110bx: a new career's first save writes
+
+`20261110bx` (on `20261110bw`). Save-path fix only. Continue's label and default focus, Back as the primary confirm button, and Neptune's stacked blocks (`brEasyCss` / `brEasyJs`, `nlPromptFit*`, `nnQol*`, `boLookCss`) are untouched.
+
+- **H1 (MARS hard FAIL on bw).** After Start a new career, Yes, and the oath, the new sitting runs at day 1 but its first save is dropped without a note. The title had already peeked the old career, and that peek raised a save-rank guard (`SV.rank`) to the old sitting's rank (day 380). Wiping the active slot for the new career never lowered that guard, so `save()` and the pagehide flush refused the shorter day-1 write. After a reload, Continue still opened the archived 380-day career, and everything played in the new one was lost.
+- **Fix.** Once the old career has been archived and the active slot has been wiped, reset `SV.rank` and `SV.lastBody` to their initial values. The reset is in `careerWipeActive` and again in `startRun` after that verified wipe. The Back path (`clearWipe`) does not wipe and does not reset the guard. A shorter career in the same slot, for example a stale tab, is still refused.
+- **Test.** `qa/career-continuity.mjs` now plays a new career to its first save in the localStorage, IndexedDB-only, and backup-key-only cases, reloads, and expects Continue to open the new career while the 380-day sitting remains in Earlier careers and can be restored. It also checks that a lower-rank stale write is still refused.
+
 ## 20261110bw: Continue opens the archived career after an oath wipe
 
 `20261110bw` (on `20261110bu`). Presentation and loader wiring only. JUPITER's archive/wipe API (`stamp:"20261110bv"`) and Neptune's easy-UI blocks (`brEasyCss` / `brEasyJs`, `nlPromptFit*`, `nnQol*`, `boLookCss`) are untouched.

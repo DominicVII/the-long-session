@@ -767,8 +767,8 @@ async function run() {
       dump: window.onumLimDump && window.onumLimDump(),
       hasCard: !!(document.getElementById("card") && document.getElementById("card").innerHTML),
     }));
-    ok("?limits=classic boots (stamp bw, limits mode classic, title card present)",
-      !!(classic.stamp === "20261110bw" && classic.dump && classic.dump.mode === "classic" && classic.hasCard),
+    ok("?limits=classic boots (stamp bx, limits mode classic, title card present)",
+      !!(classic.stamp === "20261110bx" && classic.dump && classic.dump.mode === "classic" && classic.hasCard),
       JSON.stringify({ stamp: classic.stamp, mode: classic.dump && classic.dump.mode }));
 
     const unexpected = [...pageErrors, ...errors2, ...errors3, ...errors4, ...errors5].filter((m) => {

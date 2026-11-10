@@ -1,7 +1,10 @@
 #!/usr/bin/env node
-/* 20261110bv JUPITER / 20261110bw NEPTUNE: headless continuity tests.
+/* 20261110bv JUPITER / 20261110bw NEPTUNE / 20261110bx JUPITER: headless continuity tests.
    Seeds a day-380 career and asserts Continue / archive / restore.
    bw adds Continue-after-wipe (reload and crash-before-first-save).
+   bx adds New career → oath → first save → reload: Continue opens the new
+   career, and the 380-day sitting stays in Earlier careers. Also checks
+   that a lower-rank stale write is still refused in the ordinary case.
    Usage: node qa/career-continuity.mjs [path-to-worktree]
 */
 import http from "node:http";
@@ -113,6 +116,52 @@ const SEED_LS = (key, raw, clearOthers) => {
 const SEED_META = (meta) => {
   localStorage.setItem("longsession.v3.meta", JSON.stringify(meta));
 };
+
+
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const CLEAR_ALL = async () => {
+  const drop = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (!k) continue;
+    if (k.indexOf("longsession.v3") === 0 || k.indexOf("onum_career_archive_") === 0 || k.indexOf("onum.qa.filler.") === 0) drop.push(k);
+  }
+  drop.forEach((k) => { try { localStorage.removeItem(k); } catch (e) {} });
+  await new Promise((resolve) => {
+    try {
+      const d = indexedDB.deleteDatabase("onum-saves");
+      d.onsuccess = d.onerror = d.onblocked = () => resolve(true);
+    } catch (e) { resolve(false); }
+  });
+};
+
+async function completeOathToStartRun(page, newName) {
+  await page.waitForFunction(() => !!(document.getElementById("nameIn") || document.getElementById("mkGo")), { timeout: 20000 });
+  await page.evaluate((n) => {
+    const i = document.getElementById("nameIn");
+    if (i) {
+      i.value = n;
+      i.dispatchEvent(new Event("input", { bubbles: true }));
+      i.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    try { if (window.G && G.make) G.make.name = n; } catch (e) {}
+  }, newName);
+  await page.click("#mkGo");
+  for (let i = 0; i < 24; i++) {
+    const st = await page.evaluate(() => ({
+      q: !!document.querySelector("[data-q]"),
+      go: !!(document.getElementById("qzGo") && !document.getElementById("qzGo").disabled),
+      join: !!document.querySelector("[data-join]"),
+    }));
+    if (st.join) break;
+    if (st.q) { await page.evaluate(() => { const b = document.querySelector("[data-q]"); if (b) b.click(); }); await delay(180); continue; }
+    if (st.go) { await page.evaluate(() => document.getElementById("qzGo").click()); await delay(400); continue; }
+    await delay(250);
+  }
+  await page.waitForFunction(() => !!document.querySelector("[data-join]"), { timeout: 20000 });
+}
+
 
 async function run() {
   const results = [];
@@ -469,6 +518,344 @@ async function run() {
       !!(quota.ok && (quota.idbOk || quota.lsOk)),
       JSON.stringify({ idbOk: quota.idbOk, lsOk: quota.lsOk, filled: quota.filled, why: quota.why }));
     ok("quota-full: careerFreeQuota does not evict archives", (quota.evicted || []).length === 0, "evicted=" + JSON.stringify(quota.evicted));
+
+    // ── 7. ordinary guard: a shorter in-memory career must not overwrite a longer slot ──
+    await seedOnOrigin(page, origin, async (raw) => {
+      await (async () => {})();
+      const drop = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (!k) continue;
+        if (k.indexOf("longsession.v3") === 0 || k.indexOf("onum_career_archive_") === 0 || k.indexOf("onum.qa.filler.") === 0) drop.push(k);
+      }
+      drop.forEach((k) => { try { localStorage.removeItem(k); } catch (e) {} });
+      await new Promise((resolve) => {
+        try {
+          const d = indexedDB.deleteDatabase("onum-saves");
+          d.onsuccess = d.onerror = d.onblocked = () => resolve(true);
+        } catch (e) { resolve(false); }
+      });
+      localStorage.setItem("longsession.v3", raw);
+    }, raw);
+    await openGame(page, origin);
+    await waitReady(page);
+    await page.waitForFunction(() => {
+      const b = document.getElementById("cont");
+      return !!(b && /380/.test(b.textContent || "") && /Continue/.test(b.textContent || ""));
+    }, { timeout: 20000 });
+    await page.click("#cont");
+    await page.waitForFunction(() => {
+      const day = (typeof window.onumDay === "function") ? window.onumDay() : 0;
+      const name = (typeof window.onumNameOf === "function") ? window.onumNameOf("you") : null;
+      return day === 380 && name === "Dominic Z. Taylor";
+    }, { timeout: 60000 });
+    const staleGuard = await page.evaluate(() => {
+      const beforeRaw = window.ONUM_CAREERS.activeRaw && window.ONUM_CAREERS.activeRaw();
+      let beforeDay = null, beforeName = null;
+      try {
+        const d = beforeRaw && beforeRaw.charAt(0) === "{" ? JSON.parse(beforeRaw) : null;
+        if (d) { beforeDay = d.day; beforeName = d.you && d.you.name; }
+      } catch (e) {}
+      let g = null, gHow = null;
+      try {
+        if (window.NEPTUNE && typeof window.NEPTUNE.debug === "function") {
+          g = window.NEPTUNE.debug().G; gHow = "NEPTUNE.debug";
+        }
+      } catch (e) {}
+      if (!g) { try { g = window.G; gHow = g ? "window.G" : null; } catch (e) {} }
+      let lowered = false;
+      if (g) {
+        try { g.day = 1; g.sittingDay = 1; g.minute = 0; lowered = (g.day === 1); } catch (e) {}
+      }
+      let liveDay = (typeof window.onumDay === "function") ? window.onumDay() : null;
+      try { window.dispatchEvent(new Event("pagehide")); } catch (e) {}
+      const afterRaw = window.ONUM_CAREERS.activeRaw && window.ONUM_CAREERS.activeRaw();
+      let afterDay = null, afterName = null;
+      try {
+        const d = afterRaw && afterRaw.charAt(0) === "{" ? JSON.parse(afterRaw) : null;
+        if (d) { afterDay = d.day; afterName = d.you && d.you.name; }
+      } catch (e) {}
+      let lsDay = null;
+      try {
+        const ls = localStorage.getItem("longsession.v3");
+        const d = ls && ls.charAt(0) === "{" ? JSON.parse(ls) : null;
+        if (d) lsDay = d.day;
+      } catch (e) {}
+      return {
+        gHow, lowered, liveDay,
+        beforeDay, beforeName, afterDay, afterName,
+        sameRaw: afterRaw === beforeRaw,
+        lsDay, beforeLen: (beforeRaw || "").length
+      };
+    });
+    ok("ordinary case: lower-rank stale write is refused and the day-380 slot is unchanged",
+      !!(staleGuard.lowered && staleGuard.liveDay === 1 && staleGuard.sameRaw && (staleGuard.afterDay === 380 || staleGuard.lsDay === 380) && staleGuard.beforeName === "Dominic Z. Taylor"),
+      JSON.stringify(staleGuard));
+
+    // ── 8. H1: New career → Yes → oath → first save → reload opens the NEW career ──
+    const NEW_NAME = "Ada Quint";
+    async function playNewCareerFirstSave(label, seeder, seederArg) {
+      await seedOnOrigin(page, origin, seeder, seederArg);
+      await openGame(page, origin);
+      await waitReady(page);
+      await page.waitForFunction(() => {
+        const b = document.getElementById("cont");
+        return !!(b && /380/.test(b.textContent || "") && /Continue/.test(b.textContent || ""));
+      }, { timeout: 30000 });
+
+      if (label === "LS-only") {
+        await page.click("#fresh");
+        await page.waitForFunction(() => !!document.getElementById("freshBack"), { timeout: 10000 });
+        const backRank = await page.evaluate(() => {
+          let peek = null;
+          try { peek = window.ONUM_CAREERS.peek && window.ONUM_CAREERS.peek(); } catch (e) {}
+          return { peek };
+        });
+        await page.click("#freshBack");
+        await page.waitForFunction(() => {
+          const b = document.getElementById("cont");
+          return !!(b && /380/.test(b.textContent || ""));
+        }, { timeout: 10000 });
+        ok("clearWipe / Back does not drop the day-380 Continue label (rank guard stays)",
+          true,
+          JSON.stringify(backRank.peek));
+      }
+
+      await page.click("#fresh");
+      await page.waitForFunction(() => !!document.getElementById("freshYes"), { timeout: 10000 });
+      await page.click("#freshYes");
+      await page.waitForFunction(() => !!(document.getElementById("nameIn") || document.getElementById("mkGo") || document.getElementById("freshType")), { timeout: 30000 });
+      const oathOpen = await page.evaluate(() => !!(document.getElementById("nameIn") || document.getElementById("mkGo")));
+      if (!oathOpen) {
+        ok(label + ": New career oath opened after Yes", false, "stuck on confirm or archive failed");
+        return;
+      }
+      await completeOathToStartRun(page, NEW_NAME);
+      await page.evaluate(() => {
+        const b = document.querySelector('[data-join="IND"]') || document.querySelector("[data-join]");
+        if (b) b.click();
+      });
+      const t1 = Date.now();
+      let mid = null;
+      while (Date.now() - t1 < 60000) {
+        mid = await page.evaluate(() => ({
+          day: typeof window.onumDay === "function" ? window.onumDay() : 0,
+          name: typeof window.onumNameOf === "function" ? window.onumNameOf("you") : null,
+          clock: (document.getElementById("kClock") && document.getElementById("kClock").textContent) || "",
+          veilHidden: !!(document.getElementById("veil") && document.getElementById("veil").hidden),
+          running: !!(window.ONUM && window.ONUM.running && window.ONUM.running()),
+        }));
+        if (mid.name === NEW_NAME && mid.day === 1) break;
+        await delay(400);
+      }
+      ok(label + ": new career is running as " + NEW_NAME + " on day 1",
+        !!(mid && mid.name === NEW_NAME && mid.day === 1),
+        JSON.stringify(mid));
+
+      const saveAttempt = await page.evaluate(() => {
+        let hide = null;
+        try { window.dispatchEvent(new Event("pagehide")); hide = true; } catch (e) { hide = String(e && e.message || e); }
+        return { pagehide: hide };
+      });
+      await delay(800);
+      const afterSave = await page.evaluate((expectName) => {
+        const parse = (raw) => {
+          if (!raw) return null;
+          try { if (raw.charAt(0) === "{") { const d = JSON.parse(raw); return { name: d.you && d.you.name, day: d.day }; } } catch (e) {}
+          return { compressed: true, len: raw.length };
+        };
+        const activeRaw = window.ONUM_CAREERS.activeRaw && window.ONUM_CAREERS.activeRaw();
+        const ls = (() => { try { return localStorage.getItem("longsession.v3"); } catch (e) { return null; } })();
+        const backup = (() => { try { return localStorage.getItem("longsession.v3.backup"); } catch (e) { return null; } })();
+        const meta = (() => { try { return JSON.parse(localStorage.getItem("longsession.v3.meta") || "null"); } catch (e) { return null; } })();
+        const archives = (window.ONUM_CAREERS.list().archives || []).map((x) => ({ name: x.name, day: x.day, id: x.id }));
+        const has380 = archives.some((x) => x.day === 380 && x.name === "Dominic Z. Taylor");
+        const active = parse(activeRaw) || parse(ls) || parse(backup);
+        return {
+          flushedWas: null,
+          active,
+          meta,
+          has380,
+          archiveCount: archives.length,
+          activeLen: (activeRaw || ls || backup || "").length,
+        };
+      }, NEW_NAME);
+      afterSave.flushedWas = saveAttempt.flushed;
+      const wroteNew = !!(afterSave.active && afterSave.active.name === NEW_NAME && afterSave.active.day === 1);
+      ok(label + ": first save of the new career writes (pagehide/svFlushSync)",
+        !!(wroteNew && afterSave.has380),
+        JSON.stringify({ saveAttempt, afterSave }));
+
+      await page.reload({ waitUntil: "domcontentloaded", timeout: 120000 });
+      await page.waitForFunction(() => !!(window.ONUM_CAREERS && window.ONUM_CAREERS.peek), { timeout: 90000 });
+      await waitReady(page);
+      await page.waitForFunction(() => {
+        const b = document.getElementById("cont");
+        return !!(b && /Continue/.test(b.textContent || ""));
+      }, { timeout: 30000 });
+      const titleAfter = await page.evaluate((expectName) => {
+        const btn = document.getElementById("cont");
+        const fresh = document.getElementById("fresh");
+        const archBtn = document.getElementById("bootArchives");
+        const peek = window.ONUM_CAREERS.peek && window.ONUM_CAREERS.peek();
+        return {
+          btn: btn && btn.textContent,
+          isNew: !!(btn && btn.textContent && btn.textContent.indexOf(expectName) >= 0 && /day 1/.test(btn.textContent)),
+          isOld: !!(btn && /380/.test(btn.textContent || "") && /Dominic/.test(btn.textContent || "")),
+          hasEarlier: !!(archBtn && /Earlier careers/.test(archBtn.textContent || "")),
+          earlierLabel: archBtn && archBtn.textContent,
+          peek,
+        };
+      }, NEW_NAME);
+      ok(label + ": after reload, Continue names the new day-1 career (not day 380)",
+        !!(titleAfter.isNew && !titleAfter.isOld),
+        JSON.stringify(titleAfter));
+
+      let listed380 = false;
+      if (titleAfter.hasEarlier) {
+        await page.click("#bootArchives");
+        await page.waitForFunction(() => /Your saved sittings/.test((document.querySelector("h1") && document.querySelector("h1").textContent) || ""), { timeout: 10000 });
+        listed380 = await page.evaluate(() => {
+          const text = (document.querySelector(".boot-arch-list") && document.querySelector(".boot-arch-list").textContent) || document.body.innerText || "";
+          return /Dominic Z\. Taylor/.test(text) && /day 380/.test(text);
+        });
+        await page.click("#bootArchBack");
+        await page.waitForFunction(() => !!document.getElementById("cont"), { timeout: 10000 });
+      } else {
+        listed380 = await page.evaluate(() => {
+          const archives = (window.ONUM_CAREERS.list().archives || []);
+          return archives.some((x) => x.day === 380 && x.name === "Dominic Z. Taylor");
+        });
+      }
+      ok(label + ": Earlier careers still lists the 380-day Dominic Z. Taylor archive",
+        listed380,
+        JSON.stringify({ hasEarlier: titleAfter.hasEarlier, earlierLabel: titleAfter.earlierLabel }));
+
+      if (!titleAfter.isNew) {
+        ok(label + ": Continue after first save opens the new career (name/day 1)",
+          false,
+          "title still names the old career, so the in-game Continue path was not run — " + JSON.stringify(titleAfter));
+      } else {
+        await page.waitForFunction(() => {
+          const b = document.getElementById("cont");
+          return !!(b && /Continue/.test(b.textContent || ""));
+        }, { timeout: 10000 });
+        await page.click("#cont");
+        await page.waitForFunction((expectName) => {
+          const veil = document.getElementById("veil");
+          const hidden = !!(veil && veil.hidden);
+          const card = document.getElementById("card");
+          const broken = !!(!hidden && card && /Could not open that sitting/.test(card.textContent || ""));
+          const day = (typeof window.onumDay === "function") ? window.onumDay() : 0;
+          const name = (typeof window.onumNameOf === "function") ? window.onumNameOf("you") : null;
+          const clock = (document.getElementById("kClock") && document.getElementById("kClock").textContent) || "";
+          return broken || (name === expectName && day === 1 && /day 1/.test(clock));
+        }, { timeout: 60000 }, NEW_NAME);
+        const opened = await page.evaluate(() => {
+          const veil = document.getElementById("veil");
+          const hidden = !!(veil && veil.hidden);
+          const card = document.getElementById("card");
+          return {
+            broken: !!(!hidden && card && /Could not open that sitting/.test(card.textContent || "")),
+            day: typeof window.onumDay === "function" ? window.onumDay() : 0,
+            name: typeof window.onumNameOf === "function" ? window.onumNameOf("you") : null,
+            clock: (document.getElementById("kClock") && document.getElementById("kClock").textContent) || "",
+          };
+        });
+        ok(label + ": Continue after first save opens the new career (name/day 1)",
+          !!(!opened.broken && opened.name === NEW_NAME && opened.day === 1 && /day 1/.test(opened.clock || "")),
+          JSON.stringify(opened));
+      }
+
+      const restored = await page.evaluate(() => new Promise((resolve) => {
+        const archives = (window.ONUM_CAREERS.list().archives || []);
+        const hit = archives.find((x) => x.day === 380 && x.name === "Dominic Z. Taylor");
+        if (!hit) { resolve({ ok: false, why: "not-listed" }); return; }
+        window.ONUM_CAREERS.restore(hit.id, (res) => {
+          const raw = window.ONUM_CAREERS.activeRaw && window.ONUM_CAREERS.activeRaw();
+          let name = null, day = null;
+          try {
+            if (raw && raw.charAt(0) === "{") {
+              const d = JSON.parse(raw);
+              name = d.you && d.you.name;
+              day = d.day;
+            }
+          } catch (e) {}
+          resolve({ ok: !!(res && res.ok), name, day, id: hit.id, bytes: res && res.bytes });
+        });
+      }));
+      ok(label + ": 380-day archive is restorable after the new career's first save",
+        !!(restored.ok && (restored.day === 380 || restored.bytes > 0)),
+        JSON.stringify(restored));
+    }
+
+    const seedLs = async (raw) => {
+      const drop = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (!k) continue;
+        if (k.indexOf("longsession.v3") === 0 || k.indexOf("onum_career_archive_") === 0 || k.indexOf("onum.qa.filler.") === 0) drop.push(k);
+      }
+      drop.forEach((k) => { try { localStorage.removeItem(k); } catch (e) {} });
+      await new Promise((resolve) => {
+        try {
+          const d = indexedDB.deleteDatabase("onum-saves");
+          d.onsuccess = d.onerror = d.onblocked = () => resolve(true);
+        } catch (e) { resolve(false); }
+      });
+      localStorage.setItem("longsession.v3", raw);
+    };
+    const seedBackup = async (raw) => {
+      const drop = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (!k) continue;
+        if (k.indexOf("longsession.v3") === 0 || k.indexOf("onum_career_archive_") === 0 || k.indexOf("onum.qa.filler.") === 0) drop.push(k);
+      }
+      drop.forEach((k) => { try { localStorage.removeItem(k); } catch (e) {} });
+      await new Promise((resolve) => {
+        try {
+          const d = indexedDB.deleteDatabase("onum-saves");
+          d.onsuccess = d.onerror = d.onblocked = () => resolve(true);
+        } catch (e) { resolve(false); }
+      });
+      localStorage.setItem("longsession.v3.backup", raw);
+    };
+    const seedIdbBig = async (baseRaw) => {
+      const drop = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (!k) continue;
+        if (k.indexOf("longsession.v3") === 0 || k.indexOf("onum_career_archive_") === 0 || k.indexOf("onum.qa.filler.") === 0) drop.push(k);
+      }
+      drop.forEach((k) => { try { localStorage.removeItem(k); } catch (e) {} });
+      const d = JSON.parse(baseRaw);
+      d.pad = "x".repeat(2500000);
+      const raw = JSON.stringify(d);
+      await new Promise((resolve, reject) => {
+        const rq = indexedDB.open("onum-saves", 1);
+        rq.onupgradeneeded = () => { try { rq.result.createObjectStore("s"); } catch (e) {} };
+        rq.onerror = () => reject(new Error("idb open"));
+        rq.onsuccess = () => {
+          const db = rq.result;
+          const tx = db.transaction("s", "readwrite");
+          tx.objectStore("s").put(raw, "career");
+          tx.oncomplete = () => resolve(true);
+          tx.onerror = () => reject(tx.error || new Error("idb put"));
+        };
+      });
+    };
+
+    const runCase = async (label, seeder, arg) => {
+      try {
+        await playNewCareerFirstSave(label, seeder, arg);
+      } catch (e) {
+        ok(label + ": test harness completed", false, String((e && e.message) || e));
+      }
+    };
+    await runCase("LS-only", seedLs, raw);
+    await runCase("backup-key-only", seedBackup, raw);
+    await runCase("IDB-only >2.4MB", seedIdbBig, raw);
 
   } finally {
     await browser.close().catch(() => {});
