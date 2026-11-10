@@ -1,3 +1,13 @@
+## 20261110bv: continuity first — Continue loads the sitting; a new career archives, never deletes
+
+`20261110bv` (on `20261110bs`). Neptune's easy-UI blocks (`brEasyCss` / `brEasyJs`) are untouched.
+
+- **Root cause.** A late career often lives only in IndexedDB (the small localStorage quota is full). The title card used to run on the same tick as `indexedDB.open`, before `get("career")` returned, so a 380-day save looked like "no save" and the only button was New career. A moment later the blob arrived, and the new-career confirm named that career and warned that a new oath would replace it.
+- **Fix.** Boot waits for IndexedDB (or two seconds) and refreshes the title when the career arrives. A small `longsession.v3.meta` is written on every successful save so Continue can name the sitting immediately. Continue itself waits for the store before `loadSave`.
+- **Archive.** Starting a new career copies the current blob to a permanent slot (`onum_career_archive_<ISO>_<name>`) in localStorage and IndexedDB *before* any wipe. The write is read back to verify; only then may the active slot be cleared (`startRun`). Archives are never evicted to free quota. If the archive cannot be written, the new career does not start. Back calls `ONUM_CAREERS.clearWipe()` so `G._wipeOnOath` is not left armed.
+- **API (for Neptune).** `window.ONUM_CAREERS.peek()` (sync sidecar: name, day, rank, slot), `.list()`, `.load(slotId)`, `.archiveCurrent()`, `.restore(slotId)`, `.onReady(cb)` (also `onum-careers-ready` event), `.clearWipe()`.
+- Title and confirm copy hooks are marked `NEPTUNE-TITLE` for Neptune's wording pass.
+
 ## 20261108d: the grant shows the moment you open the Engine
 
 - Opening the Engine, not only the next morning, applies the lift if it has already asked.
