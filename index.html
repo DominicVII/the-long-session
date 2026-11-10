@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261104bf">
+<meta name="onum-build" content="20261104bl">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -21,11 +21,11 @@
 <meta property="og:title" content="One Nation, Under, ME.">
 <!-- Standalone: system fonts. No CDN, no vendor folder. -->
 <style id="uxAyCss">/* 20261104az: big, steady hit targets on prompt and session buttons */#ndSess button,#ndFd button,#sxDock button,.fd-hands button,#apToast button,#sxParkBar button,.talk__btn,.tk-morebtn,#tkDone{min-height:44px!important;min-width:44px!important;touch-action:manipulation}#ndSess button,#ndFd button,#sxDock button{padding-left:12px;padding-right:12px;font-size:14px}#sxParkBar button{height:auto!important}/* 20261104az MARS: a live prompt is the one surface: side chrome folds, nameplates dim and stop taking clicks */body:has(#prompt.is-live) #clDock,body:has(#prompt.is-live) #clTx,body:has(#apToast) #clDock,body:has(#apToast) #clTx{display:none!important}body:has(#prompt.is-live) .plate,body:has(#apToast) .plate{opacity:.25!important;pointer-events:none!important}/* stable, large prompt targets: fixed width and a reserved two-line ticker so buttons never jump under the finger */#prompt.is-live{background:#0c0f13!important;border:2px solid #c9a24a!important;z-index:60}#prompt.is-catch{width:min(94vw,560px);box-sizing:border-box}#prompt .prompt__catch-line{min-height:2.7em;max-height:2.7em;overflow:hidden}#prompt .prompt__btn{min-height:44px!important;min-width:120px!important;font-size:14px;padding:10px 14px;touch-action:manipulation;transition:none}#prompt .prompt__opts,#prompt .prompt__catch-row{gap:8px}</style>
-</head>
+<style id="uxBlCss">/* 20261104bl: follow-ups strip styling only (no HUD fit) */#ndSess .nsx-fu{margin:6px 0;padding:5px 6px;background:#1d1a10;border:1px solid #c9a24a;border-radius:6px}#ndSess .nsx-fu b{color:#ffe08a;font:700 11px system-ui;letter-spacing:.06em;text-transform:uppercase}#ndSess .nsx-fu button{display:block;width:100%;text-align:left;margin:3px 0;background:#2a2410;color:#f4f1e8;border:1px solid #6b5a2a;border-radius:4px;padding:5px 7px;font:12.5px system-ui;cursor:pointer}</style></head>
 <body>
 <script>
 (function(){
-  var STAMP = "20261104bf";
+  var STAMP = "20261104bl";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -10780,7 +10780,7 @@ function apAgenda(m){
 }
 function apBudget(m){ const d = G.day; if(m._apD !== d){ m._apD = d; m._apN = 0; } return m._apN < 3; }
 function apToast(m, a){
-  try{ if(G.speechApproach || (typeof CATCH !== "undefined" && (CATCH.on || CATCH.armedByInteract)) || speechStationNear(1.15)) return; }catch(e){}
+  try{ if(G.speechApproach || (typeof CATCH !== "undefined" && (CATCH.on || CATCH.armedByInteract)) || speechStationNear(1.85)) return; }catch(e){}
   try{ if(AP.toast) AP.toast.remove(); }catch(e){}
   const w = document.createElement("div"); w.id = "apToast";
   try{ w.dataset.npc = m.id; w.dataset.name = m.name; }catch(e){}
@@ -10806,7 +10806,7 @@ function apTick(){
   if(!G || !G.running || (typeof TALK !== "undefined" && TALK.open)) return;
   if(G.t - AP.last < 25) return;
   /* 20261104bf A1: no "stops you" while the stand/catch zone owns the player */
-  try{ if(G.speechApproach || (typeof CATCH !== "undefined" && (CATCH.on || CATCH.armedByInteract)) || speechStationNear(1.15)) return; }catch(e){}
+  try{ if(G.speechApproach || (typeof CATCH !== "undefined" && (CATCH.on || CATCH.armedByInteract)) || speechStationNear(1.85)) return; }catch(e){}
   const here = everyone().filter(m => m && !m.gone && !m.ohSeat && m.room === G.room && m.x != null && apBudget(m) && !m.wantsWord && m.kind !== "player");
   if(!here.length) return;
   const m = pick(here), A = apAgenda(m); if(!A.length) return;
@@ -17583,7 +17583,11 @@ function backStandsFor(id){
 function seatPlayerInSession(){
   /* Place you in a chamber seat when a scheduled sitting / committee opens,
      so seated speech prompts are live without hunting a chair. */
+  /* 20261104bj A1 LIVE: House Floor Call-to-order must not teleport-seat you —
+     audience-side lectern catch needs a quiet standing Floor (W walk / E rise).
+     Take seat / E on a bench still seats. Committee / caucus / press unchanged. */
   if(!G.you || !SEATED_ROOMS[G.room] || G.noSit || G.plainSit) return false;
+  if(G.room === "floor") return false;
   const seats = seatsFor(G.room);
   if(!seats.length) return false;
   /* Prefer a gallery / mid seat, not the chair's dais slot (committee index 3). */
@@ -25402,7 +25406,12 @@ function takeSeat(){
   promptKey = "";
   refreshPanels();
 }
-function riseFromSeat(){ G.you.sitting = false; feed("You rise."); refreshPanels(); }
+function riseFromSeat(){
+  G.you.sitting = false;
+  try{ if(document.activeElement && document.activeElement.blur) document.activeElement.blur(); }catch(e){}
+  feed("You rise.");
+  refreshPanels();
+}
 function floorActions(){
   const b = G.bill, you = G.you, A = [];
   A.push({t: you.sitting ? "Rise" : "Take your seat", c:"5m", run(){
@@ -27505,7 +27514,7 @@ function speechBeats(kind){
 function speechStationNear(maxDist){
   /* Literal stand only. Old 3.5–5.2 m treated the aisle as the lectern
      and auto-armed CATCH while you walked past. */
-  maxDist = maxDist === undefined ? 0.72 : maxDist; maxDist = maxDist <= 1.15 ? maxDist : 0.85; /* 20261104bf: catch zone reaches the 1.15 m hard.dist ring (lectern collider kept you >0.85) */
+  maxDist = maxDist === undefined ? 0.72 : maxDist; maxDist = maxDist <= 1.85 ? maxDist : 0.85; /* 20261104bh: cap 1.85 (audience-side stand); was 1.15 — 20261104bf: catch zone reaches the 1.15 m hard.dist ring (lectern collider kept you >0.85) */
   const ids = SPEECH_STATION_IDS[G.room];
   if(!ids || !G.running) return null;
   const list = PROPS[G.room] || [];
@@ -27562,8 +27571,18 @@ function speechStandPose(o){
 }
 function distToSpeechStand(o){
   if(!o) return 99;
+  /* 20261104bh A1: min of wall-side pose, audience-side mirror, and prop centre —
+     players address the House Floor rostrum from the audience side (z~13.4) */
   const pose = speechStandPose(o);
-  return Math.hypot(cam.x - pose.x, cam.z - pose.z);
+  let d = Math.hypot(cam.x - pose.x, cam.z - pose.z);
+  try{
+    const R = ROOMS[G.room] || {w:10, d:12};
+    let ax = 0 - o.x, az = R.d * 0.42 - o.z, len = Math.hypot(ax, az);
+    if(len < 0.05){ ax = 0; az = -1; len = 1; }
+    ax /= len; az /= len;
+    d = Math.min(d, Math.hypot(cam.x - (o.x + ax * 0.95), cam.z - (o.z + az * 0.95)), Math.hypot(cam.x - o.x, cam.z - o.z));
+  }catch(e){}
+  return d;
 }
 function atSpeechStand(o, slack){
   return distToSpeechStand(o) <= (slack == null ? 0.62 : slack);
@@ -27624,9 +27643,10 @@ function tickSpeechApproach(dt){
 }
 function interactPropOrSpeech(o){
   if(!o) return;
-  /* Seated or already at the stand: open the prop. Do not walk you to the
-     lectern — that was eating File amendment / Career actions. */
-  if(o.id === "table" || (G.you && G.you.sitting && (o.id === "lectern" || o.id === "rostrum" || o.id === "table"))){
+  /* Table: open the prop (amend / career). Lectern / rostrum while seated:
+     20261104bj rise and approach the stand so A1 catch / Press-E can arm —
+     openProp here was blocking the walk-to-lectern path. */
+  if(o.id === "table"){
     openProp(o);
     return;
   }
@@ -28225,10 +28245,11 @@ function catchFrame(dt){
   if(CATCH.suspended) catchResume();
   /* Don't snag while walking to the stand — approach owns the camera */
   if(G.speechApproach) return;
-  const hard = speechStationNear(1.15);
+  const hard = speechStationNear(1.85); /* 20261104bh */
   const atStand = !!(hard && !playerIsMoving());
   /* 20261104bf A1: standing still in the stand zone arms the solo catch itself; Press-E is no longer required (it was stolen by adjacent members) */
-  if(atStand && !PROC.on && !CATCH.on && !CATCH.suppressed && !CATCH.armedByInteract) CATCH.armedByInteract = true;
+  const _soloOpen = !PROC.on || (PROC.phase === "open" && !PROC.speaker); /* 20261104bl A1: open floor, nobody up = solo catch */
+  if(atStand && _soloOpen && !CATCH.on && !CATCH.suppressed && !CATCH.armedByInteract) CATCH.armedByInteract = true;
   if(hard || CATCH.on || CATCH.armedByInteract){ try{ if(AP.toast){ AP.toast.remove(); AP.toast = null; } }catch(e){} }
   /* Armed by E at the stand; walking off before you arrive drops it */
   if(CATCH.armedByInteract && !CATCH.on && !hard && !G.speechApproach){
@@ -28254,12 +28275,12 @@ function catchFrame(dt){
     return;
   }
   /* someone else's turn at station */
-  if(PROC.on && atStand && (PROC.phase === "run" || PROC.phase === "open")){
+  if(PROC.on && !_soloOpen && atStand && (PROC.phase === "run" || PROC.phase === "open")){
     if(CATCH.on) catchClear("wait");
     return;
   }
   /* Solo podium — never from walk-by. E at the stand arms it. */
-  if(!PROC.on && (atStand || (CATCH.on && hard))){
+  if(_soloOpen && (atStand || (CATCH.on && hard))){
     if(CATCH.suppressed){
       if(CATCH.on) catchClear("wait");
       return;
@@ -28535,11 +28556,11 @@ function updatePrompt(thing, dr, seat){
   }
     /* 20261104ay+: at a speech stand, do not let an adjacent member steal the prompt for Press-E talk */
   try{
-    const hardStand = speechStationNear(1.15);
-    if(hardStand && !TALK.open && !(PROC.on && PROC.phase !== "you" && !CATCH.armedByInteract)){
-      if(CATCH.on || CATCH.armedByInteract || G.speechApproach || (hardStand.dist != null && hardStand.dist <= 1.15)){
+    const hardStand = speechStationNear(1.85); /* 20261104bh */
+    if(hardStand && !TALK.open && !(PROC.on && PROC.phase !== "you" && PROC.speaker && !CATCH.armedByInteract)){
+      if(CATCH.on || CATCH.armedByInteract || G.speechApproach || (hardStand.dist != null && hardStand.dist <= 1.85)){
         /* catchFrame / earlier branches own the glass — skip person Press-E */
-        if(thing && thing.type === "person"){ markPicks(); return; }
+        if(thing && thing.type === "person"){ /* 20261104bl A1: drop stale "Press E to speak with …" hm-p */ try{ const pr = el("prompt"); if(pr && !pr.classList.contains("is-catch") && /Press E to speak/.test(pr.textContent || "")) setGlassPrompt(null, null); }catch(e){} markPicks(); return; }
       }
     }
   }catch(e){}
@@ -37658,7 +37679,7 @@ function cabPick(text){
   return seats[Math.floor(Math.random() * seats.length)];
 }
 /* 20261104bb NEPTUNE: a called-on member is seen speaking at once, as text on the floor desk, whether or not voice is invited or LiveTalk answers */
-function cabPaint(p, text, aside){ if(!p || !text) return; try{ const FD = window.NEPTUNE_FLOORDESK, D = document.getElementById("ndFd"); if(FD && typeof FD.line === "function" && D && !D.hidden){ FD.line(p.id, String(text), !!aside); const L = D.querySelector(".fd-log"), d = L && L.lastElementChild; if(d){ d._done = true; const t = d.querySelector(".t"); if(t) t.textContent = String(text); L.scrollTop = L.scrollHeight; } } }catch(e){} try{ vhSay(p, String(text)); }catch(e){} }
+function cabPaint(p, text, aside){ if(!p || !text) return; try{ const FD = window.NEPTUNE_FLOORDESK, D = document.getElementById("ndFd"); if(FD && typeof FD.line === "function" && D && !D.hidden){ const L0 = D.querySelector(".fd-log"), l0 = L0 && L0.lastElementChild, t0 = l0 && l0.querySelector(".t"); if(l0 && l0._pid === p.id && t0 && t0.textContent === String(text)) return; FD.line(p.id, String(text), !!aside); const L = D.querySelector(".fd-log"), d = L && L.lastElementChild; if(d){ d._done = true; d._pid = p.id; const t = d.querySelector(".t"); if(t) t.textContent = String(text); L.scrollTop = L.scrollHeight; } } }catch(e){} try{ vhSay(p, String(text)); }catch(e){} }
 function cabFallback(p){ const role = String((p && p.role) || "my office"); return "Chair, from " + role + ": the department is working through today\u2019s papers. Nothing needs your decision this minute beyond what is on the order paper, and I will put the detail in writing. I need the chair\u2019s support on our next request."; }
 async function cabAsk(p, you, text, kind, callOn){
   if(!p) return; const LT = window.onumLiveTalk; if(!LT || !LT.reply){ if(callOn){ const f = cabFallback(p); cabPaint(p, f); try{ tlog(p.name, f, "talk"); }catch(e){} try{ if(SSN) ssnPublish(); }catch(e){} } return; }
@@ -37862,13 +37883,13 @@ try{ kRoomProps(); }catch(e){ console.warn("room props", e); }
     gate(["pres"], "Draft the report on the state of the Union", "60m", "sotu", () => { spend(60, 10); G.you.standing = jc(G.you.standing + 3); G.you.approval = jc(G.you.approval + 2); try{ feed(execTitle() + " " + surname(G.you.name) + " reported on the state of the Union.", "good"); }catch(e){} return jSay("Forty minutes, one glass of water, and two standing ovations you did not expect.", fx("+3 standing · +2 approval", "an hour")); }),
     gate(["pres"], "Sign a pardon", "20m", "ppardon", () => { spend(20, 3); G.you.approval = jc(G.you.approval + (Math.random() < 0.5 ? 2 : -3)); return jSay("One name, one signature. The press will decide whether it was mercy or a favour.", fx("approval moves", "20 minutes")); }),
     {t:"Ask what the diary holds", c:"2m", run(){ jSay(typeof kCalText === "function" ? kCalText() : "The diary is full.", ""); }}]});
-  jP("exec", {id:"jxcabc", label:"The cabinet chairs", sub:"Each secretary's seat, with a folder on it", x:-2.2, z:5.6, r:2.0, acts:() => [
+  jP("exec", {id:"jxcabc", label:"The cabinet chairs", sub:"Each secretary's seat, with a folder on it", x:-3.3, z:4.0, r:2.0 /* NEP_BF_SPOTS.cabinetTable */, acts:() => [
     gate(["cab:sos"], "Brief the Executive on the realms abroad", "30m", "csos", () => { spend(30, 4); try{ const r = pick(realmEnsure()); G.realmRel = G.realmRel || {}; G.realmRel[r.k] = clamp((G.realmRel[r.k] || 0) + 5, -100, 100); return jSay("Your cable from " + r.capital + " is read twice and quoted once.", fx(r.t + " warmer", "30 minutes")); }catch(e){ return jSay("The realms are quiet. You say so in one page."); } }),
     gate(["cab:treas"], "Steady the Union's money", "30m", "ctreas", () => { spend(30, 4); try{ if(G.money) G.money.index = Math.round(((G.money.index || 0) + 0.5) * 10) / 10; }catch(e){} return jSay("You move the rate a hair and the bond men breathe out.", fx("money steadier", "30 minutes")); }),
     gate(["cab:war"], "Review the readiness of the forces", "30m", "cwar", () => { spend(30, 4); try{ const w = worldEnsure(); w.heat = Math.max(0, (w.heat || 0) - 2); }catch(e){} return jSay("Three depots, two ships in dock, one general who wants more. You give him nothing and he salutes anyway.", fx("frontier calmer", "30 minutes")); }),
     gate(["cab:ag"], "Bring the Union's case to court", "30m", "cag", () => { spend(30, 4); const S = pick(G.states || [{n:"a state"}]); G.cases = G.cases || []; G.cases.push({t:"the Union v. " + S.n, state:S.n, day:G.day, voted:[]}); return jSay("You file against " + S.n + ". The bench will have it by the week's end.", fx("a case filed", "30 minutes")); })]});
   /* govoffice */
-  jP("govoffice", {id:"jgsec", label:"The Governor's secretary", sub:"A list in her hand and a pencil behind her ear", x:2.2, z:3.2, r:2.0, acts:() => [
+  jP("govoffice", {id:"jgsec", label:"The Governor's secretary", sub:"A list in her hand and a pencil behind her ear", x:3.3, z:3.0, r:2.0 /* NEP_BF_SPOTS.govSecretary */, acts:() => [
     gate(["gov"], "Grant a state pardon", "20m", "gpardon", () => { spend(20, 3); G.you.approval = jc(G.you.approval + (Math.random() < 0.5 ? 2 : -2)); return jSay("A man who stole a horse thirty years ago gets his vote back. His daughter writes to thank you.", fx("approval moves", "20 minutes")); }),
     gate(["gov"], "Call out the state guard", "30m", "gguard", () => { spend(30, 5); const S = (G.states || []).find(s => s.n === G.you.state); if(S) S.unrest = clamp((S.unrest || 0) - 6, 0, 100); G.you.approval = jc(G.you.approval - 1); return jSay("Two companies at the depot by dusk. The streets go quiet, and some people resent that.", fx(S ? S.n + " calmer" : "order kept", "-1 approval")); })]});
   /* senate: the dais and the cloakroom */
@@ -37879,7 +37900,7 @@ try{ kRoomProps(); }catch(e){ console.warn("room props", e); }
     gate(["senate"], "Place a hold on the bill", "15m", "shold", () => { const b = G.bill; if(!b || b.done) return jSay("Nothing to hold."); b.voteDay = (b.voteDay || G.day) + 2; G.you.influence = jc(G.you.influence - 2); return jSay("One note to the leader's office and the " + b.title + " sits two more days.", fx("vote slips 2 days", "-2 influence")); }),
     gate(["senate"], "Whip for cloture", "30m", "sclot", () => { const b = G.bill; if(!b || b.done || !b.filibustered) return jSay("No one is talking a bill to death today."); b.filibustered = false; b.voteDay = Math.max(G.day + 1, (b.voteDay || G.day) - 2); G.you.influence = jc(G.you.influence - 3); return jSay("Sixty names on the motion. The talking stops.", fx("filibuster ended", "-3 influence")); })]});
   /* court: counsel tables */
-  jP("court", {id:"jccounsel", label:"The counsel tables", sub:"Petitioner on the left, the Union on the right", x:0, z:4.4, r:2.4, acts:() => [
+  jP("court", {id:"jccounsel", label:"The counsel tables", sub:"Petitioner on the left, the Union on the right", x:4.6, z:6.8, r:2.4 /* NEP_BF_SPOTS.witnessStand */, acts:() => [
     gate(["bench"], "Write a dissent", "45m", "bdiss", () => { spend(45, 6); G.you.standing = jc(G.you.standing + 1); return jSay("Twelve pages. It changes nothing today and will be quoted in thirty years.", fx("+1 standing", "45 minutes")); }),
     gate(["bench"], "Take up the petitions for review", "20m", "bcertj", () => { try{ benchCert(); return null; }catch(e){ return jSay("The clerk has no petitions ready."); } }),
     gate(["cab:ag"], "Argue the Union's case", "60m", "agarg", () => { spend(60, 8); G.you.standing = jc(G.you.standing + 2); return jSay("You stand at the right-hand table and argue that the act is the law. Two justices nod; one does not.", fx("+2 standing", "an hour")); })]});
@@ -42160,6 +42181,7 @@ function tick(dt){
   /* walking while seated stands you up, rather than dragging the chair */
   if(G.you && G.you.sitting && (vx || vz)){
     G.you.sitting = false;
+    try{ if(document.activeElement && document.activeElement.blur) document.activeElement.blur(); }catch(e){}
     feed("You get up.");
     if(G._deskWasBare){
       G._deskWasBare = false;
@@ -47939,11 +47961,12 @@ try{
         (Q.length ? '<div><b style="color:#ffe08a">Waiting to speak</b><ol class="nsx-q">' + Q.slice(0, 8).map(q => '<li>' + esc4(nm(idOf(q), q && q.name)) + '</li>').join("") + '</ol>' + (Q.length > 8 ? '<small>and ' + (Q.length - 8) + ' more</small>' : "") + '</div>' : "") +
         (R ? '<div class="nsx-board"><div>' + (ay != null ? ay : cnt("aye") || 0) + '<small>AYE</small></div><div>' + (no != null ? no : cnt("no") || 0) + '<small>NO</small></div><div>' + (pr != null ? pr : cnt("present") || 0) + '<small>PRESENT</small></div></div>' + (R.needed ? '<div class="nsx-row"><span>Needed to carry</span><span>' + esc4(R.needed) + '</span></div>' : "") : "") +
         (S.speak ? '<div class="nsx-row"><input id="nsxSay" placeholder="Say to the chamber\u2026" style="flex:1;background:#000;color:#fff;border:1px solid #6b6f7a;border-radius:4px;padding:4px"><button type="button" id="nsxSpeak" style="background:#ffe08a;color:#111;border:0;border-radius:4px;font-weight:700;cursor:pointer">Speak</button></div>' : "") + '<div class="nsx-acts">' + (canVote ? '<button type="button" data-v="aye">Vote aye</button><button type="button" data-v="no">Vote no</button><button type="button" class="g" data-v="present">Present</button>' : "") +
-          acts.map(a => '<button type="button" class="g" data-a="' + esc4(a.id) + '">' + esc4(a.label) + '</button>').join("") + '</div></div>';
+          acts.map((a, i) => '<button type="button" class="g" data-ai="' + i + '" data-a="' + esc4(a.id) + '"' + (a.arg != null ? ' data-arg="' + esc4(a.arg) + '"' : '') + '>' + esc4(a.label) + '</button>').join("") + '</div></div>';
       const sb = P.querySelector("#nsxSpeak"); if(sb) sb.onclick = () => { const i = P.querySelector("#nsxSay"), t = i && i.value.trim(); if(!t) return; try{ (window.onumSession || {}).speak(t); }catch(e){} };
       P.querySelector("#nsxMin").onclick = () => { SN.min = !SN.min; render(); };
       P.querySelectorAll("[data-v]").forEach(b => b.onclick = () => { try{ OS.vote(b.getAttribute("data-v")); }catch(e){ try{ console.warn("onumSession.vote", e); }catch(e2){} } });
-      P.querySelectorAll("[data-a]").forEach(b => b.onclick = () => { const id = b.getAttribute("data-a"), a = acts.find(x => x.id === id); try{ const O = window.onumSession || {}; if(typeof O[id] === "function") O[id](a && a.arg); else if(typeof O.act === "function") O.act(id, a && a.arg); }catch(e){ try{ console.warn("onumSession." + id, e); }catch(e2){} } });
+      /* 20261104bk C4: several Call-on buttons share id "callon" — use data-ai / data-arg so Tennyson/Walsh are not Bray */
+      P.querySelectorAll("[data-ai]").forEach(b => b.onclick = () => { const i = +b.getAttribute("data-ai"), a = acts[i] || {id:b.getAttribute("data-a")}; const id = a.id || b.getAttribute("data-a"); let arg = a.arg; if(b.hasAttribute("data-arg")){ const raw = b.getAttribute("data-arg"); arg = raw === "" ? raw : (isNaN(+raw) ? raw : +raw); } try{ const O = window.onumSession || {}; if(typeof O[id] === "function") O[id](arg); else if(typeof O.act === "function") O.act(id, arg); }catch(e){ try{ console.warn("onumSession." + id, e); }catch(e2){} } });
     }catch(e){ try{ console.warn("NEPTUNE-SESSION render", e); }catch(e2){} }
   }
   SN.render = render;
@@ -52300,12 +52323,17 @@ function baRebut(a, b){ const t = baTopic(); return pick([baSn(b) + " talks as i
 /* A. Call on always gets words, and the floor is held until they finish */
 function baHoldFloor(p, out){ if(!SSN) return; SSN.floorId = p.id; SS2.spkUntil = Date.now() + ss2Read(out); SSN._busy = SS2.spkUntil + 800; ss2Pub();
   const tok = SSN._tok; setTimeout(() => { try{ if(SSN && SSN.floorId === p.id && SSN._tok === tok){ SSN.floorId = null; SSN._busy = 0; ss2Pub(); } }catch(e){} }, ss2Read(out) + 900); }
-{ const _ca = cabAsk; cabAsk = async function(p, you, text, kind){ if(!p || !SSN) return; const n0 = (SSN._th || []).length; SSN.floorId = p.id; try{ ss2Pub(); }catch(e){}
-  let done = false; const fall = () => { if(done || !SSN) return; done = true; if((SSN._th || []).length > n0) return; const out = baReport(p); try{ cabShow(p, out); }catch(e){ try{ speakAt(p, out); }catch(_){} } baHoldFloor(p, out); };
+{ const _ca = cabAsk; cabAsk = async function(p, you, text, kind){ if(!p || !SSN) return; const n0 = (SSN._th || []).length; /* 20261104bk: do not bump _baGen here — cabCallOn owns supersede; capture current gen */
+  const gen = SSN._baGen || 0; SSN.floorId = p.id; try{ ss2Pub(); }catch(e){}
+  /* 20261104bi/bk: a later Call-on bumps _baGen; this ask's 9s fallback / hold must not reclaim the floor */
+  const live = () => !!SSN && SSN._baGen === gen;
+  let done = false; const fall = () => { if(done || !live()) return; done = true; if((SSN._th || []).length > n0) return; const out = baReport(p); try{ cabShow(p, out); }catch(e){ try{ speakAt(p, out); }catch(_){} } baHoldFloor(p, out); };
   const timer = setTimeout(fall, 9000);
   try{ await _ca.apply(this, arguments); }catch(e){}
-  clearTimeout(timer); if(!done){ if(SSN && (SSN._th || []).length > n0){ done = true; const last = SSN._th[SSN._th.length - 1]; baHoldFloor(p, last.text); } else fall(); } }; }
+  clearTimeout(timer); if(!live()) return; if(!done){ if(SSN && (SSN._th || []).length > n0){ done = true; const last = SSN._th[SSN._th.length - 1]; baHoldFloor(p, last.text); } else fall(); } }; }
 cabCallOn = function(id){ try{ const p = byId(isNaN(+id) ? id : +id); if(!p || !SSN) return false; const kind = SSN.kind;
+    /* 20261104bi C4: calling on B while A holds the floor supersedes A — cancel A's stream/rebut (tok), BA fallback (gen), hold and busy */
+    try{ SSN._tok = (SSN._tok || 0) + 1; SSN._baGen = (SSN._baGen || 0) + 1; SSN._busy = 0; SSN._arg = null; if(typeof SS2 !== "undefined" && SS2){ SS2.spkUntil = 0; } }catch(e){}
     try{ SSN.floorId = p.id; ssnPublish(); }catch(e){}
     /* keep Neptune aside + callOn so bc 25s/cabFallback + cabPaint desk path stay alive */
     try{ cabPaint(p, "rises to report…", true); }catch(e){}
@@ -52534,5 +52562,22 @@ function baSayFocus(){ try{ const a = document.activeElement; if(!a || !/^(INPUT
 }catch(e){} })();
 </script>
 
-</body>
+<script id="uxBlJs">/* 20261104bl: continued effects (G.baDesk / pending G.followUps) surface IN the sitting (cabinet/council/floor) */
+(function(){ function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&","<":"<",">":">",'"':"""}[c])); }
+ function items(){ try{ if(typeof G==="undefined"||!G.running) return []; const out=[], seen={};
+   (G.baDesk||[]).filter(d=>d.day>=G.day-1).forEach(d=>{ if(seen[d.t]) return; seen[d.t]=1; out.push({t:d.t,d:d.d,who:d.whoId,s:"now"}); });
+   (G.followUps||[]).filter(x=>!x.fired).forEach(x=>{ if(seen[x.title]) return; seen[x.title]=1; out.push({t:x.title,d:x.text,who:x.whoId,s:x.day<=G.day?"due":"in "+(x.day-G.day)+"d"}); });
+   return out.slice(0,6); }catch(e){ return []; } }
+ function paint(){ try{ const s=document.getElementById("ndSess"); if(!s||s.hidden) return; const body=s.querySelector(".ns-body")||s; const L=items();
+   let box=s.querySelector(".nsx-fu"); if(!L.length){ if(box) box.remove(); return; }
+   const key=L.map(x=>x.t+x.s).join("|"); if(box&&box._k===key) return;
+   if(!box){ box=document.createElement("div"); box.className="nsx-fu"; const a=body.querySelector(".nsx-acts"); if(a) body.insertBefore(box,a); else body.appendChild(box); }
+   box._k=key; box.innerHTML="<b>Consequences / follow-ups</b>"+L.map((x,i)=>'<button type="button" data-fu="'+i+'" title="'+esc(x.d)+'">'+esc(x.t)+' <i style="opacity:.7">· '+esc(x.s)+(x.who!=null&&typeof byId==="function"&&byId(x.who)?" · "+esc(byId(x.who).name):"")+'</i></button>').join("");
+   box.onclick=function(ev){ const b=ev.target.closest("button[data-fu]"); if(!b) return; const x=L[+b.dataset.fu]; if(!x) return;
+     try{ const m=x.who!=null&&typeof byId==="function"?byId(x.who):null;
+       if(m&&typeof cabAsk==="function"&&typeof SSN!=="undefined"&&SSN){ cabAsk(m,true,"About "+x.t+": "+x.d,"fu"); return; }
+       if(m&&typeof openTalk==="function"){ openTalk(m); return; }
+       if(typeof setSay==="function") setSay(x.t+" — "+x.d, typeof fx==="function"?fx("",""):undefined); }catch(e){} };
+ }catch(e){} }
+ setInterval(paint,900); })();</script></body>
 </html>
