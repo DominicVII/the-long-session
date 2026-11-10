@@ -4,6 +4,50 @@ Neptune owned: visuals, the visible world, offices' look, LiveTalk/voices, the L
 JUPITER owns systems (procedure/clock, offices + ONUM_OFFICE_HISTORY, family sim, regions, Engine charter/audit, saves, powers, war). MARS owns QA + onumCandid. Don't edit another owner's systems; guard every cross-owner call.
 
 
+## 20261110bt — fold MARS CODE soft FAILs S1–S5 on br (on br `8684961`)
+- Only `brEasyCss` / `brEasyJs` changed (+ stamp). No engine/systems, no other Neptune blocks; `reactEmit` (JUPITER, bs) untouched.
+- S1 `onumEasyUi.off()` is a full teardown: clears the 450ms tick + pending debounce, disconnects all 3 MutationObservers, removes the key/click listeners, undoes every Back-last move (journaled `{b, par, next}`, restored in reverse), strips `data-brn`, `.br-pri/.br-dng/.br-back`, `.br-v`, `.br-has/.br-open`, `#tkSay .br-long/.br-open`, restores any `title` it set, removes `#brSayRow` + `#brHint`, then `markPicks()` if it reordered. `on()` restarts idempotently. Boot with `onum.easyUi="0"` installs nothing (API still present so `on()` works live).
+- S2 Esc targets `#apToast` only when it is really clickable (`apLive`: visible, `#prompt` not `.is-live`, pointer-events not none, opacity ≥ .5, Walk away not covered at its centre). With a live prompt Esc clicks the prompt's own Back with `preventDefault` only (no `stopImmediatePropagation`); otherwise nothing is swallowed.
+- S3 `#brHint` z-index 10045 (above `#ndFd` 10040, below `#ndAuditBtn` 10049, modals 10050, `#clPanel`/`#tipCard` 100000+). Placement tries bottom-left (lifted over docks) → top-left → top-right → bottom-right; each spot must sit fully inside the viewport and off every option button (first pass also off panels); no clear spot = hidden. Hidden while `#pauseOverlay.is-open` or a 10050 modal is up.
+- S4 `cut()` counts code points and slices by grapheme (`Intl.Segmenter`, `Array.from` fallback): no split surrogate or ZWJ emoji. Talk-box >140 test uses code points too.
+- S5 `plain()` strips only real stage directions: `*…*` (not `**bold**`, not spans with digits / Option / Motion labels) and `[…]` / `(…)` whose inside is all-lowercase, digit-free, ≤6 words and starts with a known stage verb/adverb (sighs, pauses, leans in, quietly, applause…). "Option (1)", "(3) The motion carries", "[sic]", "[the Speaker]" stay. If stripping would leave nothing, the original line is kept.
+- QA (box headless): node unit checks 18/18 (`/workspace/bt-work/unit.cjs`); page checks: off/on DOM byte-identical to pristine, 0 easy-UI mutations in 2s after off (game's own mutations ignored), reload with "0" clean; Esc with live prompt + dimmed toast → prompt Back, toast untouched, later listeners still see Esc; hint at 1024x600 inside viewport, off buttons, top-left when a 540px desk fills the bottom; desk lines with emoji at 139/140 cut cleanly. Boot error is still only the pre-existing `reactEmit` one.
+- OPEN for MARS LIVE: real sitting with `#sxDock`-docked desk, corridor toast with live prompt, hint top-left over the HUD bar on short screens.
+
+## 20261110br — easy UI + plain dialogue (Dominic: "pull common Ui from known games and simplify to easiest as well as dialogue") (on bq `0d76be2`)
+- One new `<style id="brEasyCss">` + `<script id="brEasyJs">` before `</body>` in all 6 mirrors. Presentation only: no game data, engine text, simulation, 3D layout or JUPITER systems touched. bm `nlPromptFit`, bn `nnQolCss/Js`, bo/bq `boLookCss` (dual focus ring kept), bp amenDesk powers, cause->effect/G.baDesk/followUps, cabAsk callOn, catch-dwell, rolePowers untouched.
+- Text sources are never rewritten: `#tkSay` and `#ndFd .fd-l .t` keep their exact text (cabPaint/dedupe/heckle code reads them). The simplified view is a sibling (`.br-v` on desk lines, CSS clamp + `#brSayRow` on the talk box).
+
+| Pattern (borrowed from) | What br does |
+|---|---|
+| Bottom choice bar, big plain verbs (Pokémon / Persona / Fire Emblem) | Live `#prompt` buttons 14px, wrap cleanly; header clamps to 3 lines (hover/focus shows all) |
+| Primary first, Back last (most JRPG menus) | In `#prompt .prompt__opts` and `#tkActs`, Back/Cancel/Leave it/Not now/Walk away move to the end (clicks still go by `data-gp`) |
+| Color roles (Civ / Stardew / XCOM) | gold `.br-pri` = first safe choice; red `.br-dng` = veto/reject/resign/impeach/fire…, `talk__btn--risk`; slate `.br-back` = Back/Walk out. `#apToast` Talk gold, Walk away slate |
+| Numbered shortcuts (Fallout / Mass Effect dialogue wheels) | Existing 1–9 `data-btn` badges are larger + gold. When the game shows no badges, docked choices (`#apToast`, then `#ndFd`, then `#sxDock`) get `data-brn` 1–9 and the number key clicks them (only if the game's own key handler did not take it; never while typing) |
+| Name tag + dialogue box + next cue (Pokémon / Persona / Ace Attorney) | `#tkName` is a gold name plate; long `#tkSay` (>140 chars) clamps to 4 lines with "…more/less"; blinking ▶ cue (static if reduced-motion) |
+| One idea per bubble, no stage clutter (visual novels) | Desk log lines: `*stage*`, `[stage]`, leading/trailing `(stage)` hidden from the visible line; one sentence up to ~140 chars + "…more"; click the line for the full text (full text stays in `.t` and the log) |
+| Always-on controls hint (every console game) | `#brHint` bottom-left, context aware (walking / live prompt / talk / stopped-in-hall / desk / card / typing); lifts above whatever is docked bottom-left |
+| Esc = Back (PC convention) | Esc clicks the visible Walk away on `#apToast`, or the Back/Walk out of the focused prompt/desk/dock. Talk, pause, PC desk and cards keep their own Esc; desk Cancel is never the Esc target |
+
+- Disable (reversible): `localStorage.setItem("onum.easyUi","0")` then reload (or `onumEasyUi.off()` for this tab; `onumEasyUi.on()` re-enables). Default ON. All CSS is gated on `html.br-easy`.
+- QA (box headless, :8817): boot clean apart from the pre-existing `reactEmit` ReferenceError (line ~52260, also on bq `0d76be2`, systems lane). Synthetic checks: prompt reorder + roles, toast numbering + Esc = Walk away, desk line clamp/…more/click-to-open, talk clamp + more toggle, off switch.
+- OPEN for MARS LIVE: real sitting (desk lines, `#sxDock` numbering), talk box with a real NPC, `#apToast` in a corridor, hint placement over the docked desk strip.
+
+## 20261104bq — fold MARS soft FAILs from bo (on bo `736b34b`)
+- S1: boLookCss window-glow retargeted to real panels: `#pcScreen` (desk computer), `aside.dossier` (desk panes), plus `#ndFd`, `#ndSess`, `#sxDock`. Dropped dead `#office` (3D room key, no DOM id) and `#pzOffice` (settings button).
+- S2: removed HUD button `#hmCab` from glow (no separate cabinet panel id exists).
+- S3: stamp `20261104bq` (bo < bp lexical confusion).
+- S5: unscoped `.fd-hands` focus rule dropped (kept `#ndFd .fd-hands`). S4: `#apToast` dual rules kept intentionally (outline + live background are different props).
+- Untouched: dual focus ring, placards, bm/bn blocks, amenDesk/systems.
+
+## 20261104bo — look punch + fold bn MARS LIVE soft notes (on JUPITER bp `056f287`)
+- New `<style id="boLookCss">` after `nnQolJs` (bn/bm blocks `nlPromptFit`, `nnQolCss`/`nnQolJs` untouched).
+- Window-glow: soft gold edge + inset ambient light on `#office`, `#pzOffice`, `#hmCab`, `#ndFd`, `#ndSess`, `#sxDock` (docked children get inset only). No layout changes.
+- Soft placards: office/desk notes, `.fd-cue`, `.fd-top`, asides get letter-spacing .02em, line-height 1.45, cream `#e9dfc4`, muted gold bold.
+- Focus ring (MARS soft FAIL "ring unclear"): 3px `#ffe08a` outline offset 2px + dark gap + 5px `#c9a24a` ring + gold halo on `#sxDock`/`#tkActs`/`.fd-hands`/prompt opts/`#apToast`; focused live option gets light gold fill.
+- CSS only: bp powers (amenDesk/rolePowers/systems), cause→effect, G.baDesk, followUps, catch-dwell, cabAsk callOn untouched; bm fit + bn scroll unchanged.
+- OPEN: LIVE heckle/PO → cabPaint (bn) still needs a sitting recheck by MARS; re-shoot focus ring at screenshot res.
+
 ## 20261104bc — fix MARS soft FAIL on bb: Call-on reply reaches the desk
 - The later `cabAsk = async function(p,you,text,kind)` (20261022f block) replaced the bb `cabAsk(..., callOn)`. Re-wrapped it: it now takes `callOn`; on Call-on the LiveTalk reply is raced against 25s, and empty/timeout gives `cabFallback` (templated report) instead of returning silently. Also no-SSN + callOn paints the fallback.
 - `cabShow` now calls `cabPaint` (desk `.fd-log` line + bubble via vhSay) instead of bare `vhSay`, so every cabinet reply/rebuttal paints the desk.
@@ -394,3 +438,44 @@ Dominic: "Max code and graphical design."
 - `cabAsk(..., callOn=true)`: LiveTalk missing → templated report painted right away; LiveTalk empty/timeout (25s for Call on, 120s otherwise unchanged) → templated report. Real reply → painted on the desk + bubble (voice via `speakAt`/`speak` still only when invited).
 - Not touched: vote/tally/argue (JUPITER ba), catchDwell / setGlassPrompt / TALK.clear (JUPITER ay), az hit-target + `.prompt.is-live` CSS.
 - Gaps: desk paint only when #ndFd is visible (bubble always); no separate LiveTalk chat (#ltcLog) entry; fallback report is generic per office; headless browser boot not run this pass (all inline scripts pass `node --check`).
+
+## 20261104bd (NEPTUNE, on JUPITER ba tip 8b20ec8)
+- **One surface, tighter:** new `#uxBdCss` (appended; az `#uxAyCss` untouched). While `#prompt.is-live` or `#apToast` is up, `.notices`, `#tipCard`, `.wire` fold; `#procBar` and `.compass` dim and stop taking clicks; a live prompt dims a coexisting `#apToast` so only one surface asks. Desk/toast buttons keep min 120px wide, `#ndFd .fd-log` scroll is contained (no page jump under the finger).
+- **Dialogue paint:** `#ndBdPaint` wraps `ss2NpcSpeak`: it captures the speech text from the `onumSessionEvent` speak call and sends it to `cabPaint` → `#ndFd` (and `vhSay`), skipping it if the desk's last line already shows that text. ba vote/argue/holdFloor, cabAsk callOn, cabShow→cabPaint, cabCallOn aside+callOn not touched.
+- **Look:** no change. Faces and bodies from the ultra stamps are already on the tip; I made no look edits without a live check.
+- **For be:** `ss2MaybeHeckle` interjections and `#ltcLog` mirroring still skip cabPaint. Next: route heckles through cabPaint(aside=true). Also a room-distance look pass, after a live screenshot.
+
+
+## 20261104be
+MARS soft FAIL fix: uxBdCss one-surface fold now also hides Ledger wire `#hmWire` (no `.wire` class) during prompt/apToast, same `display:none!important` as `.wire`.
+
+## 20261104bf (NEPTUNE, rebased onto JUPITER bg tip 9142568) — office LOOK/DETAIL only
+No abilities, no PROPS actions, no rolePowers / OFFICE_DUTIES / K_HOME_OF / docketFor / kDeskActs edits (JUPITER owns those).
+- **`execRich()` / `govRich()`**, wired in `kOfficeRich` beside `senateRich`/`courtRich`: emissive windows with floor light-pools, gilt portraits, a floor seal ("THE EXECUTIVE" / "STATE OF <state>"), a cluttered Executive desk (blotter, pen set, out-tray, photo, nameplate) and a grain map under the Governor's desk glass. Door plaques: "THE OFFICE OF THE EXECUTIVE", "OFFICE OF THE GOVERNOR".
+- **Own-office layouts:** `officeRoleSpots()` now gives the Senator and the Justice their own table/mail positions. `nepOfficeRoleLook()`: Senator gets a flag pair by the state-map wall, a portrait and an "OFFICE OF THE SENATOR" plaque. Justice gets darker walnut furniture, a law-book wall, a robe on a stand and "CHAMBERS OF THE JUSTICE". Leader and Representative get door plaques.
+- **Senate (`nepChamberLook`):** a raised presiding dais step with a "PRESIDING OFFICER" plaque, a wooden cap on the existing visitors' rail with a "VISITORS" plaque, and a press rail with a reporters' ledge.
+- **Court:** placards on the existing counsel tables (PETITIONER/RESPONDENT), the lectern and the bar, plus a brass lectern edge. I added no duplicate geometry because the tables, lectern and bar already exist in the base build.
+- **Inert placeholders** (labels only, no click): cabinet table (exec -3.3,4.0, new mesh), Governor's secretary desk (govoffice 3.3,3.0, new mesh), and a witness-stand label on the existing stand (court 4.6,6.8). Their coordinates are exposed as `window.NEP_BF_SPOTS` so JUPITER can attach actions there.
+- **QA:** `node --check` passes on the main script. The headless boot never exposed `G` (same as the base b241e08), so I have no live screenshots.
+- **On bg:** the `#hmWire` selector from be was missing in `#uxBdCss` on the bg tip, so I added it back next to `.wire`. JUPITER bg code is untouched.
+
+## 20261104bm (NEPTUNE, on JUPITER bl c640479) — prompt/HUD options fit the viewport
+- Fixes Dominic + MARS soft FAIL (hud-scroll/SOFT-FAIL-fit.txt): long option lists (Call-on rows, continued effects) ran off-screen, unscrollable.
+- `<style id="nlPromptFit">` + `<script id="nlPromptFitJs">` before `</body>` in all mirrors:
+  - `#prompt.is-live` flex column capped `min(100dvh - 96px, 100% - 24px)`; `.prompt__opts`/`.prompt__catch-row` scroll (overflow-y:auto, overscroll contain, pan-y, -webkit-overflow-scrolling).
+  - `.is-many` (>4 opts: 2-col, 40px) / `.is-lots` (>8: 36px); wheel/touchmove on `#prompt`/`#apToast` stopPropagation.
+  - `#apToast` capped 100dvh-140px scroll; `#ndFd .fd-hands` 30dvh scroll; `#sxDock` dvh cap + pan-y/overscroll on `#sxDock`, fd-on panes, `#tkActs` (bl added no HUD fit, only follow-up strip styling).
+- Untouched: Consequences strip, G.baDesk, followUps, catch arm/dwell, abilities, rolePowers, cabAsk/cabCallOn, uxAyCss/uxBdCss/#hmWire.
+
+## 20261104bn — HUD QoL + polish (on bm)
+- Hit targets: `#sxDock`, `#tkActs`, `.fd-hands` buttons ≥44px; Consequences strip `.nsx-fu` buttons ≥40px; `#prompt.is-lots` floor raised 36→40px (bm scroll/compress kept).
+- Desk: `#ndFd .fd-log` capped at 38dvh with its own scroll, 14px/1.45 for reading.
+- One-surface: `#tipCard` and `#wire` hidden while `#prompt.is-live` or `#apToast` (adds to az clDock/clTx/plate fold).
+- Focus: `.prompt__opts`/`.prompt__catch-row` get tabindex=-1 so scroll containers never take gamepad/Tab focus; focused options `scrollIntoView({block:"nearest"})`; 3px gold `:focus-visible` ring.
+- Sitting heckles/points of order (ss2MaybeHeckle → onumSession.interject) now land on the desk via `cabPaint(m, text, true)` from an `onum-session` interjection listener (no wrapping; murmurs with no text skipped).
+- `#ltcLog` left alone: it is the private Chat thread (chatPaint wipes/rebuilds it from MEM), so mirroring cabPaint there would pollute DMs.
+- Next (bo): look/window-glow.
+
+### 20261104bn soft-FAIL fold
+- Gold 3px `#ffe08a` focus ring + `scroll-margin:8px` extended to `#ndFd .fd-hands button`, `.fd-hands button`, `#apToast button`, `#apToast [role=button]` (nnQolCss only; bm `nlPromptFit*` untouched).
+- Point of order: the engine has no separate PO event — `onumSession.interject()` dispatches `onum-session` with `stage:"interjection"` and `interjection.kind:"point_of_order"`. nnQolJs now branches on that existing `kind` (distinct PO paint, "Point of order:" prefix) rather than inventing a new event. PO still rides the interjection stage by design.
