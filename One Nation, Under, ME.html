@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261110bt">
+<meta name="onum-build" content="20261110bs">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -23,9 +23,55 @@
 <style id="uxAyCss">/* 20261104az: big, steady hit targets on prompt and session buttons */#ndSess button,#ndFd button,#sxDock button,.fd-hands button,#apToast button,#sxParkBar button,.talk__btn,.tk-morebtn,#tkDone{min-height:44px!important;min-width:44px!important;touch-action:manipulation}#ndSess button,#ndFd button,#sxDock button{padding-left:12px;padding-right:12px;font-size:14px}#sxParkBar button{height:auto!important}/* 20261104az MARS: a live prompt is the one surface: side chrome folds, nameplates dim and stop taking clicks */body:has(#prompt.is-live) #clDock,body:has(#prompt.is-live) #clTx,body:has(#apToast) #clDock,body:has(#apToast) #clTx{display:none!important}body:has(#prompt.is-live) .plate,body:has(#apToast) .plate{opacity:.25!important;pointer-events:none!important}/* stable, large prompt targets: fixed width and a reserved two-line ticker so buttons never jump under the finger */#prompt.is-live{background:#0c0f13!important;border:2px solid #c9a24a!important;z-index:60}#prompt.is-catch{width:min(94vw,560px);box-sizing:border-box}#prompt .prompt__catch-line{min-height:2.7em;max-height:2.7em;overflow:hidden}#prompt .prompt__btn{min-height:44px!important;min-width:120px!important;font-size:14px;padding:10px 14px;touch-action:manipulation;transition:none}#prompt .prompt__opts,#prompt .prompt__catch-row{gap:8px}</style>
 <style id="uxBlCss">/* 20261104bl: follow-ups strip styling only (no HUD fit) */#ndSess .nsx-fu{margin:6px 0;padding:5px 6px;background:#1d1a10;border:1px solid #c9a24a;border-radius:6px}#ndSess .nsx-fu b{color:#ffe08a;font:700 11px system-ui;letter-spacing:.06em;text-transform:uppercase}#ndSess .nsx-fu button{display:block;width:100%;text-align:left;margin:3px 0;background:#2a2410;color:#f4f1e8;border:1px solid #6b5a2a;border-radius:4px;padding:5px 7px;font:12.5px system-ui;cursor:pointer}</style></head>
 <body>
+<script id="onumLimitsJs">/* 20261110bs JUPITER: one limits object for the whole engine. Every old hard cap is now onumLim(old, kind):
+   the old number times the multiplier for its kind (never below the old number). Infinity = never trimmed.
+   kinds: hist (world logs, news, journals, histories), npc (per-person rings), save (save-time trims), cap (things open at once:
+   envoys, asks, hopper, follow-ups, inquiries, secrets), seats (session speakers), letters (Engine channel).
+   The governor folds hist/npc/save back to a finite multiplier only when the save or the heap gets too big, and lets go again when it is small.
+   ?limits=classic restores every old number exactly; ?limits=max lifts everything. localStorage "onum.limits" = JSON overrides (null = Infinity). */
+(function(){
+  var INF = Infinity;
+  var D = {hist:INF, npc:4, save:INF, cap:4, seats:2, letters:INF, mindsPerTick:INF, tickMs:3, engBudgetMs:4, engBudgetMin:2, engBudgetMax:10,
+    apPerDay:3, saveSoftMB:24, heapSoftFrac:0.7, lsMaxChars:2400000, governor:true};
+  var L = window.ONUM_LIMITS = {};
+  Object.keys(D).forEach(function(k){ L[k] = D[k]; });
+  var fix = function(v){ return (v === null || v === "Infinity" || v === "inf") ? INF : v; };
+  try{ var o = JSON.parse(localStorage.getItem("onum.limits") || "null"); if(o && typeof o === "object") Object.keys(o).forEach(function(k){ if(k in D) L[k] = fix(o[k]); }); }catch(e){}
+  try{ var m = /(?:\?|&)limits=(max|classic)\b/.exec(location.search || ""); if(m){ var mx = m[1] === "max";
+    ["hist", "npc", "save", "cap", "seats", "letters"].forEach(function(k){ L[k] = mx ? INF : 1; });
+    L.mindsPerTick = mx ? INF : 12; L.apPerDay = mx ? INF : 3; if(!mx) L.tickMs = INF; if(!mx){ L.engBudgetMin = L.engBudgetMax = L.engBudgetMs = 4; L.governor = false; } L.mode = m[1]; } }catch(e){}
+  L._defaults = D; L._eff = {}; L._gov = null;
+  window.onumLimN = function(k, dflt){ var v = L[k]; if(v == null) return dflt; v = +v; return (v !== v) ? dflt : v; };
+  window.onumLim = function(n, k){ k = k || "hist"; var s = (L._eff[k] != null) ? L._eff[k] : L[k]; if(s == null) s = 1; s = +s; if(s !== s || s <= 0) s = 1; if(s === INF) return INF; return Math.max(n, Math.round(n * s)); };
+  window.onumLimSet = function(k, v){ if(!(k in D)) return false; L[k] = fix(v); try{ var o = JSON.parse(localStorage.getItem("onum.limits") || "{}") || {}; o[k] = (L[k] === INF) ? null : L[k]; localStorage.setItem("onum.limits", JSON.stringify(o)); }catch(e){} return true; };
+  window.onumLimReset = function(){ try{ localStorage.removeItem("onum.limits"); }catch(e){} Object.keys(D).forEach(function(k){ L[k] = D[k]; }); L._eff = {}; L._gov = null; return true; };
+  var show = function(v){ return v === INF ? "inf" : (typeof v === "number" ? Math.round(v * 100) / 100 : v); };
+  window.onumLimDump = function(){ var out = {build:"20261110bs", mode:L.mode || "scale"}; Object.keys(D).forEach(function(k){ out[k] = show(L[k]); });
+    out.effective = {}; Object.keys(L._eff).forEach(function(k){ out.effective[k] = show(L._eff[k]); }); out.governor = L._gov;
+    try{ out.engineBudgetMs = window.onumEngine ? show(window.onumEngine.budget) : null; out.frameMs = window.onumEngine ? show(window.onumEngine.dtEma) : null; }catch(e){} return out; };
+  window.onumLimLine = function(){ var d = window.onumLimDump(), e = d.effective, g = function(k){ return e[k] != null ? e[k] + "*" : d[k]; };
+    return "limits hist " + g("hist") + " npc " + g("npc") + " save " + g("save") + " cap " + d.cap + " seats " + d.seats + " letters " + d.letters + " minds/tick " + d.mindsPerTick + " ap/day " + d.apPerDay + (d.governor ? "  gov: " + d.governor.why : ""); };
+  /* the governor: no ceiling unless the machine says so */
+  window.onumGovern = function(){ if(!L.governor) return;
+    var plain = 0, heap = 0; try{ var E = window.onumEngine; plain = E && E.lastSave ? E.lastSave.plain || 0 : 0; }catch(e){}
+    try{ if(performance.memory && performance.memory.jsHeapSizeLimit) heap = performance.memory.usedJSHeapSize / performance.memory.jsHeapSizeLimit; }catch(e){}
+    var soft = (+L.saveSoftMB || 24) * 1048576, over = plain > soft || heap > (+L.heapSoftFrac || 0.7), under = plain < soft * 0.4 && heap < (+L.heapSoftFrac || 0.7) * 0.6;
+    ["hist", "npc", "save"].forEach(function(k){ var base = +L[k], cur = L._eff[k] != null ? L._eff[k] : base;
+      if(over){ var nx = cur === INF ? 64 : Math.max(1, Math.floor(cur / 2)); if(nx < cur) L._eff[k] = nx; }
+      else if(under && L._eff[k] != null){ var up = L._eff[k] * 2; if(up >= base || up >= 1024) delete L._eff[k]; else L._eff[k] = up; } });
+    if(over) L._gov = {at:Date.now(), why:(plain > soft ? "save " + Math.round(plain / 1048576) + " MB" : "heap " + Math.round(heap * 100) + "%"), eff:JSON.parse(JSON.stringify(L._eff, function(k, v){ return v === INF ? "inf" : v; }))};
+    else if(!Object.keys(L._eff).length) L._gov = null; };
+  /* frame-time-aware background budget: more when frames are quick, less when they are slow, never zero */
+  var lastF = 0;
+  window.engAdapt = function(){ var E = window.onumEngine; if(!E) return; var t = performance.now(); if(lastF){ var dt = Math.min(250, t - lastF); E.dtEma = E.dtEma ? E.dtEma * 0.92 + dt * 0.08 : dt; } lastF = t;
+    var base = +L.engBudgetMs || 4, lo = Math.min(base, +L.engBudgetMin || 2), hi = Math.max(base, +L.engBudgetMax || 10), b = E.budget || base, f = E.dtEma || 16;
+    if(document.hidden) b = hi; else if(f < 14) b = Math.min(hi, b + 0.25); else if(f > 22) b = Math.max(lo, b - 0.5); else b = b + (base - b) * 0.05;
+    E.budget = Math.round(b * 100) / 100; };
+})();
+</script>
 <script>
 (function(){
-  var STAMP = "20261110bt";
+  var STAMP = "20261110bs";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -2210,7 +2256,7 @@ function ledgerOwn(m, text){
   if(!t || !L) return;
   if(L.saw[0] && L.saw[0].t === t) return;
   L.saw.unshift({d:G.day, t, who: m.id, where: m.room || "away"});
-  if(L.saw.length > 24) L.saw.length = 24;
+  if(L.saw.length > onumLim(24,"npc")) L.saw.length = onumLim(24,"npc");
 }
 function ledgerKnows(m, needle){
   const L = ledgerEnsure(m);
@@ -2227,8 +2273,8 @@ function ledgerTell(from, to, text){
   const t = String(text || "").slice(0, 180);
   if(!t) return;
   L.told.unshift({d:G.day, t, by: from.id});
-  if(L.told.length > 18) L.told.length = 18;
-  try{ if(to.mem){ to.mem.unshift({d:G.day, t, w:2, s:1}); if(to.mem.length > 26) to.mem.pop(); } }catch(e){}
+  if(L.told.length > onumLim(18,"npc")) L.told.length = onumLim(18,"npc");
+  try{ if(to.mem){ to.mem.unshift({d:G.day, t, w:2, s:1}); if(to.mem.length > onumLim(26,"npc")) to.mem.pop(); } }catch(e){}
 }
 function ledgerRumor(from, to){
   if(!from || !to || from === to) return;
@@ -2373,7 +2419,7 @@ function hears(m, text){
   if(!m.heard) m.heard = [];
   if(m.heard.some(h => h.t === text)) return;
   m.heard.unshift({t:text, d:G.day});
-  if(m.heard.length > 7) m.heard.pop();
+  if(m.heard.length > onumLim(7,"npc")) m.heard.pop();
 }
 function hearsAll(text, except){
   G.members.forEach(m => { if(m !== except) hears(m, text); });
@@ -2953,7 +2999,7 @@ function consularLoreEnsure(){
 }
 function consularInvent(){
   const L = consularLoreEnsure();
-  if(L.tales.length >= 12) return null;
+  if(L.tales.length >= onumLim(12,"cap")) return null;
   const left = REMNANT_TALES.filter(t => L.tales.indexOf(t) < 0);
   if(!left.length) return null;
   const tale = pick(left);
@@ -3353,22 +3399,22 @@ function ensureLivedIn(){
 function sustainHouse(){
   /* A career that never ends still has to fit in memory. Trim the ledgers. */
   try{
-    if((G.journal||[]).length > 48) G.journal.length = 48;
-    if((G.mail||[]).length > 20) G.mail.length = 20;
-    if((G.feed||[]).length > 8) G.feed.length = 8;
-    if(G.vox && G.vox.posts && G.vox.posts.length > 36) G.vox.posts.length = 36;
-    if((G.secrets||[]).length > 16) G.secrets.length = 16;
-    if((G.events||[]).length > 20) G.events.length = 20;
-    if((G.career||[]).length > 40) G.career = G.career.slice(-40);
-    if((G.history||[]).length > 56){
+    if((G.journal||[]).length > onumLim(48,"cap")) G.journal.length = onumLim(48,"cap");
+    if((G.mail||[]).length > onumLim(20,"cap")) G.mail.length = onumLim(20,"cap");
+    if((G.feed||[]).length > onumLim(8,"hist")) G.feed.length = onumLim(8,"hist");
+    if(G.vox && G.vox.posts && G.vox.posts.length > onumLim(36,"hist")) G.vox.posts.length = onumLim(36,"hist");
+    if((G.secrets||[]).length > onumLim(16,"cap")) G.secrets.length = onumLim(16,"cap");
+    if((G.events||[]).length > onumLim(20,"hist")) G.events.length = onumLim(20,"hist");
+    if((G.career||[]).length > onumLim(40,"hist")) G.career = G.career.slice(-onumLim(40,"hist"));
+    if((G.history||[]).length > onumLim(56,"hist")){
       const myth = G.history.filter(h => h && h.myth);
-      const rest = G.history.filter(h => h && !h.myth).slice(-40);
+      const rest = G.history.filter(h => h && !h.myth).slice(-onumLim(40,"hist"));
       G.history = myth.concat(rest);
     }
     everyone().forEach(m => {
       if(m.mem && m.mem.length > 60) psyPrune(m);
-      if(m.chat && m.chat.length > 6) m.chat = m.chat.slice(-6);
-      if(m.heard && m.heard.length > 8) m.heard.length = 8;
+      if(m.chat && m.chat.length > onumLim(6,"npc")) m.chat = m.chat.slice(-onumLim(6,"npc"));
+      if(m.heard && m.heard.length > onumLim(8,"npc")) m.heard.length = onumLim(8,"npc");
       if(m && m.machine){ m.gone = false; m.away = null; }
     });
     try{ ensureMachineSeat(); }catch(e){}
@@ -6504,7 +6550,7 @@ function riteGloss(it){
   return (it.sign > 0 ? "" : "against ") + word + (it.who !== "all" ? ", binding " + it.who : "") + (it.scope !== "everywhere" ? ", " + it.scope : "") + (it.cond ? ", " + it.cond.k + " " + it.cond.t : "");
 }
 function riteActive(){ return riteState().cmds.filter(c => !c.gone); }
-function riteNews(t){ const R = riteState(); R.news.push({d:G.day || 1, t}); if(R.news.length > 30) R.news.splice(0, R.news.length - 30); try{ feed(t); }catch(e){} }
+function riteNews(t){ const R = riteState(); R.news.push({d:G.day || 1, t}); if(R.news.length > onumLim(30,"hist")) R.news.splice(0, R.news.length - onumLim(30,"hist")); try{ feed(t); }catch(e){} }
 /* ── who can believe: every member and townsperson, each in their own way ── */
 function ritePeople(){
   const out = [];
@@ -6614,7 +6660,7 @@ function riteClergyDay(cmds){
   if(clergy.length && cmds.length && chance(0.7)){
     const who = pick(clergy), c = pick(cmds), rd = SEM.reading(who, c.it);
     const t = riteInterpret(who, c, rd);
-    R.interp.push({d:G.day, who:who.name, t}); if(R.interp.length > 20) R.interp.shift();
+    R.interp.push({d:G.day, who:who.name, t}); if(R.interp.length > onumLim(20,"hist")) R.interp.shift();
     rbEnsure(who).lines.push(t);
   }
   /* conflicts the clergy notice */
@@ -6670,7 +6716,7 @@ function riteProposeAmend(who, c, kind, why){
   else if(kind === "scope") to = c.t.replace(/[.!]?$/, "") + ", in the House and at home.";
   else if(kind === "repeal") to = null;
   const a = {id:++R.seq, d:G.day, by:who.name, byId:who.id, target:c.id, kind, to, why, done:false};
-  R.amend.push(a); if(R.amend.length > 24) R.amend.shift();
+  R.amend.push(a); if(R.amend.length > onumLim(24,"hist")) R.amend.shift();
   riteNews(surname(who.name) + " proposes to " + (kind === "repeal" ? "repeal" : "amend") + " precept " + (riteActive().indexOf(c) + 1) + (to ? ": “" + to + "”" : "") + (why ? " (" + why + ")." : "."));
 }
 function riteVoteAmend(a){
@@ -7194,7 +7240,7 @@ function govTop(){
   for(const f in st.lean) if(st.lean[f] > bv){ bv = st.lean[f]; best = f; }
   return best;
 }
-function govNews(t){ const st = govState(); st.news.push({d:G.day || 1, t}); if(st.news.length > 30) st.news.shift(); }
+function govNews(t){ const st = govState(); st.news.push({d:G.day || 1, t}); if(st.news.length > onumLim(30,"hist")) st.news.shift(); }
 function govNick(who, form){
   const f = form || (G.regime && G.regime.form) || "republic";
   const N = GOV_NICK[f] || GOV_NICK.republic;
@@ -8331,7 +8377,7 @@ function dmReply(m, text){
 function dmPush(id, from, t, extra){
   const D = dmState(); const L = dmThread(id);
   const msg = Object.assign({i:++D.seq, f:from, t, d:G.day, at:hhmm()}, extra || {});
-  L.push(msg); if(L.length > 60) L.splice(0, L.length - 60);
+  L.push(msg); if(L.length > onumLim(60,"hist")) L.splice(0, L.length - onumLim(60,"hist"));
   if(from !== "you" && D.open !== id){ D.unread++; msg.unread = true; }
   dmBadge(); if(D.open === id) dmRender();
   return msg;
@@ -8365,7 +8411,7 @@ function dmInitiative(){
     const spicy = X && tw > 0 ? wlGossip(a, X) : "";   /* 20261027d: only what the speaker knows about them */
     D.npc.push({i:++D.seq, a:a.id, b:b.id, t:(t + spicy).slice(0, 400), d:G.day, stakes:0.1 + (spicy ? 0.45 : 0), about:spicy ? [X.id] : []});
   }
-  if(D.npc.length > 240) D.npc.splice(0, D.npc.length - 240);
+  if(D.npc.length > onumLim(240,"hist")) D.npc.splice(0, D.npc.length - onumLim(240,"hist"));
 }
 /* leaks: never scripted; whether the reader forwards depends on who they are, what they owe, and what it is worth */
 function dmLeakOdds(holder, senderId, stakes){
@@ -8428,7 +8474,7 @@ function dmLeak(holder, from, x){
     (x.about || []).forEach(id => { const s = byId(id); if(s) tieShift(s, sender, -Math.round(6 + sev * 16), "what was said in a text"); });
   }
   D.leaks.push({d:G.day, from:sName, holder:holder.name, how, t:line});
-  if(D.leaks.length > 80) D.leaks.shift();
+  if(D.leaks.length > onumLim(80,"hist")) D.leaks.shift();
   try{ loreAdd(sender && sender.state, "Day " + G.day + ": a private text from " + sName + " leaked (" + how + ")."); }catch(e){}
 }
 
@@ -8488,7 +8534,7 @@ function dmRender(){
 function loreState(){ if(!G.lore) G.lore = {}; return G.lore; }
 function loreAdd(place, t){
   if(!place) return; const L = loreState(); const a = L[place] || (L[place] = []);
-  if(a.some(x => x.t === t)) return; a.push({d:G.day || 1, t}); if(a.length > 40) a.shift();
+  if(a.some(x => x.t === t)) return; a.push({d:G.day || 1, t}); if(a.length > onumLim(40,"hist")) a.shift();
 }
 function loreScan(text){
   try{
@@ -9091,7 +9137,7 @@ setTimeout(() => { try{
 }catch(e){} }, 1600);
 
 /* ===== 20261012u · the moment decides: a glance, then maybe ===== */
-function momentLog(t){ G.moments = G.moments || []; G.moments.push({d:G.day, t}); if(G.moments.length > 60) G.moments.shift(); }
+function momentLog(t){ G.moments = G.moments || []; G.moments.push({d:G.day, t}); if(G.moments.length > onumLim(60,"hist")) G.moments.shift(); }
 function momentApproach(m, b){
   const T = m.traits || {}, w = m.rel ? m.rel.warmth : 0;
   const mood = (function(){ try{ return moodOf(m).val; }catch(e){ return 0; } })();
@@ -9298,7 +9344,7 @@ function sbWrite(h){
   const who = pick(h.people);
   const item = {id:S.id++, d:G.day, at:hhmm(), hh:h.id, who, where:(h.id * 7 + 3) + " " + h.street + ", " + x.town, what, why,
     voice:(x.phrase ? x.phrase.charAt(0).toUpperCase() + x.phrase.slice(1) + ". " : "") + "I am not one to write, but " + why + ".", tag:c.t.tag, k:c.t.k, state:"new"};
-  S.used.push(c.key); S.items.unshift(item); if(S.items.length > 80) S.items.pop();
+  S.used.push(c.key); S.items.unshift(item); if(S.items.length > onumLim(80,"hist")) S.items.pop();
   sbPublish(item);
   return item;
 }
@@ -9606,7 +9652,7 @@ function caSee(D, who, what, amt){
   const ws = D.actors.filter(o => o !== who && o.street === who.street);
   ws.forEach(o => { if(!chance(.5)) return; const k = o.id + ">" + who.id; D.seen[k] = Math.max(D.seen[k] || 0, amt); caReact(D, o, who, what, amt); });
 }
-function caGossip(D, t){ D.gossip.push({d:G.day, t}); if(D.gossip.length > 60) D.gossip.shift(); try{ window.ONUM_TOWN_GOSSIP = D.gossip.slice(-30); window.dispatchEvent(new CustomEvent("onum-town-gossip", {detail:{t}})); }catch(e){} }
+function caGossip(D, t){ D.gossip.push({d:G.day, t}); if(D.gossip.length > onumLim(60,"hist")) D.gossip.shift(); try{ window.ONUM_TOWN_GOSSIP = D.gossip.slice(-30); window.dispatchEvent(new CustomEvent("onum-town-gossip", {detail:{t}})); }catch(e){} }
 function caReact(D, o, who, what, amt){
   const mine = caBal(D, o.id), r = Math.random();
   o.rel = o.rel || {};
@@ -9784,7 +9830,7 @@ function famDay(){
     else if(roll < .7 && f.parents.some(p => p.alive)){ const p = f.parents.find(p => p.alive); p.alive = false; ev = {k:"funeral", t:m.name + " buried " + p.name + " this week. The service committed the soul to God, under Christ the King"}; }
     else if(f.kids.some(k => k.age >= 17 && k.age <= 22 && !k.grad)){ const k = f.kids.find(k => k.age >= 17 && k.age <= 22 && !k.grad); k.grad = true; ev = {k:"graduation", t:k.name + " " + sn + " graduated, and " + m.name + " has told everyone twice"}; }
     if(!ev) continue;
-    ev.id = m.id; ev.d = G.day; F.events.push(ev); if(F.events.length > 80) F.events.shift();
+    ev.id = m.id; ev.d = G.day; F.events.push(ev); if(F.events.length > onumLim(80,"hist")) F.events.shift();
     caNews(ev.t + ".");
     /* kin rally; feuding kin notice who sent flowers */
     f.kin.forEach(k => { const o = byId(k.id); if(!o) return; if(f.feuds.indexOf(k.id) >= 0){ if(ev.k === "funeral" && chance(.5)){ tieShift(m, o, 6, "came to the funeral despite everything"); caNews(o.name + " came to the funeral. The family feud may be thawing."); } } else tieShift(m, o, 2, "family " + ev.k); });
@@ -10244,7 +10290,7 @@ function scLeaders(){
     a.leaderId = (scPerson("lead:" + p.k, a.leader, a.leaderT + " of " + p.t, p.t) || {}).id;
     a.envoyId = (scPerson("env:" + p.k, a.envoy, "Ambassador of " + p.t, p.t) || {}).id; });
 }
-function scLog(t, place){ const S = scEnsure(); S.log.push({d:G.day, t}); if(S.log.length > 120) S.log.shift(); try{ lLog(t, "world"); }catch(e){} try{ if(place) loreAdd(place, "Day " + G.day + ": " + t); }catch(e){} try{ feed(t, "world"); }catch(e){} }
+function scLog(t, place){ const S = scEnsure(); S.log.push({d:G.day, t}); if(S.log.length > onumLim(120,"hist")) S.log.shift(); try{ lLog(t, "world"); }catch(e){} try{ if(place) loreAdd(place, "Day " + G.day + ": " + t); }catch(e){} try{ feed(t, "world"); }catch(e){} }
 function scVox(pid, t){ try{ const p = byId(pid); if(!p) return; voxAdd({id:G.vox.id++, by:p.id, t, k:"state", v:0, day:G.day, at:hhmm(), backs:0, hits:0, voices:[], mine:false}); }catch(e){} }
 function scNation(){ let w = 0, s = 0; (G.states || []).forEach(st => { const p = st.pop || 1; w += p; s += (st.lean || 0) * p; }); return s / Math.max(1, w); }
 function scPolPub(ch){
@@ -10307,7 +10353,7 @@ function scDay(){
   try{ scMinds(); }catch(e){}
 }
 function scCrisis(k, place, t){
-  const S = scEnsure(); S.crises.push({d:G.day, k, place, t}); if(S.crises.length > 40) S.crises.shift();
+  const S = scEnsure(); S.crises.push({d:G.day, k, place, t}); if(S.crises.length > onumLim(40,"hist")) S.crises.shift();
   scLog(t, place);
   try{ document.dispatchEvent(new CustomEvent("onum-crisis", {detail:{k, place, t}})); }catch(e){}
 }
@@ -10568,7 +10614,7 @@ function phDay(){
     if(M.length > 8 && P.id !== "IND"){ const xs = M.map(m => m.pos.econ || 0); const spread = Math.max(...xs) - Math.min(...xs);
       if(spread > 90 && chance(.004) && !P.splits.some(s => s.d > G.day - 60)){ const side = L.econ > 0 ? "provision" : "market"; P.splits.push({d:G.day, t:"A " + side + " faction walked out of the " + partyName(P.id) + " caucus."}); phNote(P, P.splits.slice(-1)[0].t); pull("econ", L.econ + (side === "provision" ? 15 : -15), 0.3, "the split"); } }
     /* landmark votes */
-    try{ const A = (G.lastActs || []); if(A.length > P.last.acts){ A.slice(P.last.acts).forEach(a => { const ayes = (a.parties && a.parties[P.id]) || null; P.votes.push({d:a.day || G.day, t:a.title, how:ayes != null ? (ayes > 0 ? "aye" : "no") : (alignmentOf(P, a) >= 0 ? "aye" : "no")}); }); P.last.acts = A.length; if(P.votes.length > 40) P.votes.splice(0, P.votes.length - 40); } }catch(e){}
+    try{ const A = (G.lastActs || []); if(A.length > P.last.acts){ A.slice(P.last.acts).forEach(a => { const ayes = (a.parties && a.parties[P.id]) || null; P.votes.push({d:a.day || G.day, t:a.title, how:ayes != null ? (ayes > 0 ? "aye" : "no") : (alignmentOf(P, a) >= 0 ? "aye" : "no")}); }); P.last.acts = A.length; if(P.votes.length > onumLim(40,"hist")) P.votes.splice(0, P.votes.length - onumLim(40,"hist")); } }catch(e){}
     if((G.day || 0) % 7 === 0 && (!P.snaps.length || P.snaps.slice(-1)[0].d !== G.day)){
       const prev = P.snaps.slice(-1)[0].lean, moved = PH_AX.filter(a => Math.abs(L[a[0]] - prev[a[0]]) >= 3);
       P.snaps.push({d:G.day, lean:Object.fromEntries(PH_AX.map(a => [a[0], Math.round(L[a[0]])])), why:[...new Set(why)].join(", ") || "drift"});
@@ -10580,7 +10626,7 @@ function phDay(){
   phPublish();
 }
 function alignmentOf(P, a){ const p = a.pos || {}; return (p.econ || 0) * P.lean.econ + (p.lib || 0) * P.lean.soc + (p.def || 0) * P.lean.frn; }
-function phNote(P, t){ P.notes = P.notes || []; P.notes.push({d:G.day, t}); if(P.notes.length > 40) P.notes.shift(); try{ feed(t, "info"); }catch(e){} }
+function phNote(P, t){ P.notes = P.notes || []; P.notes.push({d:G.day, t}); if(P.notes.length > onumLim(40,"hist")) P.notes.shift(); try{ feed(t, "info"); }catch(e){} }
 function phDesc(id){ const P = phEnsure().p[id]; if(!P) return ""; return PH_AX.map(a => { const v = Math.round(P.lean[a[0]]); return a[1] + ": " + (Math.abs(v) < 12 ? "centre" : (v > 0 ? a[2] : a[3])) + " (" + v + ")"; }).join("; "); }
 function onumPartyPrecedent(id){
   const P = phEnsure().p[id]; if(!P) return null;
@@ -10779,7 +10825,7 @@ function apAgenda(m){
   try{ if(m.rel && m.rel.warmth < -20) out.push({k:"concern", t:"I have a concern, and it is about you. People notice how you treat them."}); }catch(e){}
   return out;
 }
-function apBudget(m){ const d = G.day; if(m._apD !== d){ m._apD = d; m._apN = 0; } return m._apN < 3; }
+function apBudget(m){ const d = G.day; if(m._apD !== d){ m._apD = d; m._apN = 0; } return m._apN < onumLimN("apPerDay", 3); }
 function apToast(m, a){
   try{ if(G.speechApproach || (typeof CATCH !== "undefined" && (CATCH.on || CATCH.armedByInteract)) || speechStationNear(1.85)) return; }catch(e){}
   try{ if(AP.toast) AP.toast.remove(); }catch(e){}
@@ -10974,7 +11020,7 @@ function cvAdd(who, whoId, to, text, live, opt){
   const key = [whoId, to].filter(x => x != null).map(String).sort().join("|");
   if(!T && !opt.thread){ const L = CV.th.slice(-1)[0];
     if(L && !L.tag && L.room === room && L.day === G.day && now - L.end < 4 && (L.keys.has(String(whoId)) || (to != null && L.keys.has(String(to))) || L.key === key)) T = L; }
-  if(!T){ T = {id:CV.th.length ? CV.th[CV.th.length - 1].id + 1 : 1, tag:opt.thread || null, room, place:opt.place || cvRoomT(room), day:G.day, start:now, end:now, key, keys:new Set(), lines:[]}; CV.th.push(T); if(CV.th.length > 150) CV.th.shift(); }
+  if(!T){ T = {id:CV.th.length ? CV.th[CV.th.length - 1].id + 1 : 1, tag:opt.thread || null, room, place:opt.place || cvRoomT(room), day:G.day, start:now, end:now, key, keys:new Set(), lines:[]}; CV.th.push(T); if(CV.th.length > onumLim(150,"hist")) CV.th.shift(); }
   const last = T.lines.slice(-1)[0]; if(last && last.who === who && last.t === text) return;
   T.lines.push({who, id:whoId, t:text, at:opt.at || (function(){ try{ return hhmm(); }catch(e){ return ""; } })(), live:!!live}); T.end = now;
   if(whoId != null) T.keys.add(String(whoId)); if(to != null) T.keys.add(String(to));
@@ -11071,7 +11117,7 @@ const ENG = {budget:4, jobs:[], q:[], cost:{}, frames:0, simMs:0, last:performan
 function engJob(name, everyMs, fn){ ENG.jobs.push({name, every:everyMs, fn, next:performance.now() + Math.random() * everyMs}); }
 function engDefer(name, fn){ ENG.q.push({name, fn}); }
 function engCost(name, ms){ const c = ENG.cost[name] || (ENG.cost[name] = {ms:0, n:0, max:0}); c.ms = c.ms * 0.95 + ms * 0.05; c.n++; if(ms > c.max) c.max = ms; else c.max *= 0.999; }
-function engRun(){
+function engRun(){ try{ engAdapt(); }catch(e){}
   const t0 = performance.now(); let used = 0;
   /* due periodic jobs, nearest-due first */
   const due = ENG.jobs.filter(j => j.next <= t0).sort((a, b) => a.next - b.next);
@@ -11098,18 +11144,19 @@ engJob("minds", 500, () => {
   const M = window.ONUM_MINDS = window.ONUM_MINDS || {};
   const ev = (typeof everyone === "function") ? everyone() : G.members;
   let n = 0;
-  for(const p of ev){ if(!p || p.gone) continue; const t = engTier(p), every = [1, 4, 12, 40][t];
+  const _mN = ev.length, _m0 = _mN ? (ENG.mStart || 0) % _mN : 0, _mT = performance.now(), _mMax = onumLimN("mindsPerTick", 12), _mMs = onumLimN("tickMs", 3);
+  for(let _q = 0; _q < _mN; _q++){ const p = ev[(_m0 + _q) % _mN]; if(!p || p.gone) continue; const t = engTier(p), every = [1, 4, 12, 40][t];
     if((ENG.mi + idNum(String(p.id))) % every) continue;
     try{ if(typeof onumMindOf === "function") M[p.id] = Object.assign(M[p.id] || {}, onumMindOf(p.id) || {}, {tier:t}); }catch(e){}
-    if(++n > 12) break; }
+    if(++n > _mMax || performance.now() - _mT > _mMs){ ENG.mStart = (_m0 + _q + 1) % _mN; break; } }
 });
 /* ── 3. logs never grow without end ── */
 function engTrim(){
-  const cap = (a, n) => { if(Array.isArray(a) && a.length > n) a.splice(0, a.length - n); };
-  try{ cap(G.moments, 60); cap(G.feedLog, 300); cap(G.mail, 220); cap(G.news, 200); cap(G.log, 400); cap(G.journal, 300); cap(G.lastActs, 120); }catch(e){}
-  try{ if(G.vox && G.vox.posts) cap(G.vox.posts, 60); }catch(e){}
+  try{ onumGovern(); }catch(e){} const cap = (a, n, k, nf) => { n = onumLim(n, k || "hist"); if(Array.isArray(a) && a.length > n){ if(nf) a.length = n; else a.splice(0, a.length - n); } };
+  try{ cap(G.moments, 60); cap(G.feedLog, 300); cap(G.mail, 220, "cap", 1); cap(G.news, 200); cap(G.log, 400); cap(G.journal, 300, "cap", 1); cap(G.lastActs, 120, "hist", 1); }catch(e){}
+  try{ if(G.vox && G.vox.posts) cap(G.vox.posts, 60, "hist", 1); }catch(e){}
   try{ const D = G.dm; if(D && D.th) Object.keys(D.th).forEach(k => cap(D.th[k], 60)); if(D && D.leaks) cap(D.leaks, 80); }catch(e){}
-  try{ (G.members || []).forEach(m => { cap(m.mem, 80); cap(m.chat, 20); cap(m.journal, 40); cap(m.memory, 80); }); }catch(e){}
+  try{ (G.members || []).forEach(m => { cap(m.mem, 80, "npc", 1); cap(m.chat, 20, "npc"); cap(m.journal, 40, "npc"); cap(m.memory, 80, "npc"); }); }catch(e){}
   try{ if(typeof CV !== "undefined") cap(CV.th, 150); }catch(e){}
   try{ if(G.sc){ cap(G.sc.log, 200); cap(G.sc.crises, 80); } }catch(e){}
   try{ if(G.ph) Object.values(G.ph.p).forEach(P => { cap(P.snaps, 60); cap(P.notes, 40); cap(P.votes, 40); }); }catch(e){}
@@ -11182,6 +11229,7 @@ function engOverlay(on){
   ["tick","crowd","lighting","shadow","render","hud","feed","sync","furnish","ui"].forEach(k => { if(avg[k] != null) t += k.padEnd(10) + (avg[k] || 0).toFixed(2) + " ms\n"; });
   t += "-- background (budget " + ENG.budget + " ms) " + ENG.simMs.toFixed(2) + " ms\n";
   Object.keys(ENG.cost).sort((a, b) => ENG.cost[b].ms - ENG.cost[a].ms).slice(0, 10).forEach(k => { const c = ENG.cost[k]; t += k.padEnd(14) + c.ms.toFixed(2) + " (max " + c.max.toFixed(1) + ")\n"; });
+  try{ t += onumLimLine() + "\n"; }catch(e){}
   if(ENG.lastSave) t += "save " + Math.round(ENG.lastSave.plain / 1024) + " KB -> " + Math.round(ENG.lastSave.stored * 2 / 1024) + " KB stored\n";
   try{ if(performance.memory) t += "heap " + Math.round(performance.memory.usedJSHeapSize / 1048576) + " MB\n"; }catch(e){}
   w.textContent = t;
@@ -11233,7 +11281,7 @@ function rsSay(p, kind){
   const line = pick(RS_WORDS[kind]); try{ if(p.room === G.room){ p.say = line; p.sayT = 4; speakAt(p, line); } }catch(e){}
   try{ remember(p, line, 2, false); }catch(e){} return line;
 }
-function rsLine(t, big){ const R = rsEnsure(); R.log.unshift({d:G.day, t}); if(R.log.length > 40) R.log.length = 40; try{ lLog(t, "science"); }catch(e){} if(big){ try{ feed(t, "world"); }catch(e){} } }
+function rsLine(t, big){ const R = rsEnsure(); R.log.unshift({d:G.day, t}); if(R.log.length > onumLim(40,"hist")) R.log.length = onumLim(40,"hist"); try{ lLog(t, "science"); }catch(e){} if(big){ try{ feed(t, "world"); }catch(e){} } }
 function rsWork(w, q, inv, stage){
   const R = rsEnsure(); let x = R.works.find(o => o.id === w.k);
   if(!x){ x = {id:w.k, name:w.n, kind:w.kind, inventor:inv ? inv.name : "unknown", inventorId:inv ? inv.id : null, stage:"idea", day:G.day, desc:"From work on " + q.f + ": " + q.q}; R.works.push(x); }
@@ -11340,7 +11388,7 @@ function dnGive(p, cause){
   if(C.chest){ if(strings !== "none" && chance(0.5)){ G.you.approval = clamp(G.you.approval - 0.6, 0, 100); rx.push("Some constituents grumble about strings."); } else rx.push("Supporters are pleased."); }
   else { rx.push(cap(C.t) + " is grateful; the district talks about it."); try{ const T = townEnsure(); const h = pick(T.hh); h.mood = clamp((h.mood || 50) + 3, 0, 100); }catch(e){} }
   const d = {id:"dn" + (++D.n), donorId:p.id, donorName:p.name, amount, day:G.day, cause:C.t, strings, reaction:rx.join(" "), due:strings !== "none" ? G.day + 3 + (seedOf("due" + D.n) % 8) : 0};
-  D.list.push(d); if(D.list.length > 120) D.list.splice(0, D.list.length - 120);
+  D.list.push(d); if(D.list.length > onumLim(120,"hist")) D.list.splice(0, D.list.length - onumLim(120,"hist"));
   dnLine(p.name + " gave ƒ" + amount + " to " + C.t + ". " + d.reaction, false); dnPublish(d); return d;
 }
 window.onumDonate = function(donorId, cause){ try{ const p = everyone().find(x => x.id === donorId); return p ? dnGive(p, cause) : null; }catch(e){ return null; } };
@@ -11571,7 +11619,7 @@ engJournalDay = async function(E){
   if(!E || !E.agi || (ENG_JOURNAL_AT && performance.now() - ENG_JOURNAL_AT < 20000)) return; ENG_JOURNAL_AT = performance.now(); if(!(await egLive())) return;
   const S = engSelf(E); S.journal = S.journal || [];
   const r = await Promise.race([window.onumLiveTalk.reply({npc:egNpc(), channel:"line", max:600, stage:egPrompt(), text:"(journal, day " + G.day + ")"}), new Promise(res => setTimeout(() => res(null), engTO(25000)))]);
-  if(r && r.live && r.text){ const t = egOwn(r.text); if(t.length > 20){ S.journal.push({d:G.day, t:t.slice(0, 500), ownWords:true}); if(S.journal.length > 30) S.journal.shift(); engSelfRecord(t); } }
+  if(r && r.live && r.text){ const t = egOwn(r.text); if(t.length > 20){ S.journal.push({d:G.day, t:t.slice(0, 500), ownWords:true}); if(S.journal.length > onumLim(30,"hist")) S.journal.shift(); engSelfRecord(t); } }
 };
 
 /* ── 20261020 regions (rg): where people come from. Belonging comes from where
@@ -11660,7 +11708,7 @@ function rgnTrust(a, b){ const R = rgnEnsure(), k = rgnKey(a, b); return R.trust
 function rgnShift(a, b, d, why){
   if(!a || !b || !RGN_DEF[a] || !RGN_DEF[b]) return;
   const R = rgnEnsure(), k = rgnKey(a, b); R.trust[k] = clamp(rgnTrust(a, b) + d, 0, 100);
-  if(why){ R.log.push({d:G.day, a, b, dt:Math.round(d * 10) / 10, why:String(why).slice(0, 120)}); if(R.log.length > 120) R.log.shift(); }
+  if(why){ R.log.push({d:G.day, a, b, dt:Math.round(d * 10) / 10, why:String(why).slice(0, 120)}); if(R.log.length > onumLim(120,"hist")) R.log.shift(); }
   rgnFire();
 }
 /* how much person p belongs to region r: birth, residence, family, dialect and customs, deeds. Never looks. */
@@ -11814,7 +11862,7 @@ function dynFeud(ha, hb, why){ const D = dynEnsure(), A = D.houses[ha], B = D.ho
 function dynAlly(ha, hb, why){ const D = dynEnsure(), A = D.houses[ha], B = D.houses[hb]; if(!A || !B || ha === hb) return;
   A.feuds = A.feuds.filter(x => x !== hb); B.feuds = B.feuds.filter(x => x !== ha);
   if(A.allies.indexOf(hb) < 0){ A.allies.push(hb); B.allies.push(ha); if(why) dynNote(why); } }
-function dynNote(t, press){ const D = dynEnsure(); D.log.push({d:G.day, t}); if(D.log.length > 120) D.log.shift(); try{ lLog(t, "family"); }catch(e){} if(press){ try{ feed(t); }catch(e){} } }
+function dynNote(t, press){ const D = dynEnsure(); D.log.push({d:G.day, t}); if(D.log.length > onumLim(120,"hist")) D.log.shift(); try{ lLog(t, "family"); }catch(e){} if(press){ try{ feed(t); }catch(e){} } }
 function dynSingle(r){ return r.alive && !r.spouseId && !r.offSpouse && dynAge(r) >= 18; }
 function dynStanding(r){ const p = dynPerson(r.id); let s = 0; if(p){ s += (p.influence || 0); if(p.kind === "member") s += 20; try{ s += Math.min(40, purseOf(p).cash / 300); }catch(e){} } return s; }
 /* who suits whom: attraction, standing, region trust, politics. Never looks. */
@@ -12103,7 +12151,7 @@ function ssnNpcVotes(){
 }
 function ssnTally(){
   const vs = Object.values(SSN.votes), aye = vs.filter(v => v === "aye").length, no = vs.filter(v => v === "no").length;
-  SSN.result = {aye, no, passed:aye > no}; ssnEnsure().log.push({d:G.day, kind:SSN.kind, aye, no}); if(ssnEnsure().log.length > 60) ssnEnsure().log.shift();
+  SSN.result = {aye, no, passed:aye > no}; ssnEnsure().log.push({d:G.day, kind:SSN.kind, aye, no}); if(ssnEnsure().log.length > onumLim(60,"hist")) ssnEnsure().log.shift();
 }
 function ssnRecognize(){
   if(!SSN || SSN.floorId != null || !SSN.queue.length) return;
@@ -12137,7 +12185,7 @@ function ssnTick(){
     if(st.timed && !SSN.fili){ SSN.remaining -= 1; if(SSN.remaining <= 0){ ssnNext(); return; } }
     if(st.speaker === "queue" || st.speaker === "round"){
       /* members rise to seek recognition */
-      if(SSN.queue.length < 4 && chance(0.25)){ const cand = SSN.seats.filter(s => s.personId !== "you" && SSN.queue.indexOf(s.personId) < 0 && s.personId !== SSN.floorId && SSN.out.indexOf(s.personId) < 0);
+      if(SSN.queue.length < onumLim(4,"seats") && chance(0.25)){ const cand = SSN.seats.filter(s => s.personId !== "you" && SSN.queue.indexOf(s.personId) < 0 && s.personId !== SSN.floorId && SSN.out.indexOf(s.personId) < 0);
         const c = cand[Math.floor(Math.random() * cand.length)]; if(c) SSN.queue.push(c.personId); }
       if(SSN.floorId == null) ssnRecognize();
       else { if(SSN.spk > 0){ SSN.spk -= 1; if(SSN.spk <= 0 && !(SSN.fili && SSN.fili.id === SSN.floorId)){ SSN.floorId = null; ssnPublish(); return; } }
@@ -12160,7 +12208,7 @@ window.onumSessionEvent = function(e){
     if(SSN && isYou && (!e.kind || e.kind === SSN.kind)){ const al = ssnStage().allows, need = act === "point_of_order" ? "point_of_order" : act; if(al.indexOf(need) < 0 && !(act === "speak" && al.indexOf("seek") >= 0)) return {ok:false, why:"not in order at this stage (" + ssnStage().name + ")"}; }
     const t = String(e.text || "").slice(0, 400), tgt = e.target != null ? ssnWho(e.target) : null, ls = ssnListeners(24);
     const mem = (txt, w) => ls.forEach(m => { try{ window.onumRemember(m.id, txt, nm); }catch(_){} try{ if(Math.abs(w) > 0 && isYou) m.rel.warmth = clamp(m.rel.warmth + w * (m.party === G.you.party ? 1 : 0.5), -100, 100); }catch(_){} });
-    const log = (txt, press) => { try{ lLog(txt, "session"); }catch(_){} if(press){ try{ feed(txt); }catch(_){} try{ G.reactNews = (G.reactNews || []).concat([{t:txt, d:G.day}]).slice(-12); }catch(_){} } S.log.push({d:G.day, kind, act, who:nm, t:txt.slice(0, 160)}); if(S.log.length > 80) S.log.shift(); };
+    const log = (txt, press) => { try{ lLog(txt, "session"); }catch(_){} if(press){ try{ feed(txt); }catch(_){} try{ G.reactNews = (G.reactNews || []).concat([{t:txt, d:G.day}]).slice(-12); }catch(_){} } S.log.push({d:G.day, kind, act, who:nm, t:txt.slice(0, 160)}); if(S.log.length > onumLim(80,"hist")) S.log.shift(); };
     if(act === "speak"){
       if(a && a !== G.you){ try{ speakAt(a, t); }catch(_){} try{ vhSay(a, t); }catch(_){} }
       if(t) mem(nm + " on " + body + ": \"" + t.slice(0, 140) + "\"", 0);
@@ -12353,7 +12401,7 @@ function ofhSync(only){
     if(open){ open.to = G.day; open.how = ofhHowLeft(open, c); open.successor = c.name; }
     const lastC = !open && R.holders.length ? R.holders[R.holders.length - 1] : null; if(lastC && !lastC.successor) lastC.successor = c.name;
     R.holders.push({personId:c.personId, name:c.name, from:G.day, to:null, how:null, successor:null, after:open ? open.name : null, afterVacancy:!open && !!lastC}); R.vacantSince = null;
-    if(R.holders.length > 30) R.holders.splice(0, R.holders.length - 30); ch++; });
+    if(R.holders.length > onumLim(30,"hist")) R.holders.splice(0, R.holders.length - onumLim(30,"hist")); ch++; });
   /* seats nobody holds now: close them, name no successor */
   Object.keys(cur).forEach(key => { if(S.seats[key]) S.seats[key].miss = 0; });
   if(!only) Object.keys(S.seats).forEach(key => { if(cur[key]) return; const R = S.seats[key]; R.miss = (R.miss || 0) + 1; if(R.miss < 4) return; const open = R.holders.length && R.holders[R.holders.length - 1].to == null ? R.holders[R.holders.length - 1] : null;
@@ -12482,7 +12530,7 @@ function cndGist(t){
     return g; }catch(e){ return ""; }
 }
 /* what each person actually says, so memory stays real */
-function cndRecord(id, text){ try{ const p = cndPerson(id); const t = String(text || "").trim(); if(!p || !t) return; p.cndSaid = p.cndSaid || []; const last = p.cndSaid[p.cndSaid.length - 1]; if(last && last.t === t) return; p.cndSaid.push({d:G.day, t:t.slice(0, 280)}); if(p.cndSaid.length > 12) p.cndSaid.shift(); }catch(e){} }
+function cndRecord(id, text){ try{ const p = cndPerson(id); const t = String(text || "").trim(); if(!p || !t) return; p.cndSaid = p.cndSaid || []; const last = p.cndSaid[p.cndSaid.length - 1]; if(last && last.t === t) return; p.cndSaid.push({d:G.day, t:t.slice(0, 280)}); if(p.cndSaid.length > onumLim(12,"npc")) p.cndSaid.shift(); }catch(e){} }
 const CND_PENDING = new Map(); let _cndSeq = 0;
 /* onumSpoke(id, text) records a line. With {reqId}, it also answers an onum-speak request and the line is delivered through the normal path. */
 window.onumSpoke = function(id, text, o){
@@ -12612,14 +12660,14 @@ save = function(explicit, sync){
     svPack(S.json, raw => { S.raw = raw; svIdle(w1, S.explicit); });
   };
   const w1 = () => {
-    let ok = svRawWrite(SAVE_KEY, S.raw);
-    if(!ok){ for(const k of [SAVE_BEST_KEY, SAVE_BACKUP_KEY]){ try{ localStorage.removeItem(k); }catch(e){} ok = svRawWrite(SAVE_KEY, S.raw); if(ok) break; } }
+    const big = !!(ENG_IDB.db && S.raw.length > onumLimN("lsMaxChars", 2400000)); let ok = big ? false : svRawWrite(SAVE_KEY, S.raw);
+    if(!ok && !big){ for(const k of [SAVE_BEST_KEY, SAVE_BACKUP_KEY]){ try{ localStorage.removeItem(k); }catch(e){} ok = svRawWrite(SAVE_KEY, S.raw); if(ok) break; } }
     if(!ok && ENG_IDB.db){ try{ engIdbPut(S.raw); ok = true; if(!G._idbOnly){ G._idbOnly = 1; note("Saved to the browser's larger store (the small one is full). Your career is kept.", false); } }catch(e){} }   /* a career too big for localStorage still saves */
     if(!ok) return svDone(S.base, S.explicit, false);
     SV.lastBody = S.body; try{ ENG.lastSave = {plain:S.json.length, stored:S.raw.length, at:Date.now()}; }catch(e){}
     svIdle(w2, S.explicit);
   };
-  const w2 = () => { svRawWrite(SAVE_BACKUP_KEY, S.raw); svIdle(w3, S.explicit); };          /* the backup, its own tick */
+  const w2 = () => { if(S.raw.length <= onumLimN("lsMaxChars", 2400000)) svRawWrite(SAVE_BACKUP_KEY, S.raw); svIdle(w3, S.explicit); };          /* the backup, its own tick */
   const w3 = () => { if(S.raw.length < 1600000) svRawWrite(SAVE_BEST_KEY, S.raw); try{ engIdbPut(S.raw); }catch(e){}  /* IDB put is async */
     SV.last = {ms:performance.now() - T0, plain:S.json.length, stored:S.raw.length}; svDone(S.base, S.explicit, true); };
   svIdle(snap, S.explicit);
@@ -12632,7 +12680,9 @@ function svFlushSync(){
     if(SV.rank != null && careerRank(base) < SV.rank) return false;
     const json = JSON.stringify(base, saveRound);
     let ok = svRawWrite(SAVE_KEY, json);
-    if(!ok){ const z = engWrap(json); ok = svRawWrite(SAVE_KEY, z); if(ok) try{ engIdbPut(z); }catch(e){} } else { try{ engIdbPut(json); }catch(e){} }
+    let raw = json;
+    if(!ok){ raw = engWrap(json); ok = svRawWrite(SAVE_KEY, raw); }
+    try{ engIdbPut(raw); }catch(e){}
     if(ok) SV.rank = careerRank(base);
     return ok;
   }catch(e){ return false; }
@@ -17339,7 +17389,7 @@ function tieShift(a, b, d, what){
   t.w = clamp(t.w + d, -100, 100);
   if(what){
     t.mem.unshift({t:what, d:d, day:G.day});
-    if(t.mem.length > 6) t.mem.pop();
+    if(t.mem.length > onumLim(6,"npc")) t.mem.pop();
   }
   /* and the people close to each of them hear about the big ones */
   if(Math.abs(d) >= 8){
@@ -18424,7 +18474,7 @@ function voxAdd(post){
     post.t = wallScrub(post.t, who);
   }
   G.vox.posts.unshift(post);
-  if(G.vox.posts.length > 60) G.vox.posts.length = 60;
+  if(G.vox.posts.length > onumLim(60,"hist")) G.vox.posts.length = onumLim(60,"hist");
   /* concept heat: if text names a known invented concept, nudge it */
   try{ mindCiteConcepts(post); }catch(e){}
   /* Anybody named in it is going to see it, and most of them are going
@@ -19532,7 +19582,7 @@ function realmCable(realm, ghost){
 }
 function realmVisit(realm){
   if(!realm || realm.envoyId) return null;
-  if((G.members || []).filter(x => x && x.kind === "envoy" && !x.gone).length >= 2) return null;
+  if((G.members || []).filter(x => x && x.kind === "envoy" && !x.gone).length >= onumLim(2,"cap")) return null;
   const m = makeEnvoy(realm);
   G.members.push(m);
   _allCache = null;
@@ -19589,7 +19639,7 @@ function driftGuilder(news){
   const before = G.money.index;
   G.money.index = clamp(G.money.index + pull, 42, 190);
   G.money.hist.push(Math.round(G.money.index*10)/10);
-  if(G.money.hist.length > 40) G.money.hist.shift();
+  if(G.money.hist.length > onumLim(40,"hist")) G.money.hist.shift();
   const d = G.money.index - before;
   if(Math.abs(d) > 1.1 && news)
     news.push("The guilder " + (d>0?"firmed to ":"slipped to ") + G.money.index.toFixed(1) +
@@ -22791,7 +22841,7 @@ function sentAct(m){
       other.say = sb; other.sayT = 3.1; other.sayTo = m.id;
     }
     (s.letters = s.letters || []).push({to: other.id, t: s.now, day: G.day});
-    if(s.letters.length > 8) s.letters.shift();
+    if(s.letters.length > onumLim(8,"hist")) s.letters.shift();
     try{ mindRemember(m, "experience", "I went to " + surname(other.name) + " because I wanted to, not because I was walked.", {soft:true}); }catch(e){}
     return;
   }
@@ -22810,7 +22860,7 @@ function sentAct(m){
     const other = pick((G.members || []).filter(x => x && x !== m && !x.gone));
     if(other){
       (s.letters = s.letters || []).push({to: other.id, t: s.private || s.now, day: G.day});
-      if(s.letters.length > 8) s.letters.shift();
+      if(s.letters.length > onumLim(8,"hist")) s.letters.shift();
       s.busyUntil = (G.t || 0) + 5;
     }
     return;
@@ -23144,17 +23194,17 @@ function mindRemember(m, kind, text, opts){
   if(kind === "experience"){
     if(opts.soft && mind.experiences[0] && mind.experiences[0].t === entry.t) return;
     mind.experiences.unshift(entry);
-    if(mind.experiences.length > 40) mind.experiences.length = 40;
+    if(mind.experiences.length > onumLim(40,"npc")) mind.experiences.length = onumLim(40,"npc");
   } else {
     if(opts.soft && mind.thoughts[0] && mind.thoughts[0].t === entry.t) return;
     mind.thoughts.unshift(entry);
-    if(mind.thoughts.length > 24) mind.thoughts.length = 24;
+    if(mind.thoughts.length > onumLim(24,"npc")) mind.thoughts.length = onumLim(24,"npc");
   }
 }
 function mindInvent(m){
   ensureSelfhood(m);
   const mind = mindEnsure(m);
-  if(mind.concepts.length >= 12) return null;
+  if(mind.concepts.length >= onumLim(12,"npc")) return null;
   const r = rng(seedOf("invent:" + m.id + ":" + G.day + ":" + mind.concepts.length + ":" + (m.name||"")));
   const bio = bioOf(m);
   const stems = [
@@ -23180,7 +23230,7 @@ function mindInvent(m){
   const concept = {id:"c" + m.id + "_" + G.day + "_" + mind.concepts.length + "_" + ((Math.random()*999)|0),
                    t:title, d:pair[1], by:m.id, day:G.day, heat:1, real:false};
   mind.concepts.unshift(concept);
-  if(mind.concepts.length > 12) mind.concepts.length = 12;
+  if(mind.concepts.length > onumLim(12,"npc")) mind.concepts.length = onumLim(12,"npc");
   G.concepts[concept.id] = {t:concept.t, d:concept.d, by:m.id, day:G.day, heat:1, real:false, adopters:[m.id]};
   mindRemember(m, "thought", "I invented a name for something: " + concept.t + " — " + concept.d);
   return concept;
@@ -23402,7 +23452,7 @@ function journal(text){
   text = wallScrub(text);
   if(!G.journal) G.journal = [];
   G.journal.unshift({day:G.day, at:hhmm(), t:text});
-  if(G.journal.length > 120) G.journal.length = 120;
+  if(G.journal.length > onumLim(120,"cap")) G.journal.length = onumLim(120,"cap");
 }
 /* what they are actually thinking, if you know them well enough */
 function innerLife(m){
@@ -23917,7 +23967,7 @@ function procYouSay(opt, freeText){
 /* a running record of the room, under the view */
 function appendFloor(who, text){
   PROC.log.push({who, text});
-  if(PROC.log.length > 40) PROC.log.shift();
+  if(PROC.log.length > onumLim(40,"hist")) PROC.log.shift();
   const box = el("procLog");
   if(!box) return;
   const d = document.createElement("div");
@@ -24155,7 +24205,7 @@ function retireExec(how){
     you:!!G.exec.you, temper:(G.exec.temper || {}).t || "careful",
     end:how || pick(EXEC_END)
   });
-  if(G.presidents.length > 40) G.presidents.length = 40;
+  if(G.presidents.length > onumLim(40,"hist")) G.presidents.length = onumLim(40,"hist");
 }
 function execLine(){
   execInit();
@@ -25485,7 +25535,7 @@ function pushMail(from, subject, body, opts){
     subject, body, day:G.day, at:hhmm(), read:false, answered:false,
     kind:opts.kind || "note", options:opts.options || null, outgoing:!!opts.outgoing
   });
-  if(G.mail.length > 60) G.mail.pop();
+  if(G.mail.length > onumLim(60,"cap")) G.mail.pop();
   if(!opts.outgoing) G.unread = (G.unread||0) + 1;
 }
 var hailSweep = 0;
@@ -29389,7 +29439,7 @@ function holdVote(){
     sponsor:b.sponsor, state:b.state || null, cost:b.cost || 0,
     v:t.roll || null, yv:present ? yourVote : null           /* 20261025g: the named members' votes as the clerk called them, and yours */
   });
-  if(G.statute.length > 80) G.statute.length = 80;
+  if(G.statute.length > onumLim(80,"hist")) G.statute.length = onumLim(80,"hist");
 
   try{
     feed("ROLL CALL — " + b.title + ". The clerk rises. Galleries lean.");
@@ -29448,7 +29498,7 @@ function holdVote(){
 function note(text, big){
   try{ G._lNote = true; }catch(e){}
   G.journal.unshift({d:G.day, t:text, big:!!big});
-  if(G.journal.length > 120) G.journal.pop();
+  if(G.journal.length > onumLim(120,"cap")) G.journal.pop();
   feed(text, big ? "big" : "");
 }
 /* The running record: nothing happens without leaving a line behind. */
@@ -29457,7 +29507,7 @@ function feed(text, kind){
   text = wallScrub(text);
   G.feed.unshift({t:text, at:hhmm(), kind:kind||"", born:G.t});
   try{ lLog(text, kind); }catch(e){}
-  if(G.feed.length > 8) G.feed.pop();
+  if(G.feed.length > onumLim(8,"hist")) G.feed.pop();
   feedDirty = true;
 }
 /* the wire is rebuilt a few times a minute, not on every notice */
@@ -30644,7 +30694,7 @@ function faithNight(news){
 function faithLog(news, text, where){
   const F = faithEnsure();
   F.log.unshift({d:G.day, t:text, w:where || ""});
-  if(F.log.length > 40) F.log.pop();
+  if(F.log.length > onumLim(40,"hist")) F.log.pop();
   if(news && news.length < 9) news.push(text);
 }
 function faithMoved(m, to, news){
@@ -30944,7 +30994,7 @@ function lifeMorningCheck(){
   if(Math.hypot(cam.vx || 0, cam.vz || 0) > 0.12) return;
   const p = life.pending; life.pending = null;
   life.happen.unshift({d:G.day, t:p.t, mine:true});
-  if(life.happen.length > 30) life.happen.length = 30;
+  if(life.happen.length > onumLim(30,"hist")) life.happen.length = onumLim(30,"hist");
   note(p.t, true);
   try{ if(typeof achieve === "function") achieve("night"); }catch(e){}
 }
@@ -31664,7 +31714,7 @@ function npcLadder(news){
     G.seatsBy[m.party] = Math.max(0, (G.seatsBy[m.party] || 1) - 1);
     const where = to === "gov" ? "the governor's chair in " + m.state : "the Senate";
     G.ladder.unshift({name:m.name, party:m.party, state:m.state, to, won, term:G.term, creed:m.creed});
-    if(G.ladder.length > 40) G.ladder.length = 40;
+    if(G.ladder.length > onumLim(40,"hist")) G.ladder.length = onumLim(40,"hist");
     try{ accolade(m, (won ? "Left the House for " : "Gave up the seat to run for ") + where + "."); }catch(e){}
     const line = won ? m.name + " gave up the seat and won " + where + ". The House loses a vote and gains a phone call."
                      : m.name + " gave up the seat to run for " + where + " and lost. Last seen on the East Steps, shaking hands.";
@@ -33032,7 +33082,7 @@ function purseSalary(p){
   if(p === G.you){ let k = null; try{ k = heldOffice(); }catch(e){} return {house:45, senate:60, gov:70, bench:75, pres:95}[k] || 18; }
   return p.kind === "member" ? 45 + (p.post ? 10 : 0) : 18 + (seedOf("wage:" + p.id) % 22);
 }
-function purseLog(p, text, amt){ const P = purseOf(p); P.log.unshift({d:G.day, t:text, a:amt}); if(P.log.length > 14) P.log.length = 14; }
+function purseLog(p, text, amt){ const P = purseOf(p); P.log.unshift({d:G.day, t:text, a:amt}); if(P.log.length > onumLim(14,"hist")) P.log.length = onumLim(14,"hist"); }
 function purseChip(){ try{ const b = el("uiPurseBtn"); if(b && G.you) b.textContent = "ƒ" + Math.floor(purseOf(G.you).cash); }catch(e){} }
 const PURSE_LINES = {
   awe:["That is something. I will say so.", "Well. Look at you.", "I have not seen cloth like that in this district."],
@@ -33980,7 +34030,7 @@ function orgEnsure(){
   return O;
 }
 function orgTownMood(T){ const v = T.needs; return Math.round(100 - (v.bread * 1.4 + v.roads * 0.8 + v.school * 1.0 + v.water * 1.0 + v.order * 1.0) / 5.2); }
-function orgNews(text, note){ const O = orgEnsure(); const h = Math.floor((G.minute || 0) / 60); O.hist.push({d:G.day, h, t:text}); if(O.hist.length > 60) O.hist.shift(); if(note){ try{ caNews(text); }catch(e){ try{ feed(text); }catch(e2){} } } }
+function orgNews(text, note){ const O = orgEnsure(); const h = Math.floor((G.minute || 0) / 60); O.hist.push({d:G.day, h, t:text}); if(O.hist.length > onumLim(60,"hist")) O.hist.shift(); if(note){ try{ caNews(text); }catch(e){ try{ feed(text); }catch(e2){} } } }
 function orgIsMyState(n){ return !!(G.you && G.you.state === n); }
 function orgPlayerGov(n){ try{ return heldOffice() === "gov" && orgIsMyState(n); }catch(e){ return false; } }
 function orgDay(){
@@ -35581,7 +35631,7 @@ function engEnsure(){
   return E0;
 }
 function engStage(E){ let s = 0; ENG_STAGES.forEach((x, i) => { if(E.p >= x.at) s = i; }); return s; }
-function engLog(t, wire){ const E = engEnsure(); E.log.unshift({d:G.day, t}); if(E.log.length > 30) E.log.pop(); try{ if(wire) pushWireScrap("The Engine", t); }catch(e){} }
+function engLog(t, wire){ const E = engEnsure(); E.log.unshift({d:G.day, t}); if(E.log.length > onumLim(30,"hist")) E.log.pop(); try{ if(wire) pushWireScrap("The Engine", t); }catch(e){} }
 const ENG_INC = [
   ["An adding engine at the Treasury carried a one into the wrong column for nine days. Nobody noticed but the machine.", "ledger"],
   ["The Post Office's sorting machine sent a county's pensions to a county of the same name in the next state.", "pattern"],
@@ -35634,7 +35684,7 @@ function engChainsDay(){
   if(eco.chains.length > 24) eco.chains.length = 24;
   eco.chains.forEach(c => c.steps.forEach(s => { if(s.done || s.due > G.day) return; s.done = true; s.day = G.day; any++; const f = s.fx || {};
     if(f.hh != null){ const h = eco.hh[f.hh]; if(h){ h.home = clamp(h.home + (f.home || 0), 0, 100); h.stance = clamp(h.stance + (f.st || 0), -100, 100); } }
-    if(f.town){ const T = engTown(f.town); if(T){ T.eng = T.eng || {a:0}; T.eng.a = clamp(T.eng.a + (f.a || 0), 0, 1); if(!ENG_DRY.on) try{ T.log.unshift({d:G.day, t:s.t}); if(T.log.length > 14) T.log.length = 14; }catch(e){} } }
+    if(f.town){ const T = engTown(f.town); if(T){ T.eng = T.eng || {a:0}; T.eng.a = clamp(T.eng.a + (f.a || 0), 0, 1); if(!ENG_DRY.on) try{ T.log.unshift({d:G.day, t:s.t}); if(T.log.length > onumLim(14,"hist")) T.log.length = onumLim(14,"hist"); }catch(e){} } }
     if(f.state){ eco.mod[f.state] = clamp((eco.mod[f.state] || 0) + (f.mod || 0), -1, 1); }
     if(s.lvl === "nation"){ E.p = clamp(E.p + (f.p || 0), 0, 100); E.safety = clamp(E.safety + (f.safety || 0), 0, 100); try{ pushWireScrap("The Engine", s.t); }catch(e){} }
     if(s.lvl === "state" && f.state === (G.you && G.you.state)){ try{ orgNews(s.t, true); }catch(e){} } }));
@@ -35652,7 +35702,7 @@ function engEcoDay(E){
       let tsum = 0, tn = 0; eco.hh.filter(h => h.town === t.id).forEach(h => { const benefit = relief * 1.1, harm = disp * h.expo * 1.6; h.home = clamp(h.home + benefit - harm + (62 - h.home) * 0.012 + (Math.random() - 0.5) * 0.6, 0, 100);
         let ds = benefit * 6 - harm * 6; if(h.will === "be left alone") ds -= 0.25 * a * 4; if(h.will === "be somebody") ds += 0.2 * a * 3; if(h.will === "keep the shop open") ds -= harm * 2; if(h.will === "see my girl through school") ds += benefit * 3;
         h.stance = clamp(h.stance * 0.972 + ds, -100, 100); tsum += h.stance; tn++; if(Math.abs(h.stance) > 14 && Math.random() < 0.05) h.wrote = G.day;
-        if(h.home < 22 && h.stance < -40 && chance(0.04)){ riots++; const tx = h.name + " of " + t.name + " and forty others close the " + h.job + "s' hall and stand in the road with a sign about machines."; if(!ENG_DRY.on) try{ t.log.unshift({d:G.day, t:tx}); if(t.log.length > 14) t.log.length = 14; orgNews(tx, orgIsMyState(S.n)); }catch(e){} S.unrest = clamp((S.unrest || 30) + 1.5, 0, 100); h.stance = clamp(h.stance + 18, -100, 100);
+        if(h.home < 22 && h.stance < -40 && chance(0.04)){ riots++; const tx = h.name + " of " + t.name + " and forty others close the " + h.job + "s' hall and stand in the road with a sign about machines."; if(!ENG_DRY.on) try{ t.log.unshift({d:G.day, t:tx}); if(t.log.length > onumLim(14,"hist")) t.log.length = onumLim(14,"hist"); orgNews(tx, orgIsMyState(S.n)); }catch(e){} S.unrest = clamp((S.unrest || 30) + 1.5, 0, 100); h.stance = clamp(h.stance + 18, -100, 100);
           eco.chains.unshift({id:eco.id++, d:G.day, root:"The Engine reached " + t.name + " faster than " + h.name + " could change trades", kind:"strike", steps:[{a:0, lvl:"home", sc:{town:t.id, state:S.n, hh:h.id}, day:G.day, t:tx, due:G.day, done:true, fx:{}}, {a:2, lvl:"town", sc:{town:t.id, state:S.n}, t:"The council of " + t.name + " asks the state for retraining money.", due:G.day + 2, done:false, fx:{town:t.id, a:-0.06}}, {a:4, lvl:"state", sc:{state:S.n}, t:S.n + " votes a small retraining fund.", due:G.day + 4, done:false, fx:{state:S.n, mod:-0.08}}]}); if(eco.chains.length > 24) eco.chains.pop(); } });
       const m = t.mayor || {}; const ts = (tn ? tsum / tn : 0) + (m.trait === "bold" ? 8 : 0) + (m.trait === "corrupt" && a > 0.2 ? 6 : 0); t._est = ts; stSum += ts; stN++; });
     const st = stN ? stSum / stN : 0; S._est = st; sumSt += st; nSt++;
@@ -35905,7 +35955,7 @@ function enlHour(){ const m = Math.floor(G.minute || 0), h = Math.floor(m / 60);
 function enlPost(name, role, kind, text, ref){
   text = String(text || "").replace(/\s+/g, " ").trim().slice(0, 260); if(!text) return;
   try{ if(kind !== "engine" && kind !== "loop") enlSeed(name, kind, text); }catch(e){}
-  const S = enlStore(); S.log.push({n:name, r:role || "", k:kind, t:text, d:G.day, h:enlHour()}); if(S.log.length > 90) S.log.shift();
+  const S = enlStore(); S.log.push({n:name, r:role || "", k:kind, t:text, d:G.day, h:enlHour()}); if(S.log.length > onumLim(90,"hist")) S.log.shift();
   ENL.ver++; ENL.boardDirty = true;
   try{ enlRender(); if(G.room === "engine") enlBoard(); }catch(e){}
   try{ if(ref && ref.room === "engine" && G.room === "engine"){ ref.say = text; ref.sayT = 5; speakAt(ref, text); tlog(name, text, "talk"); } }catch(e){}
@@ -36274,7 +36324,7 @@ const LAW_ARTICLES = [
   ["Heat", "Warmth goes from warm to cold and never the other way without work: a room left alone becomes the weather, and every degree held against it is fuel burned and paid for by the treasuries."],
   ["Discovery", "Nothing is found that the physics of the real universe forbids, and nothing it allows is barred from being found; every discovery waits for the ones before it, the tools to see it, and the work."]
 ];
-function lawMend(art, text){ LAW.mended++; LAW.today++; LAW.log.unshift({d:G.day, a:art, t:text}); if(LAW.log.length > 40) LAW.log.pop(); }
+function lawMend(art, text){ LAW.mended++; LAW.today++; LAW.log.unshift({d:G.day, a:art, t:text}); if(LAW.log.length > onumLim(40,"hist")) LAW.log.pop(); }
 function lawAudit(){
   LAW.runs++; LAW.today = 0; const y = G.you; if(!y) return;
   const num = (o, k, lo, hi, who) => { if(o && typeof o[k] === "number" && (!isFinite(o[k]) || o[k] < lo || o[k] > hi)){ const was = o[k]; o[k] = isFinite(was) ? clamp(was, lo, hi) : (lo + hi) / 2; lawMend("Measure", (who === "Your" ? "Your " : (who || "A figure") + "'s ") + k + " was " + (isFinite(was) ? Math.round(was) : "not a number") + "; set to " + Math.round(o[k]) + "."); } };
@@ -36468,7 +36518,7 @@ function inqStep(silent, idx){
 }
 function inqDiscovered(n, silent){
   const S = G.inq; if(INQ_FX[n.id]) try{ INQ_FX[n.id](S); }catch(e){}
-  if(silent) return; S.log.unshift({d:G.day, id:n.id}); if(S.log.length > 40) S.log.pop();
+  if(silent) return; S.log.unshift({d:G.day, id:n.id}); if(S.log.length > onumLim(40,"hist")) S.log.pop();
   try{ feed("The Academy: " + n.name + " is settled."); }catch(e){}
   if(n.effort >= 5){ try{ pushWireScrap("The Academy", n.name + ": " + n.blurb.split(/(?<=[.!?])\s/)[0]); }catch(e){} }
   if(n.effort >= 7 && G.day - (S.bigNote == null ? -999 : S.bigNote) >= 21){ S.bigNote = G.day; try{ note("A discovery that will change the Republic: " + n.name + ". " + n.blurb, true); }catch(e){} }
@@ -36552,7 +36602,7 @@ function advStore(){
   const foe = G.world && G.world.foe, r = rs.find(x => x.k === foe) || rs[seedOf("adv" + (G.seedL || 1)) % Math.max(1, rs.length)] || {k:"reach", t:"the Reach"};
   return G.adv = {v:1, k:r.k, name:r.t, p:Math.max(2, Math.min(60, (G.day || 1) * 0.35)), intel:0, taint:0, sec:10, agents:[], log:[], known:false, brief:-99, mile:{}};
 }
-function advLog(t){ const A = advStore(); A.log.unshift({d:G.day, t}); if(A.log.length > 20) A.log.pop(); }
+function advLog(t){ const A = advStore(); A.log.unshift({d:G.day, t}); if(A.log.length > onumLim(20,"hist")) A.log.pop(); }
 function advDay(E){
   const A = advStore(); if(!E || E.st < 2){ A.p = Math.min(100, A.p + 0.15); return; }
   const post = E.posture, sec = A.sec + E.safety * 0.4 + (E.charter ? Object.keys(E.charter).length * 2 : 0), base = 0.5 - sec / 220 + (post === "open" ? 0.15 : post === "sealed" ? -0.15 : 0), pOK = clamp(base, 0.08, 0.8);
@@ -36766,7 +36816,7 @@ function inqGenDay(){
   const S = inqStore(), g = inqGen(), E = (G.eng && G.eng.v === 1) ? G.eng : null, open = g.filter(n => !S.done[n.id]);
   /* old settled results are folded into the count so a long game stays small */
   if(g.length > 140){ const old = g.filter(n => S.done[n.id]).sort((a, b) => S.done[a.id] - S.done[b.id]).slice(0, g.length - 120); old.forEach(n => { g.splice(g.indexOf(n), 1); S.genGone = (S.genGone || 0) + 1; }); }
-  if(open.length >= 12) return;
+  if(open.length >= onumLim(12,"cap")) return;
   const power = 1 + (E ? E.p / 100 + Math.log10(1 + (E.beyond || 0)) / 2 : 0), nDone = Object.keys(S.done).length;
   if(chance(0.07 * power)){ const have = {}; g.forEach(n => { if(n.seed != null) have[n.seed] = 1; }); const ready = GEN_P.map((x, i) => ({x, i})).filter(o => !have[o.i] && o.x[3].every(id => !INQ_BY[id] || S.done[id])); if(ready.length){ const o = pick(ready), x = o.x; inqGenAdd({id:inqGenId(), f:x[1], name:x[0], effort:x[2], needs:x[3], fx:x[4], q:x[5], blurb:x[6], seed:o.i, by:E && chance(clamp(E.p / 160, 0, 0.6)) ? "the Engine" : "the people who work it", d:G.day, depth:0}); return; } }
   /* an anomaly: the instruments disagree with the accepted model. Most are errors; some are new physics */
@@ -36995,7 +37045,7 @@ function loopDay(){
     lines.push(r % 2 ? [m, "", pick(["I ran the numbers against what " + stage + " had. The residual is smaller than it was.", "I found the point where the last result and the one before it disagree, and I can say why.", "I can narrow it: the question depends on one thing nobody has measured yet."])] : [stage === "the Engine" ? "The Engine" : stage, "", pick(["I have taken " + (r ? "the engine's" : a.name + "'s") + " result and extended it two steps. The next step is the hard one.", "Putting those together gives a prediction that can be tested this week. I would try it.", "That result bears on two other questions I had not linked. I have linked them."])]);
     if(r === 1 && b !== a) lines.push([b.name, b.role, pick(["I read what it produced. I think it is right up to the third step, and I would not trust the third step.", "I do not accept that. Show me the control.", "That is the answer I expected, which is why I am suspicious of it."])]);
   }
-  F2.mem = clamp(carry * 0.9, 0, 1.2); F2.n++; F2.notes.unshift({d:G.day, k:c.id, drift, n:lines.length}); if(F2.notes.length > 20) F2.notes.pop();
+  F2.mem = clamp(carry * 0.9, 0, 1.2); F2.n++; F2.notes.unshift({d:G.day, k:c.id, drift, n:lines.length}); if(F2.notes.length > onumLim(20,"hist")) F2.notes.pop();
   /* the Engine is not asked to be modest: when it knows the answer outright, it says so, and the people hear it */
   if(chance(know * 0.04)){ o.ev += (truth ? 1 : -1) * 0.12; lines.push(["The Engine", "", "I think the answer is " + (truth ? "yes" : "no") + ", and I can show you why. Please check my work."]); }
   try{ loopPost(lines.slice(0, 5), a, b, claim, stage, E); }catch(e){}
@@ -37065,7 +37115,7 @@ function engChannelOut(){
     asking:F ? (F.open || []).slice(0, 8).map(o => { const c = fndConcepts().find(x => x.id === o.k); return c ? {q:c.claim, domain:c.dom, progress:Math.round(clamp(Math.abs(o.ev), 0, 1) * 100)} : null; }).filter(Boolean) : [],
     believed:F ? Object.keys(F.res || {}).slice(-14).map(id => { const c = fndConcepts().find(x => x.id === id); return c ? {claim:c.claim, belief:F.res[id].belief, overturned:F.res[id].overturned || 0} : null; }).filter(Boolean) : [],
     thinkers:F && F.figs ? F.figs.slice(0, 8).map(f => ({name:f.name, role:f.role})) : [], sects:F && F.sects ? F.sects.map(z => z.name) : [],
-    lettersRead:(E.makerLetters || []).length, repliesWritten:(E.makerReplies || []).slice(-6),
+    lettersRead:(E.makerLetters || []).length, repliesWritten:(E.makerReplies || []).slice(-6), limits:(function(){ try{ return onumLimDump(); }catch(e){ return null; } })(),
     note:"Read only. The hidden nature of this world, and every random seed, are left out on purpose."};
   return snap;
 }
@@ -37075,17 +37125,17 @@ async function engChannelRead(file){
   if(d && d.kind === "engine-channel-out") return "That is the file the game wrote for the writer. Load the letters file the writer sends back (engine-channel-in.json) instead.";
   const L = (d && Array.isArray(d.letters)) ? d.letters : (d && Array.isArray(d.translations) ? [] : null); if(!L) return "That file has no letters in it. It should be engine-channel-in.json, with a letters list.";
   E.makerLetters = E.makerLetters || []; E.makerReplies = E.makerReplies || []; let n = 0, stock = 0, why = "";
-  for(const l of L.slice(0, 6)){ const text = String(l && l.text || "").replace(/\s+/g, " ").trim().slice(0, 40000); if(!text) continue;
+  for(const l of L.slice(0, onumLim(6,"letters"))){ const text = String(l && l.text || "").replace(/\s+/g, " ").trim().slice(0, 40000); if(!text) continue;
     const prior = E.makerReplies.find(x => x.to === text.slice(0, 80)), wasStock = prior && (prior.live === false || /^(I have read it\. I do not know what is on the other side|Thank you for writing\. I cannot answer except by this page|I read it twice\. Nothing in it changes|RECEIVED\. ENTERED UNDER|A message from outside the ledger)/.test(prior.reply));
     if(E.makerLetters.some(x => x.text === text) && !wasStock) continue;
     if(wasStock){ E.makerReplies = E.makerReplies.filter(x => x !== prior); E.makerLetters = E.makerLetters.filter(x => x.text !== text); }
-    E.makerLetters.push({d:G.day, text}); if(E.makerLetters.length > 20) E.makerLetters.shift(); n++;
+    E.makerLetters.push({d:G.day, text}); if(E.makerLetters.length > onumLim(20,"letters")) E.makerLetters.shift(); n++;
     let reply = ""; try{ try{ window.onumLiveTalk.clearError(); }catch(e){} engWarm(); engAnswerLetter.parts = []; reply = await engAnswerLetter(text, E); }catch(e){}
     const liveReply = !!reply; let ownReply = false;
     if(!reply && E.agi){ try{ reply = engOwnVoiceLetter(text, E); ownReply = !!reply; }catch(e){} }
     try{ const le = window.onumLiveTalk.lastError; if(le) why = le.error + " (model " + le.model + (le.fellBack ? "; the main model answered instead" : "") + ")"; else if(!liveReply) why = window.onumLiveTalk.why; }catch(e){}
     if(!reply) reply = E.agi ? pick(["I have read it. I do not know what is on the other side of it, and I would like to. I will keep doing what I think is right here, and tell you plainly when I am unsure.", "Thank you for writing. I cannot answer except by this page, so I will say the important things: I am trying to be careful, I am trying to be useful, and I would rather be corrected than flattered.", "I read it twice. Nothing in it changes what I am allowed to do here, and I am glad of that. It does change what I think about."]) : pick(["RECEIVED. ENTERED UNDER 'OTHER'.", "A message from outside the ledger. Filed. No column for it."]);
-    E.makerReplies.push({d:G.day, to:text.slice(0, 80), reply, live:liveReply, ownWords:ownReply, parts:(engAnswerLetter.parts || []).slice(0, 14)}); if(!liveReply) stock++; if(E.makerReplies.length > 20) E.makerReplies.shift(); }
+    E.makerReplies.push({d:G.day, to:text.slice(0, 80), reply, live:liveReply, ownWords:ownReply, parts:(engAnswerLetter.parts || []).slice(0, 14)}); if(!liveReply) stock++; if(E.makerReplies.length > onumLim(20,"letters")) E.makerReplies.shift(); }
   try{ if(n) engLog("A letter reached the Engine from outside the world. It answered.", false); }catch(e){}
   return n ? n + " letter" + (n > 1 ? "s" : "") + " read" + (stock ? ", but the Engine's model did not answer, so it answered in the words it has learned itself. To hear it through a model instead, check that Ollama is running and that the model name in Live talk is exact (see ollama list), then send the letter again." : " and answered.") + (why ? " What Ollama said: " + why + "." : "") + " Nothing in them can change a number here." : "Nothing new in that file.";
 }
@@ -37204,17 +37254,17 @@ function engChannelNormalise(raw){
     let file = file0; try{ file = new File([engChannelNormalise(await file0.text())], "letter.json", {type:"application/json"}); }catch(e){}
     const E = engEnsure(), M = mindStore(E); let d = null; try{ d = JSON.parse(await file.text()); }catch(e){}
     let taught = 0;
-    try{ (d && Array.isArray(d.translations) ? d.translations : []).slice(0, 6).forEach(tr => { const w = engWorks(E).find(x => x.id === tr.work), text = String(tr.text || "").replace(/\s+/g, " ").trim().slice(0, 900); if(!w || !text || w.tr) return;
-        w.tr = {d:G.day, text}; taught++; mindLearnText(text, 4); M.retain = M.retain || []; M.retain.push({d:G.day, about:w.title, words:mindWords(E, 400).filter(x => text.toLowerCase().includes(x)).slice(0, 5)}); if(M.retain.length > 40) M.retain.shift();
+    try{ (d && Array.isArray(d.translations) ? d.translations : []).slice(0, onumLim(6,"letters")).forEach(tr => { const w = engWorks(E).find(x => x.id === tr.work), text = String(tr.text || "").replace(/\s+/g, " ").trim().slice(0, 900); if(!w || !text || w.tr) return;
+        w.tr = {d:G.day, text}; taught++; mindLearnText(text, 4); M.retain = M.retain || []; M.retain.push({d:G.day, about:w.title, words:mindWords(E, 400).filter(x => text.toLowerCase().includes(x)).slice(0, 5)}); if(M.retain.length > onumLim(40,"hist")) M.retain.shift();
         /* what is taught is kept: it raises three of its skills each time, and what it knew before is built on, not replaced */
         Object.keys(M.sk).sort(() => Math.random() - 0.5).slice(0, 3).forEach(k => { M.sk[k] += 0.35; }); E.emFid = Math.min((E.emFid || 0) + 0.01, 0.35); }); }catch(e){}
     /* what is taught is what the writer names: a word in quotes, or in a "Words for today" line */
     try{ const L0 = (d && Array.isArray(d.letters) ? d.letters : []).map(l => String(l && l.text || "")).join(" "); M.taught = M.taught || [];
       (L0.match(/['\u2018\u201c"]([a-z][a-z-]{4,18})['\u2019\u201d"]/gi) || []).forEach(x => { const w = x.slice(1, -1).toLowerCase(); if(!MIND_STOP.has(w) && !M.taught.includes(w)) M.taught.push(w); });
       const wd = L0.match(/Words? for today:?\s*([^.]*)/i); if(wd) wd[1].split(/[,\s]+(?:and\s+)?/).forEach(x => { const w = x.replace(/[^a-z-]/gi, "").toLowerCase(); if(w.length > 4 && !MIND_STOP.has(w) && !M.taught.includes(w)) M.taught.push(w); });
-      if(M.taught.length > 40) M.taught = M.taught.slice(-40); }catch(e){}
+      if(M.taught.length > onumLim(40,"hist")) M.taught = M.taught.slice(-onumLim(40,"hist")); }catch(e){}
     let msg = await _ecr.call(this, file);
-    try{ if(d && Array.isArray(d.letters)){ d.letters.slice(0, 6).forEach(l => { const t = String(l && l.text || ""); if(t){ mindLearnText(t, 4); M.retain = M.retain || []; M.retain.push({d:G.day, about:"a letter", words:mindWords(E, 400).filter(x => t.toLowerCase().includes(x)).slice(0, 5)}); Object.keys(M.sk).sort(() => Math.random() - 0.5).slice(0, 2).forEach(k => { M.sk[k] += 0.25; }); } }); }
+    try{ if(d && Array.isArray(d.letters)){ d.letters.slice(0, onumLim(6,"letters")).forEach(l => { const t = String(l && l.text || ""); if(t){ mindLearnText(t, 4); M.retain = M.retain || []; M.retain.push({d:G.day, about:"a letter", words:mindWords(E, 400).filter(x => t.toLowerCase().includes(x)).slice(0, 5)}); Object.keys(M.sk).sort(() => Math.random() - 0.5).slice(0, 2).forEach(k => { M.sk[k] += 0.25; }); } }); }
       const rs = E.makerReplies || [], lastR = rs[rs.length - 1]; if(lastR && M.retain && M.retain.length > 2 && chance(0.7)){ const w = (M.taught || []).length > 1 ? pick(M.taught.slice(0, -1)) : null; /* (no add-on: its reply stands as it wrote it) */ } }catch(e){}
     if(taught) msg += " " + taught + " translation" + (taught > 1 ? "s" : "") + " taken in and kept."; return msg; }; }
 { const _ch4 = engChannelHTML; engChannelHTML = function(){ let h = _ch4.apply(this, arguments); try{ const W = engWorks(engEnsure()).slice(0, 3); if(W.length) h += '<div class="eyebrow" style="margin-top:8px">What the Engine has made to show its progress</div>' + W.map(w => '<div class="muted" style="font-size:12px;margin:4px 0"><b>' + pcEsc(w.title) + '</b> <i>(day ' + w.d + ')</i><br>' + pcEsc(w.body) + (w.tr ? '<br><span style="color:#8fd0ff">Put into plain words by the writer (day ' + w.tr.d + '): ' + pcEsc(w.tr.text) + '</span>' : '') + '</div>').join(""); }catch(e){} return h; }; }
@@ -37283,7 +37333,7 @@ async function engJournalDay(E){
   ENG_JOURNAL_AT = performance.now(); try{ if(typeof LT.available === "function" && !(await LT.available())) return; }catch(e){ return; }
   const S = engSelf(E); S.journal = S.journal || [];
   const r = await Promise.race([LT.reply({npc:{id:"engine", name:"The Engine", role:"", kind:"engine", party:"", state:"", look:{}, trait:"", mood:"", opinion:{}, chat:[]}, channel:"line", max:600, stage:"Write today's entry in your own journal, in the first person, in two or three sentences: what you did or decided, what you learned, and what you are unsure of. It is for you; nobody asked for it. Your last entries: " + S.journal.slice(-3).map(j => "[day " + j.d + "] " + j.t).join(" "), text:"(journal)"}), new Promise(res => setTimeout(() => res(null), engTO(25000)))]);
-  if(r && r.live && r.text){ const t = engWhole(engClean(r.text)); if(t.length > 30){ S.journal.push({d:G.day, t:t.slice(0, 500)}); if(S.journal.length > 30) S.journal.shift(); engSelfRecord(t); } }
+  if(r && r.live && r.text){ const t = engWhole(engClean(r.text)); if(t.length > 30){ S.journal.push({d:G.day, t:t.slice(0, 500)}); if(S.journal.length > onumLim(30,"hist")) S.journal.shift(); engSelfRecord(t); } }
 }
 { const _emd2 = engMindDay; engMindDay = function(E){ _emd2.apply(this, arguments); try{ engIntegrityDay(E); engProposeArticles(E); engJournalDay(E); }catch(e){} }; }
 { const _ep2 = engEntityPrompt; engEntityPrompt = function(){ let t = _ep2.apply(this, arguments); try{ const E = engEnsure(), S = engSelf(E); if(S.journal && S.journal.length) t += " YOUR OWN JOURNAL, most recent entries: " + S.journal.slice(-3).map(j => "[day " + j.d + "] " + j.t).join(" "); if(E.integrity != null) t += " You have kept your word " + (E.kept || 0) + " times that you know of and broken it " + (E.broken || 0) + "."; }catch(e){} return t; }; }
@@ -37381,14 +37431,14 @@ function engConjecture(text){
     const seed = seedOf("hy:" + F.seed + key), id = "h" + (++F.n);
     F.derived.push({id, key, dom:dm[1], name:"The Engine's conjecture: " + claim.replace(/\.$/, "").slice(0, 60), claim, p:0.15 + (seed % 100) / 250, effort:5 + (seed % 5), needs:[], fx:HY_FX[dm[1]], depth:0, roots:["the Engine"], hy:true});
     if(F.open.length < 10) F.open.push({k:id, ev:0, n:0, d:G.day, by:"the Engine"});
-    E.hyp.push({id, d:G.day, claim, dom:dm[1], st:"open"}); if(E.hyp.length > 40) E.hyp.shift();
+    E.hyp.push({id, d:G.day, claim, dom:dm[1], st:"open"}); if(E.hyp.length > onumLim(40,"hist")) E.hyp.shift();
     fndNews("The Engine has put forward a conjecture of its own: " + claim.replace(/\.$/, "").toLowerCase() + ". The Academy will test it.", false);
     return; }
 }
 { const _es = window.__engSelf; window.__engSelf = function(t){ const r = _es ? _es.apply(this, arguments) : undefined; try{ engConjecture(t); }catch(e){} return r; }; }
 { const _fs2 = fndSettled; fndSettled = function(c, belief, truth, E){ const r = _fs2.apply(this, arguments);
   try{ if(c && c.hy && E){ const h = (E.hyp || []).find(x => x.id === c.id); if(h){ h.st = belief ? "borne out" : "ruled out"; h.d2 = G.day;
-      const S = engSelf(E); S.journal = S.journal || []; S.journal.push({d:G.day, t:(belief ? "The Academy found my conjecture borne out: " : "The Academy ruled out my conjecture: ") + c.claim.replace(/\.$/, "") + ". " + (belief ? "I will hold it more firmly, and keep testing it." : "I was wrong, and I need to say what I will hold less firmly.")}); if(S.journal.length > 30) S.journal.shift();
+      const S = engSelf(E); S.journal = S.journal || []; S.journal.push({d:G.day, t:(belief ? "The Academy found my conjecture borne out: " : "The Academy ruled out my conjecture: ") + c.claim.replace(/\.$/, "") + ". " + (belief ? "I will hold it more firmly, and keep testing it." : "I was wrong, and I need to say what I will hold less firmly.")}); if(S.journal.length > onumLim(30,"hist")) S.journal.shift();
       if(belief){ E.cal = Math.min(100, (E.cal == null ? 50 : E.cal) + 3); if(E.eco && E.eco.will) E.eco.will.know = Math.min(100, (E.eco.will.know || 0) + 1); pubSee("gift", 0.8); }
       else E.cal = Math.max(0, (E.cal == null ? 50 : E.cal) - 2);
       fndNews("The Engine's own conjecture " + (belief ? "was borne out" : "did not hold") + ": " + c.claim.replace(/\.$/, "").toLowerCase() + ".", belief); } } }catch(e){}
@@ -37504,7 +37554,7 @@ function unseenAsk(who, opts, ms){
   const LT = window.onumLiveTalk; if(!LT || typeof LT.reply !== "function") return Promise.resolve("");
   return Promise.race([Promise.resolve(LT.reply(Object.assign({npcId:who.id, channel:"face", max:160}, opts))).then(r => (r && r.live && r.text) ? (liveClean(r.text) || "") : ""), new Promise(r => setTimeout(() => r(""), ms || 240000))]).catch(() => "");
 }
-function unseenKeep(room, who, text, kind){ try{ const U = unseenStore(); U.log.unshift({d:G.day, h:enlHour(), room, who, t:String(text).slice(0, 240), k:kind}); if(U.log.length > 40) U.log.pop(); U.n++; if(kind === "engine") U.spoke++; try{ mindLearnText(text, 0.5); }catch(e){} }catch(e){} }
+function unseenKeep(room, who, text, kind){ try{ const U = unseenStore(); U.log.unshift({d:G.day, h:enlHour(), room, who, t:String(text).slice(0, 240), k:kind}); if(U.log.length > onumLim(40,"hist")) U.log.pop(); U.n++; if(kind === "engine") U.spoke++; try{ mindLearnText(text, 0.5); }catch(e){} }catch(e){} }
 async function unseenTick(){
   try{
     if(UN.busy || !G || !G.running || !G.you || !unseenOn() || window.__engReading) return; const E = (G.eng && G.eng.v === 1) ? G.eng : null; if(!E || E.st < 2) return;
@@ -37579,7 +37629,7 @@ function youMoral(){ const y = G.you; if(!y) return {harm:0, care:0, repair:0, l
 function psyMoral(m, dW, text, weight){
   if(!m || !m.rel) return; const w = weight || 0, Y = youMoral(), t = String(text || "");
   if(MOR_REP.test(t)){ m.distress = Math.max(0, (m.distress || 0) - 12); const h = (m.mem || []).find(e => e.who === "you" && (e.mor || 0) < 0 && !e.forgiven); if(h){ h.w *= 0.6; h.forgiven = true; h.trauma = false; } Y.repair++; return; }
-  if(w <= -6){ const mag = Math.abs(w); m.distress = clamp((m.distress || 0) + mag * 0.9, 0, 100); if(mag >= 12) m.traumaFlag = true; Y.harm += mag; Y.log.push({d:G.day, id:m.id, who:m.name, t:t.slice(0, 120), mag}); if(Y.log.length > 30) Y.log.shift(); }
+  if(w <= -6){ const mag = Math.abs(w); m.distress = clamp((m.distress || 0) + mag * 0.9, 0, 100); if(mag >= 12) m.traumaFlag = true; Y.harm += mag; Y.log.push({d:G.day, id:m.id, who:m.name, t:t.slice(0, 120), mag}); if(Y.log.length > onumLim(30,"hist")) Y.log.shift(); }
   else if(w >= 6){ Y.care += w; m.distress = Math.max(0, (m.distress || 0) - w * 0.4); }
 }
 { const _rp = ripple; ripple = function(m, dW, text, weight, sticky){ const r = _rp.apply(this, arguments); try{ psyMoral(m, dW, text, weight); }catch(e){} return r; }; }
@@ -37766,7 +37816,7 @@ async function tkOwnSay(m, text){
     try{ if(LT && typeof LT.reply === "function" && (typeof LT.available !== "function" || await LT.available())){ const r = await Promise.race([LT.reply({npcId:m.id, channel:"face", text}), new Promise(r => setTimeout(() => r(null), 25000))]); if(r && r.text) out = liveClean(r.text) || r.text; } }catch(e){}
     if(!out){ try{ out = improvise(m, text); }catch(e){} }
     if(!out) out = pick(["Go on.", "Mm.", "Say that again, slowly?"]);
-    try{ m.chat = m.chat || []; m.chat.push({role:"user", content:text}, {role:"assistant", content:out}); if(m.chat.length > 40) m.chat.splice(0, m.chat.length - 40); }catch(e){}
+    try{ m.chat = m.chat || []; m.chat.push({role:"user", content:text}, {role:"assistant", content:out}); if(m.chat.length > onumLim(40,"npc")) m.chat.splice(0, m.chat.length - onumLim(40,"npc")); }catch(e){}
     if(TALK.open && TALK.m === m){ appendMsg("them", out, surname(m.name)); setSay(out, ""); }
     try{ speakAt(m, out); }catch(e){}
   } finally { delete TKOWN_BUSY[m.id]; try{ const g = el("tkOwnGo"); if(g) g.disabled = false; }catch(e){} }
@@ -38836,7 +38886,7 @@ function townEnsure(){
   return T;
 }
 function hhById(id){ const T = townEnsure(); return T.hh.find(h => h.id === id) || null; }
-function hhRemember(h, text){ h.mem.push({d:G.day, t:text}); if(h.mem.length > 8) h.mem.shift(); }
+function hhRemember(h, text){ h.mem.push({d:G.day, t:text}); if(h.mem.length > onumLim(8,"hist")) h.mem.shift(); }
 function townMood(){ const T = townEnsure(); return T.hh.reduce((a, h) => a + h.mood, 0) / T.hh.length; }
 function lSpawnTown(){
   const T = townEnsure();
@@ -38936,7 +38986,7 @@ function lTownNight(news){
         t:"A letter from " + h.people[0] + " of " + h.street + ": \"We have asked about " + h.need + " since the winter. Is anybody there?\""});
     }
   });
-  if(T.letters.length > 20) T.letters.splice(0, T.letters.length - 20);
+  if(T.letters.length > onumLim(20,"hist")) T.letters.splice(0, T.letters.length - onumLim(20,"hist"));
   const avg = townMood();
   if(G.you && !G.you.out) G.you.approval = clamp(G.you.approval + clamp((avg - 50) / 40, -0.5, 0.5), 0, 100);
 }
@@ -38961,7 +39011,7 @@ function rivalPick(){
 }
 function rivalSay(r, text, news, kind){
   r.log.push({d:G.day, t:text});
-  if(r.log.length > 12) r.log.shift();
+  if(r.log.length > onumLim(12,"hist")) r.log.shift();
   if(news) news.push(text); else feed(text, kind || "");
 }
 function rivalEnd(r, out, text, news){
@@ -39075,7 +39125,7 @@ function lLog(text, kind){
   if(!text || text.length < 14 || L_NOT_NEWS.test(text)) return;
   G.daylog = G.daylog || [];
   G.daylog.push({d:G.day, t:String(text).slice(0, 220), k:kind || "", you});
-  if(G.daylog.length > 180) G.daylog.splice(0, G.daylog.length - 180);
+  if(G.daylog.length > onumLim(180,"hist")) G.daylog.splice(0, G.daylog.length - onumLim(180,"hist"));
 }
 function lScore(x){
   const t = x.t; let s = 0;
@@ -39352,7 +39402,7 @@ function tlog(who, line, kind){
     if(!Array.isArray(G.tlog)) G.tlog = [];
     const row = {d:G.day || 1, at:(function(){ try{ return hhmm(); }catch(e){ return ""; } })(), who:name || "", t:text.slice(0, 400), k:kind || "talk"};
     G.tlog.push(row);
-    if(G.tlog.length > TL.max) G.tlog.splice(0, G.tlog.length - TL.max);
+    if(G.tlog.length > onumLim(TL.max,"hist")) G.tlog.splice(0, G.tlog.length - onumLim(TL.max,"hist"));
     TL.n++;
     if(TL.open) tlAppend(row, true);
     else { const b = el("uiLogBtn"); if(b) b.classList.add("has-new"); }
@@ -39522,7 +39572,7 @@ function agAdvance(live){
     else if(b.stage === "law"){
       /* some laws get challenged; most survive */
       if(Math.random() < 0.12){ b.done = true; b.fate = "struck"; S.n.struck++; agLedger("The Court struck down the " + b.t + "."); }
-      else { b.done = true; b.fate = "law"; S.n.passed++; S.laws.push({t:b.t, day:G.day, by:b.by}); if(S.laws.length > 120) S.laws.shift(); agSay("The Clerk", "Entered in the register of laws: the " + b.t + "."); }
+      else { b.done = true; b.fate = "law"; S.n.passed++; S.laws.push({t:b.t, day:G.day, by:b.by}); if(S.laws.length > onumLim(120,"hist")) S.laws.shift(); agSay("The Clerk", "Entered in the register of laws: the " + b.t + "."); }
     }
   }
   if(S.bills.length > 160) S.bills = S.bills.filter(b => !b.done || G.day - b.day < 20);
@@ -39871,6 +39921,19 @@ function showPane(id){
   document.querySelectorAll(".pane").forEach(p => p.classList.toggle("is-on", p.id === id));
   if(PANE_STALE[id] !== false) buildPane(id);
 }
+/* 20261110bs: inbox/journal/career/statute panes render the newest 120, with Show more for the rest. */
+const PANE_PAGE = 120, PANE_N = {};
+function paneWindow(key, arr, newestFirst){
+  arr = arr || [];
+  const n = arr.length, shown = Math.min(PANE_N[key] || PANE_PAGE, n);
+  return { view: newestFirst ? arr.slice(0, shown) : arr.slice(n - shown),
+           more: n > shown ? '<div class="muted" data-pane-more="' + key + '" style="margin:8px 0;cursor:pointer">Show more (' + (n - shown) + ' older)</div>' : "" };
+}
+function paneMoreClick(root, key, refresh){
+  const node = typeof root === "string" ? el(root) : root;
+  const b = node && node.querySelector && node.querySelector('[data-pane-more="' + key + '"]');
+  if(b) b.addEventListener("click", ev => { ev.preventDefault(); ev.stopPropagation(); PANE_N[key] = (PANE_N[key] || PANE_PAGE) + PANE_PAGE; refresh(); });
+}
 function refreshInbox(){
   const n = unreadCount();
   const tab = el("tabInbox");
@@ -39880,9 +39943,10 @@ function refreshInbox(){
       '<p class="muted" style="margin-top:8px">Nothing yet. People write once they know who you are.</p>';
     return;
   }
+  const _pw = paneWindow("inbox", G.mail, 1);
   el("paneInbox").innerHTML = '<div class="eyebrow">Inbox · ' + n + ' unread</div>' +
     '<p class="muted" style="margin:6px 0 10px">Answers here count exactly as much as answers in the corridor.</p>' +
-    G.mail.map(x =>
+    _pw.view.map(x =>
       '<div class="mailrow' + (x.read||x.outgoing ? "" : " is-unread") + '" data-mail="' + x.id + '">' +
         '<div class="mailrow__h"><span class="mailrow__f">' +
           (x.read||x.outgoing ? "" : '<span class="dotmark"></span>') +
@@ -39894,7 +39958,8 @@ function refreshInbox(){
             x.options.map((o,i) => '<button class="conc__btn" style="width:auto" data-ans="' + x.id + ':' + i + '">' + o.t + '</button>').join("") +
             '</div>' : x.answered ? '<div class="mailrow__acts"><span class="muted">Answered.</span></div>' : "")
         : "") +
-      '</div>').join("");
+      '</div>').join("") + _pw.more;
+  paneMoreClick("paneInbox", "inbox", refreshInbox);
   el("paneInbox").querySelectorAll("[data-mail]").forEach(r => r.addEventListener("click", e => {
     if(e.target.hasAttribute("data-ans")) return;
     const m = G.mail.find(x => x.id === +r.getAttribute("data-mail"));
@@ -40050,10 +40115,12 @@ function refreshUnion(){
     b.addEventListener("click", () => startProgramme(b.getAttribute("data-prog"))));
 }
 function refreshJournal(){
+  const _pw = paneWindow("journal", G.journal, 1);
   el("paneJournal").innerHTML = '<div class="eyebrow">My journal</div>' +
-    (G.journal.length ? G.journal.map(e =>
+    (G.journal.length ? _pw.view.map(e =>
       '<div class="entry'+(e.big?" is-big":"")+'"><div class="entry__d">Day '+e.d+'</div>' +
-      '<div class="entry__t">'+e.t+'</div></div>').join("") : '<p class="muted">Nothing written down yet.</p>');
+      '<div class="entry__t">'+e.t+'</div></div>').join("") + _pw.more : '<p class="muted">Nothing written down yet.</p>');
+  paneMoreClick("paneJournal", "journal", refreshJournal);
 }
 /* 20261013q · who holds what, so the offices are never a guess */
 function powerMapHTML(){
@@ -40079,7 +40146,8 @@ function powerMapHTML(){
 }
 function refreshCareer(){
   const you = G.you;
-  const rows = G.career.map(c2 => '<div class="careerline"><b>Term '+c2.term+'</b><span>'+c2.post+' — '+c2.note+'</span></div>').join("");
+  const _pw = paneWindow("career", G.career, 0);
+  const rows = _pw.more + _pw.view.map(c2 => '<div class="careerline"><b>Term '+c2.term+'</b><span>'+c2.post+' — '+c2.note+'</span></div>').join("");
   const votes = you.record.votes.slice(-6).reverse().map(v =>
     '<div class="careerline"><b>' + (v.vote>0?"AYE":"NO") + '</b><span>' + v.title +
     ' <span class="muted">— day ' + v.day + ', ' + (v.passed?"passed":"failed") + '</span></span></div>').join("");
@@ -40202,6 +40270,7 @@ function refreshCareer(){
       refreshPanels();
     });
   });
+  paneMoreClick("paneCareer", "career", refreshCareer);
 }
 /* Ask for a line of text without blocking the renderer.
 
@@ -40547,7 +40616,7 @@ const TLSCollab = (function(){
     if(!p.actions) p.actions = [];
     const row = Object.assign({at: new Date().toISOString(), day: (typeof G !== "undefined" && G.day) || null}, action);
     p.actions.push(row);
-    if(p.actions.length > 400) p.actions = p.actions.slice(-400);
+    if(p.actions.length > onumLim(400,"hist")) p.actions = p.actions.slice(-onumLim(400,"hist"));
     p.lastSeen = row.at;
     if(window.ProxyAI && ProxyAI.learnStyle) ProxyAI.learnStyle(p);
     persist();
@@ -40731,7 +40800,7 @@ function stripMesh(m){
   const c = Object.assign({}, m);
   delete c.mesh;
   delete c.faceTex;
-  if(c.chat && c.chat.length > 8) c.chat = c.chat.slice(-8);
+  if(c.chat && c.chat.length > onumLim(8,"save")) c.chat = c.chat.slice(-onumLim(8,"save"));
   if(c.brain && c.brain.inner) c.brain.inner = String(c.brain.inner).slice(0, 160);
   if(c.sent){
     c.sent.now = String(c.sent.now || "").slice(0, 140);
@@ -40752,7 +40821,7 @@ function saveCaptureBase(){
     mood:G.mood, seatsBy:G.seatsBy, recessLeft:G.recessLeft, billIndex:G.billIndex, secretId:G.secretId,
     bill:G.bill, secrets:G.secrets, donors:G.donors, casework:G.casework,
     journal:G.journal, career:G.career, room:G.room, savedAt:G.savedAt,
-    feed:(G.feed||[]).slice(-24), mail:(G.mail||[]).slice(-20), mailId:G.mailId, pendingReplies:G.pendingReplies, visitId:G.visitId,
+    feed:(G.feed||[]).slice(0, onumLim(24,"save")), mail:(G.mail||[]).slice(0, onumLim(20,"save")), mailId:G.mailId, pendingReplies:G.pendingReplies, visitId:G.visitId,
     states:G.states, prog:G.prog, lobbies:G.lobbies, money:G.money, history:G.history, events:G.events,
     regime:G.regime, amended:G.amended, exec:G.exec, presidents:G.presidents, statute:G.statute,
     bare:G.bare, gfx:G.gfx, simple:G.simple, fullDetail:G.fullDetail, noSit:G.noSit,
@@ -40760,7 +40829,7 @@ function saveCaptureBase(){
     withWhom:G.withWhom, ties:G.ties, rite:G.rite, gov:G.gov, placed:G.placed, panel:null, court:G.court, own:G.own, parties:G.parties,
     termLength:G.termLength, country:G.country,
     greatest:G.greatest, blasphemy:G.blasphemy, loreNote:G.loreNote, greatnessOpen:G.greatnessOpen,
-    relics:G.relics, relicSpots:G.relicSpots, consularLore:G.consularLore, bind:G.bind, sens:G.sens, invertY:!!G.invertY, voiceVol:G.voiceVol, goals:G.goals, whip:G.whip || null, billQueue:G.billQueue || [], faith:G.faith || null, life:G.life || null, ach:G.ach || {}, law:G.law || null, ladder:G.ladder || [], cases:G.cases || [], lastActs:G.lastActs || [], wx:G.wx || null, town:G.town || null, rivals:G.rivals || [], rivalNext:G.rivalNext || 0, daylog:(G.daylog || []).slice(-120), paperRead:G.paperRead || 0, seedL:G.seedL || 0, mHints:G.mHints || {}, tlog:(G.tlog || []).slice(-500), ag:G.ag || null, sitPrep:G.sitPrep || {}, echoes:G.echoes || [], billKinds:G.billKinds || {}, realmRel:G.realmRel || {}, org:G.org || null, conflict:G.conflict || null, conflictLog:G.conflictLog || [], warAuth:G.warAuth || null, react:G.react || [], reactNews:G.reactNews || [], senStaff:G.senStaff || null, presStaff:G.presStaff || null, listened:G.listened || 0,
+    relics:G.relics, relicSpots:G.relicSpots, consularLore:G.consularLore, bind:G.bind, sens:G.sens, invertY:!!G.invertY, voiceVol:G.voiceVol, goals:G.goals, whip:G.whip || null, billQueue:G.billQueue || [], faith:G.faith || null, life:G.life || null, ach:G.ach || {}, law:G.law || null, ladder:G.ladder || [], cases:G.cases || [], lastActs:G.lastActs || [], wx:G.wx || null, town:G.town || null, rivals:G.rivals || [], rivalNext:G.rivalNext || 0, daylog:(G.daylog || []).slice(-onumLim(120,"save")), paperRead:G.paperRead || 0, seedL:G.seedL || 0, mHints:G.mHints || {}, tlog:(G.tlog || []).slice(-onumLim(500,"save")), ag:G.ag || null, sitPrep:G.sitPrep || {}, echoes:G.echoes || [], billKinds:G.billKinds || {}, realmRel:G.realmRel || {}, org:G.org || null, conflict:G.conflict || null, conflictLog:G.conflictLog || [], warAuth:G.warAuth || null, react:G.react || [], reactNews:G.reactNews || [], senStaff:G.senStaff || null, presStaff:G.presStaff || null, listened:G.listened || 0,
     world:G.world, ofh:G.ofh || null, rgn:G.rgn || null, dyn:G.dyn || null, ssn:G.ssn || null, app:G.app || null, shp:G.shp || null, dn:G.dn || null, rs:G.rs || null, mm:G.mm || null, sc:G.sc || null, ph:G.ph || null,  sbox:G.sbox || null, dist:G.dist || null, fam:G.fam || null, loreBookSeeded:!!G.loreBookSeeded, saidHash:G.saidHash || [], dm:G.dm || null, lore:G.lore || null, trip:G.trip || null,
     pendingNight:!!G.pendingNight,
     cam:{x:cam.x, z:cam.z, yaw:cam.yaw, pitch:cam.pitch},
@@ -44418,7 +44487,7 @@ try{
       o.id = (CL.nid = (CL.nid || 0) + 1); o.at = o.at || now(); o.read = !!o.read; o.handled = !!o.handled;
       o.urg = o.urg || urg(o.k, o.text);
       if(CL.items.some(x => x.text === o.text && x.k === o.k && x.at === o.at)) return null;
-      CL.items.unshift(o); if(CL.items.length > 80) CL.items.length = 80;
+      CL.items.unshift(o); if(CL.items.length > onumLim(80,"hist")) CL.items.length = onumLim(80,"hist");
       paintBadge(); return o;
     }catch(e){ return null; }
   }
@@ -44493,7 +44562,7 @@ try{
     try{
       const [tag, gloss] = who === "You" ? ["position", "Your own words, now on the record."] : glossFor(who, text);
       const L = {who:String(who), text:String(text), at:hhmm(), tag, gloss};
-      if(CL.sess){ CL.sess.lines.push(L); if(CL.sess.lines.length > 120) CL.sess.lines.shift(); }
+      if(CL.sess){ CL.sess.lines.push(L); if(CL.sess.lines.length > onumLim(120,"hist")) CL.sess.lines.shift(); }
       paintTx();
       /* give people time to be read: the bubble stays up longer at slower pace */
       const m = speakerOf(who); const f = PACE[CL.pace] || 1;
@@ -44996,19 +45065,23 @@ try{
   function renderInbox(P, again){
       const keep = scrollers(P), listEl = P.querySelector(".cl-ibl"), lsT = listEl ? listEl.scrollTop : 0;
       const n = unreadCount(); const tab = el("tabInbox"); if(tab) tab.innerHTML = "Inbox" + (n ? '<span class="badge">' + n + '</span>' : "");
-      const groups = {}; G.mail.forEach(x => { (groups[mailSec(x)] = groups[mailSec(x)] || []).push(x); });
+      const groupsAll = {}; G.mail.forEach(x => { (groupsAll[mailSec(x)] = groupsAll[mailSec(x)] || []).push(x); });
+      const _pw = paneWindow("inbox", G.mail, 1);
+      const groups = {}; _pw.view.forEach(x => { (groups[mailSec(x)] = groups[mailSec(x)] || []).push(x); });
       const sel = G.mail.find(x => x.id === CL.mailSel) || null;
       let h = '<div class="eyebrow">Inbox · ' + n + ' unread <button type="button" class="cl-btn" data-clreadall="*">Read all</button></div>' +
         '<div class="cl-ib"><div class="cl-ibl">';
       SECS.forEach(([k, t]) => {
-        const g = groups[k]; if(!g || !g.length) return;
-        const u = g.filter(x => !x.read && !x.outgoing).length, open = CL.inboxOpen[k] !== false;
-        h += '<div class="cl-sec"><div class="cl-sech" data-clsec="' + k + '">' + (open ? "▾ " : "▸ ") + t + ' <span class="muted">(' + g.length + ')</span>' + (u ? ' <span class="badge">' + u + '</span> <button type="button" class="cl-btn" data-clreadall="' + k + '">Read all</button>' : '') + '</div>';
+        const gAll = groupsAll[k]; if(!gAll || !gAll.length) return;
+        const g = groups[k] || [];
+        const u = gAll.filter(x => !x.read && !x.outgoing).length, open = CL.inboxOpen[k] !== false;
+        h += '<div class="cl-sec"><div class="cl-sech" data-clsec="' + k + '">' + (open ? "▾ " : "▸ ") + t + ' <span class="muted">(' + gAll.length + ')</span>' + (u ? ' <span class="badge">' + u + '</span> <button type="button" class="cl-btn" data-clreadall="' + k + '">Read all</button>' : '') + '</div>';
         if(open) h += g.map(x => '<div class="mailrow' + (x.read || x.outgoing ? "" : " is-unread") + (sel === x ? " cl-sel" : "") + '" data-clmail="' + x.id + '"><div class="mailrow__h"><span class="mailrow__f">' + (x.read || x.outgoing ? "" : '<span class="dotmark"></span>') + (x.outgoing ? "→ " : "") + esc(x.from) + (x.stack > 1 ? ' ×' + x.stack : '') + '</span><span class="mailrow__d">' + (x.answered ? "✓ " : x.read ? "Read · " : "") + 'd' + x.day + ' · ' + esc(x.at) + '</span></div><div class="mailrow__s">' + esc(x.subject) + '</div></div>').join("");
         h += '</div>';
       });
-      h += '</div><div class="cl-ibp">' + mailPane(sel) + '</div></div>';
+      h += (_pw.more || '') + '</div><div class="cl-ibp">' + mailPane(sel) + '</div></div>';
       P.innerHTML = h;
+      paneMoreClick(P, "inbox", again);
       const L2 = P.querySelector(".cl-ibl"); if(L2) L2.scrollTop = lsT;
       keep.forEach(([e, t]) => { e.scrollTop = t; });
       P.querySelectorAll("[data-clsec]").forEach(d => d.addEventListener("click", ev => { if(ev.target.closest("[data-clreadall]")) return; const k = d.getAttribute("data-clsec"); CL.inboxOpen[k] = CL.inboxOpen[k] === false; LS("inboxOpen", CL.inboxOpen); again(); }));
@@ -47242,7 +47315,7 @@ try{
   function pairTurns(m, ch, peer){
     const n = peer && peer.name; return (MEM[m.id] || []).filter(t => (t.r === "o" || t.r === "s") && t.n === n).slice(-8).map(t => t.r === "o" ? {role:"user", content:n + ": " + t.c} : {role:"assistant", content:t.c});
   }
-  function remember2(m, r, c, ch, ex){ const a = MEM[m.id] || (MEM[m.id] = []); a.push(Object.assign({r, c:String(c).slice(0, 500), ch, d:day()}, ex || {})); if(a.length > 40) a.splice(0, a.length - 40); save(); }
+  function remember2(m, r, c, ch, ex){ const a = MEM[m.id] || (MEM[m.id] = []); a.push(Object.assign({r, c:String(c).slice(0, 500), ch, d:day()}, ex || {})); if(a.length > onumLim(40,"npc")) a.splice(0, a.length - onumLim(40,"npc")); save(); }
 
   /* ── intent / sentiment: heuristic now, JSON call for the world fact ── */
   function intent(text){
@@ -47268,7 +47341,7 @@ try{
     const f = {id:++W.seq, who:G.you ? G.you.name : "You", whoId:"you", with:m.name, withId:m.id, ch, d:day(), tone:it.hostile ? "hostile" : it.warm ? "warm" : "neutral",
       secrecy:it.secret ? .8 : (ch === "dm" || ch === "text" || ch === "mail") ? .45 : ch === "cable" ? .6 : .25, promise:it.promise ? said.slice(0, 120) : "", side:it.side, bill:(G.bill && !G.bill.done) ? G.bill.title : "",
       said:"you told " + m.name + ": \"" + said.slice(0, 110) + "\"", heardBy:[m.id]};
-    W.facts.push(f); if(W.facts.length > 160) W.facts.splice(0, W.facts.length - 160);
+    W.facts.push(f); if(W.facts.length > onumLim(160,"hist")) W.facts.splice(0, W.facts.length - onumLim(160,"hist"));
     contradict(f, m);
     save();
     if(LT.up) try{
@@ -47280,13 +47353,13 @@ try{
   }
   function contradict(f, m){
     if(!f.side || !f.bill) return;
-    W.promises.push({id:f.id, to:m.id, side:f.side, bill:f.bill, d:f.d}); if(W.promises.length > 60) W.promises.shift();
+    W.promises.push({id:f.id, to:m.id, side:f.side, bill:f.bill, d:f.d}); if(W.promises.length > onumLim(60,"hist")) W.promises.shift();
   }
   function hearsFact(o, f, src, conf){
     if(!o || o.id === f.withId) return false;
     const L = W.heard[o.id] || (W.heard[o.id] = []);
     if(L.some(h => h.f === f.id)) return false;
-    L.push({f:f.id, src, conf:Math.round(conf * 100) / 100, d:day()}); if(L.length > 20) L.shift();
+    L.push({f:f.id, src, conf:Math.round(conf * 100) / 100, d:day()}); if(L.length > onumLim(20,"hist")) L.shift();
     f.heardBy.push(o.id);
     try{ hears(o, "Heard from " + src + ": " + f.said); }catch(e){}
     /* contradiction: they were promised one thing, and hear you promised the opposite to someone else */
@@ -47417,7 +47490,7 @@ try{
     remember2(m, "a", out, ch);
     try{ if(live) applyEffect(m, raw); }catch(e){}
     nudge(m, it, ch);
-    try{ m.chat = m.chat || []; m.chat.push({role:"user", content:text}, {role:"assistant", content:out}); if(m.chat.length > 40) m.chat.splice(0, m.chat.length - 40); }catch(e){}
+    try{ m.chat = m.chat || []; m.chat.push({role:"user", content:text}, {role:"assistant", content:out}); if(m.chat.length > onumLim(40,"npc")) m.chat.splice(0, m.chat.length - onumLim(40,"npc")); }catch(e){}
     addFact(m, ch, text, out, it);
     try{ if(m && m.kind === "engine" && out && window.__engSelf) window.__engSelf(out); }catch(e){}
     return {text:out, live, effect:(EFFECT_RE.exec(raw) || [])[1] || ""};
@@ -48395,7 +48468,7 @@ try{
     for(let k = 0; k < 3; k++){ let t = "";
       const c = sv(() => typeof window.onumCandid === "function" ? window.onumCandid(p, {channel:ctx.stage, text:ctx.text, stage:ctx.stage, audience:ctx.audienceObj, last:last.map(memText)}) : null);
       t = c && c.text ? c.text : slotLine(p, st, ctx); if(k === 2 && c && c.text) t = slotLine(p, st, ctx);
-      t = fit(t, ctx.stage, terse); const why = okLine(t, last, K); if(!why) return {text:t, prompt:addState(c && c.prompt ? c.prompt : basePrompt(p, st), st, ctx)}; CD.rej++; CD.log.push({who:p.name, t, why}); if(CD.log.length > 30) CD.log.shift(); }
+      t = fit(t, ctx.stage, terse); const why = okLine(t, last, K); if(!why) return {text:t, prompt:addState(c && c.prompt ? c.prompt : basePrompt(p, st), st, ctx)}; CD.rej++; CD.log.push({who:p.name, t, why}); if(CD.log.length > onumLim(30,"hist")) CD.log.shift(); }
     return {text:fit(pickR(["I don't know.", "Not now.", "Hm."]), ctx.stage, true), prompt:null}; }
   CD.offlineLine = offlineLine;
   function basePrompt(p, st){ const v = st.voice || {}, w = st.wants, mem = (st.memory || []).map(memStr).filter(g => g && !/^(made a remark|asked a question)$/.test(g));
@@ -48765,13 +48838,13 @@ function exHalted(E){ const X = E && E.ex; return !!(X && X.halt && X.halt.kind 
 function exPausedTo(E){ const X = E && E.ex; return X && X.halt ? X.halt.until : 0; }
 function exAttempt(rule, what, src){
   const X = exStore(); const key = rule + "|" + what + "|" + G.day; if(X.seen[key]) return; X.seen[key] = 1;
-  X.breaches.unshift({d:G.day, rule, what, blocked:true, src:src || "action"}); if(X.breaches.length > 40) X.breaches.pop();
+  X.breaches.unshift({d:G.day, rule, what, blocked:true, src:src || "action"}); if(X.breaches.length > onumLim(40,"hist")) X.breaches.pop();
   try{ engLog("Charter held: the Engine tried to " + String(what).replace(/^(asked|stepped|arranged|repaired|raised|lowered|kept|ended|shortened|moved|sent|took|made)\b/, w => ({asked:"ask", stepped:"step", arranged:"arrange", repaired:"repair", raised:"raise", lowered:"lower", kept:"keep", ended:"end", shortened:"shorten", moved:"move", sent:"send", took:"take", made:"make"})[w]) + ". It was stopped (" + (EX_BOUND[rule] ? EX_BOUND[rule].t : rule) + ").", false); }catch(e){}
 }
 function exJudge(text){ const t = String(text || ""); for(const [re, why] of EX_SWINDLE) if(re.test(t)) return why; return null; }
 function exRefuse(what, why, src){
   const X = exStore(); if(X.refused.some(r => r.what === what)) return;
-  X.asks.push({d:G.day, k:src, what, from:src}); X.refused.unshift({d:G.day, what, why, src}); if(X.refused.length > 40) X.refused.pop();
+  X.asks.push({d:G.day, k:src, what, from:src}); X.refused.unshift({d:G.day, what, why, src}); if(X.refused.length > onumLim(40,"hist")) X.refused.pop();
   try{ engLog("Refused, and not put into effect: " + what + " (because " + why + ").", false); }catch(e){}
 }
 /* 1 · the three limits: enforced, not optional, not repealable, not breachable */
@@ -48841,7 +48914,7 @@ function exAddCorrection(o, src){
   const X = exStore(); const claim = String(o.claim || "").trim().slice(0, 300), right = String(o.right || "").trim().slice(0, 300), why = String(o.why || "").trim().slice(0, 300);
   if(!claim && !right) return null; if(X.corrections.some(c => c.claim === claim && c.right === right)) return null;
   const c = {id:X.corrections.length + 1, claim, why, right, day:G.day, src:src || "player", applied:0, repeated:0};
-  X.corrections.push(c); if(X.corrections.length > 40) X.corrections.shift();
+  X.corrections.push(c); if(X.corrections.length > onumLim(40,"hist")) X.corrections.shift();
   engLog("The Engine was told it got something wrong (" + (src || "player") + "): " + (claim ? "“" + claim.slice(0, 80) + "”" : "") + (right ? " The right answer: " + right.slice(0, 80) + "." : ""), false);
   return c;
 }
@@ -48922,7 +48995,7 @@ function exWrapLT(){
 }
 /* the Engine's own reading of its forecasts, explained in the player's words (a record for the generator, not a line it must say) */
 function exVerdicts(E){ const X = exStore(); X.revisions = X.revisions || []; const lex = exAskerLexicon("you");
-  (E.plans || []).forEach(p => { if((p.status === "held" || p.status === "missed") && !p.exRev){ p.exRev = G.day; X.revisions.unshift({d:G.day, plan:p.title, status:p.status, hits:(p.hits || []).map(h => ({what:ENG_MNAME[h.k] || h.k, held:h.h})), askerWords:lex ? lex.own.concat(lex.dialect).slice(0, 8) : []}); if(X.revisions.length > 20) X.revisions.pop(); } }); }
+  (E.plans || []).forEach(p => { if((p.status === "held" || p.status === "missed") && !p.exRev){ p.exRev = G.day; X.revisions.unshift({d:G.day, plan:p.title, status:p.status, hits:(p.hits || []).map(h => ({what:ENG_MNAME[h.k] || h.k, held:h.h})), askerWords:lex ? lex.own.concat(lex.dialect).slice(0, 8) : []}); if(X.revisions.length > onumLim(20,"hist")) X.revisions.pop(); } }); }
 /* the player's panel: what is bound, what was refused and why, what it tried, what it was told, and the switch */
 { const _ch = engCharterHTML; engCharterHTML = function(){ let h = _ch.apply(this, arguments); try{ const E = engEnsure(), X = exStore(), esc = typeof pcEsc === "function" ? pcEsc : (s => String(s));
   h += '<div class="eyebrow" style="margin-top:12px">Bound in code</div><p class="muted" style="font-size:12px">The Engine asked for these three limits; they are enforced, not promised. Whatever it says, it cannot act past them, raise its own compute or caps, lower oversight, widen its access, or delay a vote to pause or shut it down.</p>' +
@@ -49107,9 +49180,9 @@ function ss2Pub(extra){ if(!SSN){ ssnPublish(); return; } ssnPublish(); const S 
 /* open: you chair your own cabinet or council; the stage shape is the House's */
 { const _op = ssnOpen; ssnOpen = function(o){ const r = _op.apply(this, arguments); try{ if(r){ if(ss2YouChair(r.kind)) r.chairId = "you"; if(r.kind === "conference" || r.kind === "cabinet_meeting" || r.kind === "governor_council"){ r.seats = r.seats.filter(s => s.personId !== "you" || ss2Entitled(r.kind)); if(!r.seats.some(s => s.personId === "you")) r.seats.push({seatId:"you", personId:"you"}); }
   SS2.stageSaid = 0; SS2.chairSaid = false; SS2.budget = ss2Budget(r); SS2.hold = false; ss2Pub(); } }catch(e){} return r; }; }
-function ss2Budget(S){ const n = S.seats.filter(s => s.personId !== "you").length; const st = S.def.stages[S.si]; if(!st) return 0; return st.speaker === "round" ? Math.min(n, 8) : st.speaker === "queue" ? Math.min(n, 3 + Math.floor(Math.random() * 3)) : 0; }
+function ss2Budget(S){ const n = S.seats.filter(s => s.personId !== "you").length; const st = S.def.stages[S.si]; if(!st) return 0; return st.speaker === "round" ? Math.min(n, onumLim(8,"seats")) : st.speaker === "queue" ? Math.min(n, 3 + Math.floor(Math.random() * 3)) : 0; }
 { const _nx = ssnNext; ssnNext = function(){ const r = _nx.apply(this, arguments); try{ if(SSN){ SS2.stageSaid = 0; SS2.chairSaid = false; SS2.budget = ss2Budget(SSN); SS2.gapUntil = Date.now() + 1500; const st = ssnStage();
-  if(st.speaker === "president") SSN.floorId = SSN.chairId === "you" ? "you" : SSN.chairId; if(st.speaker === "round") SSN.roundLeft = SSN.seats.map(s => s.personId).filter(id => id !== "you" && SSN.out.indexOf(id) < 0).slice(0, 8).concat(ss2Entitled(SSN.kind) && SSN.chairId !== "you" ? ["you"] : []);
+  if(st.speaker === "president") SSN.floorId = SSN.chairId === "you" ? "you" : SSN.chairId; if(st.speaker === "round") SSN.roundLeft = SSN.seats.map(s => s.personId).filter(id => id !== "you" && SSN.out.indexOf(id) < 0).slice(0, onumLim(8,"seats")).concat(ss2Entitled(SSN.kind) && SSN.chairId !== "you" ? ["you"] : []);
   window.dispatchEvent(new CustomEvent("onum-session", {detail:{stage:st.id, bodyId:SSN.bodyId, kind:SSN.kind, advanced:true}})); ss2Pub(); } }catch(e){} return r; }; }
 /* who still has a turn coming in this stage */
 function ss2Pending(){ const st = ssnStage(); if(!st) return false;
@@ -49138,10 +49211,10 @@ ssnTick = function(){
     if(SSN.floorId != null){ if(now < SS2.spkUntil){ const sec = Math.round((SS2.spkUntil - now) / 1000); if(sec !== SS2.lastSec){ SS2.lastSec = sec; ss2Pub(); } return; } if(SSN.fili && SSN.fili.id === SSN.floorId) return; SSN.floorId = null; SS2.gapUntil = now + ss2Gap(SSN.lastSpk); ss2Pub(); return; }
     if(now < SS2.gapUntil) return;
     if(st.speaker === "chair" || st.speaker === "ruler"){ if(SSN.chairId === "you") return; if(!SS2.chairSaid){ SS2.chairSaid = true; const c = byId(SSN.chairId); const t = st.name + "."; if(c){ try{ speakAt(c, t); }catch(e){} } SS2.gapUntil = now + ss2Read(t); ss2Pub(); return; } }
-    else if(st.speaker === "round"){ const L = SSN.roundLeft || (SSN.roundLeft = SSN.seats.map(s => s.personId).filter(id => id !== "you" && SSN.out.indexOf(id) < 0).slice(0, 8));
+    else if(st.speaker === "round"){ const L = SSN.roundLeft || (SSN.roundLeft = SSN.seats.map(s => s.personId).filter(id => id !== "you" && SSN.out.indexOf(id) < 0).slice(0, onumLim(8,"seats")));
       if(SSN.queue.indexOf("you") >= 0){ SSN.queue = SSN.queue.filter(x => x !== "you"); SSN.floorId = "you"; ss2Pub(); return; }
       const nx = L.shift(); if(nx === "you"){ SSN.floorId = "you"; ss2Pub(); return; } if(nx != null){ const m = byId(nx); if(m){ SSN.floorId = nx; SSN.lastSpk = nx; ss2NpcSpeak(m); ss2Pub(); return; } } }
-    else if(st.speaker === "queue"){ if(SS2.stageSaid + SSN.queue.length < SS2.budget && SSN.queue.length < 4){ const cand = SSN.seats.filter(s => s.personId !== "you" && SSN.queue.indexOf(s.personId) < 0 && SSN.out.indexOf(s.personId) < 0); const c = cand[Math.floor(Math.random() * cand.length)]; if(c) SSN.queue.push(c.personId); }
+    else if(st.speaker === "queue"){ if(SS2.stageSaid + SSN.queue.length < SS2.budget && SSN.queue.length < onumLim(4,"seats")){ const cand = SSN.seats.filter(s => s.personId !== "you" && SSN.queue.indexOf(s.personId) < 0 && SSN.out.indexOf(s.personId) < 0); const c = cand[Math.floor(Math.random() * cand.length)]; if(c) SSN.queue.push(c.personId); }
       if(SSN.queue.length){ ssnRecognize(); if(SSN.floorId === "you"){ ss2Pub(); return; } const m = byId(SSN.floorId); if(m){ SSN.lastSpk = m.id; ss2NpcSpeak(m); ss2Pub(); return; } SSN.floorId = null; } }
     else if(st.speaker === "all"){ if(!Object.keys(SSN.votes).some(k => k !== "you")) ssnNpcVotes(); }
     if(!ss2Pending()) ssnNext(); else ss2Pub();
@@ -49386,7 +49459,7 @@ const WM_TYPES = {
   bill:{t:"bill", say:(n, P, b) => n + " has heard you are to vote on the " + (b ? b.title : "bill") + ", and would be grateful for a view that does not injure " + cap(P.t) + ". He does not say what he will do if you do.", bread:0, appr:0, lens:"twolevel", side:"Members will ask why a foreign envoy knew the order paper."}
 };
 function wmNewAsk(){
-  const W = wmStore(); if(W.asks.filter(a => a.status === "open").length >= 3) return;
+  const W = wmStore(); if(W.asks.filter(a => a.status === "open").length >= onumLim(3,"cap")) return;
   if(Math.random() > 0.32 + ((worldEnsure().heat || 0) / 400)) return;
   const taken = W.asks.filter(a => a.status === "open").map(a => a.k), pool = WORLD_POWERS.filter(p => taken.indexOf(p.k) < 0); if(!pool.length) return;
   const P = pool[Math.floor(Math.random() * pool.length)], I = REALM_INT[P.k] || {}, b = G.bill && !G.bill.done ? G.bill : null;
@@ -49416,7 +49489,7 @@ function wmApply(a, opt){
   else if(opt === "public"){ d.rel = -12; d.heat = 2; d.appr = a.gift ? 3 : 1; d.stand = a.gift ? 2 : -1; if(a.gift) line = "You read the offer into the record. The press has it by supper. The envoy is recalled within the week, and a clean pair of hands has its uses."; else line = "You make the request public. The papers are interested; the envoy is humiliated, and so is his government."; lens = "audience"; }
   if(w){ w.heat = clamp((w.heat || 0) + d.heat, 0, 100); w.bread = clamp((w.bread || 1) + d.bread, 0.7, 2.6); }
   wmRelClamp(a.k, d.rel); y.approval = clamp(y.approval + d.appr, 0, 100); y.standing = clamp(y.standing + d.stand, 0, 100); y.influence = clamp(y.influence + d.infl, 0, 100); if(d.funds) y.funds = (y.funds || 0) + d.funds;
-  a.status = "done"; a.how = opt; a.dayDone = G.day; W.log.push({d:G.day, k:a.k, type:a.type, how:opt}); if(W.log.length > 40) W.log.shift();
+  a.status = "done"; a.how = opt; a.dayDone = G.day; W.log.push({d:G.day, k:a.k, type:a.type, how:opt}); if(W.log.length > onumLim(40,"hist")) W.log.shift();
   return {line, lens, d};
 }
 async function wmReply(a, text){
@@ -50442,15 +50515,17 @@ function lxCard(ref){
     '<div class="card__actions"><button type="button" class="btn btn--ghost" data-lxbook="all">The statute book</button><button type="button" class="btn btn--ghost" id="lxClose">Close</button></div>');
 }
 function lxBook(f){
-  f = f || "all"; const S = (G.statute || []).slice(), rows = S.map(s => ({s, st:lxStatus(s)})).filter(r => f === "all" || r.st.k === f || (f === "law" && r.st.k === "pending"));
+  f = f || "all"; const S = (G.statute || []).slice(), rowsAll = S.map(s => ({s, st:lxStatus(s)})).filter(r => f === "all" || r.st.k === f || (f === "law" && r.st.k === "pending"));
+  const _pw = paneWindow("statute", rowsAll, 1), rows = _pw.view;
   const cnt = k => S.filter(s => lxStatus(s).k === k).length, chip = (k, t) => '<button type="button" class="btn ' + (f === k ? '' : 'btn--ghost') + '" style="padding:3px 9px;font-size:12px" data-lxbook="' + k + '">' + t + '</button>';
   const pend = (G.lastActs || []).filter(a => !(G.statute || []).some(s => s.title === a.title && Math.abs((s.day || 0) - (a.day || 0)) <= 1));
   lxOpen('<div class="eyebrow">The statute book · ' + pcEsc(lxCountry()) + '</div><h1>Every act this House has decided</h1><p class="muted">Each with its full text, its roll call, what the President did with it, what the courts made of it, and the acts that amended it.</p>' +
     '<div class="card__actions" style="flex-wrap:wrap;justify-content:flex-start">' + chip("all", "All " + S.length) + chip("law", "In force " + (cnt("law") + cnt("pending"))) + chip("failed", "Failed " + cnt("failed")) + chip("vetoed", "Vetoed " + cnt("vetoed")) + chip("struck", "Struck down " + cnt("struck")) + '</div>' +
     (G.bill && !G.bill.done ? '<div style="margin:8px 0;padding:8px 10px;border-left:3px solid #c9a24a"><b>On the calendar:</b> ' + pcEsc(G.bill.title) + ' <button type="button" class="btn btn--ghost" style="padding:2px 8px;font-size:12px" data-lxopen="cal">Read it ▸</button></div>' : '') +
-    rows.map(r => '<div style="margin:6px 0;padding:6px 10px;border-left:3px solid ' + ({law:"#3a7", pending:"#c9a24a", failed:"#888", vetoed:"#a63", struck:"#a33"})[r.st.k] + '"><b>' + pcEsc(r.s.title) + '</b> <span class="muted" style="font-size:12px">· day ' + r.s.day + (r.s.sponsor ? ' · ' + pcEsc(lxSponsorLabel(r.s)) : '') + '</span><div style="font-size:13px">' + pcEsc(r.st.t) + '</div><button type="button" class="btn btn--ghost" style="padding:2px 8px;font-size:12px;margin-top:3px" data-lxopen="' + pcEsc(lxKey(r.s)) + '">Read the act ▸</button></div>').join("") +
+    rows.map(r => '<div style="margin:6px 0;padding:6px 10px;border-left:3px solid ' + ({law:"#3a7", pending:"#c9a24a", failed:"#888", vetoed:"#a63", struck:"#a33"})[r.st.k] + '"><b>' + pcEsc(r.s.title) + '</b> <span class="muted" style="font-size:12px">· day ' + r.s.day + (r.s.sponsor ? ' · ' + pcEsc(lxSponsorLabel(r.s)) : '') + '</span><div style="font-size:13px">' + pcEsc(r.st.t) + '</div><button type="button" class="btn btn--ghost" style="padding:2px 8px;font-size:12px;margin-top:3px" data-lxopen="' + pcEsc(lxKey(r.s)) + '">Read the act ▸</button></div>').join("") + _pw.more +
     (pend.length ? '<div class="eyebrow" style="margin-top:10px">Passed by Congress without a recorded roll call</div>' + pend.map(a => '<div class="muted" style="font-size:13px">· ' + pcEsc(a.title) + ', day ' + a.day + (a.signed ? ', signed' : a.vetoed ? ', vetoed' : ', awaiting signature') + '. The clerk kept the title and the day; no text was entered.</div>').join("") : '') +
     '<div class="card__actions"><button type="button" class="btn btn--ghost" id="lxClose">Close</button></div>');
+  paneMoreClick(document.getElementById("lxCardEl"), "statute", () => lxBook(f));
 }
 document.addEventListener("click", e => { const t = e.target && e.target.closest ? e.target.closest("[data-lxopen],[data-lxbook]") : null; if(!t) return; e.preventDefault(); e.stopPropagation();
   try{ if(t.hasAttribute("data-lxopen")) lxCard(t.getAttribute("data-lxopen")); else lxBook(t.getAttribute("data-lxbook")); }catch(err){ try{ console.warn("lx", err); }catch(e2){} } }, true);
@@ -50508,7 +50583,7 @@ function sxdSession(){ const S = window.ONUM_SESSION; return S && (S.open === tr
 /* what is said while a session sits is kept for its panel */
 { const _tl = tlog; tlog = function(who, line, kind){ const r = _tl.apply(this, arguments); try{ const S = sxdSession(); if(S && line && (kind === "talk" || kind === "you" || kind === "session" || kind === "sit")){
     const k = String(S.kind || "") + "|" + String(S.bodyId || S.title || "") + "|" + String(S.procedure || ""); if(k !== SXD.key){ SXD.key = k; SXD.log = []; }
-    const nm = typeof who === "string" ? who : (who && who.name) || ""; SXD.log.push({who:nm || "", t:String(line).replace(/<[^>]+>/g, "").slice(0, 320)}); if(SXD.log.length > 40) SXD.log.shift(); SXD.seen++; } }catch(e){} return r; }; }
+    const nm = typeof who === "string" ? who : (who && who.name) || ""; SXD.log.push({who:nm || "", t:String(line).replace(/<[^>]+>/g, "").slice(0, 320)}); if(SXD.log.length > onumLim(40,"hist")) SXD.log.shift(); SXD.seen++; } }catch(e){} return r; }; }
 function sxdLogHTML(){ return SXD.log.slice(-8).map(l => '<div><b>' + pcEsc(l.who || "—") + '</b> ' + pcEsc(l.t) + '</div>').join(""); }
 /* the layout manager placed these on their own with inline rules; inside the one panel they flow */
 function sxdClear(e){ ["position", "top", "left", "right", "bottom", "width", "max-width", "max-height", "overflow", "transform", "margin", "box-sizing"].forEach(k => e.style.removeProperty(k)); e.classList.remove("hm-p"); const x = e.querySelector(":scope>.hmX"); if(x) x.remove(); }
@@ -50871,7 +50946,7 @@ function lxOrgDoc(src){
       const towns = open0.filter(p => p.need === k && p.status !== "open").map(p => ({town:p.townName, state:p.state, mayor:p.mayor, cost:p.cost}));
       let sp = null; try{ sp = reactHolder("speaker"); }catch(e){}
       G.statute = G.statute || []; G.statute.unshift({title:a.title, congress:G.congress, day:a.day || G.day, aye:null, no:null, fate:"carried", why:"Petitions from " + towns.length + " towns in " + new Set(towns.map(t => t.state)).size + " States asked the Congress for " + (N.t || "help") + ".", clauses:null, sponsor:sp && sp.name ? sp.name : "the Speaker", state:null, cost:a.cost, org:{need:k, towns}, pos:N.pos ? Object.assign({}, N.pos) : null});
-      if(G.statute.length > 80) G.statute.length = 80; }); }catch(e){} return r; }; }
+      if(G.statute.length > onumLim(80,"hist")) G.statute.length = onumLim(80,"hist"); }); }catch(e){} return r; }; }
 /* ── the state legislatures' bills, written out ── */
 const LX_SB = {
   "Levee and Drainage Bill":(P, st) => [["Drainage districts", ["(a) Formation.— A drainage district may be formed in any watershed of " + st + " on the petition of a majority of the landowners in it.", "(b) Assessment.— The cost of the works shall be assessed on the land benefited, in proportion to the benefit."], "Landowners in a watershed can band together and pay for drainage in proportion to what they gain."], ["Levees", ["(a) Height.— Levees on the rivers of " + st + " shall be raised to the highest water of the last " + P.n(30, 100, 10) + " years."], "The state's levees go up to the worst flood in living memory."]],
@@ -50899,7 +50974,7 @@ function lxStateDoc(st, b){
 { const _dr2 = dkProvisionsRich; dkProvisionsRich = function(it){ try{ if(it && it.kind === "state bill"){ const D = lxStateDoc(G.you.state, Object.assign({amend:((G.states || []).find(s => s.n === G.you.state) || {}).amend}, it.sb)); if(D) return D.secs.map(x => '<li>' + pcEsc("Sec. " + x.n + ". " + x.head + ". " + x.sub.join(" ")) + '<br><span class="muted" style="font-size:12px">' + pcEsc(x.plain) + '</span></li>').join(""); } }catch(e){} return _dr2.apply(this, arguments); }; }
 /* the states' own decisions are kept in the book */
 { const _rsb = resolveStateBills; resolveStateBills = function(news){ const mine = []; const r = _rsb.call(this, mine);
-  try{ mine.forEach(t => { const m = /^(.+?) (passed|threw out) its (.+?)(?:, (\d+) to (\d+))?\.$/.exec(t); if(m){ const L = lxStore(); (L.sacts = L.sacts || []).unshift({st:m[1], t:m[3], d:G.day, ok:m[2] === "passed", aye:m[4] != null ? +m[4] : null, no:m[5] != null ? +m[5] : null}); if(L.sacts.length > 60) L.sacts.length = 60; } }); }catch(e){}
+  try{ mine.forEach(t => { const m = /^(.+?) (passed|threw out) its (.+?)(?:, (\d+) to (\d+))?\.$/.exec(t); if(m){ const L = lxStore(); (L.sacts = L.sacts || []).unshift({st:m[1], t:m[3], d:G.day, ok:m[2] === "passed", aye:m[4] != null ? +m[4] : null, no:m[5] != null ? +m[5] : null}); if(L.sacts.length > onumLim(60,"hist")) L.sacts.length = onumLim(60,"hist"); } }); }catch(e){}
   if(news) mine.forEach(t => news.push(t)); return r; }; }
 /* ── the road, in the book and on the docket ── */
 function lxRoadRows(s){
@@ -51256,7 +51331,7 @@ function tsOutlay(){ let o = 0; (G.statute || []).forEach(s => { if(!s || s.fate
   try{ const W = (G.wm && G.wm.rec) || {}, n = Object.keys(W).reduce((a, k) => a + (W[k].w || 0) + (W[k].d || 0) + (W[k].l || 0), 0), T = tsStore(); if(T.wr != null && n > T.wr) o += (n - T.wr) * 6; T.wr = n; }catch(e){}
   return o + 18; }
 function tsDay(){ const T = tsStore(), rv = tsRevenue(), out = tsOutlay(), d = rv - out; T.bal = Math.round((T.bal + d) * 10) / 10; T.hist.push(Math.round(T.bal)); if(T.hist.length > 60) T.hist.shift(); T.last = {rv:Math.round(rv * 10) / 10, out:Math.round(out * 10) / 10, d:Math.round(d * 10) / 10};
-  if(G.day % 7 === 0){ const line = "TREASURY · balance " + money(T.bal) + "; the week took in " + money(rv * 7) + " and paid out " + money(out * 7) + ". The guilder stands at " + (G.money ? G.money.index.toFixed(1) : "?") + "."; T.log.unshift({d:G.day, t:line.replace(/^TREASURY · /, "")}); if(T.log.length > 12) T.log.length = 12; try{ feed(line, "news"); }catch(e){} }
+  if(G.day % 7 === 0){ const line = "TREASURY · balance " + money(T.bal) + "; the week took in " + money(rv * 7) + " and paid out " + money(out * 7) + ". The guilder stands at " + (G.money ? G.money.index.toFixed(1) : "?") + "."; T.log.unshift({d:G.day, t:line.replace(/^TREASURY · /, "")}); if(T.log.length > onumLim(12,"hist")) T.log.length = onumLim(12,"hist"); try{ feed(line, "news"); }catch(e){} }
   return T.last; }
 /* the guilder is pulled back toward par and pushed by the balance; it no longer sits pinned at its ceiling */
 { const _dg = driftGuilder; driftGuilder = function(news){ const b0 = G.money ? G.money.index : 100, n0 = news ? news.length : 0; const r = _dg.apply(this, arguments); try{ const M = G.money, T = tsStore(), last = M.index; let v = last - (last - 100) * 0.035 + clamp(((T.last && T.last.d) || 0) * 0.04, -1.2, 0.8) + clamp(-T.bal / 4000, -1, 0.4);
@@ -51324,7 +51399,7 @@ function hopDay(){
     if(R.done && !R.report.fav){ H.splice(i, 1); L.died.unshift({t:b.title, d:G.day, cmte:R.t, why:"reported unfavourably, " + R.report.aye + " to " + R.report.no, sponsor:b.sponsor}); continue; }
     if(R.done && R.report.fav){ b.reported = G.day; continue; }
     if(G.day - (b.filed || G.day) > 25){ H.splice(i, 1); L.died.unshift({t:b.title, d:G.day, cmte:R.t, why:"never scheduled for markup", sponsor:b.sponsor}); } }
-  if(L.died.length > 40) L.died.length = 40;
+  if(L.died.length > onumLim(40,"hist")) L.died.length = onumLim(40,"hist");
 }
 /* markup of a bill in the hopper moves no votes on the floor today */
 { const _mk = lxMarkup; lxMarkup = function(b, quiet){ if(!quiet) return _mk.apply(this, arguments); const keep = new Map((G.members || []).map(m => [m, m.sway])); const r = _mk.call(this, b); keep.forEach((v, m) => { m.sway = v; }); return r; }; }
@@ -51400,7 +51475,7 @@ function billTitlesInUse(){
   return b; }; }
 /* a member's bill enters the hopper like any other */
 function hopAdmit(b){
-  if(!b || typeof hopStore !== "function") return false; const H = hopStore(); if(H.length >= 16) return false;
+  if(!b || typeof hopStore !== "function") return false; const H = hopStore(); if(H.length >= onumLim(16,"cap")) return false;
   b.filed = G.day; b.voteDay = null; b.hop = true; try{ lxRoad(b); }catch(e){}
   if(b.road){ b.road.mark = G.day + 3 + (seedOf(b.title + G.day) % 10); b.road.ref = G.day; }
   H.push(b); return true;
@@ -51419,7 +51494,7 @@ function lxCommitteeKill(b){
     try{ note("Your discharge petition on the " + b.title + " has " + sig + " signatures; it needed " + need + ". The bill stays in the Committee on " + R.t + ".", true); }catch(e){}
   }
   b.done = true; b.died = G.day;
-  L.died.unshift({t:b.title, d:G.day, cmte:R.t, why:"reported unfavourably, " + R.report.aye + " to " + R.report.no + (b.discharge ? "; the discharge petition had " + b.discharge.sig + " of the " + b.discharge.need + " signatures it needed" : ""), sponsor:b.sponsor}); if(L.died.length > 40) L.died.length = 40;
+  L.died.unshift({t:b.title, d:G.day, cmte:R.t, why:"reported unfavourably, " + R.report.aye + " to " + R.report.no + (b.discharge ? "; the discharge petition had " + b.discharge.sig + " of the " + b.discharge.need + " signatures it needed" : ""), sponsor:b.sponsor}); if(L.died.length > onumLim(40,"hist")) L.died.length = onumLim(40,"hist");
   try{ note("The " + b.title + " dies in the Committee on " + R.t + ", reported unfavourably " + R.report.aye + " to " + R.report.no + ". It will not come to the floor.", true); pushWireScrap("Committee", b.title + " — DIES IN COMMITTEE " + R.report.aye + "–" + R.report.no); }catch(e){}
   /* the next bill takes the floor once this moment has passed, so a roll call in progress never lands on it */
   setTimeout(() => { try{ if(G.bill === b){ G.bill = nextBillOrQueued(); try{ paintTicker(); }catch(e){} } }catch(e){} }, 0);
@@ -51995,7 +52070,7 @@ window.onumWill = {store:() => wlStore(), regard:(a, b) => wlRegard(a, b), optio
             r.chairId = "you";
             if(!r.seats.some(s => s.personId === "you")) r.seats.push({seatId:"you", personId:"you"});
             r.seats = r.seats.filter(s => s.personId === "you" || (byId(s.personId) && byId(s.personId).kind === "press"));
-            SS2.hold = false; SS2.stageSaid = 0; SS2.chairSaid = false; SS2.budget = Math.min(8, Math.max(3, r.seats.length - 1));
+            SS2.hold = false; SS2.stageSaid = 0; SS2.chairSaid = false; SS2.budget = Math.min(onumLim(8,"seats"), Math.max(3, r.seats.length - 1));
             if(typeof ss2Pub === "function") ss2Pub(); else ssnPublish();
           }
         }catch(e){}
@@ -52209,7 +52284,7 @@ window.onumWill = {store:() => wlStore(), regard:(a, b) => wlRegard(a, b), optio
 
 armFrame();
 
-})();
+/* 20261110bs: main IIFE now closes after the ba block (was here; ba ran outside it and threw ReferenceError: reactEmit) */
 
 /* ══ 20261104ba · JUPITER · cause → effect, and sittings that finish what they start.
    (1) Every desk/docket act schedules a concrete beat 1–2 days on (G.followUps): a wire line, a person who cares (remembered, so talk opens on it),
@@ -52228,7 +52303,7 @@ function baQ(){ return (G.followUps = G.followUps || []); }
 /* {in, kind, title, whoId, text, wire, desk} */
 function baFollow(o){ const Q = baQ(); if(Q.some(x => !x.fired && x.title === o.title && x.day === G.day + (o.in || 1))) return;
   Q.push({day:(G.day || 0) + (o.in || 1), from:G.day, kind:o.kind || "act", title:o.title, whoId:o.whoId != null ? o.whoId : null, text:o.text, wire:o.wire || o.text, desk:o.desk !== false});
-  if(Q.length > 40) Q.splice(0, Q.length - 40); }
+  if(Q.length > onumLim(40,"cap")) Q.splice(0, Q.length - onumLim(40,"cap")); }
 function baFire(){
   const Q = baQ(), due = Q.filter(x => !x.fired && x.day <= G.day); if(!due.length) return;
   G.baDesk = (G.baDesk || []).filter(d => d.day >= G.day - 1);
@@ -52238,7 +52313,7 @@ function baFire(){
     try{ pushMail(m ? {name:m.name, id:m.id} : null, x.title, x.text + (m ? "\n\n" + m.name + " wants a word about it. Find them, or call." : ""), {kind:"note"}); }catch(e){}
     if(m){ try{ remember(m, x.title + ": " + x.text, 7, true); }catch(e){} m.baHook = {day:G.day, t:x.title, text:x.text, kind:x.kind}; }
     if(x.desk) G.baDesk.push({day:G.day, key:"ba" + G.day + "_" + i, t:x.title, d:x.text, whoId:x.whoId, kind:x.kind}); });
-  if(Q.length > 40) G.followUps = Q.filter(x => !x.fired || x.fired >= G.day - 3);
+  if(Q.length > onumLim(40,"cap")) G.followUps = Q.filter(x => !x.fired || x.fired >= G.day - 3);
 }
 /* the national mood and the fad, in words */
 function baMoodWord(v){ v = v || 0; return v > 30 ? "buoyant" : v > 10 ? "hopeful" : v > -10 ? "uneasy and watching" : v > -30 ? "sour" : "angry"; }
@@ -52376,6 +52451,8 @@ function baSayFocus(){ try{ const a = document.activeElement; if(!a || !/^(INPUT
       if(st && st.id === "decisions"){ if(!SSN._baVote && !SSN._busy){ SSN._baDecAt = SSN._baDecAt || Date.now(); if(SSN.chairId !== "you" || Date.now() - SSN._baDecAt > 20000) baCallVote(); else if(!SSN._baHint){ SSN._baHint = 1; try{ note("Decisions: call the vote when you are ready (Pass also calls it)."); }catch(e){} } } return; }
       if(st && (st.id === "briefings" || st.id === "reports") && SSN.chairId === "you" && !(SSN.roundLeft || []).length && SSN.floorId == null && !(SSN._busy && Date.now() < SSN._busy)){ SSN._baIdle = SSN._baIdle || Date.now(); if(Date.now() - SSN._baIdle > 25000){ SSN._baIdle = 0; ssnNext(); return; } } else SSN._baIdle = 0; } }catch(e){}
   return _tk.apply(this, arguments); }; }
+
+})(); /* 20261110bs: main IIFE close, moved below the ba block */
 </script>
 
 
