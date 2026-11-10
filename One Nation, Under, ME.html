@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261109a">
+<meta name="onum-build" content="20261109b">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -33,7 +33,7 @@
 <body>
 <script>
 (function(){
-  var STAMP = "20261109a";
+  var STAMP = "20261109b";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -877,6 +877,14 @@ body.boot-menu .shell{grid-template-rows:minmax(0,1fr)}
 .rx__tabs{display:flex;flex-wrap:wrap;gap:4px;margin:8px 0}
 .rx__tabs button,.rx__sel{font:600 12px Archivo,system-ui,sans-serif;min-height:36px;padding:4px 8px;border:1px solid var(--line,#8a7f66);background:transparent;color:inherit;border-radius:3px;cursor:pointer}
 .rx__tabs button.on{background:#ffe08a;color:#111;border-color:#ffe08a}
+.rx__why{font:13.5px/1.45 Georgia,serif;margin:6px 0 2px}
+.rx__how{font:12.5px/1.45 Georgia,serif;opacity:.82;margin:0 0 8px}
+.rx__tid{font:italic 13px/1.4 Georgia,serif;opacity:.8;margin:4px 0 0}
+.rx__map{margin:8px 0 4px}
+.rx__svgmap{display:block;width:100%;height:auto;max-height:300px;background:#16314a;border-radius:6px}
+.rx__vote{margin-top:10px;border-top:1px solid rgba(160,160,160,.4);padding-top:8px}
+.rx__vote b{display:block;margin-bottom:4px}
+.rx__vote p{margin:0 0 6px;font:13px/1.4 Georgia,serif}
 
 @keyframes fadeInOverlay{from{opacity:0} to{opacity:1}}
 .settings-panel{background:var(--paper); border-radius:8px; box-shadow:0 20px 60px rgba(0,0,0,.9); max-width:min(600px,92vw); max-height:85vh; overflow-y:auto; animation:slideUpPanel .35s cubic-bezier(.16,.1,.3,1); display:flex; flex-direction:column}
@@ -8620,6 +8628,18 @@ function loreScan(text){
 }
 const MAP = {open:false, mode:"lean", sel:null};
 function mapColor(st){
+  if(MAP.mode === "race"){
+    try{
+      const B = G.races && G.races.live;
+      const rc = B && B["gov@" + st.n];
+      if(rc && rc.field && rc.series && rc.series.length){
+        const a = rc.series[rc.series.length - 1][1];
+        const lead = a >= 50 ? rc.field[0] : rc.field[1];
+        return raceCol(lead.p);
+      }
+    }catch(e){}
+    return st.lean > 8 ? "#8a4b4b" : st.lean < -8 ? "#4b5f8a" : "#6b6456";
+  }
   if(MAP.mode === "tension"){ const u = Math.max(0, Math.min(100, st.unrest || 0)); return "hsl(" + (120 - u * 1.2) + ",45%," + (52 - u * 0.15) + "%)"; }
   if(MAP.mode === "faith"){ const ch = (G.rite && G.rite.chapels && G.rite.chapels[st.n]) || 0; if(ch >= 2) return "#c46a1a"; if(ch) return "#d89b55"; return {latin:"#7c5aa6", kerk:"#4f6fa8", circle:"#5b8f6a", flame:"#b5473a", none:"#888", self:"#a79b4f"}[st.creed] || "#777"; }
   const ms = (G.members || []).filter(m => !m.gone && m.state === st.n);
@@ -8806,7 +8826,8 @@ function mapExtra(){
   return '<div class="billbox q-world" style="margin:10px 0">' +
     (function(){ try{ return '<div style="margin:0 0 8px">' + foreignAtlas((G.world && G.world.foe) || MAP.sel) + '</div>'; }catch(e){ return ""; } })() +
     '<div class="eyebrow">' + (flag ? '<img src="' + flag + '" style="height:16px;vertical-align:middle;margin-right:6px;border:1px solid #000">' : '') + pcEsc((G.country && G.country.name) || "Nieuw Oranje 7") + (consular ? ' \u00b7 the Consular Republic, under Nieuw Oranje VII' : '') + '</div>' +
-    '<div style="margin:6px 0">Shade by: ' + [["lean","lean"],["party","party"],["faith","faith"],["tension","tension"]].map(([k, t]) => '<button type="button" class="cl-btn" data-qmode="' + k + '"' + (MAP.mode === k ? ' style="background:#6d5a2e;color:#fff"' : '') + '>' + t + '</button>').join("") + '</div>' +
+    '<div style="margin:6px 0">Shade by: ' + [["lean","lean"],["party","party"],["faith","faith"],["tension","tension"],["race","the race"]].map(([k, t]) => '<button type="button" class="cl-btn" data-qmode="' + k + '"' + (MAP.mode === k ? ' style="background:#6d5a2e;color:#fff"' : '') + '>' + t + '</button>').join("") + '</div>' +
+    (MAP.mode === "race" ? '<p class="muted" style="margin:4px 0 8px">Race colour is whoever leads for governor. A state with no governor in the book yet keeps its lean colour. The book adds those races as the career lengthens. It does not invent a poll that was never taken.</p>' : '') +
     '<div style="margin:4px 0;font:12px system-ui"><b>Neighbours:</b> ' + WORLD_POWERS.map(p => { const v = (G.realmRel || {})[p.k] || 0, wr = (G.realmWire || {})[p.k]; return '<button type="button" class="cl-btn" data-qplace="' + pcEsc(p.t) + '" style="border-color:' + realmHue(v) + '">' + pcEsc(p.t) + ' · ' + realmRelLabel(v) + ' ' + (v > 0 ? '+' : '') + Math.round(v) + (G.world && G.world.foe === p.k ? ' \u2694' : '') + (wr ? ' · ' + pcEsc(wr.verb) : '') + '</button>'; }).join("") + '</div>' +
     '<div style="margin:4px 0;font:12px system-ui"><b>The Capitol:</b> ' + Object.keys(ROOMS).filter(k => ROOMS[k].t && !/^visit$/.test(k)).slice(0, 18).map(k => pcEsc(ROOMS[k].t)).join(" \u00b7 ") + '</div>' +
     '<div style="margin:4px 0;font:12px system-ui"><b>Consular Rite chapels:</b> ' + (chap.length ? chap.map(k => '\u2720 ' + pcEsc(k) + (G.rite.chapels[k] > 1 ? ' \u00d7' + G.rite.chapels[k] : '')).join(", ") : 'none yet') + '</div>' +
@@ -39684,7 +39705,7 @@ function lHeadline(t){
   if(t.length > 110) t = t.slice(0, 107).replace(/\s+\S*$/, "") + "...";
   return t;
 }
-/* 20261109a · the book of races. A short board at the start; more offices and a longer poll as the career goes on. */
+/* 20261109b · the book of races. Polls, why the number, the map, the mood, and the vote that did it. */
 const RACE_SAY = [
   "Three races are being counted: the executive, your seat, and the governor at home.",
   "The papers have added your senator and the attorney general at home.",
@@ -39857,19 +39878,176 @@ function raceBars(rc){
   return '<div class="rx__bars"><span style="width:' + a + '%;background:' + raceCol(f0.p) + '">' + a + '</span><span style="width:' + b + '%;background:' + raceCol(f1.p) + '">' + b + '</span></div>' +
     '<small>' + pcEsc(f0.n) + ' ' + pcEsc(partyLabel(f0.p)) + ' ' + a + ' · ' + pcEsc(f1.n) + ' ' + pcEsc(partyLabel(f1.p)) + ' ' + b + ' · ±' + raceMoe(rc).toFixed(1) + ' · sample ' + raceSample(rc).toLocaleString("en-US") + '</small>';
 }
-function raceCardHTML(rc){
-  return '<div class="rx__c"><b>' + pcEsc(raceTitle(rc.k, rc.st)) + '</b>' + raceBars(rc) + raceSpark(rc.series) + '</div>';
+function raceStateOf(st){ return (G.states || []).find(x => x.n === st) || STATE_DEF.find(x => x.n === st) || null; }
+function raceLeadOf(rc){
+  const a = rc && rc.series && rc.series.length ? rc.series[rc.series.length - 1][1] : 50;
+  const i = a >= 50 ? 0 : 1;
+  const lead = rc.field[i], other = rc.field[i ? 0 : 1];
+  return {a, share:i ? 100 - a : a, lead, other, gap:Math.abs(a - 50) * 2, toss:Math.abs(a - 50) * 2 < raceMoe(rc) * 2};
+}
+function raceWhy(rc, short){
+  if(!rc || !rc.field) return "";
+  const L = raceLeadOf(rc), y = G.you || {}, st = rc.st ? raceStateOf(rc.st) : null, bits = [];
+  if(L.toss) bits.push(L.lead.n + " and " + L.other.n + " are inside the error. One week, or one vote the district hated, moves it.");
+  else bits.push(L.lead.n + " leads " + L.other.n + " by about " + Math.round(L.gap) + ". Sample " + raceSample(rc).toLocaleString("en-US") + ", error ±" + raceMoe(rc).toFixed(1) + ". The chart is the incumbent's share. Fifty is a tie.");
+  if(st){
+    const lean = st.lean || 0, way = lean > 8 ? "Federalist" : lean < -8 ? "Commonwealth" : "split";
+    bits.push(st.n + " leans " + way + (Math.abs(lean) > 3 ? " by " + Math.abs(Math.round(lean)) : "") + ". " + (st.note || ""));
+    if((st.unrest || 0) > 55) bits.push("Unrest is " + Math.round(st.unrest) + ". People in a loud street punish whoever already holds the office.");
+    else if((st.unrest || 0) < 22) bits.push("Unrest is quiet (" + Math.round(st.unrest || 0) + "). They are voting the habit, not the emergency.");
+    if((st.ind || 0) >= 70) bits.push("Industry is " + Math.round(st.ind) + ". A fat year helps whoever looks like the people who sign the payroll.");
+    else if((st.ind || 0) > 0 && st.ind < 42) bits.push("Industry is thin (" + Math.round(st.ind) + "). Bread and wages are the argument, not the speech.");
+  } else if(rc.k === "pres"){
+    const m = G.mood || 0;
+    bits.push("National mood is " + Math.round(m) + (m > 12 ? ", with the government" : m < -12 ? ", against the government" : ", and not yet decided") + ". The executive's number follows that more than any one state.");
+    try{
+      const cm = chamberMood();
+      bits.push("The chamber leans " + (cm.econ > 8 ? "toward the market" : cm.econ < -8 ? "toward the public purse" : "neither way on money") + " and " + (cm.lib > 8 ? "toward liberty" : cm.lib < -8 ? "toward order" : "the middle on liberty") + ". Mean unrest is " + Math.round(cm.unrest || 0) + ".");
+    }catch(e){}
+  }
+  if(!short && rc.st){
+    try{
+      const c = creedOfState(rc.st);
+      if(c) bits.push("Most of the ground is " + c.t + ". " + (c.sincere ? c.holds : (c.jab || c.holds)));
+    }catch(e){}
+  }
+  if(rc.you){
+    bits.push("This is your race. Approval at home is " + Math.round(y.approval || 0) + " and the last margin was " + Math.round(y.margin || 0) + ".");
+    if(G.town && G.town.hh && G.town.hh.length && (!rc.st || rc.st === y.state)){
+      try{
+        const tm = townMood();
+        bits.push("The households at home are " + (tm > 60 ? "warm" : tm < 40 ? "cool" : "still making up their minds") + " (" + Math.round(tm) + "). They remember a letter and a need before they remember a floor speech.");
+      }catch(e){}
+    }
+    try{
+      const w = worstVote();
+      if(w && w.v && w.fit < 0) bits.push("The vote they can hang on you is " + (w.v.vote > 0 ? "aye" : "no") + " on " + w.v.title + ", day " + w.v.day + ". It does not fit the district.");
+    }catch(e){}
+  }
+  const prior = ((G.races && G.races.hist) || []).filter(h => h.k === rc.k && (h.st || "") === (rc.st || ""));
+  const last = prior.length ? prior[prior.length - 1] : null;
+  if(last) bits.push("Last time this office was counted, " + last.w + " took it by " + last.m + " in the " + ordinal(last.c) + " Congress.");
+  if(rc.series && rc.series.length >= 2){
+    const dlt = rc.series[rc.series.length - 1][1] - rc.series[0][1];
+    bits.push("Since day " + rc.series[0][0] + " the incumbent's number has " + (dlt > 1 ? "risen " + dlt : dlt < -1 ? "fallen " + Math.abs(dlt) : "held") + ".");
+  }
+  return short ? bits.slice(0, 2).join(" ") : bits.join(" ");
+}
+function raceVoteSentence(v){
+  const y = G.you || {}, pos = v.pos || {};
+  let axis = "econ", best = -1;
+  AXES.forEach(a => { const mag = Math.abs(pos[a.k] || 0); if(mag > best){ best = mag; axis = a.k; } });
+  const ax = AXES.find(a => a.k === axis) || AXES[0];
+  const dir = pos[axis] || 0, aye = (v.vote || 0) > 0;
+  const toward = (aye ? dir : -dir) >= 0 ? ax.hi : ax.lo;
+  let fit = 0;
+  try{
+    const d = y.district || {};
+    let s = 0;
+    AXES.forEach(a => { s += -Math.abs((d[a.k] || 0) - (pos[a.k] || 0)) / 4 + 12; });
+    fit = aye ? s : -s;
+  }catch(e){}
+  const home = y.state || "home", lean = raceLean(home);
+  const help = Math.abs(dir) < 8 ? "barely moves the district either way" : (fit >= 0 ? "sits with the district" : "sits against the district");
+  return (aye ? "Aye" : "No") + " on " + (v.title || "a bill") + ", day " + (v.day || "?") + ", and it " + (v.passed ? "passed" : "failed") + ". The sharp edge is " + ax.n + ", toward " + toward + ". " + cap(help) + " in " + home + ", which leans " + (lean > 8 ? "Federalist" : lean < -8 ? "Commonwealth" : "split") + ".";
+}
+function raceTidbit(rc){
+  const y = G.you || {}, bits = [];
+  const st = rc && rc.st ? raceStateOf(rc.st) : (y.state ? raceStateOf(y.state) : null);
+  try{
+    if(st){
+      const ch = (G.rite && G.rite.chapels && G.rite.chapels[st.n]) || 0;
+      if(ch) bits.push(st.n + " keeps " + ch + " Consular chapel" + (ch > 1 ? "s" : "") + ". The lawgiver they quote is a man, never God. The pews still vote.");
+      if(st.bill && st.bill.title) bits.push("The statehouse is sitting on " + st.bill.title + ". A governor's race feels that before the Capitol does.");
+    }
+    if(G.town && G.town.hh && G.town.hh.length && (!rc || !rc.st || rc.st === y.state)){
+      const h = G.town.hh[Math.abs(seedOf("tidh:" + (G.day || 1))) % G.town.hh.length];
+      if(h) bits.push("On " + h.street + ", the " + h.fam + " household is at " + Math.round(h.mood) + " over " + h.need + ".");
+    }
+    if(G.town && G.town.letters && G.town.letters.length && (!rc || !rc.st || rc.st === y.state)){
+      const L = G.town.letters[G.town.letters.length - 1];
+      if(L && L.t) bits.push("A letter still on the desk: " + String(L.t).replace(/\s+/g, " ").slice(0, 140));
+    }
+    if(rc && rc.you){
+      let rv = null; try{ rv = rivalLive(); }catch(e){}
+      if(rv && rv.name) bits.push(rv.name + " is still in it. A rival quotes the vote you hoped was procedural.");
+    }
+    if(G.money && typeof guilderIndex === "function") bits.push("The guilder index is " + guilderIndex().toFixed(1) + ". In Coalport one guilder is still called a day's wage. A poll does not buy bread.");
+  }catch(e){}
+  if(!bits.length) return "";
+  return bits[Math.abs(seedOf("tid:" + ((rc && rc.k) || "") + ":" + ((rc && rc.st) || "") + ":" + (G.day || 1))) % bits.length];
+}
+function raceHow(){
+  return "A poll is not a vote. Each morning the hot races, the executive and your seat and home, take a new point. The rest of the book is sampled in turn, so a long career does not pretend every comptroller was called every day. Election night files the return, names a new challenger, and starts the next chart. The book grows with the term: " + (RACE_SAY[raceDepth()] || "") + " History keeps your races, the executive, your seat, and home, and trims the rest so the file can still be read. Nothing here raises a meter's ceiling, and a dry day does not write the book.";
+}
+function raceMoodBox(){
+  const y = G.you || {};
+  let tm = null;
+  if(G.town && G.town.hh && G.town.hh.length){ try{ tm = townMood(); }catch(e){} }
+  let cm = null; try{ cm = chamberMood(); }catch(e){}
+  const st = y.state ? raceStateOf(y.state) : null;
+  let line = "National mood " + Math.round(G.mood || 0) + ". Your approval " + Math.round(y.approval || 0) + ".";
+  if(tm != null) line += " Households at home " + Math.round(tm) + (tm > 60 ? ", warm" : tm < 40 ? ", cool" : ", undecided") + ".";
+  if(st) line += " " + st.n + ": unrest " + Math.round(st.unrest || 0) + ", industry " + Math.round(st.ind || 0) + ", lean " + Math.round(st.lean || 0) + ". " + (st.note || "");
+  if(cm) line += " The chamber is " + (cm.econ > 8 ? "market-minded" : cm.econ < -8 ? "public-purse-minded" : "in the middle on money") + ", and mean unrest across the states is " + Math.round(cm.unrest || 0) + ".";
+  line += " People feel a vote in their town before they feel a speech in the Capitol.";
+  return '<div class="rx__c"><b>Why the mood is what it is</b><p class="rx__why">' + pcEsc(line) + '</p></div>';
+}
+function raceMapLead(name){
+  const B = G.races && G.races.live;
+  const rc = B && B["gov@" + name];
+  if(!rc || !rc.series || !rc.series.length || !rc.field) return null;
+  const a = rc.series[rc.series.length - 1][1];
+  const lead = a >= 50 ? rc.field[0] : rc.field[1];
+  return {p:lead.p, n:lead.n};
+}
+function raceMapSVG(){
+  const S = G.states || [];
+  if(!S.length) return "";
+  const C = 48, ox = 6, oy = 6;
+  const maxC = Math.max.apply(null, S.map(s => s.col)), maxR = Math.max.apply(null, S.map(s => s.row));
+  const W = ox * 2 + (maxC + 1) * C, H = oy * 2 + (maxR + 1) * C;
+  let g = '<svg class="rx__svgmap" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Who leads for governor">';
+  S.forEach(st => {
+    const x = ox + st.col * C, y = oy + st.row * C;
+    const lead = raceMapLead(st.n);
+    const fill = lead ? raceCol(lead.p) : (st.lean > 8 ? "#8a4b4b" : st.lean < -8 ? "#4b5f8a" : "#6b6456");
+    const mine = G.you && G.you.state === st.n, sel = RACE_UI.st === st.n;
+    const label = st.n.length > 12 ? st.n.slice(0, 11) : st.n;
+    g += '<g data-rxst="' + pcEsc(st.n) + '" style="cursor:pointer"><title>' + pcEsc(st.n + (lead ? ": " + lead.n + " leads" : ": not yet in the governor count")) + '</title><rect x="' + x + '" y="' + y + '" width="' + (C - 4) + '" height="' + (C - 4) + '" rx="4" fill="' + fill + '" stroke="' + (sel ? "#ffe08a" : mine ? "#fff" : "#1a140c") + '" stroke-width="' + (sel || mine ? 2.5 : 1) + '"/><text x="' + (x + (C - 4) / 2) + '" y="' + (y + (C - 4) / 2 + 3) + '" fill="#fff" font-size="7.5" text-anchor="middle">' + pcEsc(label) + '</text></g>';
+  });
+  g += '</svg>';
+  return '<div class="rx__map"><div class="eyebrow">Who leads for governor · white ring is home · click a state</div>' + g + '<p class="rx__how">Colour is the party ahead for governor, where that race is already in the book. Everywhere else the colour is only the lean. An early career has a short map on purpose.</p></div>';
+}
+function raceHistLine(h){
+  const lean = h.st ? raceLean(h.st) : (G.mood || 0);
+  const side = h.p === "FED" ? "Federalist" : h.p === "COM" ? "Commonwealth" : (partyLabel(h.p) || "independent");
+  const read = h.m < 4 ? "A margin that small is a squeaker. One bad month undoes it." : h.m > 10 ? "That looked safe, until the mood moved." : "Real, and not a dynasty.";
+  return (h.y ? "That was you. " : "") + h.w + " (" + side + ") carried " + raceTitle(h.k, h.st) + " by " + h.m + " in the " + ordinal(h.c) + " Congress, day " + h.d + ". The ground leaned " + (lean > 8 ? "Federalist" : lean < -8 ? "Commonwealth" : "split") + ". " + read;
+}
+function raceVotesHTML(){
+  const y = G.you || {};
+  const votes = (y.record && y.record.votes) || [];
+  if(!votes.length) return '<div class="rx__vote"><b>Your roll calls, read against home</b><p class="rx__how">No roll call filed yet. The first one you cast is the sentence the district will quote.</p></div>';
+  return '<div class="rx__vote"><b>Your roll calls, read against home</b>' + votes.slice(-6).reverse().map(v => '<p>' + pcEsc(raceVoteSentence(v)) + '</p>').join("") + '<p class="rx__how">' + votes.length + ' roll calls on the record' + (y.record.partyBreaks ? ", " + y.record.partyBreaks + " against your party" : "") + (y.record.conscience ? ", " + y.record.conscience + " against your own position" : "") + (y.record.bills != null ? ", " + y.record.bills + " on the winning side" : "") + '.</p></div>';
+}
+function raceCardHTML(rc, mode){
+  const full = mode === "full";
+  const why = '<p class="rx__why">' + pcEsc(raceWhy(rc, !full)) + '</p>';
+  let tid = "";
+  if(full){ const t = raceTidbit(rc); if(t) tid = '<p class="rx__tid">' + pcEsc(t) + '</p>'; }
+  return '<div class="rx__c"><b>' + pcEsc(raceTitle(rc.k, rc.st)) + (rc.you ? " · yours" : "") + '</b>' + raceBars(rc) + raceSpark(rc.series) + why + tid + '</div>';
 }
 function raceHouseBar(){
   const s = G.seatsBy || {}, keys = Object.keys(s).filter(p => (s[p] || 0) > 0);
   const tot = keys.reduce((a, p) => a + (s[p] || 0), 0) || 1;
-  return '<div class="rx__c"><b>The House, as it stands</b><div class="rx__bars">' + keys.sort((a, b) => s[b] - s[a]).map(p => '<span style="width:' + ((s[p] / tot) * 100) + '%;background:' + raceCol(p) + '">' + s[p] + '</span>').join("") + '</div><small>' + keys.map(p => s[p] + ' ' + partyName(p)).join(" · ") + '</small></div>';
+  return '<div class="rx__c"><b>The House, as it stands</b><div class="rx__bars">' + keys.sort((a, b) => s[b] - s[a]).map(p => '<span style="width:' + ((s[p] / tot) * 100) + '%;background:' + raceCol(p) + '">' + s[p] + '</span>').join("") + '</div><small>' + keys.map(p => s[p] + ' ' + partyName(p)).join(" · ") + '</small><p class="rx__how">Seats already won, not a poll. A party can hold the room and still lose the next governor.</p></div>';
 }
 function racePaperHTML(){
   const B = raceEnsure(), depth = raceDepth();
   const home = (G.you && G.you.state) || "";
   const ids = Object.keys(B.live).filter(id => { const rc = B.live[id]; return rc.k === "pres" || rc.k === "house" || (home && rc.st === home); }).slice(0, 4);
-  return '<p class="np__deck">' + pcEsc(RACE_SAY[depth] || "") + ' The count gets longer as the term does.</p><div class="rx">' + raceHouseBar() + ids.map(id => raceCardHTML(B.live[id])).join("") + '</div>';
+  return '<p class="np__deck">' + pcEsc(RACE_SAY[depth] || "") + ' The count gets longer as the term does. The paragraph under each number is why it sits there.</p><div class="rx">' + raceHouseBar() + ids.map(id => raceCardHTML(B.live[id])).join("") + '</div>';
 }
 function raceCard(){
   G.running = false;
@@ -39880,26 +40058,73 @@ function raceCard(){
   let body = "";
   if(view === "past"){
     const rows = (B.hist || []).slice().reverse().slice(0, 48);
-    body = rows.length ? '<div class="results">' + rows.map(h => '<div><span>' + pcEsc(raceTitle(h.k, h.st)) + ' · ' + pcEsc(h.w) + ' <span class="chip chip--' + (h.p === "FED" ? "fed" : h.p === "COM" ? "com" : "ind") + '">' + pcEsc(h.p || "") + '</span></span><b class="win">+' + h.m + '</b><b>' + ordinal(h.c) + '</b></div>').join("") + '</div>' : '<p>No returns filed yet.</p>';
+    body = '<p class="rx__how">How to read a return. The plus is the margin, not the share. A small plus in a state that leans the other way is a borrowed win. Your own returns stay in the book even after the rest is trimmed. Older cycles before this career are a short backfill, not a fabricated century. The live board is what grows.</p>' +
+      (rows.length ? '<div class="results">' + rows.map(h => '<div><span>' + pcEsc(raceHistLine(h)) + '</span><b class="win">+' + h.m + '</b></div>').join("") + '</div>' : '<p>No returns filed yet. The first election night writes them.</p>');
   } else {
     let ids = Object.keys(B.live);
     if(view === "watch") ids = ids.filter(id => { const rc = B.live[id]; return rc.k === "pres" || rc.k === "house" || rc.st === (y.state || ""); });
     else if(view === "home") ids = ids.filter(id => B.live[id].st === (y.state || "") || B.live[id].k === "house" || B.live[id].k === "pres");
     else ids = ids.filter(id => B.live[id].st === RACE_UI.st || B.live[id].k === "pres");
-    body = (view === "all" ? '<label class="rx__sel">State <select id="rxSt" class="rx__sel">' + sts.map(n => '<option' + (n === RACE_UI.st ? ' selected' : '') + '>' + pcEsc(n) + '</option>').join("") + '</select></label>' : '') +
-      '<div class="rx">' + (view !== "all" ? raceHouseBar() : '') + ids.map(id => raceCardHTML(B.live[id])).join("") + '</div>';
+    body = raceMapSVG() + raceMoodBox() + '<p class="rx__how">' + pcEsc(raceHow()) + '</p>' +
+      (view === "all" ? '<label class="rx__sel">State <select id="rxSt" class="rx__sel">' + sts.map(n => '<option' + (n === RACE_UI.st ? ' selected' : '') + '>' + pcEsc(n) + '</option>').join("") + '</select></label>' : '') +
+      '<div class="rx">' + (view !== "all" ? raceHouseBar() : '') + ids.map(id => raceCardHTML(B.live[id], "full")).join("") + '</div>' +
+      raceVotesHTML();
   }
   const tab = (id, t) => '<button type="button" data-rvw="' + id + '"' + (view === id ? ' class="on"' : '') + '>' + t + '</button>';
-  card.innerHTML = '<div class="eyebrow">The book of races · ' + (depth + 1) + ' of 5</div><h1>Polls, charts, returns</h1>' +
-    '<p class="dream">' + pcEsc(RACE_SAY[depth] || "") + ' A new office joins the count as the career lengthens. Each morning adds a point. The error shrinks as the sample catches up. Election night files the return and starts the next chart.</p>' +
+  card.innerHTML = '<div class="eyebrow">The book of races · ' + (depth + 1) + ' of 5</div><h1>Polls, maps, why</h1>' +
+    '<p class="dream">' + pcEsc(RACE_SAY[depth] || "") + ' Open a state to see who leads, why the ground feels that way, and which of your votes the district will still be quoting.</p>' +
     '<div class="rx__tabs">' + tab("watch", "Watching") + tab("home", "Your state") + tab("all", "Every state") + tab("past", "History") + '</div>' + body +
     '<div class="card__actions"><button type="button" class="btn" id="rxBack">Back to the Ledger</button><button type="button" class="btn btn--ghost" id="rxClose">Close</button></div>';
   veil.hidden = false;
   card.querySelectorAll("[data-rvw]").forEach(b => b.addEventListener("click", () => { RACE_UI.view = b.getAttribute("data-rvw"); raceCard(); }));
+  card.querySelectorAll("[data-rxst]").forEach(g => g.addEventListener("click", () => { RACE_UI.st = g.getAttribute("data-rxst"); RACE_UI.view = "all"; raceCard(); }));
   const sel = el("rxSt"); if(sel) sel.addEventListener("change", () => { RACE_UI.st = sel.value; raceCard(); });
   el("rxBack").addEventListener("click", () => paperCard());
   el("rxClose").addEventListener("click", () => walkNow());
 }
+function onumLedgerFacts(stateName){
+  const y = G.you || {};
+  const name = stateName || y.state || ((G.states || [])[0] && G.states[0].n) || "";
+  const st = name ? (raceStateOf(name) || {}) : {};
+  const home = !!(y.state && name === y.state);
+  const B = (G.races && G.races.live) || {};
+  const pack = id => {
+    const rc = B[id];
+    if(!rc || !rc.series || !rc.series.length || !rc.field) return null;
+    const L = raceLeadOf(rc);
+    return {title:raceTitle(rc.k, rc.st), lead:L.lead.n, party:L.lead.p, share:L.share, you:!!rc.you, why:raceWhy(rc, true), k:rc.k};
+  };
+  const races = [];
+  ["gov","sen","ag","treas","sos","comp","housegen"].forEach(k => { const p = pack(raceId(k, name)); if(p) races.push(p); });
+  if(home){ const h = pack("house"); if(h) races.unshift(h); }
+  const pres = pack("pres");
+  let creed = null;
+  try{ const c = name && creedOfState(name); if(c) creed = {t:c.t, line:c.sincere ? c.holds : (c.jab || c.holds), sincere:!!c.sincere}; }catch(e){}
+  const votes = home ? ((y.record && y.record.votes) || []).slice(-6).reverse().map(v => { try{ return raceVoteSentence(v); }catch(e){ return (v.vote > 0 ? "Aye" : "No") + " on " + v.title; } }) : [];
+  const daylog = [];
+  (G.daylog || []).slice(-50).forEach(x => { if(x && x.t && name && String(x.t).indexOf(name) >= 0) daylog.push("Day " + x.d + ": " + String(x.t).replace(/\s+/g, " ").slice(0, 220)); });
+  let town = null;
+  if(home && G.town && G.town.hh && G.town.hh.length){
+    let mood = 50; try{ mood = Math.round(townMood()); }catch(e){}
+    const letter = (G.town.letters && G.town.letters.length) ? String(G.town.letters[G.town.letters.length - 1].t || "").replace(/\s+/g, " ").slice(0, 240) : "";
+    town = {mood, letter, streets:(G.town.hh || []).slice(0, 7).map(h => ({street:h.street, fam:h.fam, mood:Math.round(h.mood || 0), need:h.need || ""}))};
+  }
+  let gov = null;
+  try{ const g = stateGovInfo(name); if(g && g.g) gov = {t:g.g.t, d:g.g.d, short:g.g.short, name:(g.rec && g.rec.gov) || ""}; }catch(e){}
+  const hist = ((G.races && G.races.hist) || []).filter(h => h.st === name || (home && (h.y || h.k === "house"))).slice(-8).map(h => ({c:h.c, d:h.d, k:h.k, w:h.w, p:h.p, m:h.m, y:!!h.y, line:raceHistLine(h)}));
+  return {
+    ok:!!(name && (st.n || (G.states || []).some(s => s.n === name) || home)),
+    day:G.day || 1, name, home,
+    state:{n:st.n || name, lean:Math.round(st.lean || 0), unrest:Math.round(st.unrest || 0), ind:Math.round(st.ind || 0), pop:st.pop || 0, creed:st.creed || "", note:st.note || "", seats:st.seats || 0, bill:st.bill && st.bill.title ? st.bill.title : ""},
+    you:home ? {name:y.name || "", approval:Math.round(y.approval || 0), margin:Math.round(y.margin || 0), party:y.party || "", office:y.office || "house"} : null,
+    mood:Math.round(G.mood || 0), town, creed, gov, races, pres, votes,
+    daylog:daylog.slice(-6), hist,
+    states:(G.states || []).map(s => s.n),
+    chapel:(G.rite && G.rite.chapels && G.rite.chapels[name]) || 0,
+    guilder:(G.money && typeof guilderIndex === "function") ? Math.round(guilderIndex() * 10) / 10 : null
+  };
+}
+try{ window.onumLedgerFacts = onumLedgerFacts; }catch(e){}
 function paperBuild(){
   const D = G.day, y = G.you;
   const prev = (G.daylog || []).filter(x => x.d === D - 1 || (x.d === D && /overnight|this morning/i.test(x.t)));
@@ -40817,7 +41042,11 @@ function refreshUnion(){
   const del = s ? stateDelegation(s.n) : [];
   el("paneUnion").innerHTML =
     '<div class="eyebrow" style="padding-top:40px">The Union · ' + G.states.length + ' states · ' + G.seats + ' seats</div>' +
-    '<p class="muted" style="margin:6px 0 10px">Colour is the state\'s lean; the dot is unrest; the small word is how it is governed. ' +
+    '<p class="muted" style="margin:6px 0 10px">' + (MAP.mode === "race"
+      ? "Colour is who leads for governor, or the lean where that race is not in the book yet. "
+      : MAP.mode === "lean"
+      ? "Colour is the state's lean; the dot is unrest; the small word is how it is governed. "
+      : "Colour follows the shade under the map. ") +
       'Click a state to read it.</p>' +
     renderMap(sel) +
     (s ? '<div class="billbox" style="margin-top:14px">' +
@@ -53856,7 +54085,7 @@ armFrame();
 
 </script>
 <script>
-/* 20261108i District Ledger: beside the Capitol Ledger. Generated dispatches stay marked as such. */
+/* 20261109b District Ledger: career facts first, desk sketch marked as such. */
 (function(){
   'use strict';
 
@@ -53954,6 +54183,69 @@ armFrame();
     }
   };
 
+  function flavor(name, region, mood, concerns, publicLife, snow){
+    return {
+      name: name,
+      region: region,
+      mood: mood,
+      businesses: ['grocer', 'café', 'printer', 'tavern', 'market stall', 'clerk'],
+      concerns: concerns,
+      publicLife: publicLife,
+      phraseMap: {
+        snow: snow,
+        'Main Street': 'where a private complaint becomes something a stranger can see',
+        'cold ledger': 'the paper that says who is owed, and who will be reminded of it'
+      }
+    };
+  }
+  var EXTRA = {
+    'Nieuw Haarlem': flavor('Nieuw Haarlem', 'upriver', 'mill towns, practical, proud of being upriver of the capital', ['mill wages', 'river freight', 'the capital taking the credit'], 'market days and the upriver papers', 'a week the mills ran short and nobody downriver noticed'),
+    'Vlissingen': flavor('Vlissingen', 'coast', 'shipyard-loud, wary of the water', ['the yards', 'a coast that floods', 'harbor wages'], 'yard gates and the flood watch', 'water where a street was, and the argument about who pays'),
+    'Zeeland': flavor('Zeeland', 'marsh', 'patient, dairy, long memory', ['the dikes', 'milk price', 'an old slight'], 'church market and the dike walk', 'a season the marsh took back what the books said was dry'),
+    'Havenport': flavor('Havenport', 'port', 'everything passes through, and the port knows it', ['tariffs', 'dock labor', 'what the deep water charges'], 'the quay, the insurers, the night shift', 'a cargo that sat because nobody would name the rate'),
+    'Marion': flavor('Marion', 'split', 'steel in one half, tobacco in the other, and they do not vote alike', ['the mills', 'the leaf', 'which half the governor visits'], 'shift whistles and county fairs', 'a town that means the north if you are from the south'),
+    'Coalport': flavor('Coalport', 'seams', 'tired of being told the work will come back', ['the seams', 'the last shift', 'who will say it out loud'], 'the union hall and the closed tipple', 'a morning the whistle did not blow and the paper called it weather'),
+    'Grantham': flavor('Grantham', 'college', 'orchards and people who have read the bill', ['tuition', 'the orchard year', 'what the study said this week'], 'lecture halls and Saturday markets', 'a phrase the students use that the orchard does not'),
+    'Ordway': flavor('Ordway', 'high plains', 'cattle, and a legislature that is not in town for long', ['the herd price', 'the forty-day session', 'being governed from elsewhere'], 'stock pens and a short session', 'a road closed and a capitol that had already gone home'),
+    'Sandhill': flavor('Sandhill', 'dry', 'quiet, conservative, richer than it looks', ['gas', 'water', 'being called empty'], 'the co-op and the Sunday paper', 'a price that moved under a county that pretends not to notice'),
+    'Tullamore': flavor('Tullamore', 'works', 'union halls and foundries that are not all open', ['the closed works', 'the hall', 'who still hires'], 'the hall on payday and the gate on Monday', 'a shift that was posted and then taken down'),
+    'Pinevale': flavor('Pinevale', 'timber', 'the fight is about the trees and who counts them', ['the cut', 'the road', 'whose timber'], 'the yard and the meeting about the yard', 'a load that left the valley before the meeting ended'),
+    'Westrun': flavor('Westrun', 'coast', 'a coast that thinks it is its own country', ['the port', 'the capital inland', 'being spoken for'], 'the waterfront and a paper that does not quote the interior', 'a fog the inland forecasts did not mention'),
+    'Dunmore': flavor('Dunmore', 'fleet', 'fishing, and a catch that is not what it was', ['the catch', 'the boats', 'the price at the dock'], 'the dock at dawn and the kerk in the afternoon', 'a hold that came in light and a story that came in heavy')
+  };
+  function ensureFlavors(){
+    Object.keys(EXTRA).forEach(function(k){ if(!DISTRICTS[k]) DISTRICTS[k] = EXTRA[k]; });
+    if(!DISTRICTS['Nieuw Oranje'] && DISTRICTS['Nieuw Oranje VII']){
+      DISTRICTS['Nieuw Oranje'] = {
+        name: 'Nieuw Oranje',
+        region: DISTRICTS['Nieuw Oranje VII'].region,
+        mood: DISTRICTS['Nieuw Oranje VII'].mood,
+        businesses: DISTRICTS['Nieuw Oranje VII'].businesses,
+        concerns: DISTRICTS['Nieuw Oranje VII'].concerns,
+        publicLife: DISTRICTS['Nieuw Oranje VII'].publicLife,
+        phraseMap: DISTRICTS['Nieuw Oranje VII'].phraseMap
+      };
+    }
+  }
+  function hashStr(s){
+    var h = 2166136261;
+    s = String(s || '');
+    for(var i = 0; i < s.length; i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return h >>> 0;
+  }
+  function mulberry(seed){
+    var s = seed >>> 0;
+    return function(){
+      s = (Math.imul(1664525, s) + 1013904223) >>> 0;
+      return s / 4294967296;
+    };
+  }
+  function profileFor(label){
+    ensureFlavors();
+    if(DISTRICTS[label]) return DISTRICTS[label];
+    return flavor(label, 'the republic', 'a state with its own lean, its own pews, and a grudge it can name', ['the lean', 'the price', 'whether the capital is listening'], 'the ordinary week: work, worship, and the paper', 'a shortage the district already had a word for');
+  }
+
   var BUSINESS_TYPES = [
     'grocer', 'bakery', 'café', 'bookshop', 'barber', 'law chamber',
     'forge', 'warehouse', 'printer', 'dockside store', 'wine merchant',
@@ -54003,7 +54295,10 @@ armFrame();
     return Math.min(max, Math.max(min, v));
   }
 
-  function makeBusinessEntry(id, district, type, owner, x, y){
+  function makeBusinessEntry(id, district, type, owner, x, y, rnd, priceBias){
+    rnd = rnd || Math.random;
+    priceBias = priceBias || 1;
+    var base = Math.round((8 + rnd() * 28) * priceBias);
     return {
       id: id,
       district: district,
@@ -54011,20 +54306,25 @@ armFrame();
       owner: owner,
       location: { x: x, y: y },
       hours: 'open during normal market hours',
-      reputation: clamp((Math.random() * 0.6 + 0.4), 0, 1),
-      stock: Math.round(30 + Math.random() * 80),
+      reputation: clamp(0.35 + rnd() * 0.55, 0, 1),
+      stock: Math.round(18 + rnd() * 80),
       prices: {
-        base: 10 + Math.round(Math.random() * 30),
-        recent: 10 + Math.round(Math.random() * 35)
+        base: base,
+        recent: Math.max(1, Math.round(base * (0.9 + rnd() * 0.25)))
       },
-      workers: Math.round(2 + Math.random() * 9),
+      workers: Math.round(2 + rnd() * 9),
       pressures: ['competition', 'supply', 'rent'],
-      vibe: 'busy, cautious, or sharp depending on district mood'
+      vibe: 'desk sketch, priced off the day and the state, not a transaction you made',
+      sketch: true
     };
   }
 
-  function makeDistrictProfile(label, seed){
-    var profile = DISTRICTS[label] || DISTRICTS['Nieuw Oranje VII'];
+  function makeDistrictProfile(label, seed, facts){
+    ensureFlavors();
+    var profile = profileFor(label);
+    var rnd = mulberry(((seed || 1) * 997) ^ hashStr(label + ':' + ((facts && facts.day) || '')));
+    var ind = facts && facts.state && facts.state.ind ? facts.state.ind : 50;
+    var priceBias = 0.75 + ind / 160;
     var baseBusinesses = [];
     var names = [
       'Bell', 'Crown', 'North', 'Stone', 'Harbor', 'Oak', 'Leaden', 'Market', 'Pine', 'Rowan', 'Guild', 'Morrow'
@@ -54036,9 +54336,28 @@ armFrame();
         label,
         BUSINESS_TYPES[(seed + i) % BUSINESS_TYPES.length],
         names[(seed + i) % names.length] + ' & Co.',
-        (i * 11 + seed) % 100,
-        (i * 17 + seed * 3) % 100
+        Math.round(rnd() * 100),
+        Math.round(rnd() * 100),
+        rnd,
+        priceBias
       ));
+    }
+
+    var pulse;
+    if (facts && facts.state) {
+      pulse = {
+        crowding: clamp((facts.state.pop || 2) / 10, 0, 1),
+        trade: clamp((facts.state.ind || 0) / 100, 0, 1),
+        tension: clamp((facts.state.unrest || 0) / 100, 0, 1),
+        publicTrust: clamp(facts.you ? (facts.you.approval || 50) / 100 : 0.55, 0, 1)
+      };
+    } else {
+      pulse = {
+        crowding: clamp((seed % 10) / 10 + 0.4, 0, 1),
+        trade: clamp(0.35 + (seed % 7) / 10, 0, 1),
+        tension: clamp(0.2 + ((seed + 3) % 8) / 12, 0, 1),
+        publicTrust: clamp(0.5 + ((seed + 1) % 5) / 12, 0, 1)
+      };
     }
 
     return {
@@ -54049,12 +54368,7 @@ armFrame();
       publicLife: profile.publicLife,
       phraseMap: profile.phraseMap,
       businesses: baseBusinesses,
-      pulse: {
-        crowding: clamp((seed % 10) / 10 + 0.4, 0, 1),
-        trade: clamp(0.35 + (seed % 7) / 10, 0, 1),
-        tension: clamp(0.2 + ((seed + 3) % 8) / 12, 0, 1),
-        publicTrust: clamp(0.5 + ((seed + 1) % 5) / 12, 0, 1)
-      }
+      pulse: pulse
     };
   }
 
@@ -54075,7 +54389,8 @@ armFrame();
       followUp: options.followUp || 'A follow-up is expected as the facts settle.',
       politicalWeight: options.politicalWeight || 'local',
       businessImpact: options.businessImpact || 'materials, wages, and commerce are likely to shift',
-      phraseKeys: Array.isArray(options.phraseKeys) ? options.phraseKeys : []
+      phraseKeys: Array.isArray(options.phraseKeys) ? options.phraseKeys : [],
+      fromCareer: !!options.fromCareer
     };
   }
 
@@ -54089,9 +54404,11 @@ armFrame();
       lookup = mapKey ? PHRASE_LIBRARY[mapKey] : null;
     }
 
-    var district = context && context.district ? context.district : 'Nieuw Oranje VII';
-    var districtInfo = DISTRICTS[district] || DISTRICTS['Nieuw Oranje VII'];
-    var localMeaning = districtInfo && districtInfo.phraseMap && districtInfo.phraseMap[key];
+    var district = context && context.district ? context.district : 'Nieuw Oranje';
+    var districtInfo = profileFor(district);
+    var map = districtInfo && districtInfo.phraseMap;
+    var localKey = map && Object.keys(map).find(function(candidate){ return String(candidate).toLowerCase() === key; });
+    var localMeaning = localKey ? map[localKey] : null;
 
     return {
       phrase: phraseKey || 'unknown phrase',
@@ -54104,64 +54421,193 @@ armFrame();
   }
 
   function buildLedgerEdition(dayLabel, districtName, state){
-    var district = districtName || 'Nieuw Oranje VII';
-    var districtInfo = DISTRICTS[district] || DISTRICTS['Nieuw Oranje VII'];
-    var profile = makeDistrictProfile(district, (dayLabel || '').length + (district.length * 3));
-    var localState = state || {};
+    ensureFlavors();
+    var facts = (state && state.ok) ? state : null;
+    var district = (facts && facts.name) || districtName || 'Nieuw Oranje';
+    var districtInfo = profileFor(district);
+    var profile = makeDistrictProfile(district, hashStr(String(dayLabel || '') + district) % 10000, facts);
+    var leads = [];
 
-    var leads = [
-      createStoryRecord({
-        title: 'Market shifts and the city pulse',
-        section: 'district',
+    if (facts) {
+      var s = facts.state || {};
+      if (facts.races && facts.races.length) {
+        var r0 = facts.races[0];
+        leads.push(createStoryRecord({
+          title: r0.title,
+          section: 'the count',
+          district: district,
+          date: dayLabel,
+          summary: r0.lead + ' leads at ' + r0.share + '. ' + (r0.why || ''),
+          confirmed: ['The book of races has this share on day ' + facts.day + '.'],
+          claims: facts.races.slice(1, 4).map(function(r){ return r.title + ': ' + r.lead + ' at ' + r.share + '.'; }),
+          uncertainty: 'A poll is not a vote. Election night files the return.',
+          sources: ['the book of races', 'the morning count'],
+          followUp: 'The chart lengthens each morning the race is hot, and on a turn when it is not.',
+          politicalWeight: 'electoral',
+          businessImpact: 'Contracts follow a lead this size more than they follow a speech.',
+          fromCareer: true
+        }));
+      }
+      if (facts.pres) {
+        leads.push(createStoryRecord({
+          title: facts.pres.title,
+          section: 'the nation',
+          district: district,
+          date: dayLabel,
+          summary: facts.pres.lead + ' leads the nation at ' + facts.pres.share + '. ' + (facts.pres.why || ''),
+          confirmed: ['National mood stands at ' + facts.mood + '.'],
+          sources: ['the book of races'],
+          followUp: 'The executive is counted every morning.',
+          politicalWeight: 'national',
+          businessImpact: 'The guilder does not move because a poll did.',
+          fromCareer: true
+        }));
+      }
+      var moodLine = (s.note ? s.note + ' ' : '') + 'Lean ' + s.lean + ', unrest ' + s.unrest + ', industry ' + s.ind + (s.pop ? ', population ' + s.pop + 'm' : '') + '.';
+      if (facts.creed) moodLine += ' The ground is mostly ' + facts.creed.t + '. ' + facts.creed.line;
+      if (facts.gov) moodLine += ' Government: ' + facts.gov.t + '. ' + facts.gov.d + (facts.gov.name ? ' The governor on the books is ' + facts.gov.name + '.' : '');
+      if (facts.home && facts.you) moodLine += ' You are from here. Approval ' + facts.you.approval + ', last margin ' + facts.you.margin + '.';
+      if (facts.home && facts.town) moodLine += ' Households at home sit at ' + facts.town.mood + '.';
+      if (facts.guilder != null) moodLine += ' The guilder index is ' + facts.guilder + '.';
+      leads.push(createStoryRecord({
+        title: 'Why ' + district + ' feels this way',
+        section: 'mood',
         district: district,
         date: dayLabel,
-        summary: 'A local change in supply, wages, or public attention is visible in the streets and in the accounts.',
+        summary: moodLine,
         confirmed: [
-          'Businesses report a change in prices or customer flow.',
-          'Neighbors describe the affected route or district as unusually lively or tense.'
+          'Unrest ' + s.unrest + ' of 100.',
+          'Industry ' + s.ind + '.',
+          s.bill ? 'On the statehouse desk: ' + s.bill + '.' : 'Nothing named on the statehouse desk this reading.'
         ],
-        claims: [
-          'Some residents say the disruption is temporary.',
-          'Others say policy or a hidden contract is doing the work.'
-        ],
-        uncertainty: 'The public explanation is still contested, but the sensory and economic effects are real.',
-        sources: ['market witness', 'shopkeeper', 'street observer'],
-        followUp: 'A later edition is likely to report whether the disruption is temporary or structural.',
-        phraseKeys: ['snow'],
+        sources: ['the state record', 'the morning'],
+        followUp: 'Unrest and industry move when laws land and when the street does. They are not a color on a poster.',
         politicalWeight: 'district',
-        businessImpact: 'stock, rates, and foot traffic are the measurable result.'
-      }),
-      createStoryRecord({
-        title: 'Public service and the daily routine',
-        section: 'public life',
-        district: district,
-        date: dayLabel,
-        summary: 'Residents discuss queues, service delays, and whether the city is keeping its promises.',
-        confirmed: ['Public services are visible to the district and are being discussed in the open.'],
-        claims: ['Some allege that a policy is to blame, others say it is a temporary failure.'],
-        disputed: ['Whether the matter is political or administrative remains contested.'],
-        uncertainty: 'The issue is still being argued in public, but the disruption is not imagined.',
-        sources: ['civic office', 'resident witness', 'street clerk'],
-        followUp: 'The next edition may show whether the service was restored or reformed.',
-        phraseKeys: ['Main Street'],
-        politicalWeight: 'local',
-        businessImpact: 'customer flow and trust will shift if the issue remains unresolved.'
-      })
-    ];
+        businessImpact: 'Thin industry makes bread the issue. High unrest spends itself on whoever already holds the office.',
+        fromCareer: true
+      }));
+      if (facts.chapel) {
+        leads.push(createStoryRecord({
+          title: 'The chapel and the vote',
+          section: 'a note in the margin',
+          district: district,
+          date: dayLabel,
+          summary: district + ' keeps ' + facts.chapel + ' Consular chapel' + (facts.chapel > 1 ? 's' : '') + '. The lawgiver they quote is a man, never God. The pews vote with everyone else.',
+          confirmed: ['Chapel count on the rite record: ' + facts.chapel + '.'],
+          sources: ['the rite record'],
+          followUp: 'A chapel is not a bloc. It is a room that still has to mark a ballot.',
+          politicalWeight: 'local',
+          businessImpact: 'None on the price of bread. Some on who is willing to be seen at the poll.',
+          fromCareer: true
+        }));
+      }
+      if (facts.town && facts.town.streets && facts.town.streets.length) {
+        leads.push(createStoryRecord({
+          title: 'The streets that write you',
+          section: 'home',
+          district: district,
+          date: dayLabel,
+          summary: facts.town.streets.map(function(h){ return h.fam + ' on ' + h.street + ' (' + h.mood + ') want ' + h.need; }).join('. ') + '.',
+          confirmed: facts.town.streets.map(function(h){ return h.street + ': ' + h.need; }),
+          claims: facts.town.letter ? ['Latest letter: ' + facts.town.letter] : [],
+          sources: ['the household book'],
+          followUp: 'A household remembers a visit and a need. It does not remember your procedural vote as a procedure.',
+          politicalWeight: 'home',
+          businessImpact: 'These are the people who buy from the street you are about to see sketched.',
+          fromCareer: true
+        }));
+      }
+      if (facts.votes && facts.votes.length) {
+        leads.push(createStoryRecord({
+          title: 'What you voted, and what home makes of it',
+          section: 'the record',
+          district: district,
+          date: dayLabel,
+          summary: 'The last roll calls, read against the district rather than against the whip.',
+          confirmed: facts.votes.slice(),
+          sources: ['your roll-call record'],
+          followUp: 'The next vote joins this list. The district does not retire the old one because the week turned.',
+          politicalWeight: 'record',
+          businessImpact: 'A vote that sits against the district shows up in approval before it shows up in a headline.',
+          fromCareer: true
+        }));
+      }
+      if (facts.daylog && facts.daylog.length) {
+        leads.push(createStoryRecord({
+          title: 'What the day already wrote down',
+          section: 'the record',
+          district: district,
+          date: dayLabel,
+          summary: 'Lines from the career that name ' + district + '.',
+          confirmed: facts.daylog.slice(),
+          sources: ['the day record'],
+          followUp: 'New lines append. This is not a rewrite.',
+          politicalWeight: 'record',
+          businessImpact: 'A named state in the day record is a state the markets will pretend they already understood.',
+          fromCareer: true
+        }));
+      }
+      if (facts.hist && facts.hist.length) {
+        leads.push(createStoryRecord({
+          title: 'Returns already filed',
+          section: 'history',
+          district: district,
+          date: dayLabel,
+          summary: 'What this place, or you, already returned. A small margin in hostile ground is a borrowed win.',
+          confirmed: facts.hist.map(function(h){ return h.line; }),
+          sources: ['the book of races'],
+          followUp: 'The next election night adds a line. It does not invent the years before the career.',
+          politicalWeight: 'electoral',
+          businessImpact: 'A safe margin spends like credit. A squeaker does not.',
+          fromCareer: true
+        }));
+      }
+    }
+
+    leads.push(createStoryRecord({
+      title: 'Desk sketch · the street register',
+      section: 'desk sketch',
+      district: district,
+      date: dayLabel,
+      summary: 'A stable sketch of shops for this day, priced off industry ' + ((facts && facts.state && facts.state.ind) || 'an assumed 50') + '. These are not transactions from the career, and they are not the 3D city.',
+      confirmed: ['The names and prices are generated from the day and the district so a refresh does not invent a new town.'],
+      claims: ['Residents may use “snow” for a shortage, “Main Street” for a complaint that has gone public, and “cold ledger” for a debt someone intends to collect.'],
+      uncertainty: 'Desk sketch. Not a career event.',
+      sources: ['the desk, not the save'],
+      followUp: 'When the career has a fact, it is printed above this sketch and marked as from the career.',
+      phraseKeys: ['snow', 'Main Street', 'cold ledger'],
+      politicalWeight: 'illustrative',
+      businessImpact: 'Indicative only.',
+      fromCareer: false
+    }));
+
+    var concerns = (districtInfo.concerns || []).slice();
+    if (facts && facts.state) {
+      concerns = [
+        'unrest ' + facts.state.unrest,
+        'industry ' + facts.state.ind,
+        'lean ' + facts.state.lean
+      ].concat(facts.state.bill ? ['statehouse: ' + facts.state.bill] : []).concat(concerns).slice(0, 7);
+    }
+    var mood = districtInfo.mood;
+    if (facts && facts.state) {
+      mood = 'From the career: unrest ' + facts.state.unrest + ', industry ' + facts.state.ind + ', lean ' + facts.state.lean + (facts.home && facts.town ? ', households ' + facts.town.mood : '') + '. The place itself is ' + districtInfo.mood;
+    }
 
     return {
       edition: (dayLabel || 'Current day'),
       district: district,
       districtProfile: profile,
-      mood: districtInfo.mood,
-      concerns: districtInfo.concerns,
+      mood: mood,
+      concerns: concerns,
       publicLife: districtInfo.publicLife,
       stories: leads,
+      fromCareer: leads.some(function(s){ return s.fromCareer; }),
       explanation: {
         phraseMap: districtInfo.phraseMap,
         localMeaning: function(phraseKey){ return explainPhrase(phraseKey, { district: district }); }
       },
-      localState: Object.assign({}, localState, {
+      localState: Object.assign({}, facts || {}, {
         crowding: profile.pulse.crowding,
         trade: profile.pulse.trade,
         tension: profile.pulse.tension,
@@ -54170,6 +54616,7 @@ armFrame();
     };
   }
 
+  ensureFlavors();
   var api = {
     DISTRICTS: DISTRICTS,
     BUSINESS_TYPES: BUSINESS_TYPES,
@@ -54258,9 +54705,15 @@ armFrame();
   }
 
   function findDistrict() {
+    try {
+      if (typeof root.onumLedgerFacts === 'function') {
+        var facts = root.onumLedgerFacts();
+        if (facts && facts.name) return facts.name;
+      }
+    } catch (ignore) {}
     var candidates = [];
     try {
-      if (root.G && root.G.you) candidates.push(root.G.you.district, root.G.you.homeDistrict, root.G.you.home);
+      if (root.G && root.G.you) candidates.push(root.G.you.state, root.G.you.district, root.G.you.homeDistrict, root.G.you.home);
       if (root.G) candidates.push(root.G.district, root.G.where);
       if (typeof root.onumDistrict === 'function') candidates.push(root.onumDistrict());
       candidates.push(root.ONUM_DISTRICT);
@@ -54269,14 +54722,49 @@ armFrame();
       var value = candidates[i];
       if (typeof value !== 'string') continue;
       if (API.DISTRICTS[value]) return value;
-      var found = DISTRICT_NAMES.find(function (name) { return name.toLowerCase() === value.toLowerCase(); });
+      var found = Object.keys(API.DISTRICTS).find(function (name) { return name.toLowerCase() === value.toLowerCase(); });
       if (found) return found;
+      if (/nieuw oranje/i.test(value)) return API.DISTRICTS['Nieuw Oranje'] ? 'Nieuw Oranje' : 'Nieuw Oranje VII';
     }
-    return DISTRICT_NAMES.indexOf('Nieuw Oranje VII') >= 0 ? 'Nieuw Oranje VII' : DISTRICT_NAMES[0];
+    return API.DISTRICTS['Nieuw Oranje'] ? 'Nieuw Oranje' : (Object.keys(API.DISTRICTS)[0] || 'Nieuw Oranje VII');
+  }
+  function districtNames() {
+    try {
+      if (typeof root.onumLedgerFacts === 'function') {
+        var facts = root.onumLedgerFacts();
+        if (facts && facts.states && facts.states.length) return facts.states.slice();
+      }
+    } catch (ignore) {}
+    return Object.keys(API.DISTRICTS);
+  }
+  function syncSelect() {
+    var select = document.getElementById('cldDistrict');
+    if (!select) return findDistrict();
+    var names = districtNames();
+    var cur = select.value || findDistrict();
+    if (names.indexOf(cur) < 0) cur = names.indexOf(findDistrict()) >= 0 ? findDistrict() : names[0];
+    var same = select.options.length === names.length;
+    if (same) {
+      for (var i = 0; i < names.length; i++) { if (select.options[i].value !== names[i]) { same = false; break; } }
+    }
+    if (!same) {
+      while (select.firstChild) select.removeChild(select.firstChild);
+      names.forEach(function (name) {
+        var option = node('option', '', name);
+        option.value = name;
+        select.appendChild(option);
+      });
+    }
+    select.value = cur;
+    return cur;
   }
 
   function dayLabel() {
     try {
+      if (typeof root.onumLedgerFacts === 'function') {
+        var facts = root.onumLedgerFacts();
+        if (facts && facts.day) return 'Day ' + facts.day;
+      }
       if (typeof root.onumDay === 'function') return String(root.onumDay());
       if (root.G && root.G.day != null) return 'Day ' + root.G.day;
       if (root.G && root.G.date) return String(root.G.date);
@@ -54354,7 +54842,8 @@ armFrame();
     var phrases = node('div'); phrases.id = 'cldPhrases'; aside.appendChild(phrases);
     columns.appendChild(aside);
     paper.appendChild(columns);
-    var notice = node('div', 'cld-notice', 'Prototype dispatch: sample stories and generated market listings are not yet connected to career events, transactions, saved state, or the 3D city.');
+    var notice = node('div', 'cld-notice', 'Open a career and this page reads the state, the polls, the mood, and the vote record. The market register stays a desk sketch.');
+    notice.id = 'cldNotice';
     paper.appendChild(notice);
     backdrop.appendChild(paper);
     backdrop.addEventListener('click', function (event) { if (event.target === backdrop) closeDialog(); });
@@ -54379,17 +54868,19 @@ armFrame();
   }
   function renderEdition() {
     var dialog = createDialog();
-    var district = document.getElementById('cldDistrict').value;
+    var district = syncSelect();
     var edition = dayLabel();
-    var data = API.buildLedgerEdition(edition, district, {});
+    var facts = null;
+    try { if (typeof root.onumLedgerFacts === 'function') facts = root.onumLedgerFacts(district); } catch (ignore) {}
+    var data = API.buildLedgerEdition(edition, district, facts || {});
     var mastDate = dialog.querySelector('.cld-date');
     clear(mastDate);
     append('span', '', district + ' · ' + edition, mastDate);
-    append('span', '', 'Public record · District reporting', mastDate);
+    append('span', '', data.fromCareer ? 'From the career' : 'Desk sketch · no career loaded', mastDate);
     var lead = document.getElementById('cldLead');
     clear(lead);
     var first = data.stories[0];
-    append('div', 'cld-label', 'Front page · ' + first.section, lead);
+    append('div', 'cld-label', (first.fromCareer ? 'From the career · ' : 'Desk sketch · ') + first.section, lead);
     append('h2', '', first.title, lead);
     append('p', 'cld-deck', first.summary, lead);
     append('p', 'cld-fine', 'What remains uncertain: ' + first.uncertainty, lead);
@@ -54397,7 +54888,7 @@ armFrame();
     clear(stories);
     data.stories.forEach(function (story) {
       var article = append('article', 'cld-story', null, stories);
-      append('div', 'cld-tag', story.section + ' · ' + story.date, article);
+      append('div', 'cld-tag', (story.fromCareer ? 'From the career · ' : 'Desk sketch · ') + story.section + ' · ' + story.date, article);
       append('h3', '', story.title, article);
       append('p', '', story.summary, article);
       append('p', 'cld-fine', 'Business effect: ' + story.businessImpact, article);
@@ -54422,15 +54913,22 @@ armFrame();
     data.districtProfile.businesses.forEach(function (business) {
       var row = append('div', 'cld-business', null, businesses);
       append('b', '', business.owner + ' · ' + business.type, row);
-      append('div', 'cld-fine', 'Indicative price ' + business.prices.recent + ' · stock ' + business.stock + ' · ' + business.workers + ' workers · pressures: ' + business.pressures.join(', '), row);
+      append('div', 'cld-fine', 'Indicative price ' + business.prices.recent + ' · stock ' + business.stock + ' · ' + business.workers + ' workers · desk sketch', row);
     });
     var phrases = document.getElementById('cldPhrases'); clear(phrases);
-    Object.keys(data.districtProfile.phraseMap).forEach(function (key) {
+    Object.keys(data.districtProfile.phraseMap || {}).forEach(function (key) {
       var button = append('button', '', 'Explain “' + key + '”', phrases);
       button.type = 'button';
       button.addEventListener('click', function () { showPhrase(key, district); });
     });
-    showPhrase(first.phraseKeys[0] || 'snow', district);
+    var notice = document.getElementById('cldNotice');
+    if (notice) {
+      var n = data.stories.filter(function (s) { return s.fromCareer; }).length;
+      text(notice, n
+        ? (n + ' items on this page are taken from the career: the count, the mood, the households, the roll calls, and the day record. The market register is a desk sketch. Its prices follow the state\'s industry and stay put for the day. They are not money you spent, and they are not the 3D city.')
+        : 'No career is loaded, so this edition is a desk sketch. Start or import a career and the same page will read the state, the polls, the mood, and the votes.');
+    }
+    showPhrase((first.phraseKeys && first.phraseKeys[0]) || 'snow', district);
   }
   function openDialog() {
     var dialog = createDialog();
