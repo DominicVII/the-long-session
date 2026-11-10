@@ -4,6 +4,17 @@ Neptune owned: visuals, the visible world, offices' look, LiveTalk/voices, the L
 JUPITER owns systems (procedure/clock, offices + ONUM_OFFICE_HISTORY, family sim, regions, Engine charter/audit, saves, powers, war). MARS owns QA + onumCandid. Don't edit another owner's systems; guard every cross-owner call.
 
 
+## 20261110bw — Continue opens the archived career after an oath wipe (on bu `3ad2c56`)
+
+MARS S1 on bv: after the oath wipes the active slot, Continue still named the 380-day career from the sidecar, then `loadSave()` failed because it only reads the active keys.
+
+- Presentation and loader wiring only, stacked on bu (`3ad2c56`). Did not change archive/wipe logic or JUPITER's `stamp:"20261110bv"` API fields. `brEasy*` / `nlPromptFit*` / `nnQol*` / `boLookCss` byte-identical.
+- `cardActContinue`: if `loadSave()` cannot open an active sitting and `ONUM_CAREERS.peek().slot` is an archive id, call `ONUM_CAREERS.restore(slot)` then `loadSave()` again. `restore` already skips `archiveCurrent` when the active slot is empty (`{ok:true, empty:true}`), so no empty or garbage archive is created.
+- Continue keeps its label and default focus. Back stays primary on the confirm card.
+- `showContinueBroken` offers **Restore from Earlier careers** as the primary action when archives exist (Start a new career stays secondary). A failed Earlier-careers restore keeps a clear message and Back to the list, instead of a dead end.
+- Stamp `20261110bw` in `src/lib/onum-build.ts` and the HTML stamp lines (meta, `onumLimDump`, cache `STAMP`). All six mirrors updated (`public/session.html` still differs only by the `../neptune/` path).
+- Left for MARS: re-CODE of the New career → oath → wipe → reload-before-first-save path, including IDB-only and backup-key-only archives, the same case via Earlier careers → Restore, and `?limits=classic`. LIVE stays parked until a public URL serves the build.
+
 ## 20261110bu — title screen + prompt presentation (on bv `2eeec08`)
 
 Dominic: starting a game said he must start a new career, then warned it would delete his 380-day career. Continuity is the biggest part.
