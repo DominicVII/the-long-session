@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261110bx">
+<meta name="onum-build" content="20261111a">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -46,7 +46,7 @@
   window.onumLimSet = function(k, v){ if(!(k in D)) return false; L[k] = fix(v); try{ var o = JSON.parse(localStorage.getItem("onum.limits") || "{}") || {}; o[k] = (L[k] === INF) ? null : L[k]; localStorage.setItem("onum.limits", JSON.stringify(o)); }catch(e){} return true; };
   window.onumLimReset = function(){ try{ localStorage.removeItem("onum.limits"); }catch(e){} Object.keys(D).forEach(function(k){ L[k] = D[k]; }); L._eff = {}; L._gov = null; return true; };
   var show = function(v){ return v === INF ? "inf" : (typeof v === "number" ? Math.round(v * 100) / 100 : v); };
-  window.onumLimDump = function(){ var out = {build:"20261110bx", mode:L.mode || "scale"}; Object.keys(D).forEach(function(k){ out[k] = show(L[k]); });
+  window.onumLimDump = function(){ var out = {build:"20261111a", mode:L.mode || "scale"}; Object.keys(D).forEach(function(k){ out[k] = show(L[k]); });
     out.effective = {}; Object.keys(L._eff).forEach(function(k){ out.effective[k] = show(L._eff[k]); }); out.governor = L._gov;
     try{ out.engineBudgetMs = window.onumEngine ? show(window.onumEngine.budget) : null; out.frameMs = window.onumEngine ? show(window.onumEngine.dtEma) : null; }catch(e){} return out; };
   window.onumLimLine = function(){ var d = window.onumLimDump(), e = d.effective, g = function(k){ return e[k] != null ? e[k] + "*" : d[k]; };
@@ -71,7 +71,7 @@
 </script>
 <script>
 (function(){
-  var STAMP = "20261110bx";
+  var STAMP = "20261111a";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -3713,6 +3713,7 @@ renderer.domElement.addEventListener("webglcontextlost", ev => {
   if(window.console) console.warn("webgl context lost — waiting to restore");
 }, false);
 renderer.domElement.addEventListener("webglcontextrestored", () => {
+  try{ SSAO.rt = null; }catch(e){}   /* 20261111a */
   GL_LOST = false; GL_RECOVERING = true;
   try{
     renderer.shadowMap.needsUpdate = true;
@@ -42876,6 +42877,86 @@ const ONUM_PROF = (() => {
   return api;
 })();
 
+/* 20261111a · 20261030ap (JUPITER): real SSAO in the shared main loop. Two passes after the opaque scene:
+   (1) AO factor into a half-res target (4x4 interleaved spiral, no per-pixel white noise),
+   (2) composite: 4 bilinear taps = 4x4 box blur of AO (cancels the interleave pattern), then multiply.
+   Needs WebGL2 or WEBGL_depth_texture; otherwise plain render.
+   Tunables: ?ssao=0 off · ?ssao=4|8|12 samples · G.ssao = {on,n,r,k}. Default 8 samples; MODEST 4. */
+const SSAO = { on: true, n: 8, r: 0.9, k: 0.55, scale: 1, rt: null, ao: null, mA: null, mC: null, q: null, sc: null, oc: null, w: 0, h: 0, bad: false };
+try{
+  const q = new URLSearchParams(location.search).get("ssao");
+  if(q === "0") SSAO.on = false; else if(q && +q > 0) SSAO.n = Math.min(16, +q | 0);
+  if(typeof MODEST !== "undefined" && MODEST){ SSAO.n = Math.min(SSAO.n, 4); SSAO.scale = 0.75; }
+}catch(e){}
+function ssaoInit(){
+  const gl = renderer.getContext();
+  const isGL2 = (typeof WebGL2RenderingContext !== "undefined") && gl instanceof WebGL2RenderingContext;
+  if(!isGL2 && !gl.getExtension("WEBGL_depth_texture")){ SSAO.bad = true; return false; }
+  const lin = { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, format: THREE.RGBAFormat, stencilBuffer: false };
+  SSAO.rt = new THREE.WebGLRenderTarget(2, 2, Object.assign({ depthBuffer: true }, lin));
+  SSAO.rt.texture.encoding = THREE.sRGBEncoding;
+  SSAO.rt.depthTexture = new THREE.DepthTexture();
+  SSAO.rt.depthTexture.type = THREE.UnsignedShortType;
+  SSAO.ao = new THREE.WebGLRenderTarget(2, 2, Object.assign({ depthBuffer: false }, lin));
+  const vs = "varying vec2 v; void main(){ v = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }";
+  SSAO.mA = new THREE.ShaderMaterial({
+    defines: { N: SSAO.n },
+    uniforms: { tD: { value: SSAO.rt.depthTexture }, res: { value: new THREE.Vector2() }, cn: { value: 0.1 }, cf: { value: 100 }, rad: { value: SSAO.r }, k: { value: SSAO.k } },
+    vertexShader: vs,
+    fragmentShader: [
+      "uniform sampler2D tD; uniform vec2 res; uniform float cn, cf, rad, k; varying vec2 v;",
+      "float lz(vec2 p){ float d = texture2D(tD, p).x; return cn*cf / (cf - d*(cf-cn)); }",
+      "void main(){",
+      "  float z = lz(v); if(z > cf*0.98){ gl_FragColor = vec4(1.0); return; }",
+      "  vec2 ip = mod(floor(v*res), 4.0);",
+      "  float a = (ip.x*4.0 + mod(ip.y*2.0 + ip.x, 4.0) + ip.y*0.25) * 0.3927;",
+      "  float rr = rad / z; float occ = 0.0;",
+      "  for(int i = 0; i < N; i++){",
+      "    float f = (float(i)+0.5)/float(N); float ang = a + float(i)*2.3999;",
+      "    vec2 o = vec2(cos(ang), sin(ang)) * rr * sqrt(f);",
+      "    float dz = z - lz(v + o);",
+      "    occ += smoothstep(0.03, 0.12, dz) * (1.0 - smoothstep(rad*0.6, rad*1.6, dz));",
+      "  }",
+      "  gl_FragColor = vec4(vec3(1.0 - k * occ / float(N)), 1.0);",
+      "}"].join("\n"),
+    depthTest: false, depthWrite: false
+  });
+  SSAO.mC = new THREE.ShaderMaterial({
+    uniforms: { tC: { value: SSAO.rt.texture }, tA: { value: SSAO.ao.texture }, px: { value: new THREE.Vector2() } },
+    vertexShader: vs,
+    fragmentShader: [
+      "uniform sampler2D tC, tA; uniform vec2 px; varying vec2 v;",
+      "void main(){",
+      "  vec4 c = texture2D(tC, v);",
+      "  float ao = 0.25 * (texture2D(tA, v + px*vec2(-1.0,-1.0)).r + texture2D(tA, v + px*vec2(1.0,-1.0)).r",
+      "                  + texture2D(tA, v + px*vec2(-1.0, 1.0)).r + texture2D(tA, v + px*vec2(1.0, 1.0)).r);",
+      "  gl_FragColor = vec4(c.rgb * clamp(ao, 0.5, 1.0), c.a);",
+      "}"].join("\n"),
+    depthTest: false, depthWrite: false
+  });
+  SSAO.q = new THREE.Mesh(new THREE.PlaneBufferGeometry(2, 2), SSAO.mA);
+  SSAO.q.frustumCulled = false;
+  SSAO.sc = new THREE.Scene(); SSAO.sc.add(SSAO.q);
+  SSAO.oc = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+  return true;
+}
+/* Drop-in for renderer.render(scene, camera) in the main path. */
+function ssaoRender(sc, cm){
+  const S = (typeof G !== "undefined" && G.ssao) ? Object.assign(SSAO, G.ssao) : SSAO;
+  if(!S.on || S.bad || !cm.isPerspectiveCamera || (!S.rt && !ssaoInit())){ renderer.render(sc, cm); return; }
+  const sz = renderer.getDrawingBufferSize(new THREE.Vector2());
+  const w = Math.max(2, sz.x | 0), h = Math.max(2, sz.y | 0);
+  const aw = Math.max(2, w * 0.5 * S.scale | 0), ah = Math.max(2, h * 0.5 * S.scale | 0);
+  if(w !== S.w || h !== S.h){ S.rt.setSize(w, h); S.ao.setSize(aw, ah); S.w = w; S.h = h; }
+  const u = S.mA.uniforms;
+  u.res.value.set(aw, ah); u.cn.value = cm.near; u.cf.value = cm.far; u.rad.value = S.r; u.k.value = S.k;
+  if(S.mA.defines.N !== S.n){ S.mA.defines.N = S.n; S.mA.needsUpdate = true; }
+  S.mC.uniforms.px.value.set(1 / aw, 1 / ah);
+  renderer.setRenderTarget(S.rt); renderer.render(sc, cm);
+  S.q.material = S.mA; renderer.setRenderTarget(S.ao); renderer.render(S.sc, S.oc);
+  S.q.material = S.mC; renderer.setRenderTarget(null); renderer.render(S.sc, S.oc);
+}
+
 function frame(now){
   if(GL_LOST){ last = now; armFrame(); return; }
   if(typeof document !== "undefined" && document.hidden){ armFrame(); return; }
@@ -43115,7 +43196,7 @@ function frameBody(now, draw){
   if(_prof) _prof.mark("shadow");
   if(!GL_LOST){
     let _ndg = false; try{ _ndg = ndGate(); }catch(e){}
-    if(!_ndg) try{ renderer.render(scene, camera); }
+    if(!_ndg) try{ ssaoRender(scene, camera); }   /* 20261111a */
     catch(e){
       if(window.console && !frameFailLogged){ frameFailLogged = true; console.error("render error", e); }
     }
