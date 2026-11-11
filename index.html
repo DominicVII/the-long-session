@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261111b">
+<meta name="onum-build" content="20261111c">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -46,7 +46,7 @@
   window.onumLimSet = function(k, v){ if(!(k in D)) return false; L[k] = fix(v); try{ var o = JSON.parse(localStorage.getItem("onum.limits") || "{}") || {}; o[k] = (L[k] === INF) ? null : L[k]; localStorage.setItem("onum.limits", JSON.stringify(o)); }catch(e){} return true; };
   window.onumLimReset = function(){ try{ localStorage.removeItem("onum.limits"); }catch(e){} Object.keys(D).forEach(function(k){ L[k] = D[k]; }); L._eff = {}; L._gov = null; return true; };
   var show = function(v){ return v === INF ? "inf" : (typeof v === "number" ? Math.round(v * 100) / 100 : v); };
-  window.onumLimDump = function(){ var out = {build:"20261111b", mode:L.mode || "scale"}; Object.keys(D).forEach(function(k){ out[k] = show(L[k]); });
+  window.onumLimDump = function(){ var out = {build:"20261111c", mode:L.mode || "scale"}; Object.keys(D).forEach(function(k){ out[k] = show(L[k]); });
     out.effective = {}; Object.keys(L._eff).forEach(function(k){ out.effective[k] = show(L._eff[k]); }); out.governor = L._gov;
     try{ out.engineBudgetMs = window.onumEngine ? show(window.onumEngine.budget) : null; out.frameMs = window.onumEngine ? show(window.onumEngine.dtEma) : null; }catch(e){} return out; };
   window.onumLimLine = function(){ var d = window.onumLimDump(), e = d.effective, g = function(k){ return e[k] != null ? e[k] + "*" : d[k]; };
@@ -71,7 +71,7 @@
 </script>
 <script>
 (function(){
-  var STAMP = "20261111b";
+  var STAMP = "20261111c";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -899,7 +899,7 @@ body.boot-menu .shell{grid-template-rows:minmax(0,1fr)}
 .np{font-family:Georgia,"Times New Roman",serif;color:var(--ink,#e8e4d8)}
 .np__mast{text-align:center;margin-bottom:8px}.np__mast h1{font:700 clamp(28px,6vw,44px)/1.05 "Instrument Serif",Georgia,serif;letter-spacing:.02em;margin:6px 0;text-transform:none}
 .np__rule{border-top:3px double currentColor;opacity:.7}.np__dateline{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font:11px Archivo,system-ui,sans-serif;letter-spacing:.12em;text-transform:uppercase;opacity:.75;padding:4px 0}
-.np__lead{font:700 clamp(22px,4.4vw,32px)/1.12 Georgia,serif;margin:10px 0 4px;text-align:center}.np__deck{text-align:center;font-style:italic;opacity:.8;margin:0 0 10px}
+.np__lead{font:700 clamp(22px,4.4vw,32px)/1.12 Georgia,serif;margin:10px 0 4px;text-align:center}.np__deck{text-align:center;font-style:italic;opacity:.8;margin:0 0 10px}.np__matter{text-align:left;font:16px/1.45 Georgia,serif;margin:0 0 14px;max-width:68ch}
 .np__cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:0;border-top:1px solid currentColor;margin-top:8px}
 .np__col{padding:8px 12px;border-left:1px solid rgba(160,160,160,.35);font-size:14px;line-height:1.4}.np__col:first-child{border-left:0;padding-left:0}
 .np__col h3{font:700 12px Archivo,system-ui,sans-serif;letter-spacing:.12em;text-transform:uppercase;margin:0 0 6px;border-bottom:1px solid rgba(160,160,160,.4);padding-bottom:3px}.np__col h3 small{display:block;font:italic 11px Georgia,serif;letter-spacing:0;text-transform:none;opacity:.7}
@@ -18012,6 +18012,17 @@ function focusThing(){
   if(nb) return {type:"person", ref:nb};
   return null;
 }
+/* 20261111c: a target has to be gone for a moment before the prompt drops, and a new one has to hold before it steals the line. */
+{ const _focusThing = focusThing; let _fh = null, _fhAt = 0;
+  focusThing = function(){
+    const now = (typeof performance !== "undefined") ? performance.now() : Date.now();
+    let raw = null; try{ raw = _focusThing(); }catch(e){ raw = null; }
+    if(raw && _fh && raw.type === _fh.type && raw.ref === _fh.ref){ _fhAt = now; return _fh; }
+    if(raw){ if(!_fh || now - _fhAt > 140){ _fh = raw; _fhAt = now; return _fh; } return _fh; }
+    if(_fh && now - _fhAt < 520) return _fh;
+    _fh = null; return null;
+  };
+}
 function personInTalkRange(){
   const p = focusTarget();
   if(!p) return null;
@@ -28303,7 +28314,7 @@ function catchFrame(dt){
   /* 20261104bf A1: standing still in the stand zone arms the solo catch itself; Press-E is no longer required (it was stolen by adjacent members) */
   const _soloOpen = !PROC.on || (PROC.phase === "open" && !PROC.speaker); /* 20261104bl A1: open floor, nobody up = solo catch */
   if(atStand && _soloOpen && !CATCH.on && !CATCH.suppressed && !CATCH.armedByInteract) CATCH.armedByInteract = true;
-  if(hard || CATCH.on || CATCH.armedByInteract){ try{ if(AP.toast){ AP.toast.remove(); AP.toast = null; } }catch(e){} }
+  if(CATCH.on){ try{ if(AP.toast){ AP.toast.remove(); AP.toast = null; } }catch(e){} }   /* 20261111c: only the live catch glass takes the toast. Proximity alone was popping Talk and throwing it away. */
   /* Armed by E at the stand; walking off before you arrive drops it */
   if(CATCH.armedByInteract && !CATCH.on && !hard && !G.speechApproach){
     CATCH.armedByInteract = false;
@@ -28613,7 +28624,12 @@ function updatePrompt(thing, dr, seat){
     if(hardStand && !TALK.open && !(PROC.on && PROC.phase !== "you" && PROC.speaker && !CATCH.armedByInteract)){
       if(CATCH.on || CATCH.armedByInteract || G.speechApproach || (hardStand.dist != null && hardStand.dist <= 1.85)){
         /* catchFrame / earlier branches own the glass — skip person Press-E */
-        if(thing && thing.type === "person"){ /* 20261104bl A1: drop stale "Press E to speak with …" hm-p */ try{ const pr = el("prompt"); if(pr && !pr.classList.contains("is-catch") && /Press E to speak/.test(pr.textContent || "")) setGlassPrompt(null, null); }catch(e){} markPicks(); return; }
+        if(thing && thing.type === "person"){
+          const pr = el("prompt");
+          if(pr && pr.classList.contains("is-live")){ markPicks(); return; }
+          setGlassPrompt("At the stand", []);
+          markPicks(); return;
+        }
       }
     }
   }catch(e){}
@@ -39126,7 +39142,7 @@ function lLog(text, kind){
   const you = !!G._lNote; G._lNote = false;
   if(!text || text.length < 14 || L_NOT_NEWS.test(text)) return;
   G.daylog = G.daylog || [];
-  G.daylog.push({d:G.day, t:String(text).slice(0, 220), k:kind || "", you});
+  G.daylog.push({d:G.day, t:String(text).slice(0, 420), k:kind || "", you});
   if(G.daylog.length > onumLim(180,"hist")) G.daylog.splice(0, G.daylog.length - onumLim(180,"hist"));
 }
 function lScore(x){
@@ -39141,7 +39157,7 @@ function lScore(x){
 }
 function lHeadline(t){
   t = String(t).replace(/\s+/g, " ").trim();
-  if(t.length > 110) t = t.slice(0, 107).replace(/\s+\S*$/, "") + "...";
+  if(t.length > 240) t = t.slice(0, 237).replace(/\s+\S*$/, "") + "…";
   return t;
 }
 function paperBuild(){
@@ -39166,7 +39182,7 @@ function paperBuild(){
   return {
     day:D,
     head: top ? lHeadline(top.t) : (G.bill && !G.bill.done ? "The House turns to " + G.bill.title : "A quiet day in the Capitol"),
-    stories: all.slice(1, 5).map(x => lHeadline(x.t)),
+    stories: all.slice(1, 8).map(x => lHeadline(x.t)),
     rival: rl && D - rl.d <= 2 ? rl.t : null,
     letter: letter ? letter.t : null,
     wx: wxLine(),
@@ -39186,6 +39202,31 @@ function npSpin(party, headline, r){
     COM:["At whose expense? " + h, "The people were not asked: " + h, "A hollow win: " + h + ", and the bill arrives later"]
   };
   return drawn(f[party], r);
+}
+function npMatter(){
+  const y = G.you, bits = [];
+  try{
+    if(G.bill && !G.bill.done){
+      bits.push("Before the House is " + G.bill.title + (G.bill.line ? ". " + G.bill.line : "."));
+      if(G.bill.voteDay) bits.push("The clerk has the roll down for day " + G.bill.voteDay + ".");
+      if(G.bill.sponsor) bits.push("It came in under " + G.bill.sponsor + (G.bill.sponsorParty ? " (" + G.bill.sponsorParty + ")" : "") + ".");
+    }
+  }catch(e){}
+  try{
+    const T = townEnsure();
+    const hh = (T && T.hh) ? T.hh.slice().sort((a, b) => (a.mood || 50) - (b.mood || 50)) : [];
+    const hot = hh[0], warm = hh[hh.length - 1];
+    if(hot) bits.push("The " + hot.fam + "s on " + hot.street + " are " + (hot.mood < 40 ? "sore" : hot.mood > 65 ? "with you" : "still making up their minds") + (hot.need ? ", and what they want said is " + hot.need : "") + (hot.mem && hot.mem.length ? ". Last thing they remember: " + hot.mem[hot.mem.length - 1].t : "."));
+    if(warm && warm !== hot) bits.push("The " + warm.fam + "s, same district, are the other way: " + (warm.mood > 65 ? "they will say your name kindly" : "they are watching") + ".");
+  }catch(e){}
+  try{
+    if(y) bits.push(surname(y.name) + " wakes at " + Math.round(y.approval) + " at home and " + Math.round(y.standing) + " in the building" + (y.margin != null ? ", last margin " + Math.round(y.margin) : "") + ".");
+  }catch(e){}
+  try{
+    const r = rivalLive();
+    if(r) bits.push(surname(r.name) + " is still in it. Heat " + Math.round(r.heat || 0) + ", " + (["words in the cloakroom", "words in the paper", "radio time at home", "working against you", "funding a challenger", "the reckoning"][Math.min(5, r.stage | 0)] || "unsettled") + ".");
+  }catch(e){}
+  return bits.join(" ");
 }
 function npHTML(){
   const P = paperBuild(), D = G.day, y = G.you, r = rng(seedOf("np:" + D + ":" + (G.country || "")));
@@ -39219,7 +39260,7 @@ function npHTML(){
   const ind = col("From the independents", (letters.length ? letters.map(l => '<p class="np__q">“' + pcEsc(l.t) + '” <small>— the ' + pcEsc(l.fam) + 's, ' + pcEsc(l.street) + '</small></p>').join("") : '<p class="np__q">“Nobody writes when it is quiet, and nobody writes when it is bad. It is neither this week.” <small>— a reader</small></p>') + '<p class="np__q">“' + pcEsc(drawn(["The bread price is the only poll I trust.", "I do not care which party, only that they come to our road.", "My pastor says wait. My landlord says pay. I will do the second.", "If the sums were honest, the speeches would be shorter."], r)) + '” <small>— on the omnibus, overheard</small></p>');
   return '<div class="np">' +
     '<div class="np__mast"><div class="np__rule"></div><h1>The Capitol Ledger</h1><div class="np__dateline"><span>' + dateString() + '</span><span>' + pcEsc((G.country && G.country.name) || "Nieuw Oranje 7") + '</span><span>five cents</span></div><div class="np__rule"></div></div>' +
-    '<h2 class="np__lead">' + pcEsc(lead) + '</h2><p class="np__deck">' + pcEsc(P.wx) + '</p>' +
+    '<h2 class="np__lead">' + pcEsc(lead) + '</h2><p class="np__deck">' + pcEsc(P.wx) + '</p><p class="np__matter">' + pcEsc(npMatter() || "The galleries were thin and the clerks went home on time.") + '</p>' +
     '<div class="np__cols">' +
       col("The day", (stories.length ? stories.map(x => '<p>' + pcEsc(x) + '</p>').join("") : '<p>The galleries were thin and the clerks went home on time.</p>') + (P.rival ? '<p><strong>The feud:</strong> ' + pcEsc(P.rival) + '</p>' : '')) +
       col("Around the Union", small(around.map((x, i) => [["Unrest", "Industry", "Statehouse", "Statehouse", "Statehouse"][i] || "Notes", x]))) +
@@ -44475,7 +44516,7 @@ try{
   };
 
   /* loader */
-  const base = (() => { try{ return new URL("../neptune/", location.href).href; }catch(e){ return "../neptune/"; } })();
+  const base = (() => { try{ return new URL("neptune/", new URL(".", location.href)).href; }catch(e){ return "neptune/"; } })();   /* 20261111c: next to the page, not one folder up. GitHub Pages lives in a subpath; ../neptune/ missed it and the box people came back. */
   const sc = document.createElement("script"); sc.src = base + "onum-office-amenities.js"; sc.onerror = () => console.warn("NEPTUNE: amenities not loaded"); document.head.appendChild(sc);
   /* 20261030n: walls/blocked props everywhere: the furniture runtime fixes (neptune/FURNITURE-QA.md: props through walls, radiator in doorways, in-wall ledges, off-wall TV) were written but never loaded. Look-only; collision untouched. */
   { const ff = document.createElement("script"); ff.src = base + "onum-furniture-fixes.js"; ff.onerror = () => console.warn("NEPTUNE: furniture fixes not loaded"); document.head.appendChild(ff); }

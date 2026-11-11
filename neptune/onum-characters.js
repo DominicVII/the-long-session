@@ -484,8 +484,8 @@ export function makeCharacter(THREE, opts = {}) {
     const sp = surf(shape, sx * 0.33, ey, 0.94); const c = new T.Vector3(sp.x, sp.y, sp.z - 0.0089);
     const eg = new T.Group(); eg.position.copy(c); headPivot.add(eg); eyes.push(eg);
     add(eg, cached(geoCache, 'eyeball' + q, () => weld(new T.SphereGeometry(0.0127, 20, 14))), eyeW, 0, 0, 0, faceFine);
-    add(eg, cached(geoCache, 'iris', () => new T.CircleGeometry(0.0076, 24)), irisM, 0, 0, 0.0122, faceFine);
-    add(eg, cached(geoCache, 'pupil', () => new T.CircleGeometry(0.0029, 14)), pupM, 0, 0, 0.0125, faceFine);
+    add(eg, cached(geoCache, 'iris2', () => new T.CircleGeometry(0.0088, 24)), irisM, 0, 0, 0.0122, faceFine);
+    add(eg, cached(geoCache, 'pupil2', () => new T.CircleGeometry(0.0034, 14)), pupM, 0, 0, 0.0125, faceFine);
     for (const up of [1, -1]) {   // eyelids: skin shells that hug the eyeball, with a lash line on the edge
       const lg = new T.Group(); lg.position.copy(c); lg.rotation.z = -sx * (S.face.tilt + (up > 0 ? 0 : 0.05)); headPivot.add(lg);
       const lr = new T.Group(); lg.add(lr);
@@ -698,6 +698,11 @@ export function makeCharacter(THREE, opts = {}) {
 
   // ---------- dress code: uniform extras, or the home-state lapel pin ----------
   const frontZ = (y) => { let a = tp[0]; for (const t of tp) if (t[0] <= y) a = t; return a[2] * (jacket ? 1.06 : 1) + (jacket ? 0.012 : vest ? 0.006 : 0) + (a[3] || 0); };
+  if (jacket) {   /* 20261111c: a pocket square so the jacket reads as tailored, not a coloured loft */
+    const py = 0.34, px = fem ? -0.062 : 0.062;
+    add(torso, cached(geoCache, 'breastpkt', () => new T.BoxGeometry(0.034, 0.006, 0.01)), suitM, px, py, frontZ(py) + 0.004);
+    add(torso, cached(geoCache, 'pocksq', () => new T.BoxGeometry(0.026, 0.016, 0.004)), shirtM, px, py + 0.012, frontZ(py) + 0.01);
+  }
   const U = S.uniform, solid = (hex, rough = 0.5, metal = 0) => stdMat('u' + hex + '|' + rough + '|' + metal, { color: lin(hex), roughness: rough, metalness: metal });
   const goldM = solid(0xd4a64a, 0.3, 1);
   if (U) {
@@ -780,8 +785,8 @@ export function makeCharacter(THREE, opts = {}) {
   function setLod(l) {
     if (l === st.lod) return; st.lod = l;
     rig.visible = l < 3; proxy.visible = l >= 3 && st.sit < 0.5; proxySit.visible = l >= 3 && st.sit >= 0.5;
-    for (const m of faceFine) m.visible = l <= 1 || (l === 2 && m.material === hairM);
-    for (const m of bodyFine) m.visible = l === 0;
+    for (const m of faceFine){ const card = m.material && m.material.alphaTest > 0.2; m.visible = card ? l <= 1 : l < 3; }   /* 20261111c: hair cards still thin out; eyes, lids, lips and brows stay until the far proxy */
+    for (const m of bodyFine) m.visible = l <= 1;   /* buttons, cuffs, medals readable across the chamber, not only under 3.5 m */
   }
   function update(dt, state = {}) {
     dt = Math.min(dt || 0, 0.1); st.t += dt;
@@ -791,7 +796,7 @@ export function makeCharacter(THREE, opts = {}) {
     if (d == null && viewCam) { root.getWorldPosition(v3); cam.getWorldPosition(st.cw || (st.cw = new T.Vector3())); d = v3.distanceTo(st.cw); }
     if (d == null && cam && !viewCam && st.lod >= 0) d = st.lastD;   // keep the last view-camera LOD
     if (d != null) st.lastD = d;
-    const lodD = opts.lodDistances || [3.5, 10, 30];
+    const lodD = opts.lodDistances || [7, 16, 34];   /* 20261111c: eyes, mouth and buttons stayed on past a conversation. The old 3.5 m cut made a finished suit look blank across a room. */
     const hy = (i) => lodD[i] * (st.lod > i ? 0.92 : 1.0);   // 8% hysteresis: no flicker at a band edge
     setLod(state.lod != null ? state.lod : d == null ? (st.lod < 0 ? 0 : st.lod) : d < hy(0) ? 0 : d < hy(1) ? 1 : d < hy(2) ? 2 : 3);
     const sitT = state.sitting ? 1 : 0; st.sit += (sitT - st.sit) * Math.min(1, dt * 2.6);   // lowering into a chair or rising takes most of a second if (dt === 0 || state.snap) st.sit = sitT;
