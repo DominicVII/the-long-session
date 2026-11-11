@@ -38,7 +38,7 @@ const DEEPEN = 1.55;
 function deepen(c) { if (MODE === 'game') { c.r = Math.pow(c.r, DEEPEN); c.g = Math.pow(c.g, DEEPEN); c.b = Math.pow(c.b, DEEPEN); } return c; }
 function lin(hex) { const c = new T.Color(hex); return MODE === 'linear' ? c.convertSRGBToLinear() : deepen(c); }
 // skin needs more of the way: raw, the light tones carried so much green and blue that they lit up white
-function deepenSkin(c) { if (MODE === 'game') { const l = (c.r + c.g + c.b) / 3, k = 1.55 + 0.55 * Math.max(0, l - 0.45) / 0.45; c.r = Math.pow(c.r, k); c.g = Math.pow(c.g, k + 0.12); c.b = Math.pow(c.b, k + 0.16); } return c; }   // light tones get the most correction, deep tones the least
+function deepenSkin(c) { if (MODE === 'game') { const l = (c.r + c.g + c.b) / 3, k = 1.55 + 0.55 * Math.max(0, l - 0.45) / 0.45; c.r = Math.pow(c.r, k); c.g = Math.pow(c.g, k + 0.09); c.b = Math.pow(c.b, k + 0.12);   /* 20261030aw: lighter tones less orange */ } return c; }   // light tones get the most correction, deep tones the least
 function linSkin(hex) { const c = new T.Color(hex); return MODE === 'linear' ? c.convertSRGBToLinear() : deepenSkin(c); }
 function texEnc(t) { if (MODE === 'linear') { if ('colorSpace' in t && T.SRGBColorSpace) t.colorSpace = T.SRGBColorSpace; else t.encoding = T.sRGBEncoding; } return t; }
 
@@ -67,7 +67,7 @@ function heightToNormal(W, H, h, str) { const n = new Float32Array(W * H * 4);
 // Cached per skin tone x sex x beard-shadow x quality (not per person) to keep memory flat.
 function headSkinMat(S, q) {
   const shadow = S.fem ? 0 : (S.beard === 'full' || S.beard === 'short') ? 0.6 : S.beard === 'stubble' ? 1 : 0.45;
-  const key = 'headskin7' + S.skin + (S.fem ? 'f' : 'm') + shadow + q + MODE;
+  const key = 'headskin9' + S.skin + (S.fem ? 'f' : 'm') + shadow + q + MODE;
   return cached(matCache, key, () => {
     const W = q === 'high' ? 512 : q === 'med' ? 256 : 128, H = W / 2, base = deepenSkin(new T.Color(S.skin));
     const dark = (base.r + base.g + base.b) / 3 < 0.45;
@@ -83,16 +83,16 @@ function headSkinMat(S, q) {
       const pore = vn3(nx * 140, ny * 140, nz * 140, 7), pore2 = vn3(nx * 70, ny * 70, nz * 70, 8);
       const stub = vn3(nx * 220, ny * 220, nz * 220, 9);
       let r = base.r, g = base.g, b = base.b;
-      const rk = dark ? 0.5 : 1 + 0.9 * clamp(((base.r + base.g + base.b) / 3 - 0.45) / 0.3);   // fair skin shows the blood in cheeks, nose and ears most
-      r *= 1 + 0.05 * red * rk; g *= 1 - 0.12 * red * rk; b *= 1 - 0.10 * red * rk;
+      const rk = dark ? 0.5 : 1 + 0.35 * clamp(((base.r + base.g + base.b) / 3 - 0.45) / 0.3);   /* 20261030ax: fair skin flushes, not pink patches */   // fair skin shows the blood in cheeks, nose and ears most
+      r *= 1 + 0.035 * red * rk; g *= 1 - 0.085 * red * rk; b *= 1 - 0.07 * red * rk;
       r *= 1 - 0.10 * under; g *= 1 - 0.12 * under; b *= 1 - 0.06 * under; { const ysk = G2(ax - 0.33, ny - 0.12, 0.10) * fr, ybr = G2(ax - 0.30, ny - 0.215, 0.05) * fr, ych = G2(ax - 0.55, ny + 0.3, 0.13) * fr, yjw = sstep(-0.5, -0.85, ny) * sstep(-0.2, 0.3, nz), ytm = G2(ax - 0.75, ny - 0.15, 0.12) * fr;   /* 20261030ad: painted sockets, under-brow, cheek hollow, temple and under-jaw shade: the face holds its planes at 6-10 m */
       const yao = G2(ax - 0.17, ny - 0.1, 0.045) * fr + 0.8 * G2(ax - 0.15, ny + 0.34, 0.04) * fr + sstep(-0.62, -0.9, ny) * sstep(0.0, 0.4, nz) * 0.9;   /* 20261030af: crease occlusion (inner eye corners, nasolabial, under chin) */
-      /* 20261030ao: side/cheek face planes */ const ysh = 1 - 0.4 * sstep(0.42, 0.8, ax) * sstep(-0.45, 0.25, ny) - 0.18 * sstep(0.0, -0.3, ny) * sstep(0.22, 0.6, ax) - 0.5 * yao - 0.52 * ysk - 0.42 * ybr - 0.16 * ych - 0.16 * ytm - 0.5 * yjw - 0.22 * sstep(0.48, 0.66, ny) * sstep(-0.2, 0.4, nz) - 0.28 * G2(ax - 0.11, ny + 0.2, 0.05) * fr - 0.3 * G2(nx, ny + 0.33, 0.05) * fr;   /* 20261030ak: skin AO under brow, beside/under nose, hairline, under chin */ r *= ysh; g *= ysh * 0.985; b *= ysh * 0.99; }
+      /* 20261030ao: side/cheek face planes */ const ysh = 1 - 0.4 * sstep(0.42, 0.8, ax) * sstep(-0.45, 0.25, ny) - 0.18 * sstep(0.0, -0.3, ny) * sstep(0.22, 0.6, ax) - 0.5 * yao - 0.52 * ysk - 0.42 * ybr - 0.16 * ych - 0.16 * ytm - 0.5 * yjw - 0.22 * sstep(0.48, 0.66, ny) * sstep(-0.2, 0.4, nz) - 0.28 * G2(ax - 0.11, ny + 0.2, 0.05) * fr - 0.3 * G2(nx, ny + 0.33, 0.05) * fr;   /* 20261030ak: skin AO under brow, beside/under nose, hairline, under chin */ const ysv = 1 - 0.72 * (1 - ysh); /* 20261030av: planes kept, mud lifted */ r *= ysv; g *= ysv * 0.985; b *= ysv * 0.99; }
       { const E = (v, w) => Math.exp(-(v / w) * (v / w));   /* 20261030ae: painted feature marks in the head albedo itself, so they survive every LOD tier and 6-10 m */
         const ybw = E(ny - 0.255 - 0.03 * (0.3 - Math.abs(ax - 0.3)), 0.05) * sstep(0.07, 0.13, ax) * sstep(0.5, 0.42, ax) * fr, yln = E(ny - 0.13, 0.038) * sstep(0.2, 0.25, ax) * sstep(0.45, 0.4, ax) * fr;
         const yns = E(ax - 0.1, 0.03) * sstep(0.06, -0.04, ny) * sstep(-0.32, -0.22, ny) * fr, yun = G2(nx, ny + 0.32, 0.06) * fr, ylp = E(ny + 0.47, 0.02) * sstep(0.2, 0.12, ax) * fr, yul = G2(nx * 0.5, ny + 0.58, 0.05) * fr;
-        const yk = 1 - 1.15 * ybw - 1.05 * yln - 0.35 * G2(ax - 0.33, ny - 0.13, 0.09) * fr - 0.22 * yns - 0.22 * yun - 0.38 * ylp - 0.18 * yul; r *= yk; g *= yk * 0.97; b *= yk * 0.96; }
-      const m = 1 + mott * 0.06 - sstep(0.7, 0.9, freck) * 0.05 * (dark ? 0.3 : 1);
+        const yk = 1 - 0.78 * ybw - 0.9 * yln - 0.35 * G2(ax - 0.33, ny - 0.13, 0.09) * fr - 0.22 * yns - 0.22 * yun - 0.38 * ylp - 0.18 * yul; r *= yk; g *= yk * 0.97; b *= yk * 0.96; }
+      const m = 1 + mott * 0.04 - sstep(0.7, 0.9, freck) * 0.05 * (dark ? 0.3 : 1);
       r *= m; g *= m; b *= m;
       const bs = beard * (0.55 + 0.45 * sstep(0.35, 0.75, stub));
       r = mix(r, r * 0.62, bs * 0.55); g = mix(g, g * 0.64, bs * 0.55); b = mix(b, b * 0.72, bs * 0.55);
@@ -101,7 +101,7 @@ function headSkinMat(S, q) {
       const tz = Math.max(G2(nx, ny - 0.45, 0.3), G2(nx / 0.6, ny + 0.1, 0.18)) * fr;
       rgh[i / 4] = clamp(0.62 - tz * 0.18 + (pore - 0.5) * 0.1 + bs * 0.12);
     });
-    const nrm = heightToNormal(W, H, hgt, W / 256 * 0.8);
+    const nrm = heightToNormal(W, H, hgt, W / 256 * 0.42) /* 20261030av: pores read as skin, not orange peel */;
     const orm = new Float32Array(W * H * 4); for (let i = 0; i < W * H; i++) { orm[i * 4] = 1; orm[i * 4 + 1] = rgh[i]; orm[i * 4 + 2] = 0; orm[i * 4 + 3] = 1; }
     const mk = (cv) => { const t = new T.CanvasTexture(cv); t.anisotropy = 4; return t; };
     const m = new T.MeshStandardMaterial({ map: texEnc(mk(toCanvas(W, H, col))), normalMap: mk(toCanvas(W, H, nrm)), normalScale: new T.Vector2(0.12, 0.12),
@@ -125,14 +125,14 @@ function irisMat(hex) { return cached(matCache, 'iris' + hex + MODE, () => {
 // 20261030ab: hair strand cards. Alpha-cut clumps of strands, each its own tone, laid on the hair surface and lifted at the tips:
 // a broken, layered outline at room distance instead of a solid painted shell.
 function hairCardMat(S) {
-  return cached(matCache, 'haircard' + S.hair + MODE, () => {
+  return cached(matCache, 'haircard3' + S.hair + MODE, () => {
     const c = document.createElement('canvas'); c.width = 64; c.height = 128; const x = c.getContext('2d');
-    const base = deepen(new T.Color(S.hair)); let sd = 13; const r = () => { sd = (sd * 16807) % 2147483647; return sd / 2147483647; };
+    const base = deepen(new T.Color(S.hair)); if ((base.r + base.g + base.b) / 3 > 0.4) base.multiplyScalar(0.78);   /* 20261030ax: same tone as the shell under it */ let sd = 13; const r = () => { sd = (sd * 16807) % 2147483647; return sd / 2147483647; };
     for (let i = 0; i < 60; i++) { const px = 4 + r() * 56, w = 0.8 + r() * 1.6, len = 70 + r() * 58, v = 0.55 + r() * 0.4;
       x.strokeStyle = 'rgb(' + Math.min(255, base.r * 255 * v | 0) + ',' + Math.min(255, base.g * 255 * v | 0) + ',' + Math.min(255, base.b * 255 * v | 0) + ')';
       x.lineWidth = w; x.beginPath(); x.moveTo(px, 0); x.quadraticCurveTo(px + (r() - 0.5) * 10, len * 0.5, px + (r() - 0.5) * 14, len); x.stroke(); }
     { x.globalCompositeOperation = 'source-atop'; const gr = x.createLinearGradient(0, 0, 0, 128);   /* 20261030ae: fake anisotropic sheen band + dark roots: clumps read as hair, not slabs */
-      gr.addColorStop(0, 'rgba(0,0,0,0.45)'); gr.addColorStop(0.28, 'rgba(255,240,215,0.22)'); gr.addColorStop(0.42, 'rgba(255,240,215,0)'); gr.addColorStop(1, 'rgba(0,0,0,0.25)');
+      gr.addColorStop(0, 'rgba(0,0,0,0.45)'); gr.addColorStop(0.28, 'rgba(255,240,215,0.12)'); gr.addColorStop(0.42, 'rgba(255,240,215,0)'); gr.addColorStop(1, 'rgba(0,0,0,0.25)');
       x.fillStyle = gr; x.fillRect(0, 0, 64, 128); x.globalCompositeOperation = 'source-over'; }
     const t = texEnc(new T.CanvasTexture(c));
     return new T.MeshStandardMaterial({ color: 0xffffff, map: t, alphaTest: 0.45, side: T.DoubleSide, roughness: 0.88, metalness: 0 });
@@ -216,6 +216,22 @@ function loft(rings, seg, pw = 2.2, caps = true) {
 }
 // simple limb: radii along -Y from 0 to -len
 function limb(len, rads, seg, d = 1, p = 2) { return loft(rads.map((r, i) => ({ y: -len * i / (rads.length - 1), w: r, d: r * d, p })), seg); }
+// 20261030ax: a patch that lies ON a loft's front surface (shirt V, lapels, tie). It follows the same superellipse rings,
+// lifted `off` metres along the surface normal, so it never cuts through the cloth underneath (the old plastron did: a torn white edge).
+// xa(y) < xb(y) bound the patch across the front at each height.
+function loftAt(rings, pw) { const R = rings.slice().sort((a, b) => a.y - b.y);
+  return y => { let i = 0; while (i < R.length - 2 && R[i + 1].y < y) i++; const A = R[i], B = R[i + 1], t = clamp((y - A.y) / ((B.y - A.y) || 1));
+    return { w: mix(A.w, B.w, t), d: mix(A.d, B.d, t), z: mix(A.z || 0, B.z || 0, t), p: A.p || pw }; }; }
+function frontPoint(g, x, off) { const u = Math.min(0.995, Math.abs(x) / g.w), q = Math.pow(1 - Math.pow(u, g.p), 1 / g.p), zf = g.z + g.d * q;
+  const nx = Math.sign(x) * Math.pow(u, g.p - 1) / g.w, nz = Math.pow(Math.max(q, 1e-4), g.p - 1) / g.d, L = Math.hypot(nx, nz) || 1;
+  return [x + nx / L * off, zf + nz / L * off]; }
+function surfPatch(rings, pw, y0, y1, xa, xb, off, ny = 14, nx = 6) {
+  const at = loftAt(rings, pw), pos = [], uv = [], idx = [];
+  for (let i = 0; i <= ny; i++) { const y = mix(y0, y1, i / ny), g = at(y), x0 = xa(y), x1 = xb(y);
+    for (let j = 0; j <= nx; j++) { const x = mix(x0, x1, j / nx), [px, pz] = frontPoint(g, x, off); pos.push(px, y, pz); uv.push(x / 0.25 * 2, y / 0.25 * 2); } }
+  for (let i = 0; i < ny; i++) for (let j = 0; j < nx; j++) { const a = i * (nx + 1) + j, b = a + nx + 1; idx.push(a, a + 1, b, a + 1, b + 1, b); }
+  const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new T.Float32BufferAttribute(uv, 2)); geo.setIndex(idx);
+  return weld(geo); }
 
 // ---------- procedural textures (seeded, shared) ----------
 function noiseCanvas(S, seed, fn) {
@@ -236,15 +252,15 @@ function hairNormal(S) { return cached(texCache, 'hair' + S, () => (() => { cons
 // ---------- materials ----------
 function stdMat(key, o) { return cached(matCache, key, () => { const m = new T.MeshStandardMaterial(o); m.name = 'onumc:' + key; return m; }); }
 function skinMat(hex, q) { return cached(matCache, 'skin' + hex + q, () => { const m = new T.MeshStandardMaterial({ color: linSkin(hex), roughness: 0.4, metalness: 0,
-  normalMap: skinNormal(q === 'high' ? 512 : 256), normalScale: new T.Vector2(0.14, 0.14) });
+  normalMap: skinNormal(q === 'high' ? 512 : 256), normalScale: new T.Vector2(0.07, 0.07) }); /* 20261030av: smooth body skin */
   gameSkin(m, hex); m.name = 'onumc:skin'; return m; }); }
 function hairMat(hex, q) { return cached(matCache, 'hair' + hex + q, () => new T.MeshStandardMaterial({ color: lin(hex), roughness: 0.62, metalness: 0,
   normalMap: hairNormal(q === 'high' ? 512 : 256), normalScale: new T.Vector2(0.3, 0.3) })); }
 // cloth in any colour: wool normal + roughness/AO from onum-materials, colour ours
-function clothMat(hex, q, name = 'suit_wool', rep = 1) { return cached(matCache, 'cloth' + name + hex + q + rep, () => {
+function clothMat(hex, q, name = 'suit_wool', rep = 1, ns = 1.2) { return cached(matCache, 'cloth' + name + hex + q + rep + ns, () => {
   if (MODE === 'linear' && name === 'suit_wool' && hex === 0x1a2744) return makeMaterial('suit_wool', T, { repeat: rep, quality: Q[q].tex, physical: false });
   const tx = getTextures(name, T, { repeat: rep, quality: Q[q].tex });
-  return new T.MeshStandardMaterial({ color: lin(hex), normalMap: tx.normalMap, roughnessMap: tx.ormMap, aoMap: tx.ormMap, normalScale: new T.Vector2(2.2, 2.2), aoMapIntensity: 1, roughness: 1, metalness: 0 }); }); }
+  return new T.MeshStandardMaterial({ color: lin(hex), normalMap: tx.normalMap, roughnessMap: tx.ormMap, aoMap: tx.ormMap, normalScale: new T.Vector2(ns, ns) /* 20261030av: weave, not stripes */, aoMapIntensity: ns < 1 ? 0 : 0.55, roughness: 1, metalness: 0 }); }); }
 function leatherMat(hex, q) { return cached(matCache, 'leather' + hex + q, () => { const tx = getTextures('leather', T, { repeat: 1, quality: Q[q].tex });
   return new T.MeshStandardMaterial({ color: lin(hex), normalMap: tx.normalMap, normalScale: new T.Vector2(0.5, 0.5), roughness: 0.32, metalness: 0 }); }); }
 
@@ -392,11 +408,11 @@ function rollSpec(o) {
   const outfitR = pickC(fem ? OUTFITS.slice(4) : OUTFITS.slice(0, 4)), outfit = o.outfit || outfitR;
   const style = o.hair || pick(fem ? ['bob', 'long', 'bun', 'bob', 'short', 'curls'] : (a01 > 0.55 ? ['receding', 'bald_fringe', 'side_part', 'short', 'caesar'] : ['short', 'side_part', 'caesar', 'buzz', 'curls']));
   const baseHair = o.hairColor != null ? o.hairColor : (skin <= 0xd9ab84 && skin >= 0x9c6b45 ? pick(HAIRS) : skin < 0x9c6b45 ? pick([0x14100d, 0x1f1712, 0x2f2318]) : pick(HAIRS));
-  const grey = clamp((a01 - 0.35) * 1.6 + (r() - 0.5) * 0.3);
+  const grey = clamp((a01 - 0.5) * 1.5 + (r() - 0.5) * 0.3) * (o.hairColor != null ? 0.3 : 1);   /* 20261030av: the chosen hair colour stands; greying is later and pewter, not white */
   return {
     fem, age, a01, skin: hexMix(skin, [0xd07060, 0xb09060, 0x806050][r() * 3 | 0], 0.12), build,   /* 20261030at: per-person skin tint */ outfit, style, glasses: o.glasses ?? r() < 0.25 * (0.5 + a01), beard: normBeard(o.beard, fem, r, a01),
     height: o.height || (fem ? 1.56 + r() * 0.18 : 1.68 + r() * 0.2),
-    hair: vC(hexMix(baseHair, 0xc8c4bc, grey * 0.9), 0.3), eye: o.eye || pick(EYES),
+    hair: vC(hexMix(baseHair, 0x9c978e, grey * 0.8), 0.22), eye: o.eye || pick(EYES),
     suit: vC((s => o.suitColor ?? s)(pickC(SUITS)), 0.06 + r() * 0.24), shirt: (s => o.shirtColor ?? s)(pickC(SHIRTS)), tie: (s => o.tieColor ?? s)(pickC(TIES)), dress: o.dressColor,
     face: ((F) => o.face ? Object.assign(F, o.face) : F)({ faceW: fem ? 0.92 + r() * 0.08 : 0.98 + r() * 0.08, jaw: fem ? 0.80 + r() * 0.1 : 0.92 + r() * 0.14, brow: fem ? 0.6 + r() * 0.3 : 0.9 + r() * 0.4,
       nose: fem ? 0.82 + r() * 0.25 : 0.95 + r() * 0.35, cheek: 0.8 + r() * 0.5, chin: 0.7 + r() * 0.6, lip: fem ? 1.1 + r() * 0.2 : 0.85 + r() * 0.2, age: a01,
@@ -408,7 +424,7 @@ function rollSpec(o) {
   };
 }
 
-function vC(h, k) { const l = (((h >> 16) & 255) * 0.3 + ((h >> 8) & 255) * 0.59 + (h & 255) * 0.11) / 255; return hexMix(h, l < 0.42 ? 0x000000 : 0xf4f0e8, k); }   /* 20261030as: push hair/cloth value away from mid so it reads at rug distance */
+function vC(h, k) { const l = (((h >> 16) & 255) * 0.3 + ((h >> 8) & 255) * 0.59 + (h & 255) * 0.11) / 255; return hexMix(h, l < 0.42 ? 0x000000 : 0xd6d0c4, l < 0.42 ? k : k * 0.4); }   /* 20261030av: light hair and cloth no longer pushed to white */   /* 20261030as: push hair/cloth value away from mid so it reads at rug distance */
 export function makeCharacter(THREE, opts = {}) {
   T = THREE; MODE = opts.colorMode === 'linear' ? 'linear' : 'game'; matCache = matCaches[MODE];
   const opts0 = opts; { const s0 = rollSpec({ seed: 1, ...opts }), U0 = resolveUniform(opts.uniform, s0.fem);
@@ -419,7 +435,7 @@ export function makeCharacter(THREE, opts = {}) {
   // getting update() calls at every LOD (hooking a rig mesh froze LOD 3: rig hidden -> hook never ran again)
   const hook = new T.Mesh(cached(geoCache, 'hook', () => new T.BufferGeometry().setAttribute('position', new T.Float32BufferAttribute([0, 1, 0, 0.001, 1, 0, 0, 1.001, 0], 3))),
     cached(matCache, 'hookmat', () => new T.MeshBasicMaterial({ colorWrite: false, depthWrite: false, depthTest: false }))); hook.frustumCulled = false; hook.name = 'onumc-hook';
-  root.add(hook); root.add(body); { /* 20261030ah: soft contact shadow so people sit on the rug, not float on it */ const cg = cached(geoCache, "contact", () => new T.PlaneGeometry(1, 1).rotateX(-Math.PI / 2)), cm = cached(matCache, "contactmat4", () => { const c = document.createElement("canvas"); c.width = c.height = 64; const g = c.getContext("2d"), gr = g.createRadialGradient(32, 32, 2, 32, 32, 31); gr.addColorStop(0, "rgba(0,0,0,0.97)"); gr.addColorStop(0.3, "rgba(0,0,0,0.88)"); gr.addColorStop(0.55, "rgba(0,0,0,0.5)"); gr.addColorStop(0.72, "rgba(255,226,196,0.28)"); gr.addColorStop(0.88, "rgba(255,226,196,0.12)");   /* 20261030am: warm halo ring so the dark core reads against the red rug */   /* 20261030al: near-black contact core */   /* 20261030aj: darker contact core */ gr.addColorStop(1, "rgba(0,0,0,0)"); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); return new T.MeshBasicMaterial({ name: "onumc:contact", map: new T.CanvasTexture(c), color: 0xffffff, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }); }); const cmF = cached(matCache, 'contactmatF2', () => { const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'), gr = g.createRadialGradient(32, 32, 2, 32, 32, 31); gr.addColorStop(0, 'rgba(0,0,0,1)'); gr.addColorStop(0.5, 'rgba(0,0,0,0.95)'); gr.addColorStop(0.75, 'rgba(0,0,0,0.88)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); return new T.MeshBasicMaterial({ name: 'onumc:contactF', map: new T.CanvasTexture(c), color: 0xffffff, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }); });   /* 20261030aq: darker solid contact for mid/far */ const cs = new T.Mesh(cg, cm); cs.position.y = 0.006; cs.scale.set(1.45, 1, 1.2);   /* 20261030aj: larger, reads under feet at 7-9 m */ cs.renderOrder = 1; /* 20261030ao: contact grows with camera distance so it reads mid/far on the rug */ cs.onBeforeRender = (r0, s0, cam) => { const e = cs.matrixWorld.elements, dx = cam.position.x - e[12], dz = cam.position.z - e[14], k = 1 + 1.8 * Math.min(1, Math.max(0, (Math.sqrt(dx * dx + dz * dz) - 3.5) / 7)); cs.scale.set(1.45 * k, 1, 1.2 * k); cs.material = k > 1.15 ? cmF : cm; }; cs.castShadow = false; cs.name = "onumc-contact"; root.add(cs); } body.add(rig);
+  root.add(hook); root.add(body); { /* 20261030ah: soft contact shadow so people sit on the rug, not float on it */ const cg = cached(geoCache, "contact", () => new T.PlaneGeometry(1, 1).rotateX(-Math.PI / 2)), cm = cached(matCache, "contactmat5", () => { const c = document.createElement("canvas"); c.width = c.height = 64; const g = c.getContext("2d"), gr = g.createRadialGradient(32, 32, 2, 32, 32, 31); gr.addColorStop(0, "rgba(0,0,0,0.6)"); gr.addColorStop(0.35, "rgba(0,0,0,0.4)"); gr.addColorStop(0.7, "rgba(0,0,0,0.12)");   /* 20261030av: soft footprint, not a black disc with a halo */   /* 20261030am: warm halo ring so the dark core reads against the red rug */   /* 20261030al: near-black contact core */   /* 20261030aj: darker contact core */ gr.addColorStop(1, "rgba(0,0,0,0)"); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); return new T.MeshBasicMaterial({ name: "onumc:contact", map: new T.CanvasTexture(c), color: 0xffffff, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }); }); const cmF = cached(matCache, 'contactmatF2', () => { const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'), gr = g.createRadialGradient(32, 32, 2, 32, 32, 31); gr.addColorStop(0, 'rgba(0,0,0,1)'); gr.addColorStop(0.5, 'rgba(0,0,0,0.95)'); gr.addColorStop(0.75, 'rgba(0,0,0,0.88)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); return new T.MeshBasicMaterial({ name: 'onumc:contactF', map: new T.CanvasTexture(c), color: 0xffffff, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }); });   /* 20261030aq: darker solid contact for mid/far */ const cs = new T.Mesh(cg, cm); cs.position.y = 0.006; cs.scale.set(0.95, 1, 0.8);   /* 20261030aj: larger, reads under feet at 7-9 m */ cs.renderOrder = 1; /* 20261030ao: contact grows with camera distance so it reads mid/far on the rug */ cs.onBeforeRender = (r0, s0, cam) => { const e = cs.matrixWorld.elements, dx = cam.position.x - e[12], dz = cam.position.z - e[14], k = 1 + 0.3 * Math.min(1, Math.max(0, (Math.sqrt(dx * dx + dz * dz) - 3.5) / 7)); cs.scale.set(0.95 * k, 1, 0.8 * k); cs.material = cm; }; cs.castShadow = false; cs.name = "onumc-contact"; root.add(cs); } body.add(rig);
   root.name = 'onum-character'; const meshes = [], faceFine = [], bodyFine = [];
   const add = (parent, geo, mat, x = 0, y = 0, z = 0, list) => { const m = new T.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true;
     parent.add(m); meshes.push(m); if (list) list.push(m); return m; };
@@ -429,11 +445,11 @@ export function makeCharacter(THREE, opts = {}) {
     sleek: [1, 0, 'open', 'trousers'], sleek_f: [1, 0, 'open', 'trousers'] }[S.outfit] || [1, 0, 'tie', 'trousers'];
   const [jacket, vest, neck, bottom] = W;
   const skinM = skinMat(S.skin, q), hairM = hairMat(S.hair, q);
-  const suitM = clothMat(S.suit, q), shirtM = clothMat(S.shirt, q, 'suit_wool', 4);
+  const suitM = clothMat(S.suit, q), shirtM = stdMat('axshirt' + S.shirt + MODE, { color: lin(S.shirt), roughness: 0.78, metalness: 0 });   /* 20261030ax: shirting is plain cotton: no wool grain, and its onumc: name keeps the game's stone and cloth passes off it */
   const longB = bottom === 'dress' || bottom === 'robe' || bottom === 'robe_knee';
   const dressM = clothMat(S.dress != null ? S.dress : bottom === 'dress' ? hexMix(S.suit, 0x6a1a2a, 0.4) : S.suit, q);
   const shoeM = leatherMat(fem ? 0x1a1414 : (S.seed % 3 ? 0x141212 : 0x3a2014), q);
-  const hoseM = stdMat('hose' + S.skin, { color: lin(hexMix(S.skin, 0x2a1d18, 0.25)), roughness: 0.45 });
+  const hoseM = stdMat('hose2' + S.skin, { color: linSkin(hexMix(S.skin, 0x3a2a24, 0.15)), roughness: 0.5 });   /* 20261030aw: legs share the face's skin tone (linSkin), sheer hose, not orange-tan */
   const tieM = clothMat(S.tie, q, 'suit_wool', 3);
   const bkey = (fem ? 'f' : 'm') + Math.round(B * 10) + q;            // body geometry bucket (shared)
   const bw = 0.88 + 0.12 * B;                                            // width factor
@@ -468,8 +484,8 @@ export function makeCharacter(THREE, opts = {}) {
     const sp = surf(shape, sx * 0.33, ey, 0.94); const c = new T.Vector3(sp.x, sp.y, sp.z - 0.0089);
     const eg = new T.Group(); eg.position.copy(c); headPivot.add(eg); eyes.push(eg);
     add(eg, cached(geoCache, 'eyeball' + q, () => weld(new T.SphereGeometry(0.0127, 20, 14))), eyeW, 0, 0, 0, faceFine);
-    add(eg, cached(geoCache, 'iris', () => new T.CircleGeometry(0.0076, 24)), irisM, 0, 0, 0.0122, faceFine);
-    add(eg, cached(geoCache, 'pupil', () => new T.CircleGeometry(0.0029, 14)), pupM, 0, 0, 0.0125, faceFine);
+    add(eg, cached(geoCache, 'iris2', () => new T.CircleGeometry(0.0088, 24)), irisM, 0, 0, 0.0122, faceFine);
+    add(eg, cached(geoCache, 'pupil2', () => new T.CircleGeometry(0.0034, 14)), pupM, 0, 0, 0.0125, faceFine);
     for (const up of [1, -1]) {   // eyelids: skin shells that hug the eyeball, with a lash line on the edge
       const lg = new T.Group(); lg.position.copy(c); lg.rotation.z = -sx * (S.face.tilt + (up > 0 ? 0 : 0.05)); headPivot.add(lg);
       const lr = new T.Group(); lg.add(lr);
@@ -483,14 +499,14 @@ export function makeCharacter(THREE, opts = {}) {
     }
   }
   // brows: tapered, seeded shape
-  const browM = hairMat(hexMix(S.hair, 0x000000, 0.78), q)   /* 20261030at: darker brows read at 8 m */;
+  const browM = hairMat(hexMix(S.hair, 0x000000, 0.55), q)   /* 20261030at: darker brows read at 8 m */;
   const BR = S.face.browShape;
   for (const sx of [-1, 1]) {
     const by = (sx < 0 ? A.browL : A.browR);
     const xs = [0.10 + BR.gap, 0.24, 0.38, 0.47 + 0.08 * BR.len];
     const ys = [0.235, 0.27 + 0.03 * BR.arch, 0.275 + 0.035 * BR.arch, 0.235 - 0.03 * BR.tail];
     const pts = xs.map((x, i) => { const y = ys[i] + by; const p = surf(shape, sx * x, y, Math.sqrt(Math.max(0.05, 1 - x * x - y * y))); return p.add(p.clone().normalize().multiplyScalar(0.0012)); });
-    const curve = new T.CatmullRomCurve3(pts), tub = 14, rad = 6, base = (fem ? 0.0047 : 0.0064) * BR.thick * 2.3; /* 20261030au: heavier brow mass for rug distance */   /* 20261030aj: brows read across the rug */
+    const curve = new T.CatmullRomCurve3(pts), tub = 14, rad = 6, base = (fem ? 0.0047 : 0.0064) * BR.thick * 1.3; /* 20261030av: brows back from caterpillar */ /* 20261030au: heavier brow mass for rug distance */   /* 20261030aj: brows read across the rug */
     const tg = new T.TubeGeometry(curve, tub, base, rad); const P = tg.attributes.position;
     for (let i = 0; i <= tub; i++) { const cp = curve.getPointAt(i / tub), tt = i / tub, k = mix(1, 0.3, Math.pow(tt, 1.6)) * (tt < 0.08 ? 0.8 : 1);
       for (let j = 0; j <= rad; j++) { const vi = i * (rad + 1) + j; const ox = P.getX(vi) - cp.x, oy = P.getY(vi) - cp.y, oz = P.getZ(vi) - cp.z;
@@ -534,18 +550,19 @@ export function makeCharacter(THREE, opts = {}) {
     }
     // 20261030ab: strand cards over the shell (every quality: this is what reads at room distance)
     if (S.style !== 'buzz' && S.style !== 'bald_fringe') {
-      const cardG = cached(geoCache, 'hcard', () => new T.PlaneGeometry(1, 1).translate(0, -0.45, 0)), cm = hairCardMat(S);
+      const cardG = cached(geoCache, 'hcard2', () => { const g = new T.PlaneGeometry(1, 1, 1, 6).translate(0, -0.45, 0), P = g.attributes.position; for (let v = 0; v < P.count; v++) { const y = P.getY(v); P.setZ(v, -y * y); } g.computeVertexNormals(); return g; })   /* 20261030ax: cards curve with the skull (z = -y^2, sized by scale.z), so tips lie on the hair, not spiked off it */, cm = hairCardMat(S);
       let sd = 7 + ((S.hair * 31 + S.skin) % 100000); const rr = () => { sd = (sd * 16807) % 2147483647; return sd / 2147483647; };
       const Z = new T.Vector3(0, 0, 1), n = new T.Vector3(), o = [0, 0, 0], N = S.style === 'caesar' ? 22 : q === 'low' ? 34 : 50;   /* 20261030ak: fewer, wider clumps (mass, not shards) */
       for (let i = 0, tries = 0; i < N && tries < N * 6; tries++) {
         let nx = rr() * 2 - 1, ny = -0.15 + rr() * 1.15, nz = rr() * 2 - 1; const l = Math.hypot(nx, ny, nz); nx /= l; ny /= l; nz /= l;
-        const { m, t } = hairMask(S.style, nx, ny, nz, fem); if (m < 0.7) continue; i++;
+        const { m, t } = hairMask(S.style, nx, ny, nz, fem); if (m < 0.86) continue; i++;   /* 20261030ax: cards stay inside the hairline */
         shape(nx, ny, nz, o); const k = hk(nx, ny, nz, m, t) + 0.002;
         const c = add(headPivot, cardG, cm, o[0] * k, o[1] * k, o[2] * k, faceFine);   /* 20261030al: strand cards near only; far silhouette is the soft mass */ c.castShadow = false;
         n.set(o[0], o[1], o[2]).normalize(); c.quaternion.setFromUnitVectors(Z, n);
-        const L = ((S.style === 'caesar' ? 0.022 : 0.034) + rr() * 0.028) * (ny > 0.72 ? 0.45 : 1);   /* 20261030ad: short at the crown, no spikes */
-        c.rotateZ(Math.atan2(nx, ny) * 0.0 + (rr() - 0.5) * 0.7 + (nz < 0 ? Math.PI : 0) * 0); c.rotateX(-0.06 - rr() * 0.12);   /* 20261030ac: lie flat with the comb, no frizz */
-        c.scale.set(0.05 + rr() * 0.03, L * 0.85, 1);
+        const L = ((S.style === 'caesar' ? 0.022 : 0.034) + rr() * 0.028) * (ny > 0.72 ? 0.45 : ny < 0.35 ? 0.7 : 1);   /* 20261030av: shorter at the temples and sides, lying flat: no spikes off the head */   /* 20261030ad: short at the crown, no spikes */
+        { const tp = Math.min(1, Math.max(0, (ny - 0.3) / 0.5)), fl = new T.Vector3(0, -(1 - tp), -tp).normalize(), tg = fl.sub(n.clone().multiplyScalar(fl.dot(n))), dv = new T.Vector3(0, -1, 0).applyQuaternion(c.quaternion);   /* 20261030av: strands comb back over the crown and fall down the sides, not scattered scraps */
+          c.rotateZ((tg.lengthSq() > 1e-6 ? Math.atan2(n.dot(dv.clone().cross(tg)), dv.dot(tg.normalize())) : 0) + (rr() - 0.5) * 0.25); } c.rotateX(-0.01 - rr() * 0.03);   /* 20261030ac: lie flat with the comb, no frizz */
+        { const cl = L * 1.25; c.scale.set(0.028 + rr() * 0.016, cl, cl * cl / 0.2); }   /* 20261030av: longer than wide: strands, not paper scraps */
       }
     }
     if (S.style === 'bun') { const b = add(headPivot, earB, hairM, 0, 0.06, -0.1); b.scale.set(0.038, 0.034, 0.034); }
@@ -598,12 +615,25 @@ export function makeCharacter(THREE, opts = {}) {
     const vtop = 0.465, vbot = fem ? 0.2 : 0.17;
     const vMat = (neck === 'necklace' || (fem && neck !== 'bow')) ? skinM : shirtM;
     const closed = neck === 'mandarin';
-    const plast = closed ? null : gb('plast' + vbot, () => loft([{ y: vbot, w: 0.004, d: 0.004 }, { y: (vbot + vtop) / 2, w: 0.04, d: 0.008 }, { y: vtop, w: 0.05, d: 0.008 }, { y: vtop + 0.03, w: 0.06, d: 0.02, z: -0.02 }], seg, 2));
-    const pl = closed ? { userData: {} } : add(torso, plast, vMat, 0, 0, vz(0.35) - 0.012);
-    if (!closed) for (const sx of [-1, 1]) { const lp = add(torso, cached(geoCache, 'lapel', () => new T.BoxGeometry(0.022, 0.24, 0.006)), suitM, sx * 0.04, (vbot + vtop) / 2 + 0.02, vz(0.33) + 0.0); lp.rotation.z = sx * 0.2; lp.rotation.x = -0.1; }
-    for (const by of closed ? [0.06, 0.14, 0.22, 0.30, 0.38, 0.46] : [0.06, 0.13]) if (by < vbot || closed) add(torso, cached(geoCache, 'btn', () => new T.CylinderGeometry(0.008, 0.008, 0.004, 10).rotateX(Math.PI / 2)), stdMat('btn', { color: 0x111111, roughness: 0.3 }), 0, by, vz(by) + 0.003, bodyFine);
-    if (neck === 'tie') { add(torso, tieGeo(), tieM, 0, 0, vz(0.3) + 0.002); }
-    if (neck === 'bow' || neck === 'scarf') { const b = add(torso, earB, tieM, 0, 0.455, vz(0.42) + 0.004); b.scale.set(0.035, 0.015, 0.012); }
+    /* 20261030ax: the shirt V, lapels and tie are patches laid on the jacket's own surface (surfPatch), not solids pushed through it */
+    const jAt = loftAt(jp, 2.2), fz = (y, off = 0) => frontPoint(jAt(y), 0, off)[1];
+    const vy1 = 0.505, hw = y => y < vtop ? mix(0.003, 0.05, Math.pow(clamp((y - vbot) / (vtop - vbot)), 0.92)) : mix(0.05, 0.062, clamp((y - vtop) / (vy1 - vtop)));
+    const lw = y => { const t = clamp((y - vbot) / (vy1 - vbot)); return 0.006 + 0.03 * Math.sin(Math.min(1, t / 0.8) * Math.PI * 0.5) - 0.022 * sstep(0.82, 1, t); };   // the lapel widens to the notch, then rolls into the collar
+    const vkey = 'axV' + jlen + vbot;
+    const pl = closed ? { userData: {} } : add(torso, gb(vkey, () => surfPatch(jp, 2.2, vbot, vy1, y => -hw(y), y => hw(y), 0.0016, 18, 8)), shirtM);
+    if (!closed && vMat === skinM) { const ny0 = 0.425, nw = y => mix(0.003, 0.046, Math.pow(clamp((y - ny0) / (vy1 - ny0)), 0.8));   /* 20261030ax: a blouse fills the V; skin shows only at an open neckline, not to the waist */
+      add(torso, gb(vkey + 'N', () => surfPatch(jp, 2.2, ny0, vy1, y => -nw(y), y => nw(y), 0.0024, 8, 6)), skinM); }
+    if (!closed) { const lapM = clothMat(hexMix(S.suit, 0x000000, 0.16), q);   /* 20261030ax: lapel facing a shade under the body cloth: the V reads at 8 m */
+      add(torso, gb(vkey + 'L', () => surfPatch(jp, 2.2, vbot, vy1, y => -(hw(y) + lw(y)), y => -hw(y) + 0.0005, 0.0034, 18, 3)), lapM);
+      add(torso, gb(vkey + 'R', () => surfPatch(jp, 2.2, vbot, vy1, y => hw(y) - 0.0005, y => hw(y) + lw(y), 0.0034, 18, 3)), lapM); }
+    for (const by of closed ? [0.06, 0.14, 0.22, 0.30, 0.38, 0.46] : [0.06, 0.13]) if (by < vbot || closed) add(torso, cached(geoCache, 'btn', () => new T.CylinderGeometry(0.008, 0.008, 0.004, 10).rotateX(Math.PI / 2)), stdMat('btn', { color: 0x111111, roughness: 0.3 }), 0, by, fz(by, 0.003), bodyFine);
+    if (neck === 'tie') { const ty0 = vbot + 0.004, ty1 = 0.466, tw = y => { const t = clamp((y - ty0) / (ty1 - ty0)); return mix(0.0165, 0.0095, t) * Math.min(1, (y - ty0) / 0.012 + 0.08); };   /* 20261030ax: tie lies on the shirt, tip to knot */
+      add(torso, gb(vkey + 'T', () => surfPatch(jp, 2.2, ty0, ty1, y => -tw(y), y => tw(y), 0.0028, 14, 3)), tieM);
+      add(torso, cached(geoCache, 'axknot2', () => loft([{ y: -0.012, w: 0.0072, d: 0.0034 }, { y: 0.0, w: 0.0115, d: 0.0048 }, { y: 0.01, w: 0.0128, d: 0.005 }], 12, 2.6)), tieM, 0, 0.474, fz(0.474, 0.0042)); }   /* a four-in-hand knot: tapers into the blade, wider at the collar */
+    if (neck === 'bow') { const by = 0.49, bz = fz(by, 0.007);   /* 20261030ax: a bow tie (two wings pinched at a knot) at the collar, not a lozenge on the chest */
+      for (const sx of [-1, 1]) { const w = add(torso, earB, tieM, sx * 0.019, by, bz); w.scale.set(0.02, 0.012, 0.007); w.rotation.z = sx * 0.12; }
+      add(torso, earB, tieM, 0, by, bz + 0.002).scale.set(0.0065, 0.0085, 0.0065); }
+    if (neck === 'scarf') { const b = add(torso, earB, tieM, 0, 0.455, fz(0.455, 0.008)); b.scale.set(0.024, 0.04, 0.009); }   /* 20261030ax: a cravat falls down the V */
     if (neck === 'necklace') { const n = add(torso, cached(geoCache, 'neckl', () => new T.TorusGeometry(0.07, 0.003, 6, 30, Math.PI)), stdMat('pearl', { color: lin(0xf0ece0), roughness: 0.15 }), 0, 0.47, 0.03, bodyFine); n.rotation.set(1.7, 0, Math.PI); }
     pl.userData.v = 1;
   } else {
@@ -626,7 +656,7 @@ export function makeCharacter(THREE, opts = {}) {
   const sleeve = jacket ? suitM : shirtM, arms = [];
   for (const sx of [-1, 1]) {
     const sh = new T.Group(); sh.position.set(sx * shX, shoulderY, -0.005); torso.add(sh);
-    add(sh, gb('shoulderBall', () => weld(new T.SphereGeometry(0.058, 16, 12))), sleeve, -sx * 0.01, -0.02, 0).scale.set(1.04, 0.8, 1.05);   /* 20261030ak: rounder shoulder */   /* 20261030ag: sloped shoulder */   // a rounded deltoid that caps the sleeve and runs into the shoulder
+    add(sh, gb('shoulderBall', () => weld(new T.SphereGeometry(0.058, 16, 12))), sleeve, -sx * 0.014, -0.012, 0).scale.set(1.16, 0.96, 1.12);   /* 20261030ax: the cap bridges sleeve and jacket: no step at the shoulder */   /* 20261030ak: rounder shoulder */   /* 20261030ag: sloped shoulder */   // a rounded deltoid that caps the sleeve and runs into the shoulder
     add(sh, gb('upArm2', () => limb(0.3, [0.062, 0.055, 0.046, 0.041], seg)), sleeve);
     const el = new T.Group(); el.position.y = -0.30; sh.add(el);
     add(el, gb('elbowBall', () => weld(new T.SphereGeometry(0.042, 12, 10))), sleeve);   /* 20261030al: aj torus fold rings removed (read as diorama parts); sleeve tapers instead */
@@ -640,7 +670,7 @@ export function makeCharacter(THREE, opts = {}) {
     if (QQ.fingers) {
       const fg = cached(geoCache, 'finger', () => limb(0.075, [0.0085, 0.008, 0.007, 0.006], 8));
       for (let k = 0; k < 4; k++) { const f = new T.Group(); f.position.set(0, -0.09, (k - 1.5) * 0.019); f.rotation.y = 0; wr.add(f);
-        const m = add(f, fg, skinM, 0, 0, 0, faceFine); m.scale.set(1.32, [0.9, 1, 0.97, 0.78][k] * 1.05, 1.25); f.rotation.x = -0.62 - 0.16 * k; /* 20261030au: resting finger curl, not mitts */ f.position.z *= 0.96;   /* 20261030al: relaxed curled digits, not splayed */   /* 20261030aj: distinct splayed digits */   /* 20261030ah: thicker fingers read as fingers, not nubs */ f.rotation.z = -sx * 0.12; fingers.push(f); }
+        const m = add(f, fg, skinM, 0, 0, 0, faceFine); m.scale.set(1.1, [0.9, 1, 0.97, 0.78][k] * 1.0, 1.06) /* 20261030aw: slimmer fingers, no oversized hands */; f.rotation.x = -0.62 - 0.16 * k; /* 20261030au: resting finger curl, not mitts */ f.position.z *= 0.96;   /* 20261030al: relaxed curled digits, not splayed */   /* 20261030aj: distinct splayed digits */   /* 20261030ah: thicker fingers read as fingers, not nubs */ f.rotation.z = -sx * 0.12; fingers.push(f); }
       const th = new T.Group(); th.position.set(sx * -0.0, -0.03, 0.03); th.rotation.set(-0.6, 0, -sx * 0.3); wr.add(th);
       add(th, fg, skinM, 0, 0, 0, faceFine).scale.set(1.15, 0.75, 1.15); fingers.push(th);
     }
@@ -668,6 +698,11 @@ export function makeCharacter(THREE, opts = {}) {
 
   // ---------- dress code: uniform extras, or the home-state lapel pin ----------
   const frontZ = (y) => { let a = tp[0]; for (const t of tp) if (t[0] <= y) a = t; return a[2] * (jacket ? 1.06 : 1) + (jacket ? 0.012 : vest ? 0.006 : 0) + (a[3] || 0); };
+  if (jacket) {   /* 20261111c: a pocket square so the jacket reads as tailored, not a coloured loft */
+    const py = 0.34, px = fem ? -0.062 : 0.062;
+    add(torso, cached(geoCache, 'breastpkt', () => new T.BoxGeometry(0.034, 0.006, 0.01)), suitM, px, py, frontZ(py) + 0.004);
+    add(torso, cached(geoCache, 'pocksq', () => new T.BoxGeometry(0.026, 0.016, 0.004)), shirtM, px, py + 0.012, frontZ(py) + 0.01);
+  }
   const U = S.uniform, solid = (hex, rough = 0.5, metal = 0) => stdMat('u' + hex + '|' + rough + '|' + metal, { color: lin(hex), roughness: rough, metalness: metal });
   const goldM = solid(0xd4a64a, 0.3, 1);
   if (U) {
@@ -750,8 +785,8 @@ export function makeCharacter(THREE, opts = {}) {
   function setLod(l) {
     if (l === st.lod) return; st.lod = l;
     rig.visible = l < 3; proxy.visible = l >= 3 && st.sit < 0.5; proxySit.visible = l >= 3 && st.sit >= 0.5;
-    for (const m of faceFine) m.visible = l <= 1 || (l === 2 && m.material === hairM);
-    for (const m of bodyFine) m.visible = l === 0;
+    for (const m of faceFine){ const card = m.material && m.material.alphaTest > 0.2; m.visible = card ? l <= 1 : l < 3; }   /* 20261111c: hair cards still thin out; eyes, lids, lips and brows stay until the far proxy */
+    for (const m of bodyFine) m.visible = l <= 1;   /* buttons, cuffs, medals readable across the chamber, not only under 3.5 m */
   }
   function update(dt, state = {}) {
     dt = Math.min(dt || 0, 0.1); st.t += dt;
@@ -761,7 +796,7 @@ export function makeCharacter(THREE, opts = {}) {
     if (d == null && viewCam) { root.getWorldPosition(v3); cam.getWorldPosition(st.cw || (st.cw = new T.Vector3())); d = v3.distanceTo(st.cw); }
     if (d == null && cam && !viewCam && st.lod >= 0) d = st.lastD;   // keep the last view-camera LOD
     if (d != null) st.lastD = d;
-    const lodD = opts.lodDistances || [3.5, 10, 30];
+    const lodD = opts.lodDistances || [7, 16, 34];   /* 20261111c: eyes, mouth and buttons stayed on past a conversation. The old 3.5 m cut made a finished suit look blank across a room. */
     const hy = (i) => lodD[i] * (st.lod > i ? 0.92 : 1.0);   // 8% hysteresis: no flicker at a band edge
     setLod(state.lod != null ? state.lod : d == null ? (st.lod < 0 ? 0 : st.lod) : d < hy(0) ? 0 : d < hy(1) ? 1 : d < hy(2) ? 2 : 3);
     const sitT = state.sitting ? 1 : 0; st.sit += (sitT - st.sit) * Math.min(1, dt * 2.6);   // lowering into a chair or rising takes most of a second if (dt === 0 || state.snap) st.sit = sitT;
