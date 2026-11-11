@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-/* 20261110bv JUPITER: headless continuity tests.
+/* 20261110bv JUPITER / 20261110bw NEPTUNE: headless continuity tests.
    Seeds a day-380 career and asserts Continue / archive / restore.
+   bw adds Continue-after-wipe (reload and crash-before-first-save).
    Usage: node qa/career-continuity.mjs [path-to-worktree]
 */
 import http from "node:http";
@@ -298,6 +299,127 @@ async function run() {
     ok("after new-career wipe + reload, list() still has the archive", afterReload.listed, "archives=" + afterReload.archiveCount);
     ok("load(slotId) returns the old career byte-for-byte", afterReload.loadMatch);
     ok("restore(slotId) writes the old career back to the active slot byte-for-byte", !!(afterReload.restoreOk && afterReload.restoreMatch && afterReload.activeMatch));
+
+    // ── 5b. oath/wipe + reload before first save: Continue (not the API) opens day 380 ──
+    await seedOnOrigin(page, origin, (raw) => {
+      ["longsession.v3", "longsession.v3.backup", "longsession.v3.best", "longsession.v3.meta", "longsession.v3.careers"].forEach((k) => {
+        try { localStorage.removeItem(k); } catch (e) {}
+      });
+      const drop = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.indexOf("onum_career_archive_") === 0) drop.push(k);
+      }
+      drop.forEach((k) => localStorage.removeItem(k));
+      localStorage.setItem("longsession.v3", raw);
+    }, raw);
+    await openGame(page, origin);
+    await waitReady(page);
+    const preCont = await page.evaluate(() => new Promise((resolve) => {
+      window.ONUM_CAREERS.archiveCurrent((res) => {
+        if (res && res.ok) {
+          try { if (window.G) { G._archiveVerified = res; G._wipeOnOath = false; } } catch (e) {}
+          window.ONUM_CAREERS.wipeActive();
+        }
+        resolve({ ok: !!(res && res.ok), id: res && res.id, peek: window.ONUM_CAREERS.peek && window.ONUM_CAREERS.peek(), active: !!(window.ONUM_CAREERS.activeRaw && window.ONUM_CAREERS.activeRaw()) });
+      });
+    }));
+    ok("5b archive+wipe leaves sidecar pointing at the archive, active empty",
+      !!(preCont.ok && !preCont.active && preCont.peek && preCont.peek.day === 380 && preCont.peek.slot && preCont.peek.slot !== "career"),
+      JSON.stringify(preCont));
+    await page.reload({ waitUntil: "domcontentloaded", timeout: 120000 });
+    await page.waitForFunction(() => !!(window.ONUM_CAREERS && window.ONUM_CAREERS.peek), { timeout: 90000 });
+    await waitReady(page);
+    await page.waitForFunction(() => {
+      const b = document.getElementById("cont");
+      return !!(b && /380/.test(b.textContent || "") && /Continue/.test(b.textContent || ""));
+    }, { timeout: 20000 });
+    await page.click("#cont");
+    await page.waitForFunction(() => {
+      const veil = document.getElementById("veil");
+      const hidden = !!(veil && veil.hidden);
+      const card = document.getElementById("card");
+      const broken = !!(!hidden && card && /Could not open that sitting/.test(card.textContent || ""));
+      const day = (typeof window.onumDay === "function") ? window.onumDay() : 0;
+      const name = (typeof window.onumNameOf === "function") ? window.onumNameOf("you") : null;
+      const clock = (document.getElementById("kClock") && document.getElementById("kClock").textContent) || "";
+      return broken || (day === 380 && name === "Dominic Z. Taylor" && /day 380/.test(clock));
+    }, { timeout: 60000 });
+    const clicked = await page.evaluate(() => {
+      const veil = document.getElementById("veil");
+      const hidden = !!(veil && veil.hidden);
+      const card = document.getElementById("card");
+      return {
+        broken: !!(!hidden && card && /Could not open that sitting/.test(card.textContent || "")),
+        day: typeof window.onumDay === "function" ? window.onumDay() : 0,
+        name: typeof window.onumNameOf === "function" ? window.onumNameOf("you") : null,
+        clock: (document.getElementById("kClock") && document.getElementById("kClock").textContent) || "",
+      };
+    });
+    ok("5b Continue after wipe+reload opens the 380-day career (onumDay + #kClock)",
+      !!(!clicked.broken && clicked.day === 380 && clicked.name === "Dominic Z. Taylor" && /day 380/.test(clicked.clock || "")),
+      JSON.stringify(clicked));
+
+    // ── 5c. crash before first save: kill the in-memory page right after the wipe, then Continue on a new tab ──
+    await seedOnOrigin(page, origin, (raw) => {
+      ["longsession.v3", "longsession.v3.backup", "longsession.v3.best", "longsession.v3.meta", "longsession.v3.careers"].forEach((k) => {
+        try { localStorage.removeItem(k); } catch (e) {}
+      });
+      const drop = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.indexOf("onum_career_archive_") === 0) drop.push(k);
+      }
+      drop.forEach((k) => localStorage.removeItem(k));
+      localStorage.setItem("longsession.v3", raw);
+    }, raw);
+    await openGame(page, origin);
+    await waitReady(page);
+    await page.evaluate(() => new Promise((resolve) => {
+      window.ONUM_CAREERS.archiveCurrent((res) => {
+        if (res && res.ok) window.ONUM_CAREERS.wipeActive();
+        resolve(res);
+      });
+    }));
+    const pageCrash = await browser.newPage();
+    pageCrash.setDefaultTimeout(90000);
+    pageCrash.on("pageerror", () => {});
+    await pageCrash.goto(origin + "/public/session.html", { waitUntil: "domcontentloaded", timeout: 120000 });
+    await pageCrash.waitForFunction(() => !!(window.ONUM_CAREERS && window.ONUM_CAREERS.peek), { timeout: 90000 });
+    await pageCrash.evaluate(() => new Promise((resolve) => {
+      if (window.ONUM_CAREERS && window.ONUM_CAREERS.onReady) window.ONUM_CAREERS.onReady(() => resolve(true));
+      else resolve(false);
+    }));
+    await pageCrash.waitForFunction(() => {
+      const b = document.getElementById("cont");
+      return !!(b && /380/.test(b.textContent || "") && /Continue/.test(b.textContent || ""));
+    }, { timeout: 20000 });
+    await pageCrash.click("#cont");
+    await pageCrash.waitForFunction(() => {
+      const veil = document.getElementById("veil");
+      const hidden = !!(veil && veil.hidden);
+      const card = document.getElementById("card");
+      const broken = !!(!hidden && card && /Could not open that sitting/.test(card.textContent || ""));
+      const day = (typeof window.onumDay === "function") ? window.onumDay() : 0;
+      const name = (typeof window.onumNameOf === "function") ? window.onumNameOf("you") : null;
+      const clock = (document.getElementById("kClock") && document.getElementById("kClock").textContent) || "";
+      return broken || (day === 380 && name === "Dominic Z. Taylor" && /day 380/.test(clock));
+    }, { timeout: 60000 });
+    const crashed = await pageCrash.evaluate(() => {
+      const veil = document.getElementById("veil");
+      const hidden = !!(veil && veil.hidden);
+      const card = document.getElementById("card");
+      return {
+        broken: !!(!hidden && card && /Could not open that sitting/.test(card.textContent || "")),
+        day: typeof window.onumDay === "function" ? window.onumDay() : 0,
+        name: typeof window.onumNameOf === "function" ? window.onumNameOf("you") : null,
+        clock: (document.getElementById("kClock") && document.getElementById("kClock").textContent) || "",
+      };
+    });
+    ok("5c crash-before-first-save: Continue opens the 380-day career",
+      !!(!crashed.broken && crashed.day === 380 && crashed.name === "Dominic Z. Taylor" && /day 380/.test(crashed.clock || "")),
+      JSON.stringify(crashed));
+    await pageCrash.close();
 
     // ── 6. quota-full localStorage: archive still verified via IDB; archives are not evicted ──
     await seedOnOrigin(page, origin, (raw) => {

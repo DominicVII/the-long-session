@@ -4,6 +4,24 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261110bw: Continue opens the archived career after an oath wipe
+
+`20261110bw` (on `20261110bu`). Presentation and loader wiring only. JUPITER's archive/wipe API (`stamp:"20261110bv"`) and Neptune's easy-UI blocks (`brEasyCss` / `brEasyJs`, `nlPromptFit*`, `nnQol*`, `boLookCss`) are untouched.
+
+- **S1 (MARS soft FAIL on bv).** After a new career's oath wipes the active slot, the sidecar still names the archived sitting ("Continue — Dominic Z. Taylor · day 380"). Clicking Continue used to call `loadSave()`, which only reads the empty active keys, and show "Could not open that sitting." even though `ONUM_CAREERS.list` / `load` / `restore` still had the career.
+- **Fix.** If `loadSave()` fails and `ONUM_CAREERS.peek().slot` points at an archive, Continue restores that slot through `ONUM_CAREERS.restore` (which already no-ops `archiveCurrent` when the active slot is empty, so no empty or garbage archive is written) and then loads the sitting as usual. A Continue button that cannot open the named career is never left as the only path.
+- **Failed load.** The broken-sitting card now says the career was not erased and, when archives exist, offers **Restore from Earlier careers** as the primary action. Try Continue again and Start a new career stay secondary. A failed restore from the Earlier careers confirm keeps a clear message and Back to the list; it does not drop to a dead end.
+
+## 20261110bu: title Continue first — no delete warning on the way into a game
+
+`20261110bu` (on `20261110bv`). Presentation only. JUPITER's save/archive API and Neptune's easy-UI blocks (`brEasyCss` / `brEasyJs`, `nlPromptFit*`, `nnQol*`, `boLookCss`) are untouched.
+
+- **Title.** Continue is the primary, first, default-focused button, labeled "Continue — {name} · day {N}", whenever any save exists (sidecar peek, localStorage, or IndexedDB). "Start a new career" is the ghost/secondary action. While the larger store is still loading, the card says "Looking for your career…" instead of offering only a new career; it refreshes when `onum-careers-ready` / `onReady` fires.
+- **Keys.** Enter and Space never reach Start a new career if a save exists or the load is still pending, even when that button is focused. If no save is found after the wait, Enter may start a new career. Esc on the title does nothing destructive; on the confirm, archive list, name and party cards it is Back.
+- **Confirm.** "Your day N career stays saved as an archive, and you can return to it any time." Back is the primary button. "Yes, start a new career" is secondary and danger-styled. A typed confirm is required only if the archive could not be verified (to retry the archive); otherwise one click on Yes is enough. The oath screen is only reached after Yes.
+- **Back from the oath.** nameCard and sortedCard now have Back, which calls `ONUM_CAREERS.clearWipe()` and returns to the title.
+- **Earlier careers.** If archives exist, the title shows "Earlier careers (N)". Restoring one uses `list()` / `restore()` with a confirm; `restore` already archives the current career first.
+
 ## 20261110bv: continuity first — Continue loads the sitting; a new career archives, never deletes
 
 `20261110bv` (on `20261110bs`). Neptune's easy-UI blocks (`brEasyCss` / `brEasyJs`) are untouched.
