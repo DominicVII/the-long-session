@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261110bx">
+<meta name="onum-build" content="20261110by">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -29,7 +29,13 @@
 .talk.is-open.tk-prop .tk-morerow{display:none!important}
 .talk.is-open.tk-prop .talk__say{max-height:3.2em;overflow:hidden}
 </style>
-<style id="uxBlCss">/* 20261104bl: follow-ups strip styling only (no HUD fit) */#ndSess .nsx-fu{margin:6px 0;padding:5px 6px;background:#1d1a10;border:1px solid #c9a24a;border-radius:6px}#ndSess .nsx-fu b{color:#ffe08a;font:700 11px system-ui;letter-spacing:.06em;text-transform:uppercase}#ndSess .nsx-fu button{display:block;width:100%;text-align:left;margin:3px 0;background:#2a2410;color:#f4f1e8;border:1px solid #6b5a2a;border-radius:4px;padding:5px 7px;font:12.5px system-ui;cursor:pointer}</style></head>
+<style id="uxBlCss">/* 20261104bl: follow-ups strip styling only (no HUD fit) */#ndSess .nsx-fu{margin:6px 0;padding:5px 6px;background:#1d1a10;border:1px solid #c9a24a;border-radius:6px}#ndSess .nsx-fu b{color:#ffe08a;font:700 11px system-ui;letter-spacing:.06em;text-transform:uppercase}#ndSess .nsx-fu button{display:block;width:100%;text-align:left;margin:3px 0;background:#2a2410;color:#f4f1e8;border:1px solid #6b5a2a;border-radius:4px;padding:5px 7px;font:12.5px system-ui;cursor:pointer}</style>
+<style id="byConvoCss">/* 20261110by JUPITER: the reply box and the choices stay at the bottom of the open talk panel, inside it, above the Say aloud bar. Header / transcript shrink first. Neptune blocks untouched. */
+.talk.is-open>#tkOwn{order:98;flex:0 0 auto!important;min-height:36px!important;overflow:visible!important}
+.talk.is-open>#tkActs{order:99;flex:0 0 auto!important;min-height:88px!important;max-height:42%!important;overflow:auto!important}
+.talk.is-open>#chat{flex:1 1 auto!important;min-height:0!important;max-height:none}
+.talk.is-open>.talk__think,.talk.is-open>#tkThink{min-height:0!important}
+</style></head>
 <body>
 <script id="onumLimitsJs">/* 20261110bs JUPITER: one limits object for the whole engine. Every old hard cap is now onumLim(old, kind):
    the old number times the multiplier for its kind (never below the old number). Infinity = never trimmed.
@@ -54,7 +60,7 @@
   window.onumLimSet = function(k, v){ if(!(k in D)) return false; L[k] = fix(v); try{ var o = JSON.parse(localStorage.getItem("onum.limits") || "{}") || {}; o[k] = (L[k] === INF) ? null : L[k]; localStorage.setItem("onum.limits", JSON.stringify(o)); }catch(e){} return true; };
   window.onumLimReset = function(){ try{ localStorage.removeItem("onum.limits"); }catch(e){} Object.keys(D).forEach(function(k){ L[k] = D[k]; }); L._eff = {}; L._gov = null; return true; };
   var show = function(v){ return v === INF ? "inf" : (typeof v === "number" ? Math.round(v * 100) / 100 : v); };
-  window.onumLimDump = function(){ var out = {build:"20261110bx", mode:L.mode || "scale"}; Object.keys(D).forEach(function(k){ out[k] = show(L[k]); });
+  window.onumLimDump = function(){ var out = {build:"20261110by", mode:L.mode || "scale"}; Object.keys(D).forEach(function(k){ out[k] = show(L[k]); });
     out.effective = {}; Object.keys(L._eff).forEach(function(k){ out.effective[k] = show(L._eff[k]); }); out.governor = L._gov;
     try{ out.engineBudgetMs = window.onumEngine ? show(window.onumEngine.budget) : null; out.frameMs = window.onumEngine ? show(window.onumEngine.dtEma) : null; }catch(e){} return out; };
   window.onumLimLine = function(){ var d = window.onumLimDump(), e = d.effective, g = function(k){ return e[k] != null ? e[k] + "*" : d[k]; };
@@ -79,7 +85,7 @@
 </script>
 <script>
 (function(){
-  var STAMP = "20261110bx";
+  var STAMP = "20261110by";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -27527,6 +27533,15 @@ function convClear(m){
 function openTalk(m){
   if(!G.running || G.over) return;
   TALK.open = true; TALK.m = m; TALK.seq = (TALK.seq || 0) + 1;   /* 20261030b: one token per open; every delayed line checks it */
+  /* 20261110by: walking up holds W/S/Q/C; those keys must not dismiss
+     the conversation they just opened, and must not keep walking you
+     out of it, until they have all been released once. */
+  try{
+    const KB = G.bind || DEFAULT_BIND;
+    ["forward","back","stepL","stepR"].forEach(n => { const k = KB && KB[n]; if(k) keys[k] = false; });
+    cam.vx = cam.vz = 0;
+    TALK.heldMove = true;
+  }catch(e){}
   try{ const Gs = goalsEnsure(); if(Gs && m && m.kind === "member" && Gs.talked.indexOf(m.id) < 0) Gs.talked.push(m.id); }catch(e){}
   try{
     if(G.whip && m && G.whip.id === m.id){ G.whip = null; feed("You found " + surname(m.name) + ". Make the ask."); }
@@ -27740,7 +27755,7 @@ function closeTalk(){
       seed: TALK.seed
     };
   }
-  TALK.open = false; TALK.m = null; TALK.prop = null; TALK.seq = (TALK.seq || 0) + 1;
+  TALK.open = false; TALK.m = null; TALK.prop = null; TALK.seq = (TALK.seq || 0) + 1; TALK.heldMove = false;
   TALK.thread = null; TALK.beat = 2; TALK.followUp = null; TALK.seed = undefined; TALK.tell = "";
   el("talk").classList.remove("is-open", "tk-prop");
   try{ if(who) feelHit(who, "relief", "they left"); }catch(e){}
@@ -38736,7 +38751,14 @@ function tkOwnMount(m){
   }
   box.hidden = false; try{ const c = el("chat"); if(c) c.hidden = false; }catch(e){}
   /* type first, on a desktop with a pointer: the cursor is waiting in the box. On a touch screen it is not, or the keyboard would cover the talk */
-  setTimeout(() => { try{ if(TALK.open && TALK.m === m && (!document.activeElement || document.activeElement === document.body) && window.matchMedia && matchMedia("(pointer:fine)").matches) el("tkOwnIn").focus(); }catch(e){} }, 120);
+  /* 20261110by: focus the box even if the canvas still has pointer capture,
+     so a typed W/S does not walk you out of the talk. Skip only if already typing. */
+  setTimeout(() => { try{
+    if(!TALK.open || TALK.m !== m) return;
+    const a = document.activeElement;
+    const typing = a && (a.tagName === "INPUT" || a.tagName === "TEXTAREA" || a.isContentEditable);
+    if(!typing && window.matchMedia && matchMedia("(pointer:fine)").matches) el("tkOwnIn").focus();
+  }catch(e){} }, 120);
 }
 async function tkOwnSay(m, text){
   if(TKOWN_BUSY[m.id]) return; TKOWN_BUSY[m.id] = 1; try{ const g = el("tkOwnGo"); if(g) g.disabled = true; }catch(e){}
@@ -44078,10 +44100,12 @@ function tick(dt){
   /* proper WASD: W/S walk, A/D step sideways, arrows look around */
   let vx = 0, vz = 0, turn = 0, tilt = 0;
   const KB = G.bind || DEFAULT_BIND;
-  if(keys[KB.forward]) vz += 1;
-  if(keys[KB.back]) vz -= 1;
-  if(keys[KB.stepL]) vx -= 1;
-  if(keys[KB.stepR]) vx += 1;
+  if(!(TALK.open && TALK.heldMove)){
+    if(keys[KB.forward]) vz += 1;
+    if(keys[KB.back]) vz -= 1;
+    if(keys[KB.stepL]) vx -= 1;
+    if(keys[KB.stepR]) vx += 1;
+  }
   /* The camera carries a half-turn offset, so increasing yaw swings the
      view to the LEFT — the look-left key must add, not subtract. */
   if(keys[KB.lookL] || keys.arrowleft)  turn += 1;
@@ -44851,7 +44875,10 @@ function frameBody(now, draw){
   }
   if(talkUp){
     const KB = G.bind || DEFAULT_BIND;
-    if(keys[KB.forward] || keys[KB.back] || keys[KB.stepL] || keys[KB.stepR]){
+    const held = !!(keys[KB.forward] || keys[KB.back] || keys[KB.stepL] || keys[KB.stepR]);
+    /* 20261110by: a key still held from the walk-up is not a walk-away */
+    if(TALK.heldMove){ if(!held) TALK.heldMove = false; }
+    else if(held){
       try{ closeTalk(); }catch(e){}
     }
   }
@@ -53080,13 +53107,53 @@ try{
   }
   TR.decorate = decorate;
   /* 20261030g: the open talk panel ends above the Say aloud bar (hmBar), so its actions are never under it */
-  function fitTalk(){ const T = el("talk"); if(!T) return; if(!T.classList.contains("is-open")){ T.style.removeProperty("bottom"); return; }
+  function fitTalk(){ const T = el("talk"); if(!T) return; if(!T.classList.contains("is-open")){
+    T.style.removeProperty("bottom"); T.style.removeProperty("padding-bottom");
+    try{ ["tkActs","tkOwn"].forEach(id => { const n = el(id); if(!n) return; ["position","left","right","bottom","z-index","max-height","min-height","overflow","width"].forEach(p => n.style.removeProperty(p)); }); }catch(e){}
+    return; }
     T.style.removeProperty("bottom"); const tr = T.getBoundingClientRect(); let top = Infinity;
     /* the Say aloud bar and any fixed strip docked along the bottom (the wire) */
     [document.getElementById("hmBar"), ...document.querySelectorAll("body > *")].forEach(e => { try{ if(!e || e === T || T.contains(e) || e.contains(T) || e.hidden) return; const cs = getComputedStyle(e); if(cs.display === "none" || cs.visibility === "hidden" || cs.position !== "fixed") return;
       const r = e.getBoundingClientRect(); if(r.height > 0 && r.height < 90 && r.width > innerWidth * 0.5 && r.top > innerHeight * 0.75) top = Math.min(top, r.top); }catch(x){} });
-    if(!isFinite(top)) return; const ov = Math.ceil(tr.bottom - top + 6);
-    if(ov > 0) T.style.setProperty("bottom", ov + "px", "important"); }
+    if(isFinite(top)){
+      const ov = Math.ceil(tr.bottom - top + 6);
+      if(ov > 0) T.style.setProperty("bottom", ov + "px", "important");
+    }
+    /* 20261110by: pin the reply box and the choices to the bottom of the
+       open panel so they stay inside it, above the Say aloud bar. Later
+       CSS had been spreading #tkActs below the panel (under #hmBar). */
+    try{
+      const acts = el("tkActs"), own = el("tkOwn");
+      const box = T.getBoundingClientRect();
+      let ceil = box.bottom;
+      const hm = document.getElementById("hmBar");
+      if(hm && !hm.hidden){ const hr = hm.getBoundingClientRect(); if(hr.height > 0 && hr.top > box.top) ceil = Math.min(ceil, hr.top); }
+      if(isFinite(top)) ceil = Math.min(ceil, top);
+      const innerB = Math.max(8, box.bottom - ceil + 8);
+      const room = Math.max(120, box.height - 8);
+      const actsMax = Math.max(88, Math.min(room * 0.42, room - 48));
+      if(acts){
+        acts.style.setProperty("position", "absolute", "important");
+        acts.style.setProperty("left", "14px", "important");
+        acts.style.setProperty("right", "14px", "important");
+        acts.style.setProperty("bottom", innerB + "px", "important");
+        acts.style.setProperty("z-index", "4", "important");
+        acts.style.setProperty("max-height", actsMax + "px", "important");
+        acts.style.setProperty("overflow", "auto", "important");
+        acts.style.setProperty("min-height", "88px", "important");
+      }
+      const ah = acts ? Math.min(actsMax, Math.max(88, acts.getBoundingClientRect().height)) : 0;
+      if(own && !own.hidden){
+        own.style.setProperty("position", "absolute", "important");
+        own.style.setProperty("left", "14px", "important");
+        own.style.setProperty("right", "14px", "important");
+        own.style.setProperty("bottom", (innerB + (acts ? ah + 6 : 0)) + "px", "important");
+        own.style.setProperty("z-index", "4", "important");
+      }
+      const reserved = innerB + (acts ? ah + 6 : 0) + ((own && !own.hidden) ? ((own.getBoundingClientRect().height) + 6) : 0);
+      T.style.setProperty("padding-bottom", reserved + "px", "important");
+    }catch(e){}
+  }
   TR.fitTalk = fitTalk; addEventListener("resize", () => { try{ fitTalk(); }catch(e){} });
   { const _rt = renderTalk; renderTalk = function(){ const r = _rt.apply(this, arguments); try{ if(TALK.open) decorate(); }catch(e){} return r; }; }
   /* Esc in the in-talk wire closes like Esc anywhere else; Enter (not typing) puts you in the reply box */
