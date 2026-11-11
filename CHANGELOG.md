@@ -4,6 +4,15 @@ Formerly *The Long Session*. Repo: [DominicVII/the-long-session](https://github.
 
 A first-person political life in an invented republic. You are one member of the House. Standing, influence, approval, and money come only from what you do — and from what other people remember.
 
+## 20261110by: you can hold a conversation — walk-up keys and visible choices
+
+`20261110by` (on `20261110bx`). Conversation-path fix only. Continue's label and default focus, Back as the primary confirm button, and Neptune's stacked blocks (`brEasyCss` / `brEasyJs`, `nlPromptFit*`, `nnQol*`, `boLookCss`) are untouched.
+
+- **Walk-up.** Walking up to someone holds W (or S / Q / C). Pressing E opened the conversation, then the game loop treated those still-held keys as "walk away" and closed it on the next frame, so it felt like the talk never started. `openTalk` now clears those keys, sets `TALK.heldMove`, and ignores them for walking and for dismiss until they have all been released once. A new press after that still walks you out. Esc and Leave it are unchanged.
+- **Choices.** The talk panel's max height and the header / line / reply box filled the panel, so every `#tkActs` choice was laid out below it, under the Say aloud bar (`#hmBar`). A click hit the bar, not the button. The reply box and the choices are now pinned to the bottom of the open panel, inside it, above that bar. Extra actions stay behind More.
+- **Reply box.** On a pointer desktop, the box takes focus even if the canvas still holds it, so a typed W or S goes into the line instead of walking you out. The Engine / fallback reply path is unchanged: if LiveTalk is down, `improvise` or a short fallback line still answers.
+- **Test.** `qa/convo-by.mjs` plays a new career and a Continue reload: E while W is held must keep the talk open, at least one choice must be hit-testable inside the panel above the Say aloud bar, and a typed line must get a reply.
+
 ## 20261110bx: a new career's first save writes
 
 `20261110bx` (on `20261110bw`). Save-path fix only. Continue's label and default focus, Back as the primary confirm button, and Neptune's stacked blocks (`brEasyCss` / `brEasyJs`, `nlPromptFit*`, `nnQol*`, `boLookCss`) are untouched.
