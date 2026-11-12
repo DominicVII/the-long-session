@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261112a">
+<meta name="onum-build" content="20261112b">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -46,7 +46,7 @@
   window.onumLimSet = function(k, v){ if(!(k in D)) return false; L[k] = fix(v); try{ var o = JSON.parse(localStorage.getItem("onum.limits") || "{}") || {}; o[k] = (L[k] === INF) ? null : L[k]; localStorage.setItem("onum.limits", JSON.stringify(o)); }catch(e){} return true; };
   window.onumLimReset = function(){ try{ localStorage.removeItem("onum.limits"); }catch(e){} Object.keys(D).forEach(function(k){ L[k] = D[k]; }); L._eff = {}; L._gov = null; return true; };
   var show = function(v){ return v === INF ? "inf" : (typeof v === "number" ? Math.round(v * 100) / 100 : v); };
-  window.onumLimDump = function(){ var out = {build:"20261112a", mode:L.mode || "scale"}; Object.keys(D).forEach(function(k){ out[k] = show(L[k]); });
+  window.onumLimDump = function(){ var out = {build:"20261112b", mode:L.mode || "scale"}; Object.keys(D).forEach(function(k){ out[k] = show(L[k]); });
     out.effective = {}; Object.keys(L._eff).forEach(function(k){ out.effective[k] = show(L._eff[k]); }); out.governor = L._gov;
     try{ out.engineBudgetMs = window.onumEngine ? show(window.onumEngine.budget) : null; out.frameMs = window.onumEngine ? show(window.onumEngine.dtEma) : null; }catch(e){} return out; };
   window.onumLimLine = function(){ var d = window.onumLimDump(), e = d.effective, g = function(k){ return e[k] != null ? e[k] + "*" : d[k]; };
@@ -71,7 +71,7 @@
 </script>
 <script>
 (function(){
-  var STAMP = "20261112a";
+  var STAMP = "20261112b";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -315,7 +315,7 @@ body.help-held .keys{display:flex !important; opacity:1; visibility:visible}
 .tiny span{display:block; height:3px; background:var(--line-soft); border-radius:2px; overflow:hidden; margin-top:3px}
 .tiny span b{display:block; height:100%}
 .talk__say{font-family:"Instrument Serif",Georgia,serif; font-size:18px; line-height:1.38; margin-bottom:5px;
-  max-width:72ch; max-height:9.6em; overflow:auto}
+  max-width:72ch; max-height:16em; overflow:auto}
 .talk__note{font-size:11px; color:var(--ink-3); margin-bottom:11px; min-height:1.3em; font-family:"JetBrains Mono",monospace}
 .talk__note b{color:var(--good); font-weight:500}
 .talk__note u{text-decoration:none; color:var(--bad)}
@@ -18396,7 +18396,15 @@ function voxFree(m, ctx){
   ]) : "";
   const text = fresh(() => {
     const lead = open ? (open + (open.endsWith(":") || open.endsWith("—") || open.endsWith("-") ? " " : " ")) : "";
-    return (lead + core + aside).replace(/\s+/g, " ").trim();
+    let t = (lead + core + aside).replace(/\s+/g, " ").trim();
+    if(t.length < 280){
+      if(bill) t += " " + (memberVote(m, bill) > 0
+        ? "When they call " + bill.title + " I will say aye, and " + bio.town + " already knows which."
+        : "I will not dress a no on " + bill.title + " up as caution. " + bio.town + " pays either way.");
+      else t += " " + bio.town + " is talking about " + bio.trouble + ", and that is the post, not the performance.";
+      if(m.intent && m.intent.t) t += " What I want this week is to " + m.intent.t + ".";
+    }
+    return t.replace(/\s+/g, " ").trim();
   }, 16);
   const kv = voxKindVal(text, m);
   if(ctx.forceK) kv.k = ctx.forceK;
@@ -18450,7 +18458,12 @@ function voxReplyFree(p, post){
       (p.mind && p.mind.concepts[0] ? "You said “" + frag + "”. I keep inventing " + p.mind.concepts[0].t + " in my head — " + (p.mind.concepts[0].d || "a concept this building has no word for.") : "“" + frag + "”. I wandered off into my own district while reading it.")
     ]
   };
-  const text = fresh(() => pick(lines[mode] || lines.deflect), 14);
+  let text = fresh(() => pick(lines[mode] || lines.deflect), 14);
+  try{
+    const bio = bioOf(p);
+    text += " From " + bio.town + " this reads as " + (hostile ? "another lecture from people who do not pay the bill." : "something a person could actually use, if it survives the morning.") +
+      (G.bill && !G.bill.done ? " The paper is still " + G.bill.title + "." : "");
+  }catch(e){}
   mindRemember(p, "experience", "Answered " + ah + " on Vox about “" + frag + "” (" + mode + ")");
   if(hostile) mindRemember(p, "thought", "Still chewing on “" + frag + "” from " + ah);
   const kv = voxKindVal(text, p);
@@ -23632,7 +23645,17 @@ function procLineFor(m, e){
   const mood = moodOf(m).val;
   if(mood < -30) pool.push("I am going to say the unpopular thing, since nobody else in this room will.");
   if(mood > 34)  pool.push("For once I think we are close to something workable, and I would hate to watch us lose it.");
-  return fresh(() => pick(pool));
+  const first = fresh(() => pick(pool));
+  const bio = (function(){ try{ return bioOf(m); }catch(e){ return {town:st, trouble:"the ordinary trouble"}; } })();
+  const second = b
+    ? (dir > 0 ? "I will vote aye on " + b.title + "." : "I will vote no on " + b.title + ".") +
+      " " + (bio.town || st) + " will feel it in " + (bio.trouble || "the ordinary week") +
+      ", and I would rather say that here than have it said about me in the paper."
+    : "There is no live paper, which is when this room gets careless. I would rather we named the thing we are actually deciding, and who at home pays for the delay.";
+  let third = "Ask me again in the corridor if you want the part I will not put in the record.";
+  try{ const c = creedOf(m.creed); if(c && c.t) third = "I hold with " + c.t + (c.holds ? " — " + c.holds : "") + ". I will not trade that for a quiet afternoon."; }catch(e2){}
+  if(m.intent && m.intent.t) third += " What I came in to do this week is " + m.intent.t + ".";
+  return first + " " + second + " " + third;
 }
 /* "Point of order" on its own is a noise. In a real chamber the member
    has to say what the point IS, and the clerk writes it down. So every
@@ -24547,11 +24570,11 @@ function speakAt(p, text){
 function overhear(a, b, lineA, lineB){
   if(!a || !b) return;
   try{ const h = {a:a.id, b:b.id, lines:[[a.name, lineA]], t:G.t}; a._huddle = b._huddle = h; if(lineB) setTimeout(() => { h.lines.push([b.name, lineB]); h.t = G.t; }, 2300); }catch(e){}
-  a.say = lineA; a.sayT = 4.6; a.sayTo = b.id; a.faceId = b.id; a.faceUntil = G.t + 5;
+  a.say = lineA; a.sayT = Math.max(7.4, 4.2 + lineA.length / 42); a.sayTo = b.id; a.faceId = b.id; a.faceUntil = G.t + 8;
   speakAt(a, lineA);
   if(lineB) setTimeout(() => {
     if(!b || b.gone) return;
-    b.say = lineB; b.sayT = 4.2; b.sayTo = a.id; b.faceId = a.id; b.faceUntil = G.t + 5;
+    b.say = lineB; b.sayT = Math.max(6.8, 4.0 + lineB.length / 42); b.sayTo = a.id; b.faceId = a.id; b.faceUntil = G.t + 8;
     speakAt(b, lineB);
   }, 2200 + Math.random()*900);
 }
@@ -24594,7 +24617,16 @@ function smallTalk(a, b){
     if(a.sent && a.sent.want) pool.push([a.sent.want, "That is yours. I will not caucus it."]);
   }catch(e){}
   const pair = pick(pool);
-  return [fresh(() => pair[0]), fresh(() => pair[1])];
+  const A0 = fresh(() => pair[0]), B0 = fresh(() => pair[1]);
+  const bioB = (function(){ try{ return bioOf(b); }catch(e){ return null; } })();
+  let A = A0, B = B0;
+  if(bill && A.length < 160) A += " I keep coming back to " + bill.title + ", and I have not heard a reason that survives " + (bioA.town || "home") + ".";
+  if(bioB && B.length < 180) B += " In " + (bioB.town || "my district") + " they would say " + (bioB.trouble || "we have heard this speech before") + ".";
+  try{
+    const c = creedOf(a.creed);
+    if(c && c.t && A.length < 240) A += " I check it against " + c.t + " before I check it against the whip.";
+  }catch(e){}
+  return [A, B];
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -25760,7 +25792,7 @@ function dossierFor(m){
   L.push("Money is counted in guilders (" + CURRENCY.sym + "); a campaign fund is spoken of in milles. " +
     "The guilder index stands at " + guilderIndex().toFixed(0) + ".");
   L.push("");
-  L.push("Reply as " + m.name + " speaking aloud: 1-3 sentences, plain spoken, no quotation marks, no name label. Be difficult if your mood and memories say you should be. Do not agree to anything a person in your position would not agree to.");
+  L.push("Reply as " + m.name + " speaking aloud: four to seven sentences, plain spoken, no quotation marks, no name label. Answer what was just said, then say why — name your town, the paper if there is one, and one thing you will not give. Be difficult if your mood and memories say you should be. Do not agree to anything a person in your position would not agree to.");
   L.push("Then on a FINAL separate line, output an effect tag exactly like this, with only the parts that apply:");
   L.push("<<warmth:+3 trust:+1 pledge:aye remember:short sentence in your own voice about what just happened>>");
   L.push("warmth and trust are small integers between -10 and +10 reflecting how this exchange changed your view of them. Include pledge only if you just committed your vote. Include remember only if this exchange was actually memorable.");
@@ -26257,6 +26289,39 @@ function applyImprovEffect(m, u, reply){
   m.known = Math.max(m.known || 0, 1);
 }
 
+/* a second movement: what they just heard, the paper, the town, the creed */
+function talkDepth(m, u){
+  try{
+    if(!m) return "";
+    if(m.kind === "press"){
+      const b = G.bill && !G.bill.done ? G.bill : null;
+      return "I need a name, a number, and something I can print by six. Colour is not a story. " +
+        (b ? "If this is about " + b.title + ", tell me who breaks and why they break." : "If there is no paper, tell me who is afraid, and of what.");
+    }
+    const bio = (function(){ try{ return bioOf(m); }catch(e){ return {town:"home", trouble:"the ordinary trouble"}; } })();
+    const said = String((u && u.raw) || "").replace(/\s+/g, " ").trim();
+    const bits = [];
+    if(said.length > 22) bits.push("You said “" + said.slice(0, 110) + (said.length > 110 ? "…" : "") + "”. I am answering that, not the version that will be repeated.");
+    const b = G.bill && !G.bill.done ? G.bill : null;
+    if(b && m.kind === "member" && !(u && u.topics && u.topics[0] === "bill")){
+      const aye = memberVote(m, b) > 0;
+      let why = "";
+      try{ const st = stakeIn(m, b); if(st && st.why) why = " " + st.why; }catch(e){}
+      bits.push("On " + b.title + " I am " + (aye ? "an aye" : "a no") + "." + why);
+    }
+    if(bio && bio.town && !(u && u.topics && u.topics[0] === "home"))
+      bits.push("Take it back to " + bio.town + ": " + (bio.trouble || "they are tired of being the example in somebody else's speech") + ".");
+    try{
+      const w = wxToday();
+      if(w && (w.k === "rain" || w.k === "storm" || w.k === "snow")) bits.push("On a day like this the cloakroom does the real work. The floor is theatre.");
+    }catch(e){}
+    if(m.creed && !(u && u.topics && u.topics[0] === "creed")){
+      try{ const c = creedOf(m.creed); if(c && c.holds) bits.push("I check it against " + c.t + ": " + c.holds + "."); }catch(e){}
+    }
+    if(m.intent && m.intent.t) bits.push("What I came in to do this week is still " + m.intent.t + ".");
+    return bits.filter(Boolean).slice(0, 4).join(" ");
+  }catch(e){ return ""; }
+}
 /* what they say back, and what it does — fully offline, cause-aware */
 function improvise(m, said){
   const u = understand(m, said);
@@ -26406,6 +26471,10 @@ function improvise(m, said){
           ]), null, r), 14);
   }
   if(body) out.push(body);
+  if(!short && u.intent !== "farewell" && u.intent !== "greet"){
+    const deep = talkDepth(m, u);
+    if(deep) out.push(deep);
+  }
 
   /* ── cause / stake / party colour that makes them unique ── */
   if(!short && r() < 0.42){
@@ -26450,11 +26519,11 @@ function improvise(m, said){
         "Do not make me walk it back: " + bit + "."
       ]));
   }
-  const maxBeats = short ? 2 : (u.intent === "question" || u.topics[0] !== "none" ? 5 : 4);
+  const maxBeats = short ? 3 : (u.intent === "question" || u.topics[0] !== "none" ? 8 : 7);
   const cleaned = out.filter(Boolean).filter(s => !tooRecent(m, s));
   const use = cleaned.length ? cleaned : out.filter(Boolean);
   let line = use.slice(0, maxBeats).join(" ");
-  if(line.length > 420) line = line.slice(0, 410).replace(/[^ ]*$/, "").trim() + "…";
+  if(line.length > 1100) line = line.slice(0, 1080).replace(/[^ ]*$/, "").trim() + "…";
   /* sometimes the answer runs into the thing they cannot name */
   if(!short && u.intent !== "farewell" && r() < 0.3){ try{ line += " " + reachFor(m); }catch(e){} }
   noteSaid(m, line);
@@ -37110,7 +37179,10 @@ function voxTurn(m, prev, depth, topic){
   if(topic === "the machines") extra.push("Whatever one thinks of them, the letters are being answered faster than they ever were.", "My clerk says the machine read the whole bill in a minute. I don't know whether to be glad.");
   if(topic === "prices") extra.push("My constituents do the arithmetic at the till, not in a committee.");
   try{ const F = G.inq && G.inq.fnd; if(F && F.open && F.open[0] && chance(0.12)){ const c = fndConcepts().find(x => x.id === F.open[0].k); if(c) extra.push("Unrelated, but the Academy says they're testing whether " + c.claim.toLowerCase().replace(/\.$/, "") + ". I have opinions."); } }catch(e){}
-  return pick(pools[kind].concat(extra, extra));
+  const line = pick(pools[kind].concat(extra, extra));
+  const tail = " " + (bio.town || "Home") + " would add this: " +
+    (topic === "the bill" || topic === "the count" ? "read the clause before you perform it, and say who pays." : "name the town, or stop talking.");
+  return (line + tail).replace(/\s+/g, " ").trim();
 }
 function voxThread(root, m){
   const others = G.members.filter(x => x !== m && !x.gone && chance((x.voxAppetite || 30) / 100)); if(!others.length) return;
@@ -37751,11 +37823,23 @@ function cabPick(text){
 }
 /* 20261104bb NEPTUNE: a called-on member is seen speaking at once, as text on the floor desk, whether or not voice is invited or LiveTalk answers */
 function cabPaint(p, text, aside){ if(!p || !text) return; try{ const FD = window.NEPTUNE_FLOORDESK, D = document.getElementById("ndFd"); if(FD && typeof FD.line === "function" && D && !D.hidden){ const L0 = D.querySelector(".fd-log"), l0 = L0 && L0.lastElementChild, t0 = l0 && l0.querySelector(".t"); if(l0 && l0._pid === p.id && t0 && t0.textContent === String(text)) return; FD.line(p.id, String(text), !!aside); const L = D.querySelector(".fd-log"), d = L && L.lastElementChild; if(d){ d._done = true; d._pid = p.id; const t = d.querySelector(".t"); if(t) t.textContent = String(text); L.scrollTop = L.scrollHeight; } } }catch(e){} try{ vhSay(p, String(text)); }catch(e){} }
-function cabFallback(p){ const role = String((p && p.role) || "my office"); return "Chair, from " + role + ": the department is working through today\u2019s papers. Nothing needs your decision this minute beyond what is on the order paper, and I will put the detail in writing. I need the chair\u2019s support on our next request."; }
+function cabFallback(p){
+  const role = String((p && p.role) || "my office");
+  const b = G.bill && !G.bill.done ? G.bill : null;
+  let bio = {town:"the country", trouble:"money, time, and a letter that has not been answered"};
+  try{ bio = bioOf(p) || bio; }catch(e){}
+  const bits = ["Chair, from " + role + "."];
+  bits.push(b
+    ? "The paper in front of the House is " + b.title + ". My office reads it as something " + (bio.town || "the country") + " will feel in " + (bio.trouble || "the ordinary week") + "."
+    : "There is no live paper. The department is still answering last week's letters, and they are about " + (bio.trouble || "money and time") + ".");
+  bits.push("What I need from the chair is a decision I can take downstairs: hold, amend, or let it die. I will put the figures in writing before the day is out.");
+  bits.push("I will not pretend the rest of this table agrees with me, and I will not speak for an office that is not mine.");
+  return bits.join(" ");
+}
 async function cabAsk(p, you, text, kind, callOn){
   if(!p) return; const LT = window.onumLiveTalk; if(!LT || !LT.reply){ if(callOn){ const f = cabFallback(p); cabPaint(p, f); try{ tlog(p.name, f, "talk"); }catch(e){} try{ if(SSN) ssnPublish(); }catch(e){} } return; }
-  const ctx = "You are in a " + (kind === "governor_council" ? "governor's council" : "cabinet meeting") + " chaired by " + (typeof ndYou === "function" ? ndYou().address || "the chair" : "the chair") + ", who has just spoken to the room or to you. Answer as the person you are, in your own words, in one to four sentences, within your own office's duties. Do not speak for anyone else. If it belongs to another office, say whose it is.";
-  let out = ""; try{ const r = await Promise.race([LT.reply({npcId:p.id, channel:"face", text, extra:ctx, max:200}), new Promise(res => setTimeout(() => res(null), callOn ? 25000 : 120000))]); out = r && r.text ? String(r.text).trim() : ""; }catch(e){}
+  const ctx = "You are in a " + (kind === "governor_council" ? "governor's council" : "cabinet meeting") + " chaired by " + (typeof ndYou === "function" ? ndYou().address || "the chair" : "the chair") + ", who has just spoken to the room or to you. Answer as the person you are, in your own words, in five to eight sentences: what is actually happening in your office, who at home pays, what you need from the chair, and one thing you will not pretend. Do not speak for anyone else. If it belongs to another office, say whose it is and why.";
+  let out = ""; try{ const r = await Promise.race([LT.reply({npcId:p.id, channel:"face", text, extra:ctx, max:640}), new Promise(res => setTimeout(() => res(null), callOn ? 25000 : 120000))]); out = r && r.text ? String(r.text).trim() : ""; }catch(e){}
   if(!out){ if(!callOn) return; out = cabFallback(p); } else out = liveClean ? (liveClean(out) || out) : out;
   try{ speakAt(p, out); }catch(e){} cabPaint(p, out); try{ tlog(p.name, out, "talk"); }catch(e){} try{ lLog(p.name + ": " + out.slice(0, 160), "session"); }catch(e){}
   try{ if(SSN) ssnPublish(); }catch(e){}
@@ -37766,7 +37850,7 @@ function cabCallOn(id){
   try{ const p = byId(isNaN(+id) ? id : +id); if(!p || !SSN) return false; const kind = SSN.kind;
     try{ SSN.floorId = p.id; ssnPublish(); }catch(e){}
     cabPaint(p, "rises to report\u2026", true);
-    cabAsk(p, G.you, "(You call on " + p.name + " by name.) Give your report: what is going on in your department today, what needs a decision, and what you need from the chair. Two to four sentences.", kind, true).then(() => { try{ if(SSN && SSN.floorId === p.id){ SSN.floorId = null; ssnPublish(); } }catch(e){} });
+    cabAsk(p, G.you, "(You call on " + p.name + " by name.) Give your report: what is going on in your department today, who pays for it at home, what needs a decision, and what you need from the chair. Five to eight sentences. Do not pretend the table agrees.", kind, true).then(() => { try{ if(SSN && SSN.floorId === p.id){ SSN.floorId = null; ssnPublish(); } }catch(e){} });
     return true; }catch(e){ return false; } }
 window.onumSession.callon = cabCallOn;
 /* the wire, as one quiet line above the bottom bar: the newest headline, then the next, every few seconds. Click it for the Ledger. */
@@ -47438,7 +47522,7 @@ try{
   }
   async function chatNet(messages, o){
     o = o || {};
-    const body = {model:o.model || CFG.model, messages, stream:!o.json, think:false, options:{temperature:o.temp == null ? 0.85 : o.temp, num_predict:o.max || 160, repeat_penalty:1.18}};
+    const body = {model:o.model || CFG.model, messages, stream:!o.json, think:false, options:{temperature:o.temp == null ? 0.85 : o.temp, num_predict:o.max || 520, repeat_penalty:1.18}};
     if(o.json){ body.format = "json"; body.stream = false; }
     const r = await fetch(CFG.url + "/api/chat", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body), signal:o.signal});
     if(!r.ok){ let em = ""; try{ em = ((await r.json()).error || "").slice(0, 160); }catch(e){} throw Object.assign(new Error("ollama " + r.status + (em ? ": " + em : "")), {code:"http"}); }
@@ -47454,9 +47538,9 @@ try{
   /* ── prompt ───────────────────────────────────────── */
   const STYLE = {
     aide:"You are the player's own chief of staff, loyal and frank. Answer their question about the state of play from the facts above, explain anything they ask, and give practical advice. 2-6 sentences.",
-    face:"You are speaking aloud, face to face. 1-4 sentences, plain spoken.",
-    sitting:"You are speaking on the record in a formal sitting. 1-3 sentences, in the register of the chamber.",
-    phone:"You are on the telephone. Spoken, clipped, 1-3 short sentences.",
+    face:"You are speaking aloud, face to face. Answer what was just said, then say why, in four to seven sentences. Name the place you answer to, the paper if there is one, and one thing you will not give. Plain spoken.",
+    sitting:"You are speaking on the record in a formal sitting. Five to eight sentences, in the register of the chamber: the question, your vote or your office's view, who at home pays, and what you want the chair to do.",
+    phone:"You are on the telephone. Spoken, three to five sentences. Get to the ask, then say why it cannot wait.",
     dm:"This is a private text message. Terse: one or two short lines, no greeting, no sign-off.",
     text:"This is a private text message. Terse: one or two short lines, no greeting, no sign-off.",
     mail:"This is a formal letter. Open with a salutation to them, 2-5 sentences, close with a sign-off and your name.",
@@ -48644,8 +48728,10 @@ try{
   const lastOf = (id, st) => ((st && st.memory) || []).slice(-5).map(memText).concat(CD.said[String(id)] || []);
   /* length by context */
   function fit(t, stage, terse){ const S = String(t || "").replace(/\s+/g, " ").trim().match(/[^.!?…]+[.!?…]+["'”’)]*|[^.!?…]+$/g) || [];
-    const floor = /floor|sitting|speech|debate|chamber/i.test(stage || ""), max = terse ? 1 : floor ? 4 : 1;
-    let o = S.slice(0, max).map(x => x.trim().replace(/^(["'“‘(]?)([a-z])/, (m, q, c) => q + c.toUpperCase())).join(" ").trim(); if(!floor && o.length > 160) o = o.slice(0, 157).replace(/\s+\S*$/, "") + "\u2026"; return o; }
+    const floor = /floor|sitting|speech|debate|chamber|meeting|cabinet|council|press|hearing/i.test(stage || ""), max = terse ? 2 : floor ? 6 : 3;
+    let o = S.slice(0, max).map(x => x.trim().replace(/^(["'“‘(]?)([a-z])/, (m, q, c) => q + c.toUpperCase())).join(" ").trim();
+    const cap = terse ? 240 : floor ? 900 : 520;
+    if(o.length > cap) o = o.slice(0, cap - 1).replace(/\s+\S*$/, "") + "\u2026"; return o; }
   const pickR = a => a && a.length ? a[Math.floor(Math.random() * a.length)] : "";
   /* offline, from their state: want+reason or reaction+question, in their voice */
   function slotLine(p, st, ctx){ st = st || {}; const v = st.voice || {}, w = st.wants || {}, heard = String(ctx.text || "").trim();
@@ -48663,7 +48749,9 @@ try{
     if(mem.length) S.push((blunt ? "Last time you " : "I remember you ") + mem[mem.length - 1].replace(/^you /i, "").replace(/\.$/, "") + (blunt ? ". Still true?" : "."));
     if(stance) S.push((blunt ? "I'm " : "I suppose I'm ") + String(stance).replace(/\.$/, "") + ".");
     if(!S.length) S.push(pickR(["I don't know.", "Ask me later.", "Not now.", "I was just going to\u2026 never mind."]));
-    let line = S[CD.n % S.length]; if(pet && !terse && Math.random() < 0.4) line += " " + pet.replace(/^./, c => c.toUpperCase()).replace(/[^.!?…]$/, m => m + ".");
+    let line = S[CD.n % S.length];
+    if(!terse && S.length > 1){ const extra = S[(CD.n + 1) % S.length]; if(extra && extra !== line) line += " " + extra; }
+    if(pet && !terse && Math.random() < 0.4) line += " " + pet.replace(/^./, c => c.toUpperCase()).replace(/[^.!?…]$/, m => m + ".");
     return line; }
   /* one candid line, offline, checked; up to 2 retries */
   function offlineLine(p, ctx){ CD.n++; const st = ctx.state || sv(() => window.onumSpeakerState(p.id, ctx.audience)) || {}; const last = lastOf(p.id, st), K = known();
@@ -48690,11 +48778,11 @@ try{
       if(st.grudge && (st.grudge.what || st.grudge.why)) x.push("A grudge you hold against them: " + (st.grudge.what || st.grudge.why) + ".");
       if(st.debt && st.debt.what) x.push("What is owed between you: they " + st.debt.what + ".");
       if(st.mood && st.mood.label) x.push("Your mood today: " + st.mood.label + ".");
-      x.push("The moment: " + (/floor|sitting|chamber/i.test(ctx.stage || "") ? "on the floor, others listening; one to four sentences." : "an aside; one line.") + (st.voice && st.voice.terse ? " You are a person of few words." : ""));
+      x.push("The moment: " + (/floor|sitting|chamber|meeting|cabinet|press|hearing/i.test(ctx.stage || "") ? "on the record, others listening. Five to eight sentences: the question, your view, who at home pays, and what you want done." : "face to face. Three to five sentences. Answer what was said, then say why, and name one thing you will not give.") + (st.voice && st.voice.terse ? " You are a person of few words, but you still finish the thought." : ""));
       return pr + "\n" + x.join("\n"); }catch(e){ return pr; } }
   function liveUp(){ const L = window.onumLiveTalk; return !!(L && L.status && L.status.up === true && typeof L.chat === "function"); }
   async function liveLine(p, ctx, prompt, ms){ if(!prompt || !liveUp()) return null; const c = new AbortController(), t = setTimeout(() => c.abort(), ms);
-    try{ const out = await window.onumLiveTalk.chat([{role:"system", content:prompt}, {role:"user", content:ctx.text ? String(ctx.text) : "(your turn to speak)"}], {signal:c.signal, max:/floor/i.test(ctx.stage || "") ? 140 : 60, temp:0.9, json:true});
+    try{ const out = await window.onumLiveTalk.chat([{role:"system", content:prompt}, {role:"user", content:ctx.text ? String(ctx.text) : "(your turn to speak)"}], {signal:c.signal, max:/floor|sitting|meeting|cabinet|hearing|press/i.test(ctx.stage || "") ? 640 : 420, temp:0.9, json:true});
       clearTimeout(t); return out ? String(out).replace(/^["'\s]+|["'\s]+$/g, "") : null; }catch(e){ clearTimeout(t); return null; } }
   /* JUPITER's request: answer in time, always */
   addEventListener("onum-speak", ev => { try{ const D = ev.detail || {}; const p = sv(() => byId(D.speaker)) || sv(() => everyone().find(q => q && String(q.id) === String(D.speaker))); if(!p || D.reqId == null) return;
@@ -52616,7 +52704,7 @@ cabCallOn = function(id){ try{ const p = byId(isNaN(+id) ? id : +id); if(!p || !
     try{ SSN.floorId = p.id; ssnPublish(); }catch(e){}
     /* keep Neptune aside + callOn so bc 25s/cabFallback + cabPaint desk path stay alive */
     try{ cabPaint(p, "rises to report…", true); }catch(e){}
-    cabAsk(p, G.you, "(You call on " + p.name + " by name.) Give your report: what is going on in your department today, what needs a decision, and what you need from the chair. Two to four sentences.", kind, true).then(() => { try{ if(SSN && SSN.floorId === p.id){ SSN.floorId = null; ssnPublish(); } }catch(e){} });
+    cabAsk(p, G.you, "(You call on " + p.name + " by name.) Give your report: what is going on in your department today, who pays for it at home, what needs a decision, and what you need from the chair. Five to eight sentences. Do not pretend the table agrees.", kind, true).then(() => { try{ if(SSN && SSN.floorId === p.id){ SSN.floorId = null; ssnPublish(); } }catch(e){} });
     return true; }catch(e){ return false; } };
 { const _co = window.onumSession.callon; window.onumSession.callon = function(id){ try{ if(cabKind()) return cabCallOn(id); }catch(e){} return _co ? _co.apply(this, arguments) : false; }; }
 /* D. before Decisions, two to four named exchanges between secretaries; B. Decisions is a called, cast, tallied vote */
