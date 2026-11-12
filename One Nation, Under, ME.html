@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261112b">
+<meta name="onum-build" content="20261112c">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -46,7 +46,7 @@
   window.onumLimSet = function(k, v){ if(!(k in D)) return false; L[k] = fix(v); try{ var o = JSON.parse(localStorage.getItem("onum.limits") || "{}") || {}; o[k] = (L[k] === INF) ? null : L[k]; localStorage.setItem("onum.limits", JSON.stringify(o)); }catch(e){} return true; };
   window.onumLimReset = function(){ try{ localStorage.removeItem("onum.limits"); }catch(e){} Object.keys(D).forEach(function(k){ L[k] = D[k]; }); L._eff = {}; L._gov = null; return true; };
   var show = function(v){ return v === INF ? "inf" : (typeof v === "number" ? Math.round(v * 100) / 100 : v); };
-  window.onumLimDump = function(){ var out = {build:"20261112b", mode:L.mode || "scale"}; Object.keys(D).forEach(function(k){ out[k] = show(L[k]); });
+  window.onumLimDump = function(){ var out = {build:"20261112c", mode:L.mode || "scale"}; Object.keys(D).forEach(function(k){ out[k] = show(L[k]); });
     out.effective = {}; Object.keys(L._eff).forEach(function(k){ out.effective[k] = show(L._eff[k]); }); out.governor = L._gov;
     try{ out.engineBudgetMs = window.onumEngine ? show(window.onumEngine.budget) : null; out.frameMs = window.onumEngine ? show(window.onumEngine.dtEma) : null; }catch(e){} return out; };
   window.onumLimLine = function(){ var d = window.onumLimDump(), e = d.effective, g = function(k){ return e[k] != null ? e[k] + "*" : d[k]; };
@@ -71,7 +71,7 @@
 </script>
 <script>
 (function(){
-  var STAMP = "20261112b";
+  var STAMP = "20261112c";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -7639,7 +7639,14 @@ function pcTab(){
     out.push('<div class="pc__h">The country</div><div>National mood ' + (G.mood > 0 ? "+" : "") + Math.round(G.mood || 0) + '</div>');
     try{ if(typeof govPopularity === "function") out.push('<div>Government popularity ' + Math.round(govPopularity()) + '</div>' + pcBar(govPopularity())); }catch(e){}
     const r = typeof rivalLive === "function" ? rivalLive() : null;
-    if(r) out.push('<div class="pc__h">At home</div><div>' + pcEsc(r.name) + ' wants your seat.</div><button class="pc__btn" data-pcgo="rival">Rivals</button>');
+    if(r) out.push('<div class="pc__h">At home</div><div>' + pcEsc(r.name) + ' wants your seat. Heat ' + Math.round(r.heat || 0) + '.</div><button class="pc__btn" data-pcgo="rival">Rivals</button>');
+    const hist = (G.polls || []).slice(-8);
+    if(hist.length) out.push('<div class="pc__h">Soundings</div><div class="pc__m">' + hist.map(p => "d" + p.d + " " + p.v).join(" · ") + '</div>');
+    try{
+      const races = (G.states || []).slice().sort((a, b) => Math.abs(b.lean || 0) - Math.abs(a.lean || 0)).slice(0, 6);
+      if(races.length) out.push('<div class="pc__h">The map</div>' + races.map(s => '<div>' + pcEsc(s.n) + ' · ' + ((s.lean || 0) > 8 ? "Federalist" : (s.lean || 0) < -8 ? "Commonwealth" : "toss-up") + ((s.unrest || 0) > 55 ? " · restless" : "") + '</div>').join(""));
+    }catch(e){}
+    if(G.bill && !G.bill.done){ let fit = 0; try{ fit = districtFit(G.bill); }catch(e){} out.push('<div class="pc__h">The live bill</div><div>' + pcEsc(G.bill.title) + ' · home ' + (fit > 8 ? "can live with it" : fit < -8 ? "will feel it" : "is split") + ' · you are ' + (y.vote === 1 ? "aye" : y.vote === -1 ? "no" : y.vote === 0 ? "present" : "undeclared") + '</div>'); }
   } else if(t === "money"){
     out.push('<div class="pc__h">War chest · ' + money(y.funds || 0) + '</div>');
     out.push('<div>Field organisers ' + (y.field || 0) + ' · aides ' + (y.staff || 0) + (y.dOffice ? ' · district office open' : '') + '</div>');
@@ -27984,8 +27991,17 @@ function setGlassPrompt(header, choices){
     return;
   }
   try{ closeTip(); }catch(e){}
+  if(!pr._stick){
+    pr._stick = true;
+    const arm = () => { pr._down = true; glassArmHold(120000); };
+    pr.addEventListener("pointerdown", arm);
+    pr.addEventListener("pointerenter", arm);
+    pr.addEventListener("pointerup", () => { pr._down = false; glassArmHold(25000); });
+    pr.addEventListener("pointercancel", () => { pr._down = false; });
+    pr.addEventListener("pointerleave", () => { pr._down = false; });
+  }
   glassHoldKey = key;
-  glassArmHold(16000);
+  glassArmHold(45000);
   pr.classList.add("is-live");
   pr.hidden = false;
   pr._said = key;
@@ -28595,6 +28611,11 @@ function seatOutOfHand(){
 }
 
 function updatePrompt(thing, dr, seat){
+  const pr0 = el("prompt");
+  if(pr0 && pr0._down && pr0.classList.contains("is-live") && promptActs && promptActs.length){
+    glassArmHold(120000);
+    return;
+  }
   if(!G.running || TALK.open || !veil.hidden){
     glassClearHold();
     setGlassPrompt(null, null);
@@ -32257,7 +32278,51 @@ function paintAims(){
     if(box._sig !== sig){ box._sig = sig; nx.textContent = next ? done + "/" + Gs.list.length + " \u00b7 " + next.t + (next.k === "talk" ? " (" + next.have + "/" + next.need + ")" : "") : "All done today \u2713"; if(all) setHTML(all, goalsHTML()); }
     box.hidden = false; }catch(e){}
 }
+function paintVoteDock(){
+  let d = document.getElementById("voteDock");
+  const b = G.bill && !G.bill.done ? G.bill : null;
+  const busy = !!(TALK && TALK.open) || !!(typeof veil !== "undefined" && veil && !veil.hidden);
+  const hide = !b || !G.you || !G.running || busy;
+  if(!d){
+    d = document.createElement("div");
+    d.id = "voteDock";
+    d.innerHTML = '<b id="voteDockT"></b><span id="voteDockW"></span><button type="button" data-vi="1">Aye</button><button type="button" data-vi="-1">No</button><button type="button" data-vi="0">Present</button>';
+    document.body.appendChild(d);
+    d.addEventListener("click", ev => {
+      const bt = ev.target && ev.target.closest && ev.target.closest("[data-vi]");
+      if(!bt || !G.you || !G.bill || G.bill.done) return;
+      ev.preventDefault(); ev.stopPropagation();
+      const v = +bt.getAttribute("data-vi");
+      G.you.vote = v;
+      try{ if(v) taylorDayVoteDefiance(v); }catch(x){}
+      try{ note("You are " + (v > 0 ? "aye" : v < 0 ? "no" : "present") + " on " + G.bill.title + ".", true); }catch(x){}
+      try{ if(typeof TLSCollab !== "undefined" && v) TLSCollab.recordAction({kind:"intention", vote:v, billId:G.bill.id, title:G.bill.title}); }catch(x){}
+      paintVoteDock();
+      try{ if(document.querySelector(".pane.is-on") && document.querySelector(".pane.is-on").id === "paneFloor") refreshFloor(); }catch(x){}
+    });
+  }
+  const tk = document.getElementById("talk");
+  if(tk && !tk._stick){
+    tk._stick = true;
+    tk.addEventListener("pointerdown", () => { tk._down = true; });
+    tk.addEventListener("pointerup", () => { tk._down = false; });
+    tk.addEventListener("pointercancel", () => { tk._down = false; });
+    tk.addEventListener("pointerleave", () => { tk._down = false; });
+  }
+  if(hide){ d.hidden = true; return; }
+  d.hidden = false;
+  const v = G.you.vote;
+  const title = String(b.title || "The bill");
+  const t = document.getElementById("voteDockT");
+  const w = document.getElementById("voteDockW");
+  if(t) t.textContent = title.length > 48 ? title.slice(0, 46) + "…" : title;
+  let fit = 0; try{ fit = districtFit(b); }catch(e){}
+  if(w) w.textContent = (v === 1 ? "You are aye." : v === -1 ? "You are no." : v === 0 ? "You are present." : "Undeclared.") +
+    " Home " + (fit > 8 ? "can live with it." : fit < -8 ? "will feel this as written for somewhere else." : "is split.");
+  d.querySelectorAll("[data-vi]").forEach(bt => bt.classList.toggle("is-on", +bt.getAttribute("data-vi") === v));
+}
 function paintJob(){
+  try{ paintVoteDock(); }catch(e){}
   try{ paintAims(); }catch(e){}
   try{ lifeMorningCheck(); lifeMailCheck(); }catch(e){}
   try{ lTick(); }catch(e){}
@@ -32593,9 +32658,13 @@ function sitChoices(room, step){
     deliberate:[["Take the full time to work it", 0.10, {support:3, pledge:1}, {}, "safe"],
                 ["Spend from the war chest for votes", 0.25, {pledge:3, support:4, funds:-4}, {funds:-4}, "deal"],
                 ["Cut it short", 0.0, {}, {standing:-2, support:-2}, "rush"]],
-    vote:[["Cast your vote and say why", 0.10, {standing:1, approval:1}, {}, "safe"],
+    vote:[["Aye — and say why", 0.10, {standing:1, approval:1, vote:1}, {}, "safe"],
+          ["No — and say why", 0.10, {standing:1, vote:-1}, {}, "safe"],
+          ["Present. I am in the room and I am not voting", 0.05, {vote:0}, {standing:-1}, "safe"],
           ["Speak last and swing it", 0.40, {influence:3, support:4}, {standing:-2}, "bold"]],
-    ruling:[["Decide narrowly", 0.10, {standing:1}, {}, "safe"],
+    ruling:[["Aye. Decide it and own it", 0.15, {standing:2, approval:1, vote:1}, {}, "safe"],
+            ["No. Send it back", 0.15, {standing:1, vote:-1}, {approval:-1}, "safe"],
+            ["Decide narrowly", 0.10, {standing:1}, {}, "safe"],
             ["Decide broadly and own it", 0.40, {standing:3, approval:2}, {standing:-2, approval:-2}, "bold"]]
   };
   return C[step] || null;
@@ -32606,6 +32675,11 @@ function sitApply(d, sign){
   const add = (k, v, lab) => { if(!v) return; y[k] = clamp((y[k] || 0) + v, 0, 100); out.push((v > 0 ? "+" : "") + v + " " + lab); };
   add("standing", d.standing, "standing"); add("influence", d.influence, "influence"); add("approval", d.approval, "approval");
   if(d.funds){ y.funds = Math.max(0, (y.funds || 0) + d.funds); out.push((d.funds > 0 ? "+" : "") + d.funds + " war chest"); }
+  if(d.vote === 1 || d.vote === -1 || d.vote === 0){
+    y.vote = d.vote;
+    try{ if(d.vote) taylorDayVoteDefiance(d.vote); }catch(e){}
+    out.push(d.vote > 0 ? "you are aye" : d.vote < 0 ? "you are no" : "you are present");
+  }
   if(d.heat){ const r = rivalLive(); if(r){ r.heat = clamp((r.heat || 0) + d.heat, 0, 100); out.push("rival heat " + (d.heat > 0 ? "+" : "") + d.heat); } }
   if(d.support && G.bill && !G.bill.done){ G.bill.sitSupport = (G.bill.sitSupport || 0) + d.support; out.push((d.support > 0 ? "+" : "") + d.support + " bill support"); }
   if(d.pledge && G.bill && !G.bill.done){
@@ -39390,6 +39464,34 @@ function npMatter(){
   }catch(e){}
   return bits.join(" ");
 }
+function npPolls(){
+  const y = G.you; if(!y) return "";
+  const hist = (G.polls || []).slice(-10);
+  const bars = hist.map(p => {
+    const h = Math.max(6, Math.round((p.v || 0) * 0.46));
+    return '<i title="day ' + p.d + " · " + p.v + '" style="display:inline-block;width:12px;height:' + h + 'px;background:#8a6a2a;margin:0 2px;vertical-align:bottom"></i>';
+  }).join("");
+  const last = hist.length ? hist[hist.length - 1].v : Math.round(y.approval);
+  const prev = hist.length > 1 ? hist[hist.length - 2].v : last;
+  const swing = Math.round(last - prev);
+  let races = "";
+  try{
+    races = (G.states || []).slice().sort((a, b) => Math.abs(b.lean || 0) - Math.abs(a.lean || 0)).slice(0, 5)
+      .map(s => s.n + " " + ((s.lean || 0) > 8 ? "leans Federalist" : (s.lean || 0) < -8 ? "leans Commonwealth" : "is a toss-up") + ((s.unrest || 0) > 55 ? " and restless" : "")).join(". ");
+  }catch(e){}
+  const bill = G.bill && !G.bill.done ? G.bill : null;
+  let onBill = "";
+  try{
+    if(bill){
+      const fit = districtFit(bill);
+      onBill = " On " + bill.title + ", the district " + (fit > 8 ? "can live with the text" : fit < -8 ? "reads it as written for somewhere else" : "is split") + ", and you are " + (y.vote === 1 ? "aye" : y.vote === -1 ? "no" : y.vote === 0 ? "present" : "undeclared") + ".";
+    }
+  }catch(e){}
+  return '<div class="np__band">The polls</div><p class="np__matter">Home approval stands at ' + Math.round(y.approval) +
+    (hist.length > 1 ? " (" + (swing > 0 ? "+" : "") + swing + " since the last sounding, margin of error 3)" : "") +
+    ". " + (races ? races + ". " : "") + onBill + '</p>' +
+    (bars ? '<div style="text-align:center;margin:0 0 14px;line-height:0">' + bars + '</div>' : '');
+}
 function npHTML(){
   const P = paperBuild(), D = G.day, y = G.you, r = rng(seedOf("np:" + D + ":" + (G.country || "")));
   const sts = (G.states || []).slice(), hot = sts.slice().sort((a, b) => b.unrest - a.unrest)[0], bright = sts.slice().sort((a, b) => b.ind - a.ind)[0];
@@ -39430,6 +39532,7 @@ function npHTML(){
     '</div>' +
     '<div class="np__band">The presses disagree</div><div class="np__cols">' + party.join("") + faith + '</div>' +
     '<div class="np__cols">' + ind + col("Small headlines, from other papers", small(other)) + col("From the desks", (function(){ let h = ""; [() => agLedgerHTML(), () => sbLedgerHTML(), () => riteLedgerHTML(), () => govLedgerHTML(), () => orgLedgerHTML()].forEach(f => { try{ h += f() || ""; }catch(e){} }); return h || '<p class="np__q">Nothing from the desks today.</p>'; })()) + '</div>' +
+    npPolls() +
     '<p class="np__foot">' + pcEsc(P.poll) + (P.letter ? ' Letters from home: ' + pcEsc(P.letter) : '') + '</p></div>';
 }
 function paperCard(){
@@ -51111,7 +51214,33 @@ try{
       try{ const t1 = body.querySelector(":scope>textarea"), r1 = body.querySelector(":scope>.fd-row"); if(t1 && r1 && !t1.closest(".fd-reply")){ const w = document.createElement("div"); w.className = "fd-reply"; t1.parentNode.insertBefore(w, t1); w.appendChild(t1); w.appendChild(r1); } }catch(e){}
       const turn = isMe(S.floorId) || isMe(S.offer), chair = S.chairId === "you", fl = S.floorId != null && !isMe(S.floorId), press = /press/.test(String(S.kind || ""));
       const q = (Array.isArray(S.queue) ? S.queue : []).filter(x => !isMe(x));
-      const sig = [turn, chair, fl, press, q.join(","), !!S.held].join("|"); if(A.dataset.sig === sig) return; A.dataset.sig = sig;
+      const sig = [turn, chair, fl, press, q.join(","), !!S.held].join("|");
+      try{
+        if(typeof cabKind === "function" && cabKind() && SSN){
+          let V = D.querySelector(".fd-vote");
+          const youV = (SSN.votes && SSN.votes.you) || "";
+          const stg = (function(){ try{ return ssnStage().id; }catch(e){ return ""; } })();
+          const vs = stg + "|" + youV + "|" + (function(){ try{ return baTopic(); }catch(e){ return ""; } })();
+          if(!V){ V = document.createElement("div"); V.className = "fd-vote"; A.parentNode.insertBefore(V, A); }
+          if(V.dataset.sig !== vs){
+            V.dataset.sig = vs;
+            const topic = (function(){ try{ return baTopic(); }catch(e){ return "the question"; } })();
+            V.innerHTML = '<b>Your vote · ' + String(topic).replace(/[<>&"]/g, "").slice(0, 42) + '</b>' +
+              '<button type="button" data-bv="aye"' + (youV === "aye" ? ' class="is-on"' : '') + '>Aye</button>' +
+              '<button type="button" data-bv="no"' + (youV === "no" ? ' class="is-on"' : '') + '>No</button>' +
+              '<button type="button" data-bv="present"' + (youV === "present" ? ' class="is-on"' : '') + '>Present</button>';
+            V.querySelectorAll("[data-bv]").forEach(bt => bt.onclick = ev => {
+              ev.preventDefault(); ev.stopPropagation();
+              SSN.votes = SSN.votes || {};
+              SSN.votes.you = bt.getAttribute("data-bv");
+              try{ if(G.you) G.you.vote = SSN.votes.you === "aye" ? 1 : SSN.votes.you === "no" ? -1 : 0; }catch(e){}
+              try{ feed("You are " + SSN.votes.you + " on " + topic + ".", ""); }catch(e){}
+              V.dataset.sig = "";
+            });
+          }
+        } else { const V = D.querySelector(".fd-vote"); if(V) V.remove(); }
+      }catch(e){}
+      if(A.dataset.sig === sig) return; A.dataset.sig = sig;
       const ta = D.querySelector("textarea"), nm = id => { const p = sv(() => byId(isNaN(+id) ? id : +id)); return p && p.name ? String(p.name).split(/\s+/).slice(-1)[0] : String(id); };
       let h = "";
       if(chair) h += '<span class="fd-chair">You chair</span>';
@@ -52981,6 +53110,28 @@ function boot(){var p=document.getElementById("prompt");if(p){fix();new Mutation
 document.addEventListener("focusin",function(e){var t=e.target;if(!t||!t.closest)return;if(t.closest("#prompt .prompt__opts,#prompt .prompt__catch-row,#apToast,#tkActs,#sxDock,#ndFd .fd-hands")){try{t.scrollIntoView({block:"nearest",inline:"nearest"});}catch(x){}}},true);}
 window.addEventListener("onum-session",function(ev){try{var d=ev.detail;if(!d||d.stage!=="interjection"||!d.interjection)return;var I=d.interjection;if(!I.text||I.by==="you"||typeof byId!=="function"||typeof cabPaint!=="function")return;var m=byId(I.by);if(!m)return;if(I.kind==="point_of_order"){cabPaint(m,/^point of order/i.test(I.text)?I.text:"Point of order: "+I.text,true);return;}cabPaint(m,I.text,true);}catch(x){}});
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",boot);else boot();})();</script>
+<style id="fixScreenCss">
+#prompt.is-live{position:fixed!important;left:8px!important;right:8px!important;bottom:max(72px,env(safe-area-inset-bottom))!important;transform:none!important;width:auto!important;max-width:none!important;z-index:10045!important;max-height:min(62dvh,560px)!important;pointer-events:auto!important}
+#prompt.is-live .prompt__opts,#prompt.is-live .prompt__catch-row{pointer-events:auto}
+#voteDock{position:fixed;left:8px;right:8px;top:52px;z-index:48;display:flex;flex-wrap:wrap;gap:6px;align-items:center;background:rgba(18,20,25,.94);color:#f4f1e8;border:1px solid #c9a24a;border-radius:8px;padding:6px 8px;font:12.5px/1.3 system-ui,sans-serif;pointer-events:auto}
+#voteDock[hidden]{display:none!important}
+#voteDock b{flex:1 1 160px;font-weight:650}
+#voteDock span{flex:1 1 180px;opacity:.86}
+#voteDock button{min-height:40px;min-width:72px;padding:6px 12px;border-radius:8px;border:1px solid #6b5a32;background:#1c2128;color:#f4f1e8;font:700 13px system-ui;cursor:pointer;touch-action:manipulation}
+#voteDock button.is-on{background:#c9a24a;color:#14120c;border-color:#c9a24a}
+body:has(#prompt.is-live) #voteDock,body:has(#talk.is-open) #voteDock,body:has(#veil:not([hidden])) #voteDock{display:none!important}
+#sxDock{top:56px!important;bottom:8px!important;max-height:none!important;left:8px!important;right:8px!important;width:auto!important}
+@media (min-width:720px){#sxDock{left:auto!important;width:min(460px,42vw)!important}}
+#sxDock .fd-acts,#sxDock .fd-vote,#sxDock .fd-hands,#sxDock .card__actions{position:sticky;bottom:0;background:#121419;z-index:4;padding:6px 0}
+#ndFd .fd-vote{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:6px 0}
+#ndFd .fd-vote b{flex:1 1 100%;color:#ffe08a;font:700 11px system-ui;letter-spacing:.06em;text-transform:uppercase}
+#ndFd .fd-vote button{min-height:44px;flex:1 1 88px;border-radius:10px;border:0;background:#2a2d35;color:#fff;font:700 13px system-ui;cursor:pointer;touch-action:manipulation}
+#ndFd .fd-vote button.is-on{background:#c9a24a;color:#14120c}
+#veil:not(.sitx) #card{max-height:min(92dvh,920px);overflow:auto}
+#veil .card__actions{position:sticky;bottom:0;background:var(--paper,#f6f1e6);z-index:3;padding-top:8px}
+.talk.is-open{max-height:min(86dvh,100%);overflow:auto}
+.talk.is-open #tkActs{max-height:min(48dvh,420px);overflow:auto;touch-action:pan-y}
+</style>
 <style id="boLookCss">/* 20261104bo NEPTUNE look punch (bq: glow on real panels #pcScreen desk computer + aside.dossier desk panes; dropped dead office/pzOffice ids and HUD btn hmCab; scoped fd-hands): window-glow on office/desk/chamber panels, soft placards, louder gold focus ring (folds MARS LIVE soft notes from bn) */
 #pcScreen,aside.dossier,#ndFd,#ndSess,#sxDock{box-shadow:0 0 0 1px rgba(201,162,74,.35),0 0 22px 2px rgba(255,214,140,.16),inset 0 0 26px rgba(255,224,160,.07),inset 0 1px 0 rgba(255,236,190,.18)!important}
 #sxDock>#ndFd,#sxDock>#ndSess{box-shadow:inset 0 0 22px rgba(255,224,160,.06)!important}
@@ -53039,8 +53190,8 @@ html.br-easy #ndFd .fd-l.br-has>.br-v{display:inline}
       if(t.length > 60 && b.title !== t) setTitle(b, t);
       if(isB) back.push(b); else if(!pri && !isD && !b.disabled) pri = b; });
     if(!noPri) bs.forEach(function(b){ var p = b === pri; if(b.classList.contains("br-pri") !== p) b.classList.toggle("br-pri", p); });
-    if(reorder && back.length){ var par = back[0].parentNode, mv = false; back.forEach(function(b){ if(b.parentNode === par && par.lastElementChild !== b){ var after = b.nextElementSibling; var allBackAfter = true; while(after){ if(!after.classList.contains("br-back")){ allBackAfter = false; break; } after = after.nextElementSibling; } if(!allBackAfter){ moved = moved.filter(function(m){ return m.b.isConnected; }); moved.push({ b:b, par:par, next:b.nextSibling }); par.appendChild(b); mv = true; } } });
-      if(mv){ try{ if(typeof markPicks === "function") markPicks(); }catch(x){} } } }
+    if(reorder && back.length){ var host = box.closest ? box.closest("#prompt,#talk") : null; if(host && host._down){ /* a finger is on a button — do not move it */ } else { var par = back[0].parentNode, mv = false; back.forEach(function(b){ if(b.parentNode === par && par.lastElementChild !== b){ var after = b.nextElementSibling; var allBackAfter = true; while(after){ if(!after.classList.contains("br-back")){ allBackAfter = false; break; } after = after.nextElementSibling; } if(!allBackAfter){ moved = moved.filter(function(m){ return m.b.isConnected; }); moved.push({ b:b, par:par, next:b.nextSibling }); par.appendChild(b); mv = true; } } });
+      if(mv){ try{ if(typeof markPicks === "function") markPicks(); }catch(x){} } } } }
   /* numbered dock choices when the game's own 1-9 badges are not up */
   var DOCK = ["#apToast", "#ndFd", "#sxDock"];
   function dockNums(){ var own = [].slice.call(document.querySelectorAll("[data-btn]")).some(vis), want = [];
