@@ -1,3 +1,11 @@
+## 20261113b: living-world notes and continuity design
+
+- Design notes for organic social continuity (memory, families, marriages, births, lore that builds from play), owned storefronts and competing local markets, real-time currency and a stock exchange, geographically coherent nation and world maps (keeping existing filters), celebrity/entertainer/sports careers, deeper multi-step cabinet appointments with real persons on the record, and stable desk/cabinet interaction.
+- No new cardinal types. The seven districts and existing cultures remain.
+- Vox feed to appear on the phone menu; all significant public comments already route through Vox.
+- Desk prompt and Executive cabinet table interaction stability called out for the next code pass.
+- Notes pushed as LIVING-WORLD-NOTES.md.
+
 ## 20261108d: the grant shows the moment you open the Engine
 
 - Opening the Engine, not only the next morning, applies the lift if it has already asked.
@@ -21,19 +29,3 @@
 - Backing the power stations and the engine-wrights still raises the count, and there is no cap on what they add.
 - Oversight, household records, a filed plan, and a vote to pause or shut it down are unchanged. It still cannot seize compute by a side door.
 - The morning law no longer pulls capability or capacity back to 100. A broken number is still mended.
-
-## 20261107k: the notebooks show the work
-
-- Every Academy question and settled discovery now opens a full notebook: the hypothesis, the formula, the practice series (predicted vs measured, with the note), and the researcher's notes.
-- The same ledger is under the Engine's claims. What the Academy ran, what it measured, and what it wrote is on the card.
-- Key fields start with the ledgers already written (number, calculus, mechanics, quantum, the mind). The rest fill as the benches file them.
-## 20261107l: press, sittings, a closed bill, a fixed vote
-
-- A press conference asks questions. A follow-up asks for the number. A challenge comes from another paper. Caucus, hearing, crisis and town hall speak as those rooms, and End the sitting closes them.
-- The bill stays closed when a card opens. Open it from the Docket in the menu, or from Open the bill on the morning card.
-- Aye or no on the docket is the vote you set. It is what the room is told. It is not read off your mood.
-## 20261107j: the work under the claim
-
-- Every Engine claim now shows the work: what it was given, the pages it wrote, the measurement that would count, and each try the Academy ran.
-- The Academy finishes questions faster and files the finished thing. The Engine files its own pieces more often.
-- Labs, schools, stations and the shops that can use a machine show what they are turning out. The same list is on the Academy, the Engine and the district.
