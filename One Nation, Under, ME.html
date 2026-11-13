@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261112c">
+<meta name="onum-build" content="20261113a">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -46,7 +46,7 @@
   window.onumLimSet = function(k, v){ if(!(k in D)) return false; L[k] = fix(v); try{ var o = JSON.parse(localStorage.getItem("onum.limits") || "{}") || {}; o[k] = (L[k] === INF) ? null : L[k]; localStorage.setItem("onum.limits", JSON.stringify(o)); }catch(e){} return true; };
   window.onumLimReset = function(){ try{ localStorage.removeItem("onum.limits"); }catch(e){} Object.keys(D).forEach(function(k){ L[k] = D[k]; }); L._eff = {}; L._gov = null; return true; };
   var show = function(v){ return v === INF ? "inf" : (typeof v === "number" ? Math.round(v * 100) / 100 : v); };
-  window.onumLimDump = function(){ var out = {build:"20261112c", mode:L.mode || "scale"}; Object.keys(D).forEach(function(k){ out[k] = show(L[k]); });
+  window.onumLimDump = function(){ var out = {build:"20261113a", mode:L.mode || "scale"}; Object.keys(D).forEach(function(k){ out[k] = show(L[k]); });
     out.effective = {}; Object.keys(L._eff).forEach(function(k){ out.effective[k] = show(L._eff[k]); }); out.governor = L._gov;
     try{ out.engineBudgetMs = window.onumEngine ? show(window.onumEngine.budget) : null; out.frameMs = window.onumEngine ? show(window.onumEngine.dtEma) : null; }catch(e){} return out; };
   window.onumLimLine = function(){ var d = window.onumLimDump(), e = d.effective, g = function(k){ return e[k] != null ? e[k] + "*" : d[k]; };
@@ -71,7 +71,7 @@
 </script>
 <script>
 (function(){
-  var STAMP = "20261112c";
+  var STAMP = "20261113a";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -7640,8 +7640,10 @@ function pcTab(){
     try{ if(typeof govPopularity === "function") out.push('<div>Government popularity ' + Math.round(govPopularity()) + '</div>' + pcBar(govPopularity())); }catch(e){}
     const r = typeof rivalLive === "function" ? rivalLive() : null;
     if(r) out.push('<div class="pc__h">At home</div><div>' + pcEsc(r.name) + ' wants your seat. Heat ' + Math.round(r.heat || 0) + '.</div><button class="pc__btn" data-pcgo="rival">Rivals</button>');
-    const hist = (G.polls || []).slice(-8);
-    if(hist.length) out.push('<div class="pc__h">Soundings</div><div class="pc__m">' + hist.map(p => "d" + p.d + " " + p.v).join(" · ") + '</div>');
+    const hist = (G.polls || []).slice(-6);
+    if(hist.length) out.push('<div class="pc__h">How they covered it</div>' + hist.slice().reverse().map(p => '<div>Day ' + p.d + ' · ' + p.v + ' (±' + (p.moe || 3) + ')' + (p.paper ? ' · ' + pcEsc(p.paper) : '') + (p.n ? ' · ' + p.n + ' households' : '') + (p.ask ? '<div class="pc__m">Asked about ' + pcEsc(p.ask) + '.</div>' : '') + '</div>').join(""));
+    const lastR = (G.races || []).slice(-1)[0];
+    if(lastR) out.push('<div class="pc__h">Last result</div><div>The ' + lastR.congress + 'th · you ' + (lastR.won ? "won" : "lost") + ' by ' + lastR.margin + (lastR.poll != null ? '. The week before, the sounding had you at ' + lastR.poll : '') + (lastR.paper ? ' (' + pcEsc(lastR.paper) + ')' : '') + '.</div>');
     try{
       const races = (G.states || []).slice().sort((a, b) => Math.abs(b.lean || 0) - Math.abs(a.lean || 0)).slice(0, 6);
       if(races.length) out.push('<div class="pc__h">The map</div>' + races.map(s => '<div>' + pcEsc(s.n) + ' · ' + ((s.lean || 0) > 8 ? "Federalist" : (s.lean || 0) < -8 ? "Commonwealth" : "toss-up") + ((s.unrest || 0) > 55 ? " · restless" : "") + '</div>').join(""));
@@ -30097,6 +30099,27 @@ function election(){
   G.congress++; G.term++; G.sittingDay = 1;
   if(youWon) assignPosts(false);
 
+  const called = Math.abs(Math.round(youWon ? (you.margin || yourResult) : yourResult));
+  const polls = (G.polls || []).slice(-4), last = polls[polls.length - 1];
+  const late = called > 12 ? "The desk called it before the western counties were in." : called > 4 ? "They waited for the river towns, then they called it." : "They would not use the word certain until past midnight.";
+  const pollLine = last
+    ? "The last sounding, day " + last.d + ", had you at " + last.v + " (±" + (last.moe || 3) + ")" + (last.paper ? ", taken by " + last.paper + " of " + (last.n || "several hundred") + " households" : "") + (last.ask ? ", asking about " + last.ask : "") + "."
+    : "No late sounding was trusted. The papers covered the race off the canvass and the county clerks.";
+  let homeLine = "";
+  try{
+    const T = townEnsure(), hh = (T.hh || []).slice().sort((a, b) => (a.mood || 50) - (b.mood || 50));
+    if(hh[0]) homeLine = " On " + hh[0].street + " the " + hh[0].fam + "s " + ((hh[0].mood || 50) > 55 && youWon ? "had told the canvassers you would hold." : "had already told the canvassers they were done.");
+  }catch(e){}
+  const leads = (you.party === "FED"
+    ? ["The Federal Standard " + (youWon ? "led with a sound result and a market that agreed." : "led with a loss the party will be a long time explaining."),
+       "The Commonwealth Courier " + (youWon ? "asked at whose expense it was won." : "wrote that the people were heard.")]
+    : ["The Commonwealth Courier " + (youWon ? "wrote that the district kept its own." : "wrote that the district was asked, and said no."),
+       "The Federal Standard " + (youWon ? "led with a win it did not celebrate." : "led with order restored at the polls.")]).concat(["The Harbour Independent held the call until the clerks phoned the numbers in, and printed the margin beside the turnout."]);
+  G.races = (G.races || []).concat([{d:G.day, congress:G.congress, seeking, won:!!youWon, margin:called, swing:Math.round(swing), poll:last ? last.v : null, paper:last && last.paper, approval:Math.round(you.approval)}]).slice(-12);
+  G.lastRace = G.races[G.races.length - 1];
+  const cover = '<h2>How it was covered</h2><p>' + late + " " + pollLine + homeLine + '</p><p>' + leads.join(" ") + '</p>' +
+    '<p>Turnout in ' + you.state + " " + you.dist + " was " + (you.approval > 55 ? "heavy, and the clerks ran out of the short forms." : you.approval < 40 ? "thin. A wet day and a sour district." : "ordinary. The lines moved.") + "</p>";
+
   const rows = results.slice().sort((a,b)=>b.by-a.by).map(r =>
     '<div><span>'+r.m.name+' <span class="chip chip--'+(r.m.party==="FED"?"fed":r.m.party==="COM"?"com":"ind")+'">'+r.m.party+'</span></span>' +
     '<b class="'+(r.win?"win":"lose")+'">'+(r.win?"held +"+r.by:r.retired?"retired":"lost")+'</b><b>'+(r.m.post?postTitle(r.m.post):"")+'</b></div>').join("");
@@ -30113,7 +30136,8 @@ function election(){
       '% bought you a challenger and a bruising spring.</p>' : '') +
     '<p>National mood moved <strong>' + (swing>0?"+":"") + Math.round(swing) + '</strong> toward the ' +
       (swing>0?"Federalists":"Commonwealth") + '.' + (swungSeats && swungSeats.n ? ' Beyond the seats on the board, <strong>' + swungSeats.n + '</strong> changed hands from the ' + partyName(swungSeats.from) + ' to the ' + partyName(swungSeats.to) + '.' : '') + ' The House stands <strong>' + Object.keys(G.seatsBy).filter(p => (G.seatsBy[p] || 0) > 0).sort((a, c) => G.seatsBy[c] - G.seatsBy[a]).map(p => G.seatsBy[p] + ' ' + partyName(p)).join(', ') + '</strong>.</p>' +
-    '<h2>The board</h2><div class="results">' + rows + '</div>' +
+    '<h2>How the House voted</h2><div class="results">' + rows + '</div>' +
+    cover +
     (newcomers.length ? '<p><strong>Sworn in:</strong> ' + listify(newcomers.map(m=>m.name+" ("+m.party+")")) +
       '. They do not know you yet.</p>' : '') +
     (heirs.length ? '<p><strong>The houses hold:</strong> ' + listify(heirs.map(h =>
@@ -32273,34 +32297,15 @@ function officeCard(){
 function paintAims(){
   try{ const box = el("aimsHud"), nx = el("aimsNext"), all = el("aimsAll"); if(!box || !nx) return;
     if(!G.running || !G.you || !veil.hidden){ box.hidden = true; return; }
+    if(box._closed === G.day){ box.hidden = true; return; }
     const Gs = goalsEnsure(); if(!Gs || !Gs.list || !Gs.list.length){ box.hidden = true; return; }
     const done = Gs.list.filter(g => g.done).length, next = Gs.list.find(g => !g.done), sig = done + "|" + (next ? next.t + (next.have || 0) : "all") + "|" + Gs.day;
     if(box._sig !== sig){ box._sig = sig; nx.textContent = next ? done + "/" + Gs.list.length + " \u00b7 " + next.t + (next.k === "talk" ? " (" + next.have + "/" + next.need + ")" : "") : "All done today \u2713"; if(all) setHTML(all, goalsHTML()); }
     box.hidden = false; }catch(e){}
 }
 function paintVoteDock(){
-  let d = document.getElementById("voteDock");
-  const b = G.bill && !G.bill.done ? G.bill : null;
-  const busy = !!(TALK && TALK.open) || !!(typeof veil !== "undefined" && veil && !veil.hidden);
-  const hide = !b || !G.you || !G.running || busy;
-  if(!d){
-    d = document.createElement("div");
-    d.id = "voteDock";
-    d.innerHTML = '<b id="voteDockT"></b><span id="voteDockW"></span><button type="button" data-vi="1">Aye</button><button type="button" data-vi="-1">No</button><button type="button" data-vi="0">Present</button>';
-    document.body.appendChild(d);
-    d.addEventListener("click", ev => {
-      const bt = ev.target && ev.target.closest && ev.target.closest("[data-vi]");
-      if(!bt || !G.you || !G.bill || G.bill.done) return;
-      ev.preventDefault(); ev.stopPropagation();
-      const v = +bt.getAttribute("data-vi");
-      G.you.vote = v;
-      try{ if(v) taylorDayVoteDefiance(v); }catch(x){}
-      try{ note("You are " + (v > 0 ? "aye" : v < 0 ? "no" : "present") + " on " + G.bill.title + ".", true); }catch(x){}
-      try{ if(typeof TLSCollab !== "undefined" && v) TLSCollab.recordAction({kind:"intention", vote:v, billId:G.bill.id, title:G.bill.title}); }catch(x){}
-      paintVoteDock();
-      try{ if(document.querySelector(".pane.is-on") && document.querySelector(".pane.is-on").id === "paneFloor") refreshFloor(); }catch(x){}
-    });
-  }
+  const d = document.getElementById("voteDock");
+  if(d) d.remove();
   const tk = document.getElementById("talk");
   if(tk && !tk._stick){
     tk._stick = true;
@@ -32309,17 +32314,34 @@ function paintVoteDock(){
     tk.addEventListener("pointercancel", () => { tk._down = false; });
     tk.addEventListener("pointerleave", () => { tk._down = false; });
   }
-  if(hide){ d.hidden = true; return; }
-  d.hidden = false;
-  const v = G.you.vote;
-  const title = String(b.title || "The bill");
-  const t = document.getElementById("voteDockT");
-  const w = document.getElementById("voteDockW");
-  if(t) t.textContent = title.length > 48 ? title.slice(0, 46) + "…" : title;
-  let fit = 0; try{ fit = districtFit(b); }catch(e){}
-  if(w) w.textContent = (v === 1 ? "You are aye." : v === -1 ? "You are no." : v === 0 ? "You are present." : "Undeclared.") +
-    " Home " + (fit > 8 ? "can live with it." : fit < -8 ? "will feel this as written for somewhere else." : "is split.");
-  d.querySelectorAll("[data-vi]").forEach(bt => bt.classList.toggle("is-on", +bt.getAttribute("data-vi") === v));
+  try{ stampScreenClose(); }catch(e){}
+}
+function stampScreenClose(){
+  function stamp(node, fn){
+    if(!node || node.hidden || node.querySelector(":scope > .onum-x")) return;
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "onum-x";
+    b.textContent = "Close";
+    b.addEventListener("pointerdown", ev => { try{ ev.stopPropagation(); }catch(x){} });
+    b.addEventListener("click", ev => { try{ ev.preventDefault(); ev.stopPropagation(); }catch(x){} fn(); });
+    node.insertBefore(b, node.firstChild);
+  }
+  const pr = el("prompt");
+  if(pr && !pr.hidden) stamp(pr, () => {
+    promptKey = ""; glassClearHold(); promptActs = [];
+    pr.classList.remove("is-live", "is-catch"); pr.hidden = true; pr.innerHTML = "";
+  });
+  const aims = el("aimsHud");
+  if(aims && !aims.hidden) stamp(aims, () => { aims.hidden = true; aims._closed = (G && G.day) || 1; });
+  const tip = el("tipCard");
+  if(tip && !tip.hidden) stamp(tip, () => { tip.hidden = true; try{ closeTip(); }catch(e){} });
+  const toast = document.getElementById("apToast");
+  if(toast) stamp(toast, () => { try{ toast.remove(); if(typeof AP !== "undefined" && AP.toast === toast) AP.toast = null; }catch(e){} });
+  const cardEl = el("card");
+  if(cardEl && veil && !veil.hidden && !cardEl.querySelector(".onum-x") && !/okNight|okElect|sitOut|chClose|lpClose|data-off=|data-post=/.test(cardEl.innerHTML)){
+    stamp(cardEl, () => { try{ walkNow(); }catch(e){ veil.hidden = true; G.running = true; } });
+  }
 }
 function paintJob(){
   try{ paintVoteDock(); }catch(e){}
@@ -38351,7 +38373,7 @@ function refreshOfficePane(){
   const house = b && !b.done ? (function(){ const t = tallyBill(b, true);
     return '<div class="eyebrow" style="margin-top:14px">In the House, without you</div><p class="muted">' + sitEsc(b.title) + ': projected <b>' + t.aye + '</b> aye, <b>' + t.no + '</b> no, roll call day ' + b.voteDay +
       '. You have no vote there' + (k === "gov" ? '; the members from ' + y.state + ' still take your calls.' : '.') + '</p>'; })() : "";
-  pane.innerHTML = '<div class="billbox"><div class="eyebrow">Your office · ' + ROLE_T[roleKey()] + '</div>' +
+  pane.innerHTML = intentionHTML() + '<div class="billbox"><div class="eyebrow">Your office · ' + ROLE_T[roleKey()] + '</div>' +
     '<div class="h-serif">' + sitEsc(officeTitle()) + '</div><div class="muted">' + sitEsc(officeSeat()) + ' · ' + sitEsc(ROOMS[homeRoom()].t) + '</div></div>' + side +
     '<div class="eyebrow">' + sitEsc(schedBy()) + '\'s diary</div>' + schedListHTML() +
     '<div class="eyebrow" style="margin-top:14px">The routine</div>' + (rows || '<p class="muted">Nothing scheduled.</p>') +
@@ -38360,6 +38382,7 @@ function refreshOfficePane(){
       '<span class="whip__b"><button type="button" class="btn btn--ghost whip__go" data-pw="' + i + '"' + (p.off ? ' disabled' : '') + '>Do it</button></span></div>').join("") +
     house;
   schedWire(pane, refreshOfficePane);
+  wireIntention(pane);
   pane.querySelectorAll("[data-dk]").forEach(bt => bt.addEventListener("click", () => docketRun(D[+bt.getAttribute("data-dk")])));
   pane.querySelectorAll("[data-pw]").forEach(bt => bt.addEventListener("click", () => {
     const p = P[+bt.getAttribute("data-pw")]; if(!p || p.off) return;
@@ -39487,9 +39510,16 @@ function npPolls(){
       onBill = " On " + bill.title + ", the district " + (fit > 8 ? "can live with the text" : fit < -8 ? "reads it as written for somewhere else" : "is split") + ", and you are " + (y.vote === 1 ? "aye" : y.vote === -1 ? "no" : y.vote === 0 ? "present" : "undeclared") + ".";
     }
   }catch(e){}
+  const lastP = hist[hist.length - 1];
+  const told = lastP && lastP.paper ? " " + lastP.paper + " asked " + (lastP.n || "a few hundred") + " households" + (lastP.ask ? " about " + lastP.ask : "") + " and printed " + lastP.v + " (±" + (lastP.moe || 3) + ")." : "";
+  let prevRace = "";
+  try{
+    const R = (G.races || []).slice(-1)[0];
+    if(R) prevRace = " Last election, the " + R.congress + "th: you " + (R.won ? "won" : "lost") + " by " + R.margin + (R.paper ? ". " + R.paper + " had you at " + R.poll + " the week before." : ".");
+  }catch(e){}
   return '<div class="np__band">The polls</div><p class="np__matter">Home approval stands at ' + Math.round(y.approval) +
     (hist.length > 1 ? " (" + (swing > 0 ? "+" : "") + swing + " since the last sounding, margin of error 3)" : "") +
-    ". " + (races ? races + ". " : "") + onBill + '</p>' +
+    "." + told + " " + (races ? races + ". " : "") + onBill + prevRace + '</p>' +
     (bars ? '<div style="text-align:center;margin:0 0 14px;line-height:0">' + bars + '</div>' : '');
 }
 function npHTML(){
@@ -40065,11 +40095,43 @@ function goTo(id){
   feed("Walking to " + ROOMS[id].t + ".");
   enterRoom(id, G.room);
 }
+function setIntention(v){
+  if(!G.you) return;
+  G.you.vote = v;
+  try{ if(v) taylorDayVoteDefiance(v); }catch(e){}
+  try{ if(typeof cabKind === "function" && cabKind() && typeof SSN !== "undefined" && SSN){ SSN.votes = SSN.votes || {}; SSN.votes.you = v > 0 ? "aye" : v < 0 ? "no" : "present"; } }catch(e){}
+  try{ note("You are " + (v > 0 ? "aye" : v < 0 ? "no" : "present") + (G.bill && !G.bill.done ? " on " + G.bill.title : "") + ".", true); }catch(e){}
+  try{ if(typeof TLSCollab !== "undefined" && v && G.bill) TLSCollab.recordAction({kind:"intention", vote:v, billId:G.bill.id, title:G.bill.title}); }catch(e){}
+}
+function intentionHTML(){
+  const y = G.you, b = G.bill && !G.bill.done ? G.bill : null;
+  if(!y) return "";
+  let fit = 0; try{ if(b) fit = districtFit(b); }catch(e){}
+  const v = y.vote;
+  const where = (function(){ try{ const k = heldOffice(); return !k || k === "house" ? "On the phone · the Floor" : "On the phone · " + officeTabName(); }catch(e){ return "On the phone"; } })();
+  let cab = "";
+  try{ if(typeof cabKind === "function" && cabKind()) cab = " The cabinet is sitting. This is your vote on " + (typeof baTopic === "function" ? baTopic() : "the question") + ", kept here so it does not cover the words in the room."; }catch(e){}
+  return '<div class="billbox" style="margin-bottom:12px"><div class="eyebrow">' + where + '</div>' +
+    '<div class="h-serif" style="font-size:18px">How you will vote</div>' +
+    (b ? '<p class="muted" style="margin:6px 0">' + b.title + '. Home ' + (fit > 8 ? "can live with it" : fit < -8 ? "will feel this as written for somewhere else" : "is split") + '. You are <strong>' + (v === 1 ? "aye" : v === -1 ? "no" : v === 0 ? "present" : "undeclared") + '</strong>.' + cab + '</p>'
+        : '<p class="muted" style="margin:6px 0">Nothing is on the calendar. When a bill is live, Aye, No and Present live here.' + cab + '</p>') +
+    '<div class="card__actions"><button class="btn' + (v === 1 ? '' : ' btn--ghost') + '" type="button" id="voteAye">Aye</button>' +
+      '<button class="btn' + (v === -1 ? '' : ' btn--ghost') + '" type="button" id="voteNo">No</button>' +
+      '<button class="btn' + (v === 0 ? '' : ' btn--ghost') + '" type="button" id="votePresent">Present</button></div></div>';
+}
+function wireIntention(root){
+  if(!root) return;
+  const a = root.querySelector("#voteAye"), n = root.querySelector("#voteNo"), p = root.querySelector("#votePresent");
+  const go = v => () => { setIntention(v); try{ refreshPanels(); }catch(e){} };
+  if(a) a.addEventListener("click", go(1));
+  if(n) n.addEventListener("click", go(-1));
+  if(p) p.addEventListener("click", go(0));
+}
 function refreshFloor(){
   const b = G.bill, you = G.you;
   try{ officeTabLabel(); }catch(e){}
   if(you && abroadOffice()){ refreshOfficePane(); return; }
-  if(!b){ el("paneFloor").innerHTML = '<p class="muted">The calendar is clear.</p>'; return; }
+  if(!b){ el("paneFloor").innerHTML = intentionHTML() + '<p class="muted">The calendar is clear.</p>'; wireIntention(el("paneFloor")); return; }
   const t = tallyBill(b, true);
   const axes = AXES.map(a =>
     '<div class="axis"><i>'+a.lo+' / '+a.hi+'</i><span><b style="left:'+((b.pos[a.k]+100)/200*100)+
@@ -40077,7 +40139,7 @@ function refreshFloor(){
   const pledged = G.members.filter(m => m.pledge && G.day-m.pledgeDay<8);
   const com = committeeOf(you.committee);
   const canMark = !b.marked && Math.abs(b.pos[com.axis]) > 15 && you.influence >= 10;
-  el("paneFloor").innerHTML =
+  el("paneFloor").innerHTML = intentionHTML() +
     '<div class="billbox"><div class="eyebrow">On the calendar · ' + b.stakes + '</div>' +
       '<div class="h-serif"><span'+tipAttr("bill","now")+'>' + b.title + '</span></div>' +
       '<div class="muted">' + b.line + ' Sponsored by ' + youMark(b.sponsor) + '. ' +
@@ -40119,8 +40181,7 @@ function refreshFloor(){
             (you.influence < 10 || you.out ? ' disabled' : '') + '>Toward ' + a.lo +
             '<u>a bill pushing ' + a.n.toLowerCase() + ' hard to the ' + a.lo + '</u></button></div>').join("") +
       '</div></div>' +
-    '<div class="card__actions"><button class="btn btn--ghost" type="button" id="voteAye">Vote aye</button>' +
-      '<button class="btn btn--ghost" type="button" id="voteNo">Vote no</button>' +
+    '<div class="card__actions">' +
       (canMark ? '<button class="btn btn--ghost" type="button" id="markUp">Mark it up in ' + com.t + '</button>' : '') +
     '</div>' +
     '<p class="muted" style="margin-top:8px">Intention: <strong>' +
@@ -40158,19 +40219,7 @@ function refreshFloor(){
     proposeBill(ax, +d);
   }));
   const a = el("voteAye"), n = el("voteNo"), mk = el("markUp");
-  if(a) a.addEventListener("click", () => {
-    G.you.vote = 1;
-    try{ taylorDayVoteDefiance(1); }catch(e){}
-    refreshPanels();
-    /* COLLAB HOOK: intention logged as soft signal until roll call */
-    try{ if(typeof TLSCollab !== "undefined" && G.bill) TLSCollab.recordAction({kind:"intention", vote:1, billId:G.bill.id, title:G.bill.title, pos:G.bill.pos&&{econ:G.bill.pos.econ,lib:G.bill.pos.lib,def:G.bill.pos.def,wel:G.bill.pos.wel}}); }catch(e){}
-  });
-  if(n) n.addEventListener("click", () => {
-    G.you.vote = -1;
-    try{ taylorDayVoteDefiance(-1); }catch(e){}
-    refreshPanels();
-    try{ if(typeof TLSCollab !== "undefined" && G.bill) TLSCollab.recordAction({kind:"intention", vote:-1, billId:G.bill.id, title:G.bill.title, pos:G.bill.pos&&{econ:G.bill.pos.econ,lib:G.bill.pos.lib,def:G.bill.pos.def,wel:G.bill.pos.wel}}); }catch(e){}
-  });
+  wireIntention(el("paneFloor"));
   if(mk) mk.addEventListener("click", () => {
     b.marked = true; you.influence -= 10;
     const target = you.district[com.axis];
@@ -50996,7 +51045,7 @@ function sxDockTick(){
     hd.style.display = !ns && any ? "" : "none";
     const S = typeof SIT !== "undefined" && SIT.on ? SIT.on : null, SS = sxdSession();
     hd.firstChild.textContent = "⚖ " + ((S && S.D && (S.D.title || S.D.t)) || (SS && (SS.stageName || String(SS.kind || "").replace(/_/g, " "))) || "In session");
-    const min = ns ? !!(window.NEPTUNE_SESSIONVIEW && window.NEPTUNE_SESSIONVIEW.min) : SXD.min; hd.lastChild.textContent = min ? "Show" : "Hide"; D.classList.toggle("min", min);
+    const min = ns ? !!(window.NEPTUNE_SESSIONVIEW && window.NEPTUNE_SESSIONVIEW.min) : SXD.min; hd.lastChild.textContent = min ? "Show" : "Close"; D.classList.toggle("min", min);
     /* the panel's own record of the meeting, and a voice for the chair */
     if(ns && !ns.classList.contains("min")){ const body = ns.querySelector(".ns-body"); if(body){
       let lg = body.querySelector(".nsx-log"); if(fdOn){ if(lg) lg.remove(); lg = null; } const SN = window.ONUM_SESSION || {};
@@ -51214,33 +51263,7 @@ try{
       try{ const t1 = body.querySelector(":scope>textarea"), r1 = body.querySelector(":scope>.fd-row"); if(t1 && r1 && !t1.closest(".fd-reply")){ const w = document.createElement("div"); w.className = "fd-reply"; t1.parentNode.insertBefore(w, t1); w.appendChild(t1); w.appendChild(r1); } }catch(e){}
       const turn = isMe(S.floorId) || isMe(S.offer), chair = S.chairId === "you", fl = S.floorId != null && !isMe(S.floorId), press = /press/.test(String(S.kind || ""));
       const q = (Array.isArray(S.queue) ? S.queue : []).filter(x => !isMe(x));
-      const sig = [turn, chair, fl, press, q.join(","), !!S.held].join("|");
-      try{
-        if(typeof cabKind === "function" && cabKind() && SSN){
-          let V = D.querySelector(".fd-vote");
-          const youV = (SSN.votes && SSN.votes.you) || "";
-          const stg = (function(){ try{ return ssnStage().id; }catch(e){ return ""; } })();
-          const vs = stg + "|" + youV + "|" + (function(){ try{ return baTopic(); }catch(e){ return ""; } })();
-          if(!V){ V = document.createElement("div"); V.className = "fd-vote"; A.parentNode.insertBefore(V, A); }
-          if(V.dataset.sig !== vs){
-            V.dataset.sig = vs;
-            const topic = (function(){ try{ return baTopic(); }catch(e){ return "the question"; } })();
-            V.innerHTML = '<b>Your vote · ' + String(topic).replace(/[<>&"]/g, "").slice(0, 42) + '</b>' +
-              '<button type="button" data-bv="aye"' + (youV === "aye" ? ' class="is-on"' : '') + '>Aye</button>' +
-              '<button type="button" data-bv="no"' + (youV === "no" ? ' class="is-on"' : '') + '>No</button>' +
-              '<button type="button" data-bv="present"' + (youV === "present" ? ' class="is-on"' : '') + '>Present</button>';
-            V.querySelectorAll("[data-bv]").forEach(bt => bt.onclick = ev => {
-              ev.preventDefault(); ev.stopPropagation();
-              SSN.votes = SSN.votes || {};
-              SSN.votes.you = bt.getAttribute("data-bv");
-              try{ if(G.you) G.you.vote = SSN.votes.you === "aye" ? 1 : SSN.votes.you === "no" ? -1 : 0; }catch(e){}
-              try{ feed("You are " + SSN.votes.you + " on " + topic + ".", ""); }catch(e){}
-              V.dataset.sig = "";
-            });
-          }
-        } else { const V = D.querySelector(".fd-vote"); if(V) V.remove(); }
-      }catch(e){}
-      if(A.dataset.sig === sig) return; A.dataset.sig = sig;
+      const sig = [turn, chair, fl, press, q.join(","), !!S.held].join("|"); if(A.dataset.sig === sig) return; A.dataset.sig = sig;
       const ta = D.querySelector("textarea"), nm = id => { const p = sv(() => byId(isNaN(+id) ? id : +id)); return p && p.name ? String(p.name).split(/\s+/).slice(-1)[0] : String(id); };
       let h = "";
       if(chair) h += '<span class="fd-chair">You chair</span>';
@@ -51619,14 +51642,18 @@ function standDay(){
   y.influence = clamp(y.influence + (T.influence - y.influence) * 0.04, 0, 100);
   y.standing = clamp(y.standing + (T.standing - y.standing) * 0.03, 0, 100);
   if(G.day % 7 === 0){ const r = rng(seedOf("poll:" + G.day)), err = Math.round((r() + r() + r() - 1.5) * 4), poll = clamp(Math.round(y.approval + err), 0, 100);
-    G.polls = (G.polls || []).concat([{d:G.day, v:poll, moe:3}]).slice(-20);
-    try{ feed("POLL · " + (y.name || "You") + ": approval " + poll + " (±3), with " + (poll - (G.polls.length > 1 ? G.polls[G.polls.length - 2].v : poll) >= 0 ? "a rise" : "a fall") + " since the last.", "news"); }catch(e){} }
+    const papers = ["The Federal Standard", "The Commonwealth Courier", "The Harbour Independent", "The Grain Exchange Sheet"];
+    const paper = papers[Math.abs(seedOf("pp" + G.day)) % papers.length];
+    const n = 420 + (Math.abs(seedOf("pn" + G.day)) % 680);
+    const ask = (G.bill && !G.bill.done) ? "the " + G.bill.title : "the job " + (y.name || "the member") + " is doing";
+    G.polls = (G.polls || []).concat([{d:G.day, v:poll, moe:3, n, paper, ask}]).slice(-20);
+    try{ feed("POLL · " + paper + " asked " + n + " households about " + ask + ". " + (y.name || "You") + " at " + poll + " (±3).", "news"); }catch(e){} }
   return T;
 }
 { const _idm = idMend; idMend = function(){ const r = _idm.apply(this, arguments); try{ r.seats = seatMend(); r.career = careerMend(); r.envoys = envoyMend(); realmSync();
   (G.states || []).forEach(st => { if(st && st.bill && !st.bill.title && st.bill.t) st.bill.title = st.bill.t; });   /* a state bill has a name: the docket and the news read it */
   (G.journal || []).forEach(j => { if(j && typeof j.t === "string" && /over the undefined\.$/.test(j.t)) j.t = j.t.replace(/ over the undefined\.$/, " over its bill."); }); }catch(e){} return r; }; }
-{ const _scb6 = saveCaptureBase; saveCaptureBase = function(){ const o = _scb6.apply(this, arguments); try{ o.realmRel = G.realmRel || null; o.rsync = G.rsync || null; o.polls = G.polls || null; o.seats = G.seats || null; o.lastSwing = G.lastSwing || null; }catch(e){} return o; }; }
+{ const _scb6 = saveCaptureBase; saveCaptureBase = function(){ const o = _scb6.apply(this, arguments); try{ o.realmRel = G.realmRel || null; o.rsync = G.rsync || null; o.polls = G.polls || null; o.seats = G.seats || null; o.lastSwing = G.lastSwing || null; o.races = G.races || null; o.lastRace = G.lastRace || null; }catch(e){} return o; }; }
 setInterval(() => { try{ if(G && G.you){ realmSync(); if(G._standDay !== G.day){ const first = G._standDay == null; G._standDay = G.day; if(!first) standDay(); } } }catch(e){} }, 2500);
 
 /* ══ 20261027a · NO COIN DECIDES A CASE. A suit between the Union and a State over the State's own measures, or between the
@@ -53113,13 +53140,10 @@ if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",
 <style id="fixScreenCss">
 #prompt.is-live{position:fixed!important;left:8px!important;right:8px!important;bottom:max(72px,env(safe-area-inset-bottom))!important;transform:none!important;width:auto!important;max-width:none!important;z-index:10045!important;max-height:min(62dvh,560px)!important;pointer-events:auto!important}
 #prompt.is-live .prompt__opts,#prompt.is-live .prompt__catch-row{pointer-events:auto}
-#voteDock{position:fixed;left:8px;right:8px;top:52px;z-index:48;display:flex;flex-wrap:wrap;gap:6px;align-items:center;background:rgba(18,20,25,.94);color:#f4f1e8;border:1px solid #c9a24a;border-radius:8px;padding:6px 8px;font:12.5px/1.3 system-ui,sans-serif;pointer-events:auto}
-#voteDock[hidden]{display:none!important}
-#voteDock b{flex:1 1 160px;font-weight:650}
-#voteDock span{flex:1 1 180px;opacity:.86}
-#voteDock button{min-height:40px;min-width:72px;padding:6px 12px;border-radius:8px;border:1px solid #6b5a32;background:#1c2128;color:#f4f1e8;font:700 13px system-ui;cursor:pointer;touch-action:manipulation}
-#voteDock button.is-on{background:#c9a24a;color:#14120c;border-color:#c9a24a}
-body:has(#prompt.is-live) #voteDock,body:has(#talk.is-open) #voteDock,body:has(#veil:not([hidden])) #voteDock{display:none!important}
+#voteDock{display:none!important}
+.onum-x{position:absolute;top:4px;right:4px;z-index:6;min-height:32px;padding:2px 8px;border-radius:6px;border:1px solid #6b5a32;background:#121419;color:#ffe08a;font:700 11px system-ui,sans-serif;cursor:pointer;touch-action:manipulation}
+#prompt.is-live{padding-top:28px!important}
+#card{position:relative}
 #sxDock{top:56px!important;bottom:8px!important;max-height:none!important;left:8px!important;right:8px!important;width:auto!important}
 @media (min-width:720px){#sxDock{left:auto!important;width:min(460px,42vw)!important}}
 #sxDock .fd-acts,#sxDock .fd-vote,#sxDock .fd-hands,#sxDock .card__actions{position:sticky;bottom:0;background:#121419;z-index:4;padding:6px 0}
