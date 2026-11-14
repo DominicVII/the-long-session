@@ -17,26 +17,24 @@ One HTML body. Keep these **byte-identical**:
 | `session.html` | repo root |
 | `One Nation, Under, ME.html` | standalone name |
 
-**Build stamp (now): `20261114a`**
+**Build stamp (now): `20261114b`**
 
-- `<meta name="onum-build" content="20261114a">`
-- IIFE `STAMP = "20261114a"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
-- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261114a"`
+- `<meta name="onum-build" content="20261114b">`
+- IIFE `STAMP = "20261114b"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
+- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261114b"`
 - Wrapper iframe: `/session.html?v=${ONUM_BUILD}` in `src/routes/index.tsx`
 
-If you change the HTML, bump the letter (`20261114a`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
+If you change the HTML, bump the letter (`20261114b`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
 
 This sandbox tracks `public/session.html` as the playable body (root `index.html` / `session.html` / `One Nation, Under, ME.html` are not in this repo). Do not replace that file with a simpler build. Insert new game logic **inside** the main IIFE, before `})(); /* 20261110bx: main IIFE close, moved below the ba block */`.
 
-### Latest — `20261114a`
+### Latest — `20261114b`
 
-Etiquette is a manner they keep (`p.manner`), not a new kind of person. The rule they retain: they do not say aloud an office, a creed, or a name that is not theirs, and they do not say what the room does not need. Face to face, a hold is a silence you can see. On Vox, the post is simply not there, and the phone says who held it. They do not wear your sentence. The longer they keep the manner, the stricter it gets, and it is written on their ledger.
+What you see is on the conversation itself. Open a talk and the panel shows **What you see**: each person standing there, whether they are with it, against it, or only listening, in their own sentence. Say something and those lines also sit on them in the room, one after another, so the building shows it and not only the card.
 
-The cabinet live box is on the session panel and on the phone under The table. It shows the bill, and who is with it, against it, or holding, at the time somebody speaks. That slip is posted onto every person at the table. You can talk about the bill; they answer as their own office.
+Communication is allowed wherever someone can hear you. A hold no longer replaces the line when you are speaking to them, on the floor, in cabinet, or by reply. The talk panel keeps a **Say it** box and a **To the room** box even when the old bar was hidden. To the room addresses everyone close enough. A message to someone who is not in the room gets an answer in their own words on the wire, not a blank.
 
-Heads of the other states sit under The powers. Each leader speaks only for their own chair. You are not them. The ledger page is what they saw, what they were told, and what they would not say. Elections list every path still open: declare, say nothing, concede a point. The morning Ledger prints what a real reporter will sign, and what was spiked. Every path (the bill, the Engine's memo, the race, each neighbour) is one page: take one, and that is the one that happened.
-
-`20261113f` filled in desks, hearings, shops, matches, marriage, and the record. Those stay.
+`20261114a` put the manner, the table, the powers, the ledger, and every path in. Those stay. The manner still stops a person from speaking as an office that is not theirs. It does not stop the conversation.
 
 Git author: `DominicVII` `<318079878+DominicVII@users.noreply.github.com>`.
 
