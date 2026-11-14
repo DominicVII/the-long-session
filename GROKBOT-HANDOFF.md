@@ -17,24 +17,24 @@ One HTML body. Keep these **byte-identical**:
 | `session.html` | repo root |
 | `One Nation, Under, ME.html` | standalone name |
 
-**Build stamp (now): `20261114b`**
+**Build stamp (now): `20261114c`**
 
-- `<meta name="onum-build" content="20261114b">`
-- IIFE `STAMP = "20261114b"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
-- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261114b"`
+- `<meta name="onum-build" content="20261114c">`
+- IIFE `STAMP = "20261114c"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
+- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261114c"`
 - Wrapper iframe: `/session.html?v=${ONUM_BUILD}` in `src/routes/index.tsx`
 
-If you change the HTML, bump the letter (`20261114b`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
+If you change the HTML, bump the letter (`20261114c`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
 
 This sandbox tracks `public/session.html` as the playable body (root `index.html` / `session.html` / `One Nation, Under, ME.html` are not in this repo). Do not replace that file with a simpler build. Insert new game logic **inside** the main IIFE, before `})(); /* 20261110bx: main IIFE close, moved below the ba block */`.
 
-### Latest — `20261114b`
+### Latest — `20261114c`
 
-What you see is on the conversation itself. Open a talk and the panel shows **What you see**: each person standing there, whether they are with it, against it, or only listening, in their own sentence. Say something and those lines also sit on them in the room, one after another, so the building shows it and not only the card.
+The room does not stop at one answer. Say something and the person in front of you answers, then up to three people standing there answer that person, then the first answers them back. None of them wears your sentence. The extra lines show on them in the room and in the talk, under **They keep going**.
 
-Communication is allowed wherever someone can hear you. A hold no longer replaces the line when you are speaking to them, on the floor, in cabinet, or by reply. The talk panel keeps a **Say it** box and a **To the room** box even when the old bar was hidden. To the room addresses everyone close enough. A message to someone who is not in the room gets an answer in their own words on the wire, not a blank.
+**Who is here** stays on the screen while you are standing with people: each name, with it / against it / listening, and their own line, tied to the bill and the place they are from. Tap a name to talk. **Say** opens the conversation. Hide folds it to a button. It steps aside when the talk panel or a live desk prompt is up, so it does not cover the words.
 
-`20261114a` put the manner, the table, the powers, the ledger, and every path in. Those stay. The manner still stops a person from speaking as an office that is not theirs. It does not stop the conversation.
+`20261114b` put What you see on the talk and kept Say it / To the room. Those stay. A hold still does not erase a conversation, and nobody speaks as an office that is not theirs.
 
 Git author: `DominicVII` `<318079878+DominicVII@users.noreply.github.com>`.
 

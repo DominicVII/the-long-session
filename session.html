@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261114b">
+<meta name="onum-build" content="20261114c">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -16,7 +16,7 @@
   img{max-width:100%}
   [hidden]:not([hidden="until-found"]){display:none!important}
 </style>
-<title>One Nation, Under, ME. · 20261114b</title>
+<title>One Nation, Under, ME. · 20261114c</title>
 <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'>  <rect width='32' height='32' fill='#0D1014'/>  <polygon fill='#A45F27' points='16,2.8 19.04,9.69 26.32,7.77 22.82,14.44 28.87,18.94 21.47,20.36 21.73,27.89 16,23 10.27,27.89 10.53,20.36 3.13,18.94 9.18,14.44 5.68,7.77 12.96,9.69'/></svg>">
 <meta property="og:title" content="One Nation, Under, ME.">
 <!-- Standalone: system fonts. No CDN, no vendor folder. -->
@@ -46,7 +46,7 @@
   window.onumLimSet = function(k, v){ if(!(k in D)) return false; L[k] = fix(v); try{ var o = JSON.parse(localStorage.getItem("onum.limits") || "{}") || {}; o[k] = (L[k] === INF) ? null : L[k]; localStorage.setItem("onum.limits", JSON.stringify(o)); }catch(e){} return true; };
   window.onumLimReset = function(){ try{ localStorage.removeItem("onum.limits"); }catch(e){} Object.keys(D).forEach(function(k){ L[k] = D[k]; }); L._eff = {}; L._gov = null; return true; };
   var show = function(v){ return v === INF ? "inf" : (typeof v === "number" ? Math.round(v * 100) / 100 : v); };
-  window.onumLimDump = function(){ var out = {build:"20261114b", mode:L.mode || "scale"}; Object.keys(D).forEach(function(k){ out[k] = show(L[k]); });
+  window.onumLimDump = function(){ var out = {build:"20261114c", mode:L.mode || "scale"}; Object.keys(D).forEach(function(k){ out[k] = show(L[k]); });
     out.effective = {}; Object.keys(L._eff).forEach(function(k){ out.effective[k] = show(L._eff[k]); }); out.governor = L._gov;
     try{ out.engineBudgetMs = window.onumEngine ? show(window.onumEngine.budget) : null; out.frameMs = window.onumEngine ? show(window.onumEngine.dtEma) : null; }catch(e){} return out; };
   window.onumLimLine = function(){ var d = window.onumLimDump(), e = d.effective, g = function(k){ return e[k] != null ? e[k] + "*" : d[k]; };
@@ -71,7 +71,7 @@
 </script>
 <script>
 (function(){
-  var STAMP = "20261114b";
+  var STAMP = "20261114c";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -983,7 +983,7 @@ body.boot-menu .shell{grid-template-rows:minmax(0,1fr)}
   <div class="grid">
     <div>
       <section class="stage">
-        <div class="scene" id="scene"><div class="boot" id="boot">Building the chamber… · 20261114b</div></div>
+        <div class="scene" id="scene"><div class="boot" id="boot">Building the chamber… · 20261114c</div></div>
         <div class="hud"><i id="whereTag">Location</i><b id="whereName">—</b></div>
         <div class="aims" id="aimsHud" hidden tabindex="0" aria-label="Today's aims"><i>Today's aims</i><b id="aimsNext"></b><div class="aims__all" id="aimsAll"></div></div>
         <div class="compass" id="compass" aria-hidden="true"><div class="compass__rail"></div><i class="compass__n">N</i><div id="compassTicks"></div></div>
@@ -55899,6 +55899,178 @@ document.addEventListener("click", function(ev){
   }catch(e){}
   return r;
 }; }
+
+
+/* 20261114c */
+/* 20261114c — the room keeps talking, and you can see it without opening a card.
+   One sentence gets an answer, then the people standing there answer each other. */
+onumMark = function(p, text){
+  const lean = onumLean(p);
+  let tone = lean.lean;
+  try{
+    if(text && typeof readTone === "function"){
+      const toneR = readTone(text);
+      if(toneR && toneR.hostile && p.rel && p.rel.warmth < 12) tone = "against";
+      else if(toneR && toneR.warm && p.rel && p.rel.warmth > 0) tone = "for";
+    }
+  }catch(e){}
+  const seat = p.state || p.role || p.post || "where I stand";
+  const bill = (G.bill && !G.bill.done && G.bill.title) ? G.bill.title : "what is in front of us";
+  const about = tone === "for"
+    ? "On " + bill + ", from " + seat + ", I am with it. That mark is mine."
+    : tone === "against"
+      ? "On " + bill + ", from " + seat + ", I am against it. I will not dress that up."
+      : "On " + bill + " I am listening. " + seat + " did not send me here to nod.";
+  let line = about;
+  try{ if(typeof onumSay === "function") line = onumSay(p, about); }catch(e){}
+  return {p:p, lean:tone, line:String(line || about).slice(0, 200)};
+};
+
+function onumChainLog(beats){
+  const box = document.getElementById("tkSee");
+  if(!box || !beats.length) return;
+  const more = beats.map(b => '<div style="margin-top:4px"><b>' + onumEsc(b.p.name) + '</b> <span style="opacity:.75">answers</span><div>“' + onumEsc(b.t) + '”</div></div>').join("");
+  box.insertAdjacentHTML("beforeend", '<div style="margin-top:6px;border-top:1px solid #6b5a2a;padding-top:4px"><b style="color:#ffe08a">They keep going</b>' + more + '</div>');
+}
+function onumChain(text){
+  if(!G || !G.you) return;
+  if(G._chainUntil && Date.now() < G._chainUntil) return;
+  const near = onumNear();
+  if(!near.length) return;
+  G._chainUntil = Date.now() + 4500;
+  const first = (TALK && TALK.m && near.indexOf(TALK.m) >= 0) ? TALK.m : near[0];
+  const rest = near.filter(p => p !== first).slice(0, 3);
+  const bill = (G.bill && G.bill.title) ? G.bill.title : "this";
+  const beats = [];
+  const say = (p, about) => {
+    let line = about;
+    try{ line = onumSay(p, about); }catch(e){}
+    return String(line || about).slice(0, 200);
+  };
+  beats.push({p:first, t:say(first, "I heard you on " + bill + ". I am answering for myself, not in your words."), delay:500});
+  rest.forEach((p, i) => {
+    const lean = onumLean(p);
+    const who = first.name.split(" ").slice(-1)[0];
+    const about = lean.lean === "against"
+      ? "I heard " + who + ". I do not agree, and I will not let that sit as if the room were one person."
+      : lean.lean === "for"
+        ? "I heard " + who + ". I am with the point. I am not with a crowd."
+        : "I heard " + who + ". I am not taking a side I have not taken.";
+    beats.push({p:p, t:say(p, about), delay:1400 + i * 1200});
+  });
+  if(rest[0]){
+    const back = rest[0].name.split(" ").slice(-1)[0];
+    beats.push({p:first, t:say(first, "I heard " + back + ". I am answering them. I am not repeating what was said to me."), delay:1400 + rest.length * 1200});
+  }
+  onumChainLog(beats);
+  beats.forEach(b => {
+    setTimeout(function(){
+      try{
+        if(!b.p || b.p.gone) return;
+        if(b.p.room && G.room && b.p.room !== G.room) return;
+        b.p.say = b.t;
+        b.p.sayT = 7.5;
+        b.p.sayTo = "you";
+        b.p.faceUntil = (G.t || 0) + 8;
+        if(TALK && TALK.open){
+          try{ appendMsg("them", b.t, (typeof surname === "function" ? surname(b.p.name) : b.p.name)); }catch(e){}
+          if(TALK.m === b.p){ try{ setSay(b.t, ""); }catch(e){} }
+        }
+      }catch(e){}
+    }, b.delay);
+  });
+}
+
+function onumStandDock(){
+  let d = document.getElementById("onumSeeDock");
+  if(!d){
+    d = document.createElement("div");
+    d.id = "onumSeeDock";
+    d.setAttribute("role", "region");
+    d.setAttribute("aria-label", "Who is in the room");
+    d.innerHTML = '<div class="h"><b>Who is here</b><button type="button" id="onumSeeX">Hide</button></div><div id="onumSeeBody"></div><div class="row"><input id="onumSeeIn" maxlength="240" placeholder="Say it. They answer, then the room does."><button type="button" id="onumSeeGo">Say</button></div>';
+    document.body.appendChild(d);
+  }
+  return d;
+}
+function onumStandPaint(){
+  const d = onumStandDock();
+  if(!d) return;
+  const pr = document.getElementById("prompt");
+  const live = pr && !pr.hidden && pr.classList.contains("is-live");
+  if((TALK && TALK.open) || live || !(G && G.you)){ d.hidden = true; return; }
+  d.hidden = false;
+  d.classList.toggle("fold", !!(G && G._seeHide));
+  const rows = onumNear().slice(0, 4).map(p => onumMark(p, ""));
+  const body = document.getElementById("onumSeeBody");
+  if(!body) return;
+  const word = r => r.lean === "for" ? "with it" : r.lean === "against" ? "against it" : "listening";
+  body.innerHTML = rows.length ? rows.map(r =>
+    '<button type="button" data-seeid="' + onumEsc(r.p.id) + '"><b>' + onumEsc(r.p.name) + '</b> <i>' + word(r) + '</i><span>' + onumEsc(r.line) + '</span></button>'
+  ).join("") : '<p>Nobody is close. Walk up to someone, or say it anyway.</p>';
+}
+if(!document.getElementById("onumSeeCss")){
+  const st = document.createElement("style");
+  st.id = "onumSeeCss";
+  st.textContent = "#onumSeeDock{position:fixed;left:8px;bottom:70px;z-index:42;width:min(300px,92vw);max-height:34vh;overflow:auto;background:#121419;color:#f4f1e8;border:2px solid #c9a24a;border-radius:8px;padding:6px 8px;font:12px/1.35 system-ui}" +
+    "#onumSeeDock .h{display:flex;justify-content:space-between;align-items:center;color:#ffe08a}" +
+    "#onumSeeDock .h button,#onumSeeDock .row button{background:#ffe08a;color:#111;border:0;border-radius:4px;font:700 12px system-ui;padding:6px 8px}" +
+    "#onumSeeDock .row{display:flex;gap:6px;margin-top:6px}" +
+    "#onumSeeDock input{flex:1;min-height:36px;background:#0d0f13;color:#fff;border:1px solid #c9a24a;border-radius:4px;padding:4px 6px}" +
+    "#onumSeeDock.fold #onumSeeBody,#onumSeeDock.fold .row{display:none}" +
+    "#onumSeeBody button{display:block;width:100%;text-align:left;margin:4px 0;background:#1a160e;color:#f4f1e8;border:1px solid #6b5a2a;border-radius:4px;padding:4px 6px}" +
+    "#onumSeeBody i{color:#ffe08a;font-style:normal}#onumSeeBody span{display:block;opacity:.9}";
+  document.head.appendChild(st);
+}
+document.addEventListener("click", function(ev){
+  const t = ev.target;
+  if(!t || !t.closest) return;
+  if(t.closest("#onumSeeX")){
+    if(G) G._seeHide = !G._seeHide;
+    const d = document.getElementById("onumSeeDock");
+    if(d) d.classList.toggle("fold", !!(G && G._seeHide));
+    const b = document.getElementById("onumSeeX");
+    if(b) b.textContent = (G && G._seeHide) ? "Show" : "Hide";
+    return;
+  }
+  const who = t.closest("[data-seeid]");
+  if(who){
+    ev.preventDefault();
+    let p = null;
+    try{ p = byId(who.getAttribute("data-seeid")); }catch(e){}
+    if(!p) p = onumNear().find(x => String(x.id) === String(who.getAttribute("data-seeid")));
+    if(p && typeof openTalk === "function"){ try{ openTalk(p); }catch(e){} }
+    return;
+  }
+  if(t.closest("#onumSeeGo")){
+    ev.preventDefault();
+    const inp = document.getElementById("onumSeeIn");
+    const said = inp && inp.value;
+    if(inp) inp.value = "";
+    const m = onumNear()[0];
+    if(m && typeof openTalk === "function"){ try{ if(!TALK.open || TALK.m !== m) openTalk(m); }catch(e){} }
+    try{ onumSayTo(said, !m); }catch(e){}
+  }
+});
+{ const _ar = addressRoom; addressRoom = function(text){
+  const r = _ar.apply(this, arguments);
+  try{ onumChain(text); }catch(e){}
+  return r;
+}; }
+{ const _cv = converse; converse = function(m, text){
+  const r = _cv.apply(this, arguments);
+  const go = function(){ try{ onumChain(text); }catch(e){} };
+  try{ if(r && typeof r.then === "function") r.then(go, go); else go(); }catch(e){ go(); }
+  return r;
+}; }
+{ const _live = converseLive; converseLive = function(m, text){
+  const r = _live.apply(this, arguments);
+  try{ onumChain(text); }catch(e){}
+  return r;
+}; }
+setInterval(function(){
+  try{ if(!G || !G.you) return; onumStandPaint(); }catch(e){}
+}, 2500);
 
 })(); /* 20261110bx: main IIFE close, moved below the ba block */
 </script>
