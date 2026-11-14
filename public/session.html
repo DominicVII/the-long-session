@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261113f">
+<meta name="onum-build" content="20261114a">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -16,7 +16,7 @@
   img{max-width:100%}
   [hidden]:not([hidden="until-found"]){display:none!important}
 </style>
-<title>One Nation, Under, ME. · 20261113f</title>
+<title>One Nation, Under, ME. · 20261114a</title>
 <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'>  <rect width='32' height='32' fill='#0D1014'/>  <polygon fill='#A45F27' points='16,2.8 19.04,9.69 26.32,7.77 22.82,14.44 28.87,18.94 21.47,20.36 21.73,27.89 16,23 10.27,27.89 10.53,20.36 3.13,18.94 9.18,14.44 5.68,7.77 12.96,9.69'/></svg>">
 <meta property="og:title" content="One Nation, Under, ME.">
 <!-- Standalone: system fonts. No CDN, no vendor folder. -->
@@ -46,7 +46,7 @@
   window.onumLimSet = function(k, v){ if(!(k in D)) return false; L[k] = fix(v); try{ var o = JSON.parse(localStorage.getItem("onum.limits") || "{}") || {}; o[k] = (L[k] === INF) ? null : L[k]; localStorage.setItem("onum.limits", JSON.stringify(o)); }catch(e){} return true; };
   window.onumLimReset = function(){ try{ localStorage.removeItem("onum.limits"); }catch(e){} Object.keys(D).forEach(function(k){ L[k] = D[k]; }); L._eff = {}; L._gov = null; return true; };
   var show = function(v){ return v === INF ? "inf" : (typeof v === "number" ? Math.round(v * 100) / 100 : v); };
-  window.onumLimDump = function(){ var out = {build:"20261113f", mode:L.mode || "scale"}; Object.keys(D).forEach(function(k){ out[k] = show(L[k]); });
+  window.onumLimDump = function(){ var out = {build:"20261114a", mode:L.mode || "scale"}; Object.keys(D).forEach(function(k){ out[k] = show(L[k]); });
     out.effective = {}; Object.keys(L._eff).forEach(function(k){ out.effective[k] = show(L._eff[k]); }); out.governor = L._gov;
     try{ out.engineBudgetMs = window.onumEngine ? show(window.onumEngine.budget) : null; out.frameMs = window.onumEngine ? show(window.onumEngine.dtEma) : null; }catch(e){} return out; };
   window.onumLimLine = function(){ var d = window.onumLimDump(), e = d.effective, g = function(k){ return e[k] != null ? e[k] + "*" : d[k]; };
@@ -71,7 +71,7 @@
 </script>
 <script>
 (function(){
-  var STAMP = "20261113f";
+  var STAMP = "20261114a";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -983,7 +983,7 @@ body.boot-menu .shell{grid-template-rows:minmax(0,1fr)}
   <div class="grid">
     <div>
       <section class="stage">
-        <div class="scene" id="scene"><div class="boot" id="boot">Building the chamber… · 20261113f</div></div>
+        <div class="scene" id="scene"><div class="boot" id="boot">Building the chamber… · 20261114a</div></div>
         <div class="hud"><i id="whereTag">Location</i><b id="whereName">—</b></div>
         <div class="aims" id="aimsHud" hidden tabindex="0" aria-label="Today's aims"><i>Today's aims</i><b id="aimsNext"></b><div class="aims__all" id="aimsAll"></div></div>
         <div class="compass" id="compass" aria-hidden="true"><div class="compass__rail"></div><i class="compass__n">N</i><div id="compassTicks"></div></div>
@@ -55170,6 +55170,564 @@ onumPhoneVox = function(){
     o.web = G.web || null;
     if(G.vox && G.vox.posts) o.vox = {id:G.vox.id || 1, posts:G.vox.posts.slice(0, 80)};
   }catch(e){}
+  return o;
+}; }
+
+
+/* 20261114a */
+/* 20261114a — etiquette, the table, the powers, the ledger, the race, the paper, every path.
+   No new kind of person. They keep a manner, and they do not speak as someone they are not. */
+function onumEtiq(){
+  if(!G.etiq || G.etiq.v !== 1) G.etiq = {v:1, log:[]};
+  return G.etiq;
+}
+function onumManner(p){
+  if(!p || p === G.you) return null;
+  if(!p.manner || p.manner.v !== 1){
+    const disc = (p.traits && p.traits.discretion) || 50;
+    p.manner = {v:1, held:0, said:0, slips:0, strict:disc >= 64 ? 1 : 0, taught:false,
+      rule:"I do not say aloud an office, a creed, or a name that is not mine. I do not say what the room does not need."};
+  }
+  return p.manner;
+}
+function onumNeedRoll(p, text, where){
+  try{ return Math.abs(seedOf(String(p && p.id) + ":" + where + ":" + (G.day || 0) + ":" + String(text || "").length)) % 100; }
+  catch(e){ return ((G.day || 0) * 13 + String(text || "").length) % 100; }
+}
+function onumNeeded(p, text, where){
+  if(where === "cabinet" || where === "summit" || where === "reply") return true;
+  const T = (p && p.traits) || {};
+  const M = onumManner(p);
+  const strict = M ? (M.strict || 0) : 0;
+  const low = String(text || "").toLowerCase();
+  const bill = G.bill && !G.bill.done ? String(G.bill.title || "") : "";
+  const onBill = bill && low.indexOf(bill.toLowerCase().slice(0, 14)) >= 0;
+  const home = p && p.state && low.indexOf(String(p.state).toLowerCase()) >= 0;
+  const hot = (T.temper || 0) > 74;
+  if(onBill || home || hot) return true;
+  const disc = T.discretion || 42;
+  const cut = (where === "vox" ? 46 : 62) + strict * 10;
+  if(disc < cut && (T.temper || 40) > 48) return true;
+  return onumNeedRoll(p, text, where) > (38 + strict * 12);
+}
+function onumHeld(p, why, where){
+  const M = onumManner(p);
+  if(!M) return;
+  M.held++;
+  if(M.held === 3 || M.held === 8) M.strict = Math.min(4, (M.strict || 0) + 1);
+  if(!M.taught && M.held >= 3){
+    M.taught = true;
+    try{ remember(p, M.rule, 2, true); }catch(e){}
+  }
+  M.last = {d:G.day, where:where, why:why};
+  const line = (p.name || "They") + " did not say it (" + where + "). " + why;
+  try{ remember(p, "I did not say it. " + M.rule, 1); }catch(e){}
+  try{ ledgerOwn(p, line); }catch(e){}
+  const E = onumEtiq();
+  E.log.unshift({d:G.day, id:p.id, who:p.name, where:where, why:why});
+  if(E.log.length > 40) E.log.pop();
+}
+function onumGate(p, text, where){
+  const raw = String(text || "").replace(/\s+/g, " ").trim();
+  if(!p || p === G.you || !raw) return {say:true, text:raw, why:""};
+  const key = String(p.id) + "|" + where + "|" + raw.slice(0, 70);
+  if(p._gk === key && p._gr) return p._gr;
+  const M = onumManner(p);
+  let t = raw.replace(/[\u201c"]([^\u201d"]{32,})[\u201d"]/g, "what was said");
+  const role = String(p.role || p.post || "").toLowerCase();
+  const titles = ["president", "governor", "speaker", "secretary of state", "secretary of the treasury", "secretary of war", "secretary of defense", "attorney general", "chief justice"];
+  let slip = false;
+  titles.forEach(function(title){
+    const re = new RegExp("\\b(I am|as|I'm) the " + title + "\\b", "i");
+    if(re.test(t) && role.indexOf(title) < 0){
+      slip = true;
+      t = t.replace(re, "not as the " + title);
+    }
+  });
+  if(G.you && G.you.name && t.indexOf("I am " + G.you.name) >= 0){
+    slip = true;
+    t = t.replace("I am " + G.you.name, "I am not " + G.you.name);
+  }
+  if(slip){
+    if(M) M.slips++;
+    t = "I will not speak as someone I am not. I am " + (p.role || p.name) + ". " + t;
+    try{ remember(p, "I nearly spoke as someone else. I stopped.", 2); }catch(e){}
+  }
+  let res;
+  if(!onumNeeded(p, t, where)){
+    const why = "It was not needed, and it was not " + String(p.name || "theirs").split(" ")[0] + "'s to put in the room.";
+    res = {say:false, text:"", why:why};
+    onumHeld(p, why, where);
+  } else {
+    if(M) M.said++;
+    if(where === "vox" && t.length > 320 && (p.traits && p.traits.discretion > 58)) t = t.slice(0, 300).replace(/\s+\S*$/, "") + ".";
+    res = {say:true, text:t, why:""};
+  }
+  p._gk = key;
+  p._gr = res;
+  return res;
+}
+
+{ const _ss = setSay; setSay = function(t, n){
+  try{
+    const m = (typeof TALK !== "undefined" && TALK && TALK.open && TALK.m) ? TALK.m : null;
+    const s = String(t || "");
+    if(m && s && s.charAt(0) !== "\u201c" && s.charAt(0) !== '"'){
+      const g = onumGate(m, s, "talk");
+      if(!g.say){
+        t = m.name.split(" ")[0] + " does not say it.";
+        n = (n || "") + " " + g.why;
+      } else t = g.text;
+    }
+  }catch(e){}
+  return _ss.call(this, t, n);
+}; }
+{ const _am = appendMsg; appendMsg = function(kind, text, who){
+  try{
+    if(kind === "them" && TALK && TALK.m){
+      const g = onumGate(TALK.m, text, "talk");
+      if(!g.say) text = TALK.m.name.split(" ")[0] + " does not say it. " + g.why;
+      else text = g.text;
+    }
+  }catch(e){}
+  return _am.call(this, kind, text, who);
+}; }
+{ const _nl = ssnNpcLine; ssnNpcLine = function(m){
+  const l = _nl.apply(this, arguments);
+  try{
+    const where = (typeof SSN !== "undefined" && SSN && (SSN.kind === "cabinet_meeting" || SSN.kind === "governor_council")) ? "cabinet" : "floor";
+    const g = onumGate(m, l, where);
+    if(!g.say) return (m && m.name ? m.name.split(" ")[0] : "They") + " does not take it up. It was not theirs.";
+    return g.text;
+  }catch(e){ return l; }
+}; }
+{ const _cs = (typeof cabShow === "function") ? cabShow : null; if(_cs) cabShow = function(p, out){
+  try{
+    const g = onumGate(p, out, "cabinet");
+    if(!g.say) out = (p && p.name ? p.name.split(" ")[0] : "They") + " does not add it. " + g.why;
+    else out = g.text;
+  }catch(e){}
+  return _cs.call(this, p, out);
+}; }
+{ const _va = voxAdd; voxAdd = function(post){
+  try{
+    if(post && !post.mine && post.by != null){
+      const p = byId(post.by);
+      if(p){
+        const g = onumGate(p, post.t, post.reply ? "reply" : "vox");
+        if(!g.say) return;
+        post.t = g.text;
+      }
+    }
+    if(post && !post.mine && !String(post.t || "").trim()) return;
+  }catch(e){}
+  return _va.apply(this, arguments);
+}; }
+
+function onumLean(p){
+  let lean = "quiet", why = "Not their point to mark.";
+  const bill = G.bill && !G.bill.done ? G.bill : null;
+  try{
+    if(bill && p && p !== G.you && typeof memberVote === "function" && p.kind === "member"){
+      const v = memberVote(p, bill);
+      if(v > 0) return {id:p.id, name:p.name, role:p.role || "", lean:"for", why:"With " + bill.title + "."};
+      if(v < 0) return {id:p.id, name:p.name, role:p.role || "", lean:"against", why:"Against " + bill.title + "."};
+    }
+  }catch(e){}
+  if(p && G.you && p.party && p.party === G.you.party){ lean = "for"; why = "Same caucus. Not a signature they handed over."; }
+  else if(p && G.you && p.party && G.you.party && p.party !== G.you.party){ lean = "against"; why = "Not their caucus, and they will not pretend."; }
+  else if(p && p.traits && p.traits.discretion > 70){ lean = "quiet"; why = "They are in the room. The point is not theirs to mark."; }
+  return {id:p ? p.id : null, name:p ? p.name : "Someone", role:(p && p.role) || "", lean:lean, why:why};
+}
+function onumTablePeople(){
+  const out = [];
+  const seen = {};
+  const add = p => { if(!p || p === G.you || p.gone || seen[p.id]) return; seen[p.id] = 1; out.push(p); };
+  try{ if(typeof cabSeats === "function") cabSeats().forEach(add); }catch(e){}
+  try{
+    if(typeof presStaff === "function" && typeof PRES_ROLES !== "undefined"){
+      const st = presStaff();
+      Object.keys(PRES_ROLES).forEach(k => add(st && st[k]));
+    }
+  }catch(e){}
+  try{ if(typeof SSN !== "undefined" && SSN && SSN.seats) SSN.seats.forEach(s => { if(s.personId !== "you") add(byId(s.personId)); }); }catch(e){}
+  return out.slice(0, 8);
+}
+function onumLiveReact(speaker, text){
+  const rows = onumTablePeople().filter(p => !speaker || p !== speaker).map(onumLean);
+  const last = function(n){ return String(n || "").split(" ").slice(-1)[0]; };
+  const forN = rows.filter(r => r.lean === "for").map(r => last(r.name));
+  const agN = rows.filter(r => r.lean === "against").map(r => last(r.name));
+  const qN = rows.filter(r => r.lean === "quiet").map(r => last(r.name));
+  const posted = "Posted to the table: with it, " + (forN.join(", ") || "no one") + ". Against, " + (agN.join(", ") || "no one") + ". Held, " + (qN.join(", ") || "no one") + ".";
+  rows.forEach(r => { const p = byId(r.id); try{ if(p) ledgerOwn(p, posted); }catch(e){} });
+  try{ if(G.you) ledgerOwn(G.you, posted); }catch(e){}
+  try{ if(typeof SSN !== "undefined" && SSN){ ssnEnsure().log.push({d:G.day, kind:SSN.kind, act:"live", who:"the table", t:posted.slice(0, 160)}); } }catch(e){}
+  const live = {at:Date.now(), speaker:speaker && speaker.name, text:String(text || "").slice(0, 180), rows:rows, posted:posted};
+  try{ if(typeof SSN !== "undefined" && SSN) SSN.live = live; }catch(e){}
+  try{ if(window.ONUM_SESSION) window.ONUM_SESSION.live = live; }catch(e){}
+  G._live = live;
+  try{ onumSessStrip(); }catch(e){}
+  return live;
+}
+function onumBillBits(){
+  const b = G.bill && !G.bill.done ? G.bill : null;
+  if(!b) return {title:"No bill on the table", line:"The chair has not laid a paper down. There is nothing to be for yet."};
+  const bits = [b.title];
+  if(b.line) bits.push(b.line);
+  if(b.sponsor) bits.push("In under " + b.sponsor + (b.sponsorParty ? " (" + b.sponsorParty + ")" : "") + ".");
+  return {title:b.title, line:bits.slice(1).join(" ") || "The clerk has the title. The argument is whose it is."};
+}
+function onumTableTalk(text){
+  const said = String(text || "").trim();
+  if(!said) return;
+  try{ if(window.onumSession && typeof SSN !== "undefined" && SSN && window.onumSession.speak) window.onumSession.speak(said); }catch(e){}
+  const live = onumLiveReact(G.you, said);
+  const answers = [];
+  onumTablePeople().slice(0, 5).forEach(p => {
+    const take = onumLean(p);
+    const about = take.lean === "for"
+      ? "On the bill I am with it, in my own office, not in yours."
+      : take.lean === "against"
+        ? "On the bill I am against it. I will not dress that up to keep the afternoon kind."
+        : "I am not marking it. It is not mine to mark, and I will not borrow a voice.";
+    const g = onumGate(p, (typeof onumSay === "function" ? onumSay(p, about) : about), "cabinet");
+    if(!g.say) answers.push({p:p, t:p.name.split(" ")[0] + " does not add it.", lean:"quiet"});
+    else answers.push({p:p, t:g.text, lean:take.lean});
+  });
+  G._liveAnswers = answers;
+  return {live:live, answers:answers};
+}
+function onumTableCard(){
+  const B = onumBillBits();
+  const live = G._live;
+  const rows = (live && live.rows) || onumTablePeople().map(onumLean);
+  const paint = r => '<div style="margin:4px 0"><b>' + onumEsc(r.name) + '</b> <span class="muted">· ' + onumEsc(r.role || "") + ' · ' + (r.lean === "for" ? "with it" : r.lean === "against" ? "against it" : "held") + '</span><div class="muted">' + onumEsc(r.why || "") + '</div></div>';
+  const ans = (G._liveAnswers || []).map(a => '<div style="margin:6px 0"><b>' + onumEsc(a.p.name) + '</b><div>“' + onumEsc(a.t) + '”</div></div>').join("");
+  const body = '<p><b>' + onumEsc(B.title) + '</b></p><p>' + onumEsc(B.line) + '</p>' +
+    '<div class="eyebrow">Posted to all of them</div>' + (rows.length ? rows.map(paint).join("") : '<p class="muted">Nobody is at the table yet.</p>') +
+    (live && live.posted ? '<p class="muted">' + onumEsc(live.posted) + '</p>' : '') +
+    '<div class="eyebrow">Say it, about the bill</div><textarea id="tbSay" maxlength="240" style="width:100%;min-height:64px" placeholder="Your own words. They will answer as themselves."></textarea>' +
+    '<div class="card__actions"><button type="button" class="btn" id="tbGo">Say it to the table</button></div><div class="dream" id="tbOut"></div>' + ans;
+  govCardOpen("The table", "Who is with it, who is not", "The same slip is posted to every person in the room. They can see it. You can see the bill, and you can talk about it.", body, null);
+  const go = el("tbGo"); if(go) go.addEventListener("click", () => {
+    const inp = el("tbSay");
+    const r = onumTableTalk(inp && inp.value);
+    if(!r) return;
+    const o = el("tbOut");
+    if(o) o.textContent = r.live.posted;
+    onumTableCard();
+  });
+}
+function onumSessStrip(){
+  const P = document.getElementById("ndSess");
+  const body = P && P.querySelector(".ns-body");
+  if(!body) return;
+  let box = body.querySelector("#nsxLive");
+  if(!box){ box = document.createElement("div"); box.id = "nsxLive"; box.style.cssText = "margin-top:6px;padding:6px;border:1px solid #c9a24a;border-radius:6px;background:#1a160e"; body.appendChild(box); }
+  const B = onumBillBits();
+  const live = (typeof SSN !== "undefined" && SSN && SSN.live) || G._live;
+  const rows = (live && live.rows) || [];
+  const last = n => String(n || "").split(" ").slice(-1)[0];
+  const line = rows.length ? ("With it: " + (rows.filter(r => r.lean === "for").map(r => last(r.name)).join(", ") || "—") + ". Against: " + (rows.filter(r => r.lean === "against").map(r => last(r.name)).join(", ") || "—") + ". Held: " + (rows.filter(r => r.lean === "quiet").map(r => last(r.name)).join(", ") || "—") + ".") : "The leans post when somebody speaks.";
+  box.innerHTML = '<div style="color:#ffe08a;font:700 12px Georgia,serif">The bill</div><div>' + onumEsc(B.title) + '</div><div style="color:#e8e2d0;font-size:12px;margin:4px 0">' + onumEsc(line) + '</div><button type="button" id="nsxTable" style="background:#ffe08a;color:#111;border:0;border-radius:4px;padding:4px 8px;font:700 12px system-ui;cursor:pointer">Open the table</button>';
+}
+setTimeout(function(){
+  try{
+    const SN = window.NEPTUNE_SESSIONVIEW;
+    if(!SN || !SN.render || SN._onumLive) return;
+    SN._onumLive = 1;
+    const _r = SN.render;
+    SN.render = function(){ const r = _r.apply(this, arguments); try{ onumSessStrip(); }catch(e){} return r; };
+  }catch(e){}
+}, 0);
+document.addEventListener("click", function(ev){
+  const t = ev.target && ev.target.closest && ev.target.closest("#nsxTable");
+  if(!t) return;
+  ev.preventDefault();
+  try{ onumTableCard(); }catch(e){}
+});
+{ const _ev = window.onumSessionEvent; window.onumSessionEvent = function(e){
+  const r = _ev.apply(this, arguments);
+  try{
+    if(e && e.action === "speak" && typeof SSN !== "undefined" && SSN && (SSN.kind === "cabinet_meeting" || SSN.kind === "governor_council" || SSN.kind === "house_floor" || SSN.kind === "senate_floor")){
+      const who = (e.actorId === "you" || (G.you && e.actorId === G.you.id)) ? G.you : byId(e.actorId);
+      onumLiveReact(who, e.text);
+    }
+  }catch(x){}
+  return r;
+}; }
+
+function onumRealmVoice(folk, pwr, about){
+  const rel = (G.realmRel || {})[pwr.k] || 0;
+  const g = (typeof REALM_GOV !== "undefined" && REALM_GOV[pwr.k]) || {};
+  const seat = g.head || folk.title || "the chair at home";
+  return folk.name + ", " + folk.title + " of " + pwr.t + ": I am not your head of state, and I will not speak as one. " + about + " What I carry home is mine. " + (rel < -25 ? "We are cold, and I will not warm it for the cable." : rel > 25 ? "We are on decent terms. That is not a blank." : "We are correct with each other. That is enough for today.") + (g.seat ? " I sit at " + g.seat + ", not in your capital." : "");
+}
+function onumSummitCard(k){
+  const pwr = (typeof WORLD_POWERS !== "undefined" ? WORLD_POWERS : []).find(x => x.k === k);
+  if(!pwr) return;
+  let folk = []; try{ folk = realmFolk(k) || []; }catch(e){}
+  const three = folk.filter(f => f && f.id !== "envoy").slice(0, 3);
+  if(!three.length) three.push({id:"head", name:pwr.t, title:"head of government"});
+  const rel = Math.round((G.realmRel || {})[k] || 0);
+  const label = (typeof realmRelLabel === "function") ? realmRelLabel(rel) : "";
+  const B = onumBillBits();
+  const rows = three.map(f => {
+    const lean = rel >= 20 ? "with the ask" : rel <= -20 ? "against the ask" : "not marking it";
+    return '<div style="margin:8px 0;padding:6px 10px;border-left:3px solid var(--line-soft)"><b>' + onumEsc(f.name) + '</b> <span class="muted">· ' + onumEsc(f.title) + ' · ' + lean + '</span><div>“' + onumEsc(onumRealmVoice(f, pwr, "I speak only for " + pwr.t + ".")) + '”</div></div>';
+  }).join("");
+  const body = '<p>' + onumEsc(pwr.t) + ' is ' + onumEsc(label || "at the table") + ' (' + rel + '). You are ' + onumEsc((typeof officeTitle === "function" ? officeTitle() : "the chair")) + '. They are not.</p>' +
+    '<div class="eyebrow">The bill, if you raise it</div><p><b>' + onumEsc(B.title) + '</b> ' + onumEsc(B.line) + '</p>' + rows +
+    '<div class="card__actions" style="flex-wrap:wrap"><button type="button" class="btn" data-sm="bill">Raise the bill</button><button type="button" class="btn btn--ghost" data-sm="trade">Offer trade</button><button type="button" class="btn btn--ghost" data-sm="press">Press a point</button><button type="button" class="btn btn--ghost" data-sm="hold">Say nothing</button></div><div class="dream" id="smOut"></div>';
+  govCardOpen(pwr.t, "Heads, not costumes", "Each of them answers from their own chair. Posted to the three of them: who is with the ask, who is not, who holds.", body, null);
+  card.querySelectorAll("[data-sm]").forEach(b => b.addEventListener("click", () => {
+    const a = b.getAttribute("data-sm");
+    G.realmRel = G.realmRel || {};
+    const was = G.realmRel[k] || 0;
+    let msg = "";
+    if(a === "hold"){
+      msg = "You do not say it. They notice the hold, and they do not fill it for you.";
+      three.forEach(f => { const line = onumRealmVoice(f, pwr, "You kept it. I will not invent the sentence you did not say."); try{ onumWebPush(f.name, "personal", line.slice(0, 180)); }catch(e){} });
+    } else {
+      const bump = a === "trade" ? 4 : a === "press" ? (was > 0 ? 2 : -3) : 1;
+      G.realmRel[k] = Math.max(-100, Math.min(100, was + bump));
+      const about = a === "bill" ? "You raised " + B.title + ". I will answer for " + pwr.t + " only." : a === "trade" ? "A trade is a paper, not a friendship. I can carry a paper." : "You pressed. I will say at home that you pressed, in my name.";
+      msg = three.map(f => onumRealmVoice(f, pwr, about)).join(" ");
+      try{ setPrecedent("sat with " + pwr.t + " (" + a + ")", "a head of state speaks with another head, and neither wears the other's office", true); }catch(e){}
+      try{ if(typeof onumKeep === "function") onumKeep(pwr.t + ": " + about, null); }catch(e){}
+    }
+    const o = el("smOut"); if(o) o.textContent = msg;
+  }));
+}
+function onumPowersCard(){
+  const powers = (typeof WORLD_POWERS !== "undefined" ? WORLD_POWERS : []);
+  const rows = powers.map(p => {
+    const rel = Math.round((G.realmRel || {})[p.k] || 0);
+    const label = (typeof realmRelLabel === "function") ? realmRelLabel(rel) : "";
+    let head = ""; try{ const f = (realmFolk(p.k) || []).find(x => x.id === "head"); if(f) head = f.name + ", " + f.title; }catch(e){}
+    return '<div style="margin:8px 0"><b>' + onumEsc(p.t) + '</b> <span class="muted">· ' + onumEsc(label) + ' ' + rel + (head ? " · " + onumEsc(head) : "") + '</span><div class="card__actions"><button type="button" class="btn" data-pw="' + onumEsc(p.k) + '">Sit with their leaders</button></div></div>';
+  }).join("");
+  govCardOpen("The powers", "Your chair, and theirs", "You meet them as the head of this state. They answer as the heads of theirs.", rows || "<p class='muted'>No neighbours are on the map.</p>", null);
+  card.querySelectorAll("[data-pw]").forEach(b => b.addEventListener("click", () => onumSummitCard(b.getAttribute("data-pw"))));
+}
+{ const _rd = realmDo; realmDo = function(k, a){
+  const r = _rd.apply(this, arguments);
+  if(a === "aud") setTimeout(function(){ try{ onumSummitCard(k); }catch(e){} }, 90);
+  return r;
+}; }
+
+function onumLedgerCard(){
+  const pool = [];
+  try{ onumTablePeople().forEach(p => pool.push(p)); }catch(e){}
+  try{ (G.members || []).forEach(p => { if(pool.length < 10 && p && !p.gone && p !== G.you && pool.indexOf(p) < 0 && (p.met || (p.manner && p.manner.held))) pool.push(p); }); }catch(e){}
+  const rows = pool.slice(0, 8).map(p => {
+    let L = null; try{ L = ledgerEnsure(p); }catch(e){}
+    const M = onumManner(p);
+    const saw = L && L.saw ? L.saw.slice(0, 3).map(x => onumEsc(x.t)).join("<br>") : "";
+    const told = L && L.told ? L.told.slice(0, 2).map(x => onumEsc(x.t)).join("<br>") : "";
+    return '<div style="margin:8px 0;padding:6px 10px;border-left:3px solid var(--line-soft)"><b>' + onumEsc(p.name) + '</b> <span class="muted">· held ' + (M ? M.held : 0) + ' · said ' + (M ? M.said : 0) + ' · slips ' + (M ? M.slips : 0) + '</span><div class="muted">' + onumEsc(M ? M.rule : "") + '</div>' +
+      (saw ? '<div><b>Saw.</b> ' + saw + '</div>' : '') + (told ? '<div><b>Was told.</b> ' + told + '</div>' : '') + '</div>';
+  }).join("");
+  const holds = onumEtiq().log.slice(0, 6).map(x => '<div class="muted">d' + x.d + ' · ' + onumEsc(x.who) + ' · ' + onumEsc(x.where) + ' · ' + onumEsc(x.why) + '</div>').join("");
+  govCardOpen("The ledger", "What they know, and what they would not say", "A thing is on their ledger when they saw it or were told it. A hold is also on it. They keep the manner.", rows + '<div class="eyebrow">What was not said</div>' + (holds || '<p class="muted">Nobody has held a sentence yet.</p>'), null);
+}
+function onumPaperTail(){
+  const E = onumEtiq();
+  const held = E.log.filter(x => x.d === G.day).slice(0, 3);
+  const press = (G.press || []).filter(p => p && !p.gone)[0] || (G.members || []).filter(p => p && p.kind === "press")[0];
+  let voice = "";
+  if(press && typeof onumSay === "function"){
+    const M = onumManner(press);
+    if(M && (M.strict || 0) >= 1 && onumNeedRoll(press, "paper", "news") > 55) voice = press.name + " spiked the line. It was not needed on the front, and it was not theirs to invent.";
+    else voice = onumSay(press, "I will print what I stood in front of. I will not print a voice that was not in the room.");
+  }
+  const B = onumBillBits();
+  const foe = (typeof WORLD_POWERS !== "undefined" && G.world) ? WORLD_POWERS.find(p => p.k === G.world.foe) : null;
+  let foreign = "";
+  if(foe){
+    const rel = Math.round((G.realmRel || {})[foe.k] || 0);
+    foreign = foe.t + " is " + ((typeof realmRelLabel === "function") ? realmRelLabel(rel) : "on the page") + " (" + rel + "). Their head is not your head.";
+  }
+  return '<div class="np__band">What was not printed</div><p class="np__matter">' + onumEsc(voice || "No reporter in the room chose a sentence.") + '</p>' +
+    (held.length ? '<p class="np__matter">' + held.map(x => onumEsc(x.who) + " held a line (" + onumEsc(x.where) + ").").join(" ") + '</p>' : '<p class="np__matter">Nothing was held back this morning. That is also a fact.</p>') +
+    '<div class="np__band">The bill, and the neighbours</div><p class="np__matter">' + onumEsc(B.title) + '. ' + onumEsc(B.line) + (foreign ? ' ' + onumEsc(foreign) : '') + '</p>';
+}
+{ const _np = npHTML; npHTML = function(){
+  let h = _np.apply(this, arguments);
+  try{ h += onumPaperTail(); }catch(e){}
+  return h;
+}; }
+
+function onumElectPaths(){
+  const y = G.you; if(!y) return "";
+  const foe = (G.camp && G.camp.field || []).filter(f => !f.out).sort((a, b) => b.poll - a.poll)[0];
+  const paths = [
+    ["declare", "Declare, in your own name", "The papers get a sentence you actually said. The sounding moves a little, toward you or away, depending who reads it."],
+    ["quiet", "Do not announce it", "You hold the line. A high-discretion reporter may spike it. The race does not get a quote you did not give."],
+    ["concede", "Concede one point to the other name", "You give a real point. They have to answer as themselves, not as a costume of you."]
+  ];
+  return '<div class="eyebrow">Every path still open</div>' + paths.map(p => '<div style="margin:6px 0"><button type="button" class="btn btn--ghost" data-el="path:' + p[0] + '">' + onumEsc(p[1]) + '</button><div class="muted">' + onumEsc(p[2]) + (foe ? " Facing " + onumEsc(foe.name) + "." : "") + '</div></div>').join("") + '<div class="dream" id="elPath"></div>';
+}
+function onumElectPath(k){
+  const y = G.you; if(!y) return "";
+  try{ onumCamp(); }catch(e){}
+  const foe = (G.camp.field || []).filter(f => !f.out).sort((a, b) => b.poll - a.poll)[0];
+  const press = (G.press || []).filter(p => p && !p.gone)[0];
+  if(k === "quiet"){
+    if(press) onumHeld(press, "The announcement was not made, so there was nothing to print.", "news");
+    return "You do not announce it. " + (press ? press.name + " has nothing to print that you said." : "No paper has a quote.");
+  }
+  if(k === "concede"){
+    if(foe){ foe.poll = Math.max(0, Math.min(100, foe.poll + 2)); foe.heat = Math.max(0, (foe.heat || 0) - 4); }
+    y.approval = Math.max(0, Math.min(100, (y.approval || 0) - 1));
+    const line = (foe ? foe.name : "The other name") + " heard a real point, not a costume. They will answer it themselves or not at all.";
+    try{ if(press && typeof onumKeep === "function") onumKeep(press.name + " printed the concession.", press.id); }catch(e){}
+    return line;
+  }
+  y.approval = Math.max(0, Math.min(100, (y.approval || 0) + 1));
+  if(foe) foe.poll = Math.max(0, Math.min(100, foe.poll - 1));
+  const line = "You declared, as " + (typeof officeTitle === "function" ? officeTitle() : "yourself") + ", and not as anyone else.";
+  try{ if(press) onumWebPush(press.outlet || press.name, "paper", line); }catch(e){}
+  try{ voxInit(); voxYouPost("note", null, line); }catch(e){}
+  return line;
+}
+{ const _eb = onumElectBody; onumElectBody = function(){
+  let h = _eb.apply(this, arguments);
+  try{ h += onumElectPaths(); }catch(e){}
+  return h;
+}; }
+{ const _ed = onumElectDo; onumElectDo = function(k){
+  if(k && String(k).indexOf("path:") === 0) return onumElectPath(String(k).slice(5));
+  return _ed.apply(this, arguments);
+}; }
+
+function onumPossTake(key){
+  const y = G.you; if(!y) return "No career yet.";
+  const parts = String(key || "").split(":");
+  const kind = parts[0], act = parts[1];
+  if(kind === "bill"){
+    const b = G.bill && !G.bill.done ? G.bill : null;
+    if(!b) return "There is no bill. That path is not open.";
+    if(act === "hold") return "You do not declare. The roll does not get a quote you did not give.";
+    y.vote = act === "aye" ? 1 : act === "no" ? -1 : 0;
+    const live = onumLiveReact(y, act + " on " + b.title);
+    try{ if(typeof onumKeep === "function") onumKeep(y.name + " is " + act + " on " + b.title + ".", null); }catch(e){}
+    return "You are " + act + " on " + b.title + ". " + (live.posted || "");
+  }
+  if(kind === "eng"){
+    const E = (typeof engEnsure === "function") ? engEnsure() : null;
+    if(!E || !E.memo) return "The Engine has no memo waiting. The other paths are the bill, the race, and the powers.";
+    if(act === "hold"){
+      const quiet = "You have not said which way. The memo is still on the desk. The papers do not have it.";
+      try{ engLog("The memo was not announced.", false); }catch(e){}
+      return quiet;
+    }
+    return "Open the Engine and take " + (act === "yes" ? "the first" : "the second") + " choice on the memo. Both are still there, and so is saying nothing.";
+  }
+  if(kind === "race") return onumElectPath(act === "aye" ? "declare" : act === "no" ? "concede" : "quiet");
+  if(kind === "realm"){
+    onumSummitCard(act);
+    return "Their leaders are up. You are not them.";
+  }
+  return "That path is not on the board.";
+}
+function onumPossCard(){
+  const B = onumBillBits();
+  const rows = [];
+  const add = (key, title, why) => { rows.push({key:key, title:title, why:why}); };
+  if(G.bill && !G.bill.done){
+    add("bill:aye", "Aye on " + B.title, "The members already with it stay with it. It is posted to the table.");
+    add("bill:no", "No on " + B.title, "The members already against it are not surprised. It is posted to the table.");
+    add("bill:present", "Present", "You are in the room and not on a side. They can see that too.");
+    add("bill:hold", "Do not declare", "The manner. It is not needed yet, so it is not said.");
+  } else add("bill:hold", "No bill is down", "There is nothing to be for. Inventing one would be speaking as a clerk you are not.");
+  const E = (typeof engEnsure === "function") ? (function(){ try{ return engEnsure(); }catch(e){ return null; } })() : null;
+  if(E && E.memo){
+    add("eng:yes", "Engine: " + E.memo[1], E.memo[0]);
+    add("eng:no", "Engine: " + E.memo[2], "The other fork of the same memo.");
+    add("eng:hold", "Engine: do not announce a choice", "The memo stays. The papers do not get a decision you did not give.");
+  } else add("eng:hold", "The Engine has no memo today", "No fork is pretending to be open.");
+  add("race:aye", "The race: declare", "Your name, your office, your sentence.");
+  add("race:quiet", "The race: say nothing", "A hold. The other name does not get a quote to wear.");
+  add("race:no", "The race: concede a point", "One real point. They answer as themselves.");
+  (typeof WORLD_POWERS !== "undefined" ? WORLD_POWERS : []).forEach(p => {
+    const rel = Math.round((G.realmRel || {})[p.k] || 0);
+    add("realm:" + p.k, "Sit with " + p.t, "Their head is not yours. Relations " + rel + ".");
+  });
+  const body = rows.map((r, i) => '<div style="margin:8px 0;padding:6px 10px;border-left:3px solid var(--line-soft)"><b>' + onumEsc(r.title) + '</b><div class="muted">' + onumEsc(r.why) + '</div><button type="button" class="btn" data-ps="' + i + '">Take this path</button></div>').join("") + '<div class="dream" id="psOut"></div>';
+  govCardOpen("Every path", "What can still happen", "Nothing here is a costume of another path. Take one and it is the one that happened.", body, null);
+  card.querySelectorAll("[data-ps]").forEach(b => b.addEventListener("click", () => {
+    const r = rows[+b.getAttribute("data-ps")];
+    const msg = r ? onumPossTake(r.key) : "";
+    const o = el("psOut"); if(o) o.textContent = msg;
+  }));
+}
+
+onumPhoneVox = function(){
+  try{ voxInit(); }catch(e){}
+  const all = ((G.vox && G.vox.posts) || []);
+  const mine = all.filter(p => p.mine);
+  const nested = {};
+  let b = '<div class="pb__h">Vox</div><p><small>Your posts, the answers under them, then the rest. A person who is not you does not wear your sentence. If it was not needed, it is not here.</small></p>';
+  const holds = onumEtiq().log.filter(x => x.where === "vox").slice(0, 3);
+  if(holds.length) b += holds.map(x => '<p><small>' + onumEsc(x.who) + ' did not post. ' + onumEsc(x.why) + '</small></p>').join("");
+  b += '<p><small>' + mine.length + ' under your name.</small></p>';
+  if(!all.length && !holds.length) b += '<p>Nobody has spoken yet.</p>';
+  const voiceLine = function(p){
+    const vs = (p.voices || []).slice(0, 4).map(v => {
+      let nm = "Someone"; try{ const a = byId(v.id); if(a && a.name) nm = a.name; }catch(e){}
+      const mark = /back/.test(v.t || "") ? "with it" : "against it";
+      return onumEsc(nm) + " " + mark;
+    });
+    return vs.length ? '<br><small>' + vs.join(" · ") + '</small>' : "";
+  };
+  let loose = true;
+  mine.forEach(p => {
+    b += '<div class="pb__row" style="border-left:3px solid #c9a24a;padding-left:6px"><span><b>' + onumEsc((G.you && G.you.name) || "You") + ' · you</b><br><small>' + onumEsc(String(p.t || "")) + '</small>' + voiceLine(p) + '</span></div>';
+    const replies = all.filter(r => r && !r.mine && r.reply === p.id);
+    if(loose){
+      all.filter(r => r && !r.mine && r.reply === true && r.day === p.day).slice(0, 2).forEach(r => replies.push(r));
+      loose = false;
+    }
+    replies.slice(0, 3).forEach(r => {
+      nested[r.id] = 1;
+      let nm = "Someone"; try{ const a = byId(r.by); if(a && a.name) nm = a.name; }catch(e){}
+      b += '<div class="pb__row"><span><b>' + onumEsc(nm) + '</b><br><small>' + onumEsc(String(r.t || "")) + '</small>' + voiceLine(r) + '</span></div>';
+    });
+  });
+  all.filter(r => r && !r.mine && r.reply === true && !nested[r.id]).slice(0, 4).forEach(r => {
+    nested[r.id] = 1;
+    let nm = "Someone"; try{ const a = byId(r.by); if(a && a.name) nm = a.name; }catch(e){}
+    b += '<div class="pb__row"><span><b>' + onumEsc(nm) + '</b><br><small>' + onumEsc(String(r.t || "")) + '</small></span></div>';
+  });
+  all.filter(p => p && !p.mine && !p.reply && !nested[p.id]).slice(0, 8).forEach(p => {
+    let nm = "Someone"; try{ const a = byId(p.by); if(a && a.name) nm = a.name; }catch(e){}
+    b += '<div class="pb__row"><span><b>' + onumEsc(nm) + '</b><br><small>' + onumEsc(String(p.t || "").slice(0, 220)) + '</small>' + voiceLine(p) + '</span></div>';
+  });
+  b += '<div class="pb__row"><button data-pbvoxw="1">Write on Vox</button></div>';
+  return b;
+};
+
+{ const _apps = pbApps; pbApps = function(){
+  const L = _apps.apply(this, arguments) || [];
+  [["soc-table","The table","The bill, and who is with it."],
+   ["soc-pow","The powers","Heads of the other states, in their own chairs."],
+   ["soc-ledg","The ledger","What they saw, and what they would not say."],
+   ["soc-poss","Every path","The bill, the Engine, the race, the powers."]
+  ].forEach(a => { if(!L.some(x => x[0] === a[0])) L.push(a); });
+  return L;
+}; }
+{ const _go = pbAppGo; pbAppGo = function(id){
+  if(id === "soc-table"){ setTimeout(function(){ try{ onumTableCard(); }catch(e){} }, 30); return; }
+  if(id === "soc-pow"){ setTimeout(function(){ try{ onumPowersCard(); }catch(e){} }, 30); return; }
+  if(id === "soc-ledg"){ setTimeout(function(){ try{ onumLedgerCard(); }catch(e){} }, 30); return; }
+  if(id === "soc-poss"){ setTimeout(function(){ try{ onumPossCard(); }catch(e){} }, 30); return; }
+  return _go.apply(this, arguments);
+}; }
+{ const _sc = saveCaptureBase; saveCaptureBase = function(){
+  const o = _sc.apply(this, arguments);
+  try{ o.etiq = G.etiq || null; }catch(e){}
   return o;
 }; }
 

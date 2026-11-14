@@ -17,32 +17,26 @@ One HTML body. Keep these **byte-identical**:
 | `session.html` | repo root |
 | `One Nation, Under, ME.html` | standalone name |
 
-**Build stamp (now): `20261113f`**
+**Build stamp (now): `20261114a`**
 
-- `<meta name="onum-build" content="20261113f">`
-- IIFE `STAMP = "20261113f"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
-- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261113f"`
+- `<meta name="onum-build" content="20261114a">`
+- IIFE `STAMP = "20261114a"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
+- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261114a"`
 - Wrapper iframe: `/session.html?v=${ONUM_BUILD}` in `src/routes/index.tsx`
 
-If you change the HTML, bump the letter (`20261113f`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
+If you change the HTML, bump the letter (`20261114a`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
 
 This sandbox tracks `public/session.html` as the playable body (root `index.html` / `session.html` / `One Nation, Under, ME.html` are not in this repo). Do not replace that file with a simpler build. Insert new game logic **inside** the main IIFE, before `})(); /* 20261110bx: main IIFE close, moved below the ba block */`.
 
-### Latest — `20261113f`
+### Latest — `20261114a`
 
-The systems from `20261113d` / `20261113e` stay. This stamp fills them in. No new kinds of person. A sentence is `onumSay`: who they already are, then the thing in front of them. They do not quote the player.
+Etiquette is a manner they keep (`p.manner`), not a new kind of person. The rule they retain: they do not say aloud an office, a creed, or a name that is not theirs, and they do not say what the room does not need. Face to face, a hold is a silence you can see. On Vox, the post is simply not there, and the phone says who held it. They do not wear your sentence. The longer they keep the manner, the stricter it gets, and it is written on their ledger.
 
-Desks and the cabinet table still stay clickable (glass line + a card with Close, and the same work on the phone). The desk page now names the day, the guilder, the chest, the precedent that actually matches the word, and — at the cabinet table and the chairs — the four secretaries who hold the chairs, with town, creed, and view. The record, the family, and the market open from that page.
+The cabinet live box is on the session panel and on the phone under The table. It shows the bill, and who is with it, against it, or holding, at the time somebody speaks. That slip is posted onto every person at the table. You can talk about the bill; they answer as their own office.
 
-A cabinet appointment is still a named person and a real chair. The file shows creed and what they hold. The hearing is up to five members, not a copy of each other: aye or no comes from alignment and party, each one asks a question that belongs to that chair (Treasury, State, War, Justice), and the room count is shown next to the Senate roll. Swear-in: the person who had the chair speaks if the name changes, the nominee speaks for Monday, a precedent is set, and it is written down only if someone in the room chooses to keep it. Refusal: the nominee and the person still in the chair both speak, and either may put it on the Web. Confirmed or refused, `G.chronicle` is kept versus lost. Place-lore stays on `G.lore`.
+Heads of the other states sit under The powers. Each leader speaks only for their own chair. You are not them. The ledger page is what they saw, what they were told, and what they would not say. Elections list every path still open: declare, say nothing, concede a point. The morning Ledger prints what a real reporter will sign, and what was spiked. Every path (the bill, the Engine's memo, the race, each neighbour) is one page: take one, and that is the one that happened.
 
-Shops are owned by people who already exist (name and id). Everyone is bound to one price book; a door may mark it up; a person says why they paid that door or walked. Shares and the guilder still move while the day is running. The tape records what you bought and sold. A match has a score and a captain who is a real member of the winning state. A song is titled from the week they actually had and posted on Vox in their own words. A shift is a real job at an owned door.
-
-Families already birth, marry, and bury. Asking to marry now fails in that person's voice (already married, not courting, not warm enough, not two days). A yes writes both sides of `G.fam`, sets a precedent, and opens the wedding with the people who were actually there. The family page marks which of those events were written down.
-
-Vox on the phone lists every post under your name, the answers under them, then the rest of the feed. A sentence you type is posted as typed. One person may answer it without repeating your sentence. Songs stay on the public feed. The Union map is still the continent (Pale, Marches, Reach, Horn, Isles, Rift) and the shade is still lean / party / faith / tension; the caption names the filter, the coasts, and the realms. Precedent is the matching line from `G.history`, not a random one. Save keeps `G.mkt`, `G.chronicle`, `G.web`, and the Vox posts.
-
-`20261113e` was the same body as `20261113d` with the stamp on the boot line so a cached `13a` could not hide. The corner badge reads the meta stamp.
+`20261113f` filled in desks, hearings, shops, matches, marriage, and the record. Those stay.
 
 Git author: `DominicVII` `<318079878+DominicVII@users.noreply.github.com>`.
 
