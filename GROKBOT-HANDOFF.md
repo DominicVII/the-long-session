@@ -17,7 +17,7 @@ One HTML body. Keep these **byte-identical**:
 | `session.html` | repo root |
 | `One Nation, Under, ME.html` | standalone name |
 
-**Build stamp (now): `20261106b`**
+**Build stamp (now): `20261113e`**
 
 - `<meta name="onum-build" content="20261027d">`
 - IIFE `STAMP = "20261027d"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
