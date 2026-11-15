@@ -17,26 +17,32 @@ One HTML body. Keep these **byte-identical**:
 | `session.html` | repo root |
 | `One Nation, Under, ME.html` | standalone name |
 
-**Build stamp (now): `20261115b`**
+**Build stamp (now): `20261115c`**
 
-- `<meta name="onum-build" content="20261115b">`
-- IIFE `STAMP = "20261115b"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
-- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261115b"`
+- `<meta name="onum-build" content="20261115c">`
+- IIFE `STAMP = "20261115c"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
+- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261115c"`
 - Wrapper iframe: `/session.html?v=${ONUM_BUILD}` in `src/routes/index.tsx`
 
-If you change the HTML, bump the letter (`20261115b`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
+If you change the HTML, bump the letter (`20261115c`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
 
 This sandbox tracks `public/session.html` as the playable body (root `index.html` / `session.html` / `One Nation, Under, ME.html` are not in this repo). Do not replace that file with a simpler build. Insert new game logic **inside** the main IIFE, before `})(); /* 20261110bx: main IIFE close, moved below the ba block */`.
 
-### Latest — `20261115b`
+### Latest — `20261115c`
 
-They say the point first. A sentence no longer opens with "I am so-and-so" and a life story. The name is already on the plate, the desk, and the cast. What you hear is the vote, the stake, the bill, or the thing they came to say. A leading "I am…" is cut. Cabinet reports do the same. They still do not speak as an office that is not theirs.
+The seams, first. The weather calendar is the only season. The wider world's season follows it, so the sky and the record cannot disagree.
 
-**The board** is on the phone, on the broadcast, and on the election card. It is a graphic: the call in large type, the House as a bar, the soundings as columns, the states as unrest, and every office by the name that holds it — you, the executive, the former executives, the bench, the cabinet, the governors, the seat ledger, and the people named in the record.
+The Engine is given a World Card built that day: the date, the season, the weather, the state's name as it is now, the form of government, who is sovereign, the war, the bread, the treasury, and the bill on the floor. It is told not to use an older name. "Coalmere" is no longer written into its instructions. The old atlas still says Coalmere, because that book is a record of an earlier career, not the name of this one.
 
-The Engine, when you open it, shows what it has actually read, those same names. Ask it about the bill, the offices, or the record and it answers from those, point first. If no outside model is running, that answer still stands. It says it is the machine. It does not hold an office.
+A letter that is a pressed document, or a letter that has swollen past what a letter should be, is cut down or refused in one line. The same cut runs on the letters already stored, the next time the career loads.
 
-`20261115a` still has the bill, the town, and the household on the sheet. Those stay, after the point.
+A reply that loops, or that leaves the language, is thrown out and replaced with the card. A number it states is followed by the field it came from. It keeps a few turns, a note for the day, and one question it was chewing on when nobody asked. A study question does not drag the room into the answer.
+
+On the phone, **A question** opens one Academy question as a page: the claim, the method, the progress on the ledger, and what would prove it wrong. It is marked as a question, not a discovery.
+
+`20261115b` still has the point first, and the board of offices. Those stay.
+
+Git author: `DominicVII` `<318079878+DominicVII@users.noreply.github.com>`.
 
 Git author: `DominicVII` `<318079878+DominicVII@users.noreply.github.com>`.
 
