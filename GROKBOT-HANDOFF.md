@@ -17,26 +17,26 @@ One HTML body. Keep these **byte-identical**:
 | `session.html` | repo root |
 | `One Nation, Under, ME.html` | standalone name |
 
-**Build stamp (now): `20261114e`**
+**Build stamp (now): `20261114f`**
 
-- `<meta name="onum-build" content="20261114e">`
-- IIFE `STAMP = "20261114e"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
-- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261114e"`
+- `<meta name="onum-build" content="20261114f">`
+- IIFE `STAMP = "20261114f"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
+- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261114f"`
 - Wrapper iframe: `/session.html?v=${ONUM_BUILD}` in `src/routes/index.tsx`
 
-If you change the HTML, bump the letter (`20261114e`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
+If you change the HTML, bump the letter (`20261114f`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
 
 This sandbox tracks `public/session.html` as the playable body (root `index.html` / `session.html` / `One Nation, Under, ME.html` are not in this repo). Do not replace that file with a simpler build. Insert new game logic **inside** the main IIFE, before `})(); /* 20261110bx: main IIFE close, moved below the ba block */`.
 
-### Latest — `20261114e`
+### Latest — `20261114f`
 
-The gallery is a newsroom. The casters are the press already in the building, on the outlets they already have. A reporter files. An editor holds, and will cut a line the count does not support (a close race is not a landslide). An anchor reads only what was held, and says they are not the clerk and not the candidate.
+The room stops repainting what has not changed. Who is here keeps its lines until the people, the bill, the day, or a real shift in feeling changes, and it steps aside when a card or the talk is up. A sentence still gets an answer, and the talk keeps only the latest of those rounds so the panel does not grow without end. Tonight's cast is fixed for the day, so opening it again does not rewrite the copy.
 
-**The broadcast** is on Who is here, on the phone, on the paper, and on the desk. Tonight's cast covers the bill, the standing, the restless state, a line that was actually kept, and the district. **Election nights** keep each race: the call, the last sounding against the count, the households, the House, what was filed, what was cut, what was read. The election card itself carries that night, with **The whole night**.
+The election card leads with the count: held or lost, by how many, when they called it, the last sounding, the House, and what the editor cut. The anchor's line is under that. The filed copy and the rest of the night are still on **The whole night**. The wire keeps at most three of the desk's own tags so the day, the floor, and the district are still on it. The dock fits a phone: the buttons wrap, and it sits above the wire.
 
-**What was written** opens the book in pages, the lines a person kept and the lines nobody wrote, the precedents, every sounding, the races on file, and the letters from the houses. The book's two witnesses are marked as in the book, not in the gallery. The family as it is lived is the other page. The night is saved with the career. Each morning the anchor files one sourced line onto the wire.
+`20261114e` still has the newsroom and the written record. Nothing was removed.
 
-`20261114d` still has the loop and the five anchors. Those stay.
+Git author: `DominicVII` `<318079878+DominicVII@users.noreply.github.com>`.
 
 Git author: `DominicVII` `<318079878+DominicVII@users.noreply.github.com>`.
 
