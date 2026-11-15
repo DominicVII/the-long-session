@@ -17,24 +17,28 @@ One HTML body. Keep these **byte-identical**:
 | `session.html` | repo root |
 | `One Nation, Under, ME.html` | standalone name |
 
-**Build stamp (now): `20261114f`**
+**Build stamp (now): `20261115a`**
 
-- `<meta name="onum-build" content="20261114f">`
-- IIFE `STAMP = "20261114f"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
-- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261114f"`
+- `<meta name="onum-build" content="20261115a">`
+- IIFE `STAMP = "20261115a"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
+- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261115a"`
 - Wrapper iframe: `/session.html?v=${ONUM_BUILD}` in `src/routes/index.tsx`
 
-If you change the HTML, bump the letter (`20261114f`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
+If you change the HTML, bump the letter (`20261115a`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
 
 This sandbox tracks `public/session.html` as the playable body (root `index.html` / `session.html` / `One Nation, Under, ME.html` are not in this repo). Do not replace that file with a simpler build. Insert new game logic **inside** the main IIFE, before `})(); /* 20261110bx: main IIFE close, moved below the ba block */`.
 
-### Latest — `20261114f`
+### Latest — `20261115a`
 
-The room stops repainting what has not changed. Who is here keeps its lines until the people, the bill, the day, or a real shift in feeling changes, and it steps aside when a card or the talk is up. A sentence still gets an answer, and the talk keeps only the latest of those rounds so the panel does not grow without end. Tonight's cast is fixed for the day, so opening it again does not rewrite the copy.
+The detail that was already true is on the screen. Who is here, and What you see in the talk, now name the person, the place, the party, the creed they will not trade, the town they still answer to, and whether they are a yes or a no on the live bill and why. If they are carrying a line from their own ledger, that is in the sentence too.
 
-The election card leads with the count: held or lost, by how many, when they called it, the last sounding, the House, and what the editor cut. The anchor's line is under that. The filed copy and the rest of the night are still on **The whole night**. The wire keeps at most three of the desk's own tags so the day, the floor, and the district are still on it. The dock fits a phone: the buttons wrap, and it sits above the wire.
+Tonight's cast is no longer one line a desk. The anchor reads the bill, the sponsor, the roll day, and the projected aye, no, and unpledged. The editor reads the standing, the war chest, the last margin, and the last sounding with the paper and the household count. The wire reads the states: unrest, industry, cult, and whatever the statehouse is on. The district desk reads the houses by street, mood, and what they want said. The paper carries the same sheet.
 
-`20261114e` still has the newsroom and the written record. Nothing was removed.
+An election night, once filed, also keeps the states and the district on the copy that was read. Nobody new was added. A person still does not speak as the clerk, the sponsor, or the chair.
+
+`20261114f` still keeps the room from repainting what has not changed. That stays.
+
+Git author: `DominicVII` `<318079878+DominicVII@users.noreply.github.com>`.
 
 Git author: `DominicVII` `<318079878+DominicVII@users.noreply.github.com>`.
 
