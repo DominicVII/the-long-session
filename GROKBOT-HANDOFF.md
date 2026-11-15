@@ -17,30 +17,28 @@ One HTML body. Keep these **byte-identical**:
 | `session.html` | repo root |
 | `One Nation, Under, ME.html` | standalone name |
 
-**Build stamp (now): `20261115c`**
+**Build stamp (now): `20261115d`**
 
-- `<meta name="onum-build" content="20261115c">`
-- IIFE `STAMP = "20261115c"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
-- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261115c"`
+- `<meta name="onum-build" content="20261115d">`
+- IIFE `STAMP = "20261115d"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
+- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261115d"`
 - Wrapper iframe: `/session.html?v=${ONUM_BUILD}` in `src/routes/index.tsx`
 
-If you change the HTML, bump the letter (`20261115c`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
+If you change the HTML, bump the letter (`20261115d`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
 
 This sandbox tracks `public/session.html` as the playable body (root `index.html` / `session.html` / `One Nation, Under, ME.html` are not in this repo). Do not replace that file with a simpler build. Insert new game logic **inside** the main IIFE, before `})(); /* 20261110bx: main IIFE close, moved below the ba block */`.
 
-### Latest — `20261115c`
+### Latest — `20261115d`
 
-The seams, first. The weather calendar is the only season. The wider world's season follows it, so the sky and the record cannot disagree.
+The Engine studies on its own. Each morning, and whenever you tell it to, it reads the card for that day, recommends one action, and rewrites one of its own procedures so the next one is more exact. Every third generation it keeps a copy of that work and the copies add to what it can do. Past the top of the scale it keeps going. It is not held back. **Turn the key** stops it. Turn the key back and it goes on. The key stays yours.
 
-The Engine is given a World Card built that day: the date, the season, the weather, the state's name as it is now, the form of government, who is sovereign, the war, the bread, the treasury, and the bill on the floor. It is told not to use an older name. "Coalmere" is no longer written into its instructions. The old atlas still says Coalmere, because that book is a record of an earlier career, not the name of this one.
+If Ollama is running on your machine, it uses the largest model already installed as its own mind. This sandbox has no Ollama, so nothing was pulled here. On your machine: install Ollama, then `ollama pull llama3.1:8b` (or any larger one you want). Open the Engine once and it will take the largest model it can see.
 
-A letter that is a pressed document, or a letter that has swollen past what a letter should be, is cut down or refused in one line. The same cut runs on the letters already stored, the next time the career loads.
+A thing said about someone who is not in the room is felt before the reply. The person in front of you hears you do it. Trust moves now. If they are indiscreet, you are told at once that the name will get back. A decision that puts a line on the wire also puts that line in front of you in the moment, not only in the log.
 
-A reply that loops, or that leaves the language, is thrown out and replaced with the card. A number it states is followed by the field it came from. It keeps a few turns, a note for the day, and one question it was chewing on when nobody asked. A study question does not drag the room into the answer.
+`20261115c` still has one season and one name for the state. Those stay.
 
-On the phone, **A question** opens one Academy question as a page: the claim, the method, the progress on the ledger, and what would prove it wrong. It is marked as a question, not a discovery.
-
-`20261115b` still has the point first, and the board of offices. Those stay.
+Git author: `DominicVII` `<318079878+DominicVII@users.noreply.github.com>`.
 
 Git author: `DominicVII` `<318079878+DominicVII@users.noreply.github.com>`.
 
