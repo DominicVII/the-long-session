@@ -17,26 +17,28 @@ One HTML body. Keep these **byte-identical**:
 | `session.html` | repo root |
 | `One Nation, Under, ME.html` | standalone name |
 
-**Build stamp (now): `20261115a`**
+**Build stamp (now): `20261115b`**
 
-- `<meta name="onum-build" content="20261115a">`
-- IIFE `STAMP = "20261115a"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
-- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261115a"`
+- `<meta name="onum-build" content="20261115b">`
+- IIFE `STAMP = "20261115b"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
+- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261115b"`
 - Wrapper iframe: `/session.html?v=${ONUM_BUILD}` in `src/routes/index.tsx`
 
-If you change the HTML, bump the letter (`20261115a`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
+If you change the HTML, bump the letter (`20261115b`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
 
 This sandbox tracks `public/session.html` as the playable body (root `index.html` / `session.html` / `One Nation, Under, ME.html` are not in this repo). Do not replace that file with a simpler build. Insert new game logic **inside** the main IIFE, before `})(); /* 20261110bx: main IIFE close, moved below the ba block */`.
 
-### Latest — `20261115a`
+### Latest — `20261115b`
 
-The detail that was already true is on the screen. Who is here, and What you see in the talk, now name the person, the place, the party, the creed they will not trade, the town they still answer to, and whether they are a yes or a no on the live bill and why. If they are carrying a line from their own ledger, that is in the sentence too.
+They say the point first. A sentence no longer opens with "I am so-and-so" and a life story. The name is already on the plate, the desk, and the cast. What you hear is the vote, the stake, the bill, or the thing they came to say. A leading "I am…" is cut. Cabinet reports do the same. They still do not speak as an office that is not theirs.
 
-Tonight's cast is no longer one line a desk. The anchor reads the bill, the sponsor, the roll day, and the projected aye, no, and unpledged. The editor reads the standing, the war chest, the last margin, and the last sounding with the paper and the household count. The wire reads the states: unrest, industry, cult, and whatever the statehouse is on. The district desk reads the houses by street, mood, and what they want said. The paper carries the same sheet.
+**The board** is on the phone, on the broadcast, and on the election card. It is a graphic: the call in large type, the House as a bar, the soundings as columns, the states as unrest, and every office by the name that holds it — you, the executive, the former executives, the bench, the cabinet, the governors, the seat ledger, and the people named in the record.
 
-An election night, once filed, also keeps the states and the district on the copy that was read. Nobody new was added. A person still does not speak as the clerk, the sponsor, or the chair.
+The Engine, when you open it, shows what it has actually read, those same names. Ask it about the bill, the offices, or the record and it answers from those, point first. If no outside model is running, that answer still stands. It says it is the machine. It does not hold an office.
 
-`20261114f` still keeps the room from repainting what has not changed. That stays.
+`20261115a` still has the bill, the town, and the household on the sheet. Those stay, after the point.
+
+Git author: `DominicVII` `<318079878+DominicVII@users.noreply.github.com>`.
 
 Git author: `DominicVII` `<318079878+DominicVII@users.noreply.github.com>`.
 
