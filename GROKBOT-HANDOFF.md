@@ -17,24 +17,26 @@ One HTML body. Keep these **byte-identical**:
 | `session.html` | repo root |
 | `One Nation, Under, ME.html` | standalone name |
 
-**Build stamp (now): `20261114c`**
+**Build stamp (now): `20261114d`**
 
-- `<meta name="onum-build" content="20261114c">`
-- IIFE `STAMP = "20261114c"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
-- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261114c"`
+- `<meta name="onum-build" content="20261114d">`
+- IIFE `STAMP = "20261114d"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
+- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261114d"`
 - Wrapper iframe: `/session.html?v=${ONUM_BUILD}` in `src/routes/index.tsx`
 
-If you change the HTML, bump the letter (`20261114c`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
+If you change the HTML, bump the letter (`20261114d`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
 
 This sandbox tracks `public/session.html` as the playable body (root `index.html` / `session.html` / `One Nation, Under, ME.html` are not in this repo). Do not replace that file with a simpler build. Insert new game logic **inside** the main IIFE, before `})(); /* 20261110bx: main IIFE close, moved below the ba block */`.
 
-### Latest — `20261114c`
+### Latest — `20261114d`
 
-The room does not stop at one answer. Say something and the person in front of you answers, then up to three people standing there answer that person, then the first answers them back. None of them wears your sentence. The extra lines show on them in the room and in the talk, under **They keep going**.
+The world reads its own record. What is done is written back as the reason it was done. That reading is on the wire, in the paper, in the ledger, and on the phone under **The loop**. **Who is here** has the same button.
 
-**Who is here** stays on the screen while you are standing with people: each name, with it / against it / listening, and their own line, tied to the bill and the place they are from. Tap a name to talk. **Say** opens the conversation. Hide folds it to a button. It steps aside when the talk panel or a live desk prompt is up, so it does not cover the words.
+Open it and you get the live shape, not a lecture. The states repeat the realm at a smaller scale. A shop's till buys the stock the till exists to sell. A bill leaves a smaller copy in the next sitting's papers, and that copy is not a second vote. Vox is a sitting inside this sitting. Looking at a room is what makes the room hold. Every seventh day compiles the last scar into an epoch, and a day then weighs a little more or less, which the price of bread feels once. People in the room will talk about it. They say they see it. They do not speak as the world, and they do not speak as an office that is not theirs.
 
-`20261114b` put What you see on the talk and kept Say it / To the room. Those stay. A hold still does not erase a conversation, and nobody speaks as an office that is not theirs.
+Five things do not move: the charter, the capital, the guilder unit, a person's own name, and a vote counted once. The charter can cite every law but the law that would prove the charter. **Set the anchor** cuts a runaway copy. **Let it copy once** nests a copy until the eighth, then that place stops and the sitting does not. **Walk the loop** once a day returns you through the door into the room you left. The loop is saved with the career.
+
+`20261114c` still lets the room keep talking, and still shows who is here. Those stay.
 
 Git author: `DominicVII` `<318079878+DominicVII@users.noreply.github.com>`.
 
