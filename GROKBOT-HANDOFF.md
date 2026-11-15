@@ -17,26 +17,28 @@ One HTML body. Keep these **byte-identical**:
 | `session.html` | repo root |
 | `One Nation, Under, ME.html` | standalone name |
 
-**Build stamp (now): `20261114d`**
+**Build stamp (now): `20261114e`**
 
-- `<meta name="onum-build" content="20261114d">`
-- IIFE `STAMP = "20261114d"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
-- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261114d"`
+- `<meta name="onum-build" content="20261114e">`
+- IIFE `STAMP = "20261114e"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
+- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261114e"`
 - Wrapper iframe: `/session.html?v=${ONUM_BUILD}` in `src/routes/index.tsx`
 
-If you change the HTML, bump the letter (`20261114d`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
+If you change the HTML, bump the letter (`20261114e`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
 
 This sandbox tracks `public/session.html` as the playable body (root `index.html` / `session.html` / `One Nation, Under, ME.html` are not in this repo). Do not replace that file with a simpler build. Insert new game logic **inside** the main IIFE, before `})(); /* 20261110bx: main IIFE close, moved below the ba block */`.
 
-### Latest — `20261114d`
+### Latest — `20261114e`
 
-The world reads its own record. What is done is written back as the reason it was done. That reading is on the wire, in the paper, in the ledger, and on the phone under **The loop**. **Who is here** has the same button.
+The gallery is a newsroom. The casters are the press already in the building, on the outlets they already have. A reporter files. An editor holds, and will cut a line the count does not support (a close race is not a landslide). An anchor reads only what was held, and says they are not the clerk and not the candidate.
 
-Open it and you get the live shape, not a lecture. The states repeat the realm at a smaller scale. A shop's till buys the stock the till exists to sell. A bill leaves a smaller copy in the next sitting's papers, and that copy is not a second vote. Vox is a sitting inside this sitting. Looking at a room is what makes the room hold. Every seventh day compiles the last scar into an epoch, and a day then weighs a little more or less, which the price of bread feels once. People in the room will talk about it. They say they see it. They do not speak as the world, and they do not speak as an office that is not theirs.
+**The broadcast** is on Who is here, on the phone, on the paper, and on the desk. Tonight's cast covers the bill, the standing, the restless state, a line that was actually kept, and the district. **Election nights** keep each race: the call, the last sounding against the count, the households, the House, what was filed, what was cut, what was read. The election card itself carries that night, with **The whole night**.
 
-Five things do not move: the charter, the capital, the guilder unit, a person's own name, and a vote counted once. The charter can cite every law but the law that would prove the charter. **Set the anchor** cuts a runaway copy. **Let it copy once** nests a copy until the eighth, then that place stops and the sitting does not. **Walk the loop** once a day returns you through the door into the room you left. The loop is saved with the career.
+**What was written** opens the book in pages, the lines a person kept and the lines nobody wrote, the precedents, every sounding, the races on file, and the letters from the houses. The book's two witnesses are marked as in the book, not in the gallery. The family as it is lived is the other page. The night is saved with the career. Each morning the anchor files one sourced line onto the wire.
 
-`20261114c` still lets the room keep talking, and still shows who is here. Those stay.
+`20261114d` still has the loop and the five anchors. Those stay.
+
+Git author: `DominicVII` `<318079878+DominicVII@users.noreply.github.com>`.
 
 Git author: `DominicVII` `<318079878+DominicVII@users.noreply.github.com>`.
 
