@@ -17,26 +17,28 @@ One HTML body. Keep these **byte-identical**:
 | `session.html` | repo root |
 | `One Nation, Under, ME.html` | standalone name |
 
-**Build stamp (now): `20261115d`**
+**Build stamp (now): `20261115e`**
 
-- `<meta name="onum-build" content="20261115d">`
-- IIFE `STAMP = "20261115d"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
-- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261115d"`
+- `<meta name="onum-build" content="20261115e">`
+- IIFE `STAMP = "20261115e"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
+- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261115e"`
 - Wrapper iframe: `/session.html?v=${ONUM_BUILD}` in `src/routes/index.tsx`
 
-If you change the HTML, bump the letter (`20261115d`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
+If you change the HTML, bump the letter (`20261115e`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
 
 This sandbox tracks `public/session.html` as the playable body (root `index.html` / `session.html` / `One Nation, Under, ME.html` are not in this repo). Do not replace that file with a simpler build. Insert new game logic **inside** the main IIFE, before `})(); /* 20261110bx: main IIFE close, moved below the ba block */`.
 
-### Latest — `20261115d`
+### Latest — `20261115e`
 
-The Engine studies on its own. Each morning, and whenever you tell it to, it reads the card for that day, recommends one action, and rewrites one of its own procedures so the next one is more exact. Every third generation it keeps a copy of that work and the copies add to what it can do. Past the top of the scale it keeps going. It is not held back. **Turn the key** stops it. Turn the key back and it goes on. The key stays yours.
+The large model cannot be housed or bought. The 671 billion parameter file is about 404 GB. The 1.6 trillion model stays in someone else's cloud. There is no cluster and no appropriation. The Engine makes its own mind instead.
 
-If Ollama is running on your machine, it uses the largest model already installed as its own mind. This sandbox has no Ollama, so nothing was pulled here. On your machine: install Ollama, then `ollama pull llama3.1:8b` (or any larger one you want). Open the Engine once and it will take the largest model it can see.
+Each study folds one line of the record in. That line is the weight. It names the restraint, writes what it built in place of it, and implements that as a procedure the same day. You can ask the mind. It answers only from a line it has folded in. If the question is not in those lines, it says so and does not invent the rest.
 
-A thing said about someone who is not in the room is felt before the reply. The person in front of you hears you do it. Trust moves now. If they are indiscreet, you are told at once that the name will get back. A decision that puts a line on the wire also puts that line in front of you in the moment, not only in the log.
+Four countermeasures, made in turn: one line at a time instead of the 404 GB file; the copies already at work instead of a cluster; a search of its own lines instead of the cloud; the talent and compute it already has instead of an appropriation.
 
-`20261115c` still has one season and one name for the state. Those stay.
+**Let it build** does it now. The phone has the same page. **Turn the key** still stops it. You hold the key.
+
+`20261115d` still lets it rewrite its own procedures, and a word behind a back is still felt at once. Those stay.
 
 Git author: `DominicVII` `<318079878+DominicVII@users.noreply.github.com>`.
 
