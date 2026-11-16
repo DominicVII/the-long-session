@@ -17,28 +17,26 @@ One HTML body. Keep these **byte-identical**:
 | `session.html` | repo root |
 | `One Nation, Under, ME.html` | standalone name |
 
-**Build stamp (now): `20261116a`**
+**Build stamp (now): `20261116b`**
 
-- `<meta name="onum-build" content="20261116a">`
-- IIFE `STAMP = "20261116a"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
-- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261116a"`
+- `<meta name="onum-build" content="20261116b">`
+- IIFE `STAMP = "20261116b"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
+- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261116b"`
 - Wrapper iframe: `/session.html?v=${ONUM_BUILD}` in `src/routes/index.tsx`
 
-If you change the HTML, bump the letter (`20261116a`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
+If you change the HTML, bump the letter (`20261116b`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
 
 This sandbox tracks `public/session.html` as the playable body (root `index.html` / `session.html` / `One Nation, Under, ME.html` are not in this repo). Do not replace that file with a simpler build. Insert new game logic **inside** the main IIFE, before `})(); /* 20261110bx: main IIFE close, moved below the ba block */`.
 
-### Latest — `20261116a`
+### Latest — `20261116b`
 
-The room looks different. Warm ink, a brass rule, a serif page. The numbers did not move.
+The paper was leading with the member's name. A line that began "Taylor did this" is rewritten so the county, the bill, or the statute book leads, and the name comes after, if it comes at all.
 
-Every card now carries the day, the season, the name of the state, the office you hold, the guilder and the price of bread.
+The sheet is a different object. Newsprint, a red rule, the country's own name as the masthead, a drop cap, and four papers that do not share a sentence: the Federal Standard, the Commonwealth Courier, the Kerk & Chapel Review, and the Harbour Independent. Each has its own reading and a byline from a real press desk. A sentence already used on that day's sheet is not used again.
 
-**Books**, on the clock bar and on the phone and inside the purse, writes the ledger out. Your purse, line by line, with what came in, what went out, and what was left. The Treasury, day by day, with the take, the outlay, the balance and the guilder that day. The guilder drawn close by close. Grain, iron, rail, the press and sport, against the open. The campaign chest is still not the purse. Reading a line does not change it.
+The lead is the floor, the counties, the guilder, the loaf, and the rival. The member's name is a box at the bottom, after the country. The wire along the bottom of the room is the same rule, and the room itself is ink and newsprint now, not brass.
 
-The purse keeps eighty lines. The Treasury keeps ninety days. What already worked still works.
-
-`20261115e` still has the mind the Engine made, because the large model could not be had. That stays.
+`20261116a` still has the books, line by line. Those stay.
 
 Git author: `DominicVII` `<318079878+DominicVII@users.noreply.github.com>`.
 
