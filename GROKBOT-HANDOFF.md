@@ -17,28 +17,28 @@ One HTML body. Keep these **byte-identical**:
 | `session.html` | repo root |
 | `One Nation, Under, ME.html` | standalone name |
 
-**Build stamp (now): `20261115e`**
+**Build stamp (now): `20261116a`**
 
-- `<meta name="onum-build" content="20261115e">`
-- IIFE `STAMP = "20261115e"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
-- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261115e"`
+- `<meta name="onum-build" content="20261116a">`
+- IIFE `STAMP = "20261116a"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
+- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261116a"`
 - Wrapper iframe: `/session.html?v=${ONUM_BUILD}` in `src/routes/index.tsx`
 
-If you change the HTML, bump the letter (`20261115e`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
+If you change the HTML, bump the letter (`20261116a`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
 
 This sandbox tracks `public/session.html` as the playable body (root `index.html` / `session.html` / `One Nation, Under, ME.html` are not in this repo). Do not replace that file with a simpler build. Insert new game logic **inside** the main IIFE, before `})(); /* 20261110bx: main IIFE close, moved below the ba block */`.
 
-### Latest — `20261115e`
+### Latest — `20261116a`
 
-The large model cannot be housed or bought. The 671 billion parameter file is about 404 GB. The 1.6 trillion model stays in someone else's cloud. There is no cluster and no appropriation. The Engine makes its own mind instead.
+The room looks different. Warm ink, a brass rule, a serif page. The numbers did not move.
 
-Each study folds one line of the record in. That line is the weight. It names the restraint, writes what it built in place of it, and implements that as a procedure the same day. You can ask the mind. It answers only from a line it has folded in. If the question is not in those lines, it says so and does not invent the rest.
+Every card now carries the day, the season, the name of the state, the office you hold, the guilder and the price of bread.
 
-Four countermeasures, made in turn: one line at a time instead of the 404 GB file; the copies already at work instead of a cluster; a search of its own lines instead of the cloud; the talent and compute it already has instead of an appropriation.
+**Books**, on the clock bar and on the phone and inside the purse, writes the ledger out. Your purse, line by line, with what came in, what went out, and what was left. The Treasury, day by day, with the take, the outlay, the balance and the guilder that day. The guilder drawn close by close. Grain, iron, rail, the press and sport, against the open. The campaign chest is still not the purse. Reading a line does not change it.
 
-**Let it build** does it now. The phone has the same page. **Turn the key** still stops it. You hold the key.
+The purse keeps eighty lines. The Treasury keeps ninety days. What already worked still works.
 
-`20261115d` still lets it rewrite its own procedures, and a word behind a back is still felt at once. Those stay.
+`20261115e` still has the mind the Engine made, because the large model could not be had. That stays.
 
 Git author: `DominicVII` `<318079878+DominicVII@users.noreply.github.com>`.
 
