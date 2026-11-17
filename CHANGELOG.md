@@ -1,3 +1,13 @@
+## 20261117q: the race book is back beside the results, lost systems restored, Enter picks the highlighted reply (JUPITER)
+
+- The book of races (polls for every governor, Senate and House race, the race map shade, the Races button in the paper, the election-night settle) is back from 20261109b. It now lives in its own record, so it never touches the list of your election results. A save from a build that kept the book in the results' place is moved across on load, and the results are kept.
+- Restored from 20261109b, where the 20261110 install had dropped them: members follow the room or break from it on purpose, and walk with their side; members give their own reason once and then a new angle, never the slogan twice (no line is said twice); a speech you step away from is held and picked up again; foreign powers say why they want what they want, with the six-capital atlas and relation colours; the cabinet secretaries and the governor's council are people who take their seats at a sitting, and a confirmed nominee takes an open post; the court docket says what the bench is asked; the Engine's claims carry a worked sheet and named tries; finished works land on a street and show on the Engine, inquiry and city cards; the world map is shaded by relation.
+- The District Ledger (the Capital Ledger edition: career facts first, story sources, local phrases) is back from 20261109b, whole, with its button beside the paper on the toolbar.
+- A desk, rostrum or urn you open stays open again (20261107f). A check that runs every second had been closing anything with no person in it.
+- On the title and the oath, the toolbar no longer covers the card's last row. At 800x600, "Take the oath" and Back sat under it and a click hit the toolbar.
+- Esc closes an open dialog such as the District Ledger before it adjourns a sitting you chair.
+- In a conversation, Enter or Space picks the highlighted choice when the reply box is empty or not in use. Typing in the box, spaces included, is unchanged, and Enter still sends what you typed.
+- Four functions that had been declared twice now have one name each, and every caller gets what it expects: mood colours on the reading bars and the talk header are colours again, members react to posts on Vox again, and a member's family at the front (the funerals and the "my brother is at the strait" lines) no longer collides with the family record. The duplicate check is strict: none allowed.
 ## 20261117p: cabinet and brief prompts stay on screen, on 20261117o (Neptune)
 
 - Merges the 20261117n caFit display-only work onto JUPITER's 20261117o systems branch. The stamp is 20261117p. Engine, vote, sitting close, talk-gate, say-box, and title-career logic stay as in o.
