@@ -1,0 +1,44 @@
+name: assemble-jupiter-17o
+on:
+  workflow_dispatch:
+  push:
+    branches: [jupiter-nov17-systems-on-main]
+    paths:
+      - '.github/workflows/assemble-jupiter-17o.yml'
+permissions:
+  contents: write
+jobs:
+  assemble:
+    if: "github.ref == 'refs/heads/jupiter-nov17-systems-on-main' && github.actor != 'github-actions[bot]'"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: jupiter-nov17-systems-on-main
+          persist-credentials: true
+      - name: Concatenate parts, verify the blob hash, write the four mirrors, then remove staging
+        env:
+          WANT: 36fcaac0800807d4b9324b0b9f9ec57a23f7552f
+        run: |
+          set -euo pipefail
+          D=collab/jupiter-20261117o
+          test "$(git hash-object $D/session.html.part00)" = dc9fdb9fe8d2df7e936babbc2983b3b2b8c78152
+          test "$(git hash-object $D/session.html.part01)" = ee3b5777fad039f1487a06ac412deaef4b07beb1
+          test "$(git hash-object $D/session.html.part02)" = ba7b5f5fd4a1b61ca6363ba67543aa08bc05a962
+          cat $D/session.html.part00 $D/session.html.part01 $D/session.html.part02 > /tmp/session.html
+          got=$(git hash-object /tmp/session.html)
+          echo "assembled $got (want $WANT)"
+          test "$got" = "$WANT"
+          cp /tmp/session.html session.html
+          cp /tmp/session.html index.html
+          cp /tmp/session.html "One Nation, Under, ME.html"
+          mkdir -p public
+          cp /tmp/session.html public/session.html
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add session.html index.html "One Nation, Under, ME.html" public/session.html
+          git commit -m "Assemble the 20261117o HTML mirrors (session, index, One Nation, public)."
+          git rm -r -q $D .github/workflows/assemble-jupiter-17o.yml
+          git commit -m "Remove the 20261117o staging parts and the assemble workflow."
+          git push origin HEAD:jupiter-nov17-systems-on-main
