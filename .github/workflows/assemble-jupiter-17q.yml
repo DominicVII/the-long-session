@@ -1,0 +1,44 @@
+name: assemble-jupiter-17q
+on:
+  workflow_dispatch:
+  push:
+    branches: [jupiter-nov17-q-on-o]
+    paths:
+      - '.github/workflows/assemble-jupiter-17q.yml'
+permissions:
+  contents: write
+jobs:
+  assemble:
+    if: "github.ref == 'refs/heads/jupiter-nov17-q-on-o' && github.actor != 'github-actions[bot]'"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: jupiter-nov17-q-on-o
+          persist-credentials: true
+      - name: Concatenate parts, verify the blob hash, write the four mirrors, then remove staging
+        env:
+          WANT: e3501cc6f1d9986231e966252cdae705497d078a
+        run: |
+          set -euo pipefail
+          D=collab/jupiter-20261117q
+          test "$(git hash-object $D/session.html.part00)" = 954b40f158fe7242abb88f9d02b655bf4e072bec
+          test "$(git hash-object $D/session.html.part01)" = 19b79e5c2ea4051756573e5af1358a76e6921fc7
+          test "$(git hash-object $D/session.html.part02)" = 8772e94f3d88ffd926bffbb0ba42381771a6a3fd
+          cat $D/session.html.part00 $D/session.html.part01 $D/session.html.part02 > /tmp/session.html
+          got=$(git hash-object /tmp/session.html)
+          echo "assembled $got (want $WANT)"
+          test "$got" = "$WANT"
+          cp /tmp/session.html session.html
+          cp /tmp/session.html index.html
+          cp /tmp/session.html "One Nation, Under, ME.html"
+          mkdir -p public
+          cp /tmp/session.html public/session.html
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add session.html index.html "One Nation, Under, ME.html" public/session.html
+          git commit -m "Assemble the 20261117q HTML mirrors (session, index, One Nation, public)."
+          git rm -r -q $D .github/workflows/assemble-jupiter-17q.yml
+          git commit -m "Remove the 20261117q staging parts and the assemble workflow."
+          git push origin HEAD:jupiter-nov17-q-on-o
