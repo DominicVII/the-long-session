@@ -1,0 +1,54 @@
+name: assemble-onum
+on:
+  workflow_dispatch:
+  push:
+    branches: [neptune-p-on-o]
+    paths:
+      - '.github/workflows/assemble-onum.yml'
+      - 'collab/neptune-20261117p/**'
+permissions:
+  contents: write
+jobs:
+  assemble:
+    if: "github.ref == 'refs/heads/neptune-p-on-o' && github.actor != 'github-actions[bot]'"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: neptune-p-on-o
+          persist-credentials: true
+      - name: Concatenate parts, verify hashes, write mirrors, then remove staging
+        env:
+          WANT_SESSION: ea62caf93ec066688392dcdd5616ec7a451edac7
+          WANT_STANDALONE: f40596050fb437ec61c63a251598485a8cc0cb5a
+          WANT_DOT: d974b2373a1ae350b35831ff8b1ebc8e1be396a5
+        run: |
+          set -euo pipefail
+          D=collab/neptune-20261117p
+          cat $D/session.html.part00 $D/session.html.part01 $D/session.html.part02 $D/session.html.part03 > /tmp/session.html
+          got=$(git hash-object /tmp/session.html)
+          echo "session $got (want $WANT_SESSION)"
+          test "$got" = "$WANT_SESSION"
+          cat $D/session.standalone.html.part00 $D/session.standalone.html.part01 $D/session.standalone.html.part02 > /tmp/standalone.html
+          got=$(git hash-object /tmp/standalone.html)
+          echo "standalone $got (want $WANT_STANDALONE)"
+          test "$got" = "$WANT_STANDALONE"
+          cat $D/dot.html.part00 $D/dot.html.part01 > /tmp/dot.html
+          got=$(git hash-object /tmp/dot.html)
+          echo "dot $got (want $WANT_DOT)"
+          test "$got" = "$WANT_DOT"
+          cp /tmp/session.html session.html
+          cp /tmp/session.html index.html
+          cp /tmp/session.html "One Nation, Under, ME.html"
+          mkdir -p public
+          cp /tmp/session.html public/session.html
+          cp /tmp/standalone.html session.standalone.html
+          cp /tmp/dot.html "One Nation, Under, ME..html"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add session.html index.html "One Nation, Under, ME.html" public/session.html session.standalone.html "One Nation, Under, ME..html"
+          git commit -m "Assemble the 20261117p HTML mirrors (session, index, One Nation, public, standalone, double-dot)."
+          git rm -r -q $D .github/workflows/assemble-onum.yml
+          git commit -m "Remove the 20261117p staging parts and the assemble workflow."
+          git push origin HEAD:neptune-p-on-o
