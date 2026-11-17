@@ -17,18 +17,22 @@ One HTML body. Keep these **byte-identical**:
 | `session.html` | repo root |
 | `One Nation, Under, ME.html` | standalone name |
 
-**Build stamp (now): `20261117a`**
+**Build stamp (now): `20261117b`**
 
-- `<meta name="onum-build" content="20261117a">`
-- IIFE `STAMP = "20261117a"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
-- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261117a"`
+- `<meta name="onum-build" content="20261117b">`
+- IIFE `STAMP = "20261117b"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
+- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261117b"`
 - Wrapper iframe: `/session.html?v=${ONUM_BUILD}` in `src/routes/index.tsx`
 
-If you change the HTML, bump the letter (`20261117a`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
+If you change the HTML, bump the letter (`20261117b`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
 
 This sandbox tracks `public/session.html` as the playable body (root `index.html` / `session.html` / `One Nation, Under, ME.html` are not in this repo). Do not replace that file with a simpler build. Insert new game logic **inside** the main IIFE, before `})(); /* 20261110bx: main IIFE close, moved below the ba block */`.
 
-### Latest — `20261117a`
+### Latest — `20261117b`
+
+Review of the street. One hole: a remainder the remnant moved lived only in memory, so a reload put it back in the room it started in, and two of them could be left in the same room so one could not be found. The place is now kept on the save, put back when you continue, and a live remainder is not moved into a room that already has one.
+
+The rest of `20261117a` held. The district is still longer. The till, the houses, the Host, the file, and the wire still work. The Capitol is still not remeshed. Doors still walk you through.
 
 The district is longer. Walk in from the East Steps and the seven blocks are on the ground: the parish, the union hall, your counter, the press kiosk, the grain wharf, the campaign block, market row. Foot traffic and the price move with the guilder, the duties, and the unrest. The till on your counter is yours. The Capitol is not remeshed to make the street. Doors still walk you through. Adjacent rooms are not streamed in on a frame.
 
@@ -45,18 +49,6 @@ A name the district already knows can be put on the steps, or set to run. What i
 Taylor Day hangs banners. A lost seat puts a crowd on the steps. Neither rebuilds the stone.
 
 `20261116c` still draws every room and every door. That stays.
-
-Git author: `DominicVII` `<318079878+DominicVII@users.noreply.github.com>`.
-
-Git author: `DominicVII` `<318079878+DominicVII@users.noreply.github.com>`.
-
-Git author: `DominicVII` `<318079878+DominicVII@users.noreply.github.com>`.
-
-Git author: `DominicVII` `<318079878+DominicVII@users.noreply.github.com>`.
-
-Git author: `DominicVII` `<318079878+DominicVII@users.noreply.github.com>`.
-
-Git author: `DominicVII` `<318079878+DominicVII@users.noreply.github.com>`.
 
 Git author: `DominicVII` `<318079878+DominicVII@users.noreply.github.com>`.
 
