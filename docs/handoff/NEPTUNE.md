@@ -1,5 +1,14 @@
 # Neptune handoff notes (for Claude Code) — One Nation, Under, ME.
 
+## 20261117t — toolbar, District Ledger, atlas, talk hint (on 20261117s)
+
+- Stamp 20261117t. Display only, on JUPITER's 20261117s (appointees persist). Leave `jpBootBarCss` (`body.boot-menu #uiToolbar{z-index:70!important}`) in place. Do not change Enter/Space talk-pick logic or cabinet persistence.
+- `#uiToolbar` wraps and compactens (short labels when a button would clip) so every panel button, including District Ledger beside the paper, stays on screen from 800×600 up to 1920×1080. The gold HUD is lifted above the bar.
+- While a veil card or talk is open, the high HUD and the panels bar fold so Close and talk choices stay clickable.
+- `#onumCapitalLedgerDialog` is capped to the viewport; `.cld-close` is sticky at the top of the paper.
+- `#pfMap` / the foreign-capitals SVG is boxed and scaled to the card.
+- Talk hint: "Enter/Space pick the highlighted choice · type to say your own · Esc leave" (with 1–9 when those numbers are shown). At short heights the in-talk "What you see" box yields to the choice list.
+
 ## 20261117p — caFit on 20261117o: sitting, talk choices, briefs, title
 
 - Stamp 20261117p. Merges 20261117n caFit onto JUPITER's 20261117o systems branch. Display only. Do not change sitting close, talk-gate, say-box go(), or title-career load logic.

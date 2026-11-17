@@ -1,3 +1,12 @@
+## 20261117t: the panels bar, the District Ledger, and the capitals map stay on the screen (Neptune)
+
+- Display only, on 20261117s. JUPITER's title/oath toolbar fix (`jpBootBarCss`: while the boot menu is up, `#uiToolbar` sits under the card at z-index 70) is unchanged. Talk Enter/Space picking is unchanged. Appointee persistence from 20261117s is unchanged.
+- The panels toolbar (including the new District Ledger button beside the paper) wraps and compactens so every button stays on screen at 800×600, 1280×720, 1280×800, 1366×768 and 1920×1080. The gold HUD sits just above the (possibly wrapped) bar so both stay clickable.
+- While a veil card or a talk is open, the high HUD and the panels bar fold, so Close and the talk choices are not covered.
+- The District Ledger dialog stays inside the viewport; its close control is pinned at the top of the paper.
+- The six-capital atlas is boxed to the card in the game's gold-on-sea look and no longer spills past the card.
+- The talk hint matches the keys: Enter or Space picks the highlighted choice when the reply box is empty or not in use; type in the box to say your own (Enter still sends what you typed); 1–9 pick when those numbers are shown.
+
 ## 20261117s: the people you appoint stay appointed across a reload (JUPITER)
 
 - Cabinet and council officials are no longer made fresh each session. The office record (the President's secretaries, a governor's cabinet and agency heads) decides who holds each office. Each holder is one saved person with a key of their own, cab:<office>:<n>, kept in a new cabinet store in the save, so the Secretary you named is the same person after any number of reloads: same name, office, views, chat history and texts.
