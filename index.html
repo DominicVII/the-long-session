@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261116b">
+<meta name="onum-build" content="20261116c">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -16,7 +16,7 @@
   img{max-width:100%}
   [hidden]:not([hidden="until-found"]){display:none!important}
 </style>
-<title>One Nation, Under, ME. · 20261116b</title>
+<title>One Nation, Under, ME. · 20261116c</title>
 <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'>  <rect width='32' height='32' fill='#0D1014'/>  <polygon fill='#A45F27' points='16,2.8 19.04,9.69 26.32,7.77 22.82,14.44 28.87,18.94 21.47,20.36 21.73,27.89 16,23 10.27,27.89 10.53,20.36 3.13,18.94 9.18,14.44 5.68,7.77 12.96,9.69'/></svg>">
 <meta property="og:title" content="One Nation, Under, ME.">
 <!-- Standalone: system fonts. No CDN, no vendor folder. -->
@@ -46,7 +46,7 @@
   window.onumLimSet = function(k, v){ if(!(k in D)) return false; L[k] = fix(v); try{ var o = JSON.parse(localStorage.getItem("onum.limits") || "{}") || {}; o[k] = (L[k] === INF) ? null : L[k]; localStorage.setItem("onum.limits", JSON.stringify(o)); }catch(e){} return true; };
   window.onumLimReset = function(){ try{ localStorage.removeItem("onum.limits"); }catch(e){} Object.keys(D).forEach(function(k){ L[k] = D[k]; }); L._eff = {}; L._gov = null; return true; };
   var show = function(v){ return v === INF ? "inf" : (typeof v === "number" ? Math.round(v * 100) / 100 : v); };
-  window.onumLimDump = function(){ var out = {build:"20261116b", mode:L.mode || "scale"}; Object.keys(D).forEach(function(k){ out[k] = show(L[k]); });
+  window.onumLimDump = function(){ var out = {build:"20261116c", mode:L.mode || "scale"}; Object.keys(D).forEach(function(k){ out[k] = show(L[k]); });
     out.effective = {}; Object.keys(L._eff).forEach(function(k){ out.effective[k] = show(L._eff[k]); }); out.governor = L._gov;
     try{ out.engineBudgetMs = window.onumEngine ? show(window.onumEngine.budget) : null; out.frameMs = window.onumEngine ? show(window.onumEngine.dtEma) : null; }catch(e){} return out; };
   window.onumLimLine = function(){ var d = window.onumLimDump(), e = d.effective, g = function(k){ return e[k] != null ? e[k] + "*" : d[k]; };
@@ -71,7 +71,7 @@
 </script>
 <script>
 (function(){
-  var STAMP = "20261116b";
+  var STAMP = "20261116c";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -983,7 +983,7 @@ body.boot-menu .shell{grid-template-rows:minmax(0,1fr)}
   <div class="grid">
     <div>
       <section class="stage">
-        <div class="scene" id="scene"><div class="boot" id="boot">Building the chamber… · 20261116b</div></div>
+        <div class="scene" id="scene"><div class="boot" id="boot">Building the chamber… · 20261116c</div></div>
         <div class="hud"><i id="whereTag">Location</i><b id="whereName">—</b></div>
         <div class="aims" id="aimsHud" hidden tabindex="0" aria-label="Today's aims"><i>Today's aims</i><b id="aimsNext"></b><div class="aims__all" id="aimsAll"></div></div>
         <div class="compass" id="compass" aria-hidden="true"><div class="compass__rail"></div><i class="compass__n">N</i><div id="compassTicks"></div></div>
@@ -58354,6 +58354,202 @@ if(!document.getElementById("onumSkin16b")){
   ].join("");
   document.head.appendChild(st);
 }
+
+
+/* 20261116c */
+/* 20261116c — the open world, drawn out: every room, every door, every thing you can do there.
+   Drawing the whole room is a switch. The frame stays the one that already works until you ask. */
+function onumRoomPeople(id){
+  let n = 0;
+  const names = [];
+  try{
+    (everyone() || []).forEach(function(p){
+      if(!p || p.gone || p === G.you || p.room !== id) return;
+      n++;
+      if(names.length < 4 && p.name) names.push(p.name);
+    });
+  }catch(e){}
+  return {n:n, names:names};
+}
+function onumRoomActs(id){
+  const out = [];
+  const list = (typeof PROPS !== "undefined" && PROPS[id]) || [];
+  list.forEach(function(p){
+    if(!p || !p.label) return;
+    let acts = [];
+    try{ acts = typeof p.acts === "function" ? (p.acts() || []) : (p.acts || []); }catch(e){ acts = []; }
+    if(!Array.isArray(acts)) acts = [];
+    const names = [];
+    acts.forEach(function(a){ if(a && a.t && names.length < 5) names.push(String(a.t)); });
+    out.push({label:String(p.label), sub:p.sub ? String(p.sub) : "", acts:names});
+  });
+  return out;
+}
+function onumWorldPlan(){
+  const spot = {
+    office:[0,1], cloak:[1,0], corridor:[1,1], caucus:[0,2], committee:[2,0],
+    floor:[1,2], press:[2,1], engine:[2,2], senate:[3,0], court:[3,1],
+    exec:[3,2], steps:[4,1], district:[5,1], govoffice:[5,2], visit:[0,0]
+  };
+  const cw = 132, ch = 78;
+  let boxes = "", lines = "";
+  const here = G.room;
+  Object.keys(ROOMS).forEach(function(id){
+    const at = spot[id] || [0,3];
+    const x = 16 + at[0] * cw, y = 16 + at[1] * ch;
+    const R = ROOMS[id];
+    const on = id === here;
+    boxes += '<g class="onum-rm" data-rm="' + id + '" style="cursor:pointer"><rect x="' + x + '" y="' + y + '" width="118" height="58" rx="2" fill="' + (on ? "#9c1c1c" : "#f7f3e8") + '" stroke="#161513" stroke-width="' + (on ? 2.5 : 1) + '"></rect>' +
+      '<text x="' + (x + 59) + '" y="' + (y + 24) + '" text-anchor="middle" font-family="Georgia,serif" font-size="11" fill="' + (on ? "#f7f3e8" : "#161513") + '">' + pcEsc(R.t) + '</text>' +
+      '<text x="' + (x + 59) + '" y="' + (y + 42) + '" text-anchor="middle" font-family="ui-monospace,Menlo,monospace" font-size="9" fill="' + (on ? "#f3d0d0" : "#6e675c") + '">' + (R.open ? "open air" : "indoors") + " · " + (R.travel || 0) + "m</text></g>";
+  });
+  Object.keys(DOORS || {}).forEach(function(from){
+    (DOORS[from] || []).forEach(function(d){
+      const a = spot[from], b = spot[d.to];
+      if(!a || !b) return;
+      lines += '<line x1="' + (16 + a[0] * cw + 59) + '" y1="' + (16 + a[1] * ch + 29) + '" x2="' + (16 + b[0] * cw + 59) + '" y2="' + (16 + b[1] * ch + 29) + '" stroke="#9c1c1c" stroke-width="1" opacity="0.45"></line>';
+    });
+  });
+  const W = 16 + 6 * cw, H = 16 + 4 * ch;
+  return '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto;background:#f6f1e4;border:1px solid #161513">' + lines + boxes + '</svg>' +
+    '<p class="muted">A red room is the one you are standing in. A line is a door. Minutes are the walk. Click a room to go there. The picture of the room itself is unchanged.</p>';
+}
+function onumWorldHTML(){
+  const here = G.room;
+  const R = ROOMS[here] || {};
+  const people = onumRoomPeople(here);
+  const props = onumRoomActs(here);
+  const doors = ((DOORS && DOORS[here]) || []).map(function(d){
+    const to = ROOMS[d.to];
+    return to ? (to.t + " (" + (to.travel || 0) + " min)") : d.to;
+  });
+  const propHtml = props.length ? props.map(function(p){
+    return '<div style="border-top:1px solid var(--line);padding:6px 0"><b>' + pcEsc(p.label) + '</b>' +
+      (p.sub ? '<div class="muted">' + pcEsc(p.sub) + '</div>' : '') +
+      (p.acts.length ? '<div>' + p.acts.map(function(t){ return pcEsc(t); }).join(" · ") + '</div>' : '<div class="muted">Nothing to do but stand by it.</div>') +
+      '</div>';
+  }).join("") : '<p class="muted">Nothing in this room has a use written on it.</p>';
+  const rooms = ROOM_ORDER.filter(function(id){ return ROOMS[id]; }).map(function(id){
+    const Rm = ROOMS[id];
+    const pe = onumRoomPeople(id);
+    const nProps = ((PROPS && PROPS[id]) || []).length;
+    return '<tr' + (id === here ? ' style="background:rgba(156,28,28,.08)"' : '') + '><td>' + pcEsc(Rm.t) + '</td><td>' + (Rm.open ? "open air" : "indoors") + '</td><td>' + (Rm.travel || 0) + ' min</td><td>' + nProps + ' things</td><td>' + pe.n + (pe.names.length ? " — " + pcEsc(pe.names.join(", ")) : "") + '</td></tr>';
+  }).join("");
+  const states = (G.states || []).map(function(s){
+    let gov = "";
+    try{ gov = stateGovInfo(s.n).g.short; }catch(e){}
+    const home = G.you && s.n === G.you.state;
+    const can = [];
+    if(home) can.push("your streets, your door, the shops, the church, the campaign office");
+    if(s.bill && s.bill.title) can.push("the statehouse has " + s.bill.title);
+    can.push(gov || "a government of its own");
+    return '<tr' + (home ? ' style="background:rgba(156,28,28,.08)"' : '') + '><td>' + (home ? "★ " : "") + pcEsc(s.n) + '</td><td>' + Math.round(s.unrest || 0) + '</td><td>' + Math.round(s.ind || 0) + '</td><td>' + pcEsc(can.join(". ")) + '</td></tr>';
+  }).join("");
+  const draw = !!(G && G.drawAll);
+  return '<p>You can walk every room that has a door, speak to whoever is standing in it, and use whatever is written on the furniture. Open air is the steps and the district: sky, ground, and a longer walk. The statehouse is through the district. Nothing here invents a power the room does not already have.</p>' +
+    '<div class="eyebrow">Where you are</div>' +
+    '<p><b>' + pcEsc(R.t || here || "nowhere") + '</b> · ' + pcEsc(R.tag || "") + ' · ' + (R.open ? "open air" : "indoors") + ' · ' + (R.travel || 0) + ' minutes if you come from away. ' +
+    (people.n ? people.n + ' others here' + (people.names.length ? ': ' + pcEsc(people.names.join(", ")) : '') + '.' : 'Nobody else is in the room.') +
+    (doors.length ? ' Doors: ' + pcEsc(doors.join("; ")) + '.' : '') + '</p>' +
+    '<div class="eyebrow">What you can do in this room</div>' + propHtml +
+    '<div class="eyebrow">The building, rendered</div>' + onumWorldPlan() +
+    '<div class="eyebrow">Every room</div>' +
+    '<table class="onum-book"><thead><tr><th>Room</th><th>Air</th><th>Walk</th><th>Things</th><th>People</th></tr></thead><tbody>' + rooms + '</tbody></table>' +
+    '<div class="eyebrow">Every state, and what it will let you do</div>' +
+    '<table class="onum-book"><thead><tr><th>State</th><th>Unrest</th><th>Industry</th><th>Capability</th></tr></thead><tbody>' + states + '</tbody></table>' +
+    '<div class="card__actions"><button type="button" class="btn" id="onumDrawAll">' + (draw ? "Draw only what is near" : "Draw the whole room") + '</button></div>' +
+    '<p class="muted">' + (draw ? "Everyone in reach is being drawn, and the far plane is out. Turn it off if the picture stutters." : "The picture still drops detail at a distance, so the frame holds. Draw the whole room when you want every person in it.") + '</p>';
+}
+function onumDrawAll(on){
+  G.drawAll = !!on;
+  try{ applyQuality(); }catch(e){}
+  try{
+    if(typeof camera !== "undefined" && camera){
+      camera.far = G.drawAll ? Math.max(camera.far || 180, 420) : Math.min(camera.far || 180, 180);
+      if(camera.updateProjectionMatrix) camera.updateProjectionMatrix();
+    }
+  }catch(e){}
+  try{ note(G.drawAll ? "The whole room is being drawn." : "Drawing is back to the distance that keeps the frame."); }catch(e){}
+}
+function onumWorldBind(){
+  const b = document.getElementById("onumDrawAll");
+  if(b && !b.dataset.bound){
+    b.dataset.bound = "1";
+    b.addEventListener("click", function(){ onumDrawAll(!G.drawAll); try{ onumWorldCard(); }catch(e){} });
+  }
+  document.querySelectorAll(".onum-rm").forEach(function(g){
+    if(g.dataset.bound) return;
+    g.dataset.bound = "1";
+    g.addEventListener("click", function(){
+      const id = g.getAttribute("data-rm");
+      if(!id || !ROOMS[id] || id === G.room) return;
+      try{ if(typeof veil !== "undefined") veil.hidden = true; }catch(e){}
+      try{ card.classList.remove("card--open"); }catch(e){}
+      G.running = true;
+      try{ enterRoom(id, G.room); }catch(e){ G.room = id; }
+    });
+  });
+}
+function onumWorldCard(){
+  try{ govCardOpen("The open world", "What you can walk, and what you can do", "Every room, every door, every state.", onumWorldHTML(), null); }catch(e){ return; }
+  setTimeout(onumWorldBind, 0);
+}
+{ const _aq = applyQuality; applyQuality = function(){
+  const r = _aq.apply(this, arguments);
+  try{
+    if(G && G.drawAll){
+      LOD_NEAR = 16; LOD_MID = 36; LOD_FAR = 80;
+      if(typeof camera !== "undefined" && camera){
+        camera.far = Math.max(camera.far || 180, 420);
+        if(camera.updateProjectionMatrix) camera.updateProjectionMatrix();
+      }
+    }
+  }catch(e){}
+  return r;
+}; }
+{ const _rm = renderMap; renderMap = function(sel){
+  const svg = _rm.apply(this, arguments);
+  try{
+    const rows = (G.states || []).map(function(s){
+      const on = sel === s.n;
+      let gov = "";
+      try{ gov = stateGovInfo(s.n).g.short; }catch(e){}
+      return '<div style="display:flex;gap:8px;justify-content:space-between;border-bottom:1px solid var(--line-soft);padding:3px 0;font:12px/1.35 ui-monospace,Menlo,monospace' + (on ? ';background:rgba(156,28,28,.08)' : '') + '"><span>' + (s.n === (G.you && G.you.state) ? "★ " : "") + pcEsc(s.n) + '</span><span>unrest ' + Math.round(s.unrest || 0) + ' · industry ' + Math.round(s.ind || 0) + ' · ' + pcEsc(gov || "governed") + (s.bill && s.bill.title ? " · " + pcEsc(s.bill.title) : "") + '</span></div>';
+    }).join("");
+    return svg + '<div class="eyebrow" style="margin-top:10px">All ' + (G.states || []).length + ' states, rendered</div>' + rows;
+  }catch(e){ return svg; }
+}; }
+{ const _mc = mapCard; mapCard = function(){
+  const r = _mc.apply(this, arguments);
+  try{
+    const done = el("mapDone");
+    if(done && !document.getElementById("onumWorldBtn")){
+      const b = document.createElement("button");
+      b.id = "onumWorldBtn"; b.type = "button"; b.className = "btn"; b.textContent = "What the world can do";
+      done.parentNode.insertBefore(b, done);
+      b.addEventListener("click", function(){ onumWorldCard(); });
+    }
+  }catch(e){}
+  return r;
+}; }
+function onumWorldBar(){
+  if(document.getElementById("onumWorldBar")) return;
+  const speed = document.getElementById("speed");
+  if(!speed) return;
+  const b = document.createElement("button");
+  b.id = "onumWorldBar"; b.type = "button"; b.title = "The open world"; b.setAttribute("aria-label", "Open the world"); b.textContent = "World";
+  b.addEventListener("click", function(){ try{ onumWorldCard(); }catch(e){} });
+  speed.appendChild(b);
+}
+try{
+  const _pb = pbApps;
+  pbApps = function(){
+    const A = _pb.apply(this, arguments) || [];
+    A.push({id:"soc-world", t:"The open world", d:"Every room, every door, every state, and what you can do there.", run:function(){ onumWorldCard(); }});
+    return A;
+  };
+}catch(e){}
+setTimeout(onumWorldBar, 800);
 
 })(); /* 20261110bx: main IIFE close, moved below the ba block */
 </script>

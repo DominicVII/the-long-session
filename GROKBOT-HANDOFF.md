@@ -17,26 +17,24 @@ One HTML body. Keep these **byte-identical**:
 | `session.html` | repo root |
 | `One Nation, Under, ME.html` | standalone name |
 
-**Build stamp (now): `20261116b`**
+**Build stamp (now): `20261116c`**
 
-- `<meta name="onum-build" content="20261116b">`
-- IIFE `STAMP = "20261116b"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
-- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261116b"`
+- `<meta name="onum-build" content="20261116c">`
+- IIFE `STAMP = "20261116c"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
+- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261116c"`
 - Wrapper iframe: `/session.html?v=${ONUM_BUILD}` in `src/routes/index.tsx`
 
-If you change the HTML, bump the letter (`20261116b`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
+If you change the HTML, bump the letter (`20261116c`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
 
 This sandbox tracks `public/session.html` as the playable body (root `index.html` / `session.html` / `One Nation, Under, ME.html` are not in this repo). Do not replace that file with a simpler build. Insert new game logic **inside** the main IIFE, before `})(); /* 20261110bx: main IIFE close, moved below the ba block */`.
 
-### Latest — `20261116b`
+### Latest — `20261116c`
 
-The paper was leading with the member's name. A line that began "Taylor did this" is rewritten so the county, the bill, or the statute book leads, and the name comes after, if it comes at all.
+The open world is written out. **World**, on the clock bar, on the phone, and inside the building map, draws every room, every door, and the walk in minutes. The room you are in lists every thing you can use, by the words already on it, and names who else is standing there. Every state is on the sheet: unrest, industry, how it is governed, and the bill on its own table if it has one. Your district is marked.
 
-The sheet is a different object. Newsprint, a red rule, the country's own name as the masthead, a drop cap, and four papers that do not share a sentence: the Federal Standard, the Commonwealth Courier, the Kerk & Chapel Review, and the Harbour Independent. Each has its own reading and a byline from a real press desk. A sentence already used on that day's sheet is not used again.
+The picture of the room is not rebuilt. Detail still drops at a distance, so the frame holds. **Draw the whole room** pushes that distance out and draws everyone in reach. **Draw only what is near** puts it back. Shadows are not recompiled.
 
-The lead is the floor, the counties, the guilder, the loaf, and the rival. The member's name is a box at the bottom, after the country. The wire along the bottom of the room is the same rule, and the room itself is ink and newsprint now, not brass.
-
-`20261116a` still has the books, line by line. Those stay.
+`20261116b` still leads the paper with the nation. That stays.
 
 Git author: `DominicVII` `<318079878+DominicVII@users.noreply.github.com>`.
 
