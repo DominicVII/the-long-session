@@ -1,3 +1,12 @@
+## 20261117p: cabinet and brief prompts stay on screen, on 20261117o (Neptune)
+
+- Merges the 20261117n caFit display-only work onto JUPITER's 20261117o systems branch. The stamp is 20261117p. Engine, vote, sitting close, talk-gate, say-box, and title-career logic stay as in o.
+- The sitting dock is no longer capped at about 20vh, so the Aye/No/Present row and the tally stay on screen. The park-bar close control stays inside the right edge (the bar is wider than the old 66px slot once the 44px hit targets are counted).
+- #sxDock and #cvLive no longer spill past their boxes: the dock can grow with the viewport and scroll inside; the room log is boxed and scrolls.
+- Cabinet roll: a pinned vote row is shown when the desk has no Aye/No/Present controls yet, and clicks go through onumSession.vote (or the session event). Brief cards already have JUPITER's table aye/nay; their action rows stay pinned at the bottom of each section.
+- While a talk is open, the HUD strips that covered choice buttons at 1280-wide (#hmWire, #onumSeeDock, #hmBar/#hmSay, #tick/"The Wire", #wire) are folded. The talk panel and its choices stay inside the viewport, above those overlays. The transcript (#talk #chat) is not folded. Enter/Space picking is unchanged.
+- Continue on the title stays the primary, default-focused button when a career exists, including one kept only in the browser's database (o's 20261110bv/bw title presentation, verified).
+
 ## 20261117o: the Engine opens again, your vote stays put, and the table votes aye or nay (JUPITER)
 
 - Opening the Engine opened "The open world" instead. Build 20261116c added a second function with the same name as the one the Engine uses for its daily look at the world, and the new one replaced it, so the Engine station ("Open the Engine's file"), the election board ("Open the Engine") and the Pocketbook all showed the world card. The world card now has its own name. The Engine's file and the maker's channel open again: "Write the file for the writer" downloads engine-channel-out-dayN.json (about 1 MB on a day-447 career), and letters by file or paste are read.
@@ -8,6 +17,12 @@
 - People: the nearest people are finished first. The bundled figure used for file:// play (Play.bat) had missed 20261111c (eyes, mouth and buttons past 3.5 m, the pocket square), so people looked unfinished there. It now has them.
 - Esc adjourns a sitting you chair when nothing else is open. A member's family line no longer reads "undefined is dead at undefined". Letters to the Engine are read whole again (the 40,000-character cut is gone). Election-night copy works again: 20261116b had declared a second onumDeskCopy (the papers' version is now onumPaperCopy).
 - Continue finds a career kept only in the browser's database (the 20261110bv/bw careers and the title screen, carried forward). A save without flag colours loads. A reply that fails gives the offline answer instead of "…".
+
+## 20261117n: cabinet and brief prompts stay on screen (Neptune caFit)
+
+- Cabinet meetings and morning/staff/cabinet brief cards are pinned inside the viewport. Long text scrolls inside the panel. Close, choice, and Aye/Nay/action rows stay visible at the bottom.
+- A leftover desk prompt no longer covers the card or the sitting dock. Call-on and sitting actions are no longer clipped by a short overflow-hidden dock.
+- Display only. Save and sitting logic are unchanged.
 
 ## 20261113b: living-world notes and continuity design
 
