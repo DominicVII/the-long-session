@@ -1,3 +1,11 @@
+## 20261117s: the people you appoint stay appointed across a reload (JUPITER)
+
+- Cabinet and council officials are no longer made fresh each session. The office record (the President's secretaries, a governor's cabinet and agency heads) decides who holds each office. Each holder is one saved person with a key of their own, cab:<office>:<n>, kept in a new cabinet store in the save, so the Secretary you named is the same person after any number of reloads: same name, office, views, chat history and texts.
+- A new official gets a number from a range of its own, so it never shares a number with a member. When an office changes hands, the person who held it retires into a former title and keeps their own history. Before this, the seat was renamed and the newcomer inherited the old holder's past.
+- Older saves keep their cabinet: the secretaries the save already held (on day 447: Niek Brouwer, Pieter van der Brouwer, Trien van den Schouten, Saskia de Boer) are given keys and keep their numbers. Only an office with nobody in it is filled, once, and then saved.
+- The cabinet table seats those secretaries again. In 20261117q it seated six people generated at random, a different six after each load. The appointment card names the secretary in the record. Cabinet and council officials are listed in Texts.
+- New check qa/nov17-s.mjs: appoint, text, reload twice. It fails on 20261117q and passes here.
+
 ## 20261117q: the race book is back beside the results, lost systems restored, Enter picks the highlighted reply (JUPITER)
 
 - The book of races (polls for every governor, Senate and House race, the race map shade, the Races button in the paper, the election-night settle) is back from 20261109b. It now lives in its own record, so it never touches the list of your election results. A save from a build that kept the book in the results' place is moved across on load, and the results are kept.

@@ -45,7 +45,7 @@ try {
     t("heard", () => { Q.rememberLine("q-test line one"); return Q.heardBefore("q-test line one") && !Q.heardBefore("q-test never said"); });
     t("motive", () => { const R = Q.realmEnsure(); const k = (R[0] && R[0].k) || "x"; const M = Q.realmMotive(k); return !!(M && M.line && M.because); });
     t("atlas", () => /<svg/.test(Q.foreignAtlas(G.world && G.world.foe)));
-    t("cab", () => { const P = Q.cabRoster(); const S = { kind: "cabinet_meeting", seats: [] }; Q.cabSeatMeeting(S); return P.length === 6 && S.seats.length >= 6 && P.every((p) => Q.everyone().indexOf(p) >= 0) && P.some((p) => /Treasury/.test(p.role)); });
+    t("cab", () => { const P = Q.cabRoster(); const S = { kind: "cabinet_meeting", seats: [] }; Q.cabSeatMeeting(S); /* 20261117s: the roster is the record's four secretaries, each keyed */ return P.length === 4 && S.seats.length >= 4 && P.every((p) => /^cab:exec\./.test(p.cabKey || "")) && P.every((p) => Q.everyone().indexOf(p) >= 0) && P.some((p) => /Treasury/.test(p.role)); });
     t("suit", () => { const s = Q.suitExplain({ t: "A v. B" }); return typeof s === "string" && s.length > 40; });
     t("claim", () => /Given:/.test(Q.clmSheet({ k: "dzz", claim: "It finds a use nobody ordered", status: "unverified", tries: 0 })));
     t("sci", () => typeof Q.sciBoard() === "string");
