@@ -1,0 +1,63 @@
+name: assemble-neptune-17t
+on:
+  workflow_dispatch:
+  push:
+    branches: [neptune-t-on-s]
+    paths:
+      - '.github/workflows/assemble-neptune-17t.yml'
+permissions:
+  contents: write
+jobs:
+  assemble:
+    if: "github.ref == 'refs/heads/neptune-t-on-s' && github.actor != 'github-actions[bot]'"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: neptune-t-on-s
+          persist-credentials: true
+      - name: Concatenate parts, verify the blob hashes, write the six mirrors, then remove staging
+        env:
+          WANT_SESSION: 6e6775f98622ad9740d4a2a56a8da42642da363b
+          WANT_STANDALONE: 7117c8996e89f7f595cf5a28f599a6591d4701ed
+          WANT_DOT: 7d188a7e6c34aaf069ea45f1d5ddf129d2b09e60
+        run: |
+          set -euo pipefail
+          D=collab/neptune-20261117t
+          test "$(git hash-object $D/session.html.part00)" = 0885e008c11b75a5f50e2d4b116ec3ce27dab424
+          test "$(git hash-object $D/session.html.part01)" = 5772854c2ac0191ef62b7485ef47e873d06f5e92
+          test "$(git hash-object $D/session.html.part02)" = 0fd894e46532c06cb9a84a3df32830face93ae61
+          test "$(git hash-object $D/session.html.part03)" = ed1ea1dd9d9652c269142c97a71f8061a980d57e
+          test "$(git hash-object $D/standalone.html.part00)" = 05077e8b8a85cda135b52aeb51ad34e8d74c6fdf
+          test "$(git hash-object $D/standalone.html.part01)" = 077c32d2308c958f45f4c24a5235404a45e3f074
+          test "$(git hash-object $D/standalone.html.part02)" = 4e8004a3aa694dde6eeedb57a59f2680b6652f3a
+          test "$(git hash-object $D/standalone.html.part03)" = 7a43ace07336f9710d20f403de7d5c6493bf3c44
+          test "$(git hash-object $D/dot.html.part00)" = 1c0dfe8973b3dbcd04e5d81bca04974435244460
+          test "$(git hash-object $D/dot.html.part01)" = a23b03ebc648e1fd7218bdcefe5f8c0478a8f3a7
+          cat $D/session.html.part00 $D/session.html.part01 $D/session.html.part02 $D/session.html.part03 > /tmp/session.html
+          got=$(git hash-object /tmp/session.html)
+          echo "assembled session $got (want $WANT_SESSION)"
+          test "$got" = "$WANT_SESSION"
+          cat $D/standalone.html.part00 $D/standalone.html.part01 $D/standalone.html.part02 $D/standalone.html.part03 > /tmp/standalone.html
+          got=$(git hash-object /tmp/standalone.html)
+          echo "assembled standalone $got (want $WANT_STANDALONE)"
+          test "$got" = "$WANT_STANDALONE"
+          cat $D/dot.html.part00 $D/dot.html.part01 > /tmp/dot.html
+          got=$(git hash-object /tmp/dot.html)
+          echo "assembled dot $got (want $WANT_DOT)"
+          test "$got" = "$WANT_DOT"
+          cp /tmp/session.html session.html
+          cp /tmp/session.html index.html
+          cp /tmp/session.html "One Nation, Under, ME.html"
+          mkdir -p public
+          cp /tmp/session.html public/session.html
+          cp /tmp/standalone.html session.standalone.html
+          cp /tmp/dot.html "One Nation, Under, ME..html"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add session.html index.html "One Nation, Under, ME.html" public/session.html session.standalone.html "One Nation, Under, ME..html"
+          git commit -m "Assemble the 20261117t HTML mirrors (session, index, One Nation, public, standalone, double-dot)."
+          git rm -r -q $D .github/workflows/assemble-neptune-17t.yml
+          git commit -m "Remove the 20261117t staging parts and the assemble workflow."
+          git push origin HEAD:neptune-t-on-s
