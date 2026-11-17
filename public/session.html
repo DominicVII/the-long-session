@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261116c">
+<meta name="onum-build" content="20261117a">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -16,7 +16,7 @@
   img{max-width:100%}
   [hidden]:not([hidden="until-found"]){display:none!important}
 </style>
-<title>One Nation, Under, ME. · 20261116c</title>
+<title>One Nation, Under, ME. · 20261117a</title>
 <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'>  <rect width='32' height='32' fill='#0D1014'/>  <polygon fill='#A45F27' points='16,2.8 19.04,9.69 26.32,7.77 22.82,14.44 28.87,18.94 21.47,20.36 21.73,27.89 16,23 10.27,27.89 10.53,20.36 3.13,18.94 9.18,14.44 5.68,7.77 12.96,9.69'/></svg>">
 <meta property="og:title" content="One Nation, Under, ME.">
 <!-- Standalone: system fonts. No CDN, no vendor folder. -->
@@ -46,7 +46,7 @@
   window.onumLimSet = function(k, v){ if(!(k in D)) return false; L[k] = fix(v); try{ var o = JSON.parse(localStorage.getItem("onum.limits") || "{}") || {}; o[k] = (L[k] === INF) ? null : L[k]; localStorage.setItem("onum.limits", JSON.stringify(o)); }catch(e){} return true; };
   window.onumLimReset = function(){ try{ localStorage.removeItem("onum.limits"); }catch(e){} Object.keys(D).forEach(function(k){ L[k] = D[k]; }); L._eff = {}; L._gov = null; return true; };
   var show = function(v){ return v === INF ? "inf" : (typeof v === "number" ? Math.round(v * 100) / 100 : v); };
-  window.onumLimDump = function(){ var out = {build:"20261116c", mode:L.mode || "scale"}; Object.keys(D).forEach(function(k){ out[k] = show(L[k]); });
+  window.onumLimDump = function(){ var out = {build:"20261117a", mode:L.mode || "scale"}; Object.keys(D).forEach(function(k){ out[k] = show(L[k]); });
     out.effective = {}; Object.keys(L._eff).forEach(function(k){ out.effective[k] = show(L._eff[k]); }); out.governor = L._gov;
     try{ out.engineBudgetMs = window.onumEngine ? show(window.onumEngine.budget) : null; out.frameMs = window.onumEngine ? show(window.onumEngine.dtEma) : null; }catch(e){} return out; };
   window.onumLimLine = function(){ var d = window.onumLimDump(), e = d.effective, g = function(k){ return e[k] != null ? e[k] + "*" : d[k]; };
@@ -71,7 +71,7 @@
 </script>
 <script>
 (function(){
-  var STAMP = "20261116c";
+  var STAMP = "20261117a";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -983,7 +983,7 @@ body.boot-menu .shell{grid-template-rows:minmax(0,1fr)}
   <div class="grid">
     <div>
       <section class="stage">
-        <div class="scene" id="scene"><div class="boot" id="boot">Building the chamber… · 20261116c</div></div>
+        <div class="scene" id="scene"><div class="boot" id="boot">Building the chamber… · 20261117a</div></div>
         <div class="hud"><i id="whereTag">Location</i><b id="whereName">—</b></div>
         <div class="aims" id="aimsHud" hidden tabindex="0" aria-label="Today's aims"><i>Today's aims</i><b id="aimsNext"></b><div class="aims__all" id="aimsAll"></div></div>
         <div class="compass" id="compass" aria-hidden="true"><div class="compass__rail"></div><i class="compass__n">N</i><div id="compassTicks"></div></div>
@@ -58550,6 +58550,417 @@ try{
   };
 }catch(e){}
 setTimeout(onumWorldBar, 800);
+
+
+/* 20261117a */
+/* 20261117a — the street, the houses, the relics, the wire.
+   The building is not remeshed. Doors still walk you through.
+   The district is longer, so the seven blocks have ground under them. */
+function onumWidenDistrict(){
+  const R = ROOMS.district;
+  if(!R || R._wide) return;
+  R._wide = 1;
+  if(R.w < 22) R.w = 22;
+  if(R.d < 26) R.d = 26;
+}
+function onumBlocks(){
+  if(G.blocks && G.blocks.v === 1 && G.blocks.list && G.blocks.list.length === 7) return G.blocks;
+  const state = (G.you && G.you.state) || "home";
+  let towns = [];
+  try{ towns = (townsOf(state) || []).map(function(t){ return t && t.name; }).filter(Boolean); }catch(e){}
+  const roles = [
+    ["parish", "The parish"],
+    ["union", "The union hall"],
+    ["counter", "Your counter"],
+    ["kiosk", "The press kiosk"],
+    ["wharf", "The grain wharf"],
+    ["campaign", "The campaign block"],
+    ["market", "Market row"]
+  ];
+  G.blocks = {v:1, list: roles.map(function(r, i){
+    return {k:r[0], role:r[1], name: towns[i] || r[1], foot: 30 + ((i * 11) % 40), price: 8 + i * 2, till: r[0] === "counter" ? 48 : 0, owned: r[0] === "counter"};
+  })};
+  return G.blocks;
+}
+function onumBlock(k){
+  return onumBlocks().list.filter(function(b){ return b.k === k; })[0] || null;
+}
+function onumDutyCount(){
+  try{ return (G.statute || []).filter(function(s){ return s && s.fate === "carried" && typeof lxDomainOf === "function" && lxDomainOf(s) === "tariff"; }).length; }catch(e){ return 0; }
+}
+function onumShopTick(){
+  const B = onumBlocks();
+  const g = (function(){ try{ return guilderIndex(); }catch(e){ return 100; } })();
+  const duty = onumDutyCount();
+  const hot = (function(){ const s = onumHotState && onumHotState(); return s ? s.unrest || 0 : 30; })();
+  B.list.forEach(function(b){
+    const pull = (100 - g) * 0.15 + duty * 2 - (hot > 60 ? 6 : 0);
+    b.foot = Math.max(4, Math.round((b.foot || 20) * 0.82 + 18 + pull));
+    b.price = Math.max(2, Math.round(((b.price || 10) * (g / 100) + duty) * 10) / 10);
+    if(b.owned) b.till = Math.round(((b.till || 0) + b.foot * b.price * 0.02) * 10) / 10;
+  });
+  B.day = G.day;
+}
+function onumTickerText(){
+  let g = "?", bread = "?", grain = "?";
+  try{ g = guilderIndex().toFixed(1); }catch(e){}
+  try{ if(G.world && G.world.bread) bread = (G.world.bread * (guilderIndex() / 100)).toFixed(2); }catch(e){}
+  try{ const M = onumMkt(); if(M && M.px) grain = Number(M.px.grain).toFixed(1); }catch(e){}
+  const bill = (G.bill && !G.bill.done && G.bill.title) ? G.bill.title : "no bill on the floor";
+  const duty = onumDutyCount();
+  return "Guilder " + g + "  ·  loaf " + bread + "  ·  grain " + grain + "  ·  duties " + duty + "  ·  " + bill;
+}
+function onumPublic(text){
+  const t = String(text || "").replace(/\s+/g, " ").trim();
+  if(!t) return;
+  G.lorePublic = G.lorePublic || [];
+  if(G.lorePublic.some(function(x){ return x.t === t && x.d === G.day; })) return;
+  G.lorePublic.unshift({d:G.day, t:t});
+  if(G.lorePublic.length > 40) G.lorePublic.length = 40;
+  try{ voxAdd({t:t, d:G.day, reply:true}); }catch(e){}
+}
+function onumHeirDay(){
+  G.dynasty = G.dynasty || {in:[], day:-1};
+  if(G.dynasty.day === G.day) return;
+  G.dynasty.day = G.day;
+  if((seedOf("vac:" + G.day) % 100) > 42) return;
+  let F = null;
+  try{ F = famEnsure(); }catch(e){ return; }
+  const gone = (G.members || []).filter(function(m){ return m && m.gone && m !== G.you && F.p && F.p[m.id]; });
+  if(!gone.length) return;
+  const m = gone[seedOf("heir:" + G.day) % gone.length];
+  const f = F.p[m.id];
+  const kid = (f.kids || []).slice().sort(function(a, b){ return (b.age || 0) - (a.age || 0); })[0];
+  const grown = kid && kid.age >= 18;
+  const who = grown ? (kid.name + " " + surname(m.name)) : (f.spouse ? f.spouse.name : "");
+  if(!who) return;
+  const civ = (G.civ || []).filter(function(c){ return c && !c.gone && !c._heir && c.state === m.state; })[0];
+  let line;
+  if(!civ){
+    line = who + ", of the house of " + surname(m.name) + ", is named for the vacancy. They are not in the building yet.";
+  } else {
+    civ._heir = m.id;
+    civ.role = grown ? ("Freshman, house of " + surname(m.name)) : ("Staffer, house of " + surname(m.name));
+    civ.room = "corridor";
+    try{ placeInRoom(civ); }catch(e){}
+    line = who + " comes into the corridor for the house of " + surname(m.name) + ", which has fallen.";
+  }
+  G.dynasty.in.unshift({d:G.day, t:line});
+  if(G.dynasty.in.length > 12) G.dynasty.in.length = 12;
+  try{ feed(line, "news"); }catch(e){}
+  onumPublic(line);
+}
+function onumPassRelic(){
+  let L = null;
+  try{ L = consularLoreEnsure(); }catch(e){ return; }
+  const live = CONSULAR_HORCRUXES.filter(function(h){ return h && !L.smashed[h.id]; });
+  if(!live.length) return;
+  const h = live[seedOf("hx:" + G.day) % live.length];
+  const rooms = ["corridor","cloak","office","committee","floor","press","steps","caucus"];
+  const nxt = rooms[(rooms.indexOf(h.room) + 1 + (seedOf("hxr:" + G.day) % 3)) % rooms.length];
+  const spot = {corridor:[-1.1,11.2], cloak:[1.1,4.2], office:[-1.4,5.6], committee:[-2.1,5.2], floor:[2.2,7.4], press:[-1.2,4.1], steps:[1.4,6.2], caucus:[2.1,6.4]};
+  h.room = nxt;
+  const sp = spot[nxt] || [0, 4];
+  h.x = sp[0]; h.z = sp[1];
+  G.relicWalk = G.relicWalk || [];
+  const line = "The remnant passed " + h.t.toLowerCase() + " into " + ((ROOMS[nxt] && ROOMS[nxt].t) || nxt) + ". You can walk to it.";
+  G.relicWalk.unshift({d:G.day, id:h.id, room:nxt, t:line});
+  if(G.relicWalk.length > 16) G.relicWalk.length = 16;
+  try{ feed(line); }catch(e){}
+  onumPublic(line);
+}
+function onumHost(){
+  if(!G || !G.running || !G.you) return;
+  const hour = Math.floor((G.minute || 0) / 60);
+  if(hour !== 7 && hour !== 12 && hour !== 18) return;
+  const key = G.day + ":" + hour;
+  if(G._hostHour === key) return;
+  const cons = (G.members || []).filter(function(m){ return m && !m.gone && isConsular(m); });
+  const chap = (G.members || []).filter(function(m){ return m && !m.gone && m.creed === "latin" && !isConsular(m); })[0];
+  if(!cons.length || !chap) return;
+  G._hostHour = key;
+  (G.members || []).forEach(function(m){
+    if(!m || m.gone || !m.rel) return;
+    if(m.creed === "latin" && !isConsular(m)) m.rel.warmth = Math.max(-100, Math.min(100, (m.rel.warmth || 0) + 4));
+    if(isConsular(m)) m.rel.warmth = Math.max(-100, Math.min(100, (m.rel.warmth || 0) - 6));
+  });
+  const line = chap.name + " refuses the Host to the Consulars at the corridor bronze. The Latin members saw it, and they will vote as if they saw it.";
+  try{ feed(line, "news"); }catch(e){}
+  onumPublic(line);
+}
+function onumCapitolMood(){
+  const hour = Math.floor((G.minute || 0) / 60);
+  let mood = "ordinary";
+  try{ if(typeof isTaylorDay === "function" && isTaylorDay()) mood = "taylor"; }catch(e){}
+  if(mood === "ordinary" && (hour === 7 || hour === 12 || hour === 18)) mood = "vigil";
+  if(G.you && G.you.out) mood = "crowd";
+  G.capitolMood = mood;
+  return mood;
+}
+function onumCeleb(){
+  if(G.celebId){ const p = byId(G.celebId); if(p && !p.gone) return p; }
+  const pool = (G.press || []).concat(G.civ || []).filter(function(p){ return p && !p.gone && p.name; });
+  if(!pool.length) return null;
+  pool.sort(function(a, b){ return ((b.traits && b.traits.vanity) || 0) - ((a.traits && a.traits.vanity) || 0); });
+  G.celebId = pool[0].id;
+  return pool[0];
+}
+function onumOpenDay(){
+  if(!G || !G.you) return;
+  if(G._openDay === G.day) return;
+  G._openDay = G.day;
+  try{ onumShopTick(); }catch(e){}
+  try{ onumHeirDay(); }catch(e){}
+  try{ onumPassRelic(); }catch(e){}
+  try{ onumCapitolMood(); }catch(e){}
+  try{ onumCeleb(); }catch(e){}
+}
+function onumListen(roomId){
+  const people = (typeof everyone === "function" ? everyone() : []).filter(function(m){
+    return m && !m.gone && m !== G.you && m.room === roomId && m.name;
+  });
+  if(!people.length) return "The room on the other side of the door is empty. You hear the building, not a plot.";
+  const m = people[seedOf("hear:" + roomId + ":" + G.day + ":" + Math.floor((G.minute || 0) / 30)) % people.length];
+  let said = "";
+  try{ if(m.intent && m.intent.t) said = m.name + " means to " + m.intent.t + "."; }catch(e){}
+  if(!said && m.sent && m.sent.now) said = m.name + ": " + m.sent.now;
+  if(!said) said = m.name + " is in there, and is not speaking for you.";
+  const line = "Outside the door, you hear " + said;
+  try{ feed(line); }catch(e){}
+  onumPublic("Overheard, not for the record: " + said);
+  return line;
+}
+function onumVetCard(){
+  G.vet = G.vet || {step:0};
+  const pool = (G.members || []).filter(function(m){ return m && !m.gone && m !== G.you && m.name; }).slice(0, 8);
+  const rows = pool.map(function(m){
+    return '<button type="button" class="btn btn--ghost" data-vet="' + m.id + '">' + pcEsc(m.name) + " · " + pcEsc(m.state || "") + "</button>";
+  }).join(" ");
+  const cur = G.vet.id ? byId(G.vet.id) : null;
+  const body = '<p>A name from the building comes to your office, then onto the wire, then you ask the floor. The Senate still has its own vote. This does not skip it. It makes the person walk here.</p>' +
+    (cur ? '<p><b>' + pcEsc(cur.name) + '</b> is the name on the file. Step ' + (G.vet.step || 0) + ' of 3.</p>' : '<p>No name on the file.</p>') +
+    '<div class="card__actions" style="flex-wrap:wrap">' + rows + '</div>' +
+    '<div class="card__actions"><button type="button" class="btn" id="vetCall">Call them to the office</button><button type="button" class="btn" id="vetWire">Put them on the wire</button><button type="button" class="btn" id="vetFloor">Ask the floor</button></div><div class="dream" id="vetSay"></div>';
+  govCardOpen("The file", "A person, not a post", "They have to stand in the room.", body, null);
+  document.querySelectorAll("[data-vet]").forEach(function(b){
+    b.addEventListener("click", function(){ G.vet = {id:b.getAttribute("data-vet"), step:0}; onumVetCard(); });
+  });
+  const say = function(t){ const n = document.getElementById("vetSay"); if(n) n.textContent = t; };
+  const call = document.getElementById("vetCall");
+  if(call) call.addEventListener("click", function(){
+    const p = G.vet && byId(G.vet.id); if(!p){ say("Pick a person first."); return; }
+    p.room = "office";
+    try{ placeInRoom(p); }catch(e){}
+    G.vet.step = 1;
+    say(p.name + " is in your office. Talk to them there. The mesh was not rebuilt.");
+  });
+  const wire = document.getElementById("vetWire");
+  if(wire) wire.addEventListener("click", function(){
+    const p = G.vet && byId(G.vet.id); if(!p || G.vet.step < 1){ say("They have not stood in the office yet."); return; }
+    const line = "The wire has " + p.name + " for a desk. The questions are about the office, not about a stranger.";
+    try{ feed(line, "news"); }catch(e){}
+    onumPublic(line);
+    G.vet.step = 2;
+    say(line);
+  });
+  const floor = document.getElementById("vetFloor");
+  if(floor) floor.addEventListener("click", function(){
+    const p = G.vet && byId(G.vet.id); if(!p || G.vet.step < 2){ say("The wire has not had them yet."); return; }
+    const line = "The floor is asked to look at " + p.name + ". Confirmation is still the Senate, if the Senate is in session. The ask is on the record.";
+    try{ feed(line, "news"); }catch(e){}
+    onumPublic(line);
+    G.vet.step = 3;
+    say(line);
+  });
+}
+function onumStreetHTML(){
+  onumOpenDay();
+  const mood = onumCapitolMood();
+  const moodLine = mood === "taylor" ? "Taylor Day. Banners on the steps. The corridor keeps the bronze."
+    : mood === "vigil" ? "Seven, noon, or six. Candles at the corridor bronze, if the remnant is keeping the hour."
+    : mood === "crowd" ? "You are out of the seat. The steps have a crowd, and they are not here to cheer."
+    : "An ordinary day on the stone. The doors still walk you through. Nothing is streamed in behind them.";
+  const blocks = onumBlocks().list.map(function(b){
+    return '<tr><td>' + pcEsc(b.name) + '</td><td>' + pcEsc(b.role) + '</td><td>' + b.foot + '</td><td>' + b.price + '</td><td>' + (b.owned ? ("yours · till " + b.till) : "—") + '</td></tr>';
+  }).join("");
+  const relics = CONSULAR_HORCRUXES.map(function(h){
+    let smashed = false;
+    try{ smashed = !!(consularLoreEnsure().smashed || {})[h.id]; }catch(e){}
+    return '<tr><td>' + pcEsc(h.t) + '</td><td>' + (smashed ? "smashed" : pcEsc((ROOMS[h.room] && ROOMS[h.room].t) || h.room)) + '</td></tr>';
+  }).join("");
+  const heirs = ((G.dynasty && G.dynasty.in) || []).slice(0, 5).map(function(x){ return '<li>Day ' + x.d + ' — ' + pcEsc(x.t) + '</li>'; }).join("");
+  const celeb = onumCeleb();
+  const lore = (G.lorePublic || []).slice(0, 5).map(function(x){ return '<li>Day ' + x.d + ' — ' + pcEsc(x.t) + '</li>'; }).join("");
+  return '<p>' + pcEsc(moodLine) + '</p>' +
+    '<p class="muted">' + pcEsc(onumTickerText()) + '</p>' +
+    '<div class="eyebrow">Seven blocks, past the East Steps</div>' +
+    '<p>The district is longer than it was. Walk in from the steps and the new blocks are under your feet: parish, union hall, your counter, the kiosk, the wharf, the campaign block, market row. Foot traffic and the price move with the guilder, the duties, and the unrest. Your counter is the only one whose till is yours.</p>' +
+    '<table class="onum-book"><thead><tr><th>Block</th><th>What it is</th><th>Feet</th><th>Price</th><th>Till</th></tr></thead><tbody>' + blocks + '</tbody></table>' +
+    '<div class="eyebrow">Where the eight relics are</div>' +
+    '<table class="onum-book"><thead><tr><th>Remainder</th><th>Where</th></tr></thead><tbody>' + relics + '</tbody></table>' +
+    '<p class="muted">Once a day the remnant passes one that is not smashed into another room. Walk there. Venerate it, or smash it. God is the Most High. The relic is not.</p>' +
+    '<div class="eyebrow">Houses that fell</div>' + (heirs ? '<ul>' + heirs + '</ul>' : '<p class="muted">No house has sent a son or a spouse into the corridor today. The chance, when a seat is empty, is about two in five.</p>') +
+    '<div class="eyebrow">On the wire, and kept</div>' + (lore ? '<ul>' + lore + '</ul>' : '<p class="muted">Nothing public has been kept yet today.</p>') +
+    (celeb ? '<div class="eyebrow">A name the district already knows</div><p>' + pcEsc(celeb.name) + (celeb.role ? ", " + pcEsc(celeb.role) : "") + (celeb.outlet ? ", " + pcEsc(celeb.outlet) : "") + '.</p>' : '') +
+    '<div class="card__actions" style="flex-wrap:wrap"><button type="button" class="btn" id="stTill">Take the till</button><button type="button" class="btn" id="stCeleb">Ask them onto the steps</button><button type="button" class="btn" id="stRun">Let them run</button><button type="button" class="btn" id="stVet">Open a file</button></div><div class="dream" id="stSay"></div>';
+}
+function onumStreetBind(){
+  const say = function(t){ const n = document.getElementById("stSay"); if(n) n.textContent = t; };
+  const till = document.getElementById("stTill");
+  if(till) till.addEventListener("click", function(){
+    const b = onumBlock("counter"); if(!b) return;
+    const take = Math.floor(b.till || 0);
+    if(take < 1){ say("The till is empty. Feet have not bought enough."); return; }
+    b.till = 0;
+    try{ purseOf(G.you).cash += take; purseLog(G.you, "Till from your counter", take); }catch(e){}
+    const line = "You take " + take + " from the counter. The guilder had a hand in what the street would pay.";
+    try{ feed(line); }catch(e){}
+    say(line);
+  });
+  const celebBtn = document.getElementById("stCeleb");
+  if(celebBtn) celebBtn.addEventListener("click", function(){
+    const p = onumCeleb(); if(!p){ say("Nobody in the district is famous enough to draw a crowd."); return; }
+    p.room = "steps";
+    try{ placeInRoom(p); }catch(e){}
+    const line = p.name + " is on the East Steps, and the crowd knows the name from the wire before it knows a bill.";
+    try{ feed(line, "news"); }catch(e){}
+    onumPublic(line);
+    say(line);
+  });
+  const run = document.getElementById("stRun");
+  if(run) run.addEventListener("click", function(){
+    const p = onumCeleb(); if(!p) return;
+    p._running = true;
+    const line = p.name + " will stand in the next election as a freshman the district already knew from somewhere else.";
+    try{ feed(line, "news"); }catch(e){}
+    onumPublic(line);
+    say(line);
+  });
+  const vet = document.getElementById("stVet");
+  if(vet) vet.addEventListener("click", function(){ onumVetCard(); });
+}
+function onumStreetCard(){
+  try{ govCardOpen("The street", "Seven blocks, and the houses that use them", "Walk it. The picture of the Capitol is the one you already have.", onumStreetHTML(), null); }catch(e){ return; }
+  setTimeout(onumStreetBind, 0);
+}
+function onumAddProps(){
+  onumWidenDistrict();
+  function add(room, prop){
+    PROPS[room] = PROPS[room] || [];
+    if(PROPS[room].some(function(p){ return p && p.id === prop.id; })) return;
+    PROPS[room].push(prop);
+  }
+  add("district", {id:"onum-union", label:"The union hall", sub:"A block past the market. Dues, grievances, a flag.", x:-7.2, z:16.4, r:2.2, acts:function(){
+    const b = onumBlock("union");
+    return [{t:"Read the board", c:"4m", run:function(){ spend(4, 1); setSay(b ? (b.name + " has " + b.foot + " people through the door, and the price on the board is " + b.price + ".") : "The board is blank.", ""); }}];
+  }});
+  add("district", {id:"onum-kiosk", label:"The press kiosk", sub:"The wire, an hour late, and the ticker.", x:6.4, z:16.2, r:1.8, acts:function(){
+    return [{t:"Read the ticker", c:"2m", run:function(){ spend(2, 0); setSay(onumTickerText(), ""); }}, {t:"The seven blocks", c:"6m", run:function(){ spend(6, 0); onumStreetCard(); }}];
+  }});
+  add("district", {id:"onum-counter", label:"Your counter", sub:"The storefront with your name on the glass.", x:-6.8, z:19.5, r:2.2, acts:function(){
+    const b = onumBlock("counter");
+    return [{t:"Count the till", c:"5m", run:function(){ spend(5, 0); setSay(b ? ("The till holds " + b.till + ". Feet today: " + b.foot + ". Price: " + b.price + ".") : "No till.", ""); }},
+      {t:"Take what is yours", c:"5m", run:function(){
+        const take = b ? Math.floor(b.till || 0) : 0;
+        if(!take){ setSay("Nothing to take.", ""); return; }
+        b.till = 0; spend(5, 0);
+        try{ purseOf(G.you).cash += take; purseLog(G.you, "Till from your counter", take); }catch(e){}
+        setSay("You take " + take + " and leave the price where the street put it.", "");
+      }}];
+  }});
+  add("district", {id:"onum-wharf", label:"The grain wharf", sub:"What the guilder does to a loaf, in sacks.", x:6.6, z:19.8, r:2.2, acts:function(){
+    return [{t:"Ask the price", c:"3m", run:function(){ spend(3, 0); const b = onumBlock("wharf"); setSay(b ? ("Grain off this wharf is " + b.price + ", and " + b.foot + " came down to look.") : "The wharf is quiet.", ""); }}];
+  }});
+  add("district", {id:"onum-camp", label:"The campaign block", sub:"A room with a map of the seven blocks.", x:0.4, z:21.2, r:2.0, acts:function(){
+    return [{t:"Open the street book", c:"8m", run:function(){ spend(8, 1); onumStreetCard(); }}];
+  }});
+  add("corridor", {id:"onum-caucus-door", label:"Outside the caucus door", sub:"You can hear them if you stand still.", x:-2.4, z:6.5, r:1.5, acts:function(){
+    return [{t:"Listen", c:"6m", run:function(){ spend(6, 1); setSay(onumListen("caucus"), ""); }}];
+  }});
+  add("corridor", {id:"onum-committee-door", label:"Outside Committee 2141", sub:"The door is shut. The voices are not.", x:2.6, z:8.2, r:1.5, acts:function(){
+    return [{t:"Listen", c:"6m", run:function(){ spend(6, 1); setSay(onumListen("committee"), ""); }}];
+  }});
+  add("corridor", {id:"onum-vigil", get label(){ return G.capitolMood === "vigil" ? "Candles at the bronze" : "The bronze"; }, get sub(){ return G.capitolMood === "vigil" ? "Seven, noon, or six. The remnant is keeping the hour." : "A plinth. Quiet, unless the hour is one of theirs."; }, x:-0.4, z:14.2, r:1.6, acts:function(){
+    return [{t:"Stand and look", c:"4m", run:function(){ spend(4, 0); onumCapitolMood(); setSay(G.capitolMood === "vigil" ? "The candles are lit. The Host, if it is refused, is refused where you can see it." : "The bronze is only bronze, until the hour.", ""); }}];
+  }});
+  add("steps", {id:"onum-banners", get label(){
+      if(G.capitolMood === "crowd") return "A crowd on the steps";
+      if(G.capitolMood === "taylor") return "Taylor Day banners";
+      return "The East Steps";
+    }, get sub(){
+      if(G.capitolMood === "crowd") return "They came because the seat is empty of you.";
+      if(G.capitolMood === "taylor") return "7/7. The banners are up. The building did not change shape.";
+      return "Open air, and the door back into the Capitol.";
+    }, x:0.2, z:5.5, r:2.0, acts:function(){
+      return [{t:"Read the steps", c:"3m", run:function(){ spend(3, 0); onumCapitolMood(); setSay(G.capitolMood === "taylor" ? "Taylor Day. The banners name the First Consul, who is a man under God." : G.capitolMood === "crowd" ? "The crowd is not a texture. They are here because you lost the seat." : "Ordinary stone. The door back into the Capitol is behind you.", ""); }}];
+  }});
+  add("office", {id:"onum-drawer", label:"The desk drawer", sub:"The bill, the books, and anything the remnant left in this room.", x:0.8, z:6.4, r:1.4, acts:function(){
+    const acts = [
+      {t:"Read the ticker", c:"1m", run:function(){ spend(1, 0); setSay(onumTickerText(), ""); }},
+      {t:"Open the books", c:"4m", run:function(){ spend(4, 0); try{ onumBooksCard(); }catch(e){ setSay("The books are not on the desk.", ""); } }},
+      {t:"Open a file", c:"10m", run:function(){ spend(10, 1); onumVetCard(); }}
+    ];
+    try{
+      const h = horcruxOf("office");
+      const L = consularLoreEnsure();
+      if(h && !L.smashed[h.id]) acts.push({t:"The drawer has " + h.t.toLowerCase(), c:"2m", run:function(){ setSay(h.d + " It is in this room. The prop by the wall is the thing itself.", ""); }});
+    }catch(e){}
+    return acts;
+  }});
+}
+{ const _ln = lNight; lNight = function(news){
+  const r = _ln.apply(this, arguments);
+  try{ onumOpenDay(); }catch(e){}
+  return r;
+}; }
+{ const _fd = feed; feed = function(text, kind){
+  const r = _fd.apply(this, arguments);
+  try{
+    const t = String(text || "");
+    if(/smash|remainder|lectern|Overheard|Host |Taylor Day|storefront|house of /i.test(t)) onumPublic(t);
+  }catch(e){}
+  return r;
+}; }
+{ const _rm = renderMap; renderMap = function(sel){
+  const svg = _rm.apply(this, arguments);
+  try{
+    const B = onumBlocks();
+    const foes = (typeof WORLD_POWERS !== "undefined" ? WORLD_POWERS : []).slice(0, 4).map(function(p){
+      const rel = (G.realmRel || {})[p.k];
+      return pcEsc(p.t) + " " + (rel == null ? "unmeasured" : Math.round(rel));
+    }).join(" · ");
+    const rows = B.list.map(function(b){
+      return '<div style="display:flex;justify-content:space-between;gap:8px;border-bottom:1px solid var(--line-soft);font:12px/1.35 ui-monospace,Menlo,monospace;padding:2px 0"><span>' + pcEsc(b.name) + '</span><span>' + pcEsc(b.role) + ' · feet ' + b.foot + ' · ' + b.price + '</span></div>';
+    }).join("");
+    return svg + '<div class="eyebrow" style="margin-top:8px">Seven blocks, and the trade</div><p class="muted">Duties in force: ' + onumDutyCount() + '. ' + pcEsc(onumTickerText()) + '</p>' + rows +
+      (foes ? '<p class="muted">Rivals, and the warmth of the relation: ' + foes + '.</p>' : '');
+  }catch(e){ return svg; }
+}; }
+{ const _sc = saveCaptureBase; saveCaptureBase = function(){
+  const o = _sc.apply(this, arguments);
+  try{ o.blocks = G.blocks || null; o.dynasty = G.dynasty || null; o.relicWalk = G.relicWalk || null; o.lorePublic = G.lorePublic || null; o.celebId = G.celebId || null; o.vet = G.vet || null; }catch(e){}
+  return o;
+}; }
+try{
+  const _pb = pbApps;
+  pbApps = function(){
+    const A = _pb.apply(this, arguments) || [];
+    A.push({id:"soc-street", t:"The street", d:"Seven blocks, the till, the relics, the houses.", run:function(){ onumStreetCard(); }});
+    return A;
+  };
+}catch(e){}
+function onumStreetBar(){
+  if(document.getElementById("onumStreetBar")) return;
+  const speed = document.getElementById("speed");
+  if(!speed) return;
+  const b = document.createElement("button");
+  b.id = "onumStreetBar"; b.type = "button"; b.textContent = "Street"; b.title = "The seven blocks";
+  b.addEventListener("click", function(){ try{ onumStreetCard(); }catch(e){} });
+  speed.appendChild(b);
+}
+try{ onumAddProps(); }catch(e){}
+setInterval(function(){ try{ onumHost(); }catch(e){} try{ onumCapitolMood(); }catch(e){} }, 9000);
+setTimeout(onumStreetBar, 900);
 
 })(); /* 20261110bx: main IIFE close, moved below the ba block */
 </script>

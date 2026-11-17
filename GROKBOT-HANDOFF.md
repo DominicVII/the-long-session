@@ -17,24 +17,34 @@ One HTML body. Keep these **byte-identical**:
 | `session.html` | repo root |
 | `One Nation, Under, ME.html` | standalone name |
 
-**Build stamp (now): `20261116c`**
+**Build stamp (now): `20261117a`**
 
-- `<meta name="onum-build" content="20261116c">`
-- IIFE `STAMP = "20261116c"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
-- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261116c"`
+- `<meta name="onum-build" content="20261117a">`
+- IIFE `STAMP = "20261117a"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
+- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261117a"`
 - Wrapper iframe: `/session.html?v=${ONUM_BUILD}` in `src/routes/index.tsx`
 
-If you change the HTML, bump the letter (`20261116c`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
+If you change the HTML, bump the letter (`20261117a`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
 
 This sandbox tracks `public/session.html` as the playable body (root `index.html` / `session.html` / `One Nation, Under, ME.html` are not in this repo). Do not replace that file with a simpler build. Insert new game logic **inside** the main IIFE, before `})(); /* 20261110bx: main IIFE close, moved below the ba block */`.
 
-### Latest — `20261116c`
+### Latest — `20261117a`
 
-The open world is written out. **World**, on the clock bar, on the phone, and inside the building map, draws every room, every door, and the walk in minutes. The room you are in lists every thing you can use, by the words already on it, and names who else is standing there. Every state is on the sheet: unrest, industry, how it is governed, and the bill on its own table if it has one. Your district is marked.
+The district is longer. Walk in from the East Steps and the seven blocks are on the ground: the parish, the union hall, your counter, the press kiosk, the grain wharf, the campaign block, market row. Foot traffic and the price move with the guilder, the duties, and the unrest. The till on your counter is yours. The Capitol is not remeshed to make the street. Doors still walk you through. Adjacent rooms are not streamed in on a frame.
 
-The picture of the room is not rebuilt. Detail still drops at a distance, so the frame holds. **Draw the whole room** pushes that distance out and draws everyone in reach. **Draw only what is near** puts it back. Shadows are not recompiled.
+**Street**, on the clock bar and the phone, is the book of that street. The Union map lists the seven blocks and the rivals under the states.
 
-`20261116b` still leads the paper with the nation. That stays.
+The eight remainders still sit in rooms. Once a day the remnant passes one that has not been smashed into another room, and the wire says where. At seven, at noon, and at six, a Latin member may refuse the Host to the Consulars at the bronze. The Latin members vote as if they saw it. God is the Most High. The relic is not.
+
+A fallen house, about two days in five when a seat is empty, sends a spouse or a grown child into the corridor as a person who was already in the world. They are not a new kind of person.
+
+Outside the caucus door and outside Committee 2141 you can stand and listen. The desk drawer holds the ticker, the books, a file, and, if it is in the office, the remainder. A file is a real person: they walk to the office, the wire gets them, then you ask the floor. The Senate is not skipped.
+
+A name the district already knows can be put on the steps, or set to run. What is said in public, overheard, or done to a remainder is kept, and it is on Vox.
+
+Taylor Day hangs banners. A lost seat puts a crowd on the steps. Neither rebuilds the stone.
+
+`20261116c` still draws every room and every door. That stays.
 
 Git author: `DominicVII` `<318079878+DominicVII@users.noreply.github.com>`.
 
