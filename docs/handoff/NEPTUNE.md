@@ -1,5 +1,15 @@
 # Neptune handoff notes (for Claude Code) — One Nation, Under, ME.
 
+## 20261117n — caFit: cabinet and brief prompts fit the screen
+
+- Display-only block `caFitCss` / `caFitJs` on all six HTML mirrors (stamp 20261117n).
+- `#card` inside `#veil` is capped to `calc(100dvh - 24px)` with internal scroll; only the last `.card__actions` row is sticky (Close / choices). Mid-card action rows are not sticky, so they no longer stack and overflow.
+- Dense brief/cabinet cards (three or more secretary/advisor blocks) use a two-column grid on wide enough cards so more prompts are on screen at once.
+- While a veil card is the primary surface (`html.ca-modal`), the desk `#prompt`, `#sxDock` and toast fold, so they do not cover the card.
+- While a cabinet/sitting dock is primary (`html.ca-sit`), the desk prompt folds. `#sxDock` height is auto, max `100dvh - 88px`, with internal scroll and sticky `.fd-acts` / `.fd-vote` / `.nsx-acts` so Call on, Aye/Nay and Speak stay visible.
+- `#veil.sitx` (docked sitting card, e.g. the morning briefing) is also capped and scrollable instead of spilling below the viewport.
+- No engine, vote-tally, or save changes. JUPITER still owns Aye/Nay tallies, the bill stance, and engine capacity.
+
 Neptune owned: visuals, the visible world, offices' look, LiveTalk/voices, the Live status, session rendering (floor desk), family tree/portraits, update banner + build label, walking/render lag, Engine Room displays, style editor (barber/tailor).
 JUPITER owns systems (procedure/clock, offices + ONUM_OFFICE_HISTORY, family sim, regions, Engine charter/audit, saves, powers, war). MARS owns QA + onumCandid. Don't edit another owner's systems; guard every cross-owner call.
 

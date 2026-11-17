@@ -1,3 +1,9 @@
+## 20261117n: cabinet and brief prompts stay on screen (Neptune caFit)
+
+- Cabinet meetings and morning/staff/cabinet brief cards are pinned inside the viewport. Long text scrolls inside the panel. Close, choice, and Aye/Nay/action rows stay visible at the bottom.
+- A leftover desk prompt no longer covers the card or the sitting dock. Call-on and sitting actions are no longer clipped by a short overflow-hidden dock.
+- Display only. Save and sitting logic are unchanged.
+
 ## 20261113b: living-world notes and continuity design
 
 - Design notes for organic social continuity (memory, families, marriages, births, lore that builds from play), owned storefronts and competing local markets, real-time currency and a stock exchange, geographically coherent nation and world maps (keeping existing filters), celebrity/entertainer/sports careers, deeper multi-step cabinet appointments with real persons on the record, and stable desk/cabinet interaction.
