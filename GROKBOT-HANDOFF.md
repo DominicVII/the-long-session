@@ -17,18 +17,24 @@ One HTML body. Keep these **byte-identical**:
 | `session.html` | repo root |
 | `One Nation, Under, ME.html` | standalone name |
 
-**Build stamp (now): `20261117b`**
+**Build stamp (now): `20261117c`**
 
-- `<meta name="onum-build" content="20261117b">`
-- IIFE `STAMP = "20261117b"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
-- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261117b"`
+- `<meta name="onum-build" content="20261117c">`
+- IIFE `STAMP = "20261117c"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
+- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261117c"`
 - Wrapper iframe: `/session.html?v=${ONUM_BUILD}` in `src/routes/index.tsx`
 
-If you change the HTML, bump the letter (`20261117b`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
+If you change the HTML, bump the letter (`20261117c`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
 
 This sandbox tracks `public/session.html` as the playable body (root `index.html` / `session.html` / `One Nation, Under, ME.html` are not in this repo). Do not replace that file with a simpler build. Insert new game logic **inside** the main IIFE, before `})(); /* 20261110bx: main IIFE close, moved below the ba block */`.
 
-### Latest — `20261117b`
+### Latest — `20261117c`
+
+Review of the street, against the three voices. Jupiter: the parish goods name God as the Most High, and a candle is for the altar, not the bronze. Mars: nothing is remeshed; the new prices are acts on shops that already stand. Neptune: the street book says so, and the shop lists are the surface.
+
+The purse has more to spend. The diner, the newsstand, the market, the hardware, and the parish all grew. The union hall, the kiosk, your counter, the wharf, and the campaign block take coin now. Stock on your counter brings feet, not a gift of money. A share in a cargo and the hall for a night are seen. The rest can be quiet.
+
+`20261117b` still keeps a remainder where the remnant left it. That stays.
 
 Review of the street. One hole: a remainder the remnant moved lived only in memory, so a reload put it back in the room it started in, and two of them could be left in the same room so one could not be found. The place is now kept on the save, put back when you continue, and a live remainder is not moved into a room that already has one.
 
