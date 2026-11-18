@@ -17,18 +17,36 @@ One HTML body. Keep these **byte-identical**:
 | `session.html` | repo root |
 | `One Nation, Under, ME.html` | standalone name |
 
-**Build stamp (now): `20261118a`**
+**Build stamp (now): `20261118b`**
 
-- `<meta name="onum-build" content="20261118a">`
-- IIFE `STAMP = "20261118a"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
-- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261118a"`
+- `<meta name="onum-build" content="20261118b">`
+- IIFE `STAMP = "20261118b"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
+- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261118b"`
 - Wrapper iframe: `/session.html?v=${ONUM_BUILD}` in `src/routes/index.tsx`
 
-If you change the HTML, bump the letter (`20261118a`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
+If you change the HTML, bump the letter (`20261118b`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
 
 This sandbox tracks `public/session.html` as the playable body (root `index.html` / `session.html` / `One Nation, Under, ME.html` are not in this repo). Do not replace that file with a simpler build. Insert new game logic **inside** the main IIFE, before `})(); /* 20261110bx: main IIFE close, moved below the ba block */`.
 
-### Latest — `20261118a`
+### Latest — `20261118b`
+
+The desk prompt and the cabinet table were still dying. A person in front of the table stole the line, so it showed and vanished, and pressing use opened a conversation instead of the table. While you are in reach of a desk or the cabinet table, that prompt stays. A person at the table does not clear it. **Work**, **Cabinet**, or **District** on the clock bar opens the page even if the line flickers. Use at the table opens that page. Speak is a separate choice on the line.
+
+No new kind of person was added. The creeds that already exist are the ones they keep. They remember, marry, write things down or fail to, shop, play, and take jobs as themselves.
+
+Already on the record, and left as it was:
+
+- Families, births, marriages, and a chronicle. Some people keep a thing. Some do not. It is on the record only if someone wrote it.
+- Courtship is the person, not the office. You can ask. They can say no.
+- Shops have owners. One price book. A shop may mark it up. People walk to the cheaper door.
+- A stock book, eight named companies, paid from the chest. The guilder and the book move while you stand there, not only when the day turns.
+- The district runs its own day: tills, a match, a song, a job.
+- Vox is a tab on the phone, and an app in the phone menu. Your posts first, then replies, then the feed.
+- A cabinet name is a person, a file, a hearing, a roll, and a chair. A refusal stays a refusal. A confirmation sits them at the table.
+- Precedent is cited when a hearing, a marriage, or a share leans on something already done.
+- The Union map is the nation inland, with the Pale north, the Free Marches west, the Reach east, the Horn south, and the Salt Isles in the southern sea. Shade is the filter already on the map. Click a state.
+
+`20261118a` still adjourns a meeting when you hit the X. That stays.
 
 The X on a meeting adjourned nothing. It only slid the panel aside, and a conference that had already reached its last stage stayed open, prompts and all. The X now adjourns the cabinet, the press conference, and every sitting that uses that same panel. The record closes. The floor desk, the live prompt, and the hold come down, so the duties of the office can be done. The arrow still only parks the panel. A meeting you closed does not start itself again until you leave the room or you call it on purpose.
 
