@@ -17,18 +17,22 @@ One HTML body. Keep these **byte-identical**:
 | `session.html` | repo root |
 | `One Nation, Under, ME.html` | standalone name |
 
-**Build stamp (now): `20261117d`**
+**Build stamp (now): `20261118a`**
 
-- `<meta name="onum-build" content="20261117d">`
-- IIFE `STAMP = "20261117d"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
-- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261117d"`
+- `<meta name="onum-build" content="20261118a">`
+- IIFE `STAMP = "20261118a"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
+- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261118a"`
 - Wrapper iframe: `/session.html?v=${ONUM_BUILD}` in `src/routes/index.tsx`
 
-If you change the HTML, bump the letter (`20261117d`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
+If you change the HTML, bump the letter (`20261118a`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
 
 This sandbox tracks `public/session.html` as the playable body (root `index.html` / `session.html` / `One Nation, Under, ME.html` are not in this repo). Do not replace that file with a simpler build. Insert new game logic **inside** the main IIFE, before `})(); /* 20261110bx: main IIFE close, moved below the ba block */`.
 
-### Latest — `20261117d`
+### Latest — `20261118a`
+
+The X on a meeting adjourned nothing. It only slid the panel aside, and a conference that had already reached its last stage stayed open, prompts and all. The X now adjourns the cabinet, the press conference, and every sitting that uses that same panel. The record closes. The floor desk, the live prompt, and the hold come down, so the duties of the office can be done. The arrow still only parks the panel. A meeting you closed does not start itself again until you leave the room or you call it on purpose.
+
+`20261117d` still keeps the World book off the Engine. That stays.
 
 The Engine could not be used. The daily facts and the World book were both named `onumWorldCard`. The book won. Every time the Engine asked what day it was, the book opened and covered the screen. The book is now `onumWorldBook`. It opens only from **World**, the map, or the phone. The Engine’s facts are a sentence again.
 
