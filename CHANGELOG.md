@@ -1,3 +1,9 @@
+## 20261119a: war-chest, stock book, and election substance notes
+
+- Design notes for campaign chest capacity, purse-to-chest transfer (1000 guilders = 1 mille), sale-proceeds return path, stock buy/sell against the chest, organic Ledger pieces, conversation scripts, and election page graph data.
+- Notes pushed as WAR-CHEST-STOCK-NOTES.md. Implementation brief for the next code pass on the existing stock book and chest.
+- No HTML body change. All playable copies remain byte-identical.
+
 ## 20261113b: living-world notes and continuity design
 
 - Design notes for organic social continuity (memory, families, marriages, births, lore that builds from play), owned storefronts and competing local markets, real-time currency and a stock exchange, geographically coherent nation and world maps (keeping existing filters), celebrity/entertainer/sports careers, deeper multi-step cabinet appointments with real persons on the record, and stable desk/cabinet interaction.
