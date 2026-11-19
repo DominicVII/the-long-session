@@ -17,18 +17,28 @@ One HTML body. Keep these **byte-identical**:
 | `session.html` | repo root |
 | `One Nation, Under, ME.html` | standalone name |
 
-**Build stamp (now): `20261118b`**
+**Build stamp (now): `20261118c`**
 
-- `<meta name="onum-build" content="20261118b">`
-- IIFE `STAMP = "20261118b"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
-- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261118b"`
+- `<meta name="onum-build" content="20261118c">`
+- IIFE `STAMP = "20261118c"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
+- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261118c"`
 - Wrapper iframe: `/session.html?v=${ONUM_BUILD}` in `src/routes/index.tsx`
 
-If you change the HTML, bump the letter (`20261118b`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
+If you change the HTML, bump the letter (`20261118c`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
 
 This sandbox tracks `public/session.html` as the playable body (root `index.html` / `session.html` / `One Nation, Under, ME.html` are not in this repo). Do not replace that file with a simpler build. Insert new game logic **inside** the main IIFE, before `})(); /* 20261110bx: main IIFE close, moved below the ba block */`.
 
-### Latest — `20261118b`
+### Latest — `20261118c`
+
+The prompt was under the room's words. The job line, the feed and the name plates painted over it, so a tap missed and you had to click again. A live prompt now sits on top of those words. They dim, and they do not take the tap.
+
+A desk telephone, the computer, and every shop on the street (the counter, the market, the hardware, the newsstand, the church, the named storefronts) keep the line while you stand there. The first line says what the place is. **Call from this desk** opens a page of people you have met. The call does not depend on the glass staying still.
+
+Money, as measured: 100 stuivers = 1 guilder, 10 guilders = 1 rijder, 1,000 guilders = 1 mille. The Guilder Index opens at 100 and the shelf price moves with it. The purse is guilders. The campaign chest is milles, and it still cannot buy a loaf. The purse page lists every thing for sale and what it costs today. Added to the shelves: a loaf, a beer, stamps, a record, coal, lamp oil, a hand tool, shoes, medicine, a match ticket, a hymn book.
+
+New buildings no longer drop on a random lot. They stand in pairs, west and east of Main Street, on the same spacing, past the square. A building already in the save is pulled onto that street the next time the district is built.
+
+`20261118b` still keeps the Work button. That stays.
 
 The desk prompt and the cabinet table were still dying. A person in front of the table stole the line, so it showed and vanished, and pressing use opened a conversation instead of the table. While you are in reach of a desk or the cabinet table, that prompt stays. A person at the table does not clear it. **Work**, **Cabinet**, or **District** on the clock bar opens the page even if the line flickers. Use at the table opens that page. Speak is a separate choice on the line.
 
