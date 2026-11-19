@@ -5,6 +5,42 @@ Dry. Unsentimental. God is the Most High. Christ is King. The First Consul is a 
 
 These notes record the requested fixes for the campaign chest (war chest), stock trading, unit handling, conversation scripts, organic newspaper pieces, and election page substance. They sit beside LIVING-WORLD-NOTES.md and GROKBOT-HANDOFF.md.
 
+## Exact patch for the existing onumTrade / market panel (20261119)
+
+Insert after the existing `onumTrade` function:
+
+```javascript
+function onumTransferToChest(milles){
+  const y = G.you;
+  if(!y) return "No chest.";
+  const P = purseOf(y);
+  const need = milles * 1000;
+  if((P.cash || 0) < need) return "The purse does not cover " + milles + " milles.";
+  P.cash = Math.round((P.cash - need) * 10) / 10;
+  y.funds = Math.round(((y.funds || 0) + milles) * 10) / 10;
+  try{ purseLog(y, "Moved to the campaign chest", -need); }catch(e){}
+  onumKeep(y.name + " moved " + milles + " milles from the purse to the chest.", null);
+  return "Moved " + milles + " milles to the chest. Chest now " + y.funds + ".";
+}
+```
+
+In the market card open call, add the button next to the shops button:
+
+```html
+<button type="button" class="btn" id="mktXfer">Move 10 milles from purse to chest</button>
+```
+
+And the listener after the mktShops one:
+
+```javascript
+const x = el("mktXfer"); if(x) x.addEventListener("click", () => {
+  const msg = onumTransferToChest(10);
+  const s = el("mktSay"); if(s) s.textContent = msg;
+});
+```
+
+Sells already credit `y.funds`. Buys already deduct from it. The transfer lets the chest grow from the purse so stock can be bought and sale proceeds stay in the chest.
+
 ## Currency Units (already on the record)
 
 - 100 stuivers = 1 guilder  
@@ -45,37 +81,6 @@ Eight named companies already on the record: Mill, Shipping Line, Newspaper, Def
 - Buy/sell quantity and total cost shown before confirmation.  
 - Sale proceeds return immediately to the chest.  
 - Portfolio tracks owned shares.
-
-Minimal path (integrate into existing book):
-
-```javascript
-// Chest holds milles. Rate: 1000 guilders = 1 mille.
-function transferToChest(guilders) {
-  const milles = Math.floor(guilders / 1000);
-  if (milles > 0 && purse >= milles * 1000) {
-    purse -= milles * 1000;
-    chest += milles;
-  }
-}
-
-function buyShares(company, qty) {
-  const costMilles = Math.ceil(company.price * qty / 1000);
-  if (chest >= costMilles) {
-    chest -= costMilles;
-    portfolio[company.id] = (portfolio[company.id] || 0) + qty;
-    return true;
-  }
-  return false;
-}
-
-function sellShares(company, qty) {
-  if ((portfolio[company.id] || 0) >= qty) {
-    const proceeds = Math.floor(company.price * qty / 1000);
-    chest += proceeds;
-    portfolio[company.id] -= qty;
-  }
-}
-```
 
 ## Conversation Scripts (currency, chest, stock, party)
 
