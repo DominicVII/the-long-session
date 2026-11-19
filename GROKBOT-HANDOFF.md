@@ -215,6 +215,8 @@ Fix only what he reports. Likely:
 - Save: furthest career; never day-downgrade.
 - If Best is too heavy on his Dell, Settings → Balanced. Do not silently force Simple again.
 
+**Current request (20261119):** See WAR-CHEST-STOCK-NOTES.md for the implementation brief on campaign chest capacity, purse-to-chest transfer, stock buy/sell return path, organic Ledger, conversation scripts, and election page substance. Apply that to the existing stock book and chest. Bump the stamp when the HTML changes.
+
 If nothing is broken: **do not refactor.**
 
 Play path: Continue → office/corridor → bronze 7/12/18 → witness/kneel/rebuke → one horcrux → talk → district church of your creed → East Steps up the treads through the door.
