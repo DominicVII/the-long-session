@@ -17,18 +17,36 @@ One HTML body. Keep these **byte-identical**:
 | `session.html` | repo root |
 | `One Nation, Under, ME.html` | standalone name |
 
-**Build stamp (now): `20261118c`**
+**Build stamp (now): `20261119a`**
 
-- `<meta name="onum-build" content="20261118c">`
-- IIFE `STAMP = "20261118c"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
-- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261118c"`
+- `<meta name="onum-build" content="20261119a">`
+- IIFE `STAMP = "20261119a"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
+- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261119a"`
 - Wrapper iframe: `/session.html?v=${ONUM_BUILD}` in `src/routes/index.tsx`
 
-If you change the HTML, bump the letter (`20261118c`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
+If you change the HTML, bump the letter (`20261119a`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
 
 This sandbox tracks `public/session.html` as the playable body (root `index.html` / `session.html` / `One Nation, Under, ME.html` are not in this repo). Do not replace that file with a simpler build. Insert new game logic **inside** the main IIFE, before `})(); /* 20261110bx: main IIFE close, moved below the ba block */`.
 
-### Latest — `20261118c`
+### Latest — `20261119a`
+
+The prompt was rebuilding itself every time a name or a price twitched, so the button died under the finger. While you are still standing at the same desk, phone, or shop, the line stays. The first tap runs the action. It does not wait for a second click.
+
+**Party**, **Forbes**, and **Exchange** are buttons on the bar. They open pages. They do not depend on the glass.
+
+Money. A purse past 25,000 guilders, or a county book past 400,000, was not a balance a person or a town can hold. Those are set back to a working sum, once, and the feed says so. New money cannot print itself past that again. 100 stuivers are still a guilder. 10 guilders are a rijder. 1,000 guilders are a mille. The campaign chest is milles, and it does not buy a share.
+
+Prices are not one number. Bread, grain, coal, iron, cloth, medicine, and the rest keep their own levels, and they move with the guilder instead of all sitting at 70. A purchase is said in guilders and stuivers, and it says what is left.
+
+The exchange has a bid, an ask, a volume, and a small graph for each name. You buy and sell from the purse. The page stays up.
+
+Forbes is the business daily: the movers, a quiet name, the bill, one shop door, and the race. The sentences are built from that day's numbers, not from one phrase reused. The morning Ledger is still there, one button away.
+
+The election page is a line of soundings, the change from the last mark, and the field on one scale. Rally, the ad, the canvass, and the debate are on that page.
+
+In talk, a person no longer spends the first sentence announcing their own name. They say the thing.
+
+`20261118c` still put the prompt above the room's words. That stays.
 
 The prompt was under the room's words. The job line, the feed and the name plates painted over it, so a tap missed and you had to click again. A live prompt now sits on top of those words. They dim, and they do not take the tap.
 
@@ -214,8 +232,6 @@ Fix only what he reports. Likely:
 - Audio: TTS on gesture; default unmuted.
 - Save: furthest career; never day-downgrade.
 - If Best is too heavy on his Dell, Settings → Balanced. Do not silently force Simple again.
-
-**Current request (20261119):** See WAR-CHEST-STOCK-NOTES.md for the implementation brief on campaign chest capacity, purse-to-chest transfer, stock buy/sell return path, organic Ledger, conversation scripts, and election page substance. Apply that to the existing stock book and chest. Bump the stamp when the HTML changes.
 
 If nothing is broken: **do not refactor.**
 
