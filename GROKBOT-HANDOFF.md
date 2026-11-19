@@ -17,18 +17,41 @@ One HTML body. Keep these **byte-identical**:
 | `session.html` | repo root |
 | `One Nation, Under, ME.html` | standalone name |
 
-**Build stamp (now): `20261119a`**
+**Build stamp (now): `20261119b`**
 
-- `<meta name="onum-build" content="20261119a">`
-- IIFE `STAMP = "20261119a"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
-- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261119a"`
+- `<meta name="onum-build" content="20261119b">`
+- IIFE `STAMP = "20261119b"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
+- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261119b"`
 - Wrapper iframe: `/session.html?v=${ONUM_BUILD}` in `src/routes/index.tsx`
 
-If you change the HTML, bump the letter (`20261119a`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
+If you change the HTML, bump the letter (`20261119b`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
 
 This sandbox tracks `public/session.html` as the playable body (root `index.html` / `session.html` / `One Nation, Under, ME.html` are not in this repo). Do not replace that file with a simpler build. Insert new game logic **inside** the main IIFE, before `})(); /* 20261110bx: main IIFE close, moved below the ba block */`.
 
-### Latest — `20261119a`
+### Latest — `20261119b`
+
+The desk computer is no longer a small dark box of one-line buttons. It is the desk: a paper screen, a rail of drawers, the clock, the guilder, the purse, and the chest in the masthead. **Desk** on the bar opens it from the office, the executive office, or the governor's office. The glass prompt hides while it is open, so it cannot cover the page.
+
+Drawers, and what is actually on them:
+
+- **Inbox.** Unread first. Open a letter, read it, answer it on the page. The answer is the answer. It says where the writer is standing.
+- **Constituents.** The letters from home, and the kitchens: family, street, mood, what they want said, what they remember.
+- **People.** The ones you have met. Warmth, a spouse if they have one, supper, a confidence, courtship, or a step back. Their reply stays on the page.
+- **News.** The wire as it was said, the overnight, the morning Ledger, and Forbes.
+- **Ledger.** The purse and the war chest as two books that do not mix. Salary, rent, the last lines of the purse, and what a guilder is.
+- **Duties.** The office's own list, the live bill, the docket, the whip, and the party.
+- **Schedule.** Today's diary against the clock, and the day the roll is down for.
+- **Suggestions.** What the towns are asking, on the same page as the district's own building.
+- **War chest.** Every spend is a button on the page. The number changes here. It does not throw you into another card, except backing an ally, which still asks whose race.
+- **Staff.** An aide is a person already in the world, named when you hire them, not a headcount.
+- **On the desk.** The telephone, with the people you have met. Party, Forbes, the exchange, the Ledger, the notebook, the powers of the office.
+- **Party.** Your caucus in their own sentences, then the history of the party: leaders, leans, splits, landmark votes.
+- **Polls.** The three bars, the soundings as a line, who asked, and how many households.
+- **Elections.** The race, on this screen.
+- **The Web.** The pages and the answers, on this screen.
+- **History.** Party history, the family file, what was kept, and the book.
+
+`20261119a` still holds the prompt still and keeps the money a working book. That stays.
 
 The prompt was rebuilding itself every time a name or a price twitched, so the button died under the finger. While you are still standing at the same desk, phone, or shop, the line stays. The first tap runs the action. It does not wait for a second click.
 
