@@ -17,18 +17,28 @@ One HTML body. Keep these **byte-identical**:
 | `session.html` | repo root |
 | `One Nation, Under, ME.html` | standalone name |
 
-**Build stamp (now): `20261119b`**
+**Build stamp (now): `20261120a`**
 
-- `<meta name="onum-build" content="20261119b">`
-- IIFE `STAMP = "20261119b"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
-- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261119b"`
+- `<meta name="onum-build" content="20261120a">`
+- IIFE `STAMP = "20261120a"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
+- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261120a"`
 - Wrapper iframe: `/session.html?v=${ONUM_BUILD}` in `src/routes/index.tsx`
 
-If you change the HTML, bump the letter (`20261119b`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
+If you change the HTML, bump the letter (`20261120a`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
 
 This sandbox tracks `public/session.html` as the playable body (root `index.html` / `session.html` / `One Nation, Under, ME.html` are not in this repo). Do not replace that file with a simpler build. Insert new game logic **inside** the main IIFE, before `})(); /* 20261110bx: main IIFE close, moved below the ba block */`.
 
-### Latest — `20261119b`
+### Latest — `20261120a`
+
+The district you were walking was the early grass lot. The heavy town only draws when the graphics are not on Simple, which is what a phone uses, so the street never appeared.
+
+When that heavy town is off, Main Street is built in the room itself. It is one avenue, not a scatter. The parish and the district office face each other. Vaughn's faces the campaign office. The market faces the hardware. The newsstand faces the barber. Two houses close the block. Lamps, trees, and parked cars sit on a rhythm, not wherever a number landed. The families who live in the district are named on the fronts.
+
+Every door has **Read this place**. That page stays up: who keeps it, and what is in the window at today's price. The street sign at the top of the block reads the whole street the same way. Standing at a door keeps the prompt. It does not swap out from under a finger.
+
+New buildings the town puts up, when the heavy town is on, are seeded on facing lots off the carriageway (sixteen metres out, eighteen apart, north of the cross street) instead of a spiral that dropped them in the road.
+
+`20261119b` (the desk) still holds.
 
 The desk computer is no longer a small dark box of one-line buttons. It is the desk: a paper screen, a rail of drawers, the clock, the guilder, the purse, and the chest in the masthead. **Desk** on the bar opens it from the office, the executive office, or the governor's office. The glass prompt hides while it is open, so it cannot cover the page.
 
