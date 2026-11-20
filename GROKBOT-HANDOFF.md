@@ -17,18 +17,36 @@ One HTML body. Keep these **byte-identical**:
 | `session.html` | repo root |
 | `One Nation, Under, ME.html` | standalone name |
 
-**Build stamp (now): `20261120a`**
+**Build stamp (now): `20261120b`**
 
-- `<meta name="onum-build" content="20261120a">`
-- IIFE `STAMP = "20261120a"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
-- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261120a"`
+- `<meta name="onum-build" content="20261120b">`
+- IIFE `STAMP = "20261120b"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
+- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261120b"`
 - Wrapper iframe: `/session.html?v=${ONUM_BUILD}` in `src/routes/index.tsx`
 
-If you change the HTML, bump the letter (`20261120a`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
+If you change the HTML, bump the letter (`20261120b`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
 
 This sandbox tracks `public/session.html` as the playable body (root `index.html` / `session.html` / `One Nation, Under, ME.html` are not in this repo). Do not replace that file with a simpler build. Insert new game logic **inside** the main IIFE, before `})(); /* 20261110bx: main IIFE close, moved below the ba block */`.
 
-### Latest — `20261120a`
+### Latest — `20261120b`
+
+Review of `20261120a`: the street had fronts and prices, and almost nothing behind them. A door was a name. The page did not say who was standing there, whether the hour had closed it, or what the household wanted.
+
+Each door now has a page that stays:
+
+- Open or shut, from seven to seven.
+- The person at the door, drawn from a household already on the record, and which street they live on.
+- What they say today. A diner does not say what a barber says. The line holds for the day and changes the next.
+- The thing that household has been waiting on, the child, and the last thing they remember.
+- The window, at today's price, in guilders.
+- The weather on the pavement.
+- **Speak to them.** Eight minutes. They remember that you came.
+
+The two houses at the end of the block can be knocked. Ten minutes. The visit is written into the household.
+
+The street sign is a board, not a list of labels. It leads with the guilder and whoever on the block is still waiting, then every door. Earlier days stay on the board.
+
+Awnings, a parish step, and a post box are on the pavement. `20261120a` still builds the street.
 
 The district you were walking was the early grass lot. The heavy town only draws when the graphics are not on Simple, which is what a phone uses, so the street never appeared.
 

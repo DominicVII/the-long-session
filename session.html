@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261120a">
+<meta name="onum-build" content="20261120b">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -16,7 +16,7 @@
   img{max-width:100%}
   [hidden]:not([hidden="until-found"]){display:none!important}
 </style>
-<title>One Nation, Under, ME. · 20261120a</title>
+<title>One Nation, Under, ME. · 20261120b</title>
 <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'>  <rect width='32' height='32' fill='#0D1014'/>  <polygon fill='#A45F27' points='16,2.8 19.04,9.69 26.32,7.77 22.82,14.44 28.87,18.94 21.47,20.36 21.73,27.89 16,23 10.27,27.89 10.53,20.36 3.13,18.94 9.18,14.44 5.68,7.77 12.96,9.69'/></svg>">
 <meta property="og:title" content="One Nation, Under, ME.">
 <!-- Standalone: system fonts. No CDN, no vendor folder. -->
@@ -46,7 +46,7 @@
   window.onumLimSet = function(k, v){ if(!(k in D)) return false; L[k] = fix(v); try{ var o = JSON.parse(localStorage.getItem("onum.limits") || "{}") || {}; o[k] = (L[k] === INF) ? null : L[k]; localStorage.setItem("onum.limits", JSON.stringify(o)); }catch(e){} return true; };
   window.onumLimReset = function(){ try{ localStorage.removeItem("onum.limits"); }catch(e){} Object.keys(D).forEach(function(k){ L[k] = D[k]; }); L._eff = {}; L._gov = null; return true; };
   var show = function(v){ return v === INF ? "inf" : (typeof v === "number" ? Math.round(v * 100) / 100 : v); };
-  window.onumLimDump = function(){ var out = {build:"20261120a", mode:L.mode || "scale"}; Object.keys(D).forEach(function(k){ out[k] = show(L[k]); });
+  window.onumLimDump = function(){ var out = {build:"20261120b", mode:L.mode || "scale"}; Object.keys(D).forEach(function(k){ out[k] = show(L[k]); });
     out.effective = {}; Object.keys(L._eff).forEach(function(k){ out.effective[k] = show(L._eff[k]); }); out.governor = L._gov;
     try{ out.engineBudgetMs = window.onumEngine ? show(window.onumEngine.budget) : null; out.frameMs = window.onumEngine ? show(window.onumEngine.dtEma) : null; }catch(e){} return out; };
   window.onumLimLine = function(){ var d = window.onumLimDump(), e = d.effective, g = function(k){ return e[k] != null ? e[k] + "*" : d[k]; };
@@ -71,7 +71,7 @@
 </script>
 <script>
 (function(){
-  var STAMP = "20261120a";
+  var STAMP = "20261120b";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -983,7 +983,7 @@ body.boot-menu .shell{grid-template-rows:minmax(0,1fr)}
   <div class="grid">
     <div>
       <section class="stage">
-        <div class="scene" id="scene"><div class="boot" id="boot">Building the chamber… · 20261120a</div></div>
+        <div class="scene" id="scene"><div class="boot" id="boot">Building the chamber… · 20261120b</div></div>
         <div class="hud"><i id="whereTag">Location</i><b id="whereName">—</b></div>
         <div class="aims" id="aimsHud" hidden tabindex="0" aria-label="Today's aims"><i>Today's aims</i><b id="aimsNext"></b><div class="aims__all" id="aimsAll"></div></div>
         <div class="compass" id="compass" aria-hidden="true"><div class="compass__rail"></div><i class="compass__n">N</i><div id="compassTicks"></div></div>
@@ -60570,6 +60570,228 @@ setTimeout(function(){
   }catch(e){}
   try{ onumArmShops(); }catch(e){}
 }, 1200);
+
+
+/* 20261120b */
+/* 20261120b — the street has people in it.
+   Each door says who is there, what hour it is, what they want, and what the window costs. */
+function onumHour(){ return Math.floor(((G && G.minute) || 0) / 60); }
+function onumOpenNow(){ const h = onumHour(); return h >= 7 && h < 19; }
+function onumHhOf(p){
+  try{
+    const T = townEnsure();
+    if(p && p._hh){ const hit = (T.hh || []).filter(function(h){ return h.id === p._hh; })[0]; if(hit) return hit; }
+    const i = Math.abs(seedOf((p && p.id) || "door")) % (T.hh.length || 1);
+    const h = T.hh[i];
+    if(p && h) p._hh = h.id;
+    return h || null;
+  }catch(e){ return null; }
+}
+function onumKeeper(p){
+  const h = onumHhOf(p);
+  if(!h) return (p && p._owner) || "the counter";
+  const who = h.people[(G.day || 1) % (h.people.length || 1)] || h.people[0];
+  if(p) p._keeper = who;
+  return who;
+}
+function onumDoorSaid(p){
+  const id = (p && p.id) || "shop";
+  const book = {
+    diner:[
+      "The grill has been on since six. The first three stools are regulars and they do not move.",
+      "Eggs moved with the guilder. The coffee did not. I am not arguing about the coffee.",
+      "A petition is under the sugar. I have not read it and I am not going to.",
+      "If you came to be seen, take the window. If you came to eat, take the counter."
+    ],
+    market:[
+      "The bread is this morning's. The cloth is last week's and priced like it.",
+      "Two shops on this street sell flour. Mine is the one that still has some.",
+      "I marked the loaf at the guilder, not at what I wish the guilder was.",
+      "Come before noon if you want the rye. After noon it is whatever is left."
+    ],
+    hardware:[
+      "Hinges, nails, and the latch for the gate on Church Lane. That is the morning.",
+      "I will cut a key. I will not hear a speech while I cut it.",
+      "The price of iron is on the board. I did not invent it this week.",
+      "If it is for the bridge, say so. I keep that ticket separate."
+    ],
+    newsstand:[
+      "The Ledger is the top of the pile. The other one is cheaper and angrier.",
+      "I sell the paper. I do not explain the paper. That costs extra and I do not do it.",
+      "Yesterday's is half. Today's is the number in the window.",
+      "If your name is in it, I have already sold three."
+    ],
+    church:[
+      "Mass is at eight. The notices are on the board. Nobody is asking you for a statement.",
+      "The roof takes water on the north side. The box by the door is for that, not for politics.",
+      "You can sit. You do not have to be seen sitting.",
+      "The parish will pray for the street. It will not endorse the street."
+    ],
+    barber:[
+      "The chair is fifteen minutes if you sit still.",
+      "I hear more in this chair than the paper prints. I repeat almost none of it.",
+      "A shave is a shave. A campaign haircut is the same shave and a worse conversation.",
+      "Come in before the lunch whistle or wait behind the mill men."
+    ],
+    hq:[
+      "The lists are on the left table. The phone bank is the right table. Do not mix them.",
+      "We knocked the even numbers yesterday. The odd numbers still think we forgot them.",
+      "Volunteers eat at Vaughn's and put it on the sheet. The sheet is not a wish.",
+      "If you are here to talk, talk. If you are here to fold, the pile is by the window."
+    ],
+    doffice:[
+      "Constituent hours are the afternoon. The morning is the mail, and the mail is behind.",
+      "Bring the letter. I cannot fix a thing I have not read.",
+      "The war chest is not the cash drawer. People still ask.",
+      "Write the name, the street, and the one thing. Not three things."
+    ],
+    houseW:[
+      "We are at the table. If this is about the street, say the one thing.",
+      "The child is in. Keep your voice down or come back after school.",
+      "We saw you on the pavement. We have not decided what we think.",
+      "Knock once. Twice means you want a favor."
+    ],
+    houseE:[
+      "Shoes off if you are coming in. Most people do not come in.",
+      "The water bill is on the icebox. That is the conversation, if you want one.",
+      "We shop the market on even days and the other street on odd days.",
+      "Say it from the step. The hall is for family."
+    ]
+  };
+  const lines = book[id] || [
+    "The door is open if the hour is. The window has the price.",
+    "We keep our own books. The street does not keep them for us.",
+    "Come in if you are buying. The step is for talking.",
+    "Ask the one question. I have the shop to run."
+  ];
+  return lines[Math.abs(seedOf(id + ":" + (G.day || 1))) % lines.length];
+}
+function onumWxLine(){
+  try{
+    const w = wxToday();
+    if(!w) return "";
+    if(w.k === "storm") return "The street is nearly empty. People are not pretending it is a walking day.";
+    if(w.k === "snow" || w.cover > 0) return "Snow on the kerb. The shops opened. The pavement did not agree.";
+    if(w.k === "rain") return "Rain. The awnings are doing the work the sky would not.";
+    if(w.s === "autumn") return "Cold at the edges. The lights in the shops are on before they need to be.";
+    if(w.s === "summer") return "Hot pavement. Vaughn's has the door propped and is regretting it.";
+    return "A clear street. You can read every sign from the crossing.";
+  }catch(e){ return ""; }
+}
+function onumDoorPage(p){
+  const h = onumHhOf(p);
+  const keeper = onumKeeper(p);
+  const open = onumOpenNow();
+  const said = onumDoorSaid(p);
+  const goods = onumShopBlurb(p._shop || "");
+  let g = "";
+  try{ g = "Guilder " + guilderIndex().toFixed(1) + "."; }catch(e){}
+  const mood = h ? (h.mood > 65 ? "They are with you." : h.mood < 38 ? "They are sore." : "They are watching.") : "";
+  const kid = h && h.kid ? (h.kid + " " + (h.kidNews || "")) : "";
+  const mem = h && h.mem && h.mem.length ? h.mem[h.mem.length - 1].t : "";
+  const hrs = open ? "Open. The door is unlocked." : "Shut. The sign says seven to seven, and the hour has passed.";
+  let body = "<p><b>" + pcEsc(hrs) + "</b> " + pcEsc(g) + "</p>";
+  body += "<p>" + pcEsc(keeper) + " is the one at the door" + (h ? ", of the " + pcEsc(h.fam) + "s on " + pcEsc(h.street || "the street") : "") + ".</p>";
+  body += "<p>\u201C" + pcEsc(said) + "\u201D</p>";
+  if(h && h.need) body += "<p>What they want said, and have wanted said: " + pcEsc(h.need) + ". " + pcEsc(mood) + "</p>";
+  if(kid) body += "<p>The child: " + pcEsc(kid) + ".</p>";
+  if(mem) body += "<p>They remember: " + pcEsc(mem) + ".</p>";
+  if(goods) body += "<p>In the window, at today's price: " + pcEsc(goods) + ".</p>";
+  const wx = onumWxLine();
+  if(wx) body += '<p class="muted">' + pcEsc(wx) + "</p>";
+  const acts = [];
+  try{ if(p.acts) (p.acts() || []).forEach(function(a){ if(a && a.t && a.t.indexOf("Read this place") !== 0) acts.push(a); }); }catch(e){}
+  acts.unshift({t:"Speak to " + keeper.split(" ")[0], c:"8m", run:function(){
+    try{ spend(8, 2); }catch(e){}
+    if(h){ try{ hhRemember(h, "You spoke at the door on day " + G.day + "."); }catch(e){} h.mood = Math.max(0, Math.min(100, (h.mood || 50) + 1)); }
+    try{ note(keeper.split(" ")[0] + ": " + said); }catch(e){}
+  }});
+  body += acts.map(function(a, i){
+    return '<div style="margin:8px 0"><button type="button" class="btn" data-shp="' + i + '">' + pcEsc(a.t) + "</button> <span class=\"muted\">" + pcEsc(a.c || "") + "</span></div>";
+  }).join("");
+  govCardOpen(p.label || "The door", "Day " + (G.day || 1) + " · " + (function(){ try{ return hhmm(); }catch(e){ return ""; } })(), p.sub || "", body, null);
+  card.querySelectorAll("[data-shp]").forEach(function(b){
+    b.addEventListener("click", function(){
+      const a = acts[+b.getAttribute("data-shp")];
+      if(!a || !a.run) return;
+      try{ a.run(); }catch(e){}
+    });
+  });
+}
+onumShopCard = onumDoorPage;
+
+function onumStreetLead(){
+  const h = (function(){ try{ return townEnsure().hh || []; }catch(e){ return []; } })();
+  const sore = h.filter(function(x){ return (x.mood || 50) < 40; })[0];
+  const wx = onumWxLine();
+  let g = "";
+  try{ g = "The guilder is " + guilderIndex().toFixed(1) + "."; }catch(e){}
+  if(sore) return g + " " + wx + " The " + sore.fam + "s on " + (sore.street || "their street") + " are still waiting on " + sore.need + ".";
+  return g + " " + wx + " The block is open and nobody has put a new complaint on the board.";
+}
+onumStreetBoard = function(){
+  G.streetLog = G.streetLog || [];
+  if(!G.streetLog.some(function(x){ return x.d === G.day; })){
+    G.streetLog.unshift({d:G.day, t:onumStreetLead()});
+    if(G.streetLog.length > 14) G.streetLog.length = 14;
+  }
+  const doors = (PROPS.district || []).filter(function(p){ return p && p.id && p.id !== "street" && p.label; });
+  let body = "<p>" + pcEsc(G.streetLog[0].t) + "</p>";
+  body += doors.map(function(p){
+    const h = onumHhOf(p);
+    const who = onumKeeper(p);
+    const goods = onumShopBlurb(p._shop || "");
+    return "<p><b>" + pcEsc(p.label) + "</b> " + (onumOpenNow() ? "open" : "shut") + ". " + pcEsc(who) + (h ? " of the " + pcEsc(h.fam) + "s" : "") + ". \u201C" + pcEsc(onumDoorSaid(p)) + "\u201D" + (goods ? " Window: " + pcEsc(goods) + "." : "") + (h && h.need ? " Waiting on " + pcEsc(h.need) + "." : "") + "</p>";
+  }).join("");
+  if(G.streetLog.length > 1){
+    body += "<p><b>The board, earlier</b></p>";
+    G.streetLog.slice(1, 6).forEach(function(x){ body += "<p>Day " + x.d + ". " + pcEsc(x.t) + "</p>"; });
+  }
+  govCardOpen("Main Street", (G.you && (G.you.state + " " + (G.you.dist || ""))) || "The district", "Every door, the person in it, and the price in the window.", body, null);
+};
+
+{ const _pt = onumPlainTown; onumPlainTown = function(){
+  _pt.apply(this, arguments);
+  const canvas = matCol(0x8d2f2a, 0.9);
+  const canvas2 = matCol(0x2f4a3a, 0.9);
+  [[-6.15, 36, canvas], [-6.15, 28, canvas2], [-6.15, 20, canvas], [6.15, 28, canvas], [6.15, 20, canvas2], [6.15, 12, canvas]].forEach(function(a){
+    addBox(a[2], a[0], 2.55, a[1], 1.35, 0.05, 2.2, 0, true);
+  });
+  addBox(matCol(0x2a3344, 0.9), 3.35, 0.55, 42.4, 0.45, 1.05, 0.38, 0, true);
+  addBox(matCol(0xc8b56a, 0.7), 3.35, 0.85, 42.55, 0.28, 0.22, 0.02, 0, true);
+  addBox(matCol(0x6b4a32, 0.9), -4.9, 0.12, 36, 1.6, 0.18, 0.7, 0, true);
+  addBox(matCol(0x6b4a32, 0.9), 4.9, 0.12, 36, 1.6, 0.18, 0.7, 0, true);
+  const hh = (function(){ try{ return townEnsure().hh || []; }catch(e){ return []; } })();
+  function houseProp(id, x, z, i){
+    if((PROPS.district || []).some(function(p){ return p && p.id === id; })) return;
+    const h = hh[i];
+    PROPS.district.push({id:id, label:h ? ("The " + h.fam + "s") : "The house", sub:h ? (h.street + ". " + (h.need || "")) : "A door on the block", x:x, z:z, r:3.0, _hh:h && h.id, _owner:h && h.fam,
+      acts:function(){
+        return [{t:"Knock", c:"10m", run:function(){
+          const hh2 = onumHhOf({id:id, _hh:h && h.id});
+          try{ spend(10, 2); }catch(e){}
+          if(hh2){
+            hh2.visits = (hh2.visits || 0) + 1;
+            hh2.mood = Math.max(0, Math.min(100, (hh2.mood || 50) + 2));
+            try{ hhRemember(hh2, "You knocked on day " + G.day + "."); }catch(e){}
+          }
+          const line = onumDoorSaid({id:id});
+          try{ note((hh2 ? hh2.people[0] : "The house") + ": " + line); }catch(e){}
+        }}];
+      }});
+  }
+  houseProp("houseW", -4.7, 6.5, 3);
+  houseProp("houseE", 4.7, 6.5, 4);
+}; }
+
+try{
+  const _sc = saveCaptureBase;
+  saveCaptureBase = function(){
+    const o = _sc.apply(this, arguments);
+    try{ o.streetLog = G.streetLog || null; }catch(e){}
+    return o;
+  };
+}catch(e){}
 
 })(); /* 20261110bx: main IIFE close, moved below the ba block */
 </script>
