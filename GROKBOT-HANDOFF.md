@@ -17,18 +17,29 @@ One HTML body. Keep these **byte-identical**:
 | `session.html` | repo root |
 | `One Nation, Under, ME.html` | standalone name |
 
-**Build stamp (now): `20261120b`**
+**Build stamp (now): `20261120c`**
 
-- `<meta name="onum-build" content="20261120b">`
-- IIFE `STAMP = "20261120b"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
-- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261120b"`
+- `<meta name="onum-build" content="20261120c">`
+- IIFE `STAMP = "20261120c"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
+- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261120c"`
 - Wrapper iframe: `/session.html?v=${ONUM_BUILD}` in `src/routes/index.tsx`
 
-If you change the HTML, bump the letter (`20261120b`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
+If you change the HTML, bump the letter (`20261120c`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
 
 This sandbox tracks `public/session.html` as the playable body (root `index.html` / `session.html` / `One Nation, Under, ME.html` are not in this repo). Do not replace that file with a simpler build. Insert new game logic **inside** the main IIFE, before `})(); /* 20261110bx: main IIFE close, moved below the ba block */`.
 
-### Latest — `20261120b`
+### Latest — `20261120c`
+
+Play on a phone was still a small prompt you had to aim at. The work is now a bar fixed to the bottom of the screen, above the home indicator, and it does not move.
+
+- It names the room and says who is in it.
+- Every person in the room is a button. If they are close, it opens the talk. If they are across the room, it steps you to them and then opens the talk.
+- The nearest door lists its actions as full-width buttons. Read the place, buy, knock, speak. One tap.
+- In your office, the executive office, or the governor's office, the bar has **Open the desk**.
+- While the bar is up, the old glass prompt is hidden so the two cannot cover each other. A hearing, a catch, a card, or a conversation puts the bar away and gives the screen back.
+- The old prompt, when it does show, is fixed to the screen and its buttons are a full row high.
+
+`20261120b` still puts a person behind every door.
 
 Review of `20261120a`: the street had fronts and prices, and almost nothing behind them. A door was a name. The page did not say who was standing there, whether the hour had closed it, or what the household wanted.
 
