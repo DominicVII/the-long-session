@@ -17,18 +17,22 @@ One HTML body. Keep these **byte-identical**:
 | `session.html` | repo root |
 | `One Nation, Under, ME.html` | standalone name |
 
-**Build stamp (now): `20261120d`**
+**Build stamp (now): `20261120e`**
 
-- `<meta name="onum-build" content="20261120d">`
-- IIFE `STAMP = "20261120d"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
-- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261120d"`
+- `<meta name="onum-build" content="20261120e">`
+- IIFE `STAMP = "20261120e"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
+- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261120e"`
 - Wrapper iframe: `/session.html?v=${ONUM_BUILD}` in `src/routes/index.tsx`
 
-If you change the HTML, bump the letter (`20261120d`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
+If you change the HTML, bump the letter (`20261120e`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
 
 This sandbox tracks `public/session.html` as the playable body (root `index.html` / `session.html` / `One Nation, Under, ME.html` are not in this repo). Do not replace that file with a simpler build. Insert new game logic **inside** the main IIFE, before `})(); /* 20261110bx: main IIFE close, moved below the ba block */`.
 
-### Latest — `20261120d`
+### Latest — `20261120e`
+
+The war chest could not hold more than 300 milles on a gift, or 400 on a donation, and anything over 900 was wiped to 180. That is a House race, not the chair.
+
+It will now hold **25,000 milles**. A gift is no longer thrown away at 300. Spending 6 milles no longer shrinks a full chest down to 300. A number that is not a number, or a chest past a million milles, is brought to 25,000 and stopped there. It is not wiped to 180. The desk says the ceiling.
 
 The desk was talking like a manual. Button and scrap were glued into one line ("What this place is read it"), the chest printed `204.94500000000002`, and a precedent came out as "holds: that the…".
 
