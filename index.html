@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261120c">
+<meta name="onum-build" content="20261120d">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -16,7 +16,7 @@
   img{max-width:100%}
   [hidden]:not([hidden="until-found"]){display:none!important}
 </style>
-<title>One Nation, Under, ME. · 20261120c</title>
+<title>One Nation, Under, ME. · 20261120d</title>
 <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'>  <rect width='32' height='32' fill='#0D1014'/>  <polygon fill='#A45F27' points='16,2.8 19.04,9.69 26.32,7.77 22.82,14.44 28.87,18.94 21.47,20.36 21.73,27.89 16,23 10.27,27.89 10.53,20.36 3.13,18.94 9.18,14.44 5.68,7.77 12.96,9.69'/></svg>">
 <meta property="og:title" content="One Nation, Under, ME.">
 <!-- Standalone: system fonts. No CDN, no vendor folder. -->
@@ -46,7 +46,7 @@
   window.onumLimSet = function(k, v){ if(!(k in D)) return false; L[k] = fix(v); try{ var o = JSON.parse(localStorage.getItem("onum.limits") || "{}") || {}; o[k] = (L[k] === INF) ? null : L[k]; localStorage.setItem("onum.limits", JSON.stringify(o)); }catch(e){} return true; };
   window.onumLimReset = function(){ try{ localStorage.removeItem("onum.limits"); }catch(e){} Object.keys(D).forEach(function(k){ L[k] = D[k]; }); L._eff = {}; L._gov = null; return true; };
   var show = function(v){ return v === INF ? "inf" : (typeof v === "number" ? Math.round(v * 100) / 100 : v); };
-  window.onumLimDump = function(){ var out = {build:"20261120c", mode:L.mode || "scale"}; Object.keys(D).forEach(function(k){ out[k] = show(L[k]); });
+  window.onumLimDump = function(){ var out = {build:"20261120d", mode:L.mode || "scale"}; Object.keys(D).forEach(function(k){ out[k] = show(L[k]); });
     out.effective = {}; Object.keys(L._eff).forEach(function(k){ out.effective[k] = show(L._eff[k]); }); out.governor = L._gov;
     try{ out.engineBudgetMs = window.onumEngine ? show(window.onumEngine.budget) : null; out.frameMs = window.onumEngine ? show(window.onumEngine.dtEma) : null; }catch(e){} return out; };
   window.onumLimLine = function(){ var d = window.onumLimDump(), e = d.effective, g = function(k){ return e[k] != null ? e[k] + "*" : d[k]; };
@@ -71,7 +71,7 @@
 </script>
 <script>
 (function(){
-  var STAMP = "20261120c";
+  var STAMP = "20261120d";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -983,7 +983,7 @@ body.boot-menu .shell{grid-template-rows:minmax(0,1fr)}
   <div class="grid">
     <div>
       <section class="stage">
-        <div class="scene" id="scene"><div class="boot" id="boot">Building the chamber… · 20261120c</div></div>
+        <div class="scene" id="scene"><div class="boot" id="boot">Building the chamber… · 20261120d</div></div>
         <div class="hud"><i id="whereTag">Location</i><b id="whereName">—</b></div>
         <div class="aims" id="aimsHud" hidden tabindex="0" aria-label="Today's aims"><i>Today's aims</i><b id="aimsNext"></b><div class="aims__all" id="aimsAll"></div></div>
         <div class="compass" id="compass" aria-hidden="true"><div class="compass__rail"></div><i class="compass__n">N</i><div id="compassTicks"></div></div>
@@ -54160,7 +54160,11 @@ function onumFixCabProps(){
 function onumPrecLine(){
   try{
     const h = citePrecedent();
-    if(h && h.precedent) return "The record already holds: " + h.precedent + ".";
+    if(h && h.precedent){
+      const p = String(h.precedent).replace(/\s+/g, " ").trim();
+      if(/^that\b/i.test(p)) return "The record already says " + p + (/\.$/.test(p) ? "" : ".");
+      return "The record already holds this. " + p + (/\.$/.test(p) ? "" : ".");
+    }
   }catch(e){}
   return "";
 }
@@ -54666,7 +54670,12 @@ function onumPrecHit(word){
 }
 function onumPrecExact(word){
   const h = onumPrecHit(word);
-  if(h && h.precedent) return "The record already holds, from " + (h.who || "the last time") + ": " + h.precedent + ".";
+    if(h && h.precedent){
+      const p = String(h.precedent).replace(/\s+/g, " ").trim();
+      const who = h.who || "the last time";
+      if(/^that\b/i.test(p)) return "From " + who + ", the record already says " + p + (/\.$/.test(p) ? "" : ".");
+      return "From " + who + ", the record already holds this. " + p + (/\.$/.test(p) ? "" : ".");
+    }
   return onumPrecLine();
 }
 function onumSay(p, about){
@@ -54750,13 +54759,20 @@ onumDeskCard = function(o){
   try{ closeTalk(); }catch(e){}
   const acts = onumWorkActs(o).filter(a => a && a.t && a.t.indexOf("Open this as a page") !== 0 && a.t.indexOf("Open the work page") !== 0);
   const id = o && o.id;
-  let status = '<p class="muted">Day ' + (G.day || 1) + '. The guilder is ' + ((typeof guilderIndex === "function") ? guilderIndex().toFixed(1) : "?") + '. The chest has ' + ((G.you && G.you.funds) || 0) + '.</p>';
+  let chest = 0;
+  try{ chest = Math.round((Number(G.you && G.you.funds) || 0) * 100) / 100; }catch(e){}
+  let gld = "?";
+  try{ if(typeof guilderIndex === "function") gld = guilderIndex().toFixed(1); }catch(e){}
+  let season = "";
+  try{ const w = wxToday(); if(w && w.s) season = ", " + w.s; }catch(e){}
+  let status = "<p>It is day " + (G.day || 1) + season + ". The guilder stands at " + gld + ". The chest holds " + chest.toFixed(2) + " milles.</p>";
   if(id === "xcab" || id === "jxcabc") status += '<div class="eyebrow">Who actually holds the chairs</div>' + (onumCabRoster() || '<p class="muted">The chairs have not been filled.</p>');
   const prec = onumPrecExact(id === "xcab" || id === "jxcabc" ? "cabinet" : "desk");
   if(prec) status += '<p class="muted">' + onumEsc(prec) + '</p>';
   status += '<div class="card__actions" style="flex-wrap:wrap"><button type="button" class="btn btn--ghost" id="dkRec">The record</button><button type="button" class="btn btn--ghost" id="dkFam">The family</button><button type="button" class="btn btn--ghost" id="dkMkt">The market</button></div>';
-  const body = status + acts.map((a, i) => '<div style="margin:8px 0"><button type="button" class="btn" data-dkx="' + i + '">' + onumEsc(a.t) + '</button> <span class="muted">' + onumEsc(a.c || "") + '</span></div>').join("") || status;
-  govCardOpen(o.label || "The desk", "This page stays up", "The line in the room can flicker. The work, the names, and the record are here.", body, null);
+  status += '<p class="muted">The record is what someone chose to write down. The family is who you go home to. The market is what things cost today.</p>';
+  const body = status + acts.map((a, i) => '<div style="margin:10px 0"><button type="button" class="btn" data-dkx="' + i + '">' + onumEsc(a.t) + '</button>' + (a.c ? '<div class="muted" style="margin-top:3px">' + onumEsc(a.c) + '</div>' : '') + '</div>').join("") || status;
+  govCardOpen(o.label || "The desk", "The work on this desk", "Read it here. Then do the thing. The room can wait.", body, null);
   const rec = el("dkRec"); if(rec) rec.addEventListener("click", () => onumChronicleCard());
   const fam = el("dkFam"); if(fam) fam.addEventListener("click", () => onumFamilyCard());
   const mk = el("dkMkt"); if(mk) mk.addEventListener("click", () => onumMarketCard());
@@ -59420,7 +59436,7 @@ function onumCallCard(){
     return '<div style="margin:8px 0"><button type="button" class="btn" data-call="' + i + '">Call ' + onumEsc(m.name) + '</button> <span class="muted">' + onumEsc(m.state || m.role || "the building") + '</span></div>';
   }).join("") || "<p class=\"muted\">Nobody you have met is away from the room. Walk up to them, or meet them first.</p>";
   const ix = (typeof guilderIndex === "function" ? guilderIndex() : 100);
-  govCardOpen("The desk telephone", "A direct line", "100 stuivers make a guilder. 10 guilders make a rijder. 1,000 guilders make a mille. The index is " + ix.toFixed(1) + ", and a machinist earns about one guilder a day when the index is 100. This page stays up. The line in the room does not have to.", rows, null);
+  govCardOpen("The desk telephone", "A direct line", "A machinist earns about a guilder a day when the index sits at 100. Today the index is " + ix.toFixed(1) + ". One hundred stuivers make a guilder, ten guilders make a rijder, and a thousand guilders make a mille.", rows, null);
   const list = known;
   card.querySelectorAll("[data-call]").forEach(function(b){
     b.addEventListener("click", function(){
@@ -59430,7 +59446,7 @@ function onumCallCard(){
       try{ ripple(m, 3, "You rang from the desk, and you stayed on the line.", 2); }catch(e){}
       try{ m.known = Math.max(m.known || 0, 1); }catch(e){}
       const s = el("gcSay");
-      if(s) s.textContent = m.name + " picks up. You have them for a few minutes. Warmth moved. The call did not depend on the glass in the room.";
+      if(s) s.textContent = m.name.split(" ")[0] + " picks up. You have a few minutes. They heard you, and it will not be the same conversation it was yesterday.";
     });
   });
 }
@@ -60379,7 +60395,7 @@ function onumShopCard(p){
     acts.map(function(a, i){
       return '<div style="margin:8px 0"><button type="button" class="btn" data-shp="' + i + '">' + pcEsc(a.t) + "</button> <span class=\"muted\">" + pcEsc(a.c || "") + "</span></div>";
     }).join("");
-  govCardOpen(p.label || "The shop", "This page stays up", "Stand on the pavement and read it. The line in the street will not cover it.", body, null);
+  govCardOpen(p.label || "The shop", "The door", "Who keeps it, what they said, and what is in the window.", body, null);
   card.querySelectorAll("[data-shp]").forEach(function(b){
     b.addEventListener("click", function(){
       const a = acts[+b.getAttribute("data-shp")];
@@ -60940,6 +60956,26 @@ document.addEventListener("click", function(e){
   }
 }, true);
 setInterval(function(){ try{ onumPlayDraw(); }catch(e){} }, 450);
+
+
+/* 20261120d */
+try{
+  const _dk = onumDeskCard;
+  onumDeskCard = function(o){
+    const r = _dk.apply(this, arguments);
+    try{
+      const air = document.getElementById("dkAir");
+      if(air && air.parentNode && !document.getElementById("dkAirNote")){
+        const p = document.createElement("p");
+        p.id = "dkAirNote";
+        p.className = "muted";
+        p.textContent = "The broadcast is who read it aloud. What was written is the book, including the lines nobody kept.";
+        air.parentNode.parentNode.insertBefore(p, air.parentNode.nextSibling);
+      }
+    }catch(e){}
+    return r;
+  };
+}catch(e){}
 
 })(); /* 20261110bx: main IIFE close, moved below the ba block */
 </script>

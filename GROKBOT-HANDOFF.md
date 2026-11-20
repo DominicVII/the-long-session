@@ -17,18 +17,40 @@ One HTML body. Keep these **byte-identical**:
 | `session.html` | repo root |
 | `One Nation, Under, ME.html` | standalone name |
 
-**Build stamp (now): `20261120c`**
+**Build stamp (now): `20261120d`**
 
-- `<meta name="onum-build" content="20261120c">`
-- IIFE `STAMP = "20261120c"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
-- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261120c"`
+- `<meta name="onum-build" content="20261120d">`
+- IIFE `STAMP = "20261120d"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
+- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261120d"`
 - Wrapper iframe: `/session.html?v=${ONUM_BUILD}` in `src/routes/index.tsx`
 
-If you change the HTML, bump the letter (`20261120c`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
+If you change the HTML, bump the letter (`20261120d`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
 
 This sandbox tracks `public/session.html` as the playable body (root `index.html` / `session.html` / `One Nation, Under, ME.html` are not in this repo). Do not replace that file with a simpler build. Insert new game logic **inside** the main IIFE, before `})(); /* 20261110bx: main IIFE close, moved below the ba block */`.
 
-### Latest — `20261120c`
+### Latest — `20261120d`
+
+The desk was talking like a manual. Button and scrap were glued into one line ("What this place is read it"), the chest printed `204.94500000000002`, and a precedent came out as "holds: that the…".
+
+The desk now says it is day such-and-such, names the season, and gives the chest in milles to two places. A precedent is a sentence. If the record begins with "that", it says "the record already says that…".
+
+Every action on that page is a thing you can do, and the line under it is a sentence:
+
+- Call someone. They pick up.
+- Call the cabinet. Each secretary speaks for their own department.
+- Hear them, one by one. They do not speak as a chorus.
+- The situation room. What the law lets you do.
+- Acts waiting on your name. Sign one, or send it back.
+- A foreign capital. They speak first.
+- The press room. It is on the record.
+- A secretary. Three people, one chair, the Senate still has to agree.
+- Clemency. Three lives.
+- The party. They will not pretend to be one voice.
+- The other party. They are not one mouth.
+- The people in your life. The office did not replace them.
+- The election, the Web, the market, the district, each in a sentence of its own.
+
+The record, the family, and the market say what they are. The broadcast is who read it. What was written is the book. The same sentences are on the bar at the bottom of the screen.
 
 Play on a phone was still a small prompt you had to aim at. The work is now a bar fixed to the bottom of the screen, above the home indicator, and it does not move.
 
