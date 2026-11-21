@@ -17,18 +17,24 @@ One HTML body. Keep these **byte-identical**:
 | `session.html` | repo root |
 | `One Nation, Under, ME.html` | standalone name |
 
-**Build stamp (now): `20261121a`**
+**Build stamp (now): `20261121b`**
 
-- `<meta name="onum-build" content="20261121a">`
-- IIFE `STAMP = "20261121a"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
-- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261121a"`
+- `<meta name="onum-build" content="20261121b">`
+- IIFE `STAMP = "20261121b"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
+- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261121b"`
 - Wrapper iframe: `/session.html?v=${ONUM_BUILD}` in `src/routes/index.tsx`
 
-If you change the HTML, bump the letter (`20261121a`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
+If you change the HTML, bump the letter (`20261121b`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
 
 This sandbox tracks `public/session.html` as the playable body (root `index.html` / `session.html` / `One Nation, Under, ME.html` are not in this repo). Do not replace that file with a simpler build. Insert new game logic **inside** the main IIFE, before `})(); /* 20261110bx: main IIFE close, moved below the ba block */`.
 
-### Latest — `20261121a`
+### Latest — `20261121b`
+
+The bottom of the screen is the way you play, and it uses the same names as the building.
+
+It says the room's own title and tag, the day, and the clock. The sentence under that is a fact: who asked for a word, or the door in reach, or the nearest person by surname. A person who asked is a gold button. Everyone else is a chip with one true line: their post, their outlet, or how they lean on the bill that is actually on the desk. A door shows the work it really offers. Every exit is "Go to" the room's real name. A line at the bottom is said to the room. The say-aloud bar does not sit on top of any of it.
+
+A live prompt, a conversation, and a card still take the screen alone. A talk that has no way out still grows Leave.
 
 A prompt and a conversation were losing to the chrome. The standing calendar, Notices, Now, Who is here, and the room bar (the statutory quarter, six other people) were all sitting on the buttons. Closing a talk hit one of those instead of Leave.
 
