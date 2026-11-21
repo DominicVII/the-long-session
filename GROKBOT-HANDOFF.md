@@ -17,18 +17,24 @@ One HTML body. Keep these **byte-identical**:
 | `session.html` | repo root |
 | `One Nation, Under, ME.html` | standalone name |
 
-**Build stamp (now): `20261120e`**
+**Build stamp (now): `20261120f`**
 
-- `<meta name="onum-build" content="20261120e">`
-- IIFE `STAMP = "20261120e"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
-- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261120e"`
+- `<meta name="onum-build" content="20261120f">`
+- IIFE `STAMP = "20261120f"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
+- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261120f"`
 - Wrapper iframe: `/session.html?v=${ONUM_BUILD}` in `src/routes/index.tsx`
 
-If you change the HTML, bump the letter (`20261120e`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
+If you change the HTML, bump the letter (`20261120f`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
 
 This sandbox tracks `public/session.html` as the playable body (root `index.html` / `session.html` / `One Nation, Under, ME.html` are not in this repo). Do not replace that file with a simpler build. Insert new game logic **inside** the main IIFE, before `})(); /* 20261110bx: main IIFE close, moved below the ba block */`.
 
-### Latest — `20261120e`
+### Latest — `20261120f`
+
+The party card is the caucus, five members of your party, each in their own voice. **What's this?** is only the explainer. It is not the menu.
+
+The taps were dying. Every row of buttons was stuck to the bottom of the card, piled on each other, and the say-aloud bar sat on top of them. A finger hit the bar, not the button.
+
+While a card is open, that bar, the play bar, and the glass prompt go away. The card sits above them. Each person's buttons stay next to that person. Close stays at the bottom. Ask them to hold the line, offer patronage, cut them loose, or ask them to supper, and they answer in the space under their name. The button changes to Heard. If warmth is already gone, they say so. They do not pretend a whip call fixed it.
 
 The war chest could not hold more than 300 milles on a gift, or 400 on a donation, and anything over 900 was wiped to 180. That is a House race, not the chair.
 
