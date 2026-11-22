@@ -17,18 +17,26 @@ One HTML body. Keep these **byte-identical**:
 | `session.html` | repo root |
 | `One Nation, Under, ME.html` | standalone name |
 
-**Build stamp (now): `20261122a`**
+**Build stamp (now): `20261122b`**
 
-- `<meta name="onum-build" content="20261122a">`
-- IIFE `STAMP = "20261122a"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
-- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261122a"`
+- `<meta name="onum-build" content="20261122b">`
+- IIFE `STAMP = "20261122b"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
+- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261122b"`
 - Wrapper iframe: `/session.html?v=${ONUM_BUILD}` in `src/routes/index.tsx`
 
-If you change the HTML, bump the letter (`20261122a`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
+If you change the HTML, bump the letter (`20261122b`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
 
 This sandbox tracks `public/session.html` as the playable body (root `index.html` / `session.html` / `One Nation, Under, ME.html` are not in this repo). Do not replace that file with a simpler build. Insert new game logic **inside** the main IIFE, before `})(); /* 20261110bx: main IIFE close, moved below the ba block */`.
 
-### Latest — `20261122a`
+### Latest — `20261122b`
+
+The war chest is a book, not a balance.
+
+The desk page says the sum in milles and in the old print, the cap of 25,000 milles, and the room left. Under that: what is already bought, by name. The district office, the field count and what it is for, each aide's name and the day they started, whether counsel is retained, and every colleague whose race you have backed.
+
+The tape is the money you chose to spend: the day, the milles, and the sentence of what it did. A spend the ground will not take does not leave the chest. A parish notice is refused where the state does not keep a Latin, Consular, or Reformed book. A file on a rival is refused when nobody is running.
+
+New spends, each a different thing: a letter to every box, supper for your own state's delegation, yard signs, a bus for election week, the rival's file, the parish notice, a scholarship in the home town's name. The ledger page shows the last four lines of the same tape.
 
 The map opens an atlas. Click a state.
 
