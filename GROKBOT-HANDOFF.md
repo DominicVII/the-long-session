@@ -17,18 +17,24 @@ One HTML body. Keep these **byte-identical**:
 | `session.html` | repo root |
 | `One Nation, Under, ME.html` | standalone name |
 
-**Build stamp (now): `20261121b`**
+**Build stamp (now): `20261122a`**
 
-- `<meta name="onum-build" content="20261121b">`
-- IIFE `STAMP = "20261121b"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
-- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261121b"`
+- `<meta name="onum-build" content="20261122a">`
+- IIFE `STAMP = "20261122a"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
+- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261122a"`
 - Wrapper iframe: `/session.html?v=${ONUM_BUILD}` in `src/routes/index.tsx`
 
-If you change the HTML, bump the letter (`20261121b`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
+If you change the HTML, bump the letter (`20261122a`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
 
 This sandbox tracks `public/session.html` as the playable body (root `index.html` / `session.html` / `One Nation, Under, ME.html` are not in this repo). Do not replace that file with a simpler build. Insert new game logic **inside** the main IIFE, before `})(); /* 20261110bx: main IIFE close, moved below the ba block */`.
 
-### Latest — `20261121b`
+### Latest — `20261122a`
+
+The map opens an atlas. Click a state.
+
+The plate is that state's own note, the year it was founded, the year it was admitted, the capital, the temper, the old work, and the creed the ground leans to. From there: the governorship, every House district, every town, and what the living record has actually written (the journal and anyone in the room who named the state).
+
+A governorship is a line of holders with the years and how they left. The last name is the one in office now, including you if you hold it. A district is the same kind of line, and if someone you know holds it — or you do — the page says so. A name opens. Read further keeps a new page, tied to a governor, a district, and a town already in the book, and it does not invent a second country. Back walks out. The book is stored on the save as `atlas`, so the years do not move once they are written.
 
 The bottom of the screen is the way you play, and it uses the same names as the building.
 
