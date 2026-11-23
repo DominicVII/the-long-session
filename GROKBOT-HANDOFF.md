@@ -17,18 +17,28 @@ One HTML body. Keep these **byte-identical**:
 | `session.html` | repo root |
 | `One Nation, Under, ME.html` | standalone name |
 
-**Build stamp (now): `20261123h`**
+**Build stamp (now): `20261123i`**
 
-- `<meta name="onum-build" content="20261123h">`
-- IIFE `STAMP = "20261123h"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
-- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261123h"`
+- `<meta name="onum-build" content="20261123i">`
+- IIFE `STAMP = "20261123i"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
+- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261123i"`
 - Wrapper iframe: `/session.html?v=${ONUM_BUILD}` in `src/routes/index.tsx`
 
-If you change the HTML, bump the letter (`20261123h`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
+If you change the HTML, bump the letter (`20261123i`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
 
 This sandbox tracks `public/session.html` as the playable body (root `index.html` / `session.html` / `One Nation, Under, ME.html` are not in this repo). Do not replace that file with a simpler build. Insert new game logic **inside** the main IIFE, before `})(); /* 20261110bx: main IIFE close, moved below the ba block */`.
 
-### Latest — `20261123h`
+### Latest — `20261123i`
+
+The same fact now has six desks. Open **The Republic**, then **The papers**.
+
+The Republic Record, the Oranje Tribune, the Dockworker Gazette, the Commonwealth Herald, the Merchant Chronicle, and the National Observer each have an editor and a beat. They do not share a headline. A story keeps its days: opened, a witness, a denial, a count, then old enough to be used in a race. It closes after the fifth beat. It does not reset into a new scandal to look busy.
+
+A bill with a clear spending, relief, or defense mark moves a named share: Havenport Lines, Oranje Dock, Grange & Grain, Ordnance Works, the Evening Press. The tape says the old price and the new one, and why.
+
+**The bureau** does not replace home approval. It splits the country into economic confidence, institutional trust, competence, safety, foreign standing, and social cohesion, each read off a number the game already keeps: the guilder, the debt, graft, office efficiency, unrest, the neighbors, and how far the classes have split. Classes are listed under that average. The guilder and home standing are drawn as a line, not a debug bar. States are colored by the lean already on the book, with a turnout read off unrest. It is not a count of ballots. Shares show a chief, a revenue mark, a debt mark, and their own line.
+
+`G.wire` is in the save. The gallery and the election page you already had are untouched.
 
 A bill no longer walks straight onto the floor. The day the roll would have been called, the House is still in committee, and the feed says so.
 
