@@ -17,18 +17,22 @@ One HTML body. Keep these **byte-identical**:
 | `session.html` | repo root |
 | `One Nation, Under, ME.html` | standalone name |
 
-**Build stamp (now): `20261123e`**
+**Build stamp (now): `20261123f`**
 
-- `<meta name="onum-build" content="20261123e">`
-- IIFE `STAMP = "20261123e"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
-- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261123e"`
+- `<meta name="onum-build" content="20261123f">`
+- IIFE `STAMP = "20261123f"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
+- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261123f"`
 - Wrapper iframe: `/session.html?v=${ONUM_BUILD}` in `src/routes/index.tsx`
 
-If you change the HTML, bump the letter (`20261123e`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
+If you change the HTML, bump the letter (`20261123f`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
 
 This sandbox tracks `public/session.html` as the playable body (root `index.html` / `session.html` / `One Nation, Under, ME.html` are not in this repo). Do not replace that file with a simpler build. Insert new game logic **inside** the main IIFE, before `})(); /* 20261110bx: main IIFE close, moved below the ba block */`.
 
-### Latest — `20261123e`
+### Latest — `20261123f`
+
+People speak without a prompt. Whoever is in the room with you gets a turn, through the model, about every forty seconds. They do not open with their name or their office. The line is said aloud, put over them, and written on the wire. Opening a conversation does the same: if the model is up, their first line is replaced by what they actually say.
+
+Someone who is not in the room still speaks, on the wire only, so the country is not mute. One at a time. If the model is already speaking, the next person waits. If Ollama is not there, the old line stays and the wire is not filled with an error.
 
 The model is in the menu. Open Settings. Under the voice sliders: **The model**, **Engine**, **Server**, and **Test the model**. The names Ollama reported are in the list. The pill that says Live or Offline is back above the play bar, and it names the model.
 
