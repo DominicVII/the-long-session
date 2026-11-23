@@ -17,18 +17,28 @@ One HTML body. Keep these **byte-identical**:
 | `session.html` | repo root |
 | `One Nation, Under, ME.html` | standalone name |
 
-**Build stamp (now): `20261123c`**
+**Build stamp (now): `20261123d`**
 
-- `<meta name="onum-build" content="20261123c">`
-- IIFE `STAMP = "20261123c"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
-- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261123c"`
+- `<meta name="onum-build" content="20261123d">`
+- IIFE `STAMP = "20261123d"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
+- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261123d"`
 - Wrapper iframe: `/session.html?v=${ONUM_BUILD}` in `src/routes/index.tsx`
 
-If you change the HTML, bump the letter (`20261123c`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
+If you change the HTML, bump the letter (`20261123d`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
 
 This sandbox tracks `public/session.html` as the playable body (root `index.html` / `session.html` / `One Nation, Under, ME.html` are not in this repo). Do not replace that file with a simpler build. Insert new game logic **inside** the main IIFE, before `})(); /* 20261110bx: main IIFE close, moved below the ba block */`.
 
-### Latest — `20261123c`
+### Latest — `20261123d`
+
+The Academy and the Engine keep the writing, and they try the model every time you talk to them.
+
+Each open question keeps a note for the stage it is actually in: opened, method, running, review, settled. The note names the researcher, the day, the question as filed, the progress, and the tries. A new stage writes a new note. It does not paste yesterday's paragraph over a different question. The notes are on the Academy card: **The notes, and a way to talk to the bench**.
+
+If Ollama is running on this machine, the first ledger note of a stage is replaced by what the model writes, and that writing is kept. If it is not running, the page says the model did not answer and leaves the ledger note. It does not invent a laboratory result to fill the silence.
+
+The Engine's study does the same. A day the model does not answer, nothing is rewritten and the generation does not tick on a stock sentence. On the Engine card there is a box. Asking it calls Ollama every time, including after a miss, and keeps the question and the answer. The Academy has the same box.
+
+Ollama is still the one on this machine, at the address in Settings, usually `http://127.0.0.1:11434`. The game cannot start it. It can only talk to it when it is already running, with `OLLAMA_ORIGINS=*` if the page is not on localhost.
 
 All four tiers are on the national journal's clock. Open it from History or Duties.
 

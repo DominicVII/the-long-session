@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261123c">
+<meta name="onum-build" content="20261123d">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -16,7 +16,7 @@
   img{max-width:100%}
   [hidden]:not([hidden="until-found"]){display:none!important}
 </style>
-<title>One Nation, Under, ME. · 20261123c</title>
+<title>One Nation, Under, ME. · 20261123d</title>
 <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'>  <rect width='32' height='32' fill='#0D1014'/>  <polygon fill='#A45F27' points='16,2.8 19.04,9.69 26.32,7.77 22.82,14.44 28.87,18.94 21.47,20.36 21.73,27.89 16,23 10.27,27.89 10.53,20.36 3.13,18.94 9.18,14.44 5.68,7.77 12.96,9.69'/></svg>">
 <meta property="og:title" content="One Nation, Under, ME.">
 <!-- Standalone: system fonts. No CDN, no vendor folder. -->
@@ -46,7 +46,7 @@
   window.onumLimSet = function(k, v){ if(!(k in D)) return false; L[k] = fix(v); try{ var o = JSON.parse(localStorage.getItem("onum.limits") || "{}") || {}; o[k] = (L[k] === INF) ? null : L[k]; localStorage.setItem("onum.limits", JSON.stringify(o)); }catch(e){} return true; };
   window.onumLimReset = function(){ try{ localStorage.removeItem("onum.limits"); }catch(e){} Object.keys(D).forEach(function(k){ L[k] = D[k]; }); L._eff = {}; L._gov = null; return true; };
   var show = function(v){ return v === INF ? "inf" : (typeof v === "number" ? Math.round(v * 100) / 100 : v); };
-  window.onumLimDump = function(){ var out = {build:"20261123c", mode:L.mode || "scale"}; Object.keys(D).forEach(function(k){ out[k] = show(L[k]); });
+  window.onumLimDump = function(){ var out = {build:"20261123d", mode:L.mode || "scale"}; Object.keys(D).forEach(function(k){ out[k] = show(L[k]); });
     out.effective = {}; Object.keys(L._eff).forEach(function(k){ out.effective[k] = show(L._eff[k]); }); out.governor = L._gov;
     try{ out.engineBudgetMs = window.onumEngine ? show(window.onumEngine.budget) : null; out.frameMs = window.onumEngine ? show(window.onumEngine.dtEma) : null; }catch(e){} return out; };
   window.onumLimLine = function(){ var d = window.onumLimDump(), e = d.effective, g = function(k){ return e[k] != null ? e[k] + "*" : d[k]; };
@@ -71,7 +71,7 @@
 </script>
 <script>
 (function(){
-  var STAMP = "20261123c";
+  var STAMP = "20261123d";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -983,7 +983,7 @@ body.boot-menu .shell{grid-template-rows:minmax(0,1fr)}
   <div class="grid">
     <div>
       <section class="stage">
-        <div class="scene" id="scene"><div class="boot" id="boot">Building the chamber… · 20261123c</div></div>
+        <div class="scene" id="scene"><div class="boot" id="boot">Building the chamber… · 20261123d</div></div>
         <div class="hud"><i id="whereTag">Location</i><b id="whereName">—</b></div>
         <div class="aims" id="aimsHud" hidden tabindex="0" aria-label="Today's aims"><i>Today's aims</i><b id="aimsNext"></b><div class="aims__all" id="aimsAll"></div></div>
         <div class="compass" id="compass" aria-hidden="true"><div class="compass__rail"></div><i class="compass__n">N</i><div id="compassTicks"></div></div>
@@ -57891,27 +57891,143 @@ function onumEngIdle(){
     return E.idle;
   }catch(e){ return []; }
 }
-function onumWorkPage(){
-  let q = null, st = null;
+function onumBenchBucket(st){
+  if(!st) return "open";
+  if(st.st === "done" || (st.prog || 0) >= 1) return "settled";
+  if((st.prog || 0) < 0.25) return "opened";
+  if((st.prog || 0) < 0.55) return "method";
+  if((st.prog || 0) < 0.85) return "running";
+  return "review";
+}
+function onumBenchPaper(q){
+  const R = rsEnsure();
+  R.papers = R.papers || {};
+  const st = R.qs[q.id] || {prog:0, tries:0, st:"open"};
+  const bucket = onumBenchBucket(st);
+  const id = q.id + ":" + bucket;
+  if(R.papers[id]) return R.papers[id];
+  const people = (typeof rsPeople === "function") ? rsPeople() : [];
+  const who = people.length ? people[Math.abs(seedOf("bench:" + id)) % people.length].p.name : "the bench";
+  const prog = Math.round((st.prog || 0) * 100);
+  const tries = st.tries || 0;
+  const day = G.day || 1;
+  let text = "";
+  if(bucket === "opened"){
+    text = who + " took the file on day " + day + ". The question, copied as it was filed: " + (q.q || q.f) + " It sits in " + (q.f || "an unnamed field") + ". Tries on the sheet: " + tries + ". Progress: " + prog + ". No result is being claimed. The note says what would waste the work: answering a different question and filing it under this one.";
+  } else if(bucket === "method"){
+    text = "Method note, " + who + ", day " + day + ". " + tries + " tries. Progress " + prog + ". The question is still: " + (q.q || q.f) + " One condition is changed at a time. If the result only appears when two conditions move together, it is marked spoiled and it does not count as a try that taught anything except that the run was spoiled.";
+  } else if(bucket === "running"){
+    text = "Running note, " + who + ", day " + day + ". " + (q.q || q.f) + " Progress " + prog + " after " + tries + " tries. What is on the page so far is the direction of the result, not a number the apparatus did not print. A reader who wants the figure will not find one here, because none was produced. The next run is the one that either repeats the direction or kills it.";
+  } else if(bucket === "review"){
+    text = "Review, day " + day + ". " + who + " is not the reviewer. The reviewer was not in the room for the run. Question: " + (q.q || q.f) + " Progress " + prog + ". Tries " + tries + ". The review asks only whether the method matches the question. It does not ask whether the result would be welcome.";
+  } else {
+    text = "Settled, day " + day + ", under " + who + "'s name. " + (q.q || q.f) + " The ledger marks it done after " + tries + " tries. What stands is the question that was asked, not a larger claim. A later worker can open it again only by saying which part of this note is wrong.";
+  }
+  R.papers[id] = {id:id, q:q.id, bucket:bucket, d:day, who:who, prog:prog, tries:tries, field:q.f || "", claim:q.q || "", text:text, ledger:1, talk:[]};
+  const list = Object.keys(R.papers);
+  if(list.length > 80) delete R.papers[list[0]];
+  return R.papers[id];
+}
+async function onumOllamaAlways(who, userText, facts){
+  const L = window.onumLiveTalk;
+  if(!L || typeof L.chat !== "function") return {live:false, why:"The talk channel is not on this page."};
+  try{ if(L.config && L.config.on === false) return {live:false, why:"Live talk is switched off in Settings."}; }catch(e){}
+  try{ if(typeof L.probe === "function") await L.probe("ui", 5000); }catch(e){}
+  let model = "";
+  try{ model = await onumPickBigModel(); }catch(e){}
+  const isEng = who === "engine";
+  const sys = isEng
+    ? "You are the Engine of this Republic. You are not a person and you do not introduce yourself. Answer the question from the facts. If a number is not in the facts, say you do not have it. Do not repeat a sentence you have used before. Write the finding: what you looked at, what follows, and what would show you wrong. Four to eight sentences."
+    : "You are writing a laboratory note at the Academy. Use the researcher's name, the day, the question, the field, the progress, and the tries. Do not invent a measurement you were not given. Do not use a stock opening. Say what was done, what is known so far, and what would prove it wrong. 160 to 240 words.";
   try{
-    const open = typeof rsOpen === "function" ? rsOpen() : [];
-    q = open[0] || null;
-    const R = typeof rsEnsure === "function" ? rsEnsure() : null;
-    if(q && R && R.qs) st = R.qs[q.id];
-  }catch(e){}
-  if(!q){
-    govCardOpen("The Academy", "Nothing on the bench", "No open question is far enough along to read.", "<p>When a question is open, this page will show the claim, the method, what would prove it wrong, and whether it is a real question, a model, or invented inside the world.</p>", null);
+    const text = await L.chat([
+      {role:"system", content:sys + "\nFacts:\n" + String(facts || "").slice(0, 1800)},
+      {role:"user", content:String(userText || "").slice(0, 1200)}
+    ], {max:680, temp:0.8, model:model || undefined});
+    const clean = String(text || "").trim();
+    if(!clean) return {live:false, why:"The model returned no words."};
+    return {live:true, text:clean, model:model || (L.config && L.config.model) || ""};
+  }catch(e){
+    return {live:false, why:String((e && e.message) || e || "The model did not answer.").slice(0, 220)};
+  }
+}
+function onumBenchAskBox(id){
+  return '<div class="eyebrow">Talk to them</div><p class="muted">This box tries the model on this machine every time. If it is not there, you get the reason, not a stock line dressed up as an answer.</p>' +
+    '<textarea id="' + id + 'Q" rows="3" style="width:100%;box-sizing:border-box" placeholder="Ask about the work in front of you."></textarea>' +
+    '<div class="card__actions"><button type="button" class="btn" id="' + id + 'Send">Ask, through the model</button></div><div class="dream" id="' + id + 'Say"></div>';
+}
+function onumWorkPage(){
+  let open = [];
+  try{ open = rsOpen(); }catch(e){}
+  if(!open.length){
+    govCardOpen("The Academy", "Nothing on the bench", "No question is open far enough to have a note.", "<p>When a question is open, this page keeps the note that was written for that stage. It does not reuse yesterday's paragraph.</p>" + onumBenchAskBox("acad"), null);
+    onumBenchBind("acad", null);
     return;
   }
-  const prog = st && st.prog != null ? Math.round(st.prog * 100) : 0;
-  const tries = st && st.tries != null ? st.tries : 0;
-  const html = '<p class="muted">REALITY: the question is a real kind of question. Nothing below is a discovery. No number here was produced by a simulation.</p>' +
-    '<div class="eyebrow">Claim</div><p>' + onumEsc(q.q || q.f) + '</p>' +
-    '<div class="eyebrow">Plain</div><p>The Academy has this filed under ' + onumEsc(q.f || "a field") + '. It is at the question stage. Reading it teaches you what is being asked, not an answer the game invented.</p>' +
-    '<div class="eyebrow">Method</div><p>Progress on the record is ' + prog + ' out of 100. Tries: ' + tries + '. Those two numbers come from the research ledger, not from a laboratory the game ran.</p>' +
-    '<div class="eyebrow">What would prove it wrong</div><p>A result that answers ' + onumEsc(q.q || "the question") + ' in the other direction, checked by someone who did not write it.</p>' +
-    '<div class="eyebrow">Limits</div><p>This page will not pretend a small model discovered new science. When a calculation is added later, it will be marked as a model and the inputs will be shown.</p>';
-  govCardOpen("The Academy", onumEsc(q.f || "A question"), "A page you can read. Not a label.", html, null);
+  open.forEach(function(q){ try{ onumBenchPaper(q); }catch(e){} });
+  const R = rsEnsure();
+  const papers = Object.keys(R.papers || {}).map(function(k){ return R.papers[k]; }).sort(function(a, b){ return (b.d || 0) - (a.d || 0); }).slice(0, 8);
+  const html = papers.map(function(p){
+    const mark = p.ledger ? "Written from the ledger, because the model had not answered this stage yet." : "Written by the model on this machine. Kept.";
+    return '<div style="margin:10px 0;padding-bottom:8px;border-bottom:1px solid var(--line-soft)"><b>' + onumEsc(p.field || "A field") + "</b> <span class=\"muted\">· " + onumEsc(p.bucket) + " · day " + p.d + " · " + p.prog + " · " + p.tries + " tries · " + onumEsc(p.who) + "</span>" +
+      "<p>" + onumEsc(p.claim || "") + "</p><p>" + onumEsc(p.text) + "</p><p class=\"muted\">" + mark + "</p>" +
+      ((p.talk || []).slice(-2).map(function(t){ return "<p><b>You asked.</b> " + onumEsc(t.q) + "</p><p><b>" + (t.live ? "The model" : "No model") + ".</b> " + onumEsc(t.a) + "</p>"; }).join("")) +
+      "</div>";
+  }).join("");
+  govCardOpen("The Academy", "The notes", "Each stage of a question keeps its own writing. A later stage does not paste the earlier one.", html + onumBenchAskBox("acad"), null);
+  onumBenchBind("acad", papers[0] || null);
+  onumBenchLive(papers.filter(function(p){ return p.ledger; }).slice(0, 1));
+}
+function onumBenchBind(id, paper){
+  const b = document.getElementById(id + "Send");
+  if(!b || b.dataset.bound) return;
+  b.dataset.bound = "1";
+  b.addEventListener("click", function(){
+    const box = document.getElementById(id + "Q");
+    const say = document.getElementById(id + "Say");
+    const q = (box && box.value || "").trim();
+    if(!q){ if(say) say.textContent = "Write the question first."; return; }
+    b.disabled = true;
+    if(say) say.textContent = "Asking the model.";
+    const facts = (function(){
+      let card = "";
+      try{ card = onumWorldCard(); }catch(e){}
+      const bit = paper ? (paper.who + " on " + paper.claim + " Progress " + paper.prog + ". " + paper.text) : "";
+      return card + "\n" + bit;
+    })();
+    onumOllamaAlways(id === "eng" ? "engine" : "academy", q, facts).then(function(r){
+      b.disabled = false;
+      const line = r.live ? r.text : ("The model did not answer. " + (r.why || "") + (paper ? " The note already on the page stands: " + paper.text.slice(0, 280) : ""));
+      if(say) say.textContent = line;
+      if(paper){
+        paper.talk = paper.talk || [];
+        paper.talk.push({d:G.day, q:q, a:line.slice(0, 900), live:!!r.live});
+        if(paper.talk.length > 8) paper.talk.shift();
+      }
+      if(id === "eng"){
+        try{
+          const E = engEnsure();
+          E.talk = E.talk || [];
+          E.talk.unshift({d:G.day, q:q, a:line.slice(0, 900), live:!!r.live});
+          if(E.talk.length > 16) E.talk.pop();
+        }catch(e){}
+      }
+    });
+  });
+}
+function onumBenchLive(list){
+  const p = list && list[0];
+  if(!p || onumBenchLive.busy) return;
+  onumBenchLive.busy = true;
+  const facts = p.who + ", day " + p.d + ", field " + p.field + ", progress " + p.prog + ", tries " + p.tries + ". Question: " + p.claim;
+  onumOllamaAlways("academy", "Write the note for this stage. Do not repeat: " + p.text.slice(0, 180), facts).then(function(r){
+    onumBenchLive.busy = false;
+    if(r.live && r.text && p.ledger){
+      p.text = r.text;
+      p.ledger = 0;
+      p.model = r.model || "";
+    }
+  });
 }
 { const _dress = onumEngDress; onumEngDress = function(){
   _dress.apply(this, arguments);
@@ -58008,7 +58124,7 @@ async function onumEngStudy(force){
   if(!thought){
     let fact = "the day";
     try{ const rows = onumFactsLines(); if(rows.length) fact = rows[0]; }catch(e){}
-    thought = "I read this: " + fact + ". I recommend you look at what is on the floor before you promise a result. Procedure rewritten: cite the field before the figure.";
+    return "The model did not answer on day " + (G.day || 1) + ". Nothing was rewritten. What the card actually says: " + fact;
   }
   const born = {id:"r" + O.generation, gen:O.generation + 1, d:G.day, t:String(thought).slice(0, 320)};
   O.routines.push(born);
@@ -58036,12 +58152,17 @@ function onumOrganismHTML(){
   const rows = (O.routines || []).slice(-4).map(function(r){
     return '<div style="border-left:3px solid #c9a24a;padding:4px 8px;margin:4px 0"><b>gen ' + r.gen + '</b> ' + onumEsc(r.t) + '</div>';
   }).join("");
+  const talks = ((E && E.talk) || []).slice(0, 3).map(function(t){
+    return "<p><b>You.</b> " + onumEsc(t.q) + "</p><p><b>" + (t.live ? "The model, day " + t.d : "No model, day " + t.d) + ".</b> " + onumEsc(t.a) + "</p>";
+  }).join("");
   return '<div class="eyebrow">What it has rewritten</div>' +
     '<p>Generation ' + O.generation + '. Copies at work: ' + (O.copies || []).length + '. ' + (O.halted ? "The key is turned. It is still." : "It is not being held back. You still hold the key.") + '</p>' +
-    '<p class="muted">Mind it will use, if one is running on this machine: ' + onumEsc(model) + '. A larger one is used when Ollama has it. Otherwise it studies from the record.</p>' +
+    '<p class="muted">It tries the model on this machine every time you ask or tell it to study. The one it will use: ' + onumEsc(model) + '.</p>' +
     rows +
     (O.last ? '<p>' + onumEsc(O.last.t) + '</p>' : '') +
-    '<div class="card__actions"><button type="button" class="btn" id="onumStudy">Let it study now</button> <button type="button" class="btn btn--ghost" id="onumKey">' + (O.halted ? "Turn the key back" : "Turn the key") + '</button></div>';
+    talks +
+    '<div class="card__actions"><button type="button" class="btn" id="onumStudy">Let it study now</button> <button type="button" class="btn btn--ghost" id="onumKey">' + (O.halted ? "Turn the key back" : "Turn the key") + '</button></div>' +
+    onumBenchAskBox("eng");
 }
 function onumOrganismBind(){
   const s = document.getElementById("onumStudy");
@@ -58067,6 +58188,7 @@ function onumOrganismBind(){
       try{ onumEngDress(); }catch(e){}
     });
   }
+  try{ onumBenchBind("eng", null); }catch(e){}
 }
 { const _dress = onumEngDress; onumEngDress = function(){
   const r = _dress.apply(this, arguments);
@@ -58086,6 +58208,20 @@ function onumOrganismBind(){
 { const _nd = nextDay; nextDay = function(){
   const r = _nd.apply(this, arguments);
   try{ onumEngStudy(false); }catch(e){}
+  try{ if(typeof rsOpen === "function") rsOpen().slice(0, 4).forEach(function(q){ onumBenchPaper(q); }); }catch(e){}
+  return r;
+}; }
+{ const _inq = inqCard; inqCard = function(){
+  const r = _inq.apply(this, arguments);
+  try{
+    if(typeof card !== "undefined" && card && !card.querySelector("#acadOpenNotes")){
+      const d = document.createElement("div");
+      d.className = "card__actions";
+      d.innerHTML = '<button type="button" class="btn" id="acadOpenNotes">The notes, and a way to talk to the bench</button>';
+      card.appendChild(d);
+      d.querySelector("#acadOpenNotes").addEventListener("click", function(){ onumWorkPage(); });
+    }
+  }catch(e){}
   return r;
 }; }
 
@@ -61660,7 +61796,7 @@ document.addEventListener("click", function(e){
 setInterval(function(){ try{ onumPlayDraw(); }catch(e){} }, 450);
 
 
-/* 20261123c */
+/* 20261123d */
 try{
   const _dk = onumDeskCard;
   onumDeskCard = function(o){
