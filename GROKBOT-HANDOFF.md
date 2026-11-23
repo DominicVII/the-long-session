@@ -17,18 +17,24 @@ One HTML body. Keep these **byte-identical**:
 | `session.html` | repo root |
 | `One Nation, Under, ME.html` | standalone name |
 
-**Build stamp (now): `20261122b`**
+**Build stamp (now): `20261122c`**
 
-- `<meta name="onum-build" content="20261122b">`
-- IIFE `STAMP = "20261122b"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
-- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261122b"`
+- `<meta name="onum-build" content="20261122c">`
+- IIFE `STAMP = "20261122c"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
+- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261122c"`
 - Wrapper iframe: `/session.html?v=${ONUM_BUILD}` in `src/routes/index.tsx`
 
-If you change the HTML, bump the letter (`20261122b`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
+If you change the HTML, bump the letter (`20261122c`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
 
 This sandbox tracks `public/session.html` as the playable body (root `index.html` / `session.html` / `One Nation, Under, ME.html` are not in this repo). Do not replace that file with a simpler build. Insert new game logic **inside** the main IIFE, before `})(); /* 20261110bx: main IIFE close, moved below the ba block */`.
 
-### Latest — `20261122b`
+### Latest — `20261122c`
+
+The play bar has one gold next step, and a test that reads the screen without moving you.
+
+**Test the flow** is on the bar. It checks that only one surface is up (the bar, a conversation, a card, or a prompt), that the bar has one gold next step, that a line can be said, that every way out is a real room, that a conversation has Leave, that your state's atlas has a governorship, and that the war chest page says milles and has the tape. Then it names the next three things to do, in order. It does not walk you, open a talk, or spend.
+
+The gold step is whoever asked for a word, else the door in reach, else the person close enough to speak to, else the desk, else the first way out. A Go, a talk, and the desk redraw the bar at once, so the old room does not linger.
 
 The war chest is a book, not a balance.
 
