@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261122d">
+<meta name="onum-build" content="20261123a">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -16,7 +16,7 @@
   img{max-width:100%}
   [hidden]:not([hidden="until-found"]){display:none!important}
 </style>
-<title>One Nation, Under, ME. · 20261122d</title>
+<title>One Nation, Under, ME. · 20261123a</title>
 <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'>  <rect width='32' height='32' fill='#0D1014'/>  <polygon fill='#A45F27' points='16,2.8 19.04,9.69 26.32,7.77 22.82,14.44 28.87,18.94 21.47,20.36 21.73,27.89 16,23 10.27,27.89 10.53,20.36 3.13,18.94 9.18,14.44 5.68,7.77 12.96,9.69'/></svg>">
 <meta property="og:title" content="One Nation, Under, ME.">
 <!-- Standalone: system fonts. No CDN, no vendor folder. -->
@@ -46,7 +46,7 @@
   window.onumLimSet = function(k, v){ if(!(k in D)) return false; L[k] = fix(v); try{ var o = JSON.parse(localStorage.getItem("onum.limits") || "{}") || {}; o[k] = (L[k] === INF) ? null : L[k]; localStorage.setItem("onum.limits", JSON.stringify(o)); }catch(e){} return true; };
   window.onumLimReset = function(){ try{ localStorage.removeItem("onum.limits"); }catch(e){} Object.keys(D).forEach(function(k){ L[k] = D[k]; }); L._eff = {}; L._gov = null; return true; };
   var show = function(v){ return v === INF ? "inf" : (typeof v === "number" ? Math.round(v * 100) / 100 : v); };
-  window.onumLimDump = function(){ var out = {build:"20261122d", mode:L.mode || "scale"}; Object.keys(D).forEach(function(k){ out[k] = show(L[k]); });
+  window.onumLimDump = function(){ var out = {build:"20261123a", mode:L.mode || "scale"}; Object.keys(D).forEach(function(k){ out[k] = show(L[k]); });
     out.effective = {}; Object.keys(L._eff).forEach(function(k){ out.effective[k] = show(L._eff[k]); }); out.governor = L._gov;
     try{ out.engineBudgetMs = window.onumEngine ? show(window.onumEngine.budget) : null; out.frameMs = window.onumEngine ? show(window.onumEngine.dtEma) : null; }catch(e){} return out; };
   window.onumLimLine = function(){ var d = window.onumLimDump(), e = d.effective, g = function(k){ return e[k] != null ? e[k] + "*" : d[k]; };
@@ -71,7 +71,7 @@
 </script>
 <script>
 (function(){
-  var STAMP = "20261122d";
+  var STAMP = "20261123a";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -983,7 +983,7 @@ body.boot-menu .shell{grid-template-rows:minmax(0,1fr)}
   <div class="grid">
     <div>
       <section class="stage">
-        <div class="scene" id="scene"><div class="boot" id="boot">Building the chamber… · 20261122d</div></div>
+        <div class="scene" id="scene"><div class="boot" id="boot">Building the chamber… · 20261123a</div></div>
         <div class="hud"><i id="whereTag">Location</i><b id="whereName">—</b></div>
         <div class="aims" id="aimsHud" hidden tabindex="0" aria-label="Today's aims"><i>Today's aims</i><b id="aimsNext"></b><div class="aims__all" id="aimsAll"></div></div>
         <div class="compass" id="compass" aria-hidden="true"><div class="compass__rail"></div><i class="compass__n">N</i><div id="compassTicks"></div></div>
@@ -60603,29 +60603,164 @@ function onumDeskHist(){
   return h;
 }
 
+function onumPageFlesh(tab){
+  const y = G.you || {};
+  const st = y.state || "your state";
+  const b = (G.bill && !G.bill.done) ? G.bill : null;
+  const mail = G.mail || [];
+  let unread = 0;
+  try{ unread = unreadCount() || 0; }catch(e){}
+  let h = '<div class="pc__h">What this drawer is holding</div>';
+  if(tab === "inbox"){
+    const fromHome = mail.filter(function(m){ return m && m.fromId == null && !m.outgoing; }).length;
+    const fromHouse = Math.max(0, mail.length - fromHome);
+    h += "<p>" + mail.length + " letters are in the box. " + unread + " are unopened. " + fromHome + " came from outside the building. " + fromHouse + " came from someone with a desk here.</p>";
+    h += "<p>An answer written on this page is the answer. It does not also have to be said in the corridor. A letter you leave for a day is still a letter. It is not a vote.</p>";
+  } else if(tab === "const"){
+    let hh = [];
+    try{ hh = townEnsure().hh || []; }catch(e){}
+    const sore = hh.filter(function(x){ return (x.mood || 0) < 35; }).length;
+    const withYou = hh.filter(function(x){ return (x.mood || 0) > 65; }).length;
+    h += "<p>" + hh.length + " households are filed on your street in " + pcEsc(st) + (y.dist ? " " + y.dist : "") + ". " + withYou + " are with you. " + sore + " are sore. The rest are watching. Home approval is " + Math.round(y.approval || 0) + ", which is the sounding, not the kitchen.</p>";
+    h += "<p>A household wants one thing said. The suggestion box is where they ask for a bill. This page is where they live. They are not the same pile.</p>";
+  } else if(tab === "people"){
+    const known = [].concat(G.members || [], G.civ || [], G.press || []).filter(function(m){ return m && !m.gone && m !== y && (m.met || (m.rel && Math.abs(m.rel.warmth || 0) > 6)); });
+    const warm = known.filter(function(m){ return ((m.rel && m.rel.warmth) || 0) > 20; }).length;
+    const cold = known.filter(function(m){ return ((m.rel && m.rel.warmth) || 0) < -12; }).length;
+    let spouse = "";
+    try{ const s = onumSpouse(y); if(s) spouse = " You are married to " + s.name + "."; }catch(e){}
+    h += "<p>The desk has " + known.length + " people it can file. " + warm + " are warm. " + cold + " are not." + pcEsc(spouse) + " Warmth is not loyalty, and loyalty is not a vote.</p>";
+    h += "<p>Supper, a confidence, and a step back are written on the person. They are not written on the office. If you leave the chair, the grudge comes with you.</p>";
+  } else if(tab === "news"){
+    const wire = (G.feed || []).length;
+    const night = (G.nightNews && G.nightNews.items) ? G.nightNews.items.length : 0;
+    const papers = (G.paperSeen || []).length;
+    h += "<p>The wire is holding " + wire + " lines. Overnight left " + night + ". Forbes has kept " + papers + " pieces so it does not print the same opening twice.</p>";
+    h += "<p>The Ledger is the morning paper. Forbes is the business daily. The wire is what was said in the building. They are three books. A sentence that fits one of them does not get copied into the other two.</p>";
+    if(b) h += "<p>The live bill is " + pcEsc(b.title) + ". A paper that has not named it today has not named it. The drawer will not pretend that it has.</p>";
+  } else if(tab === "ledger"){
+    let cash = 0, spent = 0, g = 100;
+    try{ const P = purseOf(y); cash = P.cash || 0; spent = P.spent || 0; }catch(e){}
+    try{ g = guilderIndex(); }catch(e){}
+    h += "<p>The purse is holding " + pcEsc((function(){ try{ return onumCoin(cash); }catch(e2){ return String(Math.round(cash)); } })()) + ". It has spent " + Math.round(spent) + " guilders on living. The guilder stands at " + (Math.round(g * 10) / 10) + ". The war chest is holding " + pcEsc(onumMilles(y.funds || 0)) + " and has spent " + pcEsc(onumMilles(y.spent || 0)) + " on the career.</p>";
+    h += "<p>A loaf, a coat, rent, and a share come out of the purse. An ad, an aide, and a colleague's race come out of the chest. Moving a number from one book to the other is not a thing this drawer does.</p>";
+  } else if(tab === "duties" || tab === "bills"){
+    let aye = 0, no = 0, open = 0;
+    if(b){
+      (G.members || []).forEach(function(m){
+        if(!m || m.gone) return;
+        try{
+          const v = memberVote(m, b);
+          if(v > 0) aye++; else if(v < 0) no++; else open++;
+        }catch(e){}
+      });
+    }
+    let role = "the chair", office = "the seat";
+    try{ role = roleTitle(); }catch(e){}
+    try{ office = officeTitle(); }catch(e){}
+    h += b
+      ? "<p>" + pcEsc(b.title) + " is the live bill. Among the members the desk can read: " + aye + " aye, " + no + " no, " + open + " not yet a side. The roll is day " + (b.voteDay || "?") + ". A count on this page is not the vote. The vote is the roll.</p>"
+      : "<p>There is no live bill. The duties of " + pcEsc(role) + " are still on the list above. An empty docket is not a day off.</p>";
+    h += "<p>You hold " + pcEsc(office) + ". The duty list is that office's, not a generic morning. What you did today is marked done. What you did not do is still owed.</p>";
+  } else if(tab === "sched"){
+    const today = (G.events || []).filter(function(e){ return e.day === G.day; });
+    const ahead = (G.events || []).filter(function(e){ return e.day > G.day && e.day <= G.day + 3; });
+    const nowH = Math.floor((G.minute || 0) / 60);
+    const left = today.filter(function(e){ return e.hour >= nowH && !e.done; }).length;
+    let hour = "this hour";
+    try{ hour = hourLabel(nowH); }catch(e){}
+    h += "<p>Today has " + today.length + " things written down. " + left + " of them are still ahead of " + pcEsc(hour) + ". The next three days have " + ahead.length + " more. A meeting that was not written down can still happen. The diary is not the building.</p>";
+    ahead.slice(0, 4).forEach(function(e){
+      h += "<div>Day " + e.day + " · " + pcEsc((function(){ try{ return hourLabel(e.hour); }catch(err){ return ""; } })()) + " · " + pcEsc(e.t || "") + " · " + pcEsc((ROOMS[e.room] && ROOMS[e.room].t) || e.room || "") + "</div>";
+    });
+    if(b) h += "<p>The roll on " + pcEsc(b.title) + " is day " + b.voteDay + ". It belongs on this page even when nobody wrote it into the diary.</p>";
+  } else if(tab === "sbox"){
+    let wait = 0, ideas = 0;
+    try{ wait = sbWaiting(); ideas = (sbEnsure().ideas || []).length; }catch(e){}
+    h += "<p>" + wait + " notes are waiting. " + ideas + " have already been adopted as something you might write. Leaving a note for four days is an answer. Adopting one does not file the bill. It puts the idea on your list.</p>";
+    h += "<p>The county underneath this page has its own books: wages, the mill, the farm, the grant. Those numbers are not the suggestion. They are what the suggestion is about.</p>";
+  } else if(tab === "money"){
+    const log = (y.chestLog || []).length;
+    h += "<p>The tape has " + log + " lines. The cap is 25,000 milles. Room left is " + pcEsc(onumMilles(Math.max(0, 25000 - (Number(y.funds) || 0)))) + ". A parish notice is refused where the ground does not keep that book. A file on a rival is refused when nobody is running. A refused cheque is not a line on the tape.</p>";
+  } else if(tab === "staff"){
+    const aides = (typeof onumAides === "function") ? onumAides() : [];
+    h += "<p>" + aides.length + " of three aides are on the payroll. Unread mail sitting for them: " + unread + ". Field organisers on the book: " + (y.field || 0) + ". " + (y.dOffice ? "The district office is open, so someone has to be at the door in the afternoon." : "There is no district office, so the field has no door of yours to sit in.") + "</p>";
+    h += "<p>An aide reads. An aide does not vote, does not whip, and does not say your sentence in a room you have not entered. Hiring a fourth is not a thing the desk allows.</p>";
+    if(aides.length){
+      aides.forEach(function(a){
+        h += "<div>" + pcEsc(a.name) + " has been on the desk since day " + (a.since || "?") + ". The unread pile is the work. There is no second job hiding under the title.</div>";
+      });
+    }
+  } else if(tab === "desk"){
+    const known = (G.members || []).filter(function(m){ return m && !m.gone && m.met && m !== y; }).length;
+    h += "<p>The telephone has " + known + " numbers, one for each person you have met. A call from here is the same call as standing at the phone. It writes the same line.</p>";
+    h += "<p>The party, Forbes, the exchange, the Ledger, the notebook, and the powers of the office are separate books. This blotter only opens them. It does not summarise them into one paragraph, because they are not one subject.</p>";
+  } else if(tab === "party"){
+    const mine = (G.members || []).filter(function(m){ return m && !m.gone && m.party === y.party && m !== y; });
+    let loy = 0;
+    mine.forEach(function(m){ loy += (m.traits && m.traits.loyalty) || 50; });
+    const avg = mine.length ? Math.round(loy / mine.length) : 0;
+    let pname = "Your party";
+    try{ pname = partyName(y.party); }catch(e){}
+    h += "<p>" + pcEsc(pname) + " has " + mine.length + " other members the desk can see. Mean loyalty is " + avg + ". A primary starts to breathe when your standing is under 40. Yours is " + Math.round(y.standing || 0) + ".</p>";
+    h += "<p>They are not one mouth. The line on this page is the line that member would say. Sitting them down is a different page, one person at a time.</p>";
+  } else if(tab === "polls"){
+    const hist = G.polls || [];
+    const last = hist.length ? hist[hist.length - 1] : null;
+    h += "<p>Home approval " + Math.round(y.approval || 0) + " is the district. Standing " + Math.round(y.standing || 0) + " is the building. Influence " + Math.round(y.influence || 0) + " is what you can still spend on a person today. National mood is " + (G.mood > 0 ? "+" : "") + Math.round(G.mood || 0) + ". These are four different questions.</p>";
+    h += last
+      ? "<p>The last sounding the desk trusts is day " + last.d + ", " + last.v + (last.paper ? ", printed by " + pcEsc(last.paper) : "") + (last.n ? ", " + last.n + " households" : "") + (last.ask ? ", asked about " + pcEsc(last.ask) : "") + ". The margin of error is " + (last.moe || 3) + ". A movement smaller than that is not a movement.</p>"
+      : "<p>No sounding has been filed yet. Until one is, the three numbers above are the canvass and the cloakroom, not a poll. The page will not invent a newspaper to hold them.</p>";
+  } else if(tab === "elect"){
+    let field = [];
+    try{ field = (onumCamp().field || []).filter(function(f){ return !f.out; }); }catch(e){}
+    const log = (G.camp && G.camp.log) || [];
+    h += "<p>" + field.length + " people are actually in a race against the offices you can reach. The chest pays a rally and an ad. Canvassing and debate prep do not. A point on a sounding is not a vote.</p>";
+    if(log.length) log.slice(0, 4).forEach(function(l){ h += "<div>Day " + l.d + " · " + pcEsc(l.t) + "</div>"; });
+    else h += "<p>The campaign log is empty. Nothing on this page has been done yet. The field is still there.</p>";
+  } else if(tab === "web"){
+    let posts = [];
+    try{ posts = onumWeb().posts || []; }catch(e){}
+    const mine = posts.filter(function(p){ return y && p.owner === y.name; }).length;
+    const answered = posts.filter(function(p){ return (p.replies || []).some(function(r){ return y && r.by === y.name; }); }).length;
+    h += "<p>" + posts.length + " pages are up. " + mine + " are in your name. You have answered " + answered + ". A page is a person or a paper, not a feed. An answer is remembered by the person who wrote the page.</p>";
+  } else if(tab === "hist" || tab === "lore"){
+    let book = null;
+    try{ if(y.state) book = onumAtlasEnsure(y.state); }catch(e){}
+    const fam = (G.fam && G.fam.events) || [];
+    h += "<p>The family file has " + fam.length + " births, weddings, and burials. What nobody wrote down is not in this drawer, and the drawer will not backfill it.</p>";
+    if(book) h += "<p>" + pcEsc(st) + " was admitted in " + (book.admitted || "a year the book has") + ". The governorship has " + (book.govs || []).length + " names. That book is the atlas, on the map. This drawer is the family and the lines that were kept.</p>";
+  } else {
+    h += "<p>This drawer is open. If it looks empty, nothing has been filed under it yet. The page will not invent a filing to look busy.</p>";
+  }
+  return h;
+}
 pcTab = function(){
   const t = PC.tab || "inbox";
+  let body = "";
   try{
-    if(t === "inbox") return onumDeskInbox();
-    if(t === "const") return onumDeskConst();
-    if(t === "people") return onumDeskPeople();
-    if(t === "news") return onumDeskNews();
-    if(t === "ledger") return onumDeskLedger();
-    if(t === "duties" || t === "bills") return onumDeskDuties();
-    if(t === "sched") return onumDeskSched();
-    if(t === "sbox") return onumDeskSbox();
-    if(t === "money") return onumDeskMoney();
-    if(t === "staff") return onumDeskStaff();
-    if(t === "desk") return onumDeskSurface();
-    if(t === "party") return onumDeskParty();
-    if(t === "polls") return onumDeskPolls();
-    if(t === "elect") return onumDeskElect();
-    if(t === "web") return onumDeskWeb();
-    if(t === "hist" || t === "lore") return onumDeskHist();
+    if(t === "inbox") body = onumDeskInbox();
+    else if(t === "const") body = onumDeskConst();
+    else if(t === "people") body = onumDeskPeople();
+    else if(t === "news") body = onumDeskNews();
+    else if(t === "ledger") body = onumDeskLedger();
+    else if(t === "duties" || t === "bills") body = onumDeskDuties();
+    else if(t === "sched") body = onumDeskSched();
+    else if(t === "sbox") body = onumDeskSbox();
+    else if(t === "money") body = onumDeskMoney();
+    else if(t === "staff") body = onumDeskStaff();
+    else if(t === "desk") body = onumDeskSurface();
+    else if(t === "party") body = onumDeskParty();
+    else if(t === "polls") body = onumDeskPolls();
+    else if(t === "elect") body = onumDeskElect();
+    else if(t === "web") body = onumDeskWeb();
+    else if(t === "hist" || t === "lore") body = onumDeskHist();
+    else body = '<p class="pc__m">That drawer is empty.</p>';
   }catch(err){
     return '<p class="pc__m">This page failed. ' + pcEsc(err && err.message) + "</p>";
   }
-  return '<p class="pc__m">That drawer is empty.</p>';
+  try{ body += onumPageFlesh(t); }catch(e){}
+  return body;
 };
 
 { const _boot = pcBoot; pcBoot = function(){
@@ -61524,7 +61659,7 @@ document.addEventListener("click", function(e){
 setInterval(function(){ try{ onumPlayDraw(); }catch(e){} }, 450);
 
 
-/* 20261122d */
+/* 20261123a */
 try{
   const _dk = onumDeskCard;
   onumDeskCard = function(o){

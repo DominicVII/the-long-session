@@ -17,18 +17,22 @@ One HTML body. Keep these **byte-identical**:
 | `session.html` | repo root |
 | `One Nation, Under, ME.html` | standalone name |
 
-**Build stamp (now): `20261122d`**
+**Build stamp (now): `20261123a`**
 
-- `<meta name="onum-build" content="20261122d">`
-- IIFE `STAMP = "20261122d"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
-- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261122d"`
+- `<meta name="onum-build" content="20261123a">`
+- IIFE `STAMP = "20261123a"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
+- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261123a"`
 - Wrapper iframe: `/session.html?v=${ONUM_BUILD}` in `src/routes/index.tsx`
 
-If you change the HTML, bump the letter (`20261122d`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
+If you change the HTML, bump the letter (`20261123a`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
 
 This sandbox tracks `public/session.html` as the playable body (root `index.html` / `session.html` / `One Nation, Under, ME.html` are not in this repo). Do not replace that file with a simpler build. Insert new game logic **inside** the main IIFE, before `})(); /* 20261110bx: main IIFE close, moved below the ba block */`.
 
-### Latest — `20261122d`
+### Latest — `20261123a`
+
+Every desk drawer ends with what that drawer is actually holding. The numbers are the live ones. An empty list does not get a fake filing.
+
+Inbox: how many letters, how many unopened, how many from outside the building. Constituents: households with you, households that are sore, and that the kitchen is not the suggestion box. People: warm, cold, and a marriage if there is one. News: the wire, the overnight, and Forbes kept separate. Ledger: purse against chest, and what each one is allowed to buy. Duties: aye, no, and not-yet on the live bill, and that the count is not the roll. Schedule: what is left today, and the next three days by name. Suggestions: waiting notes against adopted ideas. War chest: the tape, the room left, and which cheques get refused. Staff: which aide, since which day, and the unread pile that is their work. The blotter: how many numbers are on the phone. Party: how many members, mean loyalty, and your standing against 40. Polls: four different questions, and the last sounding with its margin of error, or an honest empty. Elections: who is actually running, and the campaign log. The Web: how many pages are yours and how many you answered. History: the family file, and the state's admission and governorship from the atlas, cited, not copied.
 
 The atlas stops repeating one sentence.
 
