@@ -17,18 +17,28 @@ One HTML body. Keep these **byte-identical**:
 | `session.html` | repo root |
 | `One Nation, Under, ME.html` | standalone name |
 
-**Build stamp (now): `20261123g`**
+**Build stamp (now): `20261123h`**
 
-- `<meta name="onum-build" content="20261123g">`
-- IIFE `STAMP = "20261123g"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
-- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261123g"`
+- `<meta name="onum-build" content="20261123h">`
+- IIFE `STAMP = "20261123h"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
+- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261123h"`
 - Wrapper iframe: `/session.html?v=${ONUM_BUILD}` in `src/routes/index.tsx`
 
-If you change the HTML, bump the letter (`20261123g`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
+If you change the HTML, bump the letter (`20261123h`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
 
 This sandbox tracks `public/session.html` as the playable body (root `index.html` / `session.html` / `One Nation, Under, ME.html` are not in this repo). Do not replace that file with a simpler build. Insert new game logic **inside** the main IIFE, before `})(); /* 20261110bx: main IIFE close, moved below the ba block */`.
 
-### Latest — `20261123g`
+### Latest — `20261123h`
+
+A bill no longer walks straight onto the floor. The day the roll would have been called, the House is still in committee, and the feed says so.
+
+The path is assigned, hearing, amendment, committee count, Senate committee, then the floor. The chair is the member on that committee with the most terms. If that chair is hard against the bill, they can refuse to schedule it. Three refusals and it dies without a floor vote. Discharge to the floor costs 6 influence.
+
+Open **The Republic**, then **The committee**. The hearing names who was called, including a member, a civilian, the press, and a Treasury clerk with the guilder as it stands. An amendment names the member, the state it is limited to, and the senior member they came up under, if there is one. Each member on the card has a birth year, a place they came from, a reputation earned from how they already vote and how loyal they are, and two staff: a chief of staff and a legislative aide.
+
+**The journals** prints papers from the guilder, the debt, industry by state, and any open work. A second scholar answers the first. The Rennian School and the Caster School do not describe two countries. The legislative staff note on the live bill is a weight read off that bill's own marks, plus the guilder and the debt, and a constitutional question only when the enforcement mark is large.
+
+`G.chamber` and `G.letters` are in the save. The real floor vote is unchanged once a bill is actually on the floor.
 
 The Republic argues about its own past. Open **The Republic**, then **The library**.
 
