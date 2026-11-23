@@ -17,18 +17,24 @@ One HTML body. Keep these **byte-identical**:
 | `session.html` | repo root |
 | `One Nation, Under, ME.html` | standalone name |
 
-**Build stamp (now): `20261123d`**
+**Build stamp (now): `20261123e`**
 
-- `<meta name="onum-build" content="20261123d">`
-- IIFE `STAMP = "20261123d"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
-- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261123d"`
+- `<meta name="onum-build" content="20261123e">`
+- IIFE `STAMP = "20261123e"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
+- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261123e"`
 - Wrapper iframe: `/session.html?v=${ONUM_BUILD}` in `src/routes/index.tsx`
 
-If you change the HTML, bump the letter (`20261123d`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
+If you change the HTML, bump the letter (`20261123e`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
 
 This sandbox tracks `public/session.html` as the playable body (root `index.html` / `session.html` / `One Nation, Under, ME.html` are not in this repo). Do not replace that file with a simpler build. Insert new game logic **inside** the main IIFE, before `})(); /* 20261110bx: main IIFE close, moved below the ba block */`.
 
-### Latest — `20261123d`
+### Latest — `20261123e`
+
+The model is in the menu. Open Settings. Under the voice sliders: **The model**, **Engine**, **Server**, and **Test the model**. The names Ollama reported are in the list. The pill that says Live or Offline is back above the play bar, and it names the model.
+
+The Engine and the Academy speak without being asked. About twenty-five seconds after the page is up, and then every minute and a half, one of them says something, if the model is actually there. It goes on the wire. If voices are on, it is spoken. They take turns. If the key is turned, the Engine stays quiet. A miss does not fill the wire with an error.
+
+The morning no longer calls the model while the day is turning. That was the hitch. A study you ask for, and a question you type, still go to the model you named. It does not silently switch to the biggest one on the machine.
 
 The Academy and the Engine keep the writing, and they try the model every time you talk to them.
 
