@@ -17,18 +17,32 @@ One HTML body. Keep these **byte-identical**:
 | `session.html` | repo root |
 | `One Nation, Under, ME.html` | standalone name |
 
-**Build stamp (now): `20261123b`**
+**Build stamp (now): `20261123c`**
 
-- `<meta name="onum-build" content="20261123b">`
-- IIFE `STAMP = "20261123b"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
-- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261123b"`
+- `<meta name="onum-build" content="20261123c">`
+- IIFE `STAMP = "20261123c"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
+- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261123c"`
 - Wrapper iframe: `/session.html?v=${ONUM_BUILD}` in `src/routes/index.tsx`
 
-If you change the HTML, bump the letter (`20261123b`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
+If you change the HTML, bump the letter (`20261123c`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
 
 This sandbox tracks `public/session.html` as the playable body (root `index.html` / `session.html` / `One Nation, Under, ME.html` are not in this repo). Do not replace that file with a simpler build. Insert new game logic **inside** the main IIFE, before `})(); /* 20261110bx: main IIFE close, moved below the ba block */`.
 
-### Latest — `20261123b`
+### Latest — `20261123c`
+
+All four tiers are on the national journal's clock. Open it from History or Duties.
+
+The bureaucracy has efficiency, staffing, corruption, and experience. Works move at that efficiency. Graft on a work raises corruption. An inquiry can be opened. It reports in twenty days. A resignation happens only if the book is bad enough. Acquittal does not scrub the graft notes.
+
+Opinion is not your approval. Government, institutions, and eight classes (workers, dockworkers, farmers, owners, civil servants, clergy, students, professionals) each have a mood that moves with unrest.
+
+The faiths are the confessions actually on the members, counted. The houses are the names on a living roll of citizens, plus anyone in the House who bears that name. The roll is sixteen people who age on New Year's Day, and who can be born or die, with the name kept after death. It is a roll, not a census of millions.
+
+Five papers split the same fact every seventh day: the State Gazette, the Harbour Independent, the Reform, the Hall, the Evening Cry. The opposition, if someone is running at you, acts every eleventh day and the journal says which method. The neighbors (Pale, Marches, Reach, Horn, Isles) send a note, offer trade, or hold the border, on their own standing.
+
+Crises open only when the condition is true: guilder over 150, debt on the works over 2,500, a state over unrest 80, corruption over 45. They close into memory after forty-five days. Memory is cited with an until-day. A shop in a district takes on a hand every two weeks without you. The coast's description ages with the year: timber pier, industrial port, harbor and rail, container terminal.
+
+What this is not: a separate person for every citizen in a state of millions, a court you can walk into for every bribe, or a foreign capital with its own parliament. Those would be a different game. What is here is on the clock, saved, and written into the journal when it happens.
 
 Tier 1 of the long list is in the game, not only on the list.
 

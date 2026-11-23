@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="onum-build" content="20261123b">
+<meta name="onum-build" content="20261123c">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#15181e">
 <meta name="description" content="One Nation, Under, ME. A first-person political life simulator. You are one member of a legislature in an invented republic, and the only thing you accumulate is what other people think of you.">
@@ -16,7 +16,7 @@
   img{max-width:100%}
   [hidden]:not([hidden="until-found"]){display:none!important}
 </style>
-<title>One Nation, Under, ME. · 20261123b</title>
+<title>One Nation, Under, ME. · 20261123c</title>
 <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'>  <rect width='32' height='32' fill='#0D1014'/>  <polygon fill='#A45F27' points='16,2.8 19.04,9.69 26.32,7.77 22.82,14.44 28.87,18.94 21.47,20.36 21.73,27.89 16,23 10.27,27.89 10.53,20.36 3.13,18.94 9.18,14.44 5.68,7.77 12.96,9.69'/></svg>">
 <meta property="og:title" content="One Nation, Under, ME.">
 <!-- Standalone: system fonts. No CDN, no vendor folder. -->
@@ -46,7 +46,7 @@
   window.onumLimSet = function(k, v){ if(!(k in D)) return false; L[k] = fix(v); try{ var o = JSON.parse(localStorage.getItem("onum.limits") || "{}") || {}; o[k] = (L[k] === INF) ? null : L[k]; localStorage.setItem("onum.limits", JSON.stringify(o)); }catch(e){} return true; };
   window.onumLimReset = function(){ try{ localStorage.removeItem("onum.limits"); }catch(e){} Object.keys(D).forEach(function(k){ L[k] = D[k]; }); L._eff = {}; L._gov = null; return true; };
   var show = function(v){ return v === INF ? "inf" : (typeof v === "number" ? Math.round(v * 100) / 100 : v); };
-  window.onumLimDump = function(){ var out = {build:"20261123b", mode:L.mode || "scale"}; Object.keys(D).forEach(function(k){ out[k] = show(L[k]); });
+  window.onumLimDump = function(){ var out = {build:"20261123c", mode:L.mode || "scale"}; Object.keys(D).forEach(function(k){ out[k] = show(L[k]); });
     out.effective = {}; Object.keys(L._eff).forEach(function(k){ out.effective[k] = show(L._eff[k]); }); out.governor = L._gov;
     try{ out.engineBudgetMs = window.onumEngine ? show(window.onumEngine.budget) : null; out.frameMs = window.onumEngine ? show(window.onumEngine.dtEma) : null; }catch(e){} return out; };
   window.onumLimLine = function(){ var d = window.onumLimDump(), e = d.effective, g = function(k){ return e[k] != null ? e[k] + "*" : d[k]; };
@@ -71,7 +71,7 @@
 </script>
 <script>
 (function(){
-  var STAMP = "20261123b";
+  var STAMP = "20261123c";
   try{
     if(navigator.serviceWorker){
       navigator.serviceWorker.getRegistrations().then(function(rs){
@@ -983,7 +983,7 @@ body.boot-menu .shell{grid-template-rows:minmax(0,1fr)}
   <div class="grid">
     <div>
       <section class="stage">
-        <div class="scene" id="scene"><div class="boot" id="boot">Building the chamber… · 20261123b</div></div>
+        <div class="scene" id="scene"><div class="boot" id="boot">Building the chamber… · 20261123c</div></div>
         <div class="hud"><i id="whereTag">Location</i><b id="whereName">—</b></div>
         <div class="aims" id="aimsHud" hidden tabindex="0" aria-label="Today's aims"><i>Today's aims</i><b id="aimsNext"></b><div class="aims__all" id="aimsAll"></div></div>
         <div class="compass" id="compass" aria-hidden="true"><div class="compass__rail"></div><i class="compass__n">N</i><div id="compassTicks"></div></div>
@@ -61660,7 +61660,7 @@ document.addEventListener("click", function(e){
 setInterval(function(){ try{ onumPlayDraw(); }catch(e){} }, 450);
 
 
-/* 20261123b */
+/* 20261123c */
 try{
   const _dk = onumDeskCard;
   onumDeskCard = function(o){
@@ -61754,10 +61754,14 @@ function onumWorkTick(){
   onumWorks().forEach(function(w){
     if(w.prog >= 100) return;
     let step = 100 / Math.max(1, w.days);
+    try{
+      const eff = onumLiving().bureau.efficiency;
+      step *= Math.max(0.35, eff / 80);
+    }catch(e){}
     const slip = ((G.day || 1) + w.t.length) % 19 === 0;
     const graft = ((G.day || 1) + w.cost) % 29 === 0;
     if(slip){ w.delay = (w.delay || 0) + 1; step *= 0.35; }
-    if(graft){ w.graft = (w.graft || 0) + 1; step *= 0.5; }
+    if(graft){ w.graft = (w.graft || 0) + 1; step *= 0.5; try{ const L = onumLiving(); L.bureau.corruption = Math.min(90, (L.bureau.corruption || 0) + 1); }catch(e){} }
     w.prog = Math.min(100, Math.round((w.prog + step) * 10) / 10);
     if(w.prog >= 100 && !w.done){
       w.done = G.day;
@@ -61795,9 +61799,211 @@ function onumMinistryMonth(){
   }
   onumAnnalsWrite("ministry", e.label + ". " + row[0] + ". " + row[1] + extra);
 }
+function onumLiving(){
+  if(G.living && G.living.v === 1 && G.living.citizens) return G.living;
+  const states = (G.states || []).map(function(s){ return s.n; });
+  const trades = ["mill hand","dock hand","farmer","clerk","owner","teacher","priest","student","nurse","miner"];
+  const people = [];
+  for(let i = 0; i < 16; i++){
+    const st = states.length ? states[i % states.length] : "the Republic";
+    let name = "A citizen";
+    try{ name = onumAtlasName(st, "cit" + i); }catch(e){}
+    people.push({
+      name:name, state:st, age:22 + ((i * 7) % 48),
+      trade:trades[i % trades.length],
+      house:(typeof HOUSES !== "undefined" ? HOUSES[i % HOUSES.length] : ""),
+      alive:1, note:"On the roll since the book opened."
+    });
+  }
+  const powers = (typeof WORLD_POWERS !== "undefined" ? WORLD_POWERS : []).map(function(p){
+    return {k:p.k, t:p.t, want:p.want, rel:0, trade:10};
+  });
+  G.living = {
+    v:1, day:0,
+    bureau:{efficiency:58, staff:40, corruption:8, experience:12},
+    classes:[
+      {k:"workers", t:"Workers", mood:0},
+      {k:"dock", t:"Dockworkers", mood:0},
+      {k:"farm", t:"Farmers", mood:0},
+      {k:"owners", t:"Business owners", mood:0},
+      {k:"civil", t:"Civil servants", mood:0},
+      {k:"clergy", t:"Clergy", mood:0},
+      {k:"students", t:"Students", mood:0},
+      {k:"prof", t:"Professionals", mood:0}
+    ],
+    foreign:powers,
+    papers:[
+      {k:"state", t:"the State Gazette"},
+      {k:"cons", t:"the Harbour Independent"},
+      {k:"lib", t:"the Reform"},
+      {k:"labor", t:"the Hall"},
+      {k:"tab", t:"the Evening Cry"}
+    ],
+    takes:[],
+    crises:[],
+    memory:[],
+    citizens:people,
+    stage:"",
+    scandal:null
+  };
+  return G.living;
+}
+function onumStageName(year){
+  if(year < 1860) return "a timber pier and a small dock";
+  if(year < 1900) return "an industrial port, iron and brick";
+  if(year < 1950) return "a harbor with sheds and a rail spur";
+  return "a container terminal, the old pier still named on the map";
+}
+function onumLivingTick(){
+  const L = onumLiving();
+  if(L.day === G.day) return;
+  L.day = G.day;
+  const e = onumEra();
+  const unrests = (G.states || []).map(function(s){ return s.unrest || 0; });
+  const avgU = unrests.length ? unrests.reduce(function(a, b){ return a + b; }, 0) / unrests.length : 0;
+  L.classes.forEach(function(c, i){
+    const pull = (avgU > 55 ? -1 : avgU < 35 ? 1 : 0);
+    if((G.day + i) % 5 === 0) c.mood = Math.max(-40, Math.min(40, (c.mood || 0) + pull));
+  });
+  L.bureau.experience = Math.min(80, (L.bureau.experience || 0) + (G.day % 30 === 0 ? 1 : 0));
+  L.bureau.efficiency = Math.max(30, Math.min(90, 70 - Math.round((L.bureau.corruption || 0) / 3) + Math.round((L.bureau.experience || 0) / 10)));
+  const stage = onumStageName(e.year);
+  if(L.stage && L.stage !== stage){
+    onumAnnalsWrite("age", "The coast is no longer " + L.stage + ". It is " + stage + ". The nation aged. The map did not forget the old name.");
+    L.memory.unshift({k:"stage", t:stage, until:(G.day || 1) + 3650});
+  }
+  L.stage = stage;
+  if(e.day === 1 && G.day > 1){
+    L.citizens.forEach(function(c){ if(c.alive) c.age = (c.age || 30) + 1; });
+    const old = L.citizens.filter(function(c){ return c.alive && c.age > 78; })[0];
+    if(old){
+      old.alive = 0;
+      old.note = "Died " + e.label + ", aged " + old.age + ".";
+      onumAnnalsWrite("death", old.name + " of " + old.state + ", " + old.trade + ", of the house of " + (old.house || "no great house") + ", died at " + old.age + ". The roll keeps the name.");
+      L.memory.unshift({k:"death", t:old.name, until:(G.day || 1) + 365});
+    }
+    const young = L.citizens.filter(function(c){ return c.alive && c.age > 22 && c.age < 40; });
+    if(young.length >= 2 && (G.day % 730) < 40){
+      const a = young[0], b = young[1];
+      const child = {name:onumAtlasName(a.state, "born" + G.day), state:a.state, age:0, trade:"a child", house:a.house, alive:1, note:"Born " + e.label + " to " + a.name + " and " + b.name + "."};
+      L.citizens.push(child);
+      if(L.citizens.length > 40) L.citizens = L.citizens.filter(function(c){ return c.alive; }).concat(L.citizens.filter(function(c){ return !c.alive; })).slice(0, 40);
+      onumAnnalsWrite("birth", child.name + " was born in " + a.state + ", of the house of " + (a.house || "no great house") + ". " + a.name + " and " + b.name + " are the parents on the roll.");
+    }
+  }
+  if((G.day % 11) === 0){
+    let foe = null;
+    try{ foe = (typeof rivalLive === "function") ? rivalLive() : null; }catch(err){}
+    if(foe){
+      const moves = [
+        foe.name + " bought space in a paper against you. It is a campaign, not yet an investigation.",
+        foe.name + " asked a committee to look at the works. Asking is not a subpoena.",
+        foe.name + " recruited in " + (foe.from || "your state") + ". The list is theirs until you answer it.",
+        foe.name + " held a day in the House on procedure. The bill, if there is one, is slower by that day."
+      ];
+      onumAnnalsWrite("opposition", moves[(G.day / 11) % moves.length | 0]);
+    }
+  }
+  if((G.day % 7) === 3){
+    const last = onumAnnals()[0];
+    const subject = last ? last.t : ((G.bill && !G.bill.done) ? G.bill.title : "a quiet week");
+    const voices = [
+      ["the State Gazette", "records it and does not take a side: "],
+      ["the Harbour Independent", "calls it the port's business and the capital's fault: "],
+      ["the Reform", "says the old way is the obstacle: "],
+      ["the Hall", "asks who pays, and who is hired: "],
+      ["the Evening Cry", "prints the name and leaves out the number: "]
+    ];
+    L.takes.unshift({d:G.day, lines:voices.map(function(v){ return v[0] + " " + v[1] + subject; })});
+    if(L.takes.length > 6) L.takes.pop();
+    onumAnnalsWrite("papers", "The papers split on the same fact. The Gazette records it. The Cry prints the name. They are not the same story.");
+  }
+  if(L.foreign.length && (G.day % 20) === 0){
+    const f = L.foreign[Math.floor(G.day / 20) % L.foreign.length];
+    f.rel = Math.max(-20, Math.min(20, (f.rel || 0) + (avgU > 50 ? -1 : 1)));
+    const act = f.rel > 6 ? "offers a trade talk. Nothing is signed." : f.rel < -6 ? "holds the border and sends no minister." : "sends a note and waits.";
+    onumAnnalsWrite("foreign", f.t + " " + act + " They want " + (f.want || "their own interest") + ".");
+  }
+  if(L.scandal && !L.scandal.done && G.day >= L.scandal.due){
+    L.scandal.done = G.day;
+    const hard = (L.bureau.corruption || 0) > 25;
+    const clerk = (L.citizens.filter(function(c){ return c.alive && c.trade === "clerk"; })[0] || {}).name || "a clerk in the works";
+    const line = hard
+      ? clerk + " resigns. The inquiry found the graft notes were not a rumour. Corruption on the book falls. The works do not become honest by the resignation."
+      : "The inquiry closes without a resignation. The graft notes stay on the works that earned them. Acquittal is not a cleaning.";
+    if(hard) L.bureau.corruption = Math.max(0, L.bureau.corruption - 12);
+    onumAnnalsWrite("trial", line);
+  }
+  L.crises = (L.crises || []).filter(function(c){ return !c.done; });
+  L.crises.forEach(function(c){ if(G.day - c.d > 45){ c.done = G.day; onumAnnalsWrite("crisis", "The " + c.k.split(":")[0] + " noted on day " + c.d + " is no longer the emergency. It is memory until day " + (c.d + 365) + "."); } });
+  try{ onumCrisisCheck(); }catch(err){}
+  if(e.month === 8 && e.day === 12) onumAnnalsWrite("culture", "Harbor Festival. The tables are fish and the mill's bread. It is not a session, and the papers still come out.");
+  if((G.day % 14) === 9){
+    const st = (G.states || [])[G.day % Math.max(1, (G.states || []).length)];
+    if(st){
+      st.ind = Math.min(100, (st.ind || 0) + 0.15);
+      onumAnnalsWrite("trade", "A shop in " + st.n + " took on a hand. Industry there is " + Math.round(st.ind) + ". Nobody in the capital filed it. The street did.");
+    }
+  }
+}
+function onumCrisisCheck(){
+  const L = onumLiving();
+  const open = function(k, t){
+    if((L.crises || []).some(function(c){ return c.k === k && !c.done; })) return;
+    L.crises.unshift({k:k, t:t, d:G.day, done:0});
+    L.memory.unshift({k:k, t:t, until:(G.day || 1) + 365});
+    if(L.memory.length > 24) L.memory.pop();
+    onumAnnalsWrite("crisis", t);
+  };
+  let g = 100;
+  try{ g = guilderIndex(); }catch(e){}
+  if(g > 150) open("inflation", "Inflation. The guilder is at " + (Math.round(g * 10) / 10) + ". Treasury has the figure. The shops do not wait for a speech.");
+  if((G.republic && G.republic.debt) > 2500) open("debt", "The debt on the works is " + Math.round(G.republic.debt) + ". A banking note is filed. It is not yet a panic.");
+  const hot = (G.states || []).filter(function(s){ return (s.unrest || 0) > 80; })[0];
+  if(hot) open("strike:" + hot.n, "A strike is called in " + hot.n + ". Unrest " + Math.round(hot.unrest) + ". It is a strike. It is not a riot unless the day is written that way later.");
+  if((L.bureau.corruption || 0) > 45) open("graft", "Corruption on the works is " + L.bureau.corruption + ". An inquiry is the remedy on this page. A speech is not.");
+}
+function onumInquiry(){
+  const L = onumLiving();
+  if(L.scandal && !L.scandal.done) return "The inquiry is already open. It reports on day " + L.scandal.due + ".";
+  L.scandal = {d:G.day, due:(G.day || 1) + 20, done:0};
+  const line = "An inquiry into the works is opened. It reports on day " + L.scandal.due + ". Opening it is not a conviction.";
+  onumAnnalsWrite("inquiry", line);
+  return line;
+}
+function onumFaithBook(){
+  const counts = {};
+  (G.members || []).forEach(function(m){
+    if(!m || m.gone) return;
+    const k = m.creed || "none";
+    counts[k] = (counts[k] || 0) + 1;
+  });
+  return Object.keys(counts).map(function(k){
+    let t = k;
+    try{ const c = (typeof CREEDS !== "undefined" ? CREEDS : []).filter(function(x){ return x.k === k; })[0]; if(c) t = c.t; }catch(e){}
+    return {k:k, t:t, n:counts[k]};
+  }).sort(function(a, b){ return b.n - a.n; });
+}
+function onumHouseBook(){
+  const map = {};
+  onumLiving().citizens.forEach(function(c){
+    const h = c.house || "no great house";
+    if(!map[h]) map[h] = {t:h, roll:0, alive:0, seats:0};
+    map[h].roll++;
+    if(c.alive) map[h].alive++;
+  });
+  (G.members || []).forEach(function(m){
+    if(!m || m.gone || !m.name) return;
+    Object.keys(map).forEach(function(h){
+      if(h !== "no great house" && m.name.indexOf(h) >= 0) map[h].seats++;
+    });
+  });
+  return Object.keys(map).map(function(k){ return map[k]; }).sort(function(a, b){ return (b.seats * 5 + b.alive) - (a.seats * 5 + a.alive); });
+}
 function onumRepublicDay(){
   try{ onumWorkTick(); }catch(e){}
   try{ onumMinistryMonth(); }catch(e){}
+  try{ onumLivingTick(); }catch(e){}
   try{
     const e = onumEra();
     if(e.day === 15){
@@ -61831,10 +62037,44 @@ function onumRepublicCard(){
   const ann = onumAnnals().slice(0, 24).map(function(a){
     return "<div>Day " + a.d + " · " + a.y + " · " + pcEsc(a.k) + " · " + pcEsc(a.t) + "</div>";
   }).join("");
+  let L = null;
+  try{ L = onumLiving(); }catch(err){}
+  let living = "";
+  if(L){
+    const y = G.you || {};
+    const govMood = Math.round(Math.max(0, Math.min(100, (y.approval || 50) - ((L.bureau.corruption || 0) / 4))));
+    const inst = Math.round(Math.max(0, Math.min(100, 80 - (L.bureau.corruption || 0))));
+    living += "<h2>The bureaucracy</h2><p>Efficiency " + L.bureau.efficiency + ". Staffing " + L.bureau.staff + ". Corruption " + L.bureau.corruption + ". Experience " + L.bureau.experience + ". A work moves at this efficiency, not at the speed of the vote. " + (L.stage ? "The coast, this year, is " + pcEsc(L.stage) + "." : "") + "</p>";
+    living += '<button type="button" class="btn btn--ghost" data-inq="1">Open an inquiry into the works</button>';
+    if(L.scandal && !L.scandal.done) living += "<p>An inquiry is open. It reports on day " + L.scandal.due + ".</p>";
+    living += "<h2>Opinion</h2><p>The government, as the districts feel it, " + govMood + ". The institutions, as the graft book leaves them, " + inst + ". These are not your approval, and they are not each other.</p>";
+    living += "<h2>Classes</h2>" + (L.classes || []).map(function(c){
+      const word = c.mood > 8 ? "with the government" : c.mood < -8 ? "against the government" : "watching";
+      return "<div>" + pcEsc(c.t) + " · " + word + " · " + c.mood + "</div>";
+    }).join("");
+    const faith = onumFaithBook();
+    living += "<h2>The faiths, as the House is actually composed</h2>" + (faith.length ? faith.map(function(f){ return "<div>" + pcEsc(f.t) + " · " + f.n + "</div>"; }).join("") : "<p>No confession is filed on the members yet.</p>");
+    const houses = onumHouseBook().slice(0, 6);
+    living += "<h2>Houses</h2>" + houses.map(function(h){ return "<div>" + pcEsc(h.t) + " · " + h.alive + " living on the roll · " + h.seats + " in the House by that name</div>"; }).join("");
+    living += "<h2>The neighbors</h2>" + (L.foreign || []).map(function(f){
+      const word = f.rel > 6 ? "a trade talk is on offer" : f.rel < -6 ? "the border is held" : "a note, and waiting";
+      return "<div>" + pcEsc(f.t) + " · " + word + " · standing " + f.rel + " · they want " + pcEsc(f.want || "") + "</div>";
+    }).join("");
+    const take = (L.takes || [])[0];
+    living += "<h2>The same fact, five papers</h2>" + (take ? take.lines.map(function(t){ return "<div>" + pcEsc(t) + "</div>"; }).join("") : "<p>The papers have not split a fact yet. They do it every seventh day.</p>");
+    living += "<h2>Crises still open</h2>" + ((L.crises || []).filter(function(c){ return !c.done; }).map(function(c){ return "<div>Day " + c.d + " · " + pcEsc(c.t) + "</div>"; }).join("") || "<p>None open. A guilder over 150, a debt over 2,500, a state over unrest 80, or corruption over 45 will open one. The page will not invent one today to look busy.</p>");
+    const mem = (L.memory || []).filter(function(m){ return m.until >= (G.day || 1); }).slice(0, 6);
+    living += "<h2>What people still say</h2>" + (mem.length ? mem.map(function(m){ return "<div>Until day " + m.until + " · " + pcEsc(m.t) + "</div>"; }).join("") : "<p>Nothing is being remembered past its week.</p>");
+    const alive = (L.citizens || []).filter(function(c){ return c.alive; }).slice(0, 12);
+    living += "<h2>The roll</h2>" + alive.map(function(c){ return "<div>" + pcEsc(c.name) + " · " + c.age + " · " + pcEsc(c.trade) + " · " + pcEsc(c.state) + " · house of " + pcEsc(c.house || "none") + "</div>"; }).join("");
+    const dead = (L.citizens || []).filter(function(c){ return !c.alive; }).slice(0, 4);
+    if(dead.length) living += "<h2>Kept, though dead</h2>" + dead.map(function(c){ return "<div>" + pcEsc(c.name) + " · " + pcEsc(c.note || "") + "</div>"; }).join("");
+  }
   const body = "<p>There is no last day. A term ends in an election. The next year is still a year. This is year " + e.year + ", year " + e.yearOfRepublic + " of the count that starts in " + (G.era && G.era.year0) + ".</p>" +
     "<p>Treasury " + (bal == null ? "not drawn" : Math.round(bal)) + ". Debt on works " + Math.round(debt) + ". The districts, added as they stand, come to about " + Math.round(gdp) + ". That figure moves when industry and population move. It is not a second economy hiding under the guilder.</p>" +
     "<h2>The works</h2>" + wrows +
     "<h2>The districts</h2>" + rows +
+    living +
     "<h2>The journal</h2>" + (ann || "<p>Nothing has been written yet. A cabinet that rises, a work that is approved, and the first of a month will write here.</p>") +
     "<div class=\"dream\" id=\"repSay\"></div>";
   govCardOpen("The Republic", e.label, "The year does not fold back into itself. The journal keeps the last 500 lines. Older than that, the year is still the year.", body, null);
@@ -61843,6 +62083,16 @@ function onumRepublicCard(){
     b.addEventListener("click", function(ev){
       ev.preventDefault();
       const line = onumWorkStart(b.getAttribute("data-work"));
+      const s = el("repSay");
+      if(s) s.textContent = line;
+      try{ note(line); }catch(err){}
+    });
+  });
+  card.querySelectorAll("[data-inq]").forEach(function(b){
+    b.addEventListener("click", function(ev){
+      ev.preventDefault();
+      let line = "";
+      try{ line = onumInquiry(); }catch(err){ line = "The inquiry would not open."; }
       const s = el("repSay");
       if(s) s.textContent = line;
       try{ note(line); }catch(err){}
@@ -61915,7 +62165,7 @@ try{
   const _sc = saveCaptureBase;
   saveCaptureBase = function(){
     const o = _sc.apply(this, arguments);
-    try{ o.annals = G.annals || null; o.works = G.works || null; o.era = G.era || null; o.republic = G.republic || null; }catch(e){}
+    try{ o.annals = G.annals || null; o.works = G.works || null; o.era = G.era || null; o.republic = G.republic || null; o.living = G.living || null; }catch(e){}
     return o;
   };
 }catch(e){}
