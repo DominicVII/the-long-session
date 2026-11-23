@@ -17,18 +17,30 @@ One HTML body. Keep these **byte-identical**:
 | `session.html` | repo root |
 | `One Nation, Under, ME.html` | standalone name |
 
-**Build stamp (now): `20261123f`**
+**Build stamp (now): `20261123g`**
 
-- `<meta name="onum-build" content="20261123f">`
-- IIFE `STAMP = "20261123f"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
-- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261123f"`
+- `<meta name="onum-build" content="20261123g">`
+- IIFE `STAMP = "20261123g"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
+- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261123g"`
 - Wrapper iframe: `/session.html?v=${ONUM_BUILD}` in `src/routes/index.tsx`
 
-If you change the HTML, bump the letter (`20261123f`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
+If you change the HTML, bump the letter (`20261123g`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
 
 This sandbox tracks `public/session.html` as the playable body (root `index.html` / `session.html` / `One Nation, Under, ME.html` are not in this repo). Do not replace that file with a simpler build. Insert new game logic **inside** the main IIFE, before `})(); /* 20261110bx: main IIFE close, moved below the ba block */`.
 
-### Latest — `20261123f`
+### Latest — `20261123g`
+
+The Republic argues about its own past. Open **The Republic**, then **The library**.
+
+Four schools each keep a historian and write the same journaled fact four different ways: Federal, Commonwealth, Materialist, Traditional. A book is stored. It is not regenerated as a new sentence the next time you open the page.
+
+Five papers have an editor, an owner, a readership, and a credibility. One may refuse a story another prints. Editors change. Credibility drifts. A district that industrializes is no longer described as the town it was.
+
+Legends are marked legend, not fact. Some old filings are forgotten. Some small ones are raised later. Houses already on the family book are listed with who is still living. Secretaries are tracked for competence, loyalty, and ambition, and a famous one can outshine the government without a scripted resignation.
+
+Neighbors keep an injury after the number improves. A crisis that stays open becomes a process, not a headline that resets. A canal, a port, or a railway moves owners one way and labor the other. The university, the seminary, and the maritime academy are named as the places ideas start.
+
+`G.hist` is in the save, with the journal.
 
 People speak without a prompt. Whoever is in the room with you gets a turn, through the model, about every forty seconds. They do not open with their name or their office. The line is said aloud, put over them, and written on the wire. Opening a conversation does the same: if the model is up, their first line is replaced by what they actually say.
 
