@@ -17,18 +17,24 @@ One HTML body. Keep these **byte-identical**:
 | `session.html` | repo root |
 | `One Nation, Under, ME.html` | standalone name |
 
-**Build stamp (now): `20261122c`**
+**Build stamp (now): `20261122d`**
 
-- `<meta name="onum-build" content="20261122c">`
-- IIFE `STAMP = "20261122c"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
-- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261122c"`
+- `<meta name="onum-build" content="20261122d">`
+- IIFE `STAMP = "20261122d"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
+- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261122d"`
 - Wrapper iframe: `/session.html?v=${ONUM_BUILD}` in `src/routes/index.tsx`
 
-If you change the HTML, bump the letter (`20261122c`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
+If you change the HTML, bump the letter (`20261122d`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
 
 This sandbox tracks `public/session.html` as the playable body (root `index.html` / `session.html` / `One Nation, Under, ME.html` are not in this repo). Do not replace that file with a simpler build. Insert new game logic **inside** the main IIFE, before `})(); /* 20261110bx: main IIFE close, moved below the ba block */`.
 
-### Latest — `20261122c`
+### Latest — `20261122d`
+
+The atlas stops repeating one sentence.
+
+A governor or a member, once opened, keeps a life: the trade they came up through, the town, the year, and the fight they were known for. That life does not move. A town page names who in this Congress calls it home. A seat page says who holds it now and where they stand on the live bill. Read further rotates six different pages — the land, the seat, the ground, the chair, the road, the living record — and an old "Reading 3 of Zeeland" page is rewritten the next time it is opened. The record page still refuses to invent a vote to fill a silence.
+
+On the play bar, the nearest person carries the post and the bill, not only a surname.
 
 The play bar has one gold next step, and a test that reads the screen without moving you.
 
