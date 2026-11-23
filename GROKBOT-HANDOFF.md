@@ -17,18 +17,30 @@ One HTML body. Keep these **byte-identical**:
 | `session.html` | repo root |
 | `One Nation, Under, ME.html` | standalone name |
 
-**Build stamp (now): `20261123a`**
+**Build stamp (now): `20261123b`**
 
-- `<meta name="onum-build" content="20261123a">`
-- IIFE `STAMP = "20261123a"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
-- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261123a"`
+- `<meta name="onum-build" content="20261123b">`
+- IIFE `STAMP = "20261123b"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
+- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261123b"`
 - Wrapper iframe: `/session.html?v=${ONUM_BUILD}` in `src/routes/index.tsx`
 
-If you change the HTML, bump the letter (`20261123a`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
+If you change the HTML, bump the letter (`20261123b`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
 
 This sandbox tracks `public/session.html` as the playable body (root `index.html` / `session.html` / `One Nation, Under, ME.html` are not in this repo). Do not replace that file with a simpler build. Insert new game logic **inside** the main IIFE, before `})(); /* 20261110bx: main IIFE close, moved below the ba block */`.
 
-### Latest — `20261123a`
+### Latest — `20261123b`
+
+Tier 1 of the long list is in the game, not only on the list.
+
+There is no last day. The calendar keeps a year. Day 1 is 1812. Day 366 is 1813. Day 516 is 15 May 1813, not a wall. A term still ends in an election, and the year after the election is the next year. Founder's Day is 1 January, Remembrance is 11 November, Harbor Festival is 12 August, and Taylor Day is still 7 July. The date line shows the year.
+
+The national journal keeps what happened: a cabinet that passes, rejects, or rises with no vote (that last one is delayed, not a silent success); a work approved; a work finished, with the days, the delays, and the graft notes; a ministry report on the first of the month; a state over unrest 70 on the 15th, named, and not called a riot unless it became one. The journal keeps 500 lines. The year does not stop when the page scrolls.
+
+The works are the National Canal, the Grand Port, the Strategic Railway, the Military Academy, the Parliament works, the teaching hospital, and the national university. Each has a ministry, a cost against the treasury (or the debt, if the treasury is short), a length, a percent, delays, and graft. Passing a thing does not finish it the same hour.
+
+The districts are on the same page: industry, wealth, people in work, population, unrest, and the state's own note. The sum is labeled as that sum. It is not a second economy under the guilder.
+
+Open it from History or Duties: **The national journal**. The rest of the list — dynasties as a full system, a corruption court, foreign capitals that act every day — is not in this build. The journal is where those will have to be written when they happen, or they did not happen.
 
 Every desk drawer ends with what that drawer is actually holding. The numbers are the live ones. An empty list does not get a fake filing.
 
