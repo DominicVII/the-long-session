@@ -17,18 +17,30 @@ One HTML body. Keep these **byte-identical**:
 | `session.html` | repo root |
 | `One Nation, Under, ME.html` | standalone name |
 
-**Build stamp (now): `20261123i`**
+**Build stamp (now): `20261123j`**
 
-- `<meta name="onum-build" content="20261123i">`
-- IIFE `STAMP = "20261123i"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
-- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261123i"`
+- `<meta name="onum-build" content="20261123j">`
+- IIFE `STAMP = "20261123j"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
+- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261123j"`
 - Wrapper iframe: `/session.html?v=${ONUM_BUILD}` in `src/routes/index.tsx`
 
-If you change the HTML, bump the letter (`20261123i`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
+If you change the HTML, bump the letter (`20261123j`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
 
 This sandbox tracks `public/session.html` as the playable body (root `index.html` / `session.html` / `One Nation, Under, ME.html` are not in this repo). Do not replace that file with a simpler build. Insert new game logic **inside** the main IIFE, before `})(); /* 20261110bx: main IIFE close, moved below the ba block */`.
 
-### Latest — `20261123i`
+### Latest — `20261123j`
+
+The district you walk is still the district. This build does not add a film renderer, level-of-detail, or a soul for every person in a state. It gives the names a ground they keep.
+
+Open **The Republic**, then **The ground** or **The morning**.
+
+Each state keeps a terrain, four quarters, and four street names, chosen once. They do not reshuffle. A house on that street keeps the year it was raised, the style of that year, the owners in order, and an assessment in guilders. The Assembly, the Treasury, the Archive, the Foreign Ministry, and the Republic Record are buildings with rooms. When the journal files a day, the building it belongs to keeps the line.
+
+Two households in each state have a name, a street, a trade, a hope, a fear, and a rumor. The rumor drifts away from the filing. The page says so. It is a sample, not a census.
+
+The morning brief is already written from the hottest district, the live bill's real stage, the guilder against the day before, and the envoy with the worst standing. Envoys are people, with a trait and years in the job. A sour relationship climbs a ladder: a hard speech, a complaint, a threat, a restriction, then a matter past two capitals. Sitting with them moves the standing by two and signs nothing. They may later call the sitting a promise. The log says it was not.
+
+`G.ground` is in the save.
 
 The same fact now has six desks. Open **The Republic**, then **The papers**.
 
