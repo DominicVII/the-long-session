@@ -30,8 +30,56 @@ try {
     const j = await page.evaluate(() => { try { ONUM_R2.journal("QA wrote this down."); } catch (e) {} try { ONUM_R2.refreshJournal(); } catch (e) { return { err: String(e) }; } const t = (document.getElementById("paneJournal") || {}).innerText || ""; return { undef: /Day undefined/.test(t), hasDay: /Day \d+/.test(t), head: t.slice(0, 160) }; });
     ok("journal: entries show their day, never 'Day undefined'", j && !j.undef && j.hasDay, j);
   }
+  if (want("appt")) {
+    const a = await page.evaluate(async () => { const R = window.ONUM_R2, D = NEPTUNE.debug(), G = D.G, out = {};
+      out.office = (function(){ try { return window.ONUM_R2.heldOffice(); } catch (e) { return null; } })();
+      const post = R.apPostOf("treasury"); const field = R.apField(post); out.field = field.map((o) => ({ name: o.name, real: o.real }));
+      const before = (function(){ try { return window.ONUM_R2.presStaff().treasury.name; } catch (e) { return null; } })(); out.before = before;
+      const n = R.apNominate(post, field.find((o) => o.real) || field[0], false); if (!n) return Object.assign(out, { noNom: true });
+      out.id = n.id; out.stage0 = n.stage; const p = D.G.civ.find((c) => c.id === n.pid); out.person = p ? { name: p.name, role: p.role } : null;
+      R.apCard(); await new Promise((r) => setTimeout(r, 300)); out.cardHas = /Before the Senate/.test(document.getElementById("card").innerText) && document.getElementById("card").innerText.includes(n.name);
+      return out; });
+    ok("appointments: the field has three people, at least one already in the Republic", a.field && a.field.length === 3 && a.field.some((o) => o.real), a.field);
+    ok("appointments: a sent name is a person in the world, being vetted, and on the nominations page", a.stage0 === "vetting" && a.person && a.person.name && a.cardHas, a);
+    await page.evaluate(() => { try { document.getElementById("gcClose").click(); } catch (e) {} try { window.ONUM.n24.nextDay(false); } catch (e) {} }); await waitIdle(page); await delay(2500);
+    const b = await page.evaluate(async (id) => { const R = window.ONUM_R2, n = R.apById(id); R.apAdvance(n); const out = { stage: n.stage, vet: (n.vet || []).map((x) => x.t), hday: n.hearing && n.hearing.day, day: NEPTUNE.debug().G.day };
+      R.apHold(n, false, true); out.result = n.result; out.qa = n.hearing && n.hearing.qa && n.hearing.qa.map((x) => x.sen + ": " + x.q).slice(0, 3); out.roll = n.roll && { aye: n.roll.aye, no: n.roll.no, names: n.roll.roll.aye.concat(n.roll.roll.no).slice(0, 4), n: n.roll.roll.aye.length + n.roll.roll.no.length };
+      const st = window.ONUM_R2.presStaff(); out.holder = st.treasury && st.treasury.name; const seated = window.ONUM_R2.cabRoster(); const me = NEPTUNE.debug().G.civ.find((c) => c.id === n.pid); out.seatedSame = seated.some((c) => c.id === n.pid); out.post = me && me.post; out.name = n.name;
+      out.journal = (NEPTUNE.debug().G.journal || []).slice(0, 3).map((e) => e.t); return out; }, a.id);
+    ok("appointments: the file comes back the next day with findings read from the person", b.stage === "filed" && b.vet.length >= 1 && b.hday === b.day + 1, b);
+    ok("appointments: the hearing asks in senators' names and the Senate votes on a named roll", b.qa && b.qa.length >= 3 && b.roll && b.roll.n === b.roll.aye + b.roll.no && b.roll.n >= 10 && b.roll.names.every((x) => /senator|\(/.test(x)), b.roll);
+    if (b.result === "sworn") ok("appointments: confirmed, the same person holds the chair, sits at the table and has the secretary's office", b.holder === b.name && b.seatedSame && b.post && /Treasury/.test(b.post.at), b);
+    else ok("appointments: refused, the chair stays with its holder", b.holder === a.before, b);
+    const c = await page.evaluate(() => { const R = window.ONUM_R2, post = R.apPostOf("war"), before = window.ONUM_R2.presStaff().war.name; const f = R.apField(post); const n = R.apNominate(post, f[f.length - 1], true); if (!n) return { noNom: true };
+      R.apAdvance(n); n.vet = Array.from({ length: 8 }, () => ({ k: "old", w: -1, t: "QA: a bad file." })); R.apHold(n, true, false); const p = NEPTUNE.debug().G.civ.find((x) => x.id === n.pid);
+      return { result: n.result, holder: window.ONUM_R2.presStaff().war.name, before, role: p && p.role, mem: p && JSON.stringify(p.mem || p.memory || "").includes("refused") }; });
+    ok("appointments: a refused nominee goes home, remembers it, and the chair stays as it was", c.result === "refused" && c.holder === c.before && /Refused nominee/.test(c.role || ""), c);
+    const sw = await page.evaluate(() => { const R = window.ONUM_R2, post = R.apPostOf("justice"), before = R.presStaff().justice.name; const f = R.apField(post); const n = R.apNominate(post, f[0], true); if (!n) return { noNom: true };
+      R.apAdvance(n); n.vet = Array.from({ length: 8 }, () => ({ k: "old", w: 1, t: "QA: a clean file." })); R.apHold(n, false, true); const G = NEPTUNE.debug().G, p = G.civ.find((x) => x.id === n.pid);
+      const seated = R.cabRoster(); const olds = G.civ.filter((x) => x && x.kslot === "exec:sec:justice" && !x.gone && !x.cabFormer);
+      return { id: n.id, result: n.result, name: n.name, before, holder: R.presStaff().justice.name, seatedSame: seated.some((x) => x.id === n.pid), post: p && p.post, role: p && p.role, holders: olds.map((x) => x.name), formerRole: (G.civ.find((x) => x && x.name === before) || {}).role }; });
+    ok("appointments: confirmed, the same person holds the chair, sits at the table, works from the secretary's office, and the old holder retires", sw.result === "sworn" && sw.holder === sw.name && sw.seatedSame && sw.post && /Justice/.test(sw.post.at) && sw.holders.length === 1 && sw.holders[0] === sw.name && /Former/.test(sw.formerRole || ""), sw);
+    /* the nominations and the confirmed secretary survive a save and a reload */
+    await page.evaluate(() => { try { window.ONUM.n24.save(); } catch (e) { try { save(true); } catch (e2) {} } });
+    { const t0 = Date.now(); while (Date.now() - t0 < 120000) { const s = await page.evaluate(() => window.onumSaveStats()); if (!s.busy && !s.pending) break; await delay(1000); } }
+    const keep = { name: b.name, result: b.result, id: a.id, sw };
+    await page.close(); const page2 = await newPage(browser, errs); await continueCareer(page2, origin, ""); await delay(5000);
+    const d = await page2.evaluate((k) => { const R = window.ONUM_R2, n = R.apById(k.id), G = NEPTUNE.debug().G; const p = n && G.civ.find((x) => x.id === n.pid); const m = R.apById(k.sw.id), q = m && G.civ.find((x) => x.id === m.pid); return { stage: n && n.stage, holder: window.ONUM_R2.presStaff().treasury.name, person: p && p.name, post: p && p.post, day: G.day, jus: window.ONUM_R2.presStaff().justice.name, jusPost: q && q.post, jusSeated: window.ONUM_R2.cabRoster().some((x) => q && x.id === q.id) }; }, keep);
+    ok("appointments: after a save and a reload the nomination, its outcome and the person are kept", d.stage === keep.result && d.person === keep.name && (keep.result !== "sworn" || (d.holder === keep.name && d.post)), d);
+    ok("appointments: after a reload the confirmed Attorney General is the same person, seated, with the office", d.jus === sw.name && d.jusPost && d.jusSeated, d);
+    globalThis.__page = page2;
+  }
+  const pg = globalThis.__page || page;
+  if (want("vox")) {
+    const v = await pg.evaluate(async () => { const R = window.ONUM_R2, apps = R.pbApps().map((x) => x[0]); R.pbAppGo("soc-vox"); await new Promise((r) => setTimeout(r, 400));
+      let err = null; try { R.onumVoxCard(); } catch (e) { err = String(e); } const cardT = document.getElementById("card").innerText; const ta = document.querySelector("#card .voxq__t"), b = document.querySelector("#card .voxq__b"); const text = "QA from the phone " + Date.now();
+      if (ta && b) { ta.value = text; b.click(); } await new Promise((r) => setTimeout(r, 600)); const G = NEPTUNE.debug().G; const top = (G.vox.posts || [])[0];
+      const after = document.getElementById("card").innerText; return { err, ta:!!ta, b:!!b, apps: apps.slice(0, 4), hasVox: apps.includes("soc-vox"), opened: /vox/i.test(cardT) && /The feed/.test(cardT) && !!ta, posted: (G.vox.posts || []).some((p) => p.mine && p.t === text), stays: /Yours/.test(after) && after.includes(text) }; });
+    ok("vox: the phone lists Vox and opens the feed with a composer", v.hasVox && v.opened, v);
+    ok("vox: a post from the phone is your post, and the phone's feed shows it under Yours", v.posted && v.stays, v);
+  }
   ok("0 page errors", errs.length === 0, errs.slice(0, 3));
-  await page.close();
+  try { await pg.close(); } catch (e) {}
 } finally {
   const failed = results.filter((r) => !r.pass).length; console.log(failed ? "FAIL " + failed + " of " + results.length : "ALL PASS " + results.length);
   try { await browser.close(); } catch (e) {} try { server.close(); } catch (e) {} process.exitCode = failed ? 1 : 0;
