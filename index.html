@@ -11444,6 +11444,7 @@ function engIdbOnCareer(raw){
     } }catch(e){}
   try{ if(raw && typeof svWriteCareerMeta === "function") svWriteCareerMeta(d0 || raw); }catch(e){}
   try{ if(typeof careerIndexMergeIdb === "function") careerIndexMergeIdb(); }catch(e){}
+  try{ const rk = ENG_IDB.rank; if(rk != null) setTimeout(function(){ try{ if(!window.ONUM_IMPORTING && ENG_IDB.rank != null && ENG_IDB.rank >= rk) svDropStaleLs(ENG_IDB.rank); }catch(e){} }, 6000); }catch(e){}   /* 20261124b */
   engIdbNotify();
   try{
     if(document.body.classList.contains("boot-menu") && !G._booting && !G.make && !(G.running && G.you)){
@@ -12849,7 +12850,7 @@ function svSliceDone(t0, nm){ const d = performance.now() - t0; SV.slices++; if(
 function svWalking(){ try{ if(G && (G.moving || G.pendingNight)) return true; }catch(e){} try{ if(typeof playerMoving === "function" && playerMoving()) return true; }catch(e){} return false; }
 function svIdle(fn, explicit){
   const run = dl => { if(!explicit && !SV.boost && svWalking()){ setTimeout(() => svIdle(fn, explicit), 300); return; }
-    const t0 = performance.now(); const left = () => Math.min(SV.BUDGET, dl && dl.timeRemaining ? dl.timeRemaining() : SV.BUDGET) - (performance.now() - t0);
+    const t0 = performance.now(), bud = SV.boost ? 24 : SV.BUDGET; const left = () => (SV.boost ? bud : Math.min(bud, dl && dl.timeRemaining ? dl.timeRemaining() : bud)) - (performance.now() - t0);
     try{ fn(left); }catch(e){ svFail(e); } svSliceDone(t0, fn.name); };
   try{ if(typeof requestIdleCallback === "function"){ requestIdleCallback(run, {timeout:1000}); return; } }catch(e){}
   setTimeout(() => run(null), 16);
@@ -12961,7 +12962,7 @@ function svFlushSync(){
     let ok = svRawWrite(SAVE_KEY, json);
     let raw = json;
     if(!ok){ raw = engWrap(json); ok = svRawWrite(SAVE_KEY, raw); }
-    try{ engIdbPut(raw); }catch(e){}
+    const rk0 = careerRank(base); try{ engIdbPut(raw, rk0); if(!ok && ENG_IDB.db && ENG_IDB.rank != null && ENG_IDB.rank <= rk0) svDropStaleLs(ENG_IDB.rank); }catch(e){}   /* 20261124b: only copies older than what IndexedDB already holds */
     if(ok){ SV.rank = careerRank(base); try{ svWriteCareerMeta(raw); }catch(e2){} }
     return ok;
   }catch(e){ return false; }
@@ -43349,8 +43350,10 @@ window.ONUM_CAREERS = {
   freeQuota: function(){ return careerFreeQuota(); }
 };
 let saveBusy = false, saveCount = 0, saveQueued = false;
+function onumTitleUp(){ try{ return ["cont", "fresh", "nameIn"].some(function(id){ const e = document.getElementById(id); return !!(e && e.getClientRects().length && getComputedStyle(e).visibility !== "hidden"); }); }catch(e){ return false; } }
 setInterval(function(){ try{
   if(!G || !G._saveOwed || !G.you || !G.members || !G.members.length || G.over) return;
+  if(onumTitleUp()){ G._saveOwed = 0; return; }   /* never from the title or the oath */
   if(Date.now() - G._saveOwed < 2500 || G.pendingNight || G.moving || saveQueued) return;
   if(typeof PROC !== "undefined" && PROC.on) return; if(typeof TALK !== "undefined" && TALK.open) return;
   if(save(false) !== false) G._saveOwed = 0;
@@ -43358,7 +43361,7 @@ setInterval(function(){ try{
 function queueSave(explicit){
   if(explicit){ try{ return save(true); }catch(e){ return false; } }
   /* 20261124b JUPITER: a save turned away now is owed, and is paid as soon as nothing is moving (a card on screen is fine) */
-  if(!G._saveOwed) G._saveOwed = Date.now();
+  try{ if(!G._saveOwed && G.you && !G.over && (G.running || G.pendingNight) && !onumTitleUp()) G._saveOwed = Date.now(); }catch(e){}
   if(PROC.on || TALK.open) return false;
   /* Never block a walk frame with autosave. */
   try{ if(houseQuiet()) return false; }catch(e){} /* feet ok — flat drip 20260921f */
@@ -45899,8 +45902,10 @@ function titlePeek(){
   return r(d) > r(m) ? Object.assign({}, m, d) : m;
 }
 function titleCareersReady(){
-  try{ if(window.__onumCareersReady) return true; }catch(e){}
+  /* 20261124b JUPITER: only IndexedDB's own answer counts (the careers index can report ready from localStorage alone);
+     if IndexedDB never answers, the title stops waiting after 12 s */
   try{ if(typeof ENG_IDB !== "undefined" && ENG_IDB && ENG_IDB.ready) return true; }catch(e){}
+  try{ if(window.__onumCareersReady && performance.now() > 12000) return true; }catch(e){}
   return false;
 }
 function titleArchiveCount(){
@@ -46150,7 +46155,7 @@ function opening(){
   const dayN = hasSave ? (peek.day || 1) : 1;
   const cname = (peek && peek.country && peek.country.name) ? peek.country.name : (G.country && G.country.name);
   const archN = titleArchiveCount();
-  const contLabel = "Continue" + (peek && peek.name ? " — " + peek.name : "") + " · day " + dayN + (titleCareersReady() ? "" : " · checking for a later day…");
+  const contLabel = "Continue" + (peek && peek.name ? " — " + peek.name : "") + (titleCareersReady() ? " · day " + dayN : " · checking for the latest day…");
   card.innerHTML =
     '<img class="card__logo" src="assets/logo.png" width="220" height="147" alt="One Nation, Under, ME." onerror="this.onerror=null;this.replaceWith(Object.assign(document.createElement(\'div\'),{className:\'card__logo card__logo--text\',textContent:\'One Nation, Under, ME.\'}))">' +    '<div class="eyebrow">One Nation, Under, ME. · The ' + ordinal(cong) + ' Congress' +
       (cname ? ' · ' + cname : '') + '</div>' +
@@ -55641,7 +55646,8 @@ function baCallVote(){ if(!SSN || !cabKind() || SSN._baVote) return false; const
       const m = seats.find(p => SSN.votes[p.id] === (R.aye > R.no ? "no" : "aye")); if(m) baFollow({in:1, kind:"cabinet", title:"Outvoted in " + (SSN.kind === "governor_council" ? "council" : "cabinet"), whoId:m.id, text:m.name + " lost the vote on " + baTopic() + " and is telling people why.", wire:"CAPITOL · " + baSn(m) + " was outvoted on " + baTopic() + "."});
       SSN._busy = 0; ss2Pub(); setTimeout(() => { try{ if(SSN && tok === SSN._tok && ssnStage().id === "decisions") ssnNext(); }catch(e){} }, ss2Read(line) + 800); return; }
     const p = seats[i++]; let v = 0; try{ v = b ? baAl(p, b.pos, b.title) : ((p.rel && p.rel.warmth) || 0) + (Math.random() * 40 - 20); }catch(e){}
-    SSN.votes[p.id] = v >= 0 ? "aye" : "no"; SSN.floorId = p.id; try{ onumRollShow(SSN, null); }catch(e){} const t = v >= 0 ? "Aye." : "No."; say(p, t + (Math.abs(v) > 25 ? " " + (v > 0 ? "Gladly." : "And I want it minuted.") : "")); ss2Pub(); setTimeout(next, 1400); };
+    let dz = false; try{ if(i === seats.length && seats.length >= 3 && baDissent(seats.slice(0, -1).map(q => SSN.votes[q.id]), v)){ v = v >= 0 ? -1 : 1; dz = true; } }catch(e){}
+    SSN.votes[p.id] = v >= 0 ? "aye" : "no"; SSN.floorId = p.id; try{ onumRollShow(SSN, null); }catch(e){} const t = v >= 0 ? "Aye." : "No."; say(p, t + (dz ? " Somebody at this table has to say it, so I will." : Math.abs(v) > 25 ? " " + (v > 0 ? "Gladly." : "And I want it minuted.") : "")); ss2Pub(); setTimeout(next, 1400); };
   setTimeout(next, 1800); return true; }
 window.onumSession.callVote = baCallVote;
 { const _nx = ssnNext; ssnNext = function(){ try{ if(SSN && cabKind()){ const nx = SSN.def.stages[SSN.si + 1], cur = ssnStage();
@@ -57217,6 +57223,321 @@ function onumVoxCard(){
   try{ const c = el("gcClose"); if(c) c.addEventListener("click", function(){ window.ONUM_VOXCARD = false; }); }catch(e){}
 }
 try{ window.ONUM_R2 = Object.assign(window.ONUM_R2 || {}, {apStore, apField, apNominate, apAdvance, apHold, apCard, apFieldCard, apById, apPostOf, onumVoxCard, presStaff: function(){ return presStaff(); }, cabRoster: function(){ return cabRoster(); }, heldOffice: function(){ return heldOffice(); }, pbApps: function(){ return pbApps(); }, pbAppGo: function(id){ return pbAppGo(id); }}); }catch(e){}
+
+/* ══ 20261124b JUPITER · who people already are. Each person has one bent, read from their own traits and kept with them:
+   proud, grasping, quick to anger, envious, wanting, indulgent or idle. It is never shown as a label. It decides what they do
+   on an ordinary day, what they remember, and what ends up written down; doing it again is remembered as again. ══ */
+const BENT_MANNER = {
+  pride:"proud: you do not apologise first, you like to be seen being right, and you take a slight personally",
+  greed:"grasping: you notice what things cost and who is paying, and you take what is offered",
+  wrath:"quick to anger: you say the hard thing too loudly and regret only some of it",
+  envy:"envious: you measure yourself against whoever is doing better and you say so behind their back",
+  lust:"wanting: you are drawn to people, you flirt when you should not, and you are careless about who sees",
+  gluttony:"indulgent: long dinners, the good bottle, more than you need, and late the next morning",
+  sloth:"idle: you put things off, you let others carry it, and you have a reason ready"
+};
+function bentHash(s){ let h = 2166136261; s = String(s); for(let i = 0; i < s.length; i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
+function bentOf(p){
+  if(!p || p === G.you) return null;
+  if(p.bent && p.bent.k && BENT_MANNER[p.bent.k]) return p.bent;
+  const t = p.traits || {}, v = k => (t[k] == null ? 50 : t[k]), h = bentHash("bent:" + p.id + ":" + p.name);
+  const j = k => (bentHash(k + ":" + h) % 17);
+  const sc = {pride:v("vanity") * 0.8 + v("conviction") * 0.2 + j("p"), greed:v("ambition") * 0.6 + (100 - v("conviction")) * 0.4 + j("g"),
+    wrath:v("temper") * 0.9 + j("w"), envy:v("ambition") * 0.5 + (100 - v("loyalty")) * 0.5 + j("e"), lust:(100 - v("discretion")) * 0.6 + v("vanity") * 0.3 + j("l"),
+    gluttony:v("vanity") * 0.45 + (100 - v("discretion")) * 0.35 + j("u"), sloth:(100 - v("ambition")) * 0.85 + j("s")};
+  let k = "pride"; Object.keys(sc).forEach(x => { if(sc[x] > sc[k]) k = x; });
+  p.bent = {k:k, s:Math.round(sc[k]), n:0, last:-99};
+  return p.bent;
+}
+function bentPool(){ return [].concat(G.members || [], G.civ || []).filter(p => p && !p.gone && p !== G.you && p.name && p.mem); }
+function bentOther(p, pred){ const pool = bentPool().filter(q => q !== p && (!pred || pred(q))); return pool.length ? pool[bentHash(p.id + ":" + G.day) % pool.length] : null; }
+function bentVox(p, text){ try{ voxInit(); voxAdd({id:G.vox.id++, by:p.id, t:text, k:"note", day:G.day, at:hhmm(), backs:0, hits:0, voices:[]}); }catch(e){} }
+function bentHouse(p){ try{ const R = G.dyn && G.dyn.P && G.dyn.P[p.id]; return R && R.house ? R.house : dynHouseId(dynSur(p.name)); }catch(e){ return null; } }
+function bentAct(p){
+  const B = bentOf(p); if(!B) return null; B.n++; B.last = G.day;
+  const again = B.n >= 3 ? " Again." : B.n === 2 ? " Not the first time." : "", fn = dynFirst ? dynFirst(p.name) : p.name.split(" ")[0];
+  let line = "", heard = null, kept = false;
+  if(B.k === "wrath"){ const o = bentOther(p, q => q.party && q.party !== p.party) || bentOther(p); if(!o) return null; heard = o;
+    line = p.name + " lost their temper with " + o.name + " in the cloakroom over nothing anyone can now remember." + again;
+    try{ remember(o, p.name + " shouted at me in the cloakroom. People heard.", 3, B.n >= 2); }catch(e){}
+    try{ remember(p, "I shouted at " + o.name + ". " + (B.n >= 2 ? "I have done it before." : "They had it coming, mostly."), 2); }catch(e){}
+    try{ if(o.rel && o.kind !== "member") o.rel.warmth = clamp((o.rel.warmth || 0) - 3, -100, 100); }catch(e){}
+    if(B.n >= 3){ try{ const a = bentHouse(p), b = bentHouse(o); if(a && b) dynFeud(a, b, "The " + dynSur(p.name) + "s and the " + dynSur(o.name) + "s are not speaking, after " + fn + "'s third shouting match."); }catch(e){} }
+    kept = B.n >= 2; }
+  else if(B.k === "envy"){ const o = bentOther(p, q => (q.followers || 0) > (p.followers || 0) || (q.standing || 0) > (p.standing || 0)); if(!o) return null; heard = o;
+    line = p.name + " was heard saying " + o.name + " got where they are by knowing the right door." + again;
+    bentVox(p, "Funny how some people get the good committee rooms. I am not naming anyone. " + (o.state ? o.state + " knows." : ""));
+    try{ remember(o, "Word came back that " + p.name + " has been talking about me.", 2); }catch(e){} }
+  else if(B.k === "greed"){ line = p.name + " took the dinner, the cigars and the envelope from " + (function(){ try{ const L = G.lobbies || []; return (L[bentHash(p.id + G.day) % Math.max(1, L.length)] || {}).name || "a man from the docks"; }catch(e){ return "a man from the docks"; } })() + "." + again;
+    try{ remember(p, "I took what was offered at dinner. Everybody does.", 2, B.n >= 2); }catch(e){} kept = true; }
+  else if(B.k === "pride"){ line = p.name + " would not take back what they said on the floor, and said it again on the steps." + again;
+    bentVox(p, "I said what I said. I will not be walking it back to suit anyone's afternoon."); }
+  else if(B.k === "lust"){ const o = bentOther(p, q => q.kind === p.kind); if(!o) return null; heard = o;
+    let married = false; try{ const R = G.dyn && G.dyn.P && G.dyn.P[p.id]; married = !!(R && R.spouseId); }catch(e){}
+    line = p.name + " and " + o.name + " left the reception late, together" + (married ? ", and " + fn + " is married." : ".") + again;
+    try{ remember(o, "I left the reception with " + p.name + ". I should not tell anyone.", 2, true); }catch(e){}
+    kept = married; }
+  else if(B.k === "gluttony"){ line = p.name + " was three hours at lunch at the club and came back for the end of committee." + again;
+    try{ remember(p, "A long lunch. Worth it. Mostly.", 1); }catch(e){} }
+  else if(B.k === "sloth"){ line = p.name + " did not come in this morning; the casework sat on the desk with a note saying tomorrow." + again;
+    try{ if(p.standing != null) p.standing = clamp(p.standing - 0.5, 0, 100); }catch(e){} }
+  if(!line) return null;
+  try{ remember(p, line.replace(p.name, "I").replace(/ their /g, " my "), 1); }catch(e){}
+  try{ if(kept) onumKeep(line, p.id); else if(bentHash(line) % 3 === 0) lLog(line, "people"); }catch(e){}
+  G.bentLog = G.bentLog || []; G.bentLog.unshift({d:G.day, id:p.id, k:B.k, t:line, with:heard ? heard.id : null}); if(G.bentLog.length > 80) G.bentLog.length = 80;
+  return line;
+}
+function bentDay(){
+  if(!G || !G.you || G.bentDay === G.day) return; G.bentDay = G.day;
+  const pool = bentPool().filter(p => { const B = bentOf(p); return B && G.day - (B.last || -99) >= 3; });
+  if(!pool.length) return;
+  const n = Math.min(4, Math.max(1, Math.round(pool.length / 60)));
+  pool.sort((a, b) => (bentOf(b).s + (bentHash(b.id + ":" + G.day) % 40)) - (bentOf(a).s + (bentHash(a.id + ":" + G.day) % 40)));
+  for(let i = 0; i < n; i++){ try{ bentAct(pool[i]); }catch(e){} }
+}
+setInterval(function(){ try{ bentDay(); }catch(e){} }, 2000);
+/* the engine hears who they are, never the player */
+{ const _ppl = psyPromptLine; psyPromptLine = function(m){ let r = ""; try{ r = _ppl.apply(this, arguments) || ""; }catch(e){} try{ const B = bentOf(m); if(B) r += " WHO YOU ARE (never say it, never name it; just be it): you are " + BENT_MANNER[B.k] + "."; }catch(e){} return r; }; }
+{ const _sc = saveCaptureBase; saveCaptureBase = function(){ const o = _sc.apply(this, arguments); try{ o.bentLog = (G.bentLog || []).slice(0, 80); o.bentDay = G.bentDay || null; }catch(e){} return o; }; }
+
+/* ══ 20261124b JUPITER · your own storefront. It is one shop among the rest, on the same price book: your markup decides
+   whether people walk in or walk to the cheaper door. The till pays into your purse. ══ */
+function onumMyShops(){ return onumShops().filter(s => s && s.ownerId === "you"); }
+function onumOpenShop(kind, book, markup){
+  const y = G.you; if(!y) return "Nobody to open it."; const P = purseOf(y), cost = 180;
+  if(onumMyShops().some(s => s.book === book)) return "You already keep a counter on that book.";
+  if((P.cash || 0) < cost) return "A lease and a counter cost ƒ" + cost + ". The purse holds ƒ" + Math.floor(P.cash || 0) + ".";
+  P.cash -= cost; try{ purseLog(y, "Took the lease on a " + kind, -cost); purseChip(); }catch(e){}
+  let town = y.state; try{ const ts = townsOf(y.state); if(ts && ts.length) town = ts[0].name || town; }catch(e){}
+  const s = {id:"shYou" + (onumShops().length + 1), kind:kind, book:book, owner:y.name, ownerId:"you", town:town, markup:clamp(markup || 1, 0.8, 1.4), till:0, loyal:[], mine:true, opened:G.day, paid:0};
+  onumShops().push(s);
+  try{ onumKeep(y.name + " opened a " + kind + " in " + town + ", on the same price book as everyone else.", null); }catch(e){}
+  try{ voxInit(); voxYouPost("note", null, "I have opened a " + kind + " in " + town + ". Same book prices as the rest. Come and see."); }catch(e){}
+  return "The " + kind + " in " + town + " is yours. Set the markup; people will compare it with the door down the street.";
+}
+function onumShopPay(){
+  const y = G.you; if(!y) return; try{ onumLiveDay(); }catch(e){} onumMyShops().forEach(s => { if(s.paidDay === G.day) return; s.paidDay = G.day;
+    try{ const p = onumPrice(s), rivals = onumShops().filter(x => x !== s && x.book === s.book), cheap = rivals.length ? Math.min.apply(null, rivals.map(onumPrice)) : p;
+      s.last = p > cheap * 1.08 ? "Day " + G.day + ": people walked to the cheaper door (" + cheap + ") rather than pay your " + p + "." : "Day " + G.day + ": the counter took " + p + " and people stayed."; }catch(e){}
+    const take = Math.max(0, Math.round((s.till - (s.paid || 0)) * 10) / 10);
+    if(take > 0){ try{ const P = purseOf(y); P.cash += take; purseLog(y, "The " + s.kind + "'s till", take); purseChip(); }catch(e){} s.paid = s.till; } });
+}
+{ let d0 = null; setInterval(function(){ try{ if(!G || !G.you || d0 === G.day) return; d0 = G.day; onumShopPay(); }catch(e){} }, 2500); }
+function onumOwnShopCard(msg){
+  const mine = onumMyShops(), kinds = [["grocer", "grain"], ["ironmonger", "iron"], ["bookseller", "press"], ["cloth", "rail"], ["music hall", "sport"]];
+  const rows = mine.map(s => { const rivals = onumShops().filter(x => x.book === s.book && x !== s), cheap = rivals.length ? Math.min.apply(null, rivals.map(onumPrice)) : null;
+      return '<div style="margin:8px 0;padding:6px 10px;border-left:3px solid var(--line-soft)"><b>Your ' + apEsc(s.kind) + '</b> <span class="muted">· ' + apEsc(s.town) + ' · book ' + apEsc(s.book) + ' at ' + onumPrice(s) + (cheap != null ? ' (cheapest rival ' + cheap + ')' : '') + ' · till ' + s.till + '</span>' +
+        '<div class="muted" style="font-size:12px">' + apEsc(s.last || "Opened day " + s.opened + ".") + '</div><div class="card__actions"><button type="button" class="btn btn--ghost" data-shm="' + s.id + ':-0.05">Mark down 5%</button><button type="button" class="btn btn--ghost" data-shm="' + s.id + ':0.05">Mark up 5%</button></div></div>'; }).join("") || '<p class="muted">You keep no shop yet.</p>';
+  const open = kinds.filter(k => !mine.some(s => s.book === k[1])).map(k => '<button type="button" class="btn" data-sho="' + k[0] + ':' + k[1] + '">Open a ' + apEsc(k[0]) + ' (ƒ180)</button>').join(" ");
+  govCardOpen("The district", "Your own counter", "One price book for every shop. Your markup is yours to set, and so is the walk to the cheaper door.", rows + '<div class="card__actions" style="flex-wrap:wrap">' + open + '</div>', null);
+  if(msg){ try{ el("gcSay").textContent = msg; }catch(e){} }
+  card.querySelectorAll("[data-sho]").forEach(b => b.addEventListener("click", () => { const [k, bk] = b.getAttribute("data-sho").split(":"); onumOwnShopCard(onumOpenShop(k, bk, 1)); }));
+  card.querySelectorAll("[data-shm]").forEach(b => b.addEventListener("click", () => { const [id, d] = b.getAttribute("data-shm").split(":"); const s = onumMyShops().find(x => x.id === id); if(s){ s.markup = clamp(Math.round((s.markup + (+d)) * 100) / 100, 0.8, 1.4); } onumOwnShopCard(s ? "Your " + s.kind + " now asks " + onumPrice(s) + "." : ""); }));
+}
+{ const _apps = pbApps; pbApps = function(){ const L = _apps.apply(this, arguments) || []; if(!L.some(x => x[0] === "soc-shop")) L.push(["soc-shop", "Your shop", "Open a storefront on the same price book as the district, set its markup, and take the till."]); return L; }; }
+{ const _go = pbAppGo; pbAppGo = function(id){ if(id === "soc-shop"){ setTimeout(function(){ try{ onumOwnShopCard(); }catch(e){} }, 30); return; } return _go.apply(this, arguments); }; }
+try{ window.ONUM_R2 = Object.assign(window.ONUM_R2 || {}, {bentOf, bentAct, bentDay, bentPool, onumOpenShop, onumMyShops, onumOwnShopCard, onumShopPay, onumShops: function(){ return onumShops(); }, onumPrice: function(s){ return onumPrice(s); }, purse: function(){ return purseOf(G.you); }, psyPromptLine: function(m){ return psyPromptLine(m); }, liveDay: function(){ return onumLiveDay(); }}); }catch(e){}
+
+/* ══ 20261124b JUPITER · the Academy and every state body publish papers (Dominic's master prompt, part 1).
+   Only a seed and the paper's numbers are kept (G.academy): number, day, institution, field, topic, school, scholar, key
+   numbers, citations, standing, rebuttal and any decision taken. The text is rebuilt from those, the same every time it is
+   opened, so the save stays small and a reloaded paper reads word for word as before. ══ */
+const AC_BODIES = [
+  {k:"acad", t:"The Academy", d:"sci"}, {k:"rb", t:"the Research Bureau", d:"policy"}, {k:"pi", t:"the Policy Institute", d:"policy"},
+  {k:"eo", t:"the Economic Office", d:"econ"}, {k:"ss", t:"the Statistical Service", d:"stat"}, {k:"ma", t:"the Military Academy", d:"mil"},
+  {k:"sa", t:"the Scientific Academy", d:"sci"}, {k:"id", t:"the Intelligence Directorate", d:"intel"}, {k:"uc", t:"the University Consortium", d:"sci"},
+  {k:"ec", t:"the Engineering Corps", d:"eng"}, {k:"hs", t:"the Historical Society", d:"hist"}];
+const AC_SCHOOLS = {
+  sci:[["the Empirical school", "nothing is settled until it is measured twice"], ["the Systematic school", "a result means nothing until it fits the whole"], ["the Practical circle", "a finding is worth what it builds"]],
+  policy:[["the Reform school", "the state should act early and adjust"], ["the Restraint school", "the state should act late and little"], ["the Federal circle", "the states know first and the capital should listen"]],
+  econ:[["the Havenport school", "sound money first, and the rest follows"], ["the Grange school", "public works and full employment first"], ["the Ledger circle", "the books, not the theory, decide"]],
+  stat:[["the Census school", "count everyone, then speak"], ["the Sample school", "a careful few tell you more than a careless many"], ["the Index circle", "one honest number beats ten flattering ones"]],
+  mil:[["the Forward school", "the frontier is held by being seen to hold it"], ["the Fortress school", "a defence that does not move does not fail"], ["the Supply circle", "wars are lost in the depots"]],
+  intel:[["the Signals school", "what they say to each other is the truth"], ["the Human school", "a person in the room is worth a thousand intercepts"], ["the Open circle", "most secrets are in the newspapers"]],
+  eng:[["the Steel school", "build it once and build it heavy"], ["the Light school", "cheap, many, and replaced"], ["the Standards circle", "the gauge matters more than the rail"]],
+  hist:[["the Annals school", "what was written at the time"], ["the Memory school", "what people still say about it"], ["the Ledger school", "what was paid, and by whom"]]};
+const AC_FIRST = ["Adriaan", "Beatrix", "Cornelis", "Dorothea", "Elias", "Frederika", "Govert", "Hester", "Isaak", "Johanna", "Kasper", "Lidewij", "Maarten", "Neeltje", "Otto", "Petronella", "Reinier", "Sophia", "Theodoor", "Wilhelmina"];
+const AC_LAST = ["Aerts", "Brandt", "Claes", "Drost", "Everts", "Fokker", "Groen", "Hals", "Ingen", "Jansma", "Kuiper", "Lammers", "Mulder", "Nolet", "Oosting", "Prins", "Reyers", "Stam", "Tromp", "Visscher"];
+const AC_TOPIC = {
+  policy:["how a bill becomes something a town can feel", "why reforms stall after the second year", "who pays for a law nobody reads"],
+  econ:["the guilder and the price of bread", "wages, rents and the shop counter", "what the Treasury's balance does to lending"],
+  stat:["how many households live within a week of want", "where the Republic's people moved this year", "what a vote costs a district"],
+  mil:["readiness at the frontier depots", "what a mobilisation does to harvest labour", "how long the fleet can stay at sea"],
+  intel:["what the neighbours are telling their own people", "the price of an informant", "rumour as a weapon in the capital"],
+  eng:["rail gauges and the cost of a junction", "bridges that outlast their budgets", "the power lines into the hill towns"],
+  hist:["how the Republic remembers its first Congress", "the precedents nobody has tested", "what earlier Presidents promised and kept"]};
+function acRng(seed){ let a = seed >>> 0; return function(){ a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+function acStore(){ if(!G.academy || G.academy.v !== 1) G.academy = {v:1, n:0, p:[]}; const A = G.academy; A.p = A.p || []; return A; }
+function acBody(k){ return AC_BODIES.find(b => b.k === k) || AC_BODIES[0]; }
+function acDomain(p){ return p.dm || acBody(p.b).d; }
+function acSchool(p, i){ const L = AC_SCHOOLS[acDomain(p)] || AC_SCHOOLS.sci; return L[(i == null ? p.sc : i) % L.length]; }
+function acScholar(p){ const h = apHash("sch:" + p.b + ":" + acDomain(p) + ":" + p.by); return AC_FIRST[h % AC_FIRST.length] + " " + AC_LAST[(h >>> 7) % AC_LAST.length]; }
+function acTopicName(p){
+  if(p.b === "acad" || p.tp && INQ_BY[p.tp]){ const n = INQ_BY[p.tp]; return n ? n.name : "an open question"; }
+  const L = AC_TOPIC[acDomain(p)] || AC_TOPIC.policy; return L[(p.ti || 0) % L.length]; }
+function acTitle(p){ const r = acRng(p.s ^ 0x51), t = acTopicName(p);
+  const forms = ["On " + t, t.charAt(0).toUpperCase() + t.slice(1) + ": a report", "What we now know about " + t, "A reconsideration of " + t];
+  return forms[Math.floor(r() * forms.length)] + (p.rb ? " (a reply to No. " + p.rb + ")" : ""); }
+function acGet(no){ return acStore().p.find(p => p && p.no === no) || null; }
+/* publish: keep only what the text is rebuilt from */
+function acPublish(b, opts){
+  const A = acStore(), o = opts || {}, no = A.n + 1, s = apHash("ac:" + no + ":" + b + ":" + (G.day || 0) + ":" + (o.tp || o.ti || 0));
+  const p = {no:no, d:G.day || 0, b:b, s:s, by:s % 6, sc:(s >>> 3) % 3, st:"held"};
+  if(o.tp) p.tp = o.tp; if(o.ti != null) p.ti = o.ti; if(o.dm) p.dm = o.dm; if(o.rev) p.rev = 1;
+  const r = acRng(s);
+  p.k = [Math.round(40 + r() * 960), Math.round(70 + r() * 28), Math.round((r() * 2 - 0.6) * 300) / 10, Math.round(10 + r() * 40), Math.round(5 + r() * 95), Math.round(1 + r() * 9)];
+  if(o.k) o.k.forEach((v, i) => { if(v != null) p.k[6 + i] = Math.round(v * 10) / 10; });
+  const same = A.p.filter(q => q && acDomain(q) === acDomain(p) && (q.tp || q.ti) === (p.tp || p.ti));
+  const earlier = A.p.filter(q => q && acDomain(q) === acDomain(p)).slice(-6);
+  p.c = earlier.slice(-3).map(q => q.no);
+  const rival = same.filter(q => q.st === "held" && q.sc !== p.sc).slice(-1)[0];
+  if(rival && r() < 0.45){ p.rb = rival.no; if(r() < 0.55){ rival.st = "failed"; rival.fb = no; } }
+  A.n = no; A.p.push(p); if(A.p.length > 400) A.p.splice(0, A.p.length - 400);
+  try{ feed(acBody(b).t.charAt(0).toUpperCase() + acBody(b).t.slice(1) + " published Paper No. " + no + ": " + acTitle(p) + "."); }catch(e){}
+  if(p.rb && acGet(p.rb) && acGet(p.rb).st === "failed"){ try{ onumKeep("Paper No. " + no + " overturned No. " + p.rb + "; the older theory goes to the archive of failed theories.", null); }catch(e){} }
+  return p;
+}
+function acFmt(n){ return (Math.round(n * 10) / 10).toLocaleString("en-US"); }
+function acText(no){
+  const p = acGet(no); if(!p) return "";
+  const r = acRng(p.s), B = acBody(p.b), t = acTopicName(p), S0 = acSchool(p), S1 = acSchool(p, p.sc + 1), S2 = acSchool(p, p.sc + 2), who = acScholar(p);
+  const [N, conf, eff, dis, cost, yrs] = p.k, up = eff >= 0, pick = a => a[Math.floor(r() * a.length)];
+  const cites = (p.c || []).map(acGet).filter(Boolean), rb = p.rb ? acGet(p.rb) : null;
+  const cite = q => "Paper No. " + q.no + " (day " + q.d + ", " + acBody(q.b).t + ")";
+  const sec = (h, body) => "## " + h + "\n\n" + body + "\n";
+  const out = [];
+  out.push("# Paper No. " + p.no + ": " + acTitle(p));
+  out.push("Institution: " + B.t.charAt(0).toUpperCase() + B.t.slice(1) + ". Lead author: " + who + ", of " + S0[0] + ". Published day " + p.d + "." + (p.st === "failed" ? " This paper has since been overturned by Paper No. " + p.fb + " and is kept in the archive of failed theories." : ""));
+  out.push(sec("Abstract", "This paper asks what is actually true about " + t + ". " + who + " and the team worked from " + acFmt(N) + " cases. The central result is a change of " + acFmt(Math.abs(eff)) + " per cent " + (up ? "in the direction most people hoped for" : "against what most people expected") + ". We hold it with about " + conf + " per cent confidence, which is good enough to act on and not good enough to stop checking.\n\n" +
+    pick(["The finding is narrower than the headlines will make it.", "It is not the last word; it is the next one.", "Some of it will be wrong, and we have tried to say which part."]) + " " + (rb ? "It is written partly in reply to " + cite(rb) + ", which " + (rb.st === "failed" ? "it now overturns." : "it disputes but does not overturn.") : "It builds on what the Republic already knows.")));
+  out.push(sec("Research Question", "What happens to " + t + " when the Republic changes one thing and holds the rest steady, and is the effect large enough to matter to a household, a district and the Treasury?"));
+  out.push(sec("Background Literature", cites.length ? cites.map(q => "- " + cite(q) + ", \u201c" + acTitle(q) + "\u201d, " + (q.st === "failed" ? "since overturned; we cite it to say why it failed." : "which found a change of " + acFmt(q.k[2]) + " per cent and which this paper " + (Math.sign(q.k[2]) === Math.sign(eff) ? "broadly confirms." : "contradicts.")) ).join("\n") : "Nothing earlier in the Republic's record speaks directly to this. That is itself a finding: nobody has looked."));
+  out.push(sec("Methodology", "We studied " + acFmt(N) + " cases across " + (2 + (p.s % 9)) + " states over " + yrs + " year" + (yrs === 1 ? "" : "s") + ". The confidence figure, " + conf + " per cent, means roughly one chance in " + Math.max(2, Math.round(100 / Math.max(1, 100 - conf))) + " that the pattern is an accident of who we happened to count. " + dis + " per cent of the scholars who reviewed the draft disagreed with at least one step; the main dispute was " + pick(["whether the towns we chose were typical", "whether the period we chose was unusual", "whether the people we asked told us the truth"]) + "."));
+  const stats = [
+    "Of the " + acFmt(N) + " cases, about " + acFmt(Math.round(N * (50 + eff / 2) / 100)) + " moved the way the paper predicts. That is " + (Math.abs(eff) > 8 ? "more than chance would give, and enough to see from a street corner." : "only a little more than chance would give, which is why we are careful."),
+    "The size of the change is " + acFmt(eff) + " per cent. For an ordinary household that is " + (Math.abs(eff) > 12 ? "the difference between a good month and a bad one." : "a few coins a week, felt only over a year."),
+    "It would cost about \u0192" + acFmt(cost) + " thousand a year to act on it nationally. That is " + (cost > 60 ? "a real line in the Treasury's book, and someone will have to give something up." : "small enough that the argument will be about principle, not money."),
+    "The effect takes about " + yrs + " year" + (yrs === 1 ? "" : "s") + " to show. " + (yrs > 4 ? "Longer than one Congress, so the people who start it will not be the ones thanked for it." : "Inside one Congress, so whoever starts it will be held to it.")];
+  if(p.k[6] != null) stats.push("When the paper was written the guilder stood at " + acFmt(p.k[6]) + ". " + (p.k[6] > 110 ? "A strong guilder makes imports cheap and exporters nervous, and it colours every number above." : p.k[6] < 90 ? "A weak guilder makes every import dearer, and it colours every number above." : "That is near par, so the numbers above are not much bent by the money."));
+  if(p.k[7] != null) stats.push("The Treasury's balance was \u0192" + acFmt(p.k[7]) + ". " + (p.k[7] < 0 ? "The Republic is borrowing, so any recommendation that costs money competes with the interest." : "There is room to act, though not for everything at once."));
+  out.push(sec("Findings", stats.join("\n\n")));
+  out.push(sec("Competing Interpretations", S0[0].charAt(0).toUpperCase() + S0[0].slice(1) + ", who hold that " + S0[1] + ", read this as " + (up ? "proof that the change works." : "a warning that it does not.") + " " + S1[0].charAt(0).toUpperCase() + S1[0].slice(1) + " (" + S1[1] + ") disagree: they say the same numbers show " + (up ? "a one-off that will fade" : "a cost that is worth paying") + ". " + S2[0].charAt(0).toUpperCase() + S2[0].slice(1) + " (" + S2[1] + ") say both are arguing past the data. The rivalry between " + acScholar(Object.assign({}, p, {by:(p.by + 1) % 6})) + " and " + who + " is older than this paper and will outlast it."));
+  out.push(sec("Counterarguments", pick(["The strongest objection is that the towns studied were chosen because they were easy to reach.", "The strongest objection is that people behave differently when they know they are being counted."]) + " A second is that a " + acFmt(Math.abs(eff)) + " per cent change may be inside the error of the old records. We think the first is fair and the second is not, and we say why in the Methodology."));
+  const hi = Math.round(Math.abs(eff) * 0.8 * 10) / 10, mid = Math.round(Math.abs(eff) * 0.45 * 10) / 10, ex = Math.round(Math.abs(eff) * 1.6 * 10) / 10;
+  out.push(sec("Policy Recommendations", "High priority: " + pick(["fund a pilot in three states", "write the finding into the next appropriation", "instruct the departments to report on it quarterly"]) + ". Projected effect: about " + hi + " per cent within " + yrs + " years, at roughly \u0192" + acFmt(cost) + " thousand a year.\n\nModerate priority: " + pick(["publish the method so the states can check it", "train the clerks who keep the numbers", "fold it into the census"]) + ". Projected effect: about " + mid + " per cent, cheaply.\n\nExperimental: " + pick(["try the opposite in one state and compare", "let one city run it without the capital", "pay the districts for results rather than effort"]) + ". Projected effect: as much as " + ex + " per cent, or nothing; that is what experimental means."));
+  out.push(sec("Risk Assessment", "If we are wrong, the cost is " + (cost > 60 ? "a large sum spent on something that does not work, and a scandal in the papers." : "a modest sum and some embarrassment.") + " If we are right and nothing is done, the cost is " + (Math.abs(eff) > 12 ? "a visible harm that someone will be blamed for in the next election." : "a slow loss nobody will notice until a historian does.")));
+  const fy = k => Math.round(Math.abs(eff) * k * 10) / 10;
+  out.push(sec("Forecast", "In one year: optimistic " + fy(0.4) + " per cent, moderate " + fy(0.25) + ", pessimistic " + fy(0.05) + ".\nIn five years: optimistic " + fy(1.2) + ", moderate " + fy(0.7) + ", pessimistic " + fy(0.2) + ".\nIn ten years: optimistic " + fy(1.8) + ", moderate " + fy(1) + ", pessimistic " + fy(0.1) + " (or a reversal, if " + S1[0] + " are right)."));
+  out.push(sec("Public Response", "The newspapers: " + pick(["\u201cAcademy says what everyone knew\u201d, which is not what it says.", "a long piece in the Ledger and a cartoon in the Evening Press."]) + "\nThe unions: " + (up ? "want it applied to wages first." : "say it proves what they have been shouting for years.") + "\nThe industrialists: " + (cost > 50 ? "ask who will pay for it, and suspect they know." : "are quietly pleased.") + "\nThe governors: " + pick(["two want the pilot in their state; one says the capital should mind its own business.", "split along the usual line, and one changes sides in private."]) + "\nThe other academics: " + S1[0] + " have already announced a reply.\nThe citizens: " + pick(["most have not heard of it; those who have argue about it in the taverns.", "a petition with four hundred names asks the President to read it."])));
+  out.push(sec("Cabinet Relevance", "This paper puts a decision before the cabinet: whether to adopt its high-priority recommendation, the moderate one, or none. " + (p.dec ? "The cabinet decided on day " + p.dec.d + ": " + ["the high-priority recommendation", "the moderate recommendation", "to do nothing for now"][p.dec.o] + "." : "It is open on the desk until someone decides.")));
+  out.push(sec("Historical Significance", p.rev ? "This is one of the discoveries that changes the Republic. Historians will date things from it: before Paper No. " + p.no + " and after." : p.st === "failed" ? "Its significance is as a mistake worth remembering. The archive keeps it so that nobody makes it again with more confidence." : "Modest, unless someone builds on it. Most papers are remembered by the ones that cite them." + (G.eng && G.eng.st >= 2 ? "\n\nThe Engine's note, in its own words: \u201cI read it twice. The second reading is the one I trust; the first was what I wanted it to say.\u201d" : "")));
+  return out.join("\n\n");
+}
+function acList(){ return acStore().p.map(p => ({no:p.no, day:p.d, institution:acBody(p.b).t, field:acDomain(p), title:acTitle(p), school:acSchool(p)[0], scholar:acScholar(p), cites:(p.c || []).slice(), replyTo:p.rb || null, status:p.st, overturnedBy:p.fb || null, decided:p.dec || null, revolutionary:!!p.rev})); }
+function acSchools(){ const out = {}; acStore().p.forEach(p => { const d = acDomain(p), s = acSchool(p)[0]; out[d] = out[d] || {}; out[d][s] = (out[d][s] || 0) + 1; }); return out; }
+function acScholars(){ const c = {}; acStore().p.forEach(p => { const n = acScholar(p); c[n] = c[n] || {name:n, papers:0, cited:0, school:acSchool(p)[0]}; c[n].papers++; }); acStore().p.forEach(p => (p.c || []).forEach(no => { const q = acGet(no); if(q){ const n = acScholar(q); if(c[n]) c[n].cited++; } })); return Object.values(c).sort((a, b) => (b.cited * 2 + b.papers) - (a.cited * 2 + a.papers)); }
+function acPrestige(){ const c = {}; acStore().p.forEach(p => { const t = acBody(p.b).t; c[t] = (c[t] || 0) + 1 + (p.c || []).length * 0 + (p.rev ? 3 : 0) - (p.st === "failed" ? 1 : 0); }); acStore().p.forEach(p => (p.c || []).forEach(no => { const q = acGet(no); if(q){ const t = acBody(q.b).t; c[t] = (c[t] || 0) + 1; } })); return Object.keys(c).map(k => ({institution:k, prestige:c[k]})).sort((a, b) => b.prestige - a.prestige); }
+function acOpenDecisions(){ return acStore().p.filter(p => p && !p.dec && p.st === "held" && (G.day || 0) - p.d <= 45); }
+function acDecide(no, o){
+  const p = acGet(no); if(!p || p.dec) return null; p.dec = {o:o, d:G.day || 0};
+  const eff = p.k[2], d = acDomain(p);
+  try{ if(o < 2){ const w = o === 0 ? 1 : 0.5; if(d === "econ" && G.money) G.money.index = clamp(G.money.index + Math.sign(eff) * 0.6 * w, 42, 190); if(G.you) G.you.approval = clamp((G.you.approval || 50) + (eff > 0 ? 0.8 : -0.4) * w, 0, 100);
+      try{ setPrecedent("adopted the " + (o === 0 ? "high-priority" : "moderate") + " recommendation of Paper No. " + p.no, "the cabinet acts on the Academy's papers by number, and the paper is cited when it does", true); }catch(e){} } }catch(e){}
+  try{ journal("The cabinet decided on Paper No. " + p.no + ": " + ["the high-priority recommendation", "the moderate recommendation", "nothing for now"][o] + "."); }catch(e){}
+  try{ onumKeep("The cabinet acted on Paper No. " + p.no + " (" + acTitle(p) + "): " + ["the high-priority recommendation", "the moderate recommendation", "nothing for now"][o] + ".", null); }catch(e){}
+  return p.dec;
+}
+/* who publishes: every Academy discovery, and one state body every few days on what is in front of the Republic */
+{ const _id = inqDiscovered; inqDiscovered = function(n, silent){ const r = _id.apply(this, arguments); try{ if(!silent && n && G.you) acPublish("acad", {tp:n.id, rev:(n.effort || 0) >= 7}); }catch(e){} return r; }; }
+{ let d0 = null; setInterval(function(){ try{ if(!G || !G.you || d0 === G.day) return; d0 = G.day; const A = acStore(); if(A.lastDay === G.day) return; A.lastDay = G.day;
+    if(apHash("acday:" + G.day) % 3 !== 0) return; const bodies = AC_BODIES.filter(b => b.k !== "acad"), b = bodies[apHash("acb:" + G.day) % bodies.length];
+    let gi = null, tb = null; try{ gi = G.money ? G.money.index : null; }catch(e){} try{ tb = tsStore().bal; }catch(e){}
+    acPublish(b.k, {ti:apHash("act:" + G.day) % 3, k:b.d === "econ" || b.d === "stat" || b.d === "policy" ? [gi, tb] : null}); }catch(e){} }, 1700); }
+{ const _sc = saveCaptureBase; saveCaptureBase = function(){ const o = _sc.apply(this, arguments); try{ o.academy = G.academy || null; }catch(e){} return o; }; }
+function acCard(no){
+  const L = acList().slice(-30).reverse(), open = acOpenDecisions();
+  if(no){ const txt = acText(no); govCardOpen("The Academy", "Paper No. " + no, "", '<div style="white-space:pre-wrap;font:14px/1.5 Georgia,serif">' + apEsc(txt) + '</div><div class="card__actions"><button type="button" class="btn btn--ghost" id="acBack">All papers</button></div>', null); const b = el("acBack"); if(b) b.addEventListener("click", () => acCard()); return; }
+  const rows = L.map(x => '<div style="margin:6px 0"><button type="button" class="btn btn--ghost" data-acr="' + x.no + '">No. ' + x.no + '</button> ' + apEsc(x.title) + ' <span class="muted">· ' + apEsc(x.institution) + ' · day ' + x.day + ' · ' + apEsc(x.school) + (x.status === "failed" ? " · overturned" : "") + '</span>' +
+    (open.some(p => p.no === x.no) ? ' <button type="button" class="btn" data-acd="' + x.no + ':0">Adopt the high recommendation</button> <button type="button" class="btn btn--ghost" data-acd="' + x.no + ':1">The moderate one</button> <button type="button" class="btn btn--ghost" data-acd="' + x.no + ':2">Not now</button>' : '') + '</div>').join("") || '<p class="muted">Nothing published yet.</p>';
+  govCardOpen("The Academy", "Papers before the Republic", "Every paper is numbered and cites the ones before it. Schools disagree; some theories fail and are kept anyway.", rows, null);
+  card.querySelectorAll("[data-acr]").forEach(b => b.addEventListener("click", () => acCard(+b.getAttribute("data-acr"))));
+  card.querySelectorAll("[data-acd]").forEach(b => b.addEventListener("click", () => { const [n, o] = b.getAttribute("data-acd").split(":"); acDecide(+n, +o); acCard(); }));
+}
+{ const _apps = pbApps; pbApps = function(){ const L = _apps.apply(this, arguments) || []; if(!L.some(x => x[0] === "soc-acad")) L.unshift(["soc-acad", "Papers", "The Academy's and the state bodies' papers, numbered, and the decisions they put before you."]); return L; }; }
+{ const _go = pbAppGo; pbAppGo = function(id){ if(id === "soc-acad"){ setTimeout(function(){ try{ acCard(); }catch(e){} }, 30); return; } return _go.apply(this, arguments); }; }
+window.onumAcademy = {list:acList, get:function(no){ const p = acGet(no); return p ? JSON.parse(JSON.stringify(p)) : null; }, text:acText, title:function(no){ const p = acGet(no); return p ? acTitle(p) : null; }, schools:acSchools, scholars:acScholars, prestige:acPrestige,
+  failed:function(){ return acList().filter(x => x.status === "failed"); }, decisions:function(){ return acOpenDecisions().map(p => p.no); }, decide:acDecide, publish:function(b, o){ return acPublish(b || "acad", o || {}); }, open:acCard, bodies:AC_BODIES.map(b => ({k:b.k, t:b.t, domain:b.d}))};
+
+/* ══ 20261124b JUPITER · organic human conversation (Dominic's master prompt, part 2).
+   People hold opinions before you arrive (from who they already are), tell the same life story every time they are asked,
+   bring up things that really happened in your career (read from your own journal, nothing new kept per person), talk to
+   each other about you, and a cabinet is not unanimous by default. ══ */
+const TK_TRADE = ["a cooper", "a schoolteacher", "a ferryman", "a seamstress", "a clerk at the land office", "a miller", "a printer", "a nurse", "a lock-keeper", "a grocer"];
+const TK_TURN = ["the winter the river froze and the mill closed", "the year my brother went west and did not write", "the flood that took our street", "the strike at the yards", "the fever that went through the school", "an election my father lost by eleven votes"];
+const TK_FIRST = ["sweeping out a printer's shop", "running messages for a magistrate", "keeping accounts for a grain merchant", "teaching the small ones to read", "hauling for the railway survey", "clerking in a county office"];
+const TK_HOPE = ["to see the line finished before I die", "that my children never have to leave for work", "to be thought fair, even by people who voted against me", "a quiet house and a long table", "to be wrong about the things I am afraid of"];
+const TK_MANNER = ["Well,", "Honestly?", "Hm.", "Look,", "Where do I start.", "It is a long story, but", "You really want this?"];
+function talkHash(s){ try{ return apHash(s); }catch(e){ let h = 2166136261; for(let i = 0; i < s.length; i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; } }
+function tkDraw(list, key){ return list[talkHash(key) % list.length]; }
+function tkStory(m){
+  if(!m) return ""; const id = String(m.id), b = bioOf(m), L = inventLife(m) || {};
+  const fam = (() => { try{ const R = G.dyn && G.dyn.P && G.dyn.P[m.id]; return R && R.house ? " The family name means something back home, for better and worse." : ""; }catch(e){ return ""; } })();
+  const now = m.post && m.post.t ? "Now I am " + m.post.t + ", which my mother still does not quite believe." : m.role ? "Now I am " + m.role.toLowerCase().replace(/^the /, "the ") + ", for what that is worth." : "";
+  return tkDraw(TK_MANNER, "man:" + id) + " I grew up in " + b.town + (m.state && b.town !== m.state ? ", in " + m.state : "") + ". My father was " + tkDraw(TK_TRADE, "fa:" + id) + " and my mother was " + tkDraw(TK_TRADE, "mo:" + id + "x") + ". " +
+    b.line + " What changed me was " + tkDraw(TK_TURN, "turn:" + id) + "; I think about it more than I should. I started out " + tkDraw(TK_FIRST, "first:" + id) + "." + fam + " " + now +
+    (L.hobby ? " When nobody needs me I am " + L.hobby + ", and I will not apologise for it." : "") + " What I want, if you are asking, is " + tkDraw(TK_HOPE, "hope:" + id) + ". " + b.priv;
+}
+function tkOpinions(m){
+  if(!m) return []; const P = m.pos || {}, out = [], id = String(m.id);
+  const ax = [["econ", "the economy", "the markets should be left to breathe", "the state has to steady the markets"], ["wel", "welfare", "people should be carried when they fall", "charity is for churches, not the Treasury"],
+    ["def", "defence", "the frontier needs more men and more ships", "the army is already too large"], ["lib", "liberty", "the capital should keep out of people's lives", "order comes before liberty"]];
+  ax.forEach(a => { const v = P[a[0]]; if(v == null) return; const strong = Math.abs(v) > 25; out.push({k:a[0], v:v, t:(strong ? "I have always thought " : "I suppose I think ") + (v >= 0 ? a[2] : a[3]) + "."}); });
+  try{ const w = (m.rel && m.rel.warmth) || 0, you = G.you && G.you.name ? G.you.name.split(" ").slice(-1)[0] : "you";
+    out.push({k:"you", v:w, t:w > 20 ? "I like " + you + ". Not blindly." : w < -20 ? "I do not trust " + you + ", and I said so long before it was fashionable." : "I have not made my mind up about " + you + ", whatever people say."}); }catch(e){}
+  return out.sort((a, b) => Math.abs(b.v) - Math.abs(a.v) || (talkHash(id + a.k) - talkHash(id + b.k)));
+}
+/* real events from your career, read from the journal you already keep; a person remembers only what happened while they were about */
+function tkEvents(m, n){
+  const J = (G.journal || []).filter(e => e && e.t && e.day != null && !/^You (opened|closed|saved)/.test(e.t)), id = String(m && m.id), since = (m && (m.met || m.since || m.born)) || 0;
+  const pool = J.filter(e => e.day >= (typeof since === "number" ? since - 400 : 0));
+  return pool.map(e => ({e:e, h:talkHash(id + ":" + e.day + ":" + e.t.slice(0, 24))})).sort((a, b) => a.h - b.h).slice(0, n || 2).map(x => ({day:x.e.day, t:x.e.t}));
+}
+function tkRecallLine(m){
+  const E = tkEvents(m, 1)[0]; if(!E) return "";
+  const w = (m.rel && m.rel.warmth) || 0, txt = E.t.replace(/\.$/, "");
+  return tkDraw(["I still think about day " + E.day + ". " + txt + ". ", "You remember day " + E.day + "? " + txt + ". I do. ", "Day " + E.day + ", wasn't it. " + txt + ". People here still bring it up. "], "rc:" + m.id + ":" + E.day) +
+    (w > 15 ? "I thought you handled it better than they said." : w < -15 ? "I have not forgotten it, if that is what you are hoping." : "I am still not sure what I think of it.");
+}
+const TK_RULES = " HOW YOU TALK: like a person, not a report. You already had opinions before this conversation; keep them unless given a real reason. Speak in your own rhythm: interrupt yourself, trail off, joke, complain, change the subject if you want. Bring up your own life and real things that happened when it fits. Never recite numbers like a readout; say what they mean to you. If someone asks about you, tell your own story, the same story every time.";
+{ const _ppl = psyPromptLine; psyPromptLine = function(m){ let r = ""; try{ r = _ppl.apply(this, arguments) || ""; }catch(e){}
+    try{ const op = tkOpinions(m).slice(0, 2).map(o => o.t).join(" "), ev = tkEvents(m, 2).map(e => "day " + e.day + ": " + e.t).join("; ");
+      r += TK_RULES + " YOUR LIFE (tell it this way if asked): " + tkStory(m) + " YOUR OPINIONS: " + op + (ev ? " THINGS YOU REMEMBER FROM THEIR CAREER: " + ev + "." : ""); }catch(e){} return r; }; }
+{ const _im = improvise; improvise = function(m, said){
+    try{ const s = String(said || "").toLowerCase();
+      if(/about yourself|your story|who are you|where (are you from|did you grow up)|tell me about you|your life|your background/.test(s)) return tkStory(m);
+      if(/what do you think|your opinion|where do you stand|how do you feel about/.test(s) && !/bill|act |tariff/.test(s)){ const o = tkOpinions(m); if(o.length) return tkDraw(TK_MANNER, "op:" + m.id) + " " + o.slice(0, 2).map(x => x.t).join(" "); }
+      if(/remember|back when|last time|that day/.test(s)){ const l = tkRecallLine(m); if(l) return l; } }catch(e){}
+    let out = _im.apply(this, arguments);
+    try{ if(typeof out === "string" && talkHash("rcall:" + m.id + ":" + G.day + ":" + ((G.minute || 0) / 30 | 0)) % 5 === 0){ const l = tkRecallLine(m); if(l) out = out + " " + l; } }catch(e){}
+    return out; }; }
+/* people talk to each other about you; the listener's view moves a little toward the teller's */
+function tkGossipDay(){
+  if(!G || !G.you) return []; const pool = (typeof bentPool === "function" ? bentPool() : []).filter(p => p.rel); if(pool.length < 2) return [];
+  const T = G.tkTalk = G.tkTalk || {d:-1, log:[]}; if(T.d === G.day) return []; T.d = G.day; const out = [];
+  for(let k = 0; k < 3; k++){ const a = pool[talkHash("ga:" + G.day + ":" + k) % pool.length], b = pool[talkHash("gb:" + G.day + ":" + k) % pool.length]; if(!a || !b || a === b) continue;
+    const wa = a.rel.warmth || 0, wb = b.rel.warmth || 0, shift = Math.round((wa - wb) * 0.12);
+    if(shift) b.rel.warmth = clamp(wb + shift, -100, 100);
+    const said = wa > 15 ? "said you were worth backing" : wa < -15 ? "said you could not be trusted" : "said nobody really knows what you want";
+    try{ remember(b, a.name + " " + said + ". I have been turning it over.", 0.6, false); }catch(e){}
+    T.log.unshift([G.day, a.id, b.id, shift]); out.push({day:G.day, from:a.id, to:b.id, said:said, shift:shift}); }
+  if(T.log.length > 24) T.log.length = 24; return out;
+}
+setInterval(function(){ try{ tkGossipDay(); }catch(e){} }, 2300);
+{ const _sc = saveCaptureBase; saveCaptureBase = function(){ const o = _sc.apply(this, arguments); try{ o.tkTalk = G.tkTalk || null; }catch(e){} return o; }; }
+/* a cabinet is not unanimous by default: when everyone before the last seat agrees and the last seat is lukewarm, it dissents */
+function baDissent(votes, v){ if(votes.length < 2) return false; const w = v >= 0 ? "aye" : "no"; return votes.every(x => x === w) && Math.abs(v) < 45; }
+window.onumPeople = {story:function(id){ const m = byId(id); return m ? tkStory(m) : null; }, opinions:function(id){ const m = byId(id); return m ? tkOpinions(m) : null; }, remembers:function(id, n){ const m = byId(id); return m ? tkEvents(m, n || 2) : null; },
+  recall:function(id){ const m = byId(id); return m ? tkRecallLine(m) : null; }, reply:function(id, said){ const m = byId(id); return m ? improvise(m, said) : null; }, gossip:tkGossipDay, dissent:baDissent, prompt:function(id){ const m = byId(id); return m ? psyPromptLine(m) : null; }};
 
 function onumMkt(){
   if(!G.mkt || G.mkt.v !== 1) G.mkt = {v:1, px:{grain:42, iron:70, rail:55, press:28, sport:22}, hist:[], day:-1};
