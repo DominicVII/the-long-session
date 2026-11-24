@@ -1,3 +1,18 @@
+## 20261124c: the sitting panel fits every stage, and your save goes first (JUPITER, with NEPTUNE's 08)
+
+- On 20261124b (628225b).
+- **Neptune's patch 08:**
+  - The sitting panel fits and scrolls with the wheel in every stage, at all five sizes.
+  - There is an Engine button on the toolbar and an Engine entry in the Menu.
+  - The last 50 ms ✕ timer is gone.
+- **Saves:**
+  - A save you ask for cancels a background save that has not started writing yet, and starts at once.
+  - Background saves now run at least 8 s apart, instead of back to back.
+  - The wait is measured as onumSaveStats().asked.
+- **QA:**
+  - New: qa/nov24-sitstages.mjs checks every stage (call, agenda, briefings, floor, decisions) at all five sizes with elementFromPoint, or the wheel over the panel.
+  - Results: stale-day, boot ×3 (nov17-systems), dupfn and viewport.
+
 ## 20261124b: a cabinet name is a person with a file, a hearing and a roll; Vox and your own shop are on the phone; people act from who they are (JUPITER)
 
 - On main 20261124a (eddf58e). The day-535 save loads unchanged, and every new record starts empty when it is missing.
