@@ -2347,8 +2347,8 @@
       headPivot.add(eg);
       eyes.push(eg);
       add(eg, cached(geoCache, "eyeball" + q, () => weld(new T.SphereGeometry(0.0127, 20, 14))), eyeW, 0, 0, 0, faceFine);
-      add(eg, cached(geoCache, "iris", () => new T.CircleGeometry(76e-4, 24)), irisM, 0, 0, 0.0122, faceFine);
-      add(eg, cached(geoCache, "pupil", () => new T.CircleGeometry(29e-4, 14)), pupM, 0, 0, 0.0125, faceFine);
+      add(eg, cached(geoCache, "iris2", () => new T.CircleGeometry(88e-4, 24)), irisM, 0, 0, 0.0122, faceFine);
+      add(eg, cached(geoCache, "pupil2", () => new T.CircleGeometry(34e-4, 14)), pupM, 0, 0, 0.0125, faceFine);
       for (const up of [1, -1]) {
         const lg = new T.Group();
         lg.position.copy(c);
@@ -2751,6 +2751,11 @@
       for (const t of tp) if (t[0] <= y) a = t;
       return a[2] * (jacket ? 1.06 : 1) + (jacket ? 0.012 : vest ? 6e-3 : 0) + (a[3] || 0);
     };
+    if (jacket) {
+      const py = 0.34, px = fem ? -0.062 : 0.062;
+      add(torso, cached(geoCache, "breastpkt", () => new T.BoxGeometry(0.034, 6e-3, 0.01)), suitM, px, py, frontZ(py) + 4e-3);
+      add(torso, cached(geoCache, "pocksq", () => new T.BoxGeometry(0.026, 0.016, 4e-3)), shirtM, px, py + 0.012, frontZ(py) + 0.01);
+    }
     const U = S.uniform, solid = (hex, rough = 0.5, metal = 0) => stdMat("u" + hex + "|" + rough + "|" + metal, { color: lin(hex), roughness: rough, metalness: metal });
     const goldM = solid(13936202, 0.3, 1);
     if (U) {
@@ -2905,8 +2910,11 @@
       rig.visible = l < 3;
       proxy.visible = l >= 3 && st.sit < 0.5;
       proxySit.visible = l >= 3 && st.sit >= 0.5;
-      for (const m of faceFine) m.visible = l <= 1 || l === 2 && m.material === hairM;
-      for (const m of bodyFine) m.visible = l === 0;
+      for (const m of faceFine) {
+        const card = m.material && m.material.alphaTest > 0.2;
+        m.visible = card ? l <= 1 : l < 3;
+      }
+      for (const m of bodyFine) m.visible = l <= 1;
     }
     function update(dt, state = {}) {
       var _a;
@@ -2921,7 +2929,7 @@
       }
       if (d == null && cam && !viewCam && st.lod >= 0) d = st.lastD;
       if (d != null) st.lastD = d;
-      const lodD = opts.lodDistances || [3.5, 10, 30];
+      const lodD = opts.lodDistances || [7, 16, 34];
       const hy = (i) => lodD[i] * (st.lod > i ? 0.92 : 1);
       setLod(state.lod != null ? state.lod : d == null ? st.lod < 0 ? 0 : st.lod : d < hy(0) ? 0 : d < hy(1) ? 1 : d < hy(2) ? 2 : 3);
       const sitT = state.sitting ? 1 : 0;
