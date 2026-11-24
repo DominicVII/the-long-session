@@ -17,18 +17,30 @@ One HTML body. Keep these **byte-identical**:
 | `session.html` | repo root |
 | `One Nation, Under, ME.html` | standalone name |
 
-**Build stamp (now): `20261123j`**
+**Build stamp (now): `20261123k`**
 
-- `<meta name="onum-build" content="20261123j">`
-- IIFE `STAMP = "20261123j"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
-- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261123j"`
+- `<meta name="onum-build" content="20261123k">`
+- IIFE `STAMP = "20261123k"` (uses `history.replaceState` to set `?v=` — **never `location.replace`**, that froze boot)
+- `src/lib/onum-build.ts` → `export const ONUM_BUILD = "20261123k"`
 - Wrapper iframe: `/session.html?v=${ONUM_BUILD}` in `src/routes/index.tsx`
 
-If you change the HTML, bump the letter (`20261123j`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
+If you change the HTML, bump the letter (`20261123k`, …) in **meta + STAMP + ONUM_BUILD together**, commit, push `main`.
 
 This sandbox tracks `public/session.html` as the playable body (root `index.html` / `session.html` / `One Nation, Under, ME.html` are not in this repo). Do not replace that file with a simpler build. Insert new game logic **inside** the main IIFE, before `})(); /* 20261110bx: main IIFE close, moved below the ba block */`.
 
-### Latest — `20261123j`
+### Latest — `20261123k`
+
+The morning briefing is now one page. Taking it from the cabinet table opens **The one page**, not another stack of desks. The four secretaries are still one button on that page.
+
+Urgent, important, and what can wait are filled from the live book: a state over unrest 70, a guilder past 160 or under 70, a debt over 2,500, an envoy at stage 3 or worse, and a bill that is actually on the floor. Everything else waits. Clerks hold ceremonial work unless you take it back. A bill is never treated as ceremonial.
+
+The page says why home standing is not the mood. The mood is one word, taken from the worst of the six readings, and it names the district carrying it. Six advisors are named and given a beat. They explain. They do not play for you.
+
+You can keep a bill, leave it with the chair, or put a working group on it. Leaving it does not skip the floor. The chair still has to let it out. Letters arrive from a household and from an envoy without being asked. The other bench names a shadow for finance, foreign, and the works, and one of them speaks on a week you did not call. The search looks up people, states, papers, companies, committees, and buildings already on the book. It does not invent a Marcus Hale.
+
+If standing and approval are both under 32, the page says the building is routing around you. It does not end the game. Executive, immersive, and strategic change what the morning shows. They do not turn the rest of the Republic off.
+
+`G.staff` is in the save.
 
 The district you walk is still the district. This build does not add a film renderer, level-of-detail, or a soul for every person in a state. It gives the names a ground they keep.
 
