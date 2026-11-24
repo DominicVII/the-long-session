@@ -1,3 +1,24 @@
+## 20261124b: a cabinet name is a person with a file, a hearing and a roll; Vox and your own shop are on the phone; people act from who they are (JUPITER)
+
+- On main 20261124a (eddf58e). The day-535 save loads unchanged, and every new record starts empty when it is missing.
+- **Nominations.** You send a person, not a title.
+  - The field is three people. Some of them already live in the Republic: a former official, or people you have met. A new name becomes a real person the moment you send it.
+  - The file is read overnight from who they are: their views against yours, their money, the papers, their temper, their family, a past chair, what they think of you. You can hurry it, and one drawer stays shut.
+  - The next day five senators, by name, each ask about something in the file, and the nominee answers in their own manner. The whole Senate then votes on the roll, by name where the Senate book has one.
+  - Sworn, the same person takes the chair and the seat at the table, and goes to work at the department's office. The old holder retires.
+  - Refused, they go home and remember it, worse if you did not come.
+  - All of it is kept in the save and on the Nominations page.
+- **Vox on the phone.** The feed, your own posts with their backing and replies, and the composer.
+- **Who people are.** Everyone has one bent, kept with them: proud, grasping, quick to anger, envious, wanting, indulgent or idle. It is never shown as a label. On an ordinary day a few people act on it: a shouting match, talk behind someone's back, the envelope at dinner, leaving a reception together, a long lunch, a morning they did not come in. Both people remember it. The third time is remembered as again, and three shouting matches become a feud between the houses. Some of it is written down. The engine is told who they are, and told never to say it.
+- **Your own shop.** Open a storefront from the phone (ƒ180 from your purse). It sits on the same price book as the district, so your markup decides whether people come in or walk to the cheaper door. The till pays into your purse each day.
+- **Fixes.**
+  - A night's save is no longer held until the morning page is closed. Only walking holds a save now.
+  - The journal shows the day, never "Day undefined".
+  - After Continue at 1280x720 the talk panel keeps the first choice in view while the line streams in, until you scroll it yourself.
+- **Kept from main and used, not rebuilt:** the market, the shares and the guilder, the shops with owners, the match, the music hall, the families and houses, courtship, the chronicle, the web, and precedent.
+- **Not in this build:** the accurate continental and nation maps, celebrity careers, and walkable department offices. The details are in docs/handoff/20261124.md.
+- **QA:** qa/nov24-r2.mjs on a copy of the day-535 save (nightly save, journal, nominations both ways and after a reload, Vox, people, shop). All earlier suites were rerun.
+
 ## 20261124a: the title shows the day you are on, the desk and the cabinet table stay put, and the Nov 17 work is back on top of 23k (JUPITER, with NEPTUNE's screen fit)
 
 - Built on main 20261123k (f30620b). Everything Dominic made from 17b to 23k is kept. The Nov 17 branches (o, q, s and Neptune's t) are carried over by hand where main did not already have them.

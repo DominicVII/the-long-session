@@ -70,6 +70,25 @@ try {
     globalThis.__page = page2;
   }
   const pg = globalThis.__page || page;
+  if (want("life")) {
+    const L = await pg.evaluate(() => { const R = window.ONUM_R2, pool = R.bentPool().slice(0, 40); const a = pool.map((p) => R.bentOf(p).k); const b = pool.map((p, i) => R.bentOf(p).k === a[i] && !!p.bent);
+      const kinds = [...new Set(a)]; const w = pool.find((p) => R.bentOf(p).k === "wrath") || pool[0]; const lines = []; for (let i = 0; i < 3; i++) lines.push(R.bentAct(w));
+      const words = /\b(pride|proud|greed|wrath|envy|envious|lust|gluttony|sloth|sin|sins)\b/i;
+      const prompt = R.psyPromptLine(w);
+      return { kinds, stable: b.every(Boolean), id: w.id, k: w.bent.k, n: w.bent.n, lines, labelled: lines.some((l) => l && words.test(l)), prompt: /WHO YOU ARE/.test(prompt), mem: (w.mem || []).slice(0, 2).map((m) => m.t), log: (NEPTUNE.debug().G.bentLog || []).length, ids: pool.map((p) => p.id), ks: a }; });
+    ok("people: everyone has one bent of their own, read from their traits, the same each time it is read", L.stable && L.kinds.length >= 3, { kinds: L.kinds, stable: L.stable });
+    ok("people: acting on it is remembered, and the third time is remembered as again", L.n >= 3 && L.lines.every(Boolean) && /Again\./.test(L.lines[2]) && L.mem.length && L.log >= 3, { k: L.k, lines: L.lines, mem: L.mem });
+    ok("people: what they do is never labelled with a vice; the engine is told who they are, quietly", !L.labelled && L.prompt, { labelled: L.labelled, prompt: L.prompt });
+    const S = await pg.evaluate(async () => { const R = window.ONUM_R2, P = R.purse(); P.cash = Math.max(P.cash || 0, 1000); const c0 = P.cash; const msg = R.onumOpenShop("grocer", "grain", 0.9); const mine = R.onumMyShops()[0];
+      const rival = R.onumShops().find((x) => x.book === "grain" && x !== mine); const base = (x) => R.onumPrice(x) / x.markup;
+      return { msg, mine: mine && { id: mine.id, book: mine.book, markup: mine.markup, price: R.onumPrice(mine) }, sameBook: rival ? Math.abs(base(mine) - base(rival)) < 0.2 : null, paid: c0 - P.cash, listed: R.pbApps().some((x) => x[0] === "soc-shop") }; });
+    ok("shop: you can open your own storefront from the phone, paid from your purse", S.mine && S.paid === 180 && S.listed, S);
+    ok("shop: your shop is bound to the same price book as its rivals; only the markup differs", S.sameBook === true, S);
+    await pg.evaluate(() => { try { document.getElementById("gcClose").click(); } catch (e) {} try { window.ONUM.n24.nextDay(false); } catch (e) {} }); await waitIdle(pg); await delay(4000);
+    const S2 = await pg.evaluate(() => { const R = window.ONUM_R2, c0 = R.purse().cash; try { R.onumShopPay(); } catch (e) {} const m = R.onumMyShops()[0]; return { till: m && m.till, last: m && m.last, paid: m && m.paid, purse: Math.round((R.purse().cash - c0) * 10) / 10, cash: R.purse().cash }; });
+    ok("shop: priced under the cheaper door, the day's trade lands in your till and the till is paid into your purse", S2.last && S2.till > 0 && S2.paid === S2.till, S2);
+    globalThis.__life = { ids: L.ids, ks: L.ks, wid: L.id, wn: L.n, shop: S.mine && S.mine.id };
+  }
   if (want("vox")) {
     const v = await pg.evaluate(async () => { const R = window.ONUM_R2, apps = R.pbApps().map((x) => x[0]); R.pbAppGo("soc-vox"); await new Promise((r) => setTimeout(r, 400));
       let err = null; try { R.onumVoxCard(); } catch (e) { err = String(e); } const cardT = document.getElementById("card").innerText; const ta = document.querySelector("#card .voxq__t"), b = document.querySelector("#card .voxq__b"); const text = "QA from the phone " + Date.now();
@@ -78,8 +97,17 @@ try {
     ok("vox: the phone lists Vox and opens the feed with a composer", v.hasVox && v.opened, v);
     ok("vox: a post from the phone is your post, and the phone's feed shows it under Yours", v.posted && v.stays, v);
   }
+  if (want("life") && globalThis.__life) {
+    await pg.evaluate(() => { try { window.ONUM.n24.save(); } catch (e) {} });
+    { const t0 = Date.now(); while (Date.now() - t0 < 120000) { const s = await pg.evaluate(() => window.onumSaveStats()); if (!s.busy && !s.pending) break; await delay(1000); } }
+    await pg.close(); const p3 = await newPage(browser, errs); await continueCareer(p3, origin, ""); await delay(5000);
+    const k = globalThis.__life; const r = await p3.evaluate((k) => { const R = window.ONUM_R2, G = NEPTUNE.debug().G; const all = [].concat(G.members || [], G.civ || []); const ks = k.ids.map((id) => { const p = all.find((x) => x && x.id === id); return p ? R.bentOf(p).k : null; });
+      const w = all.find((x) => x && x.id === k.wid); return { same: ks.every((x, i) => x === k.ks[i]), wn: w && w.bent && w.bent.n, shop: R.onumMyShops().some((s) => s.id === k.shop) }; }, k);
+    ok("after a reload: the same people have the same bent, the count of what they did is kept, and your shop is still yours", r.same && r.wn === k.wn && r.shop, r);
+    globalThis.__page = p3;
+  }
   ok("0 page errors", errs.length === 0, errs.slice(0, 3));
-  try { await pg.close(); } catch (e) {}
+  try { await (globalThis.__page || pg).close(); } catch (e) {}
 } finally {
   const failed = results.filter((r) => !r.pass).length; console.log(failed ? "FAIL " + failed + " of " + results.length : "ALL PASS " + results.length);
   try { await browser.close(); } catch (e) {} try { server.close(); } catch (e) {} process.exitCode = failed ? 1 : 0;
