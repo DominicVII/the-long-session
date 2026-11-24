@@ -11,13 +11,32 @@
 - **Vox on the phone.** The feed, your own posts with their backing and replies, and the composer.
 - **Who people are.** Everyone has one bent, kept with them: proud, grasping, quick to anger, envious, wanting, indulgent or idle. It is never shown as a label. On an ordinary day a few people act on it: a shouting match, talk behind someone's back, the envelope at dinner, leaving a reception together, a long lunch, a morning they did not come in. Both people remember it. The third time is remembered as again, and three shouting matches become a feud between the houses. Some of it is written down. The engine is told who they are, and told never to say it.
 - **Your own shop.** Open a storefront from the phone (ƒ180 from your purse). It sits on the same price book as the district, so your markup decides whether people come in or walk to the cheaper door. The till pays into your purse each day.
+- **Papers.** The Academy and ten state bodies publish numbered papers.
+  - The bodies are the Research Bureau, the Policy Institute, the Economic Office, the Statistical Service, the Military Academy, the Scientific Academy, the Intelligence Directorate, the University Consortium, the Engineering Corps and the Historical Society.
+  - Every paper has every section in Dominic's master prompt.
+  - Papers cite earlier papers by number and day. They carry schools of thought, rivalries, ranked scholars and institution prestige.
+  - Failed theories are archived, never deleted.
+  - Each paper puts a decision before the cabinet.
+  - Only a seed and the paper's numbers are saved, about 300 bytes a paper. The text is rebuilt word for word every time it is opened.
+  - The API is `window.onumAcademy`.
+  - Dominic's prompt is in docs/ACADEMY-AND-CONVERSATION-MASTER-PROMPT.md, and the data shape is in the handoff.
+- **Conversation.**
+  - People hold opinions before you ever meet them.
+  - "Tell me about yourself" gives the same life story every time.
+  - People bring up real days from your career, read from your journal.
+  - People talk to each other about you, and the listener's view moves a little.
+  - A cabinet is not unanimous by default: a lukewarm last seat dissents.
+  - The talk prompt carries the conversation rules.
 - **Fixes.**
+  - The title prints no day number until IndexedDB has answered.
+  - A save you ask for makes the save already running finish faster.
+  - Stale localStorage copies are removed once IndexedDB confirms a newer career.
   - A night's save is no longer held until the morning page is closed. Only walking holds a save now.
   - The journal shows the day, never "Day undefined".
   - After Continue at 1280x720 the talk panel keeps the first choice in view while the line streams in, until you scroll it yourself.
 - **Kept from main and used, not rebuilt:** the market, the shares and the guilder, the shops with owners, the match, the music hall, the families and houses, courtship, the chronicle, the web, and precedent.
 - **Not in this build:** the accurate continental and nation maps, celebrity careers, and walkable department offices. The details are in docs/handoff/20261124.md.
-- **QA:** qa/nov24-r2.mjs on a copy of the day-535 save (nightly save, journal, nominations both ways and after a reload, Vox, people, shop). All earlier suites were rerun.
+- **QA:** qa/nov24-academy.mjs (papers, people, reload, save size) and qa/nov24-r2.mjs on a copy of the day-535 save (nightly save, journal, nominations both ways and after a reload, Vox, people, shop). All earlier suites were rerun.
 
 ## 20261124a: the title shows the day you are on, the desk and the cabinet table stay put, and the Nov 17 work is back on top of 23k (JUPITER, with NEPTUNE's screen fit)
 
