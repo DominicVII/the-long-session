@@ -19116,7 +19116,7 @@ document.addEventListener("click", ev => {
   try{
     const t = ev.target && ev.target.closest ? ev.target.closest("[data-vlike],[data-vdis],[data-vre],.voxq__b") : null; if(!t || !G.you) return;
     const root = t.closest("#paneVox") || card;
-    const redraw = () => { if(t.closest("#paneVox")) refreshVox(); else if(typeof phoneCard === "function" && !veil.hidden) phoneCard(); };
+    const redraw = () => { if(t.closest("#paneVox")) refreshVox(); else if(window.ONUM_VOXCARD && !veil.hidden && typeof onumVoxCard === "function") onumVoxCard(); else if(typeof phoneCard === "function" && !veil.hidden) phoneCard(); };
     if(t.matches(".voxq__b")){
       const ta = t.closest(".voxq").querySelector("textarea"), text = ta.value.trim(); if(!text) return;
       spend(rint(10, 18), 2);
@@ -39019,7 +39019,7 @@ function cabInstall(post, official){
   let st; try{ st = presStaff(); }catch(e){ return null; }
   const o = official || {}, prev = st[post.k] || {};
   const rec = {name:o.name || prev.name, role:post.t, bg:o.bg || prev.bg, creed:o.creed || prev.creed, origin:o.origin || prev.origin,
-    pos:Object.assign({}, prev.pos || {}, o.pos || {}), temper:o.temper || prev.temper || 45, warm:o.warm || 0, since:G.day || 0, town:o.town || prev.town, prior:o.prior || prev.prior, appointed:true};
+    pos:Object.assign({}, prev.pos || {}, o.pos || {}), temper:o.temper || prev.temper || 45, warm:o.warm || 0, since:G.day || 0, town:o.town || prev.town, prior:o.prior || prev.prior, appointed:true, cabKey:o.cabKey || null};
   if(!rec.name) return null;
   st[post.k] = rec;
   const p = cabSeat("exec:sec:" + post.k, rec, {role:PRES_ROLES[post.k] || post.t, chamber:"exec", room:"exec", ab:post.ab || CAB_AB[post.k],
@@ -57020,6 +57020,203 @@ function onumApptHearing(post, o){
     seal.disabled = true;
   });
 }
+
+/* ══ 20261124b JUPITER · a cabinet appointment is a person and a process.
+   You name a real person (someone already in the Republic, a former official, or a new name the file makes real the moment
+   you send it). The file is vetted overnight, from who they actually are. The Senate committee holds a hearing in their own
+   names, and the whole Senate votes on the roll. Sworn, the person takes the actual chair, keeps their own history and works
+   from the secretary's office; refused, they go home and remember it. All of it is kept in the save (G.noms). ══ */
+function apStore(){ if(!G.noms || G.noms.v !== 1) G.noms = {v:1, seq:0, list:[]}; const N = G.noms; N.list = N.list || []; return N; }
+function apPostOf(k){ return {k:k, t:(PRES_ROLES && PRES_ROLES[k]) || k, ab:(typeof CAB_AB !== "undefined" && CAB_AB[k]) || null}; }
+const AP_DEPT = {treasury:"the Treasury Building, on the second floor over the vaults", state:"the State Department, at the long table under the map", war:"the War Office, beside the readiness board", justice:"the Justice Department, in the Attorney General's chambers"};
+function apHash(s){ let h = 2166136261; s = String(s); for(let i = 0; i < s.length; i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
+function apOpenList(){ return apStore().list.filter(n => n && (n.stage === "vetting" || n.stage === "filed" || n.stage === "hearing")); }
+function apById(id){ return apStore().list.find(n => n && n.id === id) || null; }
+function apPerson(n){ return n && n.pid != null ? byId(n.pid) : null; }
+/* the field: people who already exist first, then names the file will make real */
+function apField(post){
+  const out = [], seen = new Set(), st = (function(){ try{ return presStaff(); }catch(e){ return {}; } })();
+  const holderNames = new Set(Object.keys(st).map(k => st[k] && st[k].name).filter(Boolean));
+  const civ = (G.civ || []).filter(c => c && !c.gone && c.name && !holderNames.has(c.name) && !(c.cabKey && !c.cabFormer) && !/^Nominee/.test(String(c.role || "")));
+  const former = civ.filter(c => c.cabFormer && !/late /.test(String(c.role || ""))).sort((a, b) => ((b.rel && b.rel.trust) || 0) - ((a.rel && a.rel.trust) || 0));
+  const known = civ.filter(c => !c.cabFormer && c.met && c.pos).sort((a, b) => ((b.rel && b.rel.trust) || 0) - ((a.rel && a.rel.trust) || 0));
+  [former[0], known[0], known[1]].forEach(c => { if(c && !seen.has(c.id) && out.length < 2){ seen.add(c.id); out.push({pid:c.id, name:c.name, bg:c.bg || c.role || "public work", pos:c.pos || {}, creed:c.creed, town:c.town || c.state || (G.you && G.you.state), prior:c.cabFormer ? (c.formerOf || c.role) : (c.role || c.bg || "public work"), real:true}); } });
+  let fresh = []; try{ fresh = onumApptPeople(post); }catch(e){}
+  for(let i = 0; out.length < 3 && i < fresh.length; i++){ const o = fresh[i]; out.push({pid:null, name:o.name, bg:o.bg, pos:o.pos || {}, creed:o.creed, origin:o.origin, town:o.town, prior:o.prior, temper:o.temper, real:false}); }
+  return out;
+}
+/* a name sent is a person in the world from that moment */
+function apMaterialize(o, post){
+  if(o.pid != null){ const p = byId(o.pid); if(p) return p; }
+  let c = null; try{ c = makeCivilian(); }catch(e){ return null; } if(!c) return null;
+  const C = cabStore(); c.id = cabFreeId(C); c.name = o.name; c.pos = Object.assign({}, c.pos || {}, o.pos || {}); if(o.creed) c.creed = o.creed;
+  c.bg = o.bg || c.bg; c.origin = o.origin || c.origin; c.town = o.town; c.state = (G.you && G.you.state) || c.state; c.role = "Nominee for " + post.t; c.cause = post.t;
+  c.room = "exec"; c.caseOpen = false; c.party = G.you ? G.you.party : c.party; G.civ = G.civ || []; G.civ.push(c);
+  try{ placeInRoom(c); }catch(e){} try{ _allCache = null; _hereCache = null; }catch(e){}
+  return c;
+}
+/* the file: read from the person, not invented for the occasion */
+function apVet(p, post, hurried){
+  const f = [], y = G.you, ax = {econ:"the economy", lib:"liberty", def:"defence", wel:"welfare"};
+  try{ Object.keys(ax).forEach(a => { const v = (p.pos && p.pos[a]) || 0, mine = (y.pos && y.pos[a]) || 0; if(Math.abs(v - mine) > 45) f.push({k:"views", w:-1, t:"On " + ax[a] + " they stand well apart from you (" + Math.round(v) + " against your " + Math.round(mine) + ")."}); else if(Math.abs(v) > 30 && v * mine > 0) f.push({k:"views", w:1, t:"On " + ax[a] + " they are where you are, and further."}); }); }catch(e){}
+  const T = p.traits || {};
+  if((T.vanity || 0) > 60) f.push({k:"money", w:-1, t:"Lives above the salary: a tailor's account three seasons unpaid."});
+  if((T.discretion || 50) < 38) f.push({k:"press", w:-1, t:"Talks to the papers. Two columns last year quote them by name."});
+  if((T.discretion || 50) > 65) f.push({k:"press", w:1, t:"Nothing in the papers in ten years that they did not mean to be there."});
+  if((T.loyalty || 50) > 62) f.push({k:"loyal", w:1, t:"Stood by the last person they worked for after it stopped paying."});
+  if((T.temper || 45) > 66) f.push({k:"temper", w:-1, t:"A clerk's complaint on file: a shouted meeting, a door, an apology later."});
+  try{ const R = G.dyn && G.dyn.P && G.dyn.P[p.id]; if(R){ if(R.spouse != null){ const s = byId(R.spouse); f.push({k:"family", w:0, t:"Married" + (s ? " to " + s.name : "") + "."}); } if(R.kids && R.kids.length) f.push({k:"family", w:0, t:R.kids.length + (R.kids.length === 1 ? " child" : " children") + "."}); } }catch(e){}
+  try{ const past = (cabStore().past || []).filter(x => x && x.id === p.id); if(past.length) f.push({k:"record", w:1, t:"Held " + past.map(x => String(x.slot || "").split(":").pop()).join(", ") + " before, and left it on day " + past[past.length - 1].to + "."}); }catch(e){}
+  try{ const w = (p.rel && p.rel.warmth) || 0; if(w > 20) f.push({k:"you", w:1, t:"Likes you, and has said so where it counted."}); else if(w < -15) f.push({k:"you", w:-1, t:"Has said things about you in private that are now in this file."}); }catch(e){}
+  const h = apHash(p.id + ":" + post.k);
+  if(h % 5 === 0) f.push({k:"old", w:-1, t:"An old lawsuit over a boundary fence in " + (p.town || "their town") + ", settled, sealed, still talked about."});
+  if(h % 7 === 3) f.push({k:"old", w:1, t:"Ran a relief committee after the flood year; the books balanced to the penny."});
+  if(!f.length) f.push({k:"plain", w:0, t:"A plain file. Nobody has a story about them yet."});
+  if(hurried && f.length > 2){ f.splice(1 + (h % (f.length - 1)), 1); f.push({k:"hurried", w:0, t:"(Hurried: one drawer of the file was not opened.)"}); }
+  return f;
+}
+function apScore(n){ return (n.vet || []).reduce((a, x) => a + (x.w || 0), 0); }
+function apNominate(post, o, hurry){
+  if(!G.you) return null; const N = apStore();
+  if(apOpenList().some(n => n.post === post.k)){ try{ note("There is already a name before the Senate for " + post.t + "."); }catch(e){} return null; }
+  const p = apMaterialize(o, post); if(!p) return null;
+  const n = {id:++N.seq, post:post.k, title:post.t, pid:p.id, name:p.name, day0:G.day, stage:"vetting", ready:G.day + (hurry ? 0 : 1), hurry:!!hurry, vet:null, hearing:null, roll:null, result:null, log:[]};
+  n.log.push({d:G.day, t:"You sent " + p.name + "'s name for " + post.t + "."});
+  N.list.push(n); if(N.list.length > 60) N.list.splice(0, N.list.length - 60);
+  try{ p.role = "Nominee for " + post.t; p.nomId = n.id; }catch(e){}
+  try{ remember(p, "The President sent my name to the Senate for " + post.t + ". Everyone I ever owed money is about to remember me.", 3, true); }catch(e){}
+  try{ feed("The White House sent " + p.name + "'s name to the Senate for " + post.t + ". The file goes to the vetting office" + (hurry ? " today, in a hurry." : " tonight."), ""); }catch(e){}
+  try{ voxInit(); voxYouPost("note", null, "I have sent " + p.name + "'s name to the Senate for " + post.t + "."); }catch(e){}
+  if(hurry){ try{ spend(60, 3); }catch(e){} apAdvance(n); }
+  return n;
+}
+function apAdvance(n){
+  const p = apPerson(n); if(!p){ n.stage = "withdrawn"; n.log.push({d:G.day, t:"The nominee could not be found. The name was withdrawn."}); return; }
+  if(n.stage === "vetting" && G.day >= n.ready){ n.vet = apVet(p, apPostOf(n.post), n.hurry); n.stage = "filed"; n.hearing = {day:G.day + 1, qa:null};
+    n.log.push({d:G.day, t:"The file on " + p.name + " came back: " + n.vet.length + " findings."});
+    try{ note("The file on " + p.name + " is back. The hearing is set for day " + n.hearing.day + ".", false); }catch(e){} }
+  if(n.stage === "filed" && n.hearing && G.day >= n.hearing.day){ n.stage = "hearing"; }
+  if(n.stage === "hearing" && n.hearing && G.day > n.hearing.day){ apHold(n, true); }
+}
+/* the committee: senators by name (the Senate book), each with a question drawn from the file */
+function apCommittee(n){
+  const names = []; try{ (OH.list || []).forEach(p => { if(p && p.ohK && /^sen:/.test(p.ohK) && !/^sen:(maj|min|ppt)$/.test(p.ohK) && p.name) names.push({name:p.name, st:p.ohK.slice(4), party:p.party}); }); }catch(e){}
+  if(names.length < 3){ (G.members || []).filter(m => m && !m.gone && m.kind === "member").slice(0, 5 - names.length).forEach(m => names.push({name:m.name, st:m.state, party:m.party})); }
+  const h = apHash("cmt:" + n.id); const pick = []; for(let i = 0; i < names.length && pick.length < 5; i++){ const c = names[(h + i * 7) % names.length]; if(pick.indexOf(c) < 0) pick.push(c); }
+  return pick;
+}
+function apQuestions(n, p, cmt){
+  const hard = (n.vet || []).filter(x => x.w < 0), good = (n.vet || []).filter(x => x.w > 0);
+  return cmt.map((s, i) => { const f = (i % 2 === 0 ? hard : good)[Math.floor(i / 2)] || hard[i] || good[i] || null;
+    const q = f ? ({money:"The file says you live above your salary. Who holds your notes?", press:f.w < 0 ? "You talk to the papers. Will you talk to them about this department?" : "You have kept out of the papers. Is that discretion or something to hide?", views:"You and the President do not agree on this. Whose view runs the department?", temper:"There is a complaint about a shouted meeting. Tell us about the door.", loyal:"You stayed loyal past the point it paid. Would you tell this President no?", record:"You have held a chair before. Why did you leave it?", old:f.w < 0 ? "Tell the committee about the fence in " + (p.town || "your town") + "." : "The flood committee. Who kept the books?", family:"Your family will live in this. Have they agreed?", you:"How long have you known the President, and what do you owe them?", plain:"Nobody has a story about you. Why should we trust a blank page?"}[f.k] || "Why you?") : "Why you, and why now?";
+    const T = p.traits || {}, blunt = (T.temper || 45) > 60, calm = (T.discretion || 50) > 55;
+    let a = f && f.w < 0 ? (calm ? "It is in the file because it happened. I have nothing to add that would make it better, and I will not make it worse." : blunt ? "You have read it. So have I. Ask me about the work." : "I would rather it were not there. It is. I paid what I owed and I will tell you when I make the next mistake.")
+      : (calm ? "I will do the work of " + n.title + " in my own name, and I will tell the President when I think the President is wrong." : "Because I know the work, and I know what it costs at home.");
+    try{ if(p.creed){ const c = creedOf(p.creed); if(c && i === cmt.length - 1) a += " I hold " + c.t + "; you may judge me by it."; } }catch(e){}
+    return {sen:s.name, st:s.st, q:q, a:a, hard:!!(f && f.w < 0)};
+  });
+}
+/* the roll: every seat, by name where the Senate book has one */
+function apRoll(n, p, standWith){
+  const b = {title:"Nomination of " + p.name + " as " + n.title, pos:p.pos || {}, id:"nom:" + n.id};
+  let sen = null; try{ sen = lxSenate(b); }catch(e){}
+  const roll = {aye:[], no:[]}; let aye = 0, no = 0, shift = apScore(n) + (standWith ? 1 : 0);
+  if(sen && sen.by){ Object.keys(sen.by).forEach(st => { (sen.by[st] || []).forEach((v, i) => { let vv = v; const h = apHash(n.id + ":" + st + ":" + i) % 10; if(shift < 0 && vv > 0 && h < -shift * 2) vv = -1; if(shift > 0 && vv < 0 && h < shift * 2) vv = 1; const nm = (i === 0 && sen.names && sen.names[st]) ? sen.names[st] + " (" + st + ")" : "the " + (i === 0 ? "senior" : "junior") + " senator from " + st; if(vv > 0){ aye++; roll.aye.push(nm); } else { no++; roll.no.push(nm); } }); }); }
+  else { aye = 11 + shift; no = 7 - shift; }
+  return {aye, no, ok:aye > no, roll};
+}
+function apHold(n, absent, standWith){
+  if(!n || (n.stage !== "hearing" && n.stage !== "filed")) return n;
+  const p = apPerson(n); if(!p) return n; const post = apPostOf(n.post);
+  const cmt = apCommittee(n); n.hearing = n.hearing || {day:G.day}; n.hearing.qa = n.hearing.qa || apQuestions(n, p, cmt); n.hearing.absent = !!absent; n.hearing.held = G.day;
+  const R = apRoll(n, p, standWith && !absent); n.roll = R; n.result = R.ok ? "sworn" : "refused"; n.stage = n.result; n.decided = G.day;
+  const line = (R.ok ? "Confirmed, " : "Refused, ") + R.aye + " to " + R.no + ": " + p.name + " for " + post.t + ". Aye: " + (R.roll.aye.slice(0, 8).join(", ") || "none") + (R.roll.aye.length > 8 ? " and " + (R.roll.aye.length - 8) + " more" : "") + ". Nay: " + (R.roll.no.slice(0, 8).join(", ") || "none") + (R.roll.no.length > 8 ? " and " + (R.roll.no.length - 8) + " more" : "") + ".";
+  n.log.push({d:G.day, t:line});
+  if(R.ok){
+    try{ const C = cabStore(), slot = "exec:sec:" + post.k; (G.civ || []).forEach(x => { if(x && x !== p && x.kslot === slot && !x.gone && !x.cabFormer) cabRetire(x, slot, C); });
+      if(!p.cabKey){ C.seq++; p.cabKey = "cab:" + post.k + ":" + C.seq; } }catch(e){}
+    try{ cabInstall(post, {name:p.name, bg:p.bg, creed:p.creed, origin:p.origin, pos:p.pos, town:p.town, prior:p.bg, cabKey:p.cabKey}); }catch(e){}
+    try{ p.role = post.t; p.nomId = null; p.post = {k:post.k, t:post.t, at:AP_DEPT[post.k] || "the secretary's office", since:G.day}; p.room = "exec"; }catch(e){}
+    try{ setPrecedent("confirmed " + p.name + " as " + post.t + ", " + R.aye + " to " + R.no, "a cabinet secretary is a named person, vetted, heard by the Senate committee and confirmed on the roll", true); }catch(e){}
+    try{ onumKeep(p.name + " was confirmed as " + post.t + ", " + R.aye + " to " + R.no + ", and went to work at " + (AP_DEPT[post.k] || "the department") + ".", p.id); }catch(e){}
+    try{ remember(p, "The Senate confirmed me as " + post.t + ", " + R.aye + " to " + R.no + ". I start at " + (AP_DEPT[post.k] || "the department") + " in the morning.", 4, true); p.rel && (p.rel.warmth = clamp((p.rel.warmth || 0) + 8, -100, 100)); }catch(e){}
+    try{ journal("The Senate confirmed " + p.name + " as " + post.t + ", " + R.aye + " to " + R.no + "."); }catch(e){}
+  } else {
+    try{ p.role = "Refused nominee for " + post.t; p.nomId = null; p.room = "district"; }catch(e){}
+    try{ onumKeep("The Senate refused " + p.name + " for " + post.t + ", " + R.aye + " to " + R.no + ". The chair stays with the person who held it.", p.id); }catch(e){}
+    try{ remember(p, "The Senate refused me for " + post.t + ", " + R.aye + " to " + R.no + ". " + (absent ? "The President did not come." : "The President stood there and watched."), 4, true); p.rel && (p.rel.warmth = clamp((p.rel.warmth || 0) - (absent ? 18 : 6), -100, 100)); }catch(e){}
+    try{ journal("The Senate refused " + p.name + " for " + post.t + ", " + R.aye + " to " + R.no + "."); }catch(e){}
+  }
+  try{ feed(line, R.ok ? "good" : "bad"); }catch(e){}
+  try{ onumWebPush(p.name, "personal", R.ok ? "I was confirmed as " + post.t + ". I will do the work in my own name." : "My name was refused for " + post.t + ". I will say so myself."); }catch(e){}
+  try{ _allCache = null; _hereCache = null; }catch(e){}
+  return n;
+}
+function apEsc(s){ try{ return pcEsc(String(s == null ? "" : s)); }catch(e){ return String(s).replace(/[<>&"]/g, ""); } }
+function apFileHTML(n){
+  const p = apPerson(n), rows = (n.vet || []).map(x => '<li style="margin:3px 0' + (x.w < 0 ? ';color:#e8a0a0' : x.w > 0 ? ';color:#a8d8a8' : '') + '">' + apEsc(x.t) + '</li>').join("");
+  return '<div style="margin:10px 0;padding:8px 10px;border-left:3px solid var(--line-soft)" data-apn="' + n.id + '"><b>' + apEsc(n.name) + '</b> <span class="muted">· for ' + apEsc(n.title) + ' · ' + apEsc(n.stage === "vetting" ? "being vetted (file back day " + n.ready + ")" : n.stage === "filed" ? "file back; hearing day " + (n.hearing && n.hearing.day) : n.stage === "hearing" ? "the hearing is today" : n.stage) + '</span>' +
+    (p && p.post ? '<div class="muted" style="font-size:12px">Works at ' + apEsc(p.post.at) + ', since day ' + p.post.since + '.</div>' : '') +
+    (rows ? '<ul style="margin:6px 0 6px 16px;padding:0">' + rows + '</ul>' : '') +
+    (n.hearing && n.hearing.qa ? '<details' + (n.stage === "sworn" || n.stage === "refused" ? '' : ' open') + '><summary class="muted">The hearing, day ' + (n.hearing.held || n.hearing.day) + (n.hearing.absent ? " (you were not there)" : "") + '</summary>' + n.hearing.qa.map(x => '<p style="margin:6px 0"><b>' + apEsc(x.sen) + '</b>: \u201c' + apEsc(x.q) + '\u201d<br><b>' + apEsc(n.name) + '</b>: \u201c' + apEsc(x.a) + '\u201d</p>').join("") + '</details>' : '') +
+    (n.roll ? '<p><b>The roll:</b> ' + apEsc((n.result === "sworn" ? "Confirmed, " : "Refused, ") + n.roll.aye + " to " + n.roll.no + ". Aye: " + n.roll.roll.aye.join(", ") + ". Nay: " + (n.roll.roll.no.join(", ") || "none") + ".") + '</p>' : '') +
+    '<div class="card__actions" style="flex-wrap:wrap">' +
+      (n.stage === "vetting" ? '<button type="button" class="btn btn--ghost" data-apx="hurry:' + n.id + '">Hurry the file (an hour, one drawer unopened)</button>' : '') +
+      (n.stage === "filed" || n.stage === "hearing" ? '<button type="button" class="btn" data-apx="hear:' + n.id + '">' + (n.stage === "hearing" ? "Go to the hearing" : "Ask for the hearing now") + '</button><button type="button" class="btn btn--ghost" data-apx="stand:' + n.id + '">Go, and stand with them</button>' : '') +
+      (n.stage === "vetting" || n.stage === "filed" || n.stage === "hearing" ? '<button type="button" class="btn btn--ghost" data-apx="wd:' + n.id + '">Withdraw the name</button>' : '') +
+    '</div></div>';
+}
+function apCard(msg){
+  if(!G.you) return; apOpenList().forEach(apAdvance);
+  const N = apStore(), open = apOpenList(), done = N.list.filter(n => n && (n.stage === "sworn" || n.stage === "refused" || n.stage === "withdrawn")).slice(-6).reverse();
+  let st = {}; try{ st = presStaff(); }catch(e){}
+  const chairs = Object.keys(PRES_ROLES).map(k => { const h = st[k], p = h && h.cabKey ? cabFind(h.cabKey) : null; return '<div style="margin:6px 0"><button type="button" class="btn" data-apx="post:' + k + '"' + (heldOffice() === "pres" ? "" : " disabled") + '>' + apEsc(PRES_ROLES[k]) + '</button> <span class="muted">' + (h ? "now " + apEsc(h.name) + (p && p.post ? " · at " + apEsc(p.post.at) : "") : "empty") + '</span></div>'; }).join("");
+  const body = '<h3 style="margin:8px 0 4px">The chairs</h3>' + chairs +
+    (open.length ? '<h3 style="margin:12px 0 4px">Before the Senate</h3>' + open.map(apFileHTML).join("") : '') +
+    (done.length ? '<h3 style="margin:12px 0 4px">Decided</h3>' + done.map(apFileHTML).join("") : '');
+  govCardOpen("Nominations", "A person, a file, a hearing, a vote", "You do not appoint a title. You send a person. The file is read overnight, the committee asks in its own names, and the Senate votes on the roll. " + (function(){ try{ return onumPrecLine(); }catch(e){ return ""; } })(), body, null);
+  if(msg){ try{ el("gcSay").textContent = msg; }catch(e){} }
+  card.querySelectorAll("[data-apx]").forEach(b => b.addEventListener("click", () => { const [k, v] = b.getAttribute("data-apx").split(":");
+    if(k === "post") return apFieldCard(apPostOf(v));
+    const n = apById(+v); if(!n) return;
+    if(k === "hurry"){ try{ spend(60, 3); }catch(e){} n.ready = G.day; n.hurry = true; apAdvance(n); return apCard("The vetting office worked through lunch. One drawer was left shut."); }
+    if(k === "hear" || k === "stand"){ try{ spend(90, 4); }catch(e){} apHold(n, false, k === "stand"); return apCard(n.result === "sworn" ? n.name + " is sworn, and goes to work at " + (AP_DEPT[n.post] || "the department") + "." : n.name + " is not sworn. The chair stays with the person who held it this morning."); }
+    if(k === "wd"){ n.stage = "withdrawn"; n.log.push({d:G.day, t:"You withdrew the name."}); const p = apPerson(n); try{ if(p){ p.role = "Withdrawn nominee for " + n.title; p.nomId = null; remember(p, "The President withdrew my name for " + n.title + " before the Senate could say it.", 3, true); if(p.rel) p.rel.warmth = clamp((p.rel.warmth || 0) - 10, -100, 100); } }catch(e){} try{ feed("The White House withdrew " + n.name + "'s name for " + n.title + "."); }catch(e){} return apCard("Withdrawn. " + n.name + " will remember who did it."); }
+  }));
+}
+function apFieldCard(post){
+  const people = apField(post);
+  const body = people.map((o, i) => '<div style="margin:10px 0;padding:8px 10px;border-left:3px solid var(--line-soft)"><b>' + apEsc(o.name) + '</b> <span class="muted">· ' + (o.real ? "already in the Republic" : "a new name; real from the moment you send it") + '</span>' +
+    '<p style="margin:6px 0">' + apEsc(o.name) + " comes from " + apEsc(o.town || "the provinces") + ". Before this, " + apEsc(o.prior || o.bg || "public work") + '.</p>' +
+    '<div class="card__actions" style="flex-wrap:wrap"><button type="button" class="btn" data-apf="' + i + '">Send this name (vetted overnight)</button><button type="button" class="btn btn--ghost" data-aph="' + i + '">Send it, and hurry the file</button></div></div>').join("");
+  govCardOpen(post.t, "Who will you send?", "The file is read from who they are. The hearing asks about what it finds.", body, null);
+  const go = (i, hurry) => { const n = apNominate(post, people[i], hurry); apCard(n ? n.name + "'s name is with the Senate." : "No name was sent."); };
+  card.querySelectorAll("[data-apf]").forEach(b => b.addEventListener("click", () => go(+b.getAttribute("data-apf"), false)));
+  card.querySelectorAll("[data-aph]").forEach(b => b.addEventListener("click", () => go(+b.getAttribute("data-aph"), true)));
+}
+/* the old one-card hearing now opens the process; the deep card leads with the nominations page */
+onumApptHearing = function(post, o){ const n = apNominate(post, o, false); apCard(n ? n.name + "'s name is with the Senate." : ""); };
+{ const _ad = onumAppointDeep; onumAppointDeep = function(kind){ if(kind === "cab" && G.you && heldOffice() === "pres") return apCard(); return _ad.apply(this, arguments); }; }
+{ const _sc = saveCaptureBase; saveCaptureBase = function(){ const o = _sc.apply(this, arguments); try{ o.noms = G.noms || null; }catch(e){} return o; }; }
+{ let lastDay = null; setInterval(function(){ try{ if(!G || !G.you || !G.noms) return; if(lastDay === G.day) return; lastDay = G.day; apOpenList().forEach(apAdvance); }catch(e){} }, 1500); }
+{ const _apps = pbApps; pbApps = function(){ const L = _apps.apply(this, arguments) || [];
+    [["soc-vox", "Vox", "The feed, your own posts and comments, and the replies. Post from here."], ["soc-noms", "Nominations", "Cabinet chairs, the files, the hearings and the roll."]].forEach(a => { if(!L.some(x => x[0] === a[0])) L.unshift(a); });
+    return L; }; }
+{ const _go = pbAppGo; pbAppGo = function(id){
+    if(id === "soc-vox"){ setTimeout(function(){ try{ onumVoxCard(); }catch(e){} }, 30); return; }
+    if(id === "soc-noms"){ setTimeout(function(){ try{ apCard(); }catch(e){} }, 30); return; }
+    return _go.apply(this, arguments); }; }
+/* Vox on the phone: the whole feed, yours first, and the same composer and buttons as the desk pane */
+function onumVoxCard(){
+  if(!G.you) return; voxInit(); window.ONUM_VOXCARD = true;
+  const mine = (G.vox.posts || []).filter(p => p && p.mine).slice(0, 6);
+  const mineHTML = mine.length ? mine.map(p => '<div class="vox is-mine"><div class="vox__h"><b>You</b><i> · d' + p.day + ' ' + apEsc(p.at || "") + '</i></div><div class="vox__t">' + (function(){ try{ return voxMarkup(p.t); }catch(e){ return apEsc(p.t); } })() + '</div><div class="vox__f"><span>' + (p.backs || 0) + ' backing</span><span>' + (p.hits || 0) + ' against</span>' +
+      ((p.voices || []).length ? '<span>' + p.voices.slice(0, 3).map(v => { const w = byId(v.id); return w ? apEsc(surname(w.name) + " " + v.t) : ""; }).filter(Boolean).join(" · ") + '</span>' : '') + '</div></div>').join("") : '<p class="muted">You have not posted yet.</p>';
+  govCardOpen("Vox", "The feed", "Individuals type freely. What you post here is the same post as at the desk.", voxComposerHTML() + '<h3 style="margin:8px 0 4px">Yours</h3>' + mineHTML + '<h3 style="margin:12px 0 4px">Everyone</h3>' + (voxRows(40) || '<p class="muted">Nobody has said anything yet.</p>'), null);
+  try{ voxTypePosts(card); }catch(e){}
+  try{ const c = el("gcClose"); if(c) c.addEventListener("click", function(){ window.ONUM_VOXCARD = false; }); }catch(e){}
+}
+try{ window.ONUM_R2 = Object.assign(window.ONUM_R2 || {}, {apStore, apField, apNominate, apAdvance, apHold, apCard, apFieldCard, apById, apPostOf, onumVoxCard, presStaff: function(){ return presStaff(); }, cabRoster: function(){ return cabRoster(); }, heldOffice: function(){ return heldOffice(); }, pbApps: function(){ return pbApps(); }, pbAppGo: function(id){ return pbAppGo(id); }}); }catch(e){}
 
 function onumMkt(){
   if(!G.mkt || G.mkt.v !== 1) G.mkt = {v:1, px:{grain:42, iron:70, rail:55, press:28, sport:22}, hist:[], day:-1};
