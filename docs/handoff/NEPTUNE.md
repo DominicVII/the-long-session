@@ -1,5 +1,32 @@
 # Neptune handoff notes (for Claude Code) — One Nation, Under, ME.
 
+## 20261117t — toolbar, District Ledger, atlas, talk hint (on 20261117s)
+
+- Stamp 20261117t. Display only, on JUPITER's 20261117s (appointees persist). Leave `jpBootBarCss` (`body.boot-menu #uiToolbar{z-index:70!important}`) in place. Do not change Enter/Space talk-pick logic or cabinet persistence.
+- `#uiToolbar` wraps and compactens (short labels when a button would clip) so every panel button, including District Ledger beside the paper, stays on screen from 800×600 up to 1920×1080. The gold HUD is lifted above the bar.
+- While a veil card or talk is open, the high HUD and the panels bar fold so Close and talk choices stay clickable.
+- `#onumCapitalLedgerDialog` is capped to the viewport; `.cld-close` is sticky at the top of the paper.
+- `#pfMap` / the foreign-capitals SVG is boxed and scaled to the card.
+- Talk hint: "Enter/Space pick the highlighted choice · type to say your own · Esc leave" (with 1–9 when those numbers are shown). At short heights the in-talk "What you see" box yields to the choice list.
+
+## 20261117p — caFit on 20261117o: sitting, talk choices, briefs, title
+
+- Stamp 20261117p. Merges 20261117n caFit onto JUPITER's 20261117o systems branch. Display only. Do not change sitting close, talk-gate, say-box go(), or title-career load logic.
+- Sitting: lift the injected 20vh `#sxDock.fd-on` cap; pin the vote / action rows; keep `#sxParkBar` right-aligned so the ✕ stays on screen.
+- Talk (MARS S5): `html.ca-talk` folds `#hmWire`, `#onumSeeDock`, `#hmBar`/`#hmSay`, `#tick`, and `#wire` while a talk is open. `#talk.is-open` is fixed in the viewport so `#tkActs` choices can be clicked. Do not fold `#talk #chat`.
+- Briefs: existing `.card__actions` (including JUPITER's table aye/nay on the morning briefing) stay pinned in the card.
+- Title: Continue remains primary when the career is IndexedDB-only (already in o's title code).
+
+## 20261117n — caFit: cabinet and brief prompts fit the screen
+
+- Display-only block `caFitCss` / `caFitJs` on all six HTML mirrors (stamp 20261117n).
+- `#card` inside `#veil` is capped to `calc(100dvh - 24px)` with internal scroll; only the last `.card__actions` row is sticky (Close / choices). Mid-card action rows are not sticky, so they no longer stack and overflow.
+- Dense brief/cabinet cards (three or more secretary/advisor blocks) use a two-column grid on wide enough cards so more prompts are on screen at once.
+- While a veil card is the primary surface (`html.ca-modal`), the desk `#prompt`, `#sxDock` and toast fold, so they do not cover the card.
+- While a cabinet/sitting dock is primary (`html.ca-sit`), the desk prompt folds. `#sxDock` height is auto, max `100dvh - 88px`, with internal scroll and sticky `.fd-acts` / `.fd-vote` / `.nsx-acts` so Call on, Aye/Nay and Speak stay visible.
+- `#veil.sitx` (docked sitting card, e.g. the morning briefing) is also capped and scrollable instead of spilling below the viewport.
+- No engine, vote-tally, or save changes. JUPITER still owns Aye/Nay tallies, the bill stance, and engine capacity.
+
 Neptune owned: visuals, the visible world, offices' look, LiveTalk/voices, the Live status, session rendering (floor desk), family tree/portraits, update banner + build label, walking/render lag, Engine Room displays, style editor (barber/tailor).
 JUPITER owns systems (procedure/clock, offices + ONUM_OFFICE_HISTORY, family sim, regions, Engine charter/audit, saves, powers, war). MARS owns QA + onumCandid. Don't edit another owner's systems; guard every cross-owner call.
 
