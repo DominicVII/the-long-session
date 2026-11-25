@@ -1,3 +1,13 @@
+## 20261124d: asked-for saves under 2 s under load (JUPITER, round 4)
+
+- On 20261124c (bba1db8).
+- **Saves follow-up:**
+  - Explicit saves run with `setTimeout(..., 0)` and a 48 ms slice budget rather than waiting on `requestIdleCallback`.
+  - Aborting a background save while its Worker is still packing terminates that Worker so the asked-for save does not queue behind it.
+  - `engIdbPut` and `svDone` pass the small base metadata directly instead of synchronously unpacking and parsing the full 20 MB career string on the main thread.
+  - Explicit large IndexedDB saves (>6 MB) skip the 4 s Worker LZW pass and write directly, while background saves still pack compactly.
+  - Measured on the day-535 save copy under load: 0.46 s–1.61 s (down from 15.3 s).
+
 ## 20261124c: the sitting panel fits every stage, and your save goes first (JUPITER, with NEPTUNE's 08)
 
 - On 20261124b (628225b).
