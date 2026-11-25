@@ -1,3 +1,10 @@
+## 20261125n2: prompt and meeting dock stack cleanly on vote-result at 800x600 (NEPTUNE, patch 10)
+
+- On 20261125n (`704163e`). Layout only; no Engine, save or session logic touched.
+- In `onumHud`'s `stack`, when `#prompt` and `#sxDock` share the right column, `#prompt` reserves room below it for `#sxDock` and scrolls its options rather than taking the whole column and forcing `#sxDock` to collapse (`room < 28`, where `#caFitCss` kept `#sxDock` visible at `#fixScreenCss`'s fallback `[456, 56, 336, 536]` under `#prompt`).
+- `#sxDock.hm-p:not(.hm-col):not(.sx-park):not([hidden])` keeps `min-height: 52px` so its 44px `–` fold button stays inside the dock and reachable by `elementFromPoint`.
+- **QA:** `sitstages` passes on both day-535 and day-540 copies at all 5 sizes (run serially); `convo-by`, `nov25-docs` and `nov17-dupfn` still pass; function count stays 3,540 (0 removed).
+
 ## 20261125n: institutions speak in their own documents, and the Engine's "mind it made" in plain words (NEPTUNE, patch 09)
 
 - On 20261124d (0ec8ce7). Presentation only. No Engine logic, save code, history/condense layer or hist-backup copy is touched, and nothing new is stored: each document is built when it is opened, from numbers already in the career.

@@ -16,7 +16,20 @@ const browser = await launch();
 try {
   const errs = []; const pg = await newPage(browser, errs); await pg.setViewport({ width: VW, height: VH });
   await seedIdb(pg, origin, fs.readFileSync(SAVE, "utf8")); await continueCareer(pg, origin, ""); await delay(4000);
-  const size = () => pg.evaluate(() => { try { return JSON.stringify(NEPTUNE.debug().G).length; } catch (e) { return -1; } });
+  const size = () => pg.evaluate(() => {
+    const seen = new WeakSet();
+    const ser = (v) => {
+      if (v === null || typeof v !== "object") return JSON.stringify(v);
+      if (v.isObject3D || v.isBufferGeometry || v.isMaterial || v.isTexture || v.nodeType) return '"[Obj]"';
+      if (seen.has(v)) return '"[C]"';
+      seen.add(v);
+      if (Array.isArray(v)) return "[" + v.map((x) => ser(x) ?? "null").join(",") + "]";
+      const out = [];
+      for (const k of Object.keys(v)) { const r = ser(v[k]); if (r !== undefined) out.push(JSON.stringify(k) + ":" + r); }
+      return "{" + out.join(",") + "}";
+    };
+    return ser(NEPTUNE.debug().G).length;
+  });
   const s0 = await size();
   const close = () => pg.evaluate(() => { const c = document.getElementById("gcClose"); if (c) c.click(); });
   const kinds = ["paper", "intel", "econ", "polls", "election", "district", "made"];
