@@ -14,7 +14,7 @@ import { startServer, launch, newPage, delay, resumeIfPaused } from "./nov17-lib
 const ROOT = path.resolve(process.argv[2] || ".");
 const SAVE = process.argv[3] || "/workspace/nov24/save535.json";
 const fresh = fs.readFileSync(SAVE, "utf8"); const D = JSON.parse(fresh);
-const stale = {}; for (const [k, v] of Object.entries(D)) { if (k === "members" || k === "you" || JSON.stringify(v).length < 40000) stale[k] = v; }
+const stale = {}; for (const [k, v] of Object.entries(D)) { if (k === "members" || k === "you" || JSON.stringify(v).length < 20000) stale[k] = v; }
 const NEW = D.day, OLD = NEW - 19; stale.day = OLD; stale.sittingDay = OLD; stale.minute = 600; stale.savedAtMs = (D.savedAtMs || Date.now()) - 5 * 864e5;
 const staleRaw = JSON.stringify(stale);
 let bad = 0; const ok = (c, m) => { if (!c) bad++; console.log((c ? "PASS " : "FAIL ") + m); };
@@ -53,7 +53,7 @@ async function title(page, { fast = false, settle = 4000, max = 150000 } = {}) {
 }
 async function cont(page) {
   await page.click("#cont"); const t0 = Date.now();
-  while (Date.now() - t0 < 240000) { const r = await page.evaluate(() => !!(window.ONUM && window.ONUM.running && window.ONUM.running()) && document.getElementById("veil").hidden).catch(() => false); if (r) break; await delay(500); }
+  while (Date.now() - t0 < 220000) { const r = await page.evaluate(() => !!(window.ONUM && window.ONUM.running && window.ONUM.running()) && document.getElementById("veil").hidden).catch(() => false); if (r) break; await delay(500); }
   await resumeIfPaused(page); await delay(1500);
   return page.evaluate(() => ({ day: window.ONUM.day().day, txt: [...document.querySelectorAll(".hud,#kClock,#hmBar")].map((n) => n.innerText).join(" | ").slice(0, 600) })).catch(() => ({ day: null, txt: "" }));
 }
