@@ -7,6 +7,7 @@
   - `engIdbPut` and `svDone` pass the small base metadata directly instead of synchronously unpacking and parsing the full 20 MB career string on the main thread.
   - Explicit large IndexedDB saves (>6 MB) skip the 4 s Worker LZW pass and write directly, while background saves still pack compactly.
   - Measured on the day-535 save copy under load: 0.46 s–1.61 s (down from 15.3 s).
+- **Title, when IndexedDB is late and there is no 24c+ summary:** a leftover full localStorage copy (the day-516 freeze) must not print its day. The Continue button says "checking for the latest day…" until IndexedDB itself has answered, then the real day. New: qa/nov24-title-stale.mjs samples the title every 200 ms under a 10 s delay; 0 frames may show the stale day.
 
 ## 20261124c: the sitting panel fits every stage, and your save goes first (JUPITER, with NEPTUNE's 08)
 
