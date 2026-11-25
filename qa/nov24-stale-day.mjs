@@ -15,7 +15,7 @@ const ROOT = path.resolve(process.argv[2] || ".");
 const SAVE = process.argv[3] || "/workspace/nov24/save535.json";
 const fresh = fs.readFileSync(SAVE, "utf8"); const D = JSON.parse(fresh);
 const stale = {}; for (const [k, v] of Object.entries(D)) { if (k === "members" || k === "you" || JSON.stringify(v).length < 20000) stale[k] = v; }
-const NEW = D.day, OLD = NEW - 19; stale.day = OLD; stale.sittingDay = OLD; stale.minute = 600; stale.savedAtMs = (D.savedAtMs || Date.now()) - 5 * 864e5;
+const NEW = D.day, OLD = NEW - 19; /* always the seeded save's own day, never a hardcoded 535 */ stale.day = OLD; stale.sittingDay = OLD; stale.minute = 600; stale.savedAtMs = (D.savedAtMs || Date.now()) - 5 * 864e5;
 const staleRaw = JSON.stringify(stale);
 let bad = 0; const ok = (c, m) => { if (!c) bad++; console.log((c ? "PASS " : "FAIL ") + m); };
 const srv = await startServer(ROOT); const origin = "http://127.0.0.1:" + srv.address().port;

@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-/* 20261124b JUPITER: the Academy's papers and organic conversation (MARS's list), on a COPY of the day-535 career.
+/* 20261124b JUPITER: the Academy's papers and organic conversation (MARS's list), on a COPY of a career.
+   Papers are opened through onumDoc.open("paper"), not the pre-patch-09 "Historical Significance" card.
    Usage: node qa/nov24-academy.mjs <worktree> --save <copy.json> */
 import fs from "node:fs";
 import path from "node:path";
@@ -9,12 +10,13 @@ const si = process.argv.indexOf("--save"), SAVE = si > 0 ? process.argv[si + 1] 
 const results = []; const ok = (name, pass, info) => { results.push({ name, pass: !!pass }); console.log((pass ? "PASS " : "FAIL ") + name + (info !== undefined ? "  " + JSON.stringify(info).slice(0, 500) : "")); };
 const server = await startServer(ROOT), origin = "http://127.0.0.1:" + server.address().port;
 const browser = await launch(); const raw = fs.readFileSync(SAVE, "utf8");
+const WANT = JSON.parse(raw).day;
 const SECTIONS = ["Abstract", "Research Question", "Background Literature", "Methodology", "Findings", "Competing Interpretations", "Counterarguments", "Policy Recommendations", "Risk Assessment", "Forecast", "Public Response", "Cabinet Relevance", "Historical Significance"];
 const saveWait = async (pg) => { await pg.evaluate(() => { try { window.ONUM.n24.save(); } catch (e) {} }); await delay(1500); const t0 = Date.now(); while (Date.now() - t0 < 120000) { const s = await pg.evaluate(() => window.onumSaveStats()); if (!s.busy && !s.pending) break; await delay(1000); } await delay(1000); };
 try {
   const errs = []; const pg = await newPage(browser, errs);
   await seedIdb(pg, origin, raw); let t0 = Date.now(); await continueCareer(pg, origin, ""); const cont0 = Date.now() - t0; await delay(4000);
-  ok("the day-535 copy continues on day 535", (await pg.evaluate(() => NEPTUNE.debug().G.day)) === 535);
+  ok("the seeded copy continues on day " + WANT, (await pg.evaluate(() => NEPTUNE.debug().G.day)) === WANT);
   await saveWait(pg); const len0 = (await pg.evaluate(() => window.ONUM.n24.idb())).len;
   const P = await pg.evaluate(() => { const A = window.onumAcademy, out = [];
     const tp = Object.keys(window.onumAcademy ? {} : {}); /* topics: the Academy writes on what it settles; force a few, two on one topic so rivals meet */
@@ -41,8 +43,27 @@ try {
   const dec = await pg.evaluate(() => { const A = window.onumAcademy, open = A.decisions(); if (!open.length) return { open: 0 }; const no = open[0]; A.decide(no, 0); const G = NEPTUNE.debug().G;
     return { open: open.length, no, dec: A.get(no).dec, j: (G.journal || [])[0] && G.journal[0].t, text: A.text(no).includes("The cabinet decided on day"), still: A.decisions().includes(no) }; });
   ok("papers: a paper puts a decision before the cabinet, and deciding it is recorded on the paper and in the journal", dec.open > 0 && dec.dec && dec.text && !dec.still && /Paper No\. \d+/.test(dec.j || ""), dec);
-  const opened = await pg.evaluate(async () => { window.onumAcademy.open(); await new Promise((r) => setTimeout(r, 300)); const a = document.getElementById("card").innerText; const b = document.querySelector("#card [data-acr]"); if (b) b.click(); await new Promise((r) => setTimeout(r, 300)); const t = document.getElementById("card").innerText; try { document.getElementById("gcClose").click(); } catch (e) {} return { list: /Papers before the Republic/.test(a), read: /Abstract/.test(t) && /Historical Significance/.test(t), app: window.ONUM_R2.pbApps().some((x) => x[0] === "soc-acad") }; });
-  ok("papers: the phone lists Papers, and a paper opens to its full text", opened.list && opened.read && opened.app, opened);
+  const opened = await pg.evaluate(async () => {
+    window.onumAcademy.open(); await new Promise((r) => setTimeout(r, 300));
+    const a = document.getElementById("card").innerText;
+    const list = /Papers before the Republic/.test(a);
+    const apps = (window.ONUM_R2 && window.ONUM_R2.pbApps) ? window.ONUM_R2.pbApps() : [];
+    const app = apps.some((x) => x && (x[0] === "soc-acad" || x.id === "soc-acad"));
+    const nos = (window.onumAcademy && window.onumAcademy.list) ? window.onumAcademy.list().map((x) => x.no) : [];
+    const no = nos[0];
+    if (!(window.onumDoc && typeof window.onumDoc.open === "function") || no == null) {
+      return { list, app, read: false, how: "no onumDoc.open or no paper", no };
+    }
+    window.onumDoc.open("paper", no);
+    await new Promise((r) => setTimeout(r, 500));
+    const t = (document.getElementById("card") || {}).innerText || "";
+    const h1 = ((document.querySelector("#card h1") || {}).textContent || "");
+    let chk = null; try { chk = window.onumDoc.check(document.getElementById("card")); } catch (e) { chk = { err: String(e) }; }
+    try { document.getElementById("gcClose").click(); } catch (e) {}
+    const openedDoc = /Paper No\./.test(t + " " + h1) && !!(chk && chk.n > 0 && chk.ok === chk.n && !(chk.bad && chk.bad.length));
+    return { list, app, read: openedDoc, no, h1, chk, how: "onumDoc.open", sample: t.slice(0, 160) };
+  });
+  ok("papers: the phone lists Papers, and a paper opens to its full text through onumDoc.open(\"paper\")", opened.list && opened.read && opened.app, opened);
   /* people */
   const ppl = await pg.evaluate(() => { const G = NEPTUNE.debug().G, P = window.onumPeople; const all = (G.members || []).filter((m) => m && !m.gone && m.name).slice(0, 40);
     const unmet = all.filter((m) => !(m.chat && m.chat.length)).slice(0, 5); const ops = unmet.map((m) => P.opinions(m.id)); const m = all[3];
