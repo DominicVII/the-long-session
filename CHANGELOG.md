@@ -1,3 +1,26 @@
+## 20261125n: institutions speak in their own documents, and the Engine's "mind it made" in plain words (NEPTUNE, patch 09)
+
+- On 20261124d (0ec8ce7). Presentation only. No Engine logic, save code, history/condense layer or hist-backup copy is touched, and nothing new is stored: each document is built when it is opened, from numbers already in the career.
+- **The mind it made, in plain words.**
+  - A short header says what it is: the Engine could not get a huge AI model, a card cluster, cloud access or a budget, so it built a small mind on this machine that answers only from facts copied from your save. Nothing leaves the machine.
+  - "Lines folded in" is now **Facts learned**, and "Times asked" is now **Questions answered**. Each has a hover tip.
+  - The four constraint rows are a **What it couldn't get / What it does instead** table.
+  - Each MADE entry is a card in the r4 answer shape `{question, answer, sourceKind, confidence, wrongIf}`: the question it can answer, the answer, a friendly source, the day it was learned, **Current / Stale** worked out live and read-only against the save, and when it would be wrong.
+  - Entries that only repeat a setting (the calendar, the weather) are marked **Setting echo, not knowledge**. The "filed under" label is explained as a rotation, not a link to the fact.
+  - The Ask box shows `ONUM.engine.ask`'s entry as a card: confidence, source, when it would be wrong, or "Refused to guess".
+  - No internal field name is printed anywhere on the Engine card. `(you.name)`-style tags are stripped from the text and kept only in `data-` attributes.
+  - The Engine card gets a "Plain words" glossary and hover tips for folded, weight, line of the record, generation, copies at work, the key, oversight, posture, charter, compute, talent, reliance and calibration. The Academy list gets tips for schools, overturned, cites and prestige.
+- **Official documents** (phone app, plus buttons on the existing screens). Shared document styles and inline SVG charts, with no library and no network:
+  - **Academy paper**, in a RAND/Nature form: masthead, title, author and school, abstract box, method tiles (n, confidence, effect, states, years, cost), a findings chart, numbered citations that open the cited paper, peer review, ranked recommendations, risks, a 1/5/10-year forecast chart and table, and the plain text underneath. Opening a paper from "Papers" now shows this view.
+  - **Intelligence dossier**: classification banner, executive summary, key judgments with low/moderate/high confidence (the rule is printed), threat assessment, evidence table with Admiralty-style grades (B2/C2/A3, the rule is printed), public claims and the Directorate log. Unseen operations are never shown. The rival's capability appears only after a fresh audit, as in the game. Opened from the Engine card's rival section and from the situation room.
+  - **Economic report**, in a central-bank form: a headline indicators table with 7- and 30-reading changes and sparklines, revenue and spending, the Treasury and the guilder charts, the civil service, the outlook and the risks. Opened from the books.
+  - **Approval tracker**: polls with their margin-of-error band and a 4-poll moving average, the poll table, mood by group, unrest and lean by state, past elections, and public mood.
+  - **Election desk**: a final-count banner, House bars with the majority line, Senate bars, the swing, a by-state table and past results.
+  - **District profile**: state tiles, a towns table, unmet need by service, your home district (residents, wealth, crime, money flows), a population pyramid from the register of named persons, laws passed, state government, and a picker for other states.
+  - Every number on a document carries `data-src`, and `onumDoc.check()` compares each one with the live career value.
+  - A reusable candlestick and volume helper (`onumDoc.chart.candles`) is there for r4's market. It is not wired to any screen.
+- **QA:** new qa/nov25-docs.mjs. On copies of the day-535 and day-540 saves at all five sizes: every document opens, draws, scrolls, fits, and has its controls reachable; every number matches; no field names appear; the save grows under 10%. sitstages, Engine entry, convo-by and dupfn still pass. Function count goes from 3,477 to 3,540, with none removed.
+
 ## 20261124d: asked-for saves under 2 s under load (JUPITER, round 4)
 
 - On 20261124c (bba1db8).
