@@ -1,2 +1,2 @@
-// Updated on every build.
-export const ONUM_BUILD = "20261124d";
+// Stamped by the build. Do not hand-edit.
+export const ONUM_BUILD = "20261124e";
