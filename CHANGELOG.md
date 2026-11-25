@@ -1,3 +1,15 @@
+## 20261124f: history is never lost, and careers saved on 24d get their days back (JUPITER, r4 fix)
+
+- On main bbafaf8 (PR #10, 20261124d). Fixes MARS's r4 data-loss blocker.
+- **History tiers are saved:** `G.histTier` is in `saveCaptureBase`, so every save path (sliced, sync, IndexedDB, export) keeps it. Old vivid days are dropped only after the career with its new records has been committed to IndexedDB (`tx.oncomplete`); if that write fails, nothing is deleted and condense reports `{ok:false}`.
+- **Pre-condense backup:** `hist-backup` is now a full copy of the career (every save key, about 191, plus members, press and townspeople). It is refreshed before each condense and can be exported from the Menu ("Export pre-condense backup").
+- **Recovery for careers saved on 24d:** on load, if the records are missing and the daily logs start late, the days are merged back from `hist-backup` (and the old 24d backup, kept as `hist-backup-legacy`), and the records are rebuilt. The result is written once in the journal and reported as `onumSaveStats().recovery = {rebuilt:[ranges], missing:[ranges]}`. A shorter history is never shown silently. Importing an older export of the same career offers to merge its older days in; nothing newer is rolled back.
+- **Import:** importing a file older than the current career asks first (merge, then replace). The reload waits for the IndexedDB commit, and no save can overwrite the import while it is in progress.
+- **The Engine:** it never answers from setting fields (weather, forecast, the country's name). Old `(you.name)`-style entries are cleaned from the stored record. It answers laws, bills, the cabinet, appointments, scandals, the market, the treasury, people and approval from the record (24 of MARS's 24 questions). "Who is sovereign?" is answered from the office-holder record. Article-stripping matches law titles the same way everywhere.
+- **The Engine from the Menu:** the Menu panel no longer slides 20 px into place. A save started by opening the Menu could hold that slide back for seconds, so a click landed beside the Engine row (MARS r4, 1920x1080). The build line is now drawn with the Menu, not up to 2 s later. The Engine entry opens on release even if the row is redrawn mid-click, and it retries if the Engine never appeared. The Engine page no longer shows `(you.name)`, `(country.name)` or `(world.*)` labels.
+- **Soft items:** a runaway purse, treasury or shop till is clamped on load and on every day tick. Members whose own lines named someone else are corrected, including envoys renamed after load. Repeated words in bill titles ("Public Public") are collapsed.
+- **QA:** new qa/nov24-r4-blockers.mjs, qa/nov24-recovery.mjs (24d → 24f on the same origin) and qa/nov24-engine-menu.mjs.
+
 ## 20261124d: asked-for saves under 2 s under load (JUPITER, round 4)
 
 - On 20261124c (bba1db8).
