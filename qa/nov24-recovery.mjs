@@ -44,7 +44,8 @@ try {
   const bk = await idbKeys(["hist-backup"]);
   ok(bk["hist-backup"] && bk["hist-backup"].keys <= 12, "A the 24d hist-backup is the short one (" + JSON.stringify(bk) + ")");
   point(FIX); await continueCareer(page, origin); await waitRecovery();
-  ok((await stamp()) === "20261124f", "A the fix build is running (" + (await stamp()) + ")");
+  const WANT = (fs.readFileSync(path.join(FIX, "session.html"), "utf8").match(/<meta name="onum-build" content="([^"]+)"/) || [])[1];
+  ok((await stamp()) === WANT, "A the fix build is running (" + (await stamp()) + ")");
   let s = await state();
   const lost0 = D.daylog.concat(D.tlog || []).reduce((m, x) => Math.min(m, x.d), 1e9);
   const rb = (s.rec && s.rec.rebuilt) || [];
