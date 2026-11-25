@@ -1,3 +1,15 @@
+## 20261124d: asked-for saves under 2 s under load (JUPITER, round 4)
+
+- On 20261124c (bba1db8).
+- **Saves follow-up:**
+  - Explicit saves run with `setTimeout(..., 0)` and a 48 ms slice budget rather than waiting on `requestIdleCallback`.
+  - Aborting a background save while its Worker is still packing terminates that Worker so the asked-for save does not queue behind it.
+  - `engIdbPut` and `svDone` pass the small base metadata directly instead of synchronously unpacking and parsing the full 20 MB career string on the main thread.
+  - Explicit large IndexedDB saves (>6 MB) skip the 4 s Worker LZW pass and write directly, while background saves still pack compactly.
+  - Measured on the day-535 save copy under load: 0.46 s–1.61 s (down from 15.3 s).
+- **Title, when IndexedDB is late and there is no 24c+ summary:** a leftover full localStorage copy (the day-516 freeze) must not print its day. The Continue button says "checking for the latest day…" until IndexedDB itself has answered, then the real day. New: qa/nov24-title-stale.mjs samples the title every 200 ms under a 10 s delay; 0 frames may show the stale day.
+- **History tiers, and the Engine's answers (logic only; Neptune renders):** the last 30 days stay vivid. Older days condense into compact records (laws and tallies, who rose or fell, a one-line scandal, numbers) after a pre-condense backup is written to IndexedDB, never into the career file on disk. Records older than 360 days roll into eras, but every law and every act of yours is still on the roll. The Engine's `ask` accessor returns `{question, answer, sourceKind, sourceRef, confidence, wrongIf}` and will not answer from a single shared word, or from a config field name. People's beliefs stay as numbers. Documents are still built when opened from numbers already in the save. New: qa/nov24-history.mjs, measured on a copy of the day-540 save.
+
 ## 20261124c: the sitting panel fits every stage, and your save goes first (JUPITER, with NEPTUNE's 08)
 
 - On 20261124b (628225b).
