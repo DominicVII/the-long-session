@@ -1,3 +1,11 @@
+## 20261125n3: the map's View and Shade rows scroll clear of the room prompt; flat chart axes stop repeating a label (NEPTUNE, patch 11)
+
+- On combined tip `20261124g` (`8bfb706`) as branch `neptune-nov25-p11-map-b` (first cut on `1636c3f` as `neptune-nov25-p11-map`).
+- Axis: in the institutional documents' charts, `odTickTxt` shows one decimal when the y axis spans under 4 (the flat guilder chart read `186` five times), and the new `odTickLab` leaves a tick label blank when it equals one already on that axis (grid lines stay). Data and `onumDoc.check` are untouched. Layout only; no Engine, save, session, history or econ code touched.
+- Cause: with a room prompt live and no sitting dock up (535: "The Cabinet Table — this stays"), `onumNoOverlapJs` pins `#prompt` full-width at the bottom (about 245px tall at 1280x720). `#paneUnion` is its own scroller and ends behind it, so its last rows, the View (`data-mapview`) and Shade (`data-qmode`) buttons, could never scroll above the prompt: `elementFromPoint` hit `#prompt` and a click on "party" left `MAP.mode` at "lean". At 800x600 and on 540 the prompt sits elsewhere, so it did not show there.
+- Fix: `onumNoOverlapJs` (`padMap`, run with its pin pass) measures how much of `#paneUnion`'s visible bottom the live prompt covers and sets that, plus 12px, as `--onum-pin-pad`; `#paneUnion.is-on.onum-pin-pad{padding-bottom:var(--onum-pin-pad)}` adds the room. Nothing is hidden; the class and variable are removed when the prompt or map goes away.
+- **QA:** map View/Shade reach (elementFromPoint + real clicks changing `MAP.mode`/`MAP.view`), `sitstages`, `nov25-docs`, `nov25-made-scrub` on day-535 and day-540 copies at 800x600, 1280x720, 1280x800, 1366x768, 1920x1080 (serial); `nov17-dupfn`; function count unchanged vs `1636c3f`.
+
 ## 20261125n2: prompt and meeting dock stack cleanly on vote-result at 800x600 (NEPTUNE, patch 10)
 
 - On combined tip `20261124g` (`ecbaf7d`). Layout only; no Engine, save or session logic touched. Source: Neptune's `neptune-nov25-institutions` at `5a1fea9` / `patch-10-vote-result-800.patch`. The five build stamps stay `20261124g`.
