@@ -1,3 +1,55 @@
+## 20261125n2: prompt and meeting dock stack cleanly on vote-result at 800x600 (NEPTUNE, patch 10)
+
+- On combined tip `20261124g` (`ecbaf7d`). Layout only; no Engine, save or session logic touched. Source: Neptune's `neptune-nov25-institutions` at `5a1fea9` / `patch-10-vote-result-800.patch`. The five build stamps stay `20261124g`.
+- In `onumHud`'s `stack`, when `#prompt` and `#sxDock` share the right column, `#prompt` reserves room below it for `#sxDock` and scrolls its options rather than taking the whole column and forcing `#sxDock` to collapse (`room < 28`, where `#caFitCss` kept `#sxDock` visible at `#fixScreenCss`'s fallback `[456, 56, 336, 536]` under `#prompt`).
+- `#sxDock.hm-p:not(.hm-col):not(.sx-park):not([hidden])` keeps `min-height: 52px` so its 44px `–` fold button stays inside the dock and reachable by `elementFromPoint`.
+- **QA:** `sitstages` on both day-535 and day-540 copies at all 5 sizes; `nov25-docs` size() no longer throws on circular Three.js objects.
+
+## 20261124g: one combined tip, r4fix + r5 map + Neptune's patch 09 (JUPITER)
+
+- Fast-forwards main bbafaf8. In order: `20261124f` (r4fix: history data-loss fix, 24d recovery, import confirm, Engine from the record and from the Menu), `20261124e` (r5 item 1: continental world map and nation map), and `20261125n` (Neptune's patch 09: institutional documents and the Engine's mind in plain words), each as its own commit. This commit only stamps the build.
+- Neptune's patch 10 (20261125n2) lands next on this tip and fixes the 800x600 vote-result prompt that covered the "–" button. Storefronts and stocks come after that.
+
+## 20261125n: institutions speak in their own documents, and the Engine's "mind it made" in plain words (NEPTUNE, patch 09)
+
+- Built on 20261124d (0ec8ce7) as branch neptune-nov25-institutions 704163e; folded into the combined tip 20261124g on top of r4fix and r5. Presentation only. No Engine logic, save code, history/condense layer or hist-backup copy is touched, and nothing new is stored: each document is built when it is opened, from numbers already in the career.
+- **The mind it made, in plain words.**
+  - A short header says what it is: the Engine could not get a huge AI model, a card cluster, cloud access or a budget, so it built a small mind on this machine that answers only from facts copied from your save. Nothing leaves the machine.
+  - "Lines folded in" is now **Facts learned**, and "Times asked" is now **Questions answered**. Each has a hover tip.
+  - The four constraint rows are a **What it couldn't get / What it does instead** table.
+  - Each MADE entry is a card in the r4 answer shape `{question, answer, sourceKind, confidence, wrongIf}`: the question it can answer, the answer, a friendly source, the day it was learned, **Current / Stale** worked out live and read-only against the save, and when it would be wrong.
+  - Entries that only repeat a setting (the calendar, the weather) are marked **Setting echo, not knowledge**. The "filed under" label is explained as a rotation, not a link to the fact.
+  - The Ask box shows `ONUM.engine.ask`'s entry as a card: confidence, source, when it would be wrong, or "Refused to guess".
+  - No internal field name is printed anywhere on the Engine card. `(you.name)`-style tags are stripped from the text and kept only in `data-` attributes.
+  - The Engine card gets a "Plain words" glossary and hover tips for folded, weight, line of the record, generation, copies at work, the key, oversight, posture, charter, compute, talent, reliance and calibration. The Academy list gets tips for schools, overturned, cites and prestige.
+- **Official documents** (phone app, plus buttons on the existing screens). Shared document styles and inline SVG charts, with no library and no network:
+  - **Academy paper**, in a RAND/Nature form: masthead, title, author and school, abstract box, method tiles (n, confidence, effect, states, years, cost), a findings chart, numbered citations that open the cited paper, peer review, ranked recommendations, risks, a 1/5/10-year forecast chart and table, and the plain text underneath. Opening a paper from "Papers" now shows this view.
+  - **Intelligence dossier**: classification banner, executive summary, key judgments with low/moderate/high confidence (the rule is printed), threat assessment, evidence table with Admiralty-style grades (B2/C2/A3, the rule is printed), public claims and the Directorate log. Unseen operations are never shown. The rival's capability appears only after a fresh audit, as in the game. Opened from the Engine card's rival section and from the situation room.
+  - **Economic report**, in a central-bank form: a headline indicators table with 7- and 30-reading changes and sparklines, revenue and spending, the Treasury and the guilder charts, the civil service, the outlook and the risks. Opened from the books.
+  - **Approval tracker**: polls with their margin-of-error band and a 4-poll moving average, the poll table, mood by group, unrest and lean by state, past elections, and public mood.
+  - **Election desk**: a final-count banner, House bars with the majority line, Senate bars, the swing, a by-state table and past results.
+  - **District profile**: state tiles, a towns table, unmet need by service, your home district (residents, wealth, crime, money flows), a population pyramid from the register of named persons, laws passed, state government, and a picker for other states.
+  - Every number on a document carries `data-src`, and `onumDoc.check()` compares each one with the live career value.
+  - A reusable candlestick and volume helper (`onumDoc.chart.candles`) is there for r4's market. It is not wired to any screen.
+- **QA:** new qa/nov25-docs.mjs. On copies of the day-535 and day-540 saves at all five sizes: every document opens, draws, scrolls, fits, and has its controls reachable; every number matches; no field names appear; the save grows under 10%. sitstages, Engine entry, convo-by and dupfn still pass. Function count goes from 3,477 to 3,540, with none removed.
+
+## 20261124e: continental world map and nation map (JUPITER, round 5)
+
+- First pushed on `jupiter-nov24-r4` (`0ec8ce7`) as `20261124e`; carried onto r4fix (20261124f) in the combined tip `20261124g`.
+- **World and nation map:** inline continental coastlines for all six surrounding powers (The Pale, The Free Marches, The Rift, The Reach, The Horn League, The Salt Isles) plus twenty interlocking shared-border state polygons, rivers, bays, mountain ridges, and a World / Nation view toggle. Zero external network requests. All five existing filters (`lean`, `party`, `faith`, `tension`, `race`) keep working, with `lean` and `party` distinct, and the map fits cleanly at 800×600 and 1280×720 with no clipping.
+
+## 20261124f: history is never lost, and careers saved on 24d get their days back (JUPITER, r4 fix)
+
+- On main bbafaf8 (PR #10, 20261124d). Fixes MARS's r4 data-loss blocker.
+- **History tiers are saved:** `G.histTier` is in `saveCaptureBase`, so every save path (sliced, sync, IndexedDB, export) keeps it. Old vivid days are dropped only after the career with its new records has been committed to IndexedDB (`tx.oncomplete`); if that write fails, nothing is deleted and condense reports `{ok:false}`.
+- **Pre-condense backup:** `hist-backup` is now a full copy of the career (every save key, about 191, plus members, press and townspeople). It is refreshed before each condense and can be exported from the Menu ("Export pre-condense backup").
+- **Recovery for careers saved on 24d:** on load, if the records are missing and the daily logs start late, the days are merged back from `hist-backup` (and the old 24d backup, kept as `hist-backup-legacy`), and the records are rebuilt. The result is written once in the journal and reported as `onumSaveStats().recovery = {rebuilt:[ranges], missing:[ranges]}`. A shorter history is never shown silently. Importing an older export of the same career offers to merge its older days in; nothing newer is rolled back.
+- **Import:** importing a file older than the current career asks first (merge, then replace). The reload waits for the IndexedDB commit, and no save can overwrite the import while it is in progress.
+- **The Engine:** it never answers from setting fields (weather, forecast, the country's name). Old `(you.name)`-style entries are cleaned from the stored record. It answers laws, bills, the cabinet, appointments, scandals, the market, the treasury, people and approval from the record (24 of MARS's 24 questions). "Who is sovereign?" is answered from the office-holder record. Article-stripping matches law titles the same way everywhere.
+- **The Engine from the Menu:** the Menu panel no longer slides 20 px into place. A save started by opening the Menu could hold that slide back for seconds, so a click landed beside the Engine row (MARS r4, 1920x1080). The build line is now drawn with the Menu, not up to 2 s later. The Engine entry opens on release even if the row is redrawn mid-click, and it retries if the Engine never appeared. The Engine page no longer shows `(you.name)`, `(country.name)` or `(world.*)` labels.
+- **Soft items:** a runaway purse, treasury or shop till is clamped on load and on every day tick. Members whose own lines named someone else are corrected, including envoys renamed after load. Repeated words in bill titles ("Public Public") are collapsed.
+- **QA:** new qa/nov24-r4-blockers.mjs, qa/nov24-recovery.mjs (24d → 24f on the same origin) and qa/nov24-engine-menu.mjs.
+
 ## 20261124d: asked-for saves under 2 s under load (JUPITER, round 4)
 
 - On 20261124c (bba1db8).
