@@ -1,0 +1,44 @@
+diff --git a/session.html b/session.html
+index f28b0ce..3a84146 100644
+--- a/session.html
++++ b/session.html
+@@ -47860,6 +47860,28 @@ function histMergeOlder(src){
+   return Array.from(add);
+ }
+ function histMarkFirst(){ try{ const c = Array.from(histCovered()); if(c.length){ const m = Math.min.apply(null, c); if(!(G.histFirst > 0) || m < G.histFirst) G.histFirst = m; } }catch(e){} }
++function histDayAttested(day){
++  const d = +day;
++  if(!(d > 0) || !G) return false;
++  const hit = x => x && (+x.d === d || +x.day === d);
++  const any = a => Array.isArray(a) && a.some(hit);
++  if(G.you){
++    if(+G.you.courtSince === d) return true;
++    if(G.you.purse && any(G.you.purse.log)) return true;
++    if(G.you.mind && any(G.you.mind.experiences)) return true;
++    if(G.you.led && (any(G.you.led.told) || any(G.you.led.saw))) return true;
++  }
++  if(G.eng){
++    if(G.eng.made && +G.eng.made.born === d) return true;
++    if(any(G.eng.log)) return true;
++  }
++  const folks = [].concat(G.members || [], G.civ || [], G.press || []);
++  for(let i = 0; i < folks.length; i++){
++    const p = folks[i];
++    if(p && p.led && (any(p.led.told) || any(p.led.saw))) return true;
++  }
++  return false;
++}
+ function histLostFloor(covMin){
+   let m = covMin;
+   const take = d => { const n = +d; if(n > 0 && n < m) m = n; };
+@@ -47876,6 +47898,10 @@ function histLostFloor(covMin){
+     (G.living.memory || []).forEach(x => { if(x) take(x.d); });
+   }
+   (Array.isArray(G.annals) ? G.annals : []).forEach(x => { if(x) take(x.d); });
++  /* tlog can start a day before daylog / made.born; 24d strips that earlier day
++     from the logs but it often remains stamped on the career (courtSince, a leftover talk).
++     Include only the immediately preceding attested day so pre-history statutes are not pulled in. */
++  if(m < covMin && histDayAttested(m - 1)) take(m - 1);
+   if(m >= covMin){
+     (G.statute || []).forEach(s => { if(s && +s.day > 0 && +s.day < m) m = +s.day; });
+   }
