@@ -1,7 +1,14 @@
+## 20261125n2: prompt and meeting dock stack cleanly on vote-result at 800x600 (NEPTUNE, patch 10)
+
+- On combined tip `20261124g` (`ecbaf7d`). Layout only; no Engine, save or session logic touched. Source: Neptune's `neptune-nov25-institutions` at `5a1fea9` / `patch-10-vote-result-800.patch`. The five build stamps stay `20261124g`.
+- In `onumHud`'s `stack`, when `#prompt` and `#sxDock` share the right column, `#prompt` reserves room below it for `#sxDock` and scrolls its options rather than taking the whole column and forcing `#sxDock` to collapse (`room < 28`, where `#caFitCss` kept `#sxDock` visible at `#fixScreenCss`'s fallback `[456, 56, 336, 536]` under `#prompt`).
+- `#sxDock.hm-p:not(.hm-col):not(.sx-park):not([hidden])` keeps `min-height: 52px` so its 44px `–` fold button stays inside the dock and reachable by `elementFromPoint`.
+- **QA:** `sitstages` on both day-535 and day-540 copies at all 5 sizes; `nov25-docs` size() no longer throws on circular Three.js objects.
+
 ## 20261124g: one combined tip, r4fix + r5 map + Neptune's patch 09 (JUPITER)
 
 - Fast-forwards main bbafaf8. In order: `20261124f` (r4fix: history data-loss fix, 24d recovery, import confirm, Engine from the record and from the Menu), `20261124e` (r5 item 1: continental world map and nation map), and `20261125n` (Neptune's patch 09: institutional documents and the Engine's mind in plain words), each as its own commit. This commit only stamps the build.
-- Neptune is taking the 800x600 vote-result prompt that covers the "–" button. Storefronts and stocks come after this tip.
+- Neptune's patch 10 (20261125n2) lands next on this tip and fixes the 800x600 vote-result prompt that covered the "–" button. Storefronts and stocks come after that.
 
 ## 20261125n: institutions speak in their own documents, and the Engine's "mind it made" in plain words (NEPTUNE, patch 09)
 
