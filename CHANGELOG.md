@@ -1,3 +1,11 @@
+## 20261125n4: the Union Exchange market report, an exchange page drawn from ONUM.market (NEPTUNE, patch 12)
+
+- On `jupiter-nov25-storefronts-on-main` (`82418c5` / `20261125j1`) as branch `neptune-nov25-p12-market`. Display only: no market, shop, Engine, save or history logic touched. It reads `ONUM.market.snapshot(false)` and `ONUM.shops.list()` (never `snapshot(true)`, `tick` or `trade`), and the page is built when it is opened.
+- `onumDoc.render("market", "TICKER:N")` / `onumDoc.open("market")`: masthead; the chosen listing (the Union Guilder index by default, or any of the eight shares) with last price, change and % change, and the latest session's open, high, low and volume; listing and range pickers (ten or twenty sessions, or all on the book, offered only when the book is longer); the `odCandles` candlestick chart with its volume strip; a listings table (last, change, change %, session volume); historical performance (one day, a week, a month, all on the book; a dash where the book does not reach); foreign exchange; an analyst's note phrased from those numbers; company accounts (chief, revenue mark, debt mark); holdings and owned storefronts (price, markup, sales, till, unpaid).
+- Not on the record, and said so on the page: market capitalisation (no shares outstanding), quarterly periods (one undated revenue and debt mark per company), and a full month of history (the book keeps about thirty sessions).
+- Number match: every number on the page is a tagged `od-n` with an `=mkt:` source, and `onumDoc.check` recomputes it from `ONUM.market` / `ONUM.shops`. Listed in the documents index; the Exchange panel gets a "Market report" button.
+- **QA:** `qa/nov25-docs.mjs` covers the market report (number match, no loose digit, sections, index), plus the market doc probe, `nov25-made-scrub`, `sitstages`, map and `nov17-dupfn` on the day-535 and day-540 copies at 800x600, 1280x720, 1280x800, 1366x768, 1920x1080.
+
 ## 20261125n3: the map's View and Shade rows scroll clear of the room prompt; flat chart axes stop repeating a label (NEPTUNE, patch 11)
 
 - On combined tip `20261124g` (`8bfb706`) as branch `neptune-nov25-p11-map-b` (first cut on `1636c3f` as `neptune-nov25-p11-map`).
