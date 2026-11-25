@@ -45907,6 +45907,15 @@ function titlePeek(){
   let m = null, d = null;
   try{ if(window.ONUM_CAREERS && window.ONUM_CAREERS.peek){ const p = window.ONUM_CAREERS.peek(); if(p && (p.name || p.day || p.slot || p.rank)) m = p; } }catch(e){}
   try{ d = peekSave(); }catch(e){ d = null; }
+  /* 20261124d: while IndexedDB has not answered, a full localStorage career without the small summary must not supply a day */
+  if(!titleIdbAnswered() && titleLsUntrusted()){
+    const src = m || d;
+    if(!src) return null;
+    const out = Object.assign({}, src);
+    delete out.day; delete out.rank; delete out.minute;
+    out.pending = true;
+    return out;
+  }
   if(!m) return d; if(!d) return m;
   const r = x => (+(x.congress || 1)) * 1e9 + (+(x.day || 0)) * 1e6 + (+(x.minute || 0));
   return r(d) > r(m) ? Object.assign({}, m, d) : m;
@@ -45917,6 +45926,16 @@ function titleCareersReady(){
   try{ if(typeof ENG_IDB !== "undefined" && ENG_IDB && ENG_IDB.ready) return true; }catch(e){}
   try{ if(window.__onumCareersReady && performance.now() > 12000) return true; }catch(e){}
   return false;
+}
+function titleIdbAnswered(){
+  /* 20261124d: a day number is trusted only after IndexedDB itself has answered, not after a 2 s or 12 s timeout */
+  try{ return !!(typeof ENG_IDB !== "undefined" && ENG_IDB && ENG_IDB.ready); }catch(e){ return false; }
+}
+function titleLsUntrusted(){
+  /* A 24c+ save always writes the small summary. If the only local copy is a full career and that summary is missing,
+     IndexedDB may hold a later day (the day-516 localStorage freeze). */
+  try{ if(peekCareerMeta()) return false; }catch(e){}
+  try{ return !!pickNewestSave(); }catch(e){ return false; }
 }
 function titleArchiveCount(){
   try{
@@ -46165,7 +46184,7 @@ function opening(){
   const dayN = hasSave ? (peek.day || 1) : 1;
   const cname = (peek && peek.country && peek.country.name) ? peek.country.name : (G.country && G.country.name);
   const archN = titleArchiveCount();
-  const contLabel = "Continue" + (peek && peek.name ? " — " + peek.name : "") + (titleCareersReady() ? " · day " + dayN : " · checking for the latest day…");
+  const contLabel = "Continue" + (peek && peek.name ? " — " + peek.name : "") + (titleIdbAnswered() && peek && peek.day ? " · day " + peek.day : " · checking for the latest day…");
   card.innerHTML =
     '<img class="card__logo" src="assets/logo.png" width="220" height="147" alt="One Nation, Under, ME." onerror="this.onerror=null;this.replaceWith(Object.assign(document.createElement(\'div\'),{className:\'card__logo card__logo--text\',textContent:\'One Nation, Under, ME.\'}))">' +    '<div class="eyebrow">One Nation, Under, ME. · The ' + ordinal(cong) + ' Congress' +
       (cname ? ' · ' + cname : '') + '</div>' +
