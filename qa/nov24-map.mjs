@@ -17,7 +17,7 @@ let mapWatch = false;
 page.on("request", (req) => {
   const u = req.url();
   if (u.startsWith(origin) || u.startsWith("data:") || u.startsWith("blob:")) req.continue();
-  else { if (mapWatch) extReqs.push(u); req.abort(); }
+  else { if (mapWatch && !u.startsWith("http://127.0.0.1:11434")) extReqs.push(u); req.abort(); }
 });
 await seedIdb(page, origin, raw);
 const cont = await continueCareer(page, origin);

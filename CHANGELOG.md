@@ -1,6 +1,7 @@
 ## 20261124e: continental world map and nation map (JUPITER, round 5)
 
 - On `jupiter-nov24-r4` (`0ec8ce7`), stamp `20261124e`.
+- **Owned storefronts:** every shared price book (`grain`, `iron`, `press`, `cloth`, `sport`) has competing owned storefronts (`>= 2` doors) priced from `book * markup`. All player and customer purchases debit the buyer's own savings (`purseOf`)—never the campaign chest—and settle receipts into the owner's savings. Shoppers walk to the cheapest affordable door, NPC rivals trim markup under price pressure, and `ONUM.shops` exposes the storefront & book API (`qa/nov24-shops.mjs`).
 - **World and nation map:** inline continental coastlines for all six surrounding powers (The Pale, The Free Marches, The Rift, The Reach, The Horn League, The Salt Isles) plus twenty interlocking shared-border state polygons, rivers, bays, mountain ridges, and a World / Nation view toggle. Zero external network requests. All five existing filters (`lean`, `party`, `faith`, `tension`, `race`) keep working, with `lean` and `party` distinct, and the map fits cleanly at 800×600 and 1280×720 with no clipping.
 
 ## 20261124d: asked-for saves under 2 s under load (JUPITER, round 4)
