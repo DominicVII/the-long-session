@@ -122,21 +122,56 @@ try {
   ok(mMigReload.unk === 0 && mMigReload.cur === mFresh.cur && mMigReload.stale === mFresh.stale && mMigReload.setting === 6,
     "Migrated save+reload: preserves " + mMigReload.cur + " current / " + mMigReload.stale + " stale / " + mMigReload.setting + " setting");
 
-  /* 3. Economy report Risks guilder value equals Headline guilder index on 540 & 535 */
-  for (const [label, raw] of [["540", raw540], ["535", raw535]]) {
-    if (label === "535") { await seedIdb(page, origin, raw); await continueCareer(page, origin); }
+  /* 3. Economy report Risks guilder value equals Headline guilder index on 540 & 535,
+        including after advancing +1 and +3 days and after a non-crisis G.money.index move */
+  const readEcon = async () => {
     await page.evaluate(() => window.onumDoc.open("econ"));
     await delay(500);
-    const econ = await page.evaluate(() => {
+    const r = await page.evaluate(() => {
+      const G = NEPTUNE.debug().G;
       const txt = (document.getElementById("card") || {}).innerText || "";
-      const mHead = /Guilder index\s+([0-9]+\.[0-9]+)/.exec(txt);
-      const mRisk = /The guilder is at\s+([0-9]+\.[0-9]+)/.exec(txt);
+      const mHead = /Guilder index\s+([0-9,]+\.[0-9]+)/.exec(txt);
+      const mRisk = /The guilder is at\s+([0-9,]+\.[0-9]+)/.exec(txt);
       document.getElementById("gcClose")?.click();
-      return { head: mHead && mHead[1], risk: mRisk && mRisk[1] };
+      return { day: G.day, live: G.money && G.money.index, head: mHead && mHead[1], risk: mRisk && mRisk[1] };
     });
-    ok(econ.head && econ.risk && econ.head === econ.risk,
-      "Econ " + label + ": Risks guilder (" + econ.risk + ") === Headline (" + econ.head + ")");
     await delay(250);
+    return r;
+  };
+  const stepDay = async () => {
+    await page.evaluate(async () => {
+      window.ONUM.n24.nextDay(false);
+      const t0 = Date.now();
+      while (window.ONUM.n24.busy() && Date.now() - t0 < 15000) await new Promise(r => setTimeout(r, 150));
+      while (window.ONUM.history && window.ONUM.history.busy() && Date.now() - t0 < 15000) await new Promise(r => setTimeout(r, 150));
+    });
+    await delay(300);
+  };
+
+  for (const [label, raw] of [["540", raw540], ["535", raw535]]) {
+    if (label === "535") { await seedIdb(page, origin, raw); await continueCareer(page, origin); }
+    const e0 = await readEcon();
+    ok(e0.head && e0.risk && e0.head === e0.risk,
+      "Econ " + label + " day " + e0.day + ": Risks (" + e0.risk + ") === Headline (" + e0.head + ")");
+    if (label === "540") {
+      await stepDay();
+      const e1 = await readEcon();
+      ok(e1.day === e0.day + 1 && e1.head && e1.risk && e1.head === e1.risk,
+        "Econ 540 +1 day (day " + e1.day + "): Risks (" + e1.risk + ") === Headline (" + e1.head + ", live=" + e1.live + ")");
+      await stepDay();
+      await stepDay();
+      const e3 = await readEcon();
+      ok(e3.day === e0.day + 3 && e3.head && e3.risk && e3.head === e3.risk,
+        "Econ 540 +3 days (day " + e3.day + "): Risks (" + e3.risk + ") === Headline (" + e3.head + ", live=" + e3.live + ")");
+    }
+    /* Non-crisis G.money.index move (without calling onumCrisisCheck / onumSyncCrisisGuilder) */
+    await page.evaluate(() => {
+      const G = NEPTUNE.debug().G;
+      G.money.index = Math.round((G.money.index + 0.7) * 100) / 100;
+    });
+    const eMove = await readEcon();
+    ok(eMove.head && eMove.risk && eMove.head === eMove.risk,
+      "Econ " + label + " after non-crisis G.money.index move: Risks (" + eMove.risk + ") === Headline (" + eMove.head + ", live=" + eMove.live + ")");
   }
 
   /* 4. Recovery without backup: accurate range (>=445, not 105) + red notice shown ONCE, not on reload */

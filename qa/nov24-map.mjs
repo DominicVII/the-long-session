@@ -21,8 +21,9 @@ page.on("request", (req) => {
 });
 await seedIdb(page, origin, raw);
 const cont = await continueCareer(page, origin);
+const wantDay = JSON.parse(raw).day;
 const dayNow = await page.evaluate(() => window.ONUM.day().day);
-ok(cont.running && dayNow === 540, "Continue opens day 540 (G.day " + dayNow + ")");
+ok(cont.running && dayNow === wantDay, "Continue opens day " + wantDay + " (G.day " + dayNow + ")");
 
 /* Open the Union/Map pane */
 mapWatch = true;
