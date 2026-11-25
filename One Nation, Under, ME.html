@@ -43587,10 +43587,41 @@ function save(explicit, sync){
     return false;
   }
 }
+const ENG_FACT_SRC = {
+  day:"calendar",
+  season:"weather",
+  weather:"weather",
+  state:"country.name",
+  sovereign:"you.name",
+  approval:"you.approval",
+  bread:"world.bread",
+  dead:"world.dead",
+  treasury:"treasury.bal"
+};
+function engExtractFactSrc(v, val){
+  if(!v || typeof v !== "object" || typeof val !== "string") return;
+  const idx = val.indexOf("answered from the record: ");
+  const fact = idx >= 0 ? val.slice(idx + 26) : val;
+  const mt = /^\s*([a-z][a-z ]*?)\s+is\s+(.*?)\s*\(([^()]+)\)\s*$/i.exec(fact);
+  if(mt){
+    const fk = mt[1].toLowerCase().trim(), fs = mt[3].trim();
+    if(!v.srcKey && fk) v.srcKey = fk;
+    if(!v.src && fs) v.src = fs;
+    return;
+  }
+  const mu = /^\s*([a-z][a-z ]*?)\s+is\s+(.+?)\s*$/i.exec(fact);
+  if(mu){
+    const fk = mu[1].toLowerCase().trim();
+    if(ENG_FACT_SRC[fk]){
+      if(!v.srcKey) v.srcKey = fk;
+      if(!v.src) v.src = ENG_FACT_SRC[fk];
+    }
+  }
+}
 function engScrubStoredFields(root){
   if(!root || typeof root !== "object") return root;
   const seen = new WeakSet();
-  const reParen = /\s*\((?:you|country|world|bill|states?|calendar|weather|G|m|s)(?:\.[a-z0-9_]+)?\)/gi;
+  const reParen = /\s*\((?:you|country|world|bill|states?|calendar|weather|treasury|G|m|s)(?:\.[a-z0-9_]+)?\)/gi;
   const reBare = /\b(?:you|country|world|weather)\.(?:name|approval|bread|day|season|sky)\b/gi;
   const cleanStr = s => {
     let u = s.replace(reParen, "").replace(reBare, "");
@@ -43611,8 +43642,13 @@ function engScrubStoredFields(root){
     const keys = Object.keys(v);
     for(let i = 0; i < keys.length; i++){
       const k = keys[i], val = v[k];
-      if(typeof val === "string") v[k] = cleanStr(val);
-      else if(val && typeof val === "object") walk(val);
+      if(k === "src" || k === "srcKey") continue;
+      if(typeof val === "string"){
+        if(k === "claim" || k === "from") engExtractFactSrc(v, val);
+        v[k] = cleanStr(val);
+      } else if(val && typeof val === "object"){
+        walk(val);
+      }
     }
   };
   walk(root);
@@ -43638,6 +43674,7 @@ function loadSave(){
       if(G.histTier && Array.isArray(G.histTier.records)) G.histTier.records.forEach(r => { if(r && Array.isArray(r.laws)) r.laws.forEach(l => { if(l && l.title) l.title = _cln(l.title); }); });
     }catch(e){}
     try{ if(typeof engScrubStoredFields === "function" && G.eng) engScrubStoredFields(G.eng); }catch(e){}
+    try{ if(typeof onumSyncCrisisGuilder === "function") onumSyncCrisisGuilder(); }catch(e){}
     if(G.fullDetail === undefined || G.fullDetail === null) G.fullDetail = true;
     if(!G.gfx || (G.gfx !== "best" && G.gfx !== "balanced" && G.gfx !== "simple")){
       G.gfx = (G.simple === true) ? "simple" : "best";
@@ -43738,6 +43775,9 @@ function importCareerSave(file){
           note("Import cancelled; your newer career is kept.", false);
           return;
         }
+      }
+      if(d && d.histRecovery && Array.isArray(d.histRecovery.missing) && d.histRecovery.missing.length){
+        d.histRecovery.noticed = false;
       }
       window.ONUM_IMPORTING = true;
       const raw = JSON.stringify(d, saveRound);
@@ -47820,18 +47860,48 @@ function histMergeOlder(src){
   return Array.from(add);
 }
 function histMarkFirst(){ try{ const c = Array.from(histCovered()); if(c.length){ const m = Math.min.apply(null, c); if(!(G.histFirst > 0) || m < G.histFirst) G.histFirst = m; } }catch(e){} }
-function histRecoverReport(source, added, lo){
+function histLostFloor(covMin){
+  let m = covMin;
+  const take = d => { const n = +d; if(n > 0 && n < m) m = n; };
+  if(G.histFirst > 0 && G.histFirst < m) take(G.histFirst);
+  if(G.eng && G.eng.made){
+    take(G.eng.made.born);
+    (G.eng.made.lines || []).forEach(x => { if(x) take(x.d); });
+    (G.eng.made.finds || []).forEach(x => { if(x) take(x.d); });
+  }
+  ((G.treasury && G.treasury.book) || []).forEach(x => { if(x) take(x.d); });
+  (G.journal || []).forEach(j => { if(j) take(j.day || j.d); });
+  if(G.living){
+    (G.living.crises || []).forEach(x => { if(x) take(x.d); });
+    (G.living.memory || []).forEach(x => { if(x) take(x.d); });
+  }
+  (Array.isArray(G.annals) ? G.annals : []).forEach(x => { if(x) take(x.d); });
+  if(m >= covMin){
+    (G.statute || []).forEach(s => { if(s && +s.day > 0 && +s.day < m) m = +s.day; });
+  }
+  return m;
+}
+function histRecoverReport(source, added, lo, quiet){
   const today = G.day || 1, cov = histCovered(), miss = [];
   for(let d = Math.max(1, lo); d < today; d++) if(!cov.has(d)) miss.push(d);
-  const rec = {at:today, source:source, rebuilt:histRanges(added), missing:histRanges(miss), noticed:false};
+  const rec = {at:today, source:source, rebuilt:histRanges(added), missing:histRanges(miss), noticed:!!quiet};
   G.histRecovery = rec;
-  if(rec.rebuilt.length || rec.missing.length){
+  if(!quiet && (rec.rebuilt.length || rec.missing.length)){
     let t = "History recovery (" + source + "): ";
     t += rec.rebuilt.length ? "rebuilt " + histRangeText(rec.rebuilt) + " from the " + (source === "import" ? "imported export" : "pre-condense backup") + "." : "nothing could be rebuilt.";
     if(rec.missing.length) t += " Could not rebuild " + histRangeText(rec.missing) + "; the record for those days is lost unless you import an older export (Menu, Import save).";
     else t += " No day is missing.";
-    try{ journal(t); }catch(e){}
-    try{ note(t, !!rec.missing.length); }catch(e){}
+    try{
+      const jList = G.journal || [];
+      const prev = jList.findIndex(j => j && typeof j.t === "string" && j.t.indexOf("History recovery (" + source + "):") === 0);
+      if(prev >= 0 && source === "load"){
+        jList[prev].t = t;
+        try{ if(window.NEPTUNE_CLARITY && typeof window.NEPTUNE_CLARITY.addItem === "function") window.NEPTUNE_CLARITY.addItem({k:"note", kind:"note", title:rec.missing.length ? "Notice" : "Note", text:t}); }catch(e2){}
+        try{ feed(t, rec.missing.length ? "big" : ""); }catch(e2){}
+      } else {
+        note(t, !!rec.missing.length);
+      }
+    }catch(e){}
     rec.noticed = true;
   }
   return rec;
@@ -47858,11 +47928,11 @@ function histRecover(cb){
       let lo = lo0;
       if(added.length) lo = Math.min(lo, Math.min.apply(null, added));
       else if(lost){
-        /* nothing to rebuild from: name the span the career once had, from the laws and the journal, so it is never silent */
-        let m = covMin; (G.statute || []).forEach(s => { if(s && +s.day > 0 && +s.day < m) m = +s.day; }); (G.journal || []).forEach(j => { const d = +(j && (j.day || j.d)); if(d > 0 && d < m) m = d; });
-        lo = m;
+        lo = histLostFloor(covMin);
       }
-      const rec = histRecoverReport("load", added, lo);
+      const prevRec = G.histRecovery;
+      const alreadyNoticed = !added.length && !!(prevRec && prevRec.noticed && prevRec.source === "load" && (!prevRec.rebuilt || !prevRec.rebuilt.length));
+      const rec = histRecoverReport("load", added, lo, alreadyNoticed);
       histMarkFirst();
       histRecover._busy = false;
       if(added.length){ try{ histCondense(() => fin(rec)); }catch(e){ fin(rec); } }
@@ -47877,7 +47947,7 @@ function histMergeImport(d, cb){
   const srcDays = (d.daylog || []).concat(d.tlog || []).map(x => +(x && x.d)).filter(x => x > 0);
   let lo = srcDays.length ? Math.min.apply(null, srcDays) : (added.length ? Math.min.apply(null, added) : (G.histFirst || G.day));
   if(!srcDays.length && G.histRecovery && G.histRecovery.missing && G.histRecovery.missing.length) lo = Math.min(lo, G.histRecovery.missing[0][0]);
-  const rec = histRecoverReport("import", added, lo);
+  const rec = histRecoverReport("import", added, lo, false);
   histMarkFirst();
   if(added.length){ try{ histCondense(() => { if(cb) cb(rec); }); }catch(e){ if(cb) cb(rec); } }
   else { try{ save(true); }catch(e){} if(cb) cb(rec); }
@@ -62289,10 +62359,13 @@ function onumMadeBuild(thought, force){
     if(rows.length) fact = String(rows[M.lines.length % rows.length]).slice(0, 240);
   }catch(e){}
   if(!fact) fact = "Day " + G.day + ". No figure was invented.";
-  M.lines.push({d:G.day, from:fact, restraint:R.id, lack:R.lack, made:R.make});
+  const lineObj = {d:G.day, from:fact, restraint:R.id, lack:R.lack, made:R.make};
+  try{ if(typeof engExtractFactSrc === "function") engExtractFactSrc(lineObj, fact); }catch(e){}
+  M.lines.push(lineObj);
   if(M.lines.length > 40) M.lines.shift();
   const claim = "What could not be had (" + R.id + ") is answered from the record: " + fact;
   const find = {id:"mf" + G.day + "-" + M.finds.length, d:G.day, claim:claim.slice(0, 320), limits:"This is wrong if that line is no longer in the record.", reality:"MADE", restraint:R.id};
+  try{ if(typeof engExtractFactSrc === "function") engExtractFactSrc(find, claim); }catch(e){}
   O.routines.push({id:"made" + M.lines.length, gen:O.generation, d:G.day, t:(R.make + " Cite: " + fact).slice(0, 320)});
   if(O.routines.length > 14) O.routines.shift();
   find.did = "Implemented as a procedure on day " + G.day + ". The mind can be asked, and it may only answer from a line it has folded in.";
@@ -66123,6 +66196,18 @@ function onumLivingTick(){
     }
   }
 }
+function onumSyncCrisisGuilder(){
+  try{
+    if(!G || !G.living || !Array.isArray(G.living.crises)) return;
+    const g = (G.money && isFinite(G.money.index)) ? G.money.index : (typeof guilderIndex === "function" ? guilderIndex() : 100);
+    const gx = (Math.round(g * 10) / 10).toFixed(1);
+    G.living.crises.forEach(function(c){
+      if(c && c.k === "inflation" && !c.done){
+        c.t = "Inflation. The guilder is at " + gx + ". Treasury has the figure. The shops do not wait for a speech.";
+      }
+    });
+  }catch(e){}
+}
 function onumCrisisCheck(){
   const L = onumLiving();
   const open = function(k, t){
@@ -66133,8 +66218,9 @@ function onumCrisisCheck(){
     onumAnnalsWrite("crisis", t);
   };
   let g = 100;
-  try{ g = guilderIndex(); }catch(e){}
-  if(g > 150) open("inflation", "Inflation. The guilder is at " + (Math.round(g * 10) / 10) + ". Treasury has the figure. The shops do not wait for a speech.");
+  try{ g = (G.money && isFinite(G.money.index)) ? G.money.index : guilderIndex(); }catch(e){}
+  if(g > 150) open("inflation", "Inflation. The guilder is at " + (Math.round(g * 10) / 10).toFixed(1) + ". Treasury has the figure. The shops do not wait for a speech.");
+  onumSyncCrisisGuilder();
   if((G.republic && G.republic.debt) > 2500) open("debt", "The debt on the works is " + Math.round(G.republic.debt) + ". A banking note is filed. It is not yet a panic.");
   const hot = (G.states || []).filter(function(s){ return (s.unrest || 0) > 80; })[0];
   if(hot) open("strike:" + hot.n, "A strike is called in " + hot.n + ". Unrest " + Math.round(hot.unrest) + ". It is a strike. It is not a riot unless the day is written that way later.");
@@ -67762,10 +67848,26 @@ const onumDoc = (function(){
     }catch(e){}
     return null;
   }
-  /* "sovereign is Dominic Z. Taylor (you.name)" -> {key, value, field} */
-  function odMadeParse(s){
-    const m = /^\s*([a-z]+) is (.*) \(([\w.]+)\)\s*$/i.exec(String(s || ""));
-    return m ? {key:m[1].toLowerCase(), value:m[2], field:m[3]} : null;
+  const OD_FACT_SRC = {day:"calendar", season:"weather", weather:"weather", state:"country.name", sovereign:"you.name", approval:"you.approval", bread:"world.bread", dead:"world.dead", treasury:"treasury.bal"};
+  /* "sovereign is Dominic Z. Taylor (you.name)" or stored {srcKey, src} -> {key, value, field} */
+  function odMadeParse(s, obj){
+    const raw = String(s || "");
+    const m = /^\s*([a-z][a-z ]*?) is (.*?) \(([^()]+)\)\s*$/i.exec(raw);
+    if(m){
+      const k = ((obj && obj.srcKey) || m[1]).toLowerCase().trim();
+      return {key:k, value:m[2].trim(), field:(obj && obj.src) || m[3].trim()};
+    }
+    const clean = odStripFields(raw).trim();
+    const mu = /^\s*([a-z][a-z ]*?) is (.+?)\s*$/i.exec(clean);
+    if(obj && (obj.srcKey || obj.src)){
+      const k = ((obj.srcKey || (mu && mu[1]) || "")).toLowerCase().trim();
+      if(k) return {key:k, value:mu ? mu[2].trim() : clean, field:obj.src || OD_FACT_SRC[k] || ""};
+    }
+    if(mu){
+      const k = mu[1].toLowerCase().trim();
+      if(MADE_FIELDS[k]) return {key:k, value:mu[2].trim(), field:OD_FACT_SRC[k] || ""};
+    }
+    return null;
   }
   const OD_FIELD_RE = /\s*\((?:calendar|weather|(?:you|country|world|treasury|money|eng|engine|states|dist|adv|G)\.[A-Za-z.]+)\)/g;
   function odStripFields(s){ return String(s || "").replace(OD_FIELD_RE, ""); }
@@ -67773,7 +67875,7 @@ const onumDoc = (function(){
     const M = G.eng && G.eng.made; if(!M) return [];
     return (M.finds || []).slice().reverse().map(function(f){
       const raw = String(f.claim || ""), i = raw.indexOf("answered from the record: "), fact = i >= 0 ? raw.slice(i + 26) : raw;
-      const P = odMadeParse(fact), F = P ? MADE_FIELDS[P.key] : null, R = MADE_LACK[f.restraint] || null;
+      const P = odMadeParse(fact, f), F = P ? MADE_FIELDS[P.key] : null, R = MADE_LACK[f.restraint] || null;
       const live = P ? odMadeLive(P.key) : null;
       const status = !P || live == null ? "unknown" : (live === P.value ? "current" : "stale");
       return {d:f.d, key:P ? P.key : null, field:P ? P.field : null, q:F ? F.q : "What does it hold?", answer:P ? P.value : odStripFields(fact), source:F ? F.label : "a line of your save",
@@ -67823,7 +67925,7 @@ const onumDoc = (function(){
     const intro = '<div class="eyebrow">The mind it made</div>' +
       '<p class="od-plain"><b>In plain words:</b> the Engine could not get a huge AI model, a cluster of graphics cards, cloud access or a budget. So it built a small mind of its own, here on this machine. That mind answers only from facts it has copied out of your save. Nothing leaves the machine, and it will not make up an answer it does not hold.</p>';
     if(!M) return intro + '<p class="muted">It has not learned any facts yet. Press \u201cLet it learn a fact\u201d and it will copy its first one from your save.</p>' + odMadeControls();
-    const cards = odMadeCards(), last = (M.lines || []).length ? M.lines[M.lines.length - 1] : null, lp = last ? odMadeParse(last.from) : null;
+    const cards = odMadeCards(), last = (M.lines || []).length ? M.lines[M.lines.length - 1] : null, lp = last ? odMadeParse(last.from, last) : null;
     const tiles = '<div class="od-tiles od-tiles--made">' +
       '<div class="od-tile"><span>Born</span><b>day ' + odN(M.born, "eng.made.born") + '</b><em>when it started</em></div>' +
       '<div class="od-tile"><span>' + odTip("Facts learned", MADE_TIPS["facts learned"]) + '</span><b>' + odN((M.lines || []).length, odC("madeN")) + '</b><em>kept in its memory (it holds the latest 40)</em></div>' +
