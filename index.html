@@ -10988,6 +10988,7 @@ function pbOpen(){
     w = document.createElement("div"); w.id = "pbPhone"; document.body.appendChild(w);
     w.addEventListener("click", ev => { const t = ev.target.closest("button"); if(!t) return; ev.stopPropagation(); const d = t.dataset;
       if(d.pbx){ w.remove(); return; }
+      if(d.pbtk){ const parts = d.pbtk.split(":"); const msg = onumTrade(parts[1], parts[0] === "b" ? "buy" : "sell"); PB._mktMsg = msg; pbRender(); return; }
       if(d.pbapp){ w.remove(); pbAppGo(d.pbapp); return; }
       if(d.pbt){ PB.tab = d.pbt; pbRender(); return; }
       if(d.pbdm){ w.remove(); try{ dmToggle(true, isNaN(+d.pbdm) ? d.pbdm : +d.pbdm); }catch(e){} return; }
@@ -58713,8 +58714,21 @@ function onumPhoneVox(){
 { const _pb = pbHTML; pbHTML = function(){
   let html = _pb.apply(this, arguments);
   const on = PB.tab === "vox" ? ' class="is-on"' : "";
-  html = html.replace(">Chat</button>", '>Chat</button><button data-pbt="vox"' + on + '>Vox</button>');
+  const mOn = PB.tab === "mkt" ? ' class="is-on"' : "";
+  html = html.replace(">Chat</button>", '>Chat</button><button data-pbt="mkt"' + mOn + '>Ticker</button><button data-pbt="vox"' + on + '>Vox</button>');
+  try{
+    const tk = window.ONUM && window.ONUM.market ? window.ONUM.market.ticker() : null;
+    if(tk){
+      const d = tk.guilder.delta;
+      const gStr = "ƒ UGL " + tk.guilder.index.toFixed(1) + " (" + (d >= 0 ? "+" : "") + d.toFixed(1) + ")";
+      const fxStr = tk.currencies.slice(0, 3).map(c => c.code + " " + c.rateInGuilders.toFixed(2)).join(" · ");
+      const mvStr = tk.movers.slice(0, 2).map(m => m.ticker + " " + m.px.toFixed(1) + " (" + (m.delta >= 0 ? "+" : "") + m.delta.toFixed(1) + ")").join(" · ");
+      const strip = '<div id="pbTicker" style="padding:6px 10px;background:#13171d;border-bottom:1px solid #2b333d;font:11px/1.4 ui-monospace,Menlo,monospace;color:#d6dde6"><div><b>' + pbEsc(gStr) + '</b> · ' + pbEsc(fxStr) + '</div><div style="display:flex;justify-content:space-between;gap:6px;margin-top:2px"><span>' + pbEsc(mvStr) + '</span><button type="button" data-pbt="mkt" style="padding:1px 6px;font-size:10px">Board</button></div></div>';
+      html = html.replace('<div class="pb__tabs">', strip + '<div class="pb__tabs">');
+    }
+  }catch(e){}
   if(PB.tab === "vox") html = html.replace(/<div class="pb__body">[\s\S]*<\/div>\s*$/, '<div class="pb__body">' + onumPhoneVox() + '</div>');
+  if(PB.tab === "mkt") html = html.replace(/<div class="pb__body">[\s\S]*<\/div>\s*$/, '<div class="pb__body">' + (typeof onumPhoneMarketHTML === "function" ? onumPhoneMarketHTML() : "<p>Market closed.</p>") + '</div>');
   return html;
 }; }
 document.addEventListener("click", function(ev){
@@ -59297,6 +59311,7 @@ onumLiveDay = function(){
   if(M.day === G.day) return;
   M.day = G.day;
   onumMktTick(1);
+  try{ if(typeof onumShareMove === "function") onumShareMove("day"); }catch(e){}
   const shops = onumFleshShops();
   const book = {};
   shops.forEach(s => { const p = onumPrice(s); if(book[s.book] == null || p < book[s.book]) book[s.book] = p; });
@@ -64397,79 +64412,343 @@ function onumReprice(){
   return r;
 }; }
 
+const ONUM_FX_SPEC = [
+  {code:"RCR", name:"Reach Crown", powerKey:"reach", baseRate:0.98},
+  {code:"HDC", name:"Horn Ducat", powerKey:"horn", baseRate:1.06},
+  {code:"PMK", name:"Pale Mark", powerKey:"pale", baseRate:1.02},
+  {code:"MFL", name:"March Florin", powerKey:"marches", baseRate:0.95},
+  {code:"SSH", name:"Salt Shilling", powerKey:"isles", baseRate:0.89},
+  {code:"RTH", name:"Rift Thaler", powerKey:"rift", baseRate:0.93}
+];
+const ONUM_STOCK_SPEC = [
+  {k:"dock", ticker:"DOCK", t:"Oranje Dock", sector:"Shipping", base:48, lo:24, hi:160},
+  {k:"line", ticker:"LINE", t:"Havenport Lines", sector:"Rail", base:36, lo:16, hi:130},
+  {k:"seam", ticker:"SEAM", t:"Coalport Seam", sector:"Coal", base:22, lo:8, hi:95},
+  {k:"grange", ticker:"GRNG", t:"Grange and Grain", sector:"Grain", base:31, lo:12, hi:110},
+  {k:"ord", ticker:"ORD", t:"Ordnance Works", sector:"Defense", base:64, lo:28, hi:195},
+  {k:"press", ticker:"PRSS", t:"Evening Press", sector:"Media", base:18, lo:6, hi:80},
+  {k:"isle", ticker:"ISLE", t:"Salt Isle Fisheries", sector:"Fisheries", base:27, lo:10, hi:98},
+  {k:"silv", ticker:"SILV", t:"Kestrel Silver", sector:"Bullion", base:41, lo:14, hi:145}
+];
+function onumSeedCandles(key, vals, nowPx, lo, hi, dayNow, baseVol){
+  const pts = (Array.isArray(vals) && vals.length ? vals.slice(-16) : [nowPx]).map(function(v){ return isFinite(Number(v)) ? Number(v) : nowPx; });
+  while(pts.length < 12){ pts.unshift(pts[0]); }
+  const n = pts.length;
+  const out = [];
+  let prevC = Math.round(pts[0] * 10) / 10;
+  for(let i = 0; i < n; i++){
+    const d = Math.max(1, (dayNow || 1) - (n - 1 - i));
+    const c = Math.round(((i === n - 1 ? nowPx : pts[i])) * 10) / 10;
+    const o = i === 0 ? c : prevC;
+    const seed = Math.abs(seedOf("cd:" + key + ":" + d));
+    const spreadHi = Math.max(0.1, Math.max(o, c) * (0.004 + (seed % 14) / 1000));
+    const spreadLo = Math.max(0.1, Math.min(o, c) * (0.004 + ((seed >> 4) % 14) / 1000));
+    const top = Math.max(o, c);
+    const bot = Math.min(o, c);
+    const h = Math.round(Math.max(top, Math.min(hi, top + spreadHi)) * 10) / 10;
+    const l = Math.round(Math.min(bot, Math.max(lo, bot - spreadLo)) * 10) / 10;
+    const v = i === n - 1 ? Math.max(1, Math.round(baseVol || (10 + (seed % 25)))) : (8 + (seed % 32));
+    out.push({d:d, o:o, h:h, l:l, c:c, v:v});
+    prevC = c;
+  }
+  return out;
+}
+function onumPushCandle(arr, key, o, next, lo, hi, dayNow, addVol){
+  const list = Array.isArray(arr) ? arr : [];
+  const last = list.length ? list[list.length - 1] : null;
+  const d = dayNow || 1;
+  const c = Math.round(next * 10) / 10;
+  if(last && last.d === d){
+    last.h = Math.round(Math.min(hi, Math.max(last.h, last.o, c)) * 10) / 10;
+    last.l = Math.round(Math.max(lo, Math.min(last.l, last.o, c)) * 10) / 10;
+    last.c = c;
+    last.v = Math.max(1, Math.round((last.v || 0) + (addVol || 1)));
+  } else {
+    const openPx = Math.round((isFinite(o) ? o : (last ? last.c : c)) * 10) / 10;
+    const seed = Math.abs(seedOf("cv:" + key + ":" + d));
+    list.push({
+      d:d,
+      o:openPx,
+      h:Math.round(Math.max(openPx, c) * 10) / 10,
+      l:Math.round(Math.min(openPx, c) * 10) / 10,
+      c:c,
+      v:Math.max(1, Math.round((addVol != null ? addVol : (6 + (seed % 18)))))
+    });
+    if(list.length > 30) list.shift();
+  }
+  return list;
+}
+function onumEconSignals(){
+  const g = (typeof guilderIndex === "function" && isFinite(guilderIndex())) ? guilderIndex() : 100;
+  const mHist = (G.money && Array.isArray(G.money.hist) && G.money.hist.length) ? G.money.hist : [g];
+  const gPrev = mHist.length > 1 ? mHist[mHist.length - 2] : g;
+  const sts = (G.states || []).filter(Boolean);
+  const avgInd = sts.length ? sts.reduce((a, x) => a + (x.ind || 50), 0) / sts.length : 55;
+  const avgUnrest = sts.length ? sts.reduce((a, x) => a + (x.unrest || 25), 0) / sts.length : 25;
+  let tr = {bal:0, last:{rv:0, out:0, d:0}};
+  try{ if(typeof tsStore === "function") tr = tsStore(); }catch(e){}
+  const w = (function(){ try{ return typeof worldEnsure === "function" ? worldEnsure() : (G.world || {}); }catch(e){ return G.world || {}; } })();
+  const tariffs = (G.statute || []).filter(st => st && st.fate === "carried" && typeof lxDomainOf === "function" && lxDomainOf(st) === "tariff" && !(st.lxStruck && st.lxStruck.whole)).length;
+  const carried = (G.statute || []).filter(st => st && st.fate === "carried");
+  const lastStat = carried.length ? carried[carried.length - 1] : null;
+  const shops = onumShops();
+  const shopSales = shops.reduce((a, x) => a + (x.sales || 0), 0);
+  const avgMarkup = shops.length ? shops.reduce((a, x) => a + (x.markup || 1), 0) / shops.length : 1;
+  const bill = (G.bill && !G.bill.done) ? G.bill : null;
+  const rels = G.realmRel || {};
+  const events = [];
+  if(w.war && w.war !== "none") events.push({day:G.day || 1, kind:"world", label:w.last || ("World: " + w.war), impact:w.heat > 55 ? "high" : "moderate"});
+  if(w.ration) events.push({day:G.day || 1, kind:"supply", label:"Bread rationing in force", impact:"high"});
+  if(bill && bill.title) events.push({day:G.day || 1, kind:"bill", label:"Bill on the floor: " + bill.title, impact:"moderate"});
+  if(lastStat && lastStat.title && (G.day || 0) - (lastStat.day || 0) <= 5) events.push({day:lastStat.day || G.day, kind:"statute", label:"Carried: " + lastStat.title, impact:"moderate"});
+  if(G.conflict) events.push({day:G.day || 1, kind:"conflict", label:"Dispute with " + (((typeof WORLD_POWERS !== "undefined" ? WORLD_POWERS : []).find(p => p.k === G.conflict.k) || {}).t || "a neighbour"), impact:"high"});
+  if(avgUnrest > 50) events.push({day:G.day || 1, kind:"unrest", label:"Elevated state unrest (" + Math.round(avgUnrest) + ")", impact:"high"});
+  if(tariffs > 0) events.push({day:G.day || 1, kind:"tariff", label:tariffs + " active tariff statute" + (tariffs > 1 ? "s" : ""), impact:"moderate"});
+  return {
+    g:Math.round(g * 10) / 10,
+    gPrev:Math.round(gPrev * 10) / 10,
+    gDelta:Math.round((g - gPrev) * 10) / 10,
+    avgInd:Math.round(avgInd * 10) / 10,
+    avgUnrest:Math.round(avgUnrest * 10) / 10,
+    treasuryBal:Math.round((tr.bal || 0) * 10) / 10,
+    treasuryDelta:Math.round(((tr.last && tr.last.d) || 0) * 10) / 10,
+    breadPrice:Math.round(((w.bread || 1.2) * (g / 100)) * 100) / 100,
+    ration:!!w.ration,
+    convoy:w.convoy !== false,
+    tariffs,
+    worldFoe:w.foe || "reach",
+    worldWar:w.war || "none",
+    worldHeat:Math.round((w.heat || 30) * 10) / 10,
+    worldSeason:w.season || "spring",
+    activeBill:bill ? bill.title : null,
+    shopSales,
+    avgMarkup:Math.round(avgMarkup * 100) / 100,
+    rels,
+    events
+  };
+}
+function onumCurrencyRates(sig){
+  const E = sig || onumEconSignals();
+  const M = onumMkt();
+  M.fxPrev = M.fxPrev || {};
+  const powers = typeof WORLD_POWERS !== "undefined" ? WORLD_POWERS : [];
+  const out = ONUM_FX_SPEC.map(function(fx){
+    const pw = powers.find(p => p.k === fx.powerKey);
+    const rel = Number((E.rels && E.rels[fx.powerKey]) || 0);
+    const isFoe = E.worldFoe === fx.powerKey;
+    let risk = 1 - rel / 420 + (isFoe ? (E.worldHeat / 450) : 0);
+    const drivers = [];
+    if(E.g >= 115) drivers.push("Strong guilder lowers foreign cost");
+    else if(E.g <= 92) drivers.push("Weak guilder lifts foreign FX");
+    if(isFoe){ drivers.push("Active rival tension (" + Math.round(E.worldHeat) + ")"); }
+    if(rel <= -15) drivers.push("Cool trade ties (" + Math.round(rel) + ")");
+    else if(rel >= 15) drivers.push("Warm trade ties (+" + Math.round(rel) + ")");
+    if(fx.powerKey === "horn" && E.worldWar === "strait"){ risk += 0.08; drivers.push("Strait closure premium"); }
+    if(fx.powerKey === "reach" && (E.worldWar === "grain" || E.ration)){ risk += 0.07; drivers.push("Border grain hold"); }
+    if(fx.powerKey === "pale" && (E.worldWar === "frost" || E.worldSeason === "winter")){ risk += 0.06; drivers.push("Winter iron & fuel demand"); }
+    if(fx.powerKey === "isles" && !E.convoy){ risk += 0.05; drivers.push("Delayed sea convoy"); }
+    const rateInGuilders = Math.max(0.25, Math.round(fx.baseRate * (100 / Math.max(40, E.g)) * risk * 1000) / 1000);
+    const index = Math.round((rateInGuilders / fx.baseRate) * 1000) / 10;
+    const prev = M.fxPrev[fx.code] != null ? M.fxPrev[fx.code] : rateInGuilders;
+    const delta = Math.round((rateInGuilders - prev) * 1000) / 1000;
+    M.fxPrev[fx.code] = rateInGuilders;
+    if(!drivers.length) drivers.push("Steady par clearing");
+    return {
+      code:fx.code,
+      name:fx.name,
+      powerKey:fx.powerKey,
+      powerName:pw ? pw.t : fx.powerKey,
+      rateInGuilders,
+      index,
+      delta,
+      relation:Math.round(rel),
+      isFoe,
+      driver:drivers[0],
+      drivers
+    };
+  });
+  return out;
+}
+function onumGuilderCandles(sig){
+  const M = onumMkt();
+  const E = sig || onumEconSignals();
+  const dayNow = G.day || 1;
+  const mHist = (G.money && Array.isArray(G.money.hist) && G.money.hist.length) ? G.money.hist : [E.g];
+  if(!Array.isArray(M.gCandles) || !M.gCandles.length){
+    M.gCandles = onumSeedCandles("UGL", mHist, E.g, 42, 190, dayNow, Math.max(10, (E.shopSales || 0) + 12));
+  }
+  if(M.gCandles.length > 30) M.gCandles = M.gCandles.slice(-30);
+  return M.gCandles;
+}
 function onumShareBook(){
   const M = onumMkt();
-  const rows = [
-    ["dock", "Oranje Dock", 48, 30, 110],
-    ["line", "Havenport Lines", 36, 16, 80],
-    ["seam", "Coalport Seam", 22, 8, 60],
-    ["grange", "Grange and Grain", 31, 12, 70],
-    ["ord", "Ordnance Works", 64, 28, 140],
-    ["press", "Evening Press", 18, 6, 50],
-    ["isle", "Salt Isle Fisheries", 27, 10, 64],
-    ["silv", "Kestrel Silver", 41, 14, 96]
-  ];
-  if(!M.stocks || M.stocks.length < 8 || !M.stocks[0].band){
+  if(!M.stocks || M.stocks.length < 8 || !M.stocks[0].ticker){
     const prev = {};
     (M.stocks || []).forEach(function(s){ prev[s.k] = s; });
-    M.stocks = rows.map(function(r){
-      const old = prev[r[0]] || {};
-      return {k:r[0], t:r[1], px:old.px || r[2], own:old.own || 0, vol:old.vol || 0, hist:old.hist || [r[2]], lo:r[3], hi:r[4], open:old.open || r[2]};
+    M.stocks = ONUM_STOCK_SPEC.map(function(sp){
+      const old = prev[sp.k] || {};
+      const px = isFinite(old.px) ? old.px : sp.base;
+      const hist = (Array.isArray(old.hist) && old.hist.length ? old.hist.slice(-24) : [px]);
+      return {
+        k:sp.k, ticker:sp.ticker, t:sp.t, sector:sp.sector,
+        px:px, prev:old.prev != null ? old.prev : px, open:old.open || sp.base,
+        own:old.own || 0, vol:old.vol || 0,
+        hist:hist,
+        candles:(Array.isArray(old.candles) && old.candles.length ? old.candles.slice(-30) : onumSeedCandles(sp.k, hist, px, sp.lo, sp.hi, G.day || 1, old.vol || 12)),
+        lo:sp.lo, hi:sp.hi,
+        chief:old.chief || null, rev:old.rev || null, debt:old.debt || null,
+        lastWhy:old.lastWhy || "", drivers:old.drivers || []
+      };
     });
   }
-  M.stocks.forEach(function(s){ s.band = 1; });
+  M.stocks.forEach(function(s, idx){
+    const sp = ONUM_STOCK_SPEC[idx] || {};
+    s.band = 1;
+    if(!s.ticker && sp.ticker) s.ticker = sp.ticker;
+    if(!s.sector && sp.sector) s.sector = sp.sector;
+    if(sp.hi && s.hi < sp.hi) s.hi = sp.hi;
+    if(sp.lo && s.lo > sp.lo) s.lo = sp.lo;
+    if(s.prev == null) s.prev = s.px;
+    if(!Array.isArray(s.candles) || !s.candles.length){
+      s.candles = onumSeedCandles(s.k, s.hist, s.px, s.lo || sp.lo || 4, s.hi || sp.hi || 200, G.day || 1, s.vol || 12);
+    }
+    if(s.candles.length > 30) s.candles = s.candles.slice(-30);
+    if(Array.isArray(s.hist) && s.hist.length > 24) s.hist = s.hist.slice(-24);
+  });
   return M.stocks;
 }
-function onumShareMove(){
+function onumShareMove(reason){
   const M = onumMkt();
-  const g = (typeof guilderIndex === "function" ? guilderIndex() : 100);
-  const pull = (g - 100) / 100;
+  const E = onumEconSignals();
+  const gFactor = Math.max(0.65, Math.min(1.65, 0.8 + (E.g - 100) / 260));
+  const indPull = (E.avgInd - 55) / 140;
+  const unrestDrag = Math.max(0, (E.avgUnrest - 30) / 180);
+  const heatPull = (E.worldHeat - 40) / 160;
+  const treasPull = Math.max(-0.08, Math.min(0.08, E.treasuryDelta / 300));
+  const billAxis = (G.bill && !G.bill.done && typeof onumBillAxis === "function") ? onumBillAxis(G.bill) : "";
+  const billDir = (G.bill && !G.bill.done && G.bill.pos && billAxis) ? (G.bill.pos[billAxis] || 0) : 0;
+  let dayVol = 0;
+
   onumShareBook().forEach(function(s, i){
-    const salt = Math.abs(seedOf("sh:" + s.k + ":" + (G.day || 1) + ":" + Math.floor((G.minute || 0) / 3)));
-    const j = ((salt % 100) - 48) / 100;
-    const next = Math.round(Math.max(s.lo, Math.min(s.hi, s.px * (1 + j * 0.03 + pull * 0.01))) * 10) / 10;
+    const sp = ONUM_STOCK_SPEC[i] || {base:s.open || 30};
+    let mult = gFactor;
+    const drivers = [];
+    if(s.k === "dock"){
+      if(E.worldWar === "strait" || !E.convoy){ mult -= 0.12; drivers.push("Strait/convoy disruption hurts shipping"); }
+      if(E.tariffs > 0){ mult -= Math.min(0.14, E.tariffs * 0.035); drivers.push(E.tariffs + " tariff(s) slow port cargo"); }
+      if(E.shopSales > 0){ mult += Math.min(0.06, E.shopSales * 0.002); drivers.push("Retail goods volume lifts port traffic"); }
+    } else if(s.k === "line"){
+      mult += indPull * 0.85 + treasPull * 0.6;
+      if(E.avgInd >= 58) drivers.push("Industrial output (" + Math.round(E.avgInd) + ") boosts freight");
+      if(billAxis === "econ" && billDir > 15){ mult += 0.06; drivers.push("Pro-growth floor bill lifts rail outlook"); }
+      if(unrestDrag > 0.08){ mult -= unrestDrag * 0.4; drivers.push("State unrest slows rail lines"); }
+    } else if(s.k === "seam"){
+      mult += indPull * 0.55 - unrestDrag * 0.9;
+      if(E.worldSeason === "winter" || E.worldWar === "frost"){ mult += 0.12; drivers.push("Winter/frost lifts coal demand"); }
+      if(E.avgUnrest > 45) drivers.push("Pit unrest (" + Math.round(E.avgUnrest) + ") weighs on seams");
+    } else if(s.k === "grange"){
+      const breadLift = (E.breadPrice - 1.3) * 0.14;
+      mult += breadLift;
+      if(E.ration || E.worldWar === "grain"){ mult += 0.11; drivers.push("Tight grain supply lifts farm prices"); }
+      if(billAxis === "wel" && billDir > 15){ mult += 0.05; drivers.push("Relief measure supports grain book"); }
+    } else if(s.k === "ord"){
+      mult += Math.max(-0.06, heatPull * 0.9);
+      if(E.worldHeat >= 50 || E.worldWar === "fire" || E.worldWar === "levy" || G.conflict){
+        mult += 0.12;
+        drivers.push("Heightened tension (heat " + Math.round(E.worldHeat) + ") drives defense orders");
+      }
+      if(billAxis === "def" && billDir > 15){ mult += 0.07; drivers.push("Defense bill bids up works"); }
+    } else if(s.k === "press"){
+      const buzz = (E.events.length * 0.03) + unrestDrag * 0.5 + (G.bill && !G.bill.done ? 0.04 : 0);
+      mult += buzz;
+      if(E.events.length) drivers.push("Active public events (" + E.events.length + ") sell editions");
+    } else if(s.k === "isle"){
+      const isleRel = (E.rels && E.rels.isles) || 0;
+      mult += isleRel / 420;
+      if(E.worldWar === "strait" || !E.convoy){ mult -= 0.09; drivers.push("Sea lane delays squeeze catches"); }
+      else if(isleRel >= 10) drivers.push("Steady Salt Isles waters");
+    } else if(s.k === "silv"){
+      const hedge = (100 - E.g) / 240 + Math.max(0, heatPull * 0.6) - treasPull * 0.8;
+      mult += hedge;
+      if(E.g < 100) drivers.push("Guilder below par lifts silver hedge");
+      else if(E.worldHeat > 55) drivers.push("Conflict risk drives flight to bullion");
+      else drivers.push("Treasury & bullion steady");
+    }
+    if(reason && typeof reason === "string" && !drivers.length) drivers.push(reason);
+    if(!drivers.length) drivers.push("Guilder at " + E.g.toFixed(1) + ", industry " + Math.round(E.avgInd));
+
+    const salt = Math.abs(seedOf("sh:" + s.k + ":" + (G.day || 1) + ":" + Math.floor((G.minute || 0) / 3) + ":" + Math.round(E.worldHeat) + ":" + E.tariffs));
+    const pulse = ((salt % 41) - 20) / 1000;
+    const fundamental = sp.base * Math.max(0.55, Math.min(2.1, mult));
+    const blended = s.px * 0.62 + fundamental * 0.38;
+    const next = Math.round(Math.max(s.lo, Math.min(s.hi, blended * (1 + pulse))) * 10) / 10;
+
+    s.prev = s.px;
     s.px = next;
+    s.delta = Math.round((next - s.prev) * 10) / 10;
+    s.dayDelta = Math.round((next - (s.open || sp.base)) * 10) / 10;
+    s.drivers = drivers.slice(0, 3);
+    s.lastWhy = "Day " + (G.day || 1) + ": " + s.drivers[0] + " (" + s.prev + " -> " + s.px + ").";
     s.hist = s.hist || [];
     s.hist.push(next);
     if(s.hist.length > 24) s.hist.shift();
+    const tickVol = 1 + (salt % 4);
+    dayVol += tickVol;
+    s.candles = onumPushCandle(s.candles, s.k, s.prev, next, s.lo, s.hi, G.day || 1, tickVol);
     s.bid = Math.round(next * 0.99 * 10) / 10;
     s.ask = Math.round(next * 1.015 * 10) / 10;
-    if(i === 0){ /* grain follows the dock a little, not the other way */ }
   });
+  M.gCandles = onumPushCandle(onumGuilderCandles(E), "UGL", E.gPrev, E.g, 42, 190, G.day || 1, Math.max(1, dayVol));
   try{
     Object.keys(ONUM_BOOK).forEach(function(k){
       if(M.px[k] == null) M.px[k] = ONUM_BOOK[k];
       const salt = Math.abs(seedOf("bk:" + k + ":" + (G.day || 1))) % 100;
       const base = ONUM_BOOK[k];
-      M.px[k] = Math.round(base * (0.86 + salt / 220) * (g / 100) * 10) / 10;
+      M.px[k] = Math.round(base * (0.86 + salt / 220) * (E.g / 100) * 10) / 10;
     });
   }catch(e){}
+  const fx = onumCurrencyRates(E);
+  try{ window.dispatchEvent(new CustomEvent("onum-market", {detail:{day:G.day || 1, guilder:E.g, reason:reason || "tick"}})); }catch(e){}
+  return {econ:E, currencies:fx, stocks:onumShareBook()};
 }
-onumTrade = function(k, side){
+onumTrade = function(k, side, qty){
   onumSaneMoney();
-  const s = onumShareBook().find(function(x){ return x.k === k; });
+  const n = Math.max(1, Math.floor(Number(qty) || 1));
+  const s = onumShareBook().find(function(x){ return x.k === k || x.ticker === k; });
   const y = G.you;
   if(!s || !y) return "The book is closed.";
   const P = purseOf(y);
-  const px = side === "buy" ? (s.ask || s.px) : (s.bid || s.px);
+  const unitPx = side === "buy" ? (s.ask || s.px) : (s.bid || s.px);
+  const totalPx = Math.round(unitPx * n * 100) / 100;
   if(side === "buy"){
-    if(P.cash < px) return "The purse has " + onumCoin(P.cash) + ". " + s.t + " is asked at " + onumCoin(px) + ". The campaign chest is not this money.";
-    P.cash = Math.round((P.cash - px) * 100) / 100;
-    s.own = (s.own || 0) + 1;
-    s.vol = (s.vol || 0) + 1;
-    purseLog(y, "Bought " + s.t, -px);
-    try{ purseChip(); }catch(e){}
-    return "Bought one " + s.t + " at " + onumCoin(px) + ". You hold " + s.own + ". The purse has " + onumCoin(P.cash) + ".";
+    if(P.cash < totalPx) return "Your savings hold " + onumCoin(P.cash) + ". " + n + "x " + s.t + " asks " + onumCoin(totalPx) + ". The campaign chest is not this money.";
+    P.cash = Math.round((P.cash - totalPx) * 100) / 100;
+    P.spent = Math.round(((P.spent || 0) + totalPx) * 100) / 100;
+    s.own = (s.own || 0) + n;
+    s.vol = (s.vol || 0) + n;
+    s.candles = onumPushCandle(s.candles, s.k, s.prev != null ? s.prev : s.px, s.px, s.lo, s.hi, G.day || 1, n);
+    purseLog(y, "Bought " + n + " " + s.t, -totalPx);
+    try{ purseChip(); dnPublishHome(); }catch(e){}
+    const M = onumMkt(); M.tape = M.tape || [];
+    M.tape.unshift("Day " + (G.day || 1) + " · Bought " + n + " " + s.ticker + " at " + onumCoin(unitPx));
+    if(M.tape.length > 12) M.tape.pop();
+    try{ window.dispatchEvent(new CustomEvent("onum-market", {detail:{day:G.day || 1, trade:k, side:"buy", qty:n}})); }catch(e){}
+    return "Bought " + n + " " + s.t + " at " + onumCoin(unitPx) + ". You hold " + s.own + ". Savings left: " + onumCoin(P.cash) + ".";
   }
-  if(!s.own) return "You do not hold " + s.t + ".";
-  s.own -= 1;
-  s.vol = (s.vol || 0) + 1;
-  P.cash = Math.round((P.cash + px) * 100) / 100;
-  purseLog(y, "Sold " + s.t, px);
-  try{ purseChip(); }catch(e){}
-  return "Sold one " + s.t + " at " + onumCoin(px) + ". The purse has " + onumCoin(P.cash) + ".";
+  if((s.own || 0) < n) return "You only hold " + (s.own || 0) + " of " + s.t + ".";
+  s.own -= n;
+  s.vol = (s.vol || 0) + n;
+  s.candles = onumPushCandle(s.candles, s.k, s.prev != null ? s.prev : s.px, s.px, s.lo, s.hi, G.day || 1, n);
+  P.cash = Math.round((P.cash + totalPx) * 100) / 100;
+  purseLog(y, "Sold " + n + " " + s.t, totalPx);
+  try{ purseChip(); dnPublishHome(); }catch(e){}
+  const M = onumMkt(); M.tape = M.tape || [];
+  M.tape.unshift("Day " + (G.day || 1) + " · Sold " + n + " " + s.ticker + " at " + onumCoin(unitPx));
+  if(M.tape.length > 12) M.tape.pop();
+  try{ window.dispatchEvent(new CustomEvent("onum-market", {detail:{day:G.day || 1, trade:k, side:"sell", qty:n}})); }catch(e){}
+  return "Sold " + n + " " + s.t + " at " + onumCoin(unitPx) + ". Savings left: " + onumCoin(P.cash) + ".";
 };
-function onumTickSpark(hist, w, h){   /* 20261124a JUPITER: was a second onumSpark; the guilder and tape sparks keep the first */
+function onumTickSpark(hist, w, h){   /* 20261124a JUPITER: kept for onumElectBody; exchange card stays data-driven without SVG/canvas */
   const a = (hist || []).slice(-16);
   if(a.length < 2) return "";
   const lo = Math.min.apply(null, a), hi = Math.max.apply(null, a);
@@ -64482,29 +64761,49 @@ function onumTickSpark(hist, w, h){   /* 20261124a JUPITER: was a second onumSpa
   const up = a[a.length - 1] >= a[0];
   return '<svg width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '" style="display:block"><polyline fill="none" stroke="' + (up ? "#2f6b45" : "#8a3030") + '" stroke-width="2" points="' + pts + '"/></svg>';
 }
+function onumPhoneMarketHTML(){
+  try{ onumSaneMoney(); }catch(e){}
+  const snap = window.ONUM && window.ONUM.market ? window.ONUM.market.snapshot() : null;
+  if(!snap) return "<p>Market unavailable.</p>";
+  const P = purseOf(G.you);
+  const msg = (typeof PB !== "undefined" && PB._mktMsg) ? '<div class="pb__row"><span><small>' + pbEsc(PB._mktMsg) + '</small></span></div>' : "";
+  const fx = snap.currencies.map(c =>
+    '<div class="pb__row"><span><b>' + pbEsc(c.code) + '</b> ' + pbEsc(c.name) + '<br><small>' + pbEsc(c.driver) + '</small></span><span><b>' + c.rateInGuilders.toFixed(2) + ' ƒ</b><br><small>' + (c.delta >= 0 ? "+" : "") + c.delta.toFixed(3) + '</small></span></div>'
+  ).join("");
+  const rows = snap.stocks.map(st =>
+    '<div class="pb__row"><span><b>' + pbEsc(st.ticker) + '</b> ' + pbEsc(st.name) + ' · ' + st.px.toFixed(1) + 'ƒ (' + (st.delta >= 0 ? "+" : "") + st.delta.toFixed(1) + ')<br><small>You: ' + st.own + ' · ' + pbEsc((st.drivers && st.drivers[0]) || st.sector) + '</small></span><span><button data-pbtk="b:' + st.k + '">Buy</button> <button data-pbtk="s:' + st.k + '">Sell</button></span></div>'
+  ).join("");
+  return '<div class="pb__h">Union Guilder · ' + snap.guilder.index.toFixed(1) + ' (' + (snap.guilder.delta >= 0 ? "+" : "") + snap.guilder.delta.toFixed(1) + ')</div>' +
+    '<p><small>Savings: ' + onumCoin(P.cash) + ' · Holdings: ' + onumCoin(snap.portfolio.holdingsValue) + '</small></p>' +
+    msg +
+    '<div class="pb__h">Currency Ticker</div>' + fx +
+    '<div class="pb__h">Stock Exchange</div>' + rows +
+    '<div class="pb__row"><button data-pbapp="soc-mkt">Open exchange sheet</button></div>';
+}
 onumMarketCard = function(){
   onumSaneMoney();
-  onumShareMove();
+  const snap = (window.ONUM && window.ONUM.market) ? window.ONUM.market.snapshot(true) : null;
   const M = onumMkt();
-  const g = (typeof guilderIndex === "function" ? guilderIndex() : 100);
   const P = purseOf(G.you);
-  const stocks = onumShareBook();
-  let hold = 0;
-  stocks.forEach(function(s){ hold += (s.own || 0) * (s.bid || s.px); });
+  const stocks = snap ? snap.stocks : onumShareBook();
+  const fx = snap ? snap.currencies : onumCurrencyRates();
+  const g = snap ? snap.guilder.index : (typeof guilderIndex === "function" ? guilderIndex() : 100);
+  const hold = snap ? snap.portfolio.holdingsValue : 0;
+  const fxRows = fx.map(function(c){
+    return "<div><b>" + onumEsc(c.code) + "</b> " + onumEsc(c.name) + " · <b>" + c.rateInGuilders.toFixed(3) + " ƒ</b> <span class=\"muted\">(" + (c.delta >= 0 ? "+" : "") + c.delta.toFixed(3) + " · " + onumEsc(c.driver) + ")</span></div>";
+  }).join("");
   const rows = stocks.map(function(s){
-    const ch = (s.hist && s.hist.length > 1) ? Math.round((s.px - s.hist[0]) * 10) / 10 : 0;
-    return '<div style="display:grid;grid-template-columns:1fr 92px;gap:8px;margin:8px 0;padding-bottom:6px;border-bottom:1px solid var(--line-soft)">' +
-      '<div><b>' + onumEsc(s.t) + '</b> <span class="muted">last ' + onumCoin(s.px) + ' · bid ' + onumCoin(s.bid || s.px) + ' · ask ' + onumCoin(s.ask || s.px) + ' · ' + (ch >= 0 ? "+" : "") + ch + ' · vol ' + (s.vol || 0) + ' · you ' + (s.own || 0) + '</span>' +
-      '<div class="card__actions"><button type="button" class="btn" data-stk="b:' + s.k + '">Buy the ask</button><button type="button" class="btn btn--ghost" data-stk="s:' + s.k + '">Sell the bid</button></div></div>' +
-      '<div>' + onumTickSpark(s.hist, 92, 36) + '</div></div>';
+    const d = s.delta != null ? s.delta : 0;
+    return '<div style="margin:6px 0;padding-bottom:6px;border-bottom:1px solid var(--line-soft)"><div><b>' + onumEsc(s.ticker || s.k) + " · " + onumEsc(s.name || s.t) + '</b> <span class="muted">· last ' + onumCoin(s.px) + ' · bid ' + onumCoin(s.bid || s.px) + ' · ask ' + onumCoin(s.ask || s.px) + ' · ' + (d >= 0 ? "+" : "") + d + ' · you ' + (s.own || 0) + '</span></div><div class="muted" style="font-size:12px">' + onumEsc((s.drivers && s.drivers[0]) || s.lastWhy || s.sector || "") + '</div><div class="card__actions"><button type="button" class="btn" data-stk="b:' + s.k + '">Buy the ask</button><button type="button" class="btn btn--ghost" data-stk="s:' + s.k + '">Sell the bid</button></div></div>';
   }).join("");
   const book = Object.keys(M.px || {}).map(function(k){
     return "<div>" + onumEsc(k) + " · " + onumCoin(M.px[k]) + "</div>";
   }).join("");
-  govCardOpen("The exchange", "A book with a bid and an ask", "You pay from the purse, in guilders. A loaf is not a share, and a share is not seventy of everything. The campaign chest stays out of this.",
-    "<p>Guilder index <b>" + g.toFixed(1) + "</b>. Purse <b>" + onumCoin(P.cash) + "</b>. Shares marked at the bid: <b>" + onumCoin(hold) + "</b>.</p>" +
-    '<div class="eyebrow">The tape</div>' + rows +
-    '<div class="eyebrow">What a shop actually charges</div>' + book +
+  govCardOpen("The exchange", "Stock market & currency ticker", "Paid from your own savings in guilders. Tied to the Union economy, tariffs, treasury, and world events.",
+    "<p>Guilder index <b>" + g.toFixed(1) + "</b>. Your savings <b>" + onumCoin(P.cash) + "</b>. Holdings at bid <b>" + onumCoin(hold) + "</b>.</p>" +
+    '<div class="eyebrow">Currency ticker</div>' + fxRows +
+    '<div class="eyebrow">Listed shares</div>' + rows +
+    '<div class="eyebrow">Shared price books</div>' + book +
     '<div class="dream" id="mktSay"></div>', null);
   card.querySelectorAll("[data-stk]").forEach(function(btn){
     btn.addEventListener("click", function(){
@@ -64514,6 +64813,116 @@ onumMarketCard = function(){
     });
   });
 };
+try{
+  window.ONUM = window.ONUM || {};
+  const cloneCandles = function(rows, opts){
+    const arr = (rows || []).map(function(r){ return {d:r.d, o:r.o, h:r.h, l:r.l, c:r.c, v:r.v}; });
+    const lim = opts && Number(opts.limit) > 0 ? Math.floor(Number(opts.limit)) : 0;
+    return lim ? arr.slice(-lim) : arr;
+  };
+  const mktBuild = function(doMove, reason){
+    onumSaneMoney();
+    const res = doMove ? onumShareMove(reason) : null;
+    const econ = res ? res.econ : onumEconSignals();
+    const currencies = res ? res.currencies : onumCurrencyRates(econ);
+    const M = onumMkt();
+    const P = purseOf(G.you);
+    const gCandles = cloneCandles(onumGuilderCandles(econ));
+    const stocks = onumShareBook().map(function(s){
+      const d = s.delta != null ? s.delta : Math.round((s.px - (s.prev != null ? s.prev : s.px)) * 10) / 10;
+      const pct = s.prev ? Math.round((d / s.prev) * 1000) / 10 : 0;
+      return {
+        k:s.k, ticker:s.ticker, name:s.t, sector:s.sector,
+        px:s.px, open:s.open || s.px, prev:s.prev != null ? s.prev : s.px,
+        bid:s.bid || Math.round(s.px * 0.99 * 10) / 10,
+        ask:s.ask || Math.round(s.px * 1.015 * 10) / 10,
+        delta:d, pct:pct, own:s.own || 0, vol:s.vol || 0, lo:s.lo, hi:s.hi,
+        chief:s.chief || null, rev:s.rev || null, debt:s.debt || null,
+        lastWhy:s.lastWhy || "", drivers:(s.drivers || []).slice(),
+        hist:(s.hist || []).slice(),
+        candles:cloneCandles(s.candles)
+      };
+    });
+    const holdingsValue = Math.round(stocks.reduce(function(a, s){ return a + s.own * s.bid; }, 0) * 100) / 100;
+    const totalShares = stocks.reduce(function(a, s){ return a + s.own; }, 0);
+    return {
+      day:G.day || 1,
+      minute:Math.round((G.minute || 0) * 10) / 10,
+      guilder:{
+        code:"UGL", symbol:"ƒ", name:"Union Guilder",
+        index:econ.g, prev:econ.gPrev, delta:econ.gDelta,
+        pct:econ.gPrev ? Math.round((econ.gDelta / econ.gPrev) * 1000) / 10 : 0,
+        stance:econ.g > 110 ? "strong" : econ.g < 92 ? "weak" : "steady",
+        hist:((G.money && G.money.hist) || [econ.g]).slice(-40),
+        candles:gCandles
+      },
+      currencies:currencies,
+      stocks:stocks,
+      economy:econ,
+      events:econ.events,
+      portfolio:{
+        savings:Math.round((P.cash || 0) * 100) / 100,
+        chestExcluded:true,
+        holdingsValue:holdingsValue,
+        totalShares:totalShares,
+        positions:stocks.filter(function(s){ return s.own > 0; }).map(function(s){ return {k:s.k, ticker:s.ticker, name:s.name, own:s.own, bid:s.bid, value:Math.round(s.own * s.bid * 100) / 100}; })
+      },
+      tape:(M.tape || []).slice()
+    };
+  };
+  window.ONUM.market = {
+    snapshot:function(refresh){ return mktBuild(!!refresh, refresh ? "snapshot" : null); },
+    ticker:function(){
+      const snap = mktBuild(false);
+      const sorted = snap.stocks.slice().sort(function(a, b){ return Math.abs(b.delta) - Math.abs(a.delta); });
+      const topGainer = snap.stocks.slice().sort(function(a, b){ return b.delta - a.delta; })[0] || null;
+      const topLoser = snap.stocks.slice().sort(function(a, b){ return a.delta - b.delta; })[0] || null;
+      const fxText = snap.currencies.slice(0, 3).map(function(c){ return c.code + " " + c.rateInGuilders.toFixed(2); }).join(" · ");
+      return {
+        day:snap.day,
+        guilder:snap.guilder,
+        currencies:snap.currencies,
+        movers:sorted.slice(0, 4),
+        topGainer:topGainer,
+        topLoser:topLoser,
+        events:snap.events,
+        text:"UGL " + snap.guilder.index.toFixed(1) + " (" + (snap.guilder.delta >= 0 ? "+" : "") + snap.guilder.delta.toFixed(1) + ") · " + fxText
+      };
+    },
+    stocks:function(){ return mktBuild(false).stocks; },
+    candles:function(kOrTicker, opts){
+      const snap = mktBuild(false);
+      if(kOrTicker == null || kOrTicker === ""){
+        const byStock = {};
+        snap.stocks.forEach(function(st){ byStock[st.k] = cloneCandles(st.candles, opts); });
+        return {guilder:cloneCandles(snap.guilder.candles, opts), byStock:byStock};
+      }
+      const key = String(kOrTicker).trim();
+      if(/^ugl$/i.test(key) || /^guilder$/i.test(key)) return cloneCandles(snap.guilder.candles, opts);
+      const low = key.toLowerCase();
+      const st = snap.stocks.find(function(x){ return x.k === low || (x.ticker && x.ticker.toLowerCase() === low); });
+      return st ? cloneCandles(st.candles, opts) : [];
+    },
+    currencies:function(){ return mktBuild(false).currencies; },
+    economy:function(){ return mktBuild(false).economy; },
+    events:function(){ return mktBuild(false).events; },
+    tick:function(reason){ return mktBuild(true, reason || "manual"); },
+    trade:function(k, side, qty){
+      const msg = onumTrade(k, side, qty);
+      const snap = mktBuild(false);
+      const st = snap.stocks.find(function(x){ return x.k === k || x.ticker === k; }) || null;
+      const ok = /^Bought |^Sold /.test(msg);
+      return {ok:ok, msg:msg, k:st ? st.k : k, side:side, qty:Math.max(1, Math.floor(Number(qty) || 1)), own:st ? st.own : 0, savings:snap.portfolio.savings};
+    },
+    openCard:function(){ return onumMarketCard(); },
+    openPhoneTicker:function(){
+      if(typeof PB !== "undefined") PB.tab = "mkt";
+      if(typeof pbOpen === "function") pbOpen();
+      return !!document.getElementById("pbTicker");
+    }
+  };
+  window.ONUM.ticker = function(){ return window.ONUM.market.ticker(); };
+}catch(e){}
 
 function onumLead(salt, facts){
   const banks = [
